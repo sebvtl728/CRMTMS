@@ -5,6 +5,7 @@ export interface Auth {
     can: {
         manageUsers: boolean;
         viewAudit: boolean;
+        manageCompanies: boolean;
     };
 }
 

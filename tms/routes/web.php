@@ -18,3 +18,4 @@ require __DIR__.'/auth.php';
 require __DIR__.'/users.php';
 require __DIR__.'/two-factor.php';
 require __DIR__.'/audit.php';
+require __DIR__.'/companies.php';

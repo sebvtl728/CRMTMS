@@ -3,6 +3,9 @@
 namespace App\Modules\Core\Platform;
 
 use App\Modules\Core\Access\RoleSeeder;
+use App\Modules\Core\Companies\Company;
+use App\Modules\Core\Companies\LegalForm;
+use App\Modules\Core\Companies\VatRegime;
 use App\Modules\Core\Tenancy\Tenant;
 use App\Modules\Core\Tenancy\TenantContext;
 use App\Modules\Core\Tenancy\TenantDomain;
@@ -18,7 +21,9 @@ use InvalidArgumentException;
 final class TenantProvisioner
 {
     /**
-     * Creates tenant, domains and roles in ONE transaction. $within (optional)
+     * Creates tenant, domains, roles and the placeholder default company (named
+     * after the tenant, legal form « autre », no SIRET yet: completed in the
+     * administration) in ONE transaction. $within (optional)
      * runs inside that transaction, in the new tenant's context, so callers can
      * add tenant-scoped steps (admin, invitation...): any failure leaves nothing.
      *
@@ -28,7 +33,7 @@ final class TenantProvisioner
      *
      * @throws InvalidArgumentException when the slug or a domain is unusable
      */
-    public function create(string $name, ?string $slug = null, array $domains = [], ?callable $within = null): array
+    public function create(string $name, ?string $slug = null, array $domains = [], ?callable $within = null, bool $vatExempt = false): array
     {
         $slug = Str::slug($slug !== null && $slug !== '' ? $slug : $name);
         $hosts = array_values(array_unique(array_map(fn (string $h) => mb_strtolower(trim($h)), array_filter($domains))));
@@ -49,14 +54,23 @@ final class TenantProvisioner
         }
 
         try {
-            return DB::transaction(function () use ($name, $slug, $hosts, $within): array {
+            return DB::transaction(function () use ($name, $slug, $hosts, $within, $vatExempt): array {
                 $tenant = Tenant::create(['name' => $name, 'slug' => $slug]);
                 foreach ($hosts as $host) {
                     $tenant->domains()->create(['host' => $host]);
                 }
 
                 RoleSeeder::seedFor($tenant);
-                $result = $within !== null ? app(TenantContext::class)->run($tenant, fn () => $within($tenant)) : null;
+                $result = app(TenantContext::class)->run($tenant, function () use ($tenant, $within, $vatExempt) {
+                    Company::create([
+                        'name' => $tenant->name,
+                        'legal_form' => LegalForm::Autre,
+                        'vat_regime' => $vatExempt ? VatRegime::Exempt : VatRegime::Subject,
+                        'is_default' => true,
+                    ]);
+
+                    return $within !== null ? $within($tenant) : null;
+                });
 
                 return [$tenant->load('domains'), $result];
             });

@@ -15,7 +15,7 @@ use Throwable;
 
 /**
  * First installation: tenant, roles, administrator and activation link.
- * Later increments add their own steps (default company, reference data).
+ * Creates the placeholder default company too (see TenantProvisioner).
  */
 class TmsInstall extends Command
 {
@@ -23,7 +23,8 @@ class TmsInstall extends Command
         {--tenant-name= : Nom de l\'organisme}
         {--admin-email= : E-mail de l\'administrateur}
         {--admin-name= : Nom de l\'administrateur}
-        {--domain= : Nom de domaine de l\'organisme (mode multi)}';
+        {--domain= : Nom de domaine de l\'organisme (mode multi)}
+        {--vat-exempt : Société par défaut exonérée de TVA}';
 
     protected $description = 'Initialise l\'application : organisme, administrateur et lien d\'activation';
 
@@ -58,6 +59,7 @@ class TmsInstall extends Command
 
                     return Invitation::issue($email, $adminName, Role::AdminOrganisme);
                 },
+                (bool) $this->option('vat-exempt'),
             );
         } catch (InvalidArgumentException $e) {
             $this->error($e->getMessage());

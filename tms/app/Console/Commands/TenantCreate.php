@@ -8,9 +8,9 @@ use InvalidArgumentException;
 
 class TenantCreate extends Command
 {
-    protected $signature = 'tms:tenant:create {name : Nom de l\'organisme} {--slug= : Identifiant (par défaut dérivé du nom)} {--domain=* : Nom de domaine (répétable)}';
+    protected $signature = 'tms:tenant:create {name : Nom de l\'organisme} {--slug= : Identifiant (par défaut dérivé du nom)} {--domain=* : Nom de domaine (répétable)} {--vat-exempt : Société par défaut exonérée de TVA}';
 
-    protected $description = 'Crée un organisme (tenant) avec ses domaines et ses rôles';
+    protected $description = 'Crée un organisme (tenant) avec ses domaines, ses rôles et sa société par défaut';
 
     public function handle(TenantProvisioner $provisioner): int
     {
@@ -19,6 +19,8 @@ class TenantCreate extends Command
                 (string) $this->argument('name'),
                 $this->option('slug') ?: null,
                 (array) $this->option('domain'),
+                null,
+                (bool) $this->option('vat-exempt'),
             );
         } catch (InvalidArgumentException $e) {
             $this->error($e->getMessage());

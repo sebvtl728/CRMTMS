@@ -4,7 +4,7 @@ import { NavUser } from '@/components/nav-user';
 import { Sidebar, SidebarContent, SidebarFooter, SidebarHeader, SidebarMenu, SidebarMenuButton, SidebarMenuItem } from '@/components/ui/sidebar';
 import { type NavItem, type SharedData } from '@/types';
 import { Link, usePage } from '@inertiajs/react';
-import { BookOpen, Folder, History, LayoutGrid, Users } from 'lucide-react';
+import { BookOpen, Folder, Building2, History, LayoutGrid, Users } from 'lucide-react';
 import AppLogo from './app-logo';
 
 const mainNavItems: NavItem[] = [
@@ -29,11 +29,12 @@ const footerNavItems: NavItem[] = [
 ];
 
 const usersNavItem: NavItem = { title: 'Utilisateurs', url: '/admin/users', icon: Users };
+const companiesNavItem: NavItem = { title: 'Sociétés', url: '/admin/companies', icon: Building2 };
 const auditNavItem: NavItem = { title: "Journal d'audit", url: '/admin/audit', icon: History };
 
 export function AppSidebar() {
     const { auth } = usePage<SharedData>().props;
-    const navItems = [...mainNavItems, ...(auth.can.manageUsers ? [usersNavItem] : []), ...(auth.can.viewAudit ? [auditNavItem] : [])];
+    const navItems = [...mainNavItems, ...(auth.can.manageUsers ? [usersNavItem] : []), ...(auth.can.manageCompanies ? [companiesNavItem] : []), ...(auth.can.viewAudit ? [auditNavItem] : [])];
 
     return (
         <Sidebar collapsible="icon" variant="inset">
