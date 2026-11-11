@@ -3,12 +3,14 @@
 namespace App\Console\Commands;
 
 use App\Modules\Core\Platform\TenantProvisioner;
+use App\Modules\Core\References\CapFormationReferenceSeeder;
+use App\Modules\Core\Tenancy\Tenant;
 use Illuminate\Console\Command;
 use InvalidArgumentException;
 
 class TenantCreate extends Command
 {
-    protected $signature = 'tms:tenant:create {name : Nom de l\'organisme} {--slug= : Identifiant (par défaut dérivé du nom)} {--domain=* : Nom de domaine (répétable)} {--vat-exempt : Société par défaut exonérée de TVA}';
+    protected $signature = 'tms:tenant:create {name : Nom de l\'organisme} {--slug= : Identifiant (par défaut dérivé du nom)} {--domain=* : Nom de domaine (répétable)} {--vat-exempt : Société par défaut exonérée de TVA} {--seed-cap : Charge les référentiels par défaut de CAP FORMATION}';
 
     protected $description = 'Crée un organisme (tenant) avec ses domaines, ses rôles et sa société par défaut';
 
@@ -19,7 +21,7 @@ class TenantCreate extends Command
                 (string) $this->argument('name'),
                 $this->option('slug') ?: null,
                 (array) $this->option('domain'),
-                null,
+                $this->option('seed-cap') ? fn (Tenant $tenant) => CapFormationReferenceSeeder::run($tenant) : null,
                 (bool) $this->option('vat-exempt'),
             );
         } catch (InvalidArgumentException $e) {

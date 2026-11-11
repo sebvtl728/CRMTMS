@@ -4,6 +4,7 @@ namespace App\Console\Commands;
 
 use App\Modules\Core\Access\Role;
 use App\Modules\Core\Platform\TenantProvisioner;
+use App\Modules\Core\References\CapFormationReferenceSeeder;
 use App\Modules\Core\Tenancy\Tenant;
 use App\Modules\Core\Users\Invitation;
 use App\Modules\Core\Users\InvitationNotification;
@@ -24,7 +25,8 @@ class TmsInstall extends Command
         {--admin-email= : E-mail de l\'administrateur}
         {--admin-name= : Nom de l\'administrateur}
         {--domain= : Nom de domaine de l\'organisme (mode multi)}
-        {--vat-exempt : Société par défaut exonérée de TVA}';
+        {--vat-exempt : Société par défaut exonérée de TVA}
+        {--seed-cap : Charge les référentiels par défaut de CAP FORMATION}';
 
     protected $description = 'Initialise l\'application : organisme, administrateur et lien d\'activation';
 
@@ -54,8 +56,11 @@ class TmsInstall extends Command
                 $name,
                 null,
                 $domain !== '' ? [$domain] : [],
-                function () use ($email, $adminName): Invitation {
+                function (Tenant $tenant) use ($email, $adminName): Invitation {
                     $this->createAdmin($email, $adminName);
+                    if ($this->option('seed-cap')) {
+                        CapFormationReferenceSeeder::run($tenant);
+                    }
 
                     return Invitation::issue($email, $adminName, Role::AdminOrganisme);
                 },
