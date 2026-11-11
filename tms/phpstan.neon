@@ -9,3 +9,5 @@ parameters:
         - config
         - routes
         - database
+        # Fixtures use the tenancy traits (BelongsToTenant, TenantAwareJob) so they get analysed.
+        - tests/Fixtures

@@ -15,6 +15,9 @@ docker compose run --rm vite sh -c "npm ci && npm run build"
 docker compose exec app php artisan migrate --database=pgsql_owner
 ```
 
+Organisme par défaut (mode `TMS_MODE=single`, slug `TMS_DEFAULT_TENANT`) : `docker compose exec app php artisan db:seed`.
+En mode `multi`, l'organisme est trouvé par le nom d'hôte (table `tenant_domains`).
+
 Application : http://localhost:8080 — santé : http://localhost:8080/health
 
 ## Rôles PostgreSQL

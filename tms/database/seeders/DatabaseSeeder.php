@@ -3,6 +3,7 @@
 namespace Database\Seeders;
 
 use App\Models\User;
+use App\Modules\Core\Tenancy\Tenant;
 // use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
 
@@ -13,6 +14,12 @@ class DatabaseSeeder extends Seeder
      */
     public function run(): void
     {
+        // Default tenant for single mode (TMS_MODE=single).
+        Tenant::query()->firstOrCreate(
+            ['slug' => config('tms.default_tenant')],
+            ['name' => config('app.name')],
+        );
+
         // User::factory(10)->create();
 
         User::factory()->create([
