@@ -5,7 +5,6 @@ namespace App\Console\Commands;
 use App\Modules\Core\Access\Role;
 use App\Modules\Core\Platform\TenantProvisioner;
 use App\Modules\Core\Tenancy\Tenant;
-use App\Modules\Core\Tenancy\TenantContext;
 use App\Modules\Core\Users\Invitation;
 use App\Modules\Core\Users\InvitationNotification;
 use App\Modules\Core\Users\User;
@@ -28,7 +27,7 @@ class TmsInstall extends Command
 
     protected $description = 'Initialise l\'application : organisme, administrateur et lien d\'activation';
 
-    public function handle(TenantProvisioner $provisioner, TenantContext $context): int
+    public function handle(TenantProvisioner $provisioner): int
     {
         if (Tenant::query()->exists()) {
             $this->error('Installation déjà initialisée.');
@@ -48,19 +47,23 @@ class TmsInstall extends Command
 
         $domain = (string) $this->option('domain');
 
+        // Tenant, domain, roles, admin and invitation: all or nothing.
         try {
-            $tenant = $provisioner->create($name, null, $domain !== '' ? [$domain] : []);
+            [$tenant, $invitation] = $provisioner->create(
+                $name,
+                null,
+                $domain !== '' ? [$domain] : [],
+                function () use ($email, $adminName): Invitation {
+                    $this->createAdmin($email, $adminName);
+
+                    return Invitation::issue($email, $adminName, Role::AdminOrganisme);
+                },
+            );
         } catch (InvalidArgumentException $e) {
             $this->error($e->getMessage());
 
             return self::FAILURE;
         }
-
-        $invitation = $context->run($tenant, function () use ($email, $adminName): Invitation {
-            $this->createAdmin($email, $adminName);
-
-            return Invitation::issue($email, $adminName, Role::AdminOrganisme);
-        });
 
         $base = $domain !== '' ? 'https://'.mb_strtolower(trim($domain)) : rtrim((string) config('app.url'), '/');
         $url = $base.route('activation.show', $invitation->plainToken, false);

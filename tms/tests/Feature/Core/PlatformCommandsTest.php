@@ -7,7 +7,10 @@ use App\Modules\Core\Tenancy\TenantStatus;
 use App\Modules\Core\Users\Invitation;
 use App\Modules\Core\Users\InvitationNotification;
 use App\Modules\Core\Users\User;
+use Illuminate\Support\Facades\Artisan;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Notification;
+use Illuminate\Support\Str;
 
 /**
  * @return array<string, string>
@@ -133,4 +136,60 @@ it('install prints a usable activation url without a password', function () {
     $this->artisan('tms:install', installArgs())
         ->expectsOutputToContain('https://tms.example.org/activation/')
         ->assertSuccessful();
+});
+
+it('rejects malformed domains', function (string $bad) {
+    $this->artisan('tms:tenant:create', ['name' => 'Bad', '--slug' => 'bad', '--domain' => [$bad]])
+        ->expectsOutputToContain('Domaine invalide')
+        ->assertFailed();
+    expect(Tenant::where('slug', 'bad')->exists())->toBeFalse();
+
+    emptyPlatform();
+    $this->artisan('tms:install', installArgs() + ['--domain' => $bad])->assertFailed();
+    expect(Tenant::count())->toBe(0);
+})->with(['http://x.test', 'a b.test', 'cap.test/path', 'foo.test:8080', 'nodot', '-a.test', 'a..test', ' ']);
+
+it('accepts localhost and dotted hosts', function () {
+    $this->artisan('tms:tenant:create', ['name' => 'L', '--slug' => 'l', '--domain' => ['localhost', 'Sub.Cap-1.test']])
+        ->assertSuccessful();
+    expect(Tenant::where('slug', 'l')->first()->domains->pluck('host')->sort()->values()->all())
+        ->toBe(['localhost', 'sub.cap-1.test']);
+});
+
+it('install is atomic: a failure after the tenant leaves nothing and can be retried', function () {
+    emptyPlatform();
+    $fail = true;
+    Invitation::creating(function () use (&$fail) {
+        if ($fail) {
+            throw new RuntimeException('boom');
+        }
+    });
+
+    expect(fn () => Artisan::call('tms:install', installArgs()))->toThrow(RuntimeException::class);
+    expect(Tenant::count())->toBe(0);
+
+    $fail = false;
+    $this->artisan('tms:install', installArgs())->assertSuccessful();
+    expect(Tenant::count())->toBe(1);
+});
+
+it('tenant:create is atomic when role seeding fails', function () {
+    Tenant::created(fn () => throw new RuntimeException('boom'));
+
+    expect(fn () => Artisan::call('tms:tenant:create', ['name' => 'Z', '--slug' => 'zed']))->toThrow(RuntimeException::class);
+    expect(Tenant::where('slug', 'zed')->exists())->toBeFalse();
+});
+
+it('turns a concurrent unique violation into a French error', function () {
+    // Simulates a racing process: the conflicting row appears after the checks.
+    Tenant::creating(function () {
+        DB::table('tenants')->insert([
+            'id' => (string) Str::uuid(), 'name' => 'Racer', 'slug' => 'race', 'status' => 'active',
+            'settings' => '{}', 'created_at' => now(), 'updated_at' => now(),
+        ]);
+    });
+
+    $this->artisan('tms:tenant:create', ['name' => 'Race', '--slug' => 'race'])
+        ->expectsOutputToContain('déjà utilisé')
+        ->assertFailed();
 });

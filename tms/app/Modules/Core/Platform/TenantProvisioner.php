@@ -4,7 +4,9 @@ namespace App\Modules\Core\Platform;
 
 use App\Modules\Core\Access\RoleSeeder;
 use App\Modules\Core\Tenancy\Tenant;
+use App\Modules\Core\Tenancy\TenantContext;
 use App\Modules\Core\Tenancy\TenantDomain;
+use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use InvalidArgumentException;
@@ -16,17 +18,26 @@ use InvalidArgumentException;
 final class TenantProvisioner
 {
     /**
+     * Creates tenant, domains and roles in ONE transaction. $within (optional)
+     * runs inside that transaction, in the new tenant's context, so callers can
+     * add tenant-scoped steps (admin, invitation...): any failure leaves nothing.
+     *
      * @param  list<string>  $domains
+     * @param  (callable(Tenant): mixed)|null  $within
+     * @return array{0: Tenant, 1: mixed}
      *
      * @throws InvalidArgumentException when the slug or a domain is unusable
      */
-    public function create(string $name, ?string $slug = null, array $domains = []): Tenant
+    public function create(string $name, ?string $slug = null, array $domains = [], ?callable $within = null): array
     {
         $slug = Str::slug($slug !== null && $slug !== '' ? $slug : $name);
         $hosts = array_values(array_unique(array_map(fn (string $h) => mb_strtolower(trim($h)), array_filter($domains))));
 
         if ($slug === '') {
             throw new InvalidArgumentException('Le nom de l\'organisme ne permet pas de construire un identifiant (slug).');
+        }
+        foreach ($hosts as $host) {
+            self::assertHostname($host);
         }
         if (Tenant::query()->where('slug', $slug)->exists()) {
             throw new InvalidArgumentException("Un organisme avec l'identifiant « {$slug} » existe déjà.");
@@ -37,17 +48,36 @@ final class TenantProvisioner
             }
         }
 
-        $tenant = DB::transaction(function () use ($name, $slug, $hosts): Tenant {
-            $tenant = Tenant::create(['name' => $name, 'slug' => $slug]);
-            foreach ($hosts as $host) {
-                $tenant->domains()->create(['host' => $host]);
-            }
+        try {
+            return DB::transaction(function () use ($name, $slug, $hosts, $within): array {
+                $tenant = Tenant::create(['name' => $name, 'slug' => $slug]);
+                foreach ($hosts as $host) {
+                    $tenant->domains()->create(['host' => $host]);
+                }
 
-            return $tenant;
-        });
+                RoleSeeder::seedFor($tenant);
+                $result = $within !== null ? app(TenantContext::class)->run($tenant, fn () => $within($tenant)) : null;
 
-        RoleSeeder::seedFor($tenant);
+                return [$tenant->load('domains'), $result];
+            });
+        } catch (UniqueConstraintViolationException) {
+            // Concurrent creation between the checks above and the insert.
+            throw new InvalidArgumentException("Cet identifiant (« {$slug} ») ou l'un de ces domaines est déjà utilisé.");
+        }
+    }
 
-        return $tenant->load('domains');
+    /**
+     * Bare host name only (no scheme, port, path or spaces): either "localhost"
+     * or a dotted name whose labels are letters, digits and inner hyphens.
+     */
+    public static function assertHostname(string $host): void
+    {
+        $valid = strlen($host) <= 253
+            && ($host === 'localhost'
+                || preg_match('/^(?=.{1,253}$)([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$/', $host) === 1);
+
+        if (! $valid) {
+            throw new InvalidArgumentException("Domaine invalide : « {$host} ». Indiquez un nom d'hôte seul, sans schéma, port ni chemin (ex. cap.example.org).");
+        }
     }
 }

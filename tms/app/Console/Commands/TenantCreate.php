@@ -15,7 +15,7 @@ class TenantCreate extends Command
     public function handle(TenantProvisioner $provisioner): int
     {
         try {
-            $tenant = $provisioner->create(
+            [$tenant] = $provisioner->create(
                 (string) $this->argument('name'),
                 $this->option('slug') ?: null,
                 (array) $this->option('domain'),
