@@ -122,6 +122,22 @@ class User extends Authenticatable
     }
 
     /**
+     * Revokes every other session of the user after a security change (2FA
+     * enabled, disabled, new recovery codes): rotates the remember token and
+     * deletes the database session rows except $keepSessionId.
+     */
+    public function revokeOtherSessions(?string $keepSessionId): void
+    {
+        $this->forceFill(['remember_token' => Str::random(60)])->save();
+
+        DB::connection(config('session.connection'))
+            ->table(config('session.table', 'sessions'))
+            ->where('user_id', $this->getKey())
+            ->when($keepSessionId !== null, fn ($q) => $q->where('id', '!=', $keepSessionId))
+            ->delete();
+    }
+
+    /**
      * Primary role in the current tenant (one role per user in lot 1a), or
      * null for an account without role (it then has no permission).
      */

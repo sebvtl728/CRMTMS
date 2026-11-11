@@ -1,9 +1,11 @@
 <?php
 
+use App\Modules\Core\Users\TwoFactorAuthenticator;
 use App\Modules\Core\Users\User;
 use Database\Factories\UserFactory;
 use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 use Illuminate\Testing\TestResponse;
 use Inertia\Testing\AssertableInertia as Assert;
 
@@ -260,4 +262,76 @@ it('a user deactivated during the challenge cannot complete it', function () {
 
     $this->post('/two-factor-challenge', ['code' => totp($admin)])->assertRedirect('/login');
     $this->assertGuest();
+});
+
+// ---------------------------------------------------------------- fix round 1: concurrency and sessions
+
+it('a recovery code consumed through one instance is rejected through a stale one', function () {
+    $admin = admin(twoFactor: true);
+    $code = UserFactory::$lastRecoveryCodes[0];
+    $stale = User::query()->findOrFail($admin->id); // loaded before the first use, like a parallel request
+    $authenticator = app(TwoFactorAuthenticator::class);
+
+    expect($authenticator->useRecoveryCode($admin, $code))->toBeTrue()
+        ->and($authenticator->useRecoveryCode($stale, $code))->toBeFalse()
+        ->and($admin->fresh()->two_factor_recovery_codes)->toHaveCount(7);
+});
+
+it('two different recovery codes used through stale instances are both removed', function () {
+    $admin = admin(twoFactor: true);
+    [$first, $second] = UserFactory::$lastRecoveryCodes;
+    $one = User::query()->findOrFail($admin->id);
+    $two = User::query()->findOrFail($admin->id);
+    $authenticator = app(TwoFactorAuthenticator::class);
+
+    expect($authenticator->useRecoveryCode($one, $first))->toBeTrue()
+        ->and($authenticator->useRecoveryCode($two, $second))->toBeTrue();
+
+    $remaining = $admin->fresh()->two_factor_recovery_codes;
+    expect($remaining)->toHaveCount(6)
+        ->not->toContain(TwoFactorAuthenticator::hashRecoveryCode($first))
+        ->not->toContain(TwoFactorAuthenticator::hashRecoveryCode($second));
+});
+
+/**
+ * Inserts a database session row for $user (another browser).
+ */
+function otherSessionOf(User $user): string
+{
+    $id = Str::random(40);
+    DB::table('sessions')->insert(['id' => $id, 'user_id' => $user->id, 'payload' => '', 'last_activity' => time()]);
+
+    return $id;
+}
+
+it('enabling 2fa revokes the other sessions and the remember token', function () {
+    $admin = admin();
+    $this->actingAs($admin)->get('/two-factor/setup');
+    $admin->refresh();
+    $other = otherSessionOf($admin);
+    $token = $admin->remember_token;
+
+    $this->actingAs($admin)->post('/two-factor/confirm', ['code' => totp($admin)])->assertRedirect('/two-factor/setup');
+
+    expect(DB::table('sessions')->where('id', $other)->exists())->toBeFalse()
+        ->and($admin->fresh()->remember_token)->not->toBe($token);
+    $this->assertAuthenticatedAs($admin);
+});
+
+it('regenerating recovery codes and disabling 2fa revoke the other sessions', function () {
+    $commercial = commercial(twoFactor: true);
+    $other = otherSessionOf($commercial);
+    $token = $commercial->remember_token;
+
+    $this->actingAs($commercial)->withSession(['auth.password_confirmed_at' => time()])
+        ->post('/two-factor/recovery-codes')->assertRedirect('/two-factor/setup');
+
+    expect(DB::table('sessions')->where('id', $other)->exists())->toBeFalse()
+        ->and($commercial->fresh()->remember_token)->not->toBe($token);
+
+    $other = otherSessionOf($commercial);
+    $this->actingAs($commercial)->withSession(['auth.password_confirmed_at' => time()])
+        ->delete('/two-factor')->assertRedirect('/two-factor/setup');
+
+    expect(DB::table('sessions')->where('id', $other)->exists())->toBeFalse();
 });

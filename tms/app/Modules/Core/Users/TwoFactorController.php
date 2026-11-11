@@ -58,6 +58,7 @@ class TwoFactorController extends Controller
 
         // Security level of the session changed.
         $request->session()->regenerate();
+        $user->revokeOtherSessions($request->session()->getId());
 
         return to_route('two-factor.setup')
             ->with(self::RECOVERY_CODES_FLASH, $codes)
@@ -70,8 +71,11 @@ class TwoFactorController extends Controller
         $user = $request->user();
         abort_unless($user->hasTwoFactorEnabled(), 404);
 
+        $codes = $this->twoFactor->regenerateRecoveryCodes($user);
+        $user->revokeOtherSessions($request->session()->getId());
+
         return to_route('two-factor.setup')
-            ->with(self::RECOVERY_CODES_FLASH, $this->twoFactor->regenerateRecoveryCodes($user))
+            ->with(self::RECOVERY_CODES_FLASH, $codes)
             ->with('status', 'De nouveaux codes de récupération ont été générés ; les anciens ne fonctionnent plus.');
     }
 
@@ -82,6 +86,7 @@ class TwoFactorController extends Controller
         abort_if($this->twoFactor->isRequiredFor($user), 403, 'La double authentification est obligatoire pour votre compte.');
 
         $this->twoFactor->disable($user);
+        $user->revokeOtherSessions($request->session()->getId());
 
         return to_route('two-factor.setup')->with('status', 'La double authentification est désactivée.');
     }

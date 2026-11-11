@@ -9,6 +9,7 @@ use BaconQrCode\Renderer\ImageRenderer;
 use BaconQrCode\Renderer\RendererStyle\Fill;
 use BaconQrCode\Renderer\RendererStyle\RendererStyle;
 use BaconQrCode\Writer;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use PragmaRX\Google2FA\Google2FA;
 
@@ -121,23 +122,43 @@ class TwoFactorAuthenticator
     }
 
     /**
-     * Uses (and removes) a recovery code.
+     * Uses (and removes) a recovery code. The codes are re-read from the row
+     * locked for update, so concurrent requests never both use the same code
+     * nor write back a list that resurrects a code used meanwhile.
      */
     public function useRecoveryCode(User $user, string $code): bool
     {
         $hash = self::hashRecoveryCode($code);
-        $hashes = $user->two_factor_recovery_codes ?? [];
 
-        foreach ($hashes as $i => $stored) {
-            if (hash_equals($stored, $hash)) {
-                unset($hashes[$i]);
-                $user->forceFill(['two_factor_recovery_codes' => array_values($hashes)])->save();
+        return DB::transaction(function () use ($user, $hash): bool {
+            $locked = User::query()->lockForUpdate()->find($user->getKey());
 
-                return true;
+            if (! $locked instanceof User) {
+                return false;
             }
-        }
 
-        return false;
+            $hashes = $locked->two_factor_recovery_codes ?? [];
+            $used = false;
+
+            foreach ($hashes as $i => $stored) {
+                if (hash_equals($stored, $hash)) {
+                    unset($hashes[$i]);
+                    $used = true;
+
+                    break;
+                }
+            }
+
+            if ($used) {
+                $locked->forceFill(['two_factor_recovery_codes' => array_values($hashes)])->save();
+            }
+
+            // Keep the caller's instance in step with the database.
+            $user->forceFill(['two_factor_recovery_codes' => $locked->two_factor_recovery_codes]);
+            $user->syncOriginalAttribute('two_factor_recovery_codes');
+
+            return $used;
+        });
     }
 
     /**
