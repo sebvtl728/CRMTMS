@@ -95,3 +95,10 @@ it('accepts a table protected with Rls::enable', function () {
         expect(app(RlsAudit::class)->violations('pgsql_owner'))->not->toHaveKey('arch_probe_ok');
     });
 });
+
+it('flags a materialized view, which bypasses row level security', function () {
+    withOwnerDdl('create materialized view arch_probe_matview as select id, tenant_id from probe_items', function () {
+        expect(app(RlsAudit::class)->violations('pgsql_owner')['arch_probe_matview'] ?? [])
+            ->toContain('vue matérialisée : contourne la RLS');
+    });
+});

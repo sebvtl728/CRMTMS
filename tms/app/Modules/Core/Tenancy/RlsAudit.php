@@ -8,6 +8,7 @@ use Illuminate\Support\Facades\DB;
  * Lists the tables of the public schema that break the isolation rule
  * (tenant_id uuid not null + RLS enabled and forced + the tenant_isolation
  * policy, and no other permissive policy that would widen access).
+ * Materialized views are always reported (RLS cannot protect them).
  * Tables listed in config('tms.tenancy.unscoped_tables') are skipped.
  */
 final class RlsAudit
@@ -25,9 +26,9 @@ final class RlsAudit
         $whitelist = config('tms.tenancy.unscoped_tables', []);
 
         $tables = $db->select(<<<'SQL'
-            select c.relname as name, c.relrowsecurity as enabled, c.relforcerowsecurity as forced
+            select c.relname as name, c.relkind as kind, c.relrowsecurity as enabled, c.relforcerowsecurity as forced
             from pg_class c join pg_namespace n on n.oid = c.relnamespace
-            where n.nspname = 'public' and c.relkind in ('r', 'p')
+            where n.nspname = 'public' and c.relkind in ('r', 'p', 'm')
             order by c.relname
             SQL);
 
@@ -46,6 +47,13 @@ final class RlsAudit
 
         foreach ($tables as $table) {
             if (in_array($table->name, $whitelist, true)) {
+                continue;
+            }
+
+            if ($table->kind === 'm') {
+                // Materialized views are snapshots: RLS does not apply to them.
+                $violations[$table->name] = ['vue matérialisée : contourne la RLS'];
+
                 continue;
             }
 
