@@ -1,0 +1,128 @@
+name: ci
+
+on:
+  push:
+    branches: [main, lot1a-socle]
+  pull_request:
+
+defaults:
+  run:
+    working-directory: tms
+
+jobs:
+  php:
+    runs-on: ubuntu-latest
+    env:
+      APP_ENV: testing
+      APP_KEY: base64:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=
+      DB_CONNECTION: pgsql
+      DB_HOST: 127.0.0.1
+      DB_PORT: 5432
+      DB_DATABASE: tms_test
+      DB_USERNAME: tms_app
+      DB_OWNER_USERNAME: tms_owner
+      REDIS_CLIENT: phpredis
+      REDIS_HOST: 127.0.0.1
+      # Throwaway credentials of the ephemeral CI database service only.
+      POSTGRES_USER: postgres
+      PGHOST: 127.0.0.1
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: ci-superuser
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+      redis:
+        image: redis:7
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.4'
+          extensions: pdo_pgsql, redis, intl, zip, gd, bcmath, pcntl
+          coverage: none
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: tms/package-lock.json
+
+      - name: Create roles and databases
+        run: |
+          echo "DB_PASSWORD=$(openssl rand -hex 16)" >> "$GITHUB_ENV"
+          echo "DB_OWNER_PASSWORD=$(openssl rand -hex 16)" >> "$GITHUB_ENV"
+      - run: bash docker/postgres/init.sh
+        env:
+          PGPASSWORD: ci-superuser
+          POSTGRES_OWNER_PASSWORD: ${{ env.DB_OWNER_PASSWORD }}
+          POSTGRES_APP_PASSWORD: ${{ env.DB_PASSWORD }}
+
+      - run: composer install --no-interaction --no-progress --prefer-dist
+      - run: npm ci
+      - run: npm run build
+
+      - run: vendor/bin/pint --test
+      - run: vendor/bin/phpstan analyse --memory-limit=1G
+      # No --parallel: tms_app cannot create the per-process databases.
+      - run: php artisan test
+
+  js:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: tms/package-lock.json
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run types
+      - run: npm run build
+
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.4'
+          coverage: none
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: composer audit --abandoned=report
+      # Production dependencies only: the remaining high findings are dev-toolchain transitives (eslint chain).
+      - run: npm audit --omit=dev --audit-level=high
+
+  shell:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: .
+    steps:
+      - uses: actions/checkout@v4
+      - name: shellcheck and bats (skipped while ops/ does not exist)
+        run: |
+          if [ ! -d ops ]; then
+            echo "No ops/ directory yet, nothing to check."
+            exit 0
+          fi
+          sudo apt-get update && sudo apt-get install -y shellcheck bats
+          find ops -name '*.sh' -print0 | xargs -0 -r shellcheck
+          if [ -d ops/tests ]; then bats ops/tests; fi
