@@ -4,6 +4,7 @@ export interface Auth {
     user: User;
     can: {
         manageUsers: boolean;
+        viewAudit: boolean;
     };
 }
 

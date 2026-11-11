@@ -56,6 +56,8 @@ class TwoFactorController extends Controller
             throw ValidationException::withMessages(['code' => 'Le code de vérification est invalide.']);
         }
 
+        TwoFactorEnabled::dispatch($user);
+
         // Security level of the session changed.
         $request->session()->regenerate();
         $user->revokeOtherSessions($request->session()->getId());
@@ -86,6 +88,7 @@ class TwoFactorController extends Controller
         abort_if($this->twoFactor->isRequiredFor($user), 403, 'La double authentification est obligatoire pour votre compte.');
 
         $this->twoFactor->disable($user);
+        TwoFactorDisabled::dispatch($user);
         $user->revokeOtherSessions($request->session()->getId());
 
         return to_route('two-factor.setup')->with('status', 'La double authentification est désactivée.');

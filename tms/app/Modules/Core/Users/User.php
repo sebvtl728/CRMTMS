@@ -5,6 +5,7 @@ namespace App\Modules\Core\Users;
 use App\Modules\Core\Access\PrimaryRoleChanged;
 use App\Modules\Core\Access\Role;
 use App\Modules\Core\Access\RoleModel;
+use App\Modules\Core\Audit\Auditable;
 use App\Modules\Core\Tenancy\BelongsToTenant;
 use App\Modules\Core\Tenancy\TenantContext;
 use Carbon\CarbonImmutable;
@@ -45,7 +46,22 @@ use Spatie\Permission\Traits\HasRoles;
 class User extends Authenticatable
 {
     /** @use HasFactory<UserFactory> */
-    use BelongsToTenant, HasFactory, HasRoles, HasUuids, Notifiable;
+    use Auditable, BelongsToTenant, HasFactory, HasRoles, HasUuids, Notifiable;
+
+    /**
+     * Recorded as "[masqué]" in the audit journal.
+     *
+     * @var list<string>
+     */
+    protected array $auditExclude = ['password', 'remember_token', 'two_factor_secret', 'two_factor_recovery_codes'];
+
+    /**
+     * Dropped from the audit journal: last_login_at is covered by auth.login,
+     * the others are rotated/bumped mechanically (logout, replay protection).
+     *
+     * @var list<string>
+     */
+    protected array $auditIgnore = ['last_login_at', 'remember_token', 'two_factor_last_used_step'];
 
     /**
      * @var list<string>

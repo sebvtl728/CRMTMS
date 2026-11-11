@@ -4,6 +4,7 @@ namespace App\Http\Requests\Auth;
 
 use App\Modules\Core\Tenancy\TenantContext;
 use App\Modules\Core\Users\User;
+use Illuminate\Auth\Events\Failed;
 use Illuminate\Auth\Events\Lockout;
 use Illuminate\Auth\SessionGuard;
 use Illuminate\Contracts\Validation\ValidationRule;
@@ -65,6 +66,12 @@ class LoginRequest extends FormRequest
 
         if (! $user instanceof User) {
             RateLimiter::hit($this->throttleKey());
+
+            // Unknown e-mail, wrong password or deactivated account: journaled
+            // with the attempted e-mail only. Not Auth::attempt, so Laravel
+            // would not fire Failed itself.
+            $known = User::query()->where('email', $credentials['email'])->first();
+            event(new Failed('web', $known, ['email' => $credentials['email']]));
 
             throw ValidationException::withMessages([
                 'email' => __('auth.failed'),
