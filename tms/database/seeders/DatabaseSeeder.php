@@ -2,15 +2,16 @@
 
 namespace Database\Seeders;
 
-use App\Models\User;
 use App\Modules\Core\Tenancy\Tenant;
-// use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
 
 class DatabaseSeeder extends Seeder
 {
     /**
      * Seed the application's database.
+     *
+     * No user is seeded (no default password): accounts are created by
+     * invitation or by the installer (tms:install).
      */
     public function run(): void
     {
@@ -19,12 +20,5 @@ class DatabaseSeeder extends Seeder
             ['slug' => config('tms.default_tenant')],
             ['name' => config('app.name')],
         );
-
-        // User::factory(10)->create();
-
-        User::factory()->create([
-            'name' => 'Test User',
-            'email' => 'test@example.com',
-        ]);
     }
 }

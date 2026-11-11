@@ -1,9 +1,12 @@
 <?php
 
-use App\Models\User;
+use App\Modules\Core\Users\User;
 use Illuminate\Auth\Events\Verified;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\URL;
+
+// Accounts belong to an organisme: the test body acts for the default tenant.
+beforeEach(fn () => inTenant());
 
 it('renders the email verification screen', function () {
     $user = User::factory()->unverified()->create();

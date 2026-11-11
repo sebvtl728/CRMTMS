@@ -2,8 +2,11 @@
 
 namespace App\Http\Requests\Auth;
 
+use App\Modules\Core\Tenancy\TenantContext;
+use App\Modules\Core\Users\User;
 use Illuminate\Auth\Events\Lockout;
 use Illuminate\Contracts\Validation\ValidationRule;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\RateLimiter;
@@ -36,13 +39,24 @@ class LoginRequest extends FormRequest
     /**
      * Attempt to authenticate the request's credentials.
      *
+     * Only an active, activated account of the request's tenant can match:
+     * explicit tenant filter here, plus the tenant scope, RLS on users and
+     * ActiveUserProvider (deactivated_at is null, password set).
+     *
      * @throws ValidationException
      */
     public function authenticate(): void
     {
         $this->ensureIsNotRateLimited();
 
-        if (! Auth::attempt($this->only('email', 'password'), $this->boolean('remember'))) {
+        $tenantId = app(TenantContext::class)->id();
+        $credentials = [
+            'email' => mb_strtolower($this->string('email')->trim()->value()),
+            'password' => $this->string('password')->value(),
+            fn (Builder $query) => $query->where('tenant_id', $tenantId)->whereNull('deactivated_at'),
+        ];
+
+        if (! Auth::attempt($credentials, $this->boolean('remember'))) {
             RateLimiter::hit($this->throttleKey());
 
             throw ValidationException::withMessages([
@@ -51,6 +65,10 @@ class LoginRequest extends FormRequest
         }
 
         RateLimiter::clear($this->throttleKey());
+
+        /** @var User $user */
+        $user = Auth::user();
+        $user->forceFill(['last_login_at' => now()])->save();
     }
 
     /**
@@ -81,6 +99,8 @@ class LoginRequest extends FormRequest
      */
     public function throttleKey(): string
     {
-        return Str::transliterate(Str::lower($this->string('email')).'|'.$this->ip());
+        $tenant = app(TenantContext::class)->current()->id ?? 'none';
+
+        return Str::transliterate($tenant.'|'.Str::lower($this->string('email')).'|'.$this->ip());
     }
 }

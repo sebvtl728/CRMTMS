@@ -1,6 +1,6 @@
 <?php
 
-use App\Models\User;
+use App\Modules\Core\Users\User;
 
 return [
 
@@ -63,7 +63,9 @@ return [
 
     'providers' => [
         'users' => [
-            'driver' => 'eloquent',
+            // Eloquent provider restricted to active, activated accounts
+            // (App\Modules\Core\Users\ActiveUserProvider).
+            'driver' => 'active_users',
             'model' => env('AUTH_MODEL', User::class),
         ],
 

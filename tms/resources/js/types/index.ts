@@ -2,6 +2,9 @@ import { LucideIcon } from 'lucide-react';
 
 export interface Auth {
     user: User;
+    can: {
+        manageUsers: boolean;
+    };
 }
 
 export interface BreadcrumbItem {
@@ -29,7 +32,7 @@ export interface SharedData {
 }
 
 export interface User {
-    id: number;
+    id: string;
     name: string;
     email: string;
     avatar?: string;

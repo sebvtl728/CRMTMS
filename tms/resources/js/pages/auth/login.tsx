@@ -91,10 +91,7 @@ export default function Login({ status, canResetPassword }: LoginProps) {
                 </div>
 
                 <div className="text-muted-foreground text-center text-sm">
-                    Pas encore de compte ?{' '}
-                    <TextLink href={route('register')} tabIndex={5}>
-                        Créer un compte
-                    </TextLink>
+                    Pas encore de compte ? Demandez une invitation à l'administrateur de votre organisme.
                 </div>
             </form>
 

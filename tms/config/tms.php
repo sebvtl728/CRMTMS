@@ -32,8 +32,6 @@ return [
             'cache',
             'cache_locks',
             'sessions',
-            'password_reset_tokens',
-            'users', // TODO Task 4: remove (users gets tenant_id + RLS)
         ],
     ],
 

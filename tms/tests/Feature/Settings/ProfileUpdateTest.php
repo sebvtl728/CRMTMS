@@ -1,6 +1,9 @@
 <?php
 
-use App\Models\User;
+use App\Modules\Core\Users\User;
+
+// Accounts belong to an organisme: the test body acts for the default tenant.
+beforeEach(fn () => inTenant());
 
 it('displays the profile page', function () {
     $user = User::factory()->create();

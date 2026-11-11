@@ -1,8 +1,11 @@
 <?php
 
-use App\Models\User;
+use App\Modules\Core\Users\User;
 use Illuminate\Auth\Notifications\ResetPassword;
 use Illuminate\Support\Facades\Notification;
+
+// Accounts belong to an organisme: the test body acts for the default tenant.
+beforeEach(fn () => inTenant());
 
 it('renders the reset password link screen', function () {
     $this->get('/forgot-password')->assertStatus(200);
@@ -43,8 +46,8 @@ it('resets the password with a valid token', function () {
         $this->post('/reset-password', [
             'token' => $notification->token,
             'email' => $user->email,
-            'password' => 'password',
-            'password_confirmation' => 'password',
+            'password' => 'nouveau-mot-de-passe-solide',
+            'password_confirmation' => 'nouveau-mot-de-passe-solide',
         ])
             ->assertSessionHasNoErrors()
             ->assertRedirect(route('login'));
