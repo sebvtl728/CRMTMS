@@ -3,6 +3,7 @@
 use App\Http\Middleware\HandleInertiaRequests;
 use App\Modules\Core\Security\SecurityHeaders;
 use App\Modules\Core\Tenancy\ResolveTenant;
+use App\Modules\Core\Users\EnsureTwoFactorEnrolled;
 use Illuminate\Cookie\Middleware\EncryptCookies;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
@@ -30,6 +31,8 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->web(append: [
             HandleInertiaRequests::class,
             AddLinkHeadersForPreloadedAssets::class,
+            // Every web route, so a new route can never skip mandatory 2FA.
+            EnsureTwoFactorEnrolled::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions) {

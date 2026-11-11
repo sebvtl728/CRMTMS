@@ -2,6 +2,7 @@
 
 namespace Database\Factories;
 
+use App\Modules\Core\Access\RoleSeeder;
 use App\Modules\Core\Tenancy\Tenant;
 use App\Modules\Core\Tenancy\TenantStatus;
 use Illuminate\Database\Eloquent\Factories\Factory;
@@ -13,6 +14,14 @@ use Illuminate\Support\Str;
 class TenantFactory extends Factory
 {
     protected $model = Tenant::class;
+
+    /**
+     * Every tenant gets its roles, as tms:install / tms:tenant:create do.
+     */
+    public function configure(): static
+    {
+        return $this->afterCreating(fn (Tenant $tenant) => RoleSeeder::seedFor($tenant));
+    }
 
     public function definition(): array
     {

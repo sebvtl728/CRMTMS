@@ -3,8 +3,9 @@
 namespace App\Modules\Core\Access;
 
 /**
- * Roles of an account inside its organisme. Introduced with invitations
- * (Task 4); permissions and role assignment come with Task 5.
+ * Roles of an account inside its organisme (one primary role per user in
+ * lot 1a). Each tenant has its own spatie role records (RoleSeeder), named
+ * after these values; the default permissions are in Permissions::defaultsFor().
  */
 enum Role: string
 {

@@ -2,6 +2,7 @@
 
 namespace Database\Seeders;
 
+use App\Modules\Core\Access\RoleSeeder;
 use App\Modules\Core\Tenancy\Tenant;
 use Illuminate\Database\Seeder;
 
@@ -16,9 +17,11 @@ class DatabaseSeeder extends Seeder
     public function run(): void
     {
         // Default tenant for single mode (TMS_MODE=single).
-        Tenant::query()->firstOrCreate(
+        $tenant = Tenant::query()->firstOrCreate(
             ['slug' => config('tms.default_tenant')],
             ['name' => config('app.name')],
         );
+
+        RoleSeeder::seedFor($tenant);
     }
 }

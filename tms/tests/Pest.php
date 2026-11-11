@@ -1,9 +1,11 @@
 <?php
 
+use App\Modules\Core\Access\Role;
 use App\Modules\Core\Tenancy\Tenant;
 use App\Modules\Core\Tenancy\TenantContext;
 use App\Modules\Core\Tenancy\TenantDomain;
 use App\Modules\Core\Users\User;
+use PragmaRX\Google2FA\Google2FA;
 use Tests\RefreshDatabaseAsOwner;
 use Tests\TestCase;
 
@@ -76,4 +78,58 @@ function userIn(Tenant $tenant, array $attributes = []): User
 {
     return app(TenantContext::class)
         ->run($tenant, fn () => User::factory()->create($attributes));
+}
+
+/**
+ * The tenant the test body acts for: the current context, or the default
+ * tenant (which then becomes the context).
+ */
+function tenant(): Tenant
+{
+    return app(TenantContext::class)->current() ?? inTenant();
+}
+
+/**
+ * A user of the current tenant (see tenant()) holding $role. Without
+ * two-factor authentication unless $twoFactor (then confirmed, with a secret
+ * and 8 recovery codes).
+ */
+function userWithRole(Role $role, bool $twoFactor = false): User
+{
+    tenant();
+    $factory = User::factory()->withRole($role);
+
+    return ($twoFactor ? $factory->withTwoFactor() : $factory)->create();
+}
+
+function admin(bool $twoFactor = false): User
+{
+    return userWithRole(Role::AdminOrganisme, $twoFactor);
+}
+
+function direction(bool $twoFactor = false): User
+{
+    return userWithRole(Role::Direction, $twoFactor);
+}
+
+function commercial(bool $twoFactor = false): User
+{
+    return userWithRole(Role::Commercial, $twoFactor);
+}
+
+function assistant(bool $twoFactor = false): User
+{
+    return userWithRole(Role::Assistant, $twoFactor);
+}
+
+/**
+ * Current TOTP code of a user with a two-factor secret.
+ */
+function totp(User $user, ?int $timestamp = null): string
+{
+    $google2fa = new Google2FA;
+
+    return $timestamp === null
+        ? $google2fa->getCurrentOtp((string) $user->two_factor_secret)
+        : $google2fa->oathTotp((string) $user->two_factor_secret, intdiv($timestamp, 30));
 }

@@ -5,6 +5,7 @@ namespace App\Http\Requests\Auth;
 use App\Modules\Core\Tenancy\TenantContext;
 use App\Modules\Core\Users\User;
 use Illuminate\Auth\Events\Lockout;
+use Illuminate\Auth\SessionGuard;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Foundation\Http\FormRequest;
@@ -37,7 +38,9 @@ class LoginRequest extends FormRequest
     }
 
     /**
-     * Attempt to authenticate the request's credentials.
+     * Checks the request's credentials WITHOUT logging in, and returns the
+     * matching user: the controller either logs in or, when 2FA is confirmed,
+     * starts the two-factor challenge.
      *
      * Only an active, activated account of the request's tenant can match:
      * explicit tenant filter here, plus the tenant scope, RLS on users and
@@ -45,7 +48,7 @@ class LoginRequest extends FormRequest
      *
      * @throws ValidationException
      */
-    public function authenticate(): void
+    public function validateCredentials(): User
     {
         $this->ensureIsNotRateLimited();
 
@@ -56,7 +59,11 @@ class LoginRequest extends FormRequest
             fn (Builder $query) => $query->where('tenant_id', $tenantId)->whereNull('deactivated_at'),
         ];
 
-        if (! Auth::attempt($credentials, $this->boolean('remember'))) {
+        /** @var SessionGuard $guard */
+        $guard = Auth::guard('web');
+        $user = $guard->validate($credentials) ? $guard->getLastAttempted() : null;
+
+        if (! $user instanceof User) {
             RateLimiter::hit($this->throttleKey());
 
             throw ValidationException::withMessages([
@@ -66,9 +73,11 @@ class LoginRequest extends FormRequest
 
         RateLimiter::clear($this->throttleKey());
 
-        /** @var User $user */
-        $user = Auth::user();
-        $user->forceFill(['last_login_at' => now()])->save();
+        if (config('hashing.rehash_on_login', true)) {
+            $guard->getProvider()->rehashPasswordIfRequired($user, ['password' => $credentials['password']]);
+        }
+
+        return $user;
     }
 
     /**

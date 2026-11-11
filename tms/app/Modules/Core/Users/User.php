@@ -2,7 +2,11 @@
 
 namespace App\Modules\Core\Users;
 
+use App\Modules\Core\Access\PrimaryRoleChanged;
+use App\Modules\Core\Access\Role;
+use App\Modules\Core\Access\RoleModel;
 use App\Modules\Core\Tenancy\BelongsToTenant;
+use App\Modules\Core\Tenancy\TenantContext;
 use Carbon\CarbonImmutable;
 use Database\Factories\UserFactory;
 use Illuminate\Database\Eloquent\Attributes\UseFactory;
@@ -14,6 +18,8 @@ use Illuminate\Notifications\Notifiable;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+use LogicException;
+use Spatie\Permission\Traits\HasRoles;
 
 /**
  * An account of one organisme (tenant). The same e-mail may exist in several
@@ -30,12 +36,16 @@ use Illuminate\Support\Str;
  * @property string|null $remember_token
  * @property Carbon|null $last_login_at
  * @property Carbon|null $deactivated_at
+ * @property string|null $two_factor_secret encrypted at rest
+ * @property list<string>|null $two_factor_recovery_codes sha256 hashes, encrypted at rest
+ * @property Carbon|null $two_factor_confirmed_at
+ * @property int|null $two_factor_last_used_step
  */
 #[UseFactory(UserFactory::class)]
 class User extends Authenticatable
 {
     /** @use HasFactory<UserFactory> */
-    use BelongsToTenant, HasFactory, HasUuids, Notifiable;
+    use BelongsToTenant, HasFactory, HasRoles, HasUuids, Notifiable;
 
     /**
      * @var list<string>
@@ -52,6 +62,11 @@ class User extends Authenticatable
     protected $hidden = [
         'password',
         'remember_token',
+        'two_factor_secret',
+        'two_factor_recovery_codes',
+        'two_factor_last_used_step',
+        'roles',
+        'permissions',
     ];
 
     /**
@@ -65,6 +80,10 @@ class User extends Authenticatable
             'is_platform_admin' => 'boolean',
             'last_login_at' => 'datetime',
             'deactivated_at' => 'datetime',
+            'two_factor_secret' => 'encrypted',
+            'two_factor_recovery_codes' => 'encrypted:array',
+            'two_factor_confirmed_at' => 'datetime',
+            'two_factor_last_used_step' => 'integer',
         ];
     }
 
@@ -100,5 +119,48 @@ class User extends Authenticatable
             ->table(config('session.table', 'sessions'))
             ->where('user_id', $this->getKey())
             ->delete();
+    }
+
+    /**
+     * Primary role in the current tenant (one role per user in lot 1a), or
+     * null for an account without role (it then has no permission).
+     */
+    public function role(): ?Role
+    {
+        /** @var RoleModel|null $record */
+        $record = $this->roles->first();
+
+        return $record === null ? null : Role::tryFrom($record->name);
+    }
+
+    /**
+     * Replaces the user's role. Must run in the user's own tenant (the role
+     * records are per tenant). Dispatches PrimaryRoleChanged when it changes.
+     */
+    public function assignPrimaryRole(Role $role): void
+    {
+        if ($this->tenant_id !== app(TenantContext::class)->id()) {
+            throw new LogicException('Le rôle d\'un utilisateur s\'attribue dans son propre organisme.');
+        }
+
+        $this->unsetRelation('roles');
+        $previous = $this->role();
+
+        if ($previous === $role) {
+            return;
+        }
+
+        DB::transaction(fn () => $this->syncRoles([$role->value]));
+        $this->unsetRelation('roles');
+
+        PrimaryRoleChanged::dispatch($this, $previous, $role);
+    }
+
+    /**
+     * Two-factor authentication enrolled and confirmed with a valid code.
+     */
+    public function hasTwoFactorEnabled(): bool
+    {
+        return $this->two_factor_secret !== null && $this->two_factor_confirmed_at !== null;
     }
 }

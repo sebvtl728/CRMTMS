@@ -1,5 +1,6 @@
 <?php
 
+use App\Modules\Core\Access\AccessServiceProvider;
 use App\Modules\Core\Tenancy\TenancyServiceProvider;
 use App\Modules\Core\Users\UsersServiceProvider;
 use App\Providers\AppServiceProvider;
@@ -10,4 +11,5 @@ return [
     HorizonServiceProvider::class,
     TenancyServiceProvider::class,
     UsersServiceProvider::class,
+    AccessServiceProvider::class,
 ];

@@ -24,7 +24,12 @@ class Tenant extends Model
     /** @use HasFactory<TenantFactory> */
     use HasFactory, HasUuids;
 
-    protected $fillable = ['name', 'slug', 'status', 'settings'];
+    /**
+     * JSON paths of settings are listed one by one (Eloquent only fills a
+     * "column->path" key when it is listed): security.force_2fa imposes
+     * two-factor authentication on every account of the tenant.
+     */
+    protected $fillable = ['name', 'slug', 'status', 'settings', 'settings->security->force_2fa'];
 
     protected $attributes = [
         'status' => 'active',

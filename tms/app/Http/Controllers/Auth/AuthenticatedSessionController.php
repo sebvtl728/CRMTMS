@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Auth;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Auth\LoginRequest;
+use App\Modules\Core\Users\TwoFactorChallengeController;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -29,9 +30,18 @@ class AuthenticatedSessionController extends Controller
      */
     public function store(LoginRequest $request): RedirectResponse
     {
-        $request->authenticate();
+        $user = $request->validateCredentials();
 
+        // Confirmed 2FA: not logged in yet, the code is asked first.
+        if ($user->hasTwoFactorEnabled()) {
+            TwoFactorChallengeController::begin($request, $user, $request->boolean('remember'));
+
+            return to_route('two-factor.challenge');
+        }
+
+        Auth::guard('web')->login($user, $request->boolean('remember'));
         $request->session()->regenerate();
+        $user->forceFill(['last_login_at' => now()])->save();
 
         return redirect()->intended(route('dashboard', absolute: false));
     }

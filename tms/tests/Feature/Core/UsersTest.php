@@ -9,7 +9,6 @@ use App\Modules\Core\Users\User;
 use Illuminate\Auth\Notifications\ResetPassword;
 use Illuminate\Notifications\AnonymousNotifiable;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Route;
@@ -17,15 +16,6 @@ use Inertia\Testing\AssertableInertia as Assert;
 
 const PASSWORD_A = 'mot-de-passe-A-1234';
 const PASSWORD_B = 'mot-de-passe-B-1234';
-
-/**
- * Stand-in for the users.manage permission until roles land (Task 5): the
- * gate denies everyone by default.
- */
-function allowUserManagement(): void
-{
-    Gate::define('users.manage', fn () => true);
-}
 
 function sessionCookieName(): string
 {
@@ -333,10 +323,10 @@ it('an unknown token gives 404', function () {
 
 it('lists only the users of the current tenant', function () {
     config(['tms.mode' => 'multi']);
-    allowUserManagement();
     $a = tenantOnHost('a.test');
     $b = tenantOnHost('b.test');
-    $admin = userIn($a, ['name' => 'Admin A']);
+    $admin = app(TenantContext::class)->run($a, fn () => User::factory()
+        ->withRole(Role::AdminOrganisme)->withTwoFactor()->create(['name' => 'Admin A']));
     userIn($a, ['name' => 'Collègue A']);
     userIn($b, ['name' => 'Intrus B']);
     app(TenantContext::class)->run($a, fn () => Invitation::issue('invite@a.test', 'Invité A', Role::Assistant));
@@ -353,9 +343,7 @@ it('lists only the users of the current tenant', function () {
 
 it('invites a user by e-mail', function () {
     Notification::fake();
-    allowUserManagement();
-    inTenant();
-    $admin = User::factory()->create();
+    $admin = admin(twoFactor: true);
 
     $this->actingAs($admin)->get('/admin/users/invite')->assertOk()
         ->assertInertia(fn (Assert $page) => $page->component('admin/users/invite')->has('roles', count(Role::cases())));
@@ -377,9 +365,8 @@ it('invites a user by e-mail', function () {
 });
 
 it('validates invitations', function () {
-    allowUserManagement();
-    inTenant();
-    $admin = User::factory()->create(['email' => 'deja@cap.test']);
+    $admin = admin(twoFactor: true);
+    User::factory()->create(['email' => 'deja@cap.test']);
 
     $this->actingAs($admin)->post('/admin/users/invitations', ['email' => 'deja@cap.test', 'name' => 'Doublon', 'role' => 'commercial'])
         ->assertSessionHasErrors('email');
@@ -399,8 +386,7 @@ it('a new invitation replaces the pending one for the same e-mail', function () 
 });
 
 it('refuses user administration without the users.manage permission', function () {
-    inTenant();
-    $user = User::factory()->create();
+    $user = commercial();
 
     $this->actingAs($user)->get('/admin/users')->assertForbidden();
     $this->actingAs($user)->get('/admin/users/invite')->assertForbidden();

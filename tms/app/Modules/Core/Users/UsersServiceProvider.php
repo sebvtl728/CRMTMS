@@ -2,9 +2,12 @@
 
 namespace App\Modules\Core\Users;
 
+use App\Modules\Core\Tenancy\TenantContext;
+use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Contracts\Foundation\Application;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\ServiceProvider;
 
 class UsersServiceProvider extends ServiceProvider
@@ -17,8 +20,14 @@ class UsersServiceProvider extends ServiceProvider
             return new ActiveUserProvider($app['hash'], $config['model']);
         });
 
-        // Deny by default until roles and permissions exist (Task 5 replaces
-        // this definition with the users.manage permission of the role matrix).
-        Gate::define('users.manage', fn (User $user) => false);
+        // Second login step: 5 attempts per minute per pending login (per user).
+        RateLimiter::for('two-factor', function (Request $request) {
+            $tenant = app(TenantContext::class)->current()->id ?? 'none';
+
+            return Limit::perMinute(5)->by($tenant.'|'.$request->session()->get('login.id', $request->ip()));
+        });
+
+        // Enrolment confirmation: 5 attempts per minute per user.
+        RateLimiter::for('two-factor-setup', fn (Request $request) => Limit::perMinute(5)->by('setup|'.($request->user()?->getAuthIdentifier() ?? $request->ip())));
     }
 }

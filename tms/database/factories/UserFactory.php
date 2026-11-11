@@ -2,10 +2,13 @@
 
 namespace Database\Factories;
 
+use App\Modules\Core\Access\Role;
+use App\Modules\Core\Users\TwoFactorAuthenticator;
 use App\Modules\Core\Users\User;
 use Illuminate\Database\Eloquent\Factories\Factory;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
+use PragmaRX\Google2FA\Google2FA;
 
 /**
  * @extends Factory<User>
@@ -16,6 +19,13 @@ class UserFactory extends Factory
      * The current password being used by the factory.
      */
     protected static ?string $password;
+
+    /**
+     * Plain recovery codes of the last user built with withTwoFactor().
+     *
+     * @var list<string>
+     */
+    public static array $lastRecoveryCodes = [];
 
     /**
      * Define the model's default state.
@@ -51,5 +61,31 @@ class UserFactory extends Factory
         return $this->state(fn (array $attributes) => [
             'email_verified_at' => null,
         ]);
+    }
+
+    /**
+     * Primary role, assigned after creation (needs the user's tenant as the
+     * current tenant context, as every user creation does).
+     */
+    public function withRole(Role $role): static
+    {
+        return $this->afterCreating(fn (User $user) => $user->assignPrimaryRole($role));
+    }
+
+    /**
+     * Confirmed two-factor authentication, with 8 recovery codes (plain codes
+     * in UserFactory::$lastRecoveryCodes).
+     */
+    public function withTwoFactor(): static
+    {
+        return $this->state(function () {
+            self::$lastRecoveryCodes = array_map(fn () => Str::lower(Str::random(10).'-'.Str::random(10)), range(1, TwoFactorAuthenticator::RECOVERY_CODES));
+
+            return [
+                'two_factor_secret' => (new Google2FA)->generateSecretKey(32),
+                'two_factor_recovery_codes' => array_map(TwoFactorAuthenticator::hashRecoveryCode(...), self::$lastRecoveryCodes),
+                'two_factor_confirmed_at' => now(),
+            ];
+        });
     }
 }
