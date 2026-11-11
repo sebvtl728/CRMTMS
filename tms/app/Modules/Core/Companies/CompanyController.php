@@ -115,6 +115,15 @@ class CompanyController extends Controller
         ]);
     }
 
+    private function needsFixedCapital(Request $request): bool
+    {
+        $form = LegalForm::tryFrom((string) $request->input('legal_form'));
+
+        return $form !== null
+            && in_array($form, [LegalForm::Sarl, LegalForm::Sas, LegalForm::Sasu, LegalForm::Sa, LegalForm::Eurl, LegalForm::Scop, LegalForm::Scic], true)
+            && ! filter_var($request->input('capital_variable', false), FILTER_VALIDATE_BOOLEAN);
+    }
+
     /**
      * @return array<string, mixed>
      */
@@ -156,7 +165,11 @@ class CompanyController extends Controller
                 Rule::requiredIf(fn () => LegalForm::tryFrom((string) $request->input('legal_form'))?->isCooperative() ?? false),
                 'nullable', Rule::in(LegalForm::underlyingForms()),
             ],
-            'capital_amount' => ['nullable', 'numeric', 'min:0', 'max:999999999999'],
+            // A fixed capital must be stated on quotes/invoices of capital-based forms.
+            'capital_amount' => [
+                Rule::requiredIf(fn () => $this->needsFixedCapital($request)),
+                'nullable', 'numeric', $request->input('capital_variable') ? 'min:0' : 'gt:0', 'max:999999999999',
+            ],
             'capital_variable' => ['boolean'],
             // Required here (not at database level): see Company.
             'siret' => ['required', 'string', new Siret],
@@ -173,6 +186,8 @@ class CompanyController extends Controller
             'phone' => ['nullable', 'string', 'max:30'],
             'is_default' => ['boolean'],
         ], [
+            'capital_amount.required' => 'Le capital social est obligatoire pour cette forme juridique (sauf capital variable).',
+            'capital_amount.gt' => 'Le capital doit être strictement supérieur à 0.',
             'siret.required' => 'Le numéro SIRET est obligatoire.',
             'scop_underlying_form.required' => 'Indiquez la forme sous-jacente de la coopérative (SARL, SA ou SAS).',
             'vat_number.regex' => 'Le numéro de TVA intracommunautaire est invalide (ex. FR12345678901).',

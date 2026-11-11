@@ -15,7 +15,7 @@ class Siret implements ValidationRule
 {
     public static function isValid(string $value): bool
     {
-        if (preg_match('/^\d{14}$/', $value) !== 1) {
+        if (preg_match('/^\d{14}\z/', $value) !== 1) {
             return false;
         }
 

@@ -20,7 +20,7 @@ final class LegalMentions
     {
         $segments = [$c->name, self::form($c)];
 
-        $siret = preg_match('/^\d{14}$/', (string) $c->siret) === 1 ? (string) $c->siret : null;
+        $siret = preg_match('/^\d{14}\z/', (string) $c->siret) === 1 ? (string) $c->siret : null;
         if ($siret !== null) {
             $siren = self::groups(substr($siret, 0, 9));
             if ($c->rcs_city !== null && trim($c->rcs_city) !== '') {

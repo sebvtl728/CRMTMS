@@ -77,4 +77,5 @@ it('validates sirets with the Luhn check', function (string $siret, bool $valid)
     ['7328293200007', false],
     ['732829320000745', false],
     ['7328293200007A', false],
+    ["73282932000074\n", false],
 ]);

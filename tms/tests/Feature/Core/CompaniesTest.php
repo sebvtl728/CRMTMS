@@ -63,6 +63,26 @@ it('requires the underlying form for a SCOP or SCIC', function () {
         ->assertSessionHasErrors('scop_underlying_form');
 });
 
+it('requires a positive fixed capital for capital-based forms', function () {
+    $this->actingAs(admin(twoFactor: true));
+    $sas = ['legal_form' => 'sas', 'scop_underlying_form' => null, 'capital_variable' => false];
+
+    $this->post('/admin/companies', companyPayload($sas + ['capital_amount' => null]))->assertSessionHasErrors('capital_amount');
+    $this->post('/admin/companies', companyPayload($sas + ['capital_amount' => '0']))->assertSessionHasErrors('capital_amount');
+    $this->post('/admin/companies', companyPayload($sas + ['capital_amount' => '-5']))->assertSessionHasErrors('capital_amount');
+    expect(Company::count())->toBe(0);
+
+    $this->post('/admin/companies', companyPayload($sas + ['capital_amount' => '10000']))->assertSessionDoesntHaveErrors();
+});
+
+it('keeps capital optional for variable capital and non capital forms', function () {
+    $this->actingAs(admin(twoFactor: true));
+
+    $this->post('/admin/companies', companyPayload(['capital_variable' => true, 'capital_amount' => null]))->assertSessionDoesntHaveErrors();
+    $this->post('/admin/companies', companyPayload(['legal_form' => 'association', 'scop_underlying_form' => null, 'capital_variable' => false, 'capital_amount' => null]))->assertSessionDoesntHaveErrors();
+    expect(Company::count())->toBe(2);
+});
+
 it('drops the underlying form for other legal forms', function () {
     $this->actingAs(admin(twoFactor: true))
         ->post('/admin/companies', companyPayload(['legal_form' => 'sas', 'scop_underlying_form' => 'sarl', 'capital_variable' => false, 'capital_amount' => '10000']))
