@@ -24,6 +24,7 @@ class TmsInstall extends Command
         {--tenant-name= : Nom de l\'organisme}
         {--admin-email= : E-mail de l\'administrateur}
         {--admin-name= : Nom de l\'administrateur}
+        {--slug= : Identifiant de l\'organisme (TMS_DEFAULT_TENANT en mode single ; défaut : dérivé du nom)}
         {--domain= : Nom de domaine de l\'organisme (mode multi)}
         {--vat-exempt : Société par défaut exonérée de TVA}
         {--seed-cap : Charge les référentiels par défaut de CAP FORMATION}';
@@ -48,13 +49,20 @@ class TmsInstall extends Command
             return self::FAILURE;
         }
 
+        $slug = (string) $this->option('slug');
+        if ($slug !== '' && preg_match('/^[a-z0-9]+(?:-[a-z0-9]+)*$/', $slug) !== 1) {
+            $this->error('Identifiant (slug) invalide : lettres minuscules, chiffres et tirets uniquement.');
+
+            return self::FAILURE;
+        }
+
         $domain = (string) $this->option('domain');
 
         // Tenant, domain, roles, admin and invitation: all or nothing.
         try {
             [$tenant, $invitation] = $provisioner->create(
                 $name,
-                null,
+                $slug !== '' ? $slug : null,
                 $domain !== '' ? [$domain] : [],
                 function (Tenant $tenant) use ($email, $adminName): Invitation {
                     $this->createAdmin($email, $adminName);

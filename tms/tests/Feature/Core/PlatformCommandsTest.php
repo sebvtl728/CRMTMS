@@ -138,6 +138,24 @@ it('install prints a usable activation url without a password', function () {
         ->assertSuccessful();
 });
 
+it('install uses the given slug so single mode finds the tenant', function () {
+    emptyPlatform();
+
+    $this->artisan('tms:install', installArgs() + ['--slug' => 'cap-formation'])->assertSuccessful();
+
+    expect(Tenant::sole()->slug)->toBe('cap-formation');
+});
+
+it('install rejects an unusable slug and creates nothing', function () {
+    emptyPlatform();
+
+    $this->artisan('tms:install', installArgs() + ['--slug' => 'Bad Slug!'])
+        ->expectsOutputToContain('Identifiant')
+        ->assertFailed();
+
+    expect(Tenant::count())->toBe(0);
+});
+
 it('rejects malformed domains', function (string $bad) {
     $this->artisan('tms:tenant:create', ['name' => 'Bad', '--slug' => 'bad', '--domain' => [$bad]])
         ->expectsOutputToContain('Domaine invalide')
