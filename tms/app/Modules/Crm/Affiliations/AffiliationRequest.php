@@ -112,6 +112,31 @@ class AffiliationRequest extends FormRequest
      */
     public function messages(): array
     {
+        return self::validationMessages();
+    }
+
+    /**
+     * Rules of the affiliation fields typed as text, on creation (shared
+     * with the import, which resolves the decision role itself).
+     *
+     * @return array<string, list<mixed>>
+     */
+    public static function fieldRules(): array
+    {
+        return [
+            'job_title' => ['nullable', 'string', 'max:255'],
+            'work_email' => ['nullable', 'string', 'email', 'max:255'],
+            'work_phone' => ['nullable', 'string', 'max:30'],
+            'is_referent' => ['sometimes', 'boolean'],
+            'started_on' => ['nullable', 'date_format:Y-m-d', 'after:1900-01-01'],
+        ];
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    public static function validationMessages(): array
+    {
         return [
             'required_without' => 'Indiquez le nom de la personne.',
             'max' => 'Ce champ est trop long.',

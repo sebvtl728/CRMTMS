@@ -3,16 +3,15 @@
 namespace App\Modules\Crm\Organisations;
 
 use App\Http\Controllers\Controller;
-use App\Modules\Core\Audit\AuditRecorder;
 use App\Modules\Core\References\ReferenceItem;
 use App\Modules\Core\References\ReferenceList;
-use App\Modules\Core\Tenancy\TenantContext;
 use App\Modules\Core\Users\User;
 use App\Modules\Crm\Affiliations\Affiliation;
 use App\Modules\Crm\Duplicates\DuplicateGuard;
 use App\Modules\Crm\Permissions;
 use App\Modules\Crm\Search\CrmResource;
 use App\Modules\Crm\Search\ListExtras;
+use App\Modules\Crm\Support\DasLinks;
 use App\Modules\Crm\Support\FormOptions;
 use App\Modules\Crm\Visibility\CrmVisibility;
 use Illuminate\Database\UniqueConstraintViolationException;
@@ -33,7 +32,7 @@ class OrganisationController extends Controller
 {
     private const RESTORE_CONFLICT = 'Impossible de restaurer cette entreprise : elle entre en conflit avec une autre fiche active.';
 
-    public function __construct(private readonly TenantContext $tenants, private readonly AuditRecorder $audit, private readonly DuplicateGuard $duplicates) {}
+    public function __construct(private readonly DuplicateGuard $duplicates, private readonly DasLinks $das) {}
 
     public function index(Request $request): Response
     {
@@ -248,7 +247,7 @@ class OrganisationController extends Controller
                 $organisation->fill($validated)->save();
 
                 if ($dasIds !== null) {
-                    $this->syncDas($organisation, $dasIds);
+                    $this->das->sync($organisation, $dasIds);
                 }
             });
         } catch (UniqueConstraintViolationException) {
@@ -263,25 +262,6 @@ class OrganisationController extends Controller
         }
 
         return $organisation;
-    }
-
-    /**
-     * @param  list<string>  $dasIds
-     */
-    private function syncDas(Organisation $organisation, array $dasIds): void
-    {
-        $before = $organisation->das()->pluck('reference_items.id')->all();
-        $tenantId = $this->tenants->id();
-
-        $organisation->das()->sync(collect($dasIds)->mapWithKeys(fn (string $id) => [$id => ['tenant_id' => $tenantId]])->all());
-
-        sort($before);
-        $after = $dasIds;
-        sort($after);
-
-        if ($before !== $after) {
-            $this->audit->record('crm.organisation_das_changed', $organisation, ['das_ids' => $before], ['das_ids' => $after]);
-        }
     }
 
     /**

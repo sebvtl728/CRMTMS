@@ -26,11 +26,24 @@ class OrganisationRequest extends FormRequest
 
     protected function prepareForValidation(): void
     {
+        $this->merge(self::normalise($this->all()));
+    }
+
+    /**
+     * Cleaning of the submitted text fields (screen and import): trimmed,
+     * '' as null, SIRET without spaces or dots, NAF and country upper case,
+     * website with a scheme. Only the keys present in $input are returned.
+     *
+     * @param  array<string, mixed>  $input
+     * @return array<string, mixed>
+     */
+    public static function normalise(array $input): array
+    {
         $clean = [];
 
         foreach (['name', 'siret', 'naf_code', 'email', 'phone', 'website', 'address_line1', 'address_line2', 'postal_code', 'city', 'country', 'notes_summary'] as $key) {
-            if ($this->has($key)) {
-                $value = is_string($this->input($key)) ? trim($this->input($key)) : $this->input($key);
+            if (array_key_exists($key, $input)) {
+                $value = is_string($input[$key]) ? trim($input[$key]) : $input[$key];
                 $clean[$key] = $value === '' ? null : $value;
             }
         }
@@ -48,7 +61,32 @@ class OrganisationRequest extends FormRequest
             $clean['website'] = 'https://'.$clean['website'];
         }
 
-        $this->merge($clean);
+        return $clean;
+    }
+
+    /**
+     * Rules of the fields typed as text (shared with the import, which
+     * resolves the reference fields itself).
+     *
+     * @return array<string, list<mixed>>
+     */
+    public static function fieldRules(): array
+    {
+        return [
+            'name' => ['required', 'string', 'max:255'],
+            'siret' => ['nullable', 'string', new Siret],
+            'naf_code' => ['nullable', 'string', 'regex:/^\d{2}\.?\d{2}[A-Z]$/'],
+            'status' => ['sometimes', Rule::enum(OrganisationStatus::class)],
+            'email' => ['nullable', 'string', 'email', 'max:255'],
+            'phone' => ['nullable', 'string', 'max:30'],
+            'website' => ['nullable', 'string', 'url:http,https', 'max:255'],
+            'address_line1' => ['nullable', 'string', 'max:255'],
+            'address_line2' => ['nullable', 'string', 'max:255'],
+            'postal_code' => ['nullable', 'string', 'max:10'],
+            'city' => ['nullable', 'string', 'max:255'],
+            'country' => ['nullable', 'string', 'size:2', 'alpha'],
+            'notes_summary' => ['nullable', 'string', 'max:5000'],
+        ];
     }
 
     /**
@@ -60,25 +98,13 @@ class OrganisationRequest extends FormRequest
         $current = $current instanceof Organisation ? $current : null;
 
         return [
-            'name' => ['required', 'string', 'max:255'],
-            'siret' => ['nullable', 'string', new Siret],
-            'naf_code' => ['nullable', 'string', 'regex:/^\d{2}\.?\d{2}[A-Z]$/'],
+            ...self::fieldRules(),
             'legal_form_id' => ['nullable', ...ReferenceRules::item(ReferenceList::LegalFormOrg, $current?->legal_form_id)],
             'sector_id' => ['nullable', ...ReferenceRules::item(ReferenceList::Sector, $current?->sector_id)],
             'establishment_type_id' => ['nullable', ...ReferenceRules::item(ReferenceList::EstablishmentType, $current?->establishment_type_id)],
             'company_size_id' => ['nullable', ...ReferenceRules::item(ReferenceList::CompanySize, $current?->company_size_id)],
             'origin_id' => ['nullable', ...ReferenceRules::item(ReferenceList::ContactOrigin, $current?->origin_id)],
-            'status' => ['sometimes', Rule::enum(OrganisationStatus::class)],
             'responsible_user_id' => ['nullable', ...ReferenceRules::responsible($current?->responsible_user_id)],
-            'email' => ['nullable', 'string', 'email', 'max:255'],
-            'phone' => ['nullable', 'string', 'max:30'],
-            'website' => ['nullable', 'string', 'url:http,https', 'max:255'],
-            'address_line1' => ['nullable', 'string', 'max:255'],
-            'address_line2' => ['nullable', 'string', 'max:255'],
-            'postal_code' => ['nullable', 'string', 'max:10'],
-            'city' => ['nullable', 'string', 'max:255'],
-            'country' => ['nullable', 'string', 'size:2', 'alpha'],
-            'notes_summary' => ['nullable', 'string', 'max:5000'],
             'das_ids' => ['sometimes', 'array'],
             'das_ids.*' => ['distinct', ...ReferenceRules::item(ReferenceList::Das, $current?->das()->pluck('reference_items.id')->all())],
         ];
@@ -88,6 +114,14 @@ class OrganisationRequest extends FormRequest
      * @return array<string, string>
      */
     public function messages(): array
+    {
+        return self::validationMessages();
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    public static function validationMessages(): array
     {
         return [
             'required' => 'Ce champ est obligatoire.',

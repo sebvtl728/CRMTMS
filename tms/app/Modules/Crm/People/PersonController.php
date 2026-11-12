@@ -3,10 +3,8 @@
 namespace App\Modules\Crm\People;
 
 use App\Http\Controllers\Controller;
-use App\Modules\Core\Audit\AuditRecorder;
 use App\Modules\Core\References\ReferenceItem;
 use App\Modules\Core\References\ReferenceList;
-use App\Modules\Core\Tenancy\TenantContext;
 use App\Modules\Core\Users\User;
 use App\Modules\Crm\Duplicates\DuplicateGuard;
 use App\Modules\Crm\Organisations\Organisation;
@@ -14,6 +12,7 @@ use App\Modules\Crm\Organisations\OrganisationStatus;
 use App\Modules\Crm\Permissions;
 use App\Modules\Crm\Search\CrmResource;
 use App\Modules\Crm\Search\ListExtras;
+use App\Modules\Crm\Support\DasLinks;
 use App\Modules\Crm\Support\FormOptions;
 use App\Modules\Crm\Visibility\CrmVisibility;
 use Illuminate\Database\Eloquent\Builder;
@@ -32,7 +31,7 @@ use Symfony\Component\HttpFoundation\Response as HttpResponse;
  */
 class PersonController extends Controller
 {
-    public function __construct(private readonly TenantContext $tenants, private readonly AuditRecorder $audit, private readonly DuplicateGuard $duplicates) {}
+    public function __construct(private readonly DuplicateGuard $duplicates, private readonly DasLinks $das) {}
 
     public function index(Request $request): Response
     {
@@ -270,30 +269,11 @@ class PersonController extends Controller
             $person->fill($validated)->save();
 
             if ($dasIds !== null) {
-                $this->syncDas($person, $dasIds);
+                $this->das->sync($person, $dasIds);
             }
         });
 
         return $person;
-    }
-
-    /**
-     * @param  list<string>  $dasIds
-     */
-    private function syncDas(Person $person, array $dasIds): void
-    {
-        $before = $person->das()->pluck('reference_items.id')->all();
-        $tenantId = $this->tenants->id();
-
-        $person->das()->sync(collect($dasIds)->mapWithKeys(fn (string $id) => [$id => ['tenant_id' => $tenantId]])->all());
-
-        sort($before);
-        $after = $dasIds;
-        sort($after);
-
-        if ($before !== $after) {
-            $this->audit->record('crm.person_das_changed', $person, ['das_ids' => $before], ['das_ids' => $after]);
-        }
     }
 
     /**

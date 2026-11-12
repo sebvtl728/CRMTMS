@@ -23,11 +23,24 @@ class PersonRequest extends FormRequest
 
     protected function prepareForValidation(): void
     {
+        $this->merge(self::normalise($this->all()));
+    }
+
+    /**
+     * Cleaning of the submitted text fields (screen and import): trimmed,
+     * '' as null, phones normalised, e-mails lower case, country upper case.
+     * Only the keys present in $input are returned.
+     *
+     * @param  array<string, mixed>  $input
+     * @return array<string, mixed>
+     */
+    public static function normalise(array $input): array
+    {
         $clean = [];
 
         foreach (self::TEXT as $key) {
-            if ($this->has($key)) {
-                $value = is_string($this->input($key)) ? trim($this->input($key)) : $this->input($key);
+            if (array_key_exists($key, $input)) {
+                $value = is_string($input[$key]) ? trim($input[$key]) : $input[$key];
                 $clean[$key] = $value === '' ? null : $value;
             }
         }
@@ -40,24 +53,23 @@ class PersonRequest extends FormRequest
         if (is_string($clean['country'] ?? null)) {
             $clean['country'] = mb_strtoupper($clean['country']);
         }
-        if (is_string($clean['email'] ?? null)) {
-            $clean['email'] = mb_strtolower($clean['email']);
-        }
-        if (is_string($clean['email_secondary'] ?? null)) {
-            $clean['email_secondary'] = mb_strtolower($clean['email_secondary']);
+        foreach (['email', 'email_secondary'] as $key) {
+            if (is_string($clean[$key] ?? null)) {
+                $clean[$key] = mb_strtolower($clean[$key]);
+            }
         }
 
-        $this->merge($clean);
+        return $clean;
     }
 
     /**
-     * @return array<string, mixed>
+     * Rules of the fields typed as text (shared with the import, which
+     * resolves the reference fields itself).
+     *
+     * @return array<string, list<mixed>>
      */
-    public function rules(): array
+    public static function fieldRules(): array
     {
-        $current = $this->route('person');
-        $current = $current instanceof Person ? $current : null;
-
         return [
             'civility' => ['nullable', Rule::in(['M.', 'Mme'])],
             'first_name' => ['nullable', 'string', 'max:255'],
@@ -74,10 +86,23 @@ class PersonRequest extends FormRequest
             'birth_date' => ['nullable', 'date_format:Y-m-d', 'before_or_equal:today', 'after:1900-01-01'],
             'is_individual' => ['sometimes', 'boolean'],
             'project' => ['nullable', 'string', 'max:5000'],
+            'status' => ['sometimes', Rule::enum(OrganisationStatus::class)],
+        ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function rules(): array
+    {
+        $current = $this->route('person');
+        $current = $current instanceof Person ? $current : null;
+
+        return [
+            ...self::fieldRules(),
             'professional_situation_id' => ['nullable', ...ReferenceRules::item(ReferenceList::ProfessionalSituation, $current?->professional_situation_id)],
             'funding_mode_id' => ['nullable', ...ReferenceRules::item(ReferenceList::FundingMode, $current?->funding_mode_id)],
             'origin_id' => ['nullable', ...ReferenceRules::item(ReferenceList::ContactOrigin, $current?->origin_id)],
-            'status' => ['sometimes', Rule::enum(OrganisationStatus::class)],
             'responsible_user_id' => ['nullable', ...ReferenceRules::responsible($current?->responsible_user_id)],
             'das_ids' => ['sometimes', 'array'],
             'das_ids.*' => ['distinct', ...ReferenceRules::item(ReferenceList::Das, $current?->das()->pluck('reference_items.id')->all())],
@@ -88,6 +113,14 @@ class PersonRequest extends FormRequest
      * @return array<string, string>
      */
     public function messages(): array
+    {
+        return self::validationMessages();
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    public static function validationMessages(): array
     {
         return [
             'required' => 'Ce champ est obligatoire.',
