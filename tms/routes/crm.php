@@ -4,6 +4,7 @@ use App\Modules\Crm\Affiliations\AffiliationController;
 use App\Modules\Crm\Duplicates\MergeController;
 use App\Modules\Crm\Export\ExportController;
 use App\Modules\Crm\Organisations\OrganisationController;
+use App\Modules\Crm\Organisations\SireneLookupController;
 use App\Modules\Crm\People\PersonController;
 use App\Modules\Crm\Search\SavedFilterController;
 use App\Modules\Crm\Search\SearchController;
@@ -55,6 +56,9 @@ Route::middleware(['auth'])->group(function () {
         Route::delete('{person}', [PersonController::class, 'destroy'])->middleware('can:crm.delete')->name('destroy');
         Route::post('{person}/restore', [PersonController::class, 'restore'])->middleware('can:crm.delete')->name('restore');
     });
+
+    // Prefill an entreprise from its SIRET (Sirene connector); create or update right, 30/min/user.
+    Route::get('crm/sirene/{siret}', SireneLookupController::class)->middleware('throttle:30,1')->name('crm.sirene');
 
     // Global search (Ctrl+K), saved filters; the Excel exports are above, next to their lists.
     Route::get('crm/search', SearchController::class)->middleware(['can:crm.view', 'throttle:60,1'])->name('crm.search');

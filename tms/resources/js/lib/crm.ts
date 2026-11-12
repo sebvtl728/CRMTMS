@@ -60,3 +60,26 @@ export function todayIso(): string {
 export function itemError(errors: Record<string, string | undefined>, field: string): string | undefined {
     return Object.entries(errors).find(([key, message]) => key.startsWith(`${field}.`) && message)?.[1];
 }
+
+/** SIRET as typed (spaces and dots allowed) reduced to its digits. */
+export function cleanSiret(value: string): string {
+    return value.replace(/[\s.]/g, '');
+}
+
+/** 14 digits passing the Luhn check (same rule as the server). */
+export function isValidSiret(value: string): boolean {
+    const siret = cleanSiret(value);
+    if (!/^\d{14}$/.test(siret)) return false;
+
+    let sum = 0;
+    [...siret].reverse().forEach((char, i) => {
+        let digit = Number(char);
+        if (i % 2 === 1) {
+            digit *= 2;
+            if (digit > 9) digit -= 9;
+        }
+        sum += digit;
+    });
+
+    return sum % 10 === 0;
+}

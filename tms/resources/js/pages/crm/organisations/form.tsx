@@ -7,11 +7,11 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import AppLayout from '@/layouts/app-layout';
-import { itemError, type Option } from '@/lib/crm';
+import { cleanSiret, isValidSiret, itemError, type Option } from '@/lib/crm';
 import { type BreadcrumbItem } from '@/types';
 import { Head, Link, useForm, usePage } from '@inertiajs/react';
-import { LoaderCircle } from 'lucide-react';
-import { FormEventHandler } from 'react';
+import { LoaderCircle, Search } from 'lucide-react';
+import { FormEventHandler, useState } from 'react';
 
 type OrganisationForm = {
     name: string;
@@ -58,6 +58,27 @@ interface FormProps {
 }
 
 const NONE = 'none';
+
+interface SireneData {
+    name: string;
+    naf_code: string | null;
+    address_line1: string | null;
+    postal_code: string | null;
+    city: string | null;
+    legal_form_id: string | null;
+    company_size_id: string | null;
+}
+
+/** Form field => label shown in the « Champs complétés » message. */
+const SIRENE_FIELDS: Array<[keyof SireneData & keyof OrganisationForm, string]> = [
+    ['name', 'raison sociale'],
+    ['naf_code', 'code NAF'],
+    ['legal_form_id', 'forme juridique'],
+    ['company_size_id', 'taille'],
+    ['address_line1', 'adresse'],
+    ['postal_code', 'code postal'],
+    ['city', 'ville'],
+];
 
 function Field({
     id,
@@ -116,6 +137,50 @@ export default function OrganisationFormPage({ organisation, options, duplicates
         country: str('country', 'FR'),
         notes_summary: str('notes_summary'),
     });
+
+    const [sirene, setSirene] = useState<{ loading: boolean; error: string | null; filled: string[] | null }>({
+        loading: false,
+        error: null,
+        filled: null,
+    });
+
+    /** Asks the directory for the SIRET and fills ONLY the empty fields; the user validates by saving. */
+    const completeFromSiret = async () => {
+        setSirene({ loading: true, error: null, filled: null });
+        try {
+            const response = await fetch(`/crm/sirene/${cleanSiret(data.siret)}`, {
+                headers: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+                credentials: 'same-origin',
+            });
+            const body = await response.json().catch(() => ({}));
+            if (!response.ok) {
+                setSirene({
+                    loading: false,
+                    error: body.message ?? "Service de l'annuaire indisponible, saisissez les informations manuellement.",
+                    filled: null,
+                });
+
+                return;
+            }
+
+            const found: SireneData = body.data;
+            const filled: string[] = [];
+            SIRENE_FIELDS.forEach(([key, label]) => {
+                const value = found[key];
+                if (value && !data[key]) {
+                    setData(key, value as never);
+                    filled.push(label);
+                }
+            });
+            setSirene({ loading: false, error: null, filled });
+        } catch {
+            setSirene({
+                loading: false,
+                error: "Service de l'annuaire indisponible, saisissez les informations manuellement.",
+                filled: null,
+            });
+        }
+    };
 
     const existingId = (usePage().props.errors as Record<string, string | undefined>).siret_existing_id;
 
@@ -194,6 +259,27 @@ export default function OrganisationFormPage({ organisation, options, duplicates
                                 Ouvrir l'entreprise existante
                             </Link>
                         )}
+                        <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            className="w-fit"
+                            disabled={!isValidSiret(data.siret) || sirene.loading}
+                            onClick={completeFromSiret}
+                        >
+                            {sirene.loading ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
+                            Compléter depuis le SIRET
+                        </Button>
+                        <div aria-live="polite">
+                            {sirene.error && <p className="text-sm text-red-600 dark:text-red-400">{sirene.error}</p>}
+                            {sirene.filled !== null && (
+                                <p className="text-sm text-muted-foreground">
+                                    {sirene.filled.length > 0
+                                        ? `Champs complétés : ${sirene.filled.join(', ')}. Vérifiez avant d'enregistrer.`
+                                        : 'Aucun champ à compléter : les champs concernés sont déjà renseignés.'}
+                                </p>
+                            )}
+                        </div>
                     </Field>
                     {text('naf_code', 'Code NAF', { placeholder: '5610A', maxLength: 6 })}
                     {pick('status', 'Statut', options.status, 'Prospect')}
