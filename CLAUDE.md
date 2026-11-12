@@ -26,6 +26,7 @@ docker compose exec app php artisan migrate --database=pgsql_owner   # migration
 docker compose exec app vendor/bin/pint                       # formatage PHP
 docker compose exec app vendor/bin/phpstan analyse            # analyse statique
 docker compose run --rm vite sh -c "npm run lint && npm run types && npm run build"
+npm run e2e                                                    # Playwright (hôte, pile dédiée port 8081) : voir tms/docs/install.md
 ```
 
 Installation dev complète : `tms/docs/install.md`. App : http://localhost:8080, santé : `/health`.

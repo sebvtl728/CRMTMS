@@ -55,6 +55,28 @@ Les tests s'exécutent en tant que `tms_app` sur la base `tms_test` ; le schéma
 `pgsql_owner` (voir `tests/RefreshDatabaseAsOwner.php`). Les assets doivent avoir été
 compilés (`npm run build`).
 
+### Tests de bout en bout (Playwright)
+
+Le test `tests/e2e/admin.spec.ts` rejoue le parcours d'un administrateur dans un vrai navigateur : lien
+d'activation, mot de passe, enrôlement 2FA (code TOTP calculé avec `otplib`), création d'une société SCOP,
+invitation d'un utilisateur, journal d'audit.
+
+Il s'exécute sur une pile dédiée (`compose.e2e.yaml` : application `app-e2e`, base `tms_e2e`, organisme `e2e`,
+port **8081**, assets compilés) : la base et les données de développement ne sont jamais touchées. Prérequis :
+la pile de développement démarrée (`docker compose up -d`, Colima inclus) et Node.js 20+ sur la machine hôte.
+
+```bash
+cd tms
+npm install
+npx playwright install chromium   # une seule fois : télécharge le navigateur (~100 Mo)
+npm run e2e                       # compile les assets, recrée tms_e2e, installe l'organisme, lance le test
+```
+
+`tests/e2e/prepare.sh` (appelé par `tests/e2e/global-setup.ts`) démarre la pile e2e, recrée la base `tms_e2e`,
+applique les migrations et exécute `tms:install` ; le lien d'activation obtenu est transmis au test. En cas
+d'échec, la trace est dans `test-results/` (`npx playwright show-trace <trace.zip>`). Ces tests ne sont pas
+encore exécutés par la CI GitHub (ils demandent la pile Docker complète) : suite à prévoir.
+
 ## Production : installation en une ligne
 
 Deux scripts publiés avec chaque version : `proxmox.sh` (crée un conteneur LXC sur un nœud Proxmox VE et

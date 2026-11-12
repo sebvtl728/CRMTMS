@@ -1,0 +1,10 @@
+{
+	auto_https off
+}
+
+:80 {
+	root * /var/www/html/public
+	encode zstd gzip
+	php_fastcgi app-e2e:9000
+	file_server
+}
