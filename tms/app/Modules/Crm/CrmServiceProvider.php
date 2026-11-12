@@ -62,16 +62,19 @@ class CrmServiceProvider extends ServiceProvider
                 throw (new ModelNotFoundException)->setModel(Organisation::class, [$value]);
             }
 
-            $query = Organisation::withTrashed();
             $user = request()->user();
 
+            // A merged fiche is resolved before the visibility filter (it has
+            // lost its DAS and links): only the final kept fiche must be visible.
+            self::redirectIfMerged(Organisation::withTrashed()->whereKey($value)->whereNotNull('merged_into_id')->first(), $value,
+                fn () => $user instanceof User ? CrmVisibility::organisations(Organisation::withTrashed(), $user) : Organisation::withTrashed(), 'crm.organisations.show');
+
+            $query = Organisation::withTrashed();
             if ($user instanceof User) {
                 $query = CrmVisibility::organisations($query, $user);
             }
 
-            $organisation = $query->findOrFail($value);
-
-            return self::unlessMerged($organisation, $value, fn () => $user instanceof User ? CrmVisibility::organisations(Organisation::withTrashed(), $user) : Organisation::withTrashed(), 'crm.organisations.show');
+            return $query->findOrFail($value);
         });
 
         Route::bind('person', function (string $value): Person {
@@ -79,16 +82,19 @@ class CrmServiceProvider extends ServiceProvider
                 throw (new ModelNotFoundException)->setModel(Person::class, [$value]);
             }
 
-            $query = Person::withTrashed();
             $user = request()->user();
 
+            // A merged fiche is resolved before the visibility filter (it has
+            // lost its DAS and links): only the final kept fiche must be visible.
+            self::redirectIfMerged(Person::withTrashed()->whereKey($value)->whereNotNull('merged_into_id')->first(), $value,
+                fn () => $user instanceof User ? CrmVisibility::people(Person::withTrashed(), $user) : Person::withTrashed(), 'crm.people.show');
+
+            $query = Person::withTrashed();
             if ($user instanceof User) {
                 $query = CrmVisibility::people($query, $user);
             }
 
-            $person = $query->findOrFail($value);
-
-            return self::unlessMerged($person, $value, fn () => $user instanceof User ? CrmVisibility::people(Person::withTrashed(), $user) : Person::withTrashed(), 'crm.people.show');
+            return $query->findOrFail($value);
         });
 
         // An affiliation is reachable through the entreprise it belongs to.
@@ -114,30 +120,30 @@ class CrmServiceProvider extends ServiceProvider
 
     /**
      * A merged fiche is never acted upon: every visit goes to the fiche that
-     * absorbed it (following successive merges). A GET keeps its path (fiche,
-     * edit form, timeline…); any other method gets a 303 to the kept fiche
-     * (seen as a GET: a DELETE is never replayed on it). 404 when the kept
-     * fiche is not visible.
+     * absorbed it, following successive merges without the visibility filter
+     * (the absorbed fiches lost their DAS and links), the final kept fiche
+     * must be visible (404 otherwise). A GET keeps its path (fiche, edit
+     * form, timeline…); any other method gets a 303 to the kept fiche (seen
+     * as a GET: a DELETE is never replayed on it).
      *
      * @template TModel of Organisation|Person
      *
-     * @param  TModel  $fiche
+     * @param  TModel|null  $merged
      * @param  callable(): Builder<TModel>  $visible
-     * @return TModel
      */
-    private static function unlessMerged(Organisation|Person $fiche, string $value, callable $visible, string $showRoute): Organisation|Person
+    private static function redirectIfMerged(Organisation|Person|null $merged, string $value, callable $visible, string $showRoute): void
     {
-        if ($fiche->merged_into_id === null) {
-            return $fiche;
+        if ($merged === null || $merged->merged_into_id === null) {
+            return;
         }
 
-        $target = $fiche;
+        $target = $merged;
         for ($hops = 0; $hops < 20 && $target !== null && $target->merged_into_id !== null; $hops++) {
-            $target = $visible()->find($target->merged_into_id);
+            $target = $target::withTrashed()->find($target->merged_into_id);
         }
 
-        if ($target === null || $target->merged_into_id !== null) {
-            throw (new ModelNotFoundException)->setModel($fiche::class, [$value]);
+        if ($target === null || $target->merged_into_id !== null || ! $visible()->whereKey($target->getKey())->exists()) {
+            throw (new ModelNotFoundException)->setModel($merged::class, [$value]);
         }
 
         $request = request();

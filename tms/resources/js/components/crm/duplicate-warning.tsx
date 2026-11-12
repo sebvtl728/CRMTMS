@@ -72,7 +72,7 @@ export function DuplicateWarning({ type, duplicates, canMerge, currentId, proces
                                 (currentId === null ? (
                                     <Button type="button" variant="outline" size="sm" disabled={processing} onClick={() => onCreateAndMerge(d.id)}>
                                         <Merge className="h-4 w-4" aria-hidden />
-                                        Fusionner
+                                        Créer puis fusionner
                                     </Button>
                                 ) : (
                                     <Button type="button" variant="outline" size="sm" asChild>

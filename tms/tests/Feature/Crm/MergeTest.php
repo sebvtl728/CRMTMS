@@ -13,6 +13,8 @@ use App\Modules\Crm\People\Person;
 use App\Modules\Crm\Timeline\Attachment;
 use App\Modules\Crm\Timeline\Note;
 use App\Rules\Siret;
+use Illuminate\Database\UniqueConstraintViolationException;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 use Inertia\Testing\AssertableInertia as Assert;
 
@@ -351,4 +353,79 @@ it('lists similar fiches on a fiche for those who may merge', function () {
         ->where('similar.0.id', $twin->id)->where('similar.0.reason', 'name')->where('can.merge', true));
     $this->actingAs(assistant())->get("/crm/people/{$fiche->id}")->assertInertia(fn (Assert $page) => $page
         ->where('similar', [])->where('can.merge', false));
+});
+
+it('scrubs the personal data left on the absorbed person', function () {
+    $this->actingAs(commercial());
+    $org = mgOrg('Hôtel du Lac');
+    $keep = makePerson('Dupont', ['first_name' => 'Jean', 'city' => 'Annecy']);
+    $drop = makePerson('Dupontel', ['first_name' => 'Jeannot', 'email' => 'jeannot@perso.fr', 'email_secondary' => 'j2@perso.fr',
+        'phone' => '0450112233', 'mobile' => '0698765432', 'address_line1' => '12 rue Secrète', 'address_line2' => 'Bât. Z',
+        'postal_code' => '74999', 'city' => 'Ville-Cachée', 'birth_date' => '1975-03-02', 'project' => 'Projet très personnel',
+        'source_system' => 'formevol', 'source_id' => 'P9']);
+    affiliate($keep, $org, ['started_on' => '2020-01-01']);
+    $loser = affiliate($drop, $org, ['started_on' => '2023-01-01', 'work_email' => 'pro@cache.fr', 'work_phone' => '0450998877']);
+
+    $this->post('/crm/merge/person', ['keep' => $keep->id, 'drop' => $drop->id, 'fields' => ['last_name' => 'keep', 'city' => 'keep', 'email' => 'drop']])->assertRedirect();
+
+    $keep->refresh();
+    expect($keep->last_name)->toBe('Dupont')->and($keep->city)->toBe('Annecy')->and($keep->email)->toBe('jeannot@perso.fr')
+        ->and($keep->mobile)->toBe('+33698765432');
+
+    $row = (array) DB::table('people')->where('id', $drop->id)->sole();
+    expect($row['last_name'])->toBe('Fusionnée')
+        ->and(collect(Person::PERSONAL_FIELDS)->reject(fn ($f) => $f === 'last_name')->map(fn ($f) => $row[$f])->filter()->all())->toBe([])
+        ->and($row['merged_into_id'])->toBe($keep->id)
+        ->and($row['source_id'])->toBe('P9')
+        ->and($row['search_vector'])->not->toContain('dupontel')->not->toContain('jeannot');
+    $loserRow = (array) DB::table('affiliations')->where('id', $loser->id)->sole();
+    expect($loserRow['work_email'])->toBeNull()->and($loserRow['work_phone'])->toBeNull()->and($loserRow['deleted_at'])->not->toBeNull();
+
+    $journal = AuditLog::query()->get()->map(fn (AuditLog $l) => json_encode([$l->old_values, $l->new_values], JSON_UNESCAPED_UNICODE))->implode("\n");
+    foreach (['Dupontel', 'Jeannot', 'perso.fr', 'Secrète', 'Bât. Z', '74999', 'Ville-Cachée', '1975-03-02', 'très personnel', 'cache.fr', '98765432', '112233', '998877'] as $value) {
+        expect($journal)->not->toContain($value);
+    }
+});
+
+it('redirects a Responsable DAS from an absorbed fiche he could not see to the visible kept one', function () {
+    $das = mgDas('Hôtellerie-restauration');
+    $user = userWithRole(Role::ResponsableDas);
+    followDas($user, $das);
+    $this->actingAs(commercial());
+    $keep = mgOrg('Visible');
+    $keep->das()->sync([$das->id => ['tenant_id' => tenant()->id]]);
+    $drop = mgOrg('Sans DAS');
+    $this->post('/crm/merge/organisation', ['keep' => $keep->id, 'drop' => $drop->id])->assertRedirect();
+    $hiddenKeep = mgOrg('Cachée');
+    $hiddenDrop = mgOrg('Cachée bis');
+    $this->post('/crm/merge/organisation', ['keep' => $hiddenKeep->id, 'drop' => $hiddenDrop->id])->assertRedirect();
+
+    $this->actingAs($user)->get("/crm/organisations/{$drop->id}")->assertRedirect("/crm/organisations/{$keep->id}");
+    $this->get("/crm/organisations/{$hiddenDrop->id}")->assertNotFound();
+});
+
+it('keeps the kept fiche value of a boolean by default', function () {
+    $this->actingAs(commercial());
+    $keep = makePerson('Dupont', ['is_individual' => false]);
+    $drop = makePerson('Dupond', ['is_individual' => true]);
+
+    $this->get("/crm/merge/person/{$keep->id}/{$drop->id}")->assertInertia(fn (Assert $page) => $page
+        ->where('fields', fn ($fields) => collect($fields)->firstWhere('name', 'is_individual')['default'] === 'keep'));
+    $this->post('/crm/merge/person', ['keep' => $keep->id, 'drop' => $drop->id])->assertRedirect();
+    expect($keep->refresh()->is_individual)->toBeFalse();
+});
+
+it('turns a database conflict during the merge into a message', function () {
+    $this->actingAs(commercial());
+    $keep = mgOrg('Garde');
+    $drop = mgOrg('Absorbée');
+    Organisation::updating(function (Organisation $o) use ($keep) {
+        if ($o->id === $keep->id) {
+            throw new UniqueConstraintViolationException('pgsql', 'update organisations', [], new PDOException('duplicate key'));
+        }
+    });
+
+    $this->postJson('/crm/merge/organisation', ['keep' => $keep->id, 'drop' => $drop->id])
+        ->assertJsonValidationErrors(['drop' => 'La fusion n\'a pas pu aboutir, réessayez.']);
+    expect(Organisation::query()->findOrFail($drop->id)->merged_into_id)->toBeNull();
 });

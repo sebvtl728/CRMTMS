@@ -9,6 +9,8 @@ use App\Modules\Crm\Organisations\Organisation;
 use App\Modules\Crm\People\Person;
 use App\Modules\Crm\Timeline\Attachment;
 use App\Modules\Crm\Timeline\Note;
+use Illuminate\Database\QueryException;
+use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
@@ -45,6 +47,11 @@ class Merger
         'origin_id' => 'Origine', 'project' => 'Projet',
     ];
 
+    /** Placeholder of the (NOT NULL) last name of an absorbed, scrubbed person. */
+    public const RETRY = 'La fusion n\'a pas pu aboutir, réessayez.';
+
+    public const MERGED_PERSON_NAME = 'Fusionnée';
+
     /** Affiliation fields completed from the duplicate link when empty on the surviving one. */
     private const LINK_FIELDS = ['job_title', 'decision_role_id', 'work_email', 'work_phone', 'started_on'];
 
@@ -78,12 +85,17 @@ class Merger
      */
     public static function defaultChoice(mixed $keepValue, mixed $dropValue): string
     {
+        // A boolean is never « empty »: false is a value.
+        if (is_bool($keepValue)) {
+            return 'keep';
+        }
+
         return self::isEmpty($keepValue) && ! self::isEmpty($dropValue) ? 'drop' : 'keep';
     }
 
     public static function isEmpty(mixed $value): bool
     {
-        return $value === null || $value === '' || $value === false;
+        return $value === null || $value === '';
     }
 
     /**
@@ -105,6 +117,24 @@ class Merger
             throw ValidationException::withMessages(['drop' => 'Une fiche ne peut pas être fusionnée avec elle-même.']);
         }
 
+        try {
+            return $this->transaction($keep, $drop, $choices, $fields);
+        } catch (QueryException $e) {
+            // Lost a race (unique index, deadlock): nothing was written.
+            if (in_array($e->errorInfo[0] ?? null, ['23505', '40P01'], true) || $e instanceof UniqueConstraintViolationException) {
+                throw ValidationException::withMessages(['drop' => self::RETRY]);
+            }
+
+            throw $e;
+        }
+    }
+
+    /**
+     * @param  array<string, string>  $choices
+     * @param  array<string, string>  $fields
+     */
+    private function transaction(Organisation|Person $keep, Organisation|Person $drop, array $choices, array $fields): Organisation|Person
+    {
         return DB::transaction(function () use ($keep, $drop, $choices, $fields) {
             // Fresh, locked copies, always in the same order (no deadlock
             // between two merges of the same pair). RLS keeps them in the organisme.
@@ -132,16 +162,27 @@ class Merger
             $this->moveTimeline($k, $d);
             $this->uniteDas($k, $d, $isPerson);
 
-            // Absorbed fiche first: frees its unique values (SIRET) for $keep.
-            $d->forceFill(['merged_into_id' => $k->id])->save();
-            $d->delete();
-
+            // Values retained on $keep, read before the absorbed fiche is scrubbed.
             foreach ($fields as $field => $label) {
                 $choice = $choices[$field] ?? self::defaultChoice($k->getAttribute($field), $d->getAttribute($field));
                 if ($choice === 'drop') {
                     $k->setAttribute($field, $d->getAttribute($field));
                 }
             }
+
+            // Absorbed fiche first: frees its unique values (SIRET) for $keep.
+            // A person keeps no personal data (GDPR minimisation: the row only
+            // serves the redirect and the source identifiers). Auditable masks
+            // the values. An entreprise (legal person) is kept as is.
+            $d->forceFill(['merged_into_id' => $k->id]);
+            if ($d instanceof Person) {
+                foreach (Person::PERSONAL_FIELDS as $field) {
+                    $d->setAttribute($field, null);
+                }
+                $d->last_name = self::MERGED_PERSON_NAME;
+            }
+            $d->save();
+            $d->delete();
 
             $last = collect([$k->last_contact_at, $d->last_contact_at])->filter()->max();
             $k->last_contact_at = $last instanceof Carbon ? $last : null;
@@ -199,10 +240,13 @@ class Merger
                     $survivor->setAttribute($field, $loser->getAttribute($field));
                 }
             }
-            $survivor->is_referent = $survivor->is_referent || $loser->is_referent;
 
+            // The trashed duplicate link keeps no personal contact data.
             $loser->delete();
             $loser->setAttribute($column, $keepId);
+            foreach (Affiliation::PERSONAL_FIELDS as $field) {
+                $loser->setAttribute($field, null);
+            }
             $loser->save();
 
             $survivor->setAttribute($column, $keepId);
