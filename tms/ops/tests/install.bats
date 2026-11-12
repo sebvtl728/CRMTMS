@@ -276,6 +276,17 @@ env_value() {
     grep -q -- "--slug=creme-formation-evolution " "$MOCK_LOG/docker.log"
 }
 
+@test "multi mode passes the domain to tms:install, single mode does not" {
+    TMS_MODE=multi run bash "$INSTALL_SH"
+    [ "$status" -eq 0 ]
+    grep -q -- "tms:install .*--domain=tms.example.test" "$MOCK_LOG/docker.log"
+
+    rm -rf "$TMS_DIR" "$MOCK_LOG/docker.log"
+    run bash "$INSTALL_SH"
+    [ "$status" -eq 0 ]
+    refute grep -q -- "--domain" "$MOCK_LOG/docker.log"
+}
+
 @test "TMS_SEED_CAP=0 skips the CAP references" {
     TMS_SEED_CAP=0 run bash "$INSTALL_SH"
     [ "$status" -eq 0 ]

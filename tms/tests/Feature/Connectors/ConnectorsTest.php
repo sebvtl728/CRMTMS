@@ -212,14 +212,34 @@ it('creates a configuration and keeps stored secrets when the field is left empt
     $config = ConnectorConfig::query()->sole();
     expect($config->secrets['password'])->toBe('s3cret')->and($config->company_id)->toBeNull();
 
-    $this->putJson('/admin/connectors/smtp', smtpForm(['secrets' => ['username' => '', 'password' => ''], 'settings' => ['host' => 'mail.cap.test', 'port' => 465, 'encryption' => 'ssl', 'from_address' => 'a@cap.test', 'from_name' => '']]))->assertRedirect();
+    $this->putJson('/admin/connectors/smtp', smtpForm(['secrets' => ['username' => '', 'password' => ''], 'settings' => ['host' => 'smtp.example.test', 'port' => 587, 'encryption' => 'ssl', 'from_address' => 'a@cap.test', 'from_name' => '']]))->assertRedirect();
     $config->refresh();
     expect($config->secrets)->toBe(['username' => 'cap-user', 'password' => 's3cret'])
-        ->and($config->settings['host'])->toBe('mail.cap.test')
+        ->and($config->settings['encryption'])->toBe('ssl')
         ->and(ConnectorConfig::query()->count())->toBe(1);
 
     $this->putJson('/admin/connectors/smtp', smtpForm(['secrets' => ['password' => 'n3w']]))->assertRedirect();
     expect($config->refresh()->secrets)->toBe(['username' => 'cap-user', 'password' => 'n3w']);
+});
+
+it('requires the stored secrets again when the host or the port changes', function () {
+    $this->actingAs(admin(twoFactor: true));
+    $this->putJson('/admin/connectors/smtp', smtpForm())->assertRedirect();
+    $config = ConnectorConfig::query()->sole();
+
+    $moved = fn (array $settings, array $secrets) => smtpForm(['settings' => [...smtpForm()['settings'], ...$settings], 'secrets' => $secrets]);
+
+    // The stored password must never be sent to another server without being typed again.
+    $this->putJson('/admin/connectors/smtp', $moved(['host' => 'evil.example.test'], ['username' => '', 'password' => '']))
+        ->assertUnprocessable()->assertJsonValidationErrors(['secrets.username', 'secrets.password']);
+    $this->putJson('/admin/connectors/smtp', $moved(['port' => 2525], ['username' => 'cap-user', 'password' => '']))
+        ->assertUnprocessable()->assertJsonValidationErrors(['secrets.password']);
+    expect($config->refresh()->settings['host'])->toBe('smtp.example.test')
+        ->and($config->settings['port'])->toBe(587);
+
+    $this->putJson('/admin/connectors/smtp', $moved(['host' => 'mail.cap.test', 'port' => 465], ['username' => 'cap-user', 'password' => 'n3w']))->assertRedirect();
+    expect($config->refresh()->settings['host'])->toBe('mail.cap.test')
+        ->and($config->secrets['password'])->toBe('n3w');
 });
 
 it('clears one secret on explicit request only', function () {

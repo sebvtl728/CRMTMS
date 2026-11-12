@@ -48,3 +48,7 @@ it('still answers 503 JSON when the session store (redis) is unreachable', funct
     $this->getJson('/health')->assertStatus(503)
         ->assertJson(['status' => 'error', 'db' => 'ok', 'redis' => 'error']);
 });
+
+it('exposes no framework health route besides /health', function () {
+    $this->get('/up')->assertNotFound();
+});

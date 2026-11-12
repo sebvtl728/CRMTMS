@@ -365,6 +365,8 @@ start_stack() {
 run_tms_install() {
     local -a args=(--tenant-name="$TMS_TENANT_NAME" --slug="$TMS_TENANT_SLUG" --admin-email="$TMS_ADMIN_EMAIL" --admin-name="$TMS_ADMIN_NAME")
     [[ "$TMS_SEED_CAP" == "1" ]] && args+=(--seed-cap)
+    # Multi mode: the organisme is found by its host name, so it needs its domain.
+    [[ "$TMS_MODE" == "multi" ]] && args+=(--domain="$TMS_DOMAIN")
     log_info "Création de l'organisme et de l'administrateur…"
     INSTALL_OUTPUT="$(compose exec -T app php artisan tms:install "${args[@]}")" \
         || { printf '%s\n' "${INSTALL_OUTPUT:-}" >&2; die "tms:install a échoué."; }

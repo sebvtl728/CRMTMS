@@ -205,3 +205,13 @@ it('keeps the permission team in step with the tenant context', function () {
     $context->clear();
     expect(getPermissionsTeamId())->toBeNull();
 });
+
+it('opens Horizon to platform administrators only', function () {
+    $admin = admin(twoFactor: true);
+    $platform = User::factory()->create();
+    $platform->forceFill(['is_platform_admin' => true])->save();
+
+    expect(Illuminate\Support\Facades\Gate::forUser($admin)->allows('viewHorizon'))->toBeFalse()
+        ->and(Illuminate\Support\Facades\Gate::forUser($platform)->allows('viewHorizon'))->toBeTrue()
+        ->and(Illuminate\Support\Facades\Gate::forUser(null)->allows('viewHorizon'))->toBeFalse();
+});

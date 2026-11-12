@@ -21,6 +21,9 @@ use RuntimeException;
  */
 class ConnectorController extends Controller
 {
+    /** Settings that designate the remote server: changing one requires the secrets again. */
+    private const SERVER_SETTINGS = ['host', 'port'];
+
     public function __construct(private readonly ConnectorRegistry $registry) {}
 
     public function index(Request $request): Response
@@ -99,6 +102,8 @@ class ConnectorController extends Controller
         $companyId = $data['company_id'] ?? null;
         $config = $this->find($key, $companyId) ?? new ConnectorConfig(['connector_key' => $key, 'company_id' => $companyId]);
 
+        $this->requireSecretsWhenServerMoves($connector, $config, $data);
+
         // An empty secret field keeps the stored value; clearing is explicit (clearSecret).
         $secrets = $config->secrets ?? [];
         foreach ($connector->secretKeys() as $secret) {
@@ -115,6 +120,44 @@ class ConnectorController extends Controller
         ])->save();
 
         return to_route('admin.connectors.edit', ['key' => $key, 'company' => $companyId])->with('status', 'Configuration enregistrée.');
+    }
+
+    /**
+     * Stored credentials never follow a change of server: when the host or the
+     * port changes, every stored secret must be typed again (otherwise an
+     * edited host would receive the saved password at the next send).
+     *
+     * @param  array<string, mixed>  $data
+     *
+     * @throws ValidationException
+     */
+    private function requireSecretsWhenServerMoves(Connector $connector, ConnectorConfig $config, array $data): void
+    {
+        if (! $config->exists || ($config->secrets ?? []) === []) {
+            return;
+        }
+
+        $moved = false;
+        foreach (self::SERVER_SETTINGS as $setting) {
+            if (array_key_exists($setting, $config->settings) && (string) $config->settings[$setting] !== (string) ($data['settings'][$setting] ?? '')) {
+                $moved = true;
+            }
+        }
+        if (! $moved) {
+            return;
+        }
+
+        $missing = [];
+        foreach ($connector->secretKeys() as $secret) {
+            $value = $data['secrets'][$secret] ?? null;
+            if (isset($config->secrets[$secret]) && (! is_string($value) || $value === '')) {
+                $missing["secrets.{$secret}"] = 'Le serveur a changé : ressaisissez ce champ (les identifiants enregistrés ne sont pas transmis à un autre serveur).';
+            }
+        }
+
+        if ($missing !== []) {
+            throw ValidationException::withMessages($missing);
+        }
     }
 
     public function clearSecret(Request $request, string $key, string $secret): RedirectResponse
