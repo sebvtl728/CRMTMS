@@ -52,3 +52,34 @@ docker compose exec app php artisan test
 Les tests s'exécutent en tant que `tms_app` sur la base `tms_test` ; le schéma est recréé via
 `pgsql_owner` (voir `tests/RefreshDatabaseAsOwner.php`). Les assets doivent avoir été
 compilés (`npm run build`).
+
+## Production (Docker Compose)
+
+L'image de production est construite par la cible `prod` de `docker/app.Dockerfile`
+(assets Node 22, dépendances PHP sans outils de développement, utilisateur non root,
+`APP_VERSION` fixé à la construction). Les caches Laravel (config, routes, événements,
+vues) sont générés au démarrage du conteneur par `docker/entrypoint.sh`.
+
+```bash
+docker build -f docker/app.Dockerfile --target prod --build-arg APP_VERSION=1.0.0 -t ghcr.io/<owner>/tms:1.0.0 .
+cp .env.prod.example .env      # puis renseigner les variables (voir le fichier)
+docker compose -f compose.prod.yaml --env-file .env up -d --wait
+docker compose -f compose.prod.yaml --env-file .env exec app php artisan migrate --force --database=pgsql_owner
+```
+
+Seul Caddy publie des ports (80/443) ; PostgreSQL et Redis ne sont pas exposés. Caddy est la seule
+adresse de confiance pour `X-Forwarded-*` (`TRUSTED_PROXIES`), ce qui active HTTPS/HSTS et l'IP cliente
+correcte. `/health` est aussi servi en HTTP interne (conteneur `caddy`, port 8081, non publié).
+
+### Sauvegardes et restauration
+
+`ops/backup.sh [--tag <libellé>]` exporte la base (`pg_dump -Fc`) et `storage/app`, puis les enregistre dans un
+dépôt **restic** chiffré (`RESTIC_REPOSITORY`, par défaut `/var/backups/tms`, copie distante optionnelle
+`RESTIC_REMOTE_REPOSITORY`). Rétention : 14 jours, 8 semaines, 12 mois. La dernière ligne affichée est l'identifiant du
+snapshot ; en cas d'échec un e-mail est envoyé à `TMS_ALERT_EMAIL` (`php artisan tms:alert`). Seul Docker est requis
+sur l'hôte (restic s'exécute via l'image officielle `restic/restic`).
+
+`ops/restore.sh <snapshot|latest>` arrête app/worker/scheduler, restaure la base (`pg_restore --clean --if-exists`, en
+une transaction) et les fichiers, relance la pile et attend `/health`.
+
+Tests d'intégration (pile jetable, secrets générés) : `bats ops/tests` depuis `tms/` (Docker requis).

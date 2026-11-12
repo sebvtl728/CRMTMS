@@ -1,10 +1,34 @@
+# Production Caddyfile (compose.prod.yaml).
+# TMS_DOMAIN and TMS_ACME_EMAIL come from the container environment.
 {
-	auto_https off
+	email {$TMS_ACME_EMAIL}
 }
 
-:80 {
-	root * /var/www/html/public
+{$TMS_DOMAIN} {
+	root * /srv/public
 	encode zstd gzip
-	php_fastcgi app:9000
+
+	# Static assets are served from the volume filled by the app container;
+	# PHP runs in the app container, whose document root differs.
+	php_fastcgi app:9000 {
+		root /var/www/html/public
+	}
 	file_server
+
+	# Never serve dotfiles or the framework internals if they ever land in public/.
+	@hidden path /.*
+	respond @hidden 404
+}
+
+# Internal health endpoint (plain HTTP, not published on the host): used by the
+# container healthcheck and by the ops scripts. Nothing else is served here.
+http://:8081 {
+	bind 127.0.0.1
+	root * /srv/public
+	handle /health {
+		php_fastcgi app:9000 {
+			root /var/www/html/public
+		}
+	}
+	respond 404
 }

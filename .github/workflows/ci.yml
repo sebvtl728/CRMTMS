@@ -114,15 +114,28 @@ jobs:
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: .
+        working-directory: tms
     steps:
       - uses: actions/checkout@v4
-      - name: shellcheck and bats (skipped while ops/ does not exist)
+      - name: shellcheck (skipped while ops/ does not exist)
         run: |
           if [ ! -d ops ]; then
             echo "No ops/ directory yet, nothing to check."
             exit 0
           fi
-          sudo apt-get update && sudo apt-get install -y shellcheck bats
-          find ops -name '*.sh' -print0 | xargs -0 -r shellcheck
-          if [ -d ops/tests ]; then bats ops/tests; fi
+          sudo apt-get update && sudo apt-get install -y shellcheck
+          find ops \( -name '*.sh' -o -name '*.bash' \) -print0 | xargs -0 -r shellcheck -x
+
+  # Backup/restore against a production-like stack (compose.prod.yaml, image built locally).
+  shell-integration:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: tms
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install bats
+        run: sudo apt-get update && sudo apt-get install -y bats
+      - name: bats integration tests
+        run: bats ops/tests

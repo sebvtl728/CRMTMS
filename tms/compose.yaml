@@ -4,6 +4,7 @@ x-app: &app
   build:
     context: .
     dockerfile: docker/app.Dockerfile
+    target: dev
     args:
       UID: ${HOST_UID:-1000}
       GID: ${HOST_GID:-1000}
@@ -25,7 +26,7 @@ services:
     ports:
       - "8080:80"
     volumes:
-      - ./docker/caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - ./docker/caddy/Caddyfile.dev:/etc/caddy/Caddyfile:ro
       - .:/var/www/html:ro
     depends_on:
       - app
