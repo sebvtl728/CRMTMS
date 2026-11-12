@@ -34,12 +34,13 @@ class AuthenticatedSessionController extends Controller
 
         // Confirmed 2FA: not logged in yet, the code is asked first.
         if ($user->hasTwoFactorEnabled()) {
-            TwoFactorChallengeController::begin($request, $user, $request->boolean('remember'));
+            // No "remember me": it would outlive the idle timeout.
+            TwoFactorChallengeController::begin($request, $user, false);
 
             return to_route('two-factor.challenge');
         }
 
-        Auth::guard('web')->login($user, $request->boolean('remember'));
+        Auth::guard('web')->login($user);
         $request->session()->regenerate();
         $user->forceFill(['last_login_at' => now()])->save();
 

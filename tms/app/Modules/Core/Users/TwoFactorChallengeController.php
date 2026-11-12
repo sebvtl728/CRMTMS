@@ -67,10 +67,10 @@ class TwoFactorChallengeController extends Controller
             throw ValidationException::withMessages(['recovery_code' => 'Le code de récupération est invalide.']);
         }
 
-        $remember = (bool) $request->session()->pull('login.remember', false);
-        $request->session()->forget(['login.id', 'login.expires_at']);
+        // Remember-me is not offered (it would outlive the idle timeout).
+        $request->session()->forget(['login.id', 'login.remember', 'login.expires_at']);
 
-        Auth::guard('web')->login($user, $remember);
+        Auth::guard('web')->login($user);
         $request->session()->regenerate();
         $user->forceFill(['last_login_at' => now()])->save();
 

@@ -92,6 +92,8 @@ Filtres : utilisateur, évènement, type d'objet, période (du / au). Chaque lig
 
 - **Double authentification imposée** : chaque compte non encore enrôlé est redirigé vers la page d'activation à sa prochaine action.
 - **Inactivité** : une session sans aucune requête pendant la durée choisie est fermée ; l'utilisateur est renvoyé vers la page de connexion avec le message « Votre session a expiré après une période d'inactivité ». Le contrôle ne concerne ni la page de santé `/health`, ni les visiteurs non connectés. La nouvelle durée s'applique dès la requête suivante.
+- La durée de vie de session du framework (`SESSION_LIFETIME`, 480 minutes par défaut) est un plafond d'inactivité lui aussi : elle doit rester **au moins égale** à la plus grande durée que vous réglez ici (480), sinon la session expire plus tôt que prévu. C'est ce réglage par organisme qui fait foi en dessous.
+- Il n'y a pas de « Se souvenir de moi » : un cookie de reconnexion survivrait à l'expiration. Les anciens cookies de ce type sont refusés et la personne est renvoyée vers la connexion.
 - Chaque modification est consignée dans le journal d'audit (« Paramètres de sécurité modifiés », valeurs avant / après).
 
 Autres garanties (non paramétrables) : mots de passe Argon2id d'au moins 12 caractères, limitation du nombre d'essais de code 2FA, codes de récupération à usage unique, journal d'audit non modifiable, isolation stricte des données entre organismes.

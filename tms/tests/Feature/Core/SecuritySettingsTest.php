@@ -4,6 +4,7 @@ use App\Modules\Core\Access\Permissions;
 use App\Modules\Core\Audit\AuditLog;
 use App\Modules\Core\Tenancy\Tenant;
 use App\Modules\Core\Users\User;
+use Illuminate\Support\Facades\Auth;
 use Inertia\Testing\AssertableInertia as Assert;
 
 beforeEach(fn () => inTenant());
@@ -139,4 +140,62 @@ it('shares an explicit whitelist of user fields and the permission names', funct
 it('shares only the permissions the user holds', function () {
     $this->actingAs(direction(twoFactor: true))->get('/dashboard')->assertInertia(fn (Assert $page) => $page
         ->where('auth.permissions', fn ($permissions) => collect($permissions)->sort()->values()->all() === ['audit.view', 'exports.run']));
+});
+
+it('lets a 300-minute setting outlive the 120-minute session default', function () {
+    // The framework session lifetime is an inactivity limit too: its ceiling must not undercut the setting.
+    expect(file_get_contents(config_path('session.php')))->toContain("env('SESSION_LIFETIME', 480)")
+        ->and(file_get_contents(base_path('.env.example')))->toContain('SESSION_LIFETIME=480');
+
+    tenant()->forceFill(['settings' => ['security' => ['force_2fa' => false, 'idle_timeout_minutes' => 300]]])->save();
+    $this->actingAs(User::factory()->create());
+
+    $this->get('/dashboard')->assertOk();
+    $this->travel(200)->minutes();
+    $this->get('/dashboard')->assertOk();
+    $this->travel(301)->minutes();
+    $this->get('/dashboard')->assertRedirect('/login');
+});
+
+it('ignores remember on login and issues no recaller cookie', function () {
+    $user = User::factory()->create(['password' => 'correct-horse-battery-1']);
+
+    $response = $this->post('/login', ['email' => $user->email, 'password' => 'correct-horse-battery-1', 'remember' => '1']);
+
+    $response->assertRedirect();
+    expect(collect($response->headers->getCookies())->contains(fn ($c) => str_starts_with($c->getName(), 'remember_web_')))->toBeFalse();
+    $this->assertAuthenticatedAs($user);
+});
+
+it('does not authenticate from a forged recaller cookie', function () {
+    $user = User::factory()->create();
+    $name = Auth::guard('web')->getRecallerName();
+
+    $this->withUnencryptedCookie($name, $user->id.'|forged|'.$user->password)
+        ->get('/dashboard')->assertRedirect('/login');
+    $this->assertGuest();
+});
+
+it('logs out a user restored from a remember cookie', function () {
+    $user = User::factory()->create();
+    $user->forceFill(['remember_token' => 'legacy-token'])->save();
+    $name = Auth::guard('web')->getRecallerName();
+
+    $this->withUnencryptedCookie($name, $user->id.'|legacy-token|'.$user->password)
+        ->get('/dashboard')->assertRedirect('/login');
+    $this->assertGuest();
+});
+
+it('answers an expired Inertia visit with a location redirect and other writes with 303', function () {
+    tenant()->forceFill(['settings' => ['security' => ['idle_timeout_minutes' => 15]]])->save();
+    $this->actingAs(User::factory()->create());
+    $this->get('/dashboard')->assertOk();
+    $this->travel(16)->minutes();
+
+    $this->get('/dashboard', ['X-Inertia' => 'true'])->assertStatus(409)->assertHeader('X-Inertia-Location');
+
+    $this->actingAs(User::factory()->create());
+    $this->get('/dashboard');
+    $this->travel(16)->minutes();
+    $this->put('/admin/security', securityPayload())->assertStatus(303)->assertRedirect('/login');
 });

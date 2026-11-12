@@ -6,6 +6,7 @@ use App\Modules\Core\Tenancy\TenantContext;
 use Closure;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Inertia\Inertia;
 use Symfony\Component\HttpFoundation\Response;
 
 /**
@@ -29,13 +30,21 @@ class EnforceIdleTimeout
         $timeout = SecuritySettings::for($this->tenants->current())['idle_timeout_minutes'];
         $last = $request->session()->get(self::SESSION_KEY);
 
-        if (is_int($last) && now()->timestamp - $last > $timeout * 60) {
+        // A "remember me" cookie (legacy) restores a user without any activity record: refuse it.
+        $expired = Auth::viaRemember() || (is_int($last) && now()->timestamp - $last > $timeout * 60);
+
+        if ($expired) {
             Auth::logout();
             $request->session()->invalidate();
             $request->session()->regenerateToken();
+            $request->session()->flash('status', 'Votre session a expiré après une période d\'inactivité. Veuillez vous reconnecter.');
 
-            return redirect()->route('login')
-                ->with('status', 'Votre session a expiré après une période d\'inactivité. Veuillez vous reconnecter.');
+            // Inertia visits get a full-page redirect; other writes a 303 so a PUT never replays on /login.
+            if ($request->header('X-Inertia')) {
+                return Inertia::location(route('login'));
+            }
+
+            return redirect()->route('login', status: $request->isMethodSafe() ? 302 : 303);
         }
 
         $request->session()->put(self::SESSION_KEY, now()->timestamp);
