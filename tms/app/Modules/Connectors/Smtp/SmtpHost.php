@@ -6,10 +6,10 @@ use Closure;
 use Illuminate\Contracts\Validation\ValidationRule;
 
 /**
- * A bare hostname or IP address: no scheme, path, port, credentials or
- * spaces. Loopback / link-local / unspecified addresses (cloud metadata,
- * local services) are refused unless the install opts in
- * (tms.connectors.allow_internal_hosts, for a development mail catcher).
+ * A bare hostname or IP address: no scheme, path, port, credentials, spaces
+ * or numeric shorthand (127.1, 2130706433). The addresses it resolves to
+ * must satisfy SmtpHostPolicy. A name that does not resolve yet is accepted
+ * here (the connection test reports it; send time re-checks everything).
  */
 final class SmtpHost implements ValidationRule
 {
@@ -18,7 +18,9 @@ final class SmtpHost implements ValidationRule
         $host = is_string($value) ? $value : '';
 
         $isIp = filter_var($host, FILTER_VALIDATE_IP) !== false;
-        $isHostname = (bool) preg_match('/^(?=.{1,253}$)([A-Za-z0-9]([A-Za-z0-9-]{0,61}[A-Za-z0-9])?)(\.[A-Za-z0-9]([A-Za-z0-9-]{0,61}[A-Za-z0-9])?)*$/', $host);
+        $isHostname = (bool) preg_match('/^(?=.{1,253}$)([A-Za-z0-9]([A-Za-z0-9-]{0,61}[A-Za-z0-9])?)(\.[A-Za-z0-9]([A-Za-z0-9-]{0,61}[A-Za-z0-9])?)*$/', $host)
+            // A final all-numeric label is an IPv4 shorthand (inet_aton), not a name.
+            && ! preg_match('/(^|\.)[0-9]+$/', $host);
 
         if (! $isIp && ! $isHostname) {
             $fail('Indiquez uniquement le nom du serveur (ex. smtp.exemple.fr), sans protocole, port ni chemin.');
@@ -26,21 +28,8 @@ final class SmtpHost implements ValidationRule
             return;
         }
 
-        if ($isIp && self::isInternal($host) && ! config('tms.connectors.allow_internal_hosts')) {
-            $fail('Cette adresse (locale ou réservée) n\'est pas autorisée comme serveur SMTP.');
+        if (($reason = SmtpHostPolicy::violation(SmtpHostPolicy::resolve($host))) !== null) {
+            $fail("Ce serveur pointe vers {$reason} : adresse non autorisée.");
         }
-    }
-
-    public static function isInternal(string $ip): bool
-    {
-        if (filter_var($ip, FILTER_VALIDATE_IP) === false) {
-            return false;
-        }
-
-        $normalised = (string) inet_ntop((string) inet_pton($ip));
-
-        return $normalised === '::1' || $normalised === '::'
-            || str_starts_with($normalised, '127.') || str_starts_with($normalised, '0.')
-            || str_starts_with($normalised, '169.254.') || str_starts_with(strtolower($normalised), 'fe80:');
     }
 }

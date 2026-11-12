@@ -42,6 +42,10 @@ return [
 
         // Accept loopback / link-local SMTP hosts (a development mail catcher). Keep false in production.
         'allow_internal_hosts' => (bool) env('TMS_ALLOW_INTERNAL_SMTP_HOSTS', false),
+
+        // Accept private-network SMTP hosts (RFC 1918, IPv6 ULA): a LAN relay. Allowed by default on a
+        // self-hosted install (single mode), refused in multi mode (shared platform).
+        'allow_private_hosts' => (bool) env('TMS_ALLOW_PRIVATE_SMTP_HOSTS', env('TMS_MODE', 'single') === 'single'),
     ],
 
 ];

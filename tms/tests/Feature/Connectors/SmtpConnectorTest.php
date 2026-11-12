@@ -3,15 +3,45 @@
 use App\Modules\Connectors\Core\ConnectorRegistry;
 use App\Modules\Connectors\Core\ConnectorRun;
 use App\Modules\Connectors\Smtp\SmtpConnector;
+use App\Modules\Connectors\Smtp\SmtpHostPolicy;
+use App\Modules\Connectors\Smtp\SmtpHostRefused;
 use App\Modules\Connectors\Smtp\SmtpTransportFactory;
 use App\Modules\Connectors\Smtp\TenantMailer;
 use App\Modules\Core\Companies\Company;
 use Illuminate\Support\Facades\Validator;
 use Symfony\Component\Mailer\Envelope;
+use Symfony\Component\Mailer\Exception\TransportException;
 use Symfony\Component\Mailer\SentMessage;
 use Symfony\Component\Mailer\Transport\Smtp\EsmtpTransport;
 use Symfony\Component\Mailer\Transport\TransportInterface;
 use Symfony\Component\Mime\RawMessage;
+
+/** No network: names resolve to a public documentation address, except a few fixtures. */
+beforeEach(function () {
+    SmtpHostPolicy::resolveUsing(fn (string $host): array => match ($host) {
+        'invalid.invalid' => [],
+        'localhost' => ['127.0.0.1'],
+        'rebind.example.test' => ['127.0.0.1'],
+        'lan.example.test' => ['10.0.0.5'],
+        'dual.example.test' => ['203.0.113.7', '::ffff:169.254.169.254'],
+        default => ['203.0.113.10'],
+    });
+});
+afterEach(fn () => SmtpHostPolicy::resolveUsing(null));
+
+/** Fails like a real server rejecting the credentials: the raw text echoes the username. */
+class ThrowingTransport implements TransportInterface
+{
+    public function send(RawMessage $message, ?Envelope $envelope = null): ?SentMessage
+    {
+        throw new TransportException('Failed to authenticate on SMTP server with username "smtpuser" using the following authenticators: "LOGIN". Authenticator "LOGIN" returned "535 raw-server-text".');
+    }
+
+    public function __toString(): string
+    {
+        return 'throwing://';
+    }
+}
 
 /** Records messages instead of talking to a server. */
 class RecordingTransport implements TransportInterface
@@ -76,7 +106,60 @@ it('rejects hosts with scheme, path, port or spaces', function (string $host) us
 it('rejects loopback, link-local and unspecified addresses', function (string $host) use ($valid) {
     config(['tms.connectors.allow_internal_hosts' => false]);
     expect(smtpErrors([...$valid, 'host' => $host]))->toContain('settings.host');
-})->with(['127.0.0.1', '169.254.169.254', '0.0.0.0', '::1']);
+})->with(['127.0.0.1', '169.254.169.254', '0.0.0.0', '::1', 'localhost', 'rebind.example.test', 'dual.example.test', '::ffff:127.0.0.1', '::ffff:169.254.169.254', '::ffff:7f00:1', '::127.0.0.1', '64:ff9b::7f00:1', '100.64.0.1', '224.0.0.1', 'fe80::1', '127.1', '2130706433', '0177.0.0.1']);
+
+it('classifies address forms', function (string $ip, ?string $class) {
+    expect(SmtpHostPolicy::classify($ip))->toBe($class);
+})->with([['203.0.113.7', null], ['2001:db8::1', null], ['10.0.0.5', 'private'], ['172.20.1.1', 'private'], ['192.168.1.1', 'private'], ['fd00::1', 'private'], ['::ffff:10.0.0.5', 'private'], ['172.32.0.1', null]]);
+
+it('refuses private networks in multi mode but not in single mode', function () use ($valid) {
+    config(['tms.connectors.allow_private_hosts' => false]);
+    expect(smtpErrors([...$valid, 'host' => '10.0.0.5']))->toContain('settings.host')
+        ->and(smtpErrors([...$valid, 'host' => 'lan.example.test']))->toContain('settings.host');
+
+    config(['tms.connectors.allow_private_hosts' => true]);
+    expect(smtpErrors([...$valid, 'host' => '10.0.0.5']))->toBe([])
+        ->and(smtpErrors([...$valid, 'host' => 'lan.example.test']))->toBe([])
+        ->and(smtpErrors([...$valid, 'host' => '127.0.0.1']))->toContain('settings.host');
+});
+
+it('defaults private hosts to the install mode', function () {
+    expect(config('tms.mode'))->toBe('single')->and(config('tms.connectors.allow_private_hosts'))->toBeTrue();
+});
+
+it('refuses a stored internal host at send time', function () {
+    config(['tms.connectors.allow_internal_hosts' => false]);
+    $base = ['port' => 587, 'encryption' => 'tls', 'from_address' => 'a@cap.test', 'from_name' => 'C'];
+
+    foreach (['127.0.0.1', '::ffff:169.254.169.254', 'localhost', 'rebind.example.test', 'invalid.invalid'] as $host) {
+        expect(fn () => (new SmtpTransportFactory)->make([...$base, 'host' => $host], []))->toThrow(SmtpHostRefused::class);
+    }
+    config(['tms.connectors.allow_private_hosts' => false]);
+    expect(fn () => (new SmtpTransportFactory)->make([...$base, 'host' => 'lan.example.test'], []))->toThrow(SmtpHostRefused::class);
+
+    tenant();
+    smtpConfig(['settings' => [...$base, 'host' => 'rebind.example.test']]);
+    expect(fn () => TenantMailer::for(null))->toThrow(SmtpHostRefused::class);
+});
+
+it('never relays raw transport errors to the admin', function () {
+    app()->instance(SmtpTransportFactory::class, new class extends SmtpTransportFactory
+    {
+        public function make(array $settings, array $secrets): TransportInterface
+        {
+            return new ThrowingTransport;
+        }
+    });
+    smtpConfig(['secrets' => ['username' => 'smtpuser', 'password' => 'pw-s3cret']]);
+    $this->actingAs(admin(twoFactor: true));
+
+    $response = $this->postJson('/admin/connectors/smtp/test')->assertOk()->assertJson(['ok' => false])
+        ->assertDontSee('smtpuser')->assertDontSee('raw-server-text')->assertDontSee('535');
+    expect($response->json('message'))->toContain('Authentification refusée');
+
+    $error = (string) ConnectorRun::query()->sole()->error;
+    expect($error)->not->toContain('smtpuser')->not->toContain('raw-server-text')->toContain('Authentification');
+});
 
 it('allows internal addresses when the install opts in', function () use ($valid) {
     config(['tms.connectors.allow_internal_hosts' => true]);

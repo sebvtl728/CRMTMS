@@ -80,4 +80,14 @@ Une configuration par `(organisme, connecteur, société)`. `company_id` vide = 
 
 `SmtpConnector` (clé `smtp`, type envoi). Paramètres : `host`, `port`, `encryption` (`tls`, `ssl`, `none`), `from_address`, `from_name` ; secrets : `username`, `password`.
 
-`TenantMailer::for(?Company $company)` renvoie le mailer à utiliser : configuration active de la société, sinon de l'organisme, sinon mailer par défaut de l'instance (`MAIL_*`). Les hôtes locaux (127.0.0.1, 169.254.x.x…) sont refusés, sauf `TMS_ALLOW_INTERNAL_SMTP_HOSTS=true` (capteur de mails en développement uniquement).
+`TenantMailer::for(?Company $company)` renvoie le mailer à utiliser : configuration active de la société, sinon de l'organisme, sinon mailer par défaut de l'instance (`MAIL_*`). 
+### Politique réseau des hôtes SMTP (`SmtpHostPolicy`)
+
+Appliquée à l'enregistrement (règle `SmtpHost`, qui résout l'hôte en A/AAAA) **et** à chaque envoi (`SmtpTransportFactory::make`, donc aussi `TenantMailer`) :
+
+- Format : nom ou adresse seuls, sans schéma, port, chemin ni raccourci numérique (`127.1`, `2130706433`).
+- **Toujours refusés** : boucle locale, lien local (dont `169.254.169.254`, métadonnées cloud), adresse non spécifiée, multicast / réservées, espace partagé `100.64.0.0/10`, et leurs formes IPv4 intégrées en IPv6 (`::ffff:127.0.0.1`, `::127.0.0.1`, NAT64) ; `localhost` et tout nom qui résout vers l'une d'elles. Exception : `TMS_ALLOW_INTERNAL_SMTP_HOSTS=true` (capteur de mails en développement uniquement).
+- **Réseaux privés** (RFC 1918, IPv6 ULA) : autorisés en mode `single` (relais sur le réseau local d'un client auto-hébergé), refusés en mode `multi`. Réglable par `TMS_ALLOW_PRIVATE_SMTP_HOSTS`.
+- Un nom qui ne résout pas est accepté à l'enregistrement mais refusé au test et à l'envoi (message français).
+- Les messages d'erreur du test sont toujours rédigés par l'application ; le texte brut du serveur (qui peut contenir l'identifiant) n'est jamais relayé.
+- Risque résiduel connu : le « DNS rebinding » (un nom qui change d'adresse entre la vérification et la connexion).

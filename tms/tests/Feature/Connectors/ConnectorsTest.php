@@ -7,6 +7,7 @@ use App\Modules\Connectors\Core\ConnectorKind;
 use App\Modules\Connectors\Core\ConnectorRegistry;
 use App\Modules\Connectors\Core\ConnectorRun;
 use App\Modules\Connectors\Core\Retryable;
+use App\Modules\Connectors\Smtp\SmtpHostPolicy;
 use App\Modules\Core\Audit\AuditLog;
 use App\Modules\Core\Companies\Company;
 use App\Modules\Core\Tenancy\TenantContext;
@@ -14,6 +15,9 @@ use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Inertia\Testing\AssertableInertia as Assert;
+
+beforeEach(fn () => SmtpHostPolicy::resolveUsing(fn (string $host): array => ['203.0.113.10']));
+afterEach(fn () => SmtpHostPolicy::resolveUsing(null));
 
 /**
  * @param  array<string, mixed>  $overrides

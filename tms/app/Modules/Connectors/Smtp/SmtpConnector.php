@@ -9,7 +9,6 @@ use App\Modules\Connectors\Core\ConnectorKind;
 use App\Modules\Connectors\Core\HasFormLabels;
 use App\Modules\Core\Users\User;
 use Illuminate\Support\Facades\Auth;
-use RuntimeException;
 use Symfony\Component\Mailer\Exception\TransportExceptionInterface;
 use Symfony\Component\Mime\Address;
 use Symfony\Component\Mime\Email;
@@ -72,7 +71,6 @@ class SmtpConnector implements Connector, HasFormLabels
         $secrets = $c->secrets ?? [];
 
         try {
-            $this->transports->check($settings);
             $transport = $this->transports->make($settings, $secrets);
 
             $user = Auth::user();
@@ -88,8 +86,8 @@ class SmtpConnector implements Connector, HasFormLabels
                 ->text('Ceci est un e-mail de test envoyé depuis votre TMS. Si vous le lisez, la configuration SMTP fonctionne.'));
 
             return new ConnectionTestResult(true, "E-mail de test envoyé à {$recipient}.");
-        } catch (RuntimeException $e) {
-            // Our own French messages (unresolvable / internal host).
+        } catch (SmtpHostRefused $e) {
+            // Our own French message (unresolvable / forbidden host).
             return new ConnectionTestResult(false, $e->getMessage());
         } catch (TransportExceptionInterface $e) {
             return new ConnectionTestResult(false, $this->explain($e, $c));
