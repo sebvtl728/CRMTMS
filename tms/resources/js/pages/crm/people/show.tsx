@@ -1,3 +1,4 @@
+import { Timeline } from '@/components/crm/timeline';
 import { PersonTypeBadges } from '@/components/crm/person-type-badges';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -72,6 +73,8 @@ function Item({ label, children }: { label: string; children: React.ReactNode })
     );
 }
 
+const TABS = ['Informations', 'Historique'] as const;
+
 const mail = (email: string | null) =>
     email && (
         <a href={`mailto:${email}`} className="underline">
@@ -88,6 +91,7 @@ const tel = (phone: string | null) =>
 
 export default function PersonShow({ person: p, can, status }: ShowProps) {
     const [confirming, setConfirming] = useState(false);
+    const [tab, setTab] = useState<(typeof TABS)[number]>('Informations');
 
     const breadcrumbs: BreadcrumbItem[] = [
         { title: 'Personnes', href: '/crm/people' },
@@ -170,7 +174,26 @@ export default function PersonShow({ person: p, can, status }: ShowProps) {
 
                 {status && <div className="text-sm font-medium text-green-600">{status}</div>}
 
-                <div className="grid gap-4 lg:grid-cols-2">
+                <div role="tablist" aria-label="Sections de la fiche" className="flex gap-1 overflow-x-auto border-b">
+                    {TABS.map((t) => (
+                        <button
+                            key={t}
+                            role="tab"
+                            type="button"
+                            id={`tab-${t}`}
+                            aria-selected={tab === t}
+                            aria-controls={`panel-${t}`}
+                            onClick={() => setTab(t)}
+                            className={`-mb-px border-b-2 px-4 py-2 text-sm whitespace-nowrap ${tab === t ? 'border-primary font-medium' : 'text-muted-foreground hover:text-foreground border-transparent'}`}
+                        >
+                            {t}
+                        </button>
+                    ))}
+                </div>
+
+                {tab === 'Historique' && <Timeline kind="person" subjectId={p.id} canEdit={can.update} />}
+
+                <div role="tabpanel" id="panel-Informations" aria-labelledby="tab-Informations" hidden={tab !== 'Informations'} className="grid gap-4 lg:grid-cols-2">
                     <section className="rounded-xl border p-4">
                         <h2 className="mb-3 text-sm font-semibold">Contact</h2>
                         <dl className="grid gap-3 sm:grid-cols-2">

@@ -11,7 +11,14 @@ use App\Modules\Crm\Organisations\Organisation;
 use App\Modules\Crm\Organisations\OrganisationPolicy;
 use App\Modules\Crm\People\Person;
 use App\Modules\Crm\People\PersonPolicy;
+use App\Modules\Crm\Timeline\Attachment;
+use App\Modules\Crm\Timeline\AttachmentsProvider;
+use App\Modules\Crm\Timeline\AuditProvider;
+use App\Modules\Crm\Timeline\Note;
+use App\Modules\Crm\Timeline\NotesProvider;
+use App\Modules\Crm\Timeline\Timeline;
 use App\Modules\Crm\Visibility\CrmVisibility;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Route;
@@ -25,6 +32,9 @@ class CrmServiceProvider extends ServiceProvider
         // In register(): the catalogue must be complete before
         // AccessServiceProvider::boot() defines one gate per permission.
         CorePermissions::registerModule('crm', Permissions::all(), Permissions::defaultsFor(...));
+
+        // Sources of the « Historique »; later increments tag their own.
+        $this->app->tag([NotesProvider::class, AttachmentsProvider::class, AuditProvider::class], Timeline::TAG);
     }
 
     public function boot(): void
@@ -82,6 +92,36 @@ class CrmServiceProvider extends ServiceProvider
 
             return $query->findOrFail($value);
         });
+
+        // A note / attachment is reachable through the fiche it belongs to.
+        Route::bind('note', fn (string $value): Note => self::bindOnSubject(Note::query(), $value, Note::class));
+        Route::bind('attachment', fn (string $value): Attachment => self::bindOnSubject(Attachment::query(), $value, Attachment::class));
+    }
+
+    /**
+     * @template TModel of Note|Attachment
+     *
+     * @param  Builder<TModel>  $query
+     * @param  class-string<TModel>  $model
+     * @return TModel
+     */
+    private static function bindOnSubject(Builder $query, string $value, string $model): Note|Attachment
+    {
+        if (! Str::isUuid($value)) {
+            throw (new ModelNotFoundException)->setModel($model, [$value]);
+        }
+
+        $user = request()->user();
+
+        if ($user instanceof User && CrmVisibility::restricts($user)) {
+            $query->where(fn (Builder $q) => $q
+                ->where(fn (Builder $o) => $o->where('notable_type', (new Organisation)->getMorphClass())
+                    ->whereIn('notable_id', CrmVisibility::organisations(Organisation::withTrashed(), $user)->select('organisations.id')))
+                ->orWhere(fn (Builder $p) => $p->where('notable_type', (new Person)->getMorphClass())
+                    ->whereIn('notable_id', CrmVisibility::people(Person::withTrashed(), $user)->select('people.id'))));
+        }
+
+        return $query->findOrFail($value);
     }
 
     /**

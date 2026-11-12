@@ -3,6 +3,9 @@
 use App\Modules\Crm\Affiliations\AffiliationController;
 use App\Modules\Crm\Organisations\OrganisationController;
 use App\Modules\Crm\People\PersonController;
+use App\Modules\Crm\Timeline\AttachmentController;
+use App\Modules\Crm\Timeline\NoteController;
+use App\Modules\Crm\Timeline\TimelineController;
 use App\Modules\Crm\Visibility\UserDasController;
 use Illuminate\Support\Facades\Route;
 
@@ -21,6 +24,17 @@ Route::middleware(['auth'])->group(function () {
     Route::post('crm/organisations/{organisation}/affiliations', [AffiliationController::class, 'store'])->middleware('can:crm.update')->name('crm.affiliations.store');
     Route::put('crm/affiliations/{affiliation}', [AffiliationController::class, 'update'])->middleware('can:crm.update')->name('crm.affiliations.update');
     Route::delete('crm/affiliations/{affiliation}', [AffiliationController::class, 'destroy'])->middleware('can:crm.update')->name('crm.affiliations.destroy');
+
+    // Historique: feed, notes and attachments of a fiche.
+    Route::get('crm/organisations/{organisation}/timeline', [TimelineController::class, 'organisation'])->middleware('can:crm.view')->name('crm.organisations.timeline');
+    Route::get('crm/people/{person}/timeline', [TimelineController::class, 'person'])->middleware('can:crm.view')->name('crm.people.timeline');
+    Route::post('crm/organisations/{organisation}/notes', [NoteController::class, 'storeForOrganisation'])->middleware('can:crm.update')->name('crm.organisations.notes.store');
+    Route::post('crm/people/{person}/notes', [NoteController::class, 'storeForPerson'])->middleware('can:crm.update')->name('crm.people.notes.store');
+    Route::delete('crm/notes/{note}', [NoteController::class, 'destroy'])->middleware('can:crm.update')->name('crm.notes.destroy');
+    Route::post('crm/organisations/{organisation}/attachments', [AttachmentController::class, 'storeForOrganisation'])->middleware('can:crm.update')->name('crm.organisations.attachments.store');
+    Route::post('crm/people/{person}/attachments', [AttachmentController::class, 'storeForPerson'])->middleware('can:crm.update')->name('crm.people.attachments.store');
+    Route::get('crm/attachments/{attachment}', [AttachmentController::class, 'download'])->middleware('can:crm.view')->name('crm.attachments.download');
+    Route::delete('crm/attachments/{attachment}', [AttachmentController::class, 'destroy'])->middleware('can:crm.update')->name('crm.attachments.destroy');
 
     Route::prefix('crm/people')->name('crm.people.')->group(function () {
         Route::get('/', [PersonController::class, 'index'])->middleware('can:crm.view')->name('index');

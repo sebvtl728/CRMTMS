@@ -73,11 +73,11 @@ class Person extends Model
     protected array $auditPersonal = self::PERSONAL_FIELDS;
 
     /**
-     * Generated column and bookkeeping: not worth a journal line.
+     * Generated column and bookkeeping (last_contact_at follows the notes): not worth a journal line.
      *
      * @var list<string>
      */
-    protected array $auditIgnore = ['search_vector', 'created_by', 'updated_by'];
+    protected array $auditIgnore = ['search_vector', 'created_by', 'updated_by', 'last_contact_at'];
 
     /** @var list<string> */
     protected $fillable = [

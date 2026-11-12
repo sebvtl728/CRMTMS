@@ -1,3 +1,4 @@
+import { Timeline } from '@/components/crm/timeline';
 import { OrganisationContacts, type AffiliationRow } from '@/components/crm/organisation-contacts';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -134,6 +135,14 @@ export default function OrganisationShow({ organisation: o, affiliations, former
                 </div>
 
                 {status && <div className="text-sm font-medium text-green-600">{status}</div>}
+                {errors.restore && (
+                    <div
+                        role="alert"
+                        className="rounded-lg border border-red-300 bg-red-50 p-3 text-sm text-red-900 dark:border-red-800 dark:bg-red-950 dark:text-red-100"
+                    >
+                        {errors.restore}
+                    </div>
+                )}
                 {errors.siret && (
                     <div
                         role="alert"
@@ -215,16 +224,7 @@ export default function OrganisationShow({ organisation: o, affiliations, former
                         can={{ affiliate: can.affiliate, createPerson: can.createPerson }}
                     />
                 )}
-                {tab === 'Historique' && (
-                    <p
-                        role="tabpanel"
-                        id="panel-Historique"
-                        aria-labelledby="tab-Historique"
-                        className="text-muted-foreground rounded-xl border p-8 text-center text-sm"
-                    >
-                        Bientôt disponible
-                    </p>
-                )}
+                {tab === 'Historique' && <Timeline kind="organisation" subjectId={o.id} canEdit={can.update} />}
             </div>
 
             <Dialog open={confirming} onOpenChange={setConfirming}>
