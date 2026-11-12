@@ -1,5 +1,6 @@
-import { Timeline } from '@/components/crm/timeline';
+import { SimilarFiches, type DuplicateCandidate } from '@/components/crm/duplicate-warning';
 import { PersonTypeBadges } from '@/components/crm/person-type-badges';
+import { Timeline } from '@/components/crm/timeline';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -59,8 +60,9 @@ interface PersonData {
 }
 
 interface ShowProps {
+    similar: DuplicateCandidate[];
     person: PersonData;
-    can: { update: boolean; delete: boolean; restore: boolean };
+    can: { update: boolean; delete: boolean; restore: boolean; merge: boolean };
     status?: string;
 }
 
@@ -89,7 +91,7 @@ const tel = (phone: string | null) =>
         </a>
     );
 
-export default function PersonShow({ person: p, can, status }: ShowProps) {
+export default function PersonShow({ person: p, similar, can, status }: ShowProps) {
     const [confirming, setConfirming] = useState(false);
     const [tab, setTab] = useState<(typeof TABS)[number]>('Informations');
 
@@ -98,9 +100,12 @@ export default function PersonShow({ person: p, can, status }: ShowProps) {
         { title: p.name, href: route('crm.people.show', p.id) },
     ];
 
-    const address = [p.address_line1, p.address_line2, [p.postal_code, p.city].filter(Boolean).join(' '), p.country !== 'FR' ? p.country : null].filter(
-        Boolean,
-    );
+    const address = [
+        p.address_line1,
+        p.address_line2,
+        [p.postal_code, p.city].filter(Boolean).join(' '),
+        p.country !== 'FR' ? p.country : null,
+    ].filter(Boolean);
     const active = p.affiliations.filter((a) => !a.ended_on);
     const former = p.affiliations.filter((a) => a.ended_on);
 
@@ -173,6 +178,7 @@ export default function PersonShow({ person: p, can, status }: ShowProps) {
                 </div>
 
                 {status && <div className="text-sm font-medium text-green-600">{status}</div>}
+                {can.merge && <SimilarFiches type="person" currentId={p.id} similar={similar} />}
 
                 <div role="tablist" aria-label="Sections de la fiche" className="flex gap-1 overflow-x-auto border-b">
                     {TABS.map((t) => (
@@ -193,7 +199,13 @@ export default function PersonShow({ person: p, can, status }: ShowProps) {
 
                 {tab === 'Historique' && <Timeline kind="person" subjectId={p.id} canEdit={can.update} />}
 
-                <div role="tabpanel" id="panel-Informations" aria-labelledby="tab-Informations" hidden={tab !== 'Informations'} className="grid gap-4 lg:grid-cols-2">
+                <div
+                    role="tabpanel"
+                    id="panel-Informations"
+                    aria-labelledby="tab-Informations"
+                    hidden={tab !== 'Informations'}
+                    className="grid gap-4 lg:grid-cols-2"
+                >
                     <section className="rounded-xl border p-4">
                         <h2 className="mb-3 text-sm font-semibold">Contact</h2>
                         <dl className="grid gap-3 sm:grid-cols-2">

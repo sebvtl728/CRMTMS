@@ -51,6 +51,8 @@ use Illuminate\Support\Facades\DB;
  * @property Carbon|null $anonymised_at
  * @property string|null $created_by
  * @property string|null $updated_by
+ * @property string|null $merged_into_id the fiche this one was merged into (then trashed for good)
+ * @property list<array{id: string, source_id: string|null, source_system: string|null}> $merged_sources fiches merged into this one
  * @property Carbon|null $deleted_at
  */
 class Person extends Model
@@ -77,7 +79,7 @@ class Person extends Model
      *
      * @var list<string>
      */
-    protected array $auditIgnore = ['search_vector', 'created_by', 'updated_by', 'last_contact_at'];
+    protected array $auditIgnore = ['search_vector', 'created_by', 'updated_by', 'last_contact_at', 'merged_sources'];
 
     /** @var list<string> */
     protected $fillable = [
@@ -121,6 +123,8 @@ class Person extends Model
                 Affiliation::cascadeDelete('person_id', $person);
             }
         });
+        // A merged fiche stays in the trash: its content now lives in the kept one.
+        static::restoring(fn (Person $person) => $person->merged_into_id === null ? null : false);
         static::restoring(fn (Person $person) => Affiliation::cascadeRestore('person_id', $person));
     }
 
@@ -131,6 +135,7 @@ class Person extends Model
             'birth_date' => 'date',
             'is_individual' => 'boolean',
             'last_contact_at' => 'datetime',
+            'merged_sources' => 'array',
             'anonymised_at' => 'datetime',
         ];
     }

@@ -1,3 +1,4 @@
+import { DuplicateWarning, type DuplicateCandidate } from '@/components/crm/duplicate-warning';
 import Heading from '@/components/heading';
 import InputError from '@/components/input-error';
 import { Button } from '@/components/ui/button';
@@ -52,6 +53,8 @@ interface FormProps {
         das: Option[];
         responsible: Option[];
     };
+    duplicates: DuplicateCandidate[];
+    canMerge: boolean;
 }
 
 const NONE = 'none';
@@ -87,11 +90,11 @@ function Section({ title, children }: { title: string; children: React.ReactNode
     );
 }
 
-export default function OrganisationFormPage({ organisation, options }: FormProps) {
+export default function OrganisationFormPage({ organisation, options, duplicates, canMerge }: FormProps) {
     const editing = organisation !== null;
     const str = (key: string, fallback = '') => (organisation?.[key] as string | null | undefined) ?? fallback;
 
-    const { data, setData, post, put, processing, errors } = useForm<OrganisationForm>({
+    const { data, setData, post, put, processing, errors, transform } = useForm<OrganisationForm>({
         name: str('name'),
         siret: str('siret'),
         naf_code: str('naf_code'),
@@ -121,13 +124,21 @@ export default function OrganisationFormPage({ organisation, options }: FormProp
         { title: editing ? 'Modifier' : 'Nouvelle entreprise', href: '#' },
     ];
 
+    const duplicateError = (usePage().props.errors as Record<string, string | undefined>).duplicates;
+
+    /** Saves; `extra` carries the answer to the duplicate warning (confirm_duplicate, merge_into). */
+    const send = (extra: Record<string, string> = {}) => {
+        transform((d) => ({ ...d, ...extra }));
+        if (editing) {
+            put(route('crm.organisations.update', organisation.id), { preserveScroll: true });
+        } else {
+            post(route('crm.organisations.store'), { preserveScroll: true });
+        }
+    };
+
     const submit: FormEventHandler = (e) => {
         e.preventDefault();
-        if (editing) {
-            put(route('crm.organisations.update', organisation.id));
-        } else {
-            post(route('crm.organisations.store'));
-        }
+        send();
     };
 
     const text = (key: keyof OrganisationForm & string, label: string, props: React.ComponentProps<typeof Input> = {}) => (
@@ -234,6 +245,18 @@ export default function OrganisationFormPage({ organisation, options }: FormProp
                         />
                     </Field>
                 </Section>
+
+                {duplicateError && (
+                    <DuplicateWarning
+                        type="organisation"
+                        duplicates={duplicates}
+                        canMerge={canMerge}
+                        currentId={editing ? organisation.id : null}
+                        processing={processing}
+                        onConfirm={() => send({ confirm_duplicate: '1' })}
+                        onCreateAndMerge={(id) => send({ confirm_duplicate: '1', merge_into: id })}
+                    />
+                )}
 
                 <div className="flex flex-wrap gap-2">
                     <Button type="submit" disabled={processing}>

@@ -9,6 +9,7 @@ use App\Modules\Core\References\ReferenceList;
 use App\Modules\Core\Tenancy\TenantContext;
 use App\Modules\Core\Users\User;
 use App\Modules\Crm\Affiliations\Affiliation;
+use App\Modules\Crm\Duplicates\DuplicateGuard;
 use App\Modules\Crm\Permissions;
 use App\Modules\Crm\Support\FormOptions;
 use App\Modules\Crm\Visibility\CrmVisibility;
@@ -21,6 +22,7 @@ use Illuminate\Support\Facades\Gate;
 use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use Inertia\Response;
+use Symfony\Component\HttpFoundation\Response as HttpResponse;
 
 /**
  * « Entreprises » screens: list with filters, fiche, create / edit form,
@@ -32,7 +34,7 @@ class OrganisationController extends Controller
 
     private const SORTS = ['name', 'city', 'last_contact_at', 'created_at'];
 
-    public function __construct(private readonly TenantContext $tenants, private readonly AuditRecorder $audit) {}
+    public function __construct(private readonly TenantContext $tenants, private readonly AuditRecorder $audit, private readonly DuplicateGuard $duplicates) {}
 
     public function index(Request $request): Response
     {
@@ -54,7 +56,7 @@ class OrganisationController extends Controller
 
         $query = CrmVisibility::organisations(Organisation::query(), $user)
             ->with(['sector', 'responsible', 'das'])
-            ->when($filters['trashed'], fn (Builder $q) => $q->onlyTrashed())
+            ->when($filters['trashed'], fn (Builder $q) => $q->onlyTrashed()->whereNull('merged_into_id'))
             ->when($filters['q'] !== '', fn (Builder $q) => $q->search($filters['q']))
             ->when($filters['status'], fn (Builder $q, string $v) => $q->where('status', $v))
             ->when($filters['sector'], fn (Builder $q, string $v) => $q->where('sector_id', $v))
@@ -98,21 +100,35 @@ class OrganisationController extends Controller
         ]);
     }
 
-    public function create(): Response
+    public function create(Request $request): Response
     {
         Gate::authorize('create', Organisation::class);
 
         return Inertia::render('crm/organisations/form', [
             'organisation' => null,
             'options' => $this->formOptions(null),
+            'duplicates' => DuplicateGuard::flashed($request),
+            'canMerge' => $this->user($request)->can(Permissions::MERGE),
         ]);
     }
 
-    public function store(OrganisationRequest $request): RedirectResponse
+    public function store(OrganisationRequest $request): HttpResponse
     {
         Gate::authorize('create', Organisation::class);
 
+        $duplicate = $this->duplicates->organisation($request, $request->validated(), null, route('crm.organisations.create'));
+        if ($duplicate !== null) {
+            return $duplicate;
+        }
+
         $organisation = $this->persist(new Organisation, $request);
+
+        // « Fusionner » from the warning: created, then straight to the merge screen.
+        $mergeInto = $request->input('merge_into');
+        if (is_string($mergeInto) && $this->user($request)->can(Permissions::MERGE)
+            && CrmVisibility::organisations(Organisation::query(), $this->user($request))->whereKey($this->idOrNull($mergeInto))->exists()) {
+            return to_route('crm.merge.show', ['type' => 'organisation', 'keep' => $mergeInto, 'drop' => $organisation->id]);
+        }
 
         return to_route('crm.organisations.show', $organisation)->with('status', 'Entreprise créée.');
     }
@@ -163,7 +179,9 @@ class OrganisationController extends Controller
             'affiliations' => $affiliations->whereNull('ended_on')->map($affiliationRow)->values()->all(),
             'formerAffiliations' => $affiliations->whereNotNull('ended_on')->sortByDesc(fn (Affiliation $a) => $a->ended_on)->map($affiliationRow)->values()->all(),
             'decisionRoles' => FormOptions::reference(ReferenceList::DecisionRole),
+            'similar' => $user->can(Permissions::MERGE) ? $this->duplicates->similarTo($organisation, $user) : [],
             'can' => [
+                'merge' => ! $organisation->trashed() && $user->can(Permissions::MERGE),
                 'affiliate' => ! $organisation->trashed() && $user->can('update', $organisation),
                 'createPerson' => $user->can(Permissions::CREATE),
                 'update' => ! $organisation->trashed() && $user->can('update', $organisation),
@@ -174,7 +192,7 @@ class OrganisationController extends Controller
         ]);
     }
 
-    public function edit(Organisation $organisation): Response
+    public function edit(Request $request, Organisation $organisation): Response
     {
         Gate::authorize('update', $organisation);
         abort_if($organisation->trashed(), 404);
@@ -186,13 +204,20 @@ class OrganisationController extends Controller
                 'das_ids' => $organisation->das()->pluck('reference_items.id')->all(),
             ],
             'options' => $this->formOptions($organisation),
+            'duplicates' => DuplicateGuard::flashed($request),
+            'canMerge' => $this->user($request)->can(Permissions::MERGE),
         ]);
     }
 
-    public function update(OrganisationRequest $request, Organisation $organisation): RedirectResponse
+    public function update(OrganisationRequest $request, Organisation $organisation): HttpResponse
     {
         Gate::authorize('update', $organisation);
         abort_if($organisation->trashed(), 404);
+
+        $duplicate = $this->duplicates->organisation($request, $request->validated(), $organisation, route('crm.organisations.edit', $organisation));
+        if ($duplicate !== null) {
+            return $duplicate;
+        }
 
         $this->persist($organisation, $request);
 

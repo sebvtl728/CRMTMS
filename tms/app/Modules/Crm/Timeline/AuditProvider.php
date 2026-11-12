@@ -26,12 +26,12 @@ final class AuditProvider implements TimelineProvider
         'notes_summary' => 'Notes', 'civility' => 'Civilité', 'first_name' => 'Prénom', 'last_name' => 'Nom',
         'birth_date' => 'Date de naissance', 'is_individual' => 'Particulier', 'project' => 'Projet',
         'professional_situation_id' => 'Situation professionnelle', 'funding_mode_id' => 'Mode de financement',
-        'source_system' => 'Source', 'source_id' => 'Identifiant source', 'anonymised_at' => 'Anonymisation',
+        'merged_into_id' => 'Fusion', 'source_system' => 'Source', 'source_id' => 'Identifiant source', 'anonymised_at' => 'Anonymisation',
     ];
 
     private const EVENTS = [
         'created', 'updated', 'deleted', 'restored',
-        'crm.organisation_das_changed', 'crm.person_das_changed',
+        'crm.organisation_das_changed', 'crm.person_das_changed', 'crm.merged',
     ];
 
     public function entriesFor(Model $subject, ?CarbonImmutable $before, int $limit): Collection
@@ -58,6 +58,7 @@ final class AuditProvider implements TimelineProvider
             'deleted' => 'Fiche supprimée',
             'restored' => 'Fiche restaurée',
             'crm.organisation_das_changed', 'crm.person_das_changed' => 'DAS modifiés',
+            'crm.merged' => 'Fiche en double fusionnée dans cette fiche',
             default => $this->updateTitle($log),
         };
     }

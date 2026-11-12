@@ -21,6 +21,7 @@ use App\Modules\Crm\Timeline\Timeline;
 use App\Modules\Crm\Visibility\CrmVisibility;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
+use Illuminate\Http\Exceptions\HttpResponseException;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\ServiceProvider;
@@ -68,7 +69,9 @@ class CrmServiceProvider extends ServiceProvider
                 $query = CrmVisibility::organisations($query, $user);
             }
 
-            return $query->findOrFail($value);
+            $organisation = $query->findOrFail($value);
+
+            return self::unlessMerged($organisation, $value, fn () => $user instanceof User ? CrmVisibility::organisations(Organisation::withTrashed(), $user) : Organisation::withTrashed(), 'crm.organisations.show');
         });
 
         Route::bind('person', function (string $value): Person {
@@ -83,7 +86,9 @@ class CrmServiceProvider extends ServiceProvider
                 $query = CrmVisibility::people($query, $user);
             }
 
-            return $query->findOrFail($value);
+            $person = $query->findOrFail($value);
+
+            return self::unlessMerged($person, $value, fn () => $user instanceof User ? CrmVisibility::people(Person::withTrashed(), $user) : Person::withTrashed(), 'crm.people.show');
         });
 
         // An affiliation is reachable through the entreprise it belongs to.
@@ -105,6 +110,42 @@ class CrmServiceProvider extends ServiceProvider
         // A note / attachment is reachable through the fiche it belongs to.
         Route::bind('note', fn (string $value): Note => self::bindOnSubject(Note::query(), $value, Note::class));
         Route::bind('attachment', fn (string $value): Attachment => self::bindOnSubject(Attachment::query(), $value, Attachment::class));
+    }
+
+    /**
+     * A merged fiche is never acted upon: every visit goes to the fiche that
+     * absorbed it (following successive merges). A GET keeps its path (fiche,
+     * edit form, timeline…); any other method gets a 303 to the kept fiche
+     * (seen as a GET: a DELETE is never replayed on it). 404 when the kept
+     * fiche is not visible.
+     *
+     * @template TModel of Organisation|Person
+     *
+     * @param  TModel  $fiche
+     * @param  callable(): Builder<TModel>  $visible
+     * @return TModel
+     */
+    private static function unlessMerged(Organisation|Person $fiche, string $value, callable $visible, string $showRoute): Organisation|Person
+    {
+        if ($fiche->merged_into_id === null) {
+            return $fiche;
+        }
+
+        $target = $fiche;
+        for ($hops = 0; $hops < 20 && $target !== null && $target->merged_into_id !== null; $hops++) {
+            $target = $visible()->find($target->merged_into_id);
+        }
+
+        if ($target === null || $target->merged_into_id !== null) {
+            throw (new ModelNotFoundException)->setModel($fiche::class, [$value]);
+        }
+
+        $request = request();
+        $response = $request->isMethod('GET') || $request->isMethod('HEAD')
+            ? redirect()->to(str_replace($value, (string) $target->getKey(), $request->getRequestUri()))
+            : redirect()->route($showRoute, $target->getKey(), 303);
+
+        throw new HttpResponseException($response);
     }
 
     /**

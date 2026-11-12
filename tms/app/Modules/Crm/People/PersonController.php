@@ -8,6 +8,7 @@ use App\Modules\Core\References\ReferenceItem;
 use App\Modules\Core\References\ReferenceList;
 use App\Modules\Core\Tenancy\TenantContext;
 use App\Modules\Core\Users\User;
+use App\Modules\Crm\Duplicates\DuplicateGuard;
 use App\Modules\Crm\Organisations\Organisation;
 use App\Modules\Crm\Organisations\OrganisationStatus;
 use App\Modules\Crm\Permissions;
@@ -21,6 +22,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use Inertia\Inertia;
 use Inertia\Response;
+use Symfony\Component\HttpFoundation\Response as HttpResponse;
 
 /**
  * « Personnes » screens (particuliers and interlocuteurs): list with
@@ -32,7 +34,7 @@ class PersonController extends Controller
 
     private const TYPES = ['individual', 'contact'];
 
-    public function __construct(private readonly TenantContext $tenants, private readonly AuditRecorder $audit) {}
+    public function __construct(private readonly TenantContext $tenants, private readonly AuditRecorder $audit, private readonly DuplicateGuard $duplicates) {}
 
     public function index(Request $request): Response
     {
@@ -55,7 +57,7 @@ class PersonController extends Controller
 
         $query = CrmVisibility::people(Person::query(), $user)
             ->with(['activeAffiliations.organisation', 'responsible'])
-            ->when($filters['trashed'], fn (Builder $q) => $q->onlyTrashed())
+            ->when($filters['trashed'], fn (Builder $q) => $q->onlyTrashed()->whereNull('merged_into_id'))
             ->when($filters['q'] !== '', fn (Builder $q) => $q->search($filters['q']))
             ->when($filters['type'] === 'individual', fn (Builder $q) => $q->where('is_individual', true))
             ->when($filters['type'] === 'contact', fn (Builder $q) => $q->whereExists(fn ($sub) => $sub->select(DB::raw(1))->from('affiliations')
@@ -141,21 +143,35 @@ class PersonController extends Controller
         ])->all()]);
     }
 
-    public function create(): Response
+    public function create(Request $request): Response
     {
         Gate::authorize('create', Person::class);
 
         return Inertia::render('crm/people/form', [
             'person' => null,
             'options' => $this->formOptions(null),
+            'duplicates' => DuplicateGuard::flashed($request),
+            'canMerge' => $this->user($request)->can(Permissions::MERGE),
         ]);
     }
 
-    public function store(PersonRequest $request): RedirectResponse
+    public function store(PersonRequest $request): HttpResponse
     {
         Gate::authorize('create', Person::class);
 
+        $duplicate = $this->duplicates->person($request, $request->validated(), null, route('crm.people.create'));
+        if ($duplicate !== null) {
+            return $duplicate;
+        }
+
         $person = $this->persist(new Person, $request);
+
+        // « Fusionner » from the warning: created, then straight to the merge screen.
+        $mergeInto = $request->input('merge_into');
+        if (is_string($mergeInto) && $this->user($request)->can(Permissions::MERGE)
+            && CrmVisibility::people(Person::query(), $this->user($request))->whereKey($this->idOrNull($mergeInto))->exists()) {
+            return to_route('crm.merge.show', ['type' => 'person', 'keep' => $mergeInto, 'drop' => $person->id]);
+        }
 
         return to_route('crm.people.show', $person)->with('status', 'Personne créée.');
     }
@@ -200,7 +216,9 @@ class PersonController extends Controller
                 'updated_at' => $person->updated_at?->toIso8601String(),
                 'deleted' => $person->trashed(),
             ],
+            'similar' => $user->can(Permissions::MERGE) ? $this->duplicates->similarTo($person, $user) : [],
             'can' => [
+                'merge' => ! $person->trashed() && $user->can(Permissions::MERGE),
                 'update' => ! $person->trashed() && $user->can('update', $person),
                 'delete' => ! $person->trashed() && $user->can('delete', $person),
                 'restore' => $person->trashed() && $user->can('restore', $person),
@@ -209,7 +227,7 @@ class PersonController extends Controller
         ]);
     }
 
-    public function edit(Person $person): Response
+    public function edit(Request $request, Person $person): Response
     {
         Gate::authorize('update', $person);
         abort_if($person->trashed(), 404);
@@ -221,13 +239,20 @@ class PersonController extends Controller
                 'das_ids' => $person->das()->pluck('reference_items.id')->all(),
             ],
             'options' => $this->formOptions($person),
+            'duplicates' => DuplicateGuard::flashed($request),
+            'canMerge' => $this->user($request)->can(Permissions::MERGE),
         ]);
     }
 
-    public function update(PersonRequest $request, Person $person): RedirectResponse
+    public function update(PersonRequest $request, Person $person): HttpResponse
     {
         Gate::authorize('update', $person);
         abort_if($person->trashed(), 404);
+
+        $duplicate = $this->duplicates->person($request, $request->validated(), $person, route('crm.people.edit', $person));
+        if ($duplicate !== null) {
+            return $duplicate;
+        }
 
         $this->persist($person, $request);
 

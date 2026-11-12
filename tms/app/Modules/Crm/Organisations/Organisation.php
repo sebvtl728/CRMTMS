@@ -46,6 +46,8 @@ use Illuminate\Support\Facades\Auth;
  * @property string|null $source_id
  * @property string|null $created_by
  * @property string|null $updated_by
+ * @property string|null $merged_into_id the fiche this one was merged into (then trashed for good)
+ * @property list<array{id: string, source_id: string|null, source_system: string|null}> $merged_sources fiches merged into this one
  * @property Carbon|null $deleted_at
  */
 class Organisation extends Model
@@ -57,7 +59,7 @@ class Organisation extends Model
      *
      * @var list<string>
      */
-    protected array $auditIgnore = ['search_vector', 'created_by', 'updated_by', 'last_contact_at'];
+    protected array $auditIgnore = ['search_vector', 'created_by', 'updated_by', 'last_contact_at', 'merged_sources'];
 
     /** @var list<string> */
     protected $fillable = [
@@ -92,6 +94,8 @@ class Organisation extends Model
                 Affiliation::cascadeDelete('organisation_id', $organisation);
             }
         });
+        // A merged fiche stays in the trash: its content now lives in the kept one.
+        static::restoring(fn (Organisation $organisation) => $organisation->merged_into_id === null ? null : false);
         static::restoring(fn (Organisation $organisation) => Affiliation::cascadeRestore('organisation_id', $organisation));
     }
 
@@ -100,6 +104,7 @@ class Organisation extends Model
         return [
             'status' => OrganisationStatus::class,
             'last_contact_at' => 'datetime',
+            'merged_sources' => 'array',
         ];
     }
 

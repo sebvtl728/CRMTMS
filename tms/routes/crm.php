@@ -1,6 +1,7 @@
 <?php
 
 use App\Modules\Crm\Affiliations\AffiliationController;
+use App\Modules\Crm\Duplicates\MergeController;
 use App\Modules\Crm\Organisations\OrganisationController;
 use App\Modules\Crm\People\PersonController;
 use App\Modules\Crm\Timeline\AttachmentController;
@@ -47,6 +48,10 @@ Route::middleware(['auth'])->group(function () {
         Route::delete('{person}', [PersonController::class, 'destroy'])->middleware('can:crm.delete')->name('destroy');
         Route::post('{person}/restore', [PersonController::class, 'restore'])->middleware('can:crm.delete')->name('restore');
     });
+
+    // Merge of two duplicate fiches (irreversible).
+    Route::get('crm/merge/{type}/{keep}/{drop}', [MergeController::class, 'show'])->whereIn('type', ['organisation', 'person'])->middleware('can:crm.merge')->name('crm.merge.show');
+    Route::post('crm/merge/{type}', [MergeController::class, 'store'])->whereIn('type', ['organisation', 'person'])->middleware('can:crm.merge')->name('crm.merge.store');
 
     // DAS followed by a Responsable DAS, set from the users administration page.
     Route::put('admin/users/{user}/das', [UserDasController::class, 'update'])->middleware('can:users.manage')->name('admin.users.das');

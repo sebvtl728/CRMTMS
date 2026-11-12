@@ -1,3 +1,4 @@
+import { DuplicateWarning, type DuplicateCandidate } from '@/components/crm/duplicate-warning';
 import Heading from '@/components/heading';
 import InputError from '@/components/input-error';
 import { Button } from '@/components/ui/button';
@@ -8,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import AppLayout from '@/layouts/app-layout';
 import { itemError, type Option } from '@/lib/crm';
 import { type BreadcrumbItem } from '@/types';
-import { Head, Link, useForm } from '@inertiajs/react';
+import { Head, Link, useForm, usePage } from '@inertiajs/react';
 import { LoaderCircle } from 'lucide-react';
 import { FormEventHandler } from 'react';
 
@@ -52,11 +53,25 @@ interface FormProps {
         das: Option[];
         responsible: Option[];
     };
+    duplicates: DuplicateCandidate[];
+    canMerge: boolean;
 }
 
 const NONE = 'none';
 
-function Field({ id, label, error, children, className }: { id: string; label: string; error?: string; children: React.ReactNode; className?: string }) {
+function Field({
+    id,
+    label,
+    error,
+    children,
+    className,
+}: {
+    id: string;
+    label: string;
+    error?: string;
+    children: React.ReactNode;
+    className?: string;
+}) {
     return (
         <div className={`grid gap-2 ${className ?? ''}`}>
             <Label htmlFor={id}>{label}</Label>
@@ -75,11 +90,11 @@ function Section({ title, children }: { title: string; children: React.ReactNode
     );
 }
 
-export default function PersonFormPage({ person, options }: FormProps) {
+export default function PersonFormPage({ person, options, duplicates, canMerge }: FormProps) {
     const editing = person !== null;
     const str = (key: string, fallback = '') => (person?.[key] as string | null | undefined) ?? fallback;
 
-    const { data, setData, post, put, processing, errors } = useForm<PersonForm>({
+    const { data, setData, post, put, processing, errors, transform } = useForm<PersonForm>({
         civility: str('civility'),
         first_name: str('first_name'),
         last_name: str('last_name'),
@@ -109,13 +124,21 @@ export default function PersonFormPage({ person, options }: FormProps) {
         { title: editing ? 'Modifier' : 'Nouvelle personne', href: '#' },
     ];
 
+    const duplicateError = (usePage().props.errors as Record<string, string | undefined>).duplicates;
+
+    /** Saves; `extra` carries the answer to the duplicate warning (confirm_duplicate, merge_into). */
+    const send = (extra: Record<string, string> = {}) => {
+        transform((d) => ({ ...d, ...extra }));
+        if (editing) {
+            put(route('crm.people.update', person.id), { preserveScroll: true });
+        } else {
+            post(route('crm.people.store'), { preserveScroll: true });
+        }
+    };
+
     const submit: FormEventHandler = (e) => {
         e.preventDefault();
-        if (editing) {
-            put(route('crm.people.update', person.id));
-        } else {
-            post(route('crm.people.store'));
-        }
+        send();
     };
 
     const text = (key: keyof PersonForm & string, label: string, props: React.ComponentProps<typeof Input> = {}) => (
@@ -155,7 +178,15 @@ export default function PersonFormPage({ person, options }: FormProps) {
                 />
 
                 <Section title="Identité">
-                    {pick('civility', 'Civilité', [{ value: 'M.', label: 'M.' }, { value: 'Mme', label: 'Mme' }], 'Non précisée')}
+                    {pick(
+                        'civility',
+                        'Civilité',
+                        [
+                            { value: 'M.', label: 'M.' },
+                            { value: 'Mme', label: 'Mme' },
+                        ],
+                        'Non précisée',
+                    )}
                     <div className="hidden md:block" />
                     {text('first_name', 'Prénom', { autoComplete: 'off' })}
                     <Field id="last_name" label="Nom *" error={errors.last_name}>
@@ -219,6 +250,18 @@ export default function PersonFormPage({ person, options }: FormProps) {
                         />
                     </Field>
                 </Section>
+
+                {duplicateError && (
+                    <DuplicateWarning
+                        type="person"
+                        duplicates={duplicates}
+                        canMerge={canMerge}
+                        currentId={editing ? person.id : null}
+                        processing={processing}
+                        onConfirm={() => send({ confirm_duplicate: '1' })}
+                        onCreateAndMerge={(id) => send({ confirm_duplicate: '1', merge_into: id })}
+                    />
+                )}
 
                 <div className="flex flex-wrap gap-2">
                     <Button type="submit" disabled={processing}>

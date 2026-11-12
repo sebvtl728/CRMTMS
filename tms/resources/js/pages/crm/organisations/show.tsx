@@ -1,5 +1,6 @@
-import { Timeline } from '@/components/crm/timeline';
+import { SimilarFiches, type DuplicateCandidate } from '@/components/crm/duplicate-warning';
 import { OrganisationContacts, type AffiliationRow } from '@/components/crm/organisation-contacts';
+import { Timeline } from '@/components/crm/timeline';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -44,11 +45,12 @@ interface OrganisationData {
 }
 
 interface ShowProps {
+    similar: DuplicateCandidate[];
     organisation: OrganisationData;
     affiliations: AffiliationRow[];
     formerAffiliations: AffiliationRow[];
     decisionRoles: Option[];
-    can: { affiliate: boolean; createPerson: boolean; update: boolean; delete: boolean; restore: boolean };
+    can: { affiliate: boolean; createPerson: boolean; update: boolean; delete: boolean; restore: boolean; merge: boolean };
     status?: string;
 }
 
@@ -75,7 +77,7 @@ function safeLink(url: string | null): React.ReactNode {
     );
 }
 
-export default function OrganisationShow({ organisation: o, affiliations, formerAffiliations, decisionRoles, can, status }: ShowProps) {
+export default function OrganisationShow({ organisation: o, affiliations, formerAffiliations, decisionRoles, similar, can, status }: ShowProps) {
     const [tab, setTab] = useState<(typeof TABS)[number]>('Informations');
     const [confirming, setConfirming] = useState(false);
     const errors = usePage().props.errors as Record<string, string | undefined>;
@@ -135,6 +137,7 @@ export default function OrganisationShow({ organisation: o, affiliations, former
                 </div>
 
                 {status && <div className="text-sm font-medium text-green-600">{status}</div>}
+                {can.merge && <SimilarFiches type="organisation" currentId={o.id} similar={similar} />}
                 {errors.restore && (
                     <div
                         role="alert"
