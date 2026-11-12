@@ -6,6 +6,7 @@ use App\Modules\Core\Access\Role;
 use App\Modules\Core\Platform\TenantProvisioner;
 use App\Modules\Core\References\CapFormationReferenceSeeder;
 use App\Modules\Core\Tenancy\Tenant;
+use App\Modules\Core\Users\ActivationLink;
 use App\Modules\Core\Users\Invitation;
 use App\Modules\Core\Users\InvitationNotification;
 use App\Modules\Core\Users\User;
@@ -80,8 +81,7 @@ class TmsInstall extends Command
             return self::FAILURE;
         }
 
-        $base = $domain !== '' ? 'https://'.mb_strtolower(trim($domain)) : rtrim((string) config('app.url'), '/');
-        $url = $base.route('activation.show', $invitation->plainToken, false);
+        $url = ActivationLink::url((string) $invitation->plainToken, $tenant, $domain);
 
         $this->info("Organisme « {$tenant->name} » installé.");
         $this->sendMail($url, $email, $adminName, $tenant->name);

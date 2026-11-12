@@ -15,7 +15,7 @@ Par défaut, l'administrateur détient toutes les permissions ; la direction a s
 
 ## 1. Première connexion
 
-1. L'installation (`php artisan tms:install`, voir `install.md`) affiche un **lien d'activation** et l'envoie par e-mail si la messagerie est configurée. Il est à **usage unique** et valable **24 heures**. S'il a expiré, un autre administrateur peut renvoyer une invitation ; pour le tout premier compte, relancer l'installation sur une base vierge.
+1. L'installation (`php artisan tms:install`, voir `install.md`) affiche un **lien d'activation** et l'envoie par e-mail si la messagerie est configurée. Il est à **usage unique** et valable **24 heures**. S'il a expiré, un autre administrateur peut renvoyer une invitation ; sinon l'exploitant en émet un nouveau en ligne de commande (voir *Récupérer l'accès administrateur*).
 2. Ouvrez le lien : choisissez un mot de passe d'au moins **12 caractères** (les mots de passe connus pour avoir fuité sont refusés).
 3. Connectez-vous avec votre adresse e-mail et ce mot de passe. La double authentification vous est alors imposée (voir ci-dessous).
 4. Après la connexion, vous arrivez sur **Accueil**. Le menu de gauche liste les écrans d'administration.
@@ -97,3 +97,21 @@ Filtres : utilisateur, évènement, type d'objet, période (du / au). Chaque lig
 - Chaque modification est consignée dans le journal d'audit (« Paramètres de sécurité modifiés », valeurs avant / après).
 
 Autres garanties (non paramétrables) : mots de passe Argon2id d'au moins 12 caractères, limitation du nombre d'essais de code 2FA, codes de récupération à usage unique, journal d'audit non modifiable, isolation stricte des données entre organismes.
+
+## 9. Récupérer l'accès administrateur
+
+Deux commandes d'exploitation, lancées sur le serveur, rétablissent l'accès sans jamais afficher ni fixer de mot de passe. Elles agissent dans un seul organisme (`--tenant=<identifiant>`, par défaut celui de l'installation) et sont consignées dans le journal d'audit.
+
+```bash
+cd /opt/tms
+# Nouveau lien d'activation (24 h, usage unique) pour un compte qui n'a jamais choisi son mot de passe :
+docker compose -f compose.prod.yaml --env-file .env exec app php artisan tms:user:activation-link admin@exemple.fr
+# … ou invitation d'une nouvelle adresse, avec son rôle :
+docker compose -f compose.prod.yaml --env-file .env exec app php artisan tms:user:activation-link secours@exemple.fr --role=admin_organisme --name="Admin de secours"
+# Téléphone et codes de récupération perdus : réinitialise la 2FA et ferme toutes les sessions du compte.
+docker compose -f compose.prod.yaml --env-file .env exec app php artisan tms:user:reset-2fa admin@exemple.fr
+```
+
+- `tms:user:activation-link` affiche le lien à transmettre au seul titulaire de l'adresse ; tout lien précédent est annulé. Un compte déjà activé est refusé : utilisez « Mot de passe oublié » sur la page de connexion. Journal : « Lien d'activation réémis » (`users.activation_reissued`).
+- `tms:user:reset-2fa` efface le secret et les codes de récupération ; un administrateur ou un membre de la direction devra enrôler un nouvel appareil à sa prochaine connexion. Journal : `auth.2fa_reset_by_operator`.
+- Rôles possibles pour `--role` : `admin_organisme`, `direction`, `commercial`, `charge_relations`, `assistant`, `responsable_das`.

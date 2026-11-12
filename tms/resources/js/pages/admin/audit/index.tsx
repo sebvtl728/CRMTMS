@@ -53,9 +53,12 @@ const EVENT_LABELS: Record<string, string> = {
     'auth.logout': 'Déconnexion',
     'auth.2fa_enabled': 'Double authentification activée',
     'auth.2fa_disabled': 'Double authentification désactivée',
+    'auth.2fa_reset_by_operator': 'Double authentification réinitialisée (exploitant)',
     'access.role_changed': 'Changement de rôle',
     'export.run': 'Export',
     'users.invitation_sent': 'Invitation envoyée',
+    'users.invitation_send_failed': "Échec d'envoi de l'invitation",
+    'users.activation_reissued': "Lien d'activation réémis",
     'settings.security_changed': 'Paramètres de sécurité modifiés',
 };
 

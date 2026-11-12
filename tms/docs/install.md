@@ -259,6 +259,16 @@ la sauvegarde restic), puis lance `ops/update.sh` dans le conteneur et renvoie s
    (`MAIL_MAILER=log`), les alertes de sauvegarde ne partent pas par e-mail.
 3. Compléter la fiche société, inviter les utilisateurs.
 
+### Récupérer l'accès administrateur
+
+Lien d'activation expiré ou jamais reçu, 2FA perdue : voir [`admin.md`](admin.md#9-récupérer-laccès-administrateur).
+En bref, depuis `/opt/tms` :
+
+```bash
+docker compose -f compose.prod.yaml --env-file .env exec app php artisan tms:user:activation-link <e-mail> [--role=admin_organisme] [--tenant=<identifiant>]
+docker compose -f compose.prod.yaml --env-file .env exec app php artisan tms:user:reset-2fa <e-mail> [--tenant=<identifiant>]
+```
+
 ### Installation interrompue
 
 Si l'installation échoue après la création de `.env`, le message indique comment repartir de zéro :
