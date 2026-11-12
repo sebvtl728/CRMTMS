@@ -1,5 +1,6 @@
 <?php
 
+use App\Modules\Connectors\ConnectorsServiceProvider;
 use App\Modules\Core\Access\AccessServiceProvider;
 use App\Modules\Core\Audit\AuditServiceProvider;
 use App\Modules\Core\Tenancy\TenancyServiceProvider;
@@ -14,4 +15,5 @@ return [
     UsersServiceProvider::class,
     AccessServiceProvider::class,
     AuditServiceProvider::class,
+    ConnectorsServiceProvider::class,
 ];

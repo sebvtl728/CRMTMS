@@ -38,4 +38,10 @@ return [
         ],
     ],
 
+    'connectors' => [
+
+        // Accept loopback / link-local SMTP hosts (a development mail catcher). Keep false in production.
+        'allow_internal_hosts' => (bool) env('TMS_ALLOW_INTERNAL_SMTP_HOSTS', false),
+    ],
+
 ];

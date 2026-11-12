@@ -7,6 +7,7 @@ export interface Auth {
         viewAudit: boolean;
         manageCompanies: boolean;
         manageReferences: boolean;
+        manageConnectors: boolean;
     };
 }
 
