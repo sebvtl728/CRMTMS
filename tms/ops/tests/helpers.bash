@@ -13,6 +13,8 @@ export TMS_ROOT
 
 # shellcheck disable=SC1091
 source "$TMS_ROOT/ops/lib.sh"
+# shellcheck disable=SC1091
+source "$TMS_ROOT/ops/tests/bundle.bash"
 # bats relies on errexit; nounset from lib.sh would break its internals.
 set +u
 
@@ -67,15 +69,14 @@ ENV
     wait_health 120
 }
 
-# copy_bundle <dir>: the files of a release bundle (see docs/install.md), from the source tree.
+# copy_bundle <dir>: the files of a release bundle, extracted from a real make-bundle.sh archive.
 copy_bundle() {
-    local dest="$1"
-    mkdir -p "$dest/ops" "$dest/docker/caddy" "$dest/docker/postgres" "$dest/docs"
-    cp "$TMS_ROOT/compose.prod.yaml" "$TMS_ROOT/.env.prod.example" "$dest/"
-    cp "$TMS_ROOT"/ops/*.sh "$dest/ops/"
-    cp "$TMS_ROOT/docker/caddy/Caddyfile" "$dest/docker/caddy/"
-    cp "$TMS_ROOT/docker/postgres/init.sh" "$TMS_ROOT/docker/postgres/init.sql" "$dest/docker/postgres/"
-    cp "$TMS_ROOT/docs/install.md" "$dest/docs/"
+    local dest="$1" out
+    out="$(mktemp -d)"
+    "$TMS_ROOT/ops/release/make-bundle.sh" bats "$out" 2>/dev/null
+    mkdir -p "$dest"
+    tar -xzf "$out/tms-bats.tar.gz" -C "$dest" --no-same-owner
+    rm -rf "$out"
 }
 
 stack_down() {

@@ -1,0 +1,20 @@
+# Helpers to build release bundles with the real ops/release/make-bundle.sh.
+# Needs TMS_ROOT.
+
+# stage_src <dir>: copy of the source files a release is built from (files.txt + installers),
+# so a test can alter them before bundling.
+stage_src() {
+    local dest="$1" f
+    mkdir -p "$dest/ops/release" "$dest/ops/install"
+    cp "$TMS_ROOT/ops/release/files.txt" "$dest/ops/release/"
+    cp "$TMS_ROOT/ops/install/install.sh" "$TMS_ROOT/ops/install/proxmox.sh" "$dest/ops/install/"
+    while IFS= read -r f; do
+        mkdir -p "$dest/$(dirname "$f")"
+        cp "$TMS_ROOT/$f" "$dest/$f"
+    done < <(sed -e 's/#.*//' -e 's/[[:space:]]//g' "$TMS_ROOT/ops/release/files.txt" | grep -v '^$')
+}
+
+# bundle_src <src dir> <version> <out dir>: runs make-bundle.sh on a staged tree.
+bundle_src() {
+    TMS_BUNDLE_SRC="$1" "$TMS_ROOT/ops/release/make-bundle.sh" "$2" "$3" 2>/dev/null
+}

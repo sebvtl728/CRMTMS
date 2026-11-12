@@ -67,12 +67,13 @@ build_test_images() {
     docker tag tms-ci:bats tms-ci:test-sabotage
 }
 
-# release_archive <dist dir> <version> [stage hook]: tms-<version>.tar.gz from the source tree.
+# release_archive <dist dir> <version> [stage hook]: tms-<version>.tar.gz built by the real make-bundle.sh.
 release_archive() {
     local dist="$1" version="$2" stage="$STACK_DIR/stage-$2"
     rm -rf "$stage"
-    copy_bundle "$stage"
+    stage_src "$stage"
     printf '%s\n' "$version" >"$stage/docs/bats-release.txt"
+    printf 'docs/bats-release.txt\n' >>"$stage/ops/release/files.txt"
     if [[ "$version" == "test-ok" ]]; then
         # The new release's own updater must be the one that runs.
         awk '{ print } /^source .*lib\.sh"$/ { print "log_info \"bats-reexec : programme de mise à jour de la version publiée\"" }' \
@@ -95,7 +96,8 @@ SH
         chmod 755 "$stage/ops/migrate.sh"
     fi
     mkdir -p "$dist"
-    tar -czf "$dist/tms-$version.tar.gz" -C "$stage" .
+    bundle_src "$stage" "$version" "$STACK_DIR/out-$version"
+    cp "$STACK_DIR/out-$version/tms-$version.tar.gz" "$dist/"
 }
 
 build_dist() {

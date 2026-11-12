@@ -245,13 +245,22 @@ Si l'installation échoue après la création de `.env`, le message indique comm
 
 ### Contenu d'une version (contrat avec la publication)
 
-Fichiers attachés à chaque version : `tms-<version>.tar.gz` (à la racine de l'archive : `compose.prod.yaml`,
-`.env.prod.example`, `ops/`, `docker/caddy/Caddyfile`, `docker/postgres/init.sh`, `docker/postgres/init.sql`,
-`docs/install.md`), `SHA256SUMS` (format `sha256sum`, liste **l'archive et `install.sh`**), `install.sh`,
-`proxmox.sh`. Image : `ghcr.io/<propriétaire>/tms:<version>`. Nouveau paramètre : l'ajouter à `.env.prod.example`
-(valeur par défaut, ou `__GENERATE__` pour un secret). Le programme de mise à jour de la version précédente lance
-`ops/update.sh` de la nouvelle avec `TMS_UPDATE_REEXEC=1 … --version <version> --bundle-dir <dossier>` : cette
-interface doit rester stable.
+Fichiers attachés à chaque version (workflow `.github/workflows/release.yml`, voir [`release.md`](release.md)) :
+`tms-<version>.tar.gz`, `SHA256SUMS` (format `sha256sum`, liste **l'archive, `install.sh` et `proxmox.sh`**),
+`SHA256SUMS.cosign.bundle` (signature cosign de `SHA256SUMS`), `install.sh`, `proxmox.sh`. Image :
+`ghcr.io/<propriétaire>/tms:<version>` (`linux/amd64` et `linux/arm64`, signée ; `:latest` hors pré-version).
+
+Contenu de l'archive (à la racine, noms triés, date et propriétaire fixes : reproductible) : la liste
+`ops/release/files.txt`, **source unique** lue par `ops/release/make-bundle.sh` (publication et tests) :
+`compose.prod.yaml`, `.env.prod.example`, `ops/{lib,migrate,backup,restore,update}.sh`, `docker/caddy/Caddyfile`,
+`docker/postgres/init.sh`, `docker/postgres/init.sql`, `docs/install.md`. `fetch_bundle` (`ops/lib.sh`, recopié dans
+`install.sh`) refuse une archive à laquelle manque l'un de ces fichiers ; `ops/tests/release.bats` vérifie que
+les deux listes concordent : **ajouter un fichier à l'archive = l'ajouter à `files.txt`** (et à `fetch_bundle` s'il
+est indispensable).
+
+Nouveau paramètre : l'ajouter à `.env.prod.example` (valeur par défaut, ou `__GENERATE__` pour un secret). Le
+programme de mise à jour de la version précédente lance `ops/update.sh` de la nouvelle avec
+`TMS_UPDATE_REEXEC=1 … --version <version> --bundle-dir <dossier>` : cette interface doit rester stable.
 
 ### Validation manuelle sur Proxmox (à réaliser à chaque version)
 

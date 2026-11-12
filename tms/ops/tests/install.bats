@@ -9,6 +9,8 @@ TMS_ROOT="$(cd "$BATS_TEST_DIRNAME/../.." && pwd)"
 INSTALL_SH="$TMS_ROOT/ops/install/install.sh"
 PROXMOX_SH="$TMS_ROOT/ops/install/proxmox.sh"
 FIXTURE_VERSION="9.9.9"
+# shellcheck source=bundle.bash
+source "$BATS_TEST_DIRNAME/bundle.bash"
 
 setup() {
     MOCK_BIN="$BATS_TEST_TMPDIR/bin"
@@ -32,19 +34,12 @@ setup() {
     unset TMS_VERSION TMS_SEED_CAP TMS_TLS TMS_PRINT_SECRETS TMS_NONINTERACTIVE CTID CT_IP CT_GW
 }
 
-# Fake release: tms-<version>.tar.gz (flat archive), install.sh, SHA256SUMS.
+# Fake release built by the real make-bundle.sh: tms-<version>.tar.gz, install.sh, proxmox.sh, SHA256SUMS.
 build_release() {
     local stage="$BATS_TEST_TMPDIR/stage"
-    mkdir -p "$stage/ops" "$stage/docker/caddy" "$stage/docker/postgres" "$stage/docs"
-    cp "$TMS_ROOT/compose.prod.yaml" "$TMS_ROOT/.env.prod.example" "$stage/"
-    cp "$TMS_ROOT"/ops/*.sh "$stage/ops/"
-    cp "$TMS_ROOT/docker/caddy/Caddyfile" "$stage/docker/caddy/"
-    cp "$TMS_ROOT/docker/postgres/init.sh" "$TMS_ROOT/docker/postgres/init.sql" "$stage/docker/postgres/"
-    cp "$TMS_ROOT/docs/install.md" "$stage/docs/"
+    stage_src "$stage"
     echo "BATS_GENERATED_SECRET=__GENERATE__" >>"$stage/.env.prod.example"
-    tar -czf "$MOCK_DIST/tms-$FIXTURE_VERSION.tar.gz" -C "$stage" .
-    cp "$INSTALL_SH" "$MOCK_DIST/install.sh"
-    (cd "$MOCK_DIST" && shasum -a 256 "tms-$FIXTURE_VERSION.tar.gz" install.sh >SHA256SUMS)
+    bundle_src "$stage" "$FIXTURE_VERSION" "$MOCK_DIST"
 }
 
 mock() {
