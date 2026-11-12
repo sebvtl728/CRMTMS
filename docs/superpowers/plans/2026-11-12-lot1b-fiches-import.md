@@ -340,9 +340,12 @@ it('failover mailer ending in log is treated as delivering nowhere', fn () => /*
 
 ---
 
-## Ordre d'exécution
+## Ordre d'exécution **[décidé par Sébastien : saisie de données d'abord]**
 
-1 → 2 → 3 → 4 → 5 → 6 → 7 → 8 → 9 → 10 → 11 → 12
+2 → 3 → 4 → 5 → **point de livraison : Sébastien saisit des entreprises, personnes et notes** → 6 → 7 → 8 → 9 → 10 → 11 → 1 → 12
+
+- Task 2 reste en tête uniquement pour ce dont les fiches ont besoin (permissions CRM + `PermissionSync`, `TenantStorage`, extensions de recherche, arch test) ; `ForEachTenant` et le contexte de log peuvent glisser avec la Task 11 si besoin.
+- Vocabulaire de l'interface : le modèle `Organisation` s'affiche **« Entreprises »** (menu, titres, boutons) pour ne pas confondre avec l'« organisme » qui utilise l'application ; l'écran dit « Entreprise » même pour une association ou une collectivité.
 
 ## Hors 1b (rappel)
 
