@@ -1,5 +1,17 @@
 <?php
 
+/*
+| Compose passes unset optional variables as empty strings: an empty value
+| means "default", never false. Booleans accept true/false/1/0/yes/no/on/off.
+*/
+$mode = env('TMS_MODE') ?: 'single';
+$bool = static function (string $key, bool $default): bool {
+    $value = env($key);
+
+    // filter_var() reads '' as false: an empty value must fall back instead.
+    return $value === null || $value === '' ? $default : (filter_var($value, FILTER_VALIDATE_BOOL, FILTER_NULL_ON_FAILURE) ?? $default);
+};
+
 return [
 
     /*
@@ -7,16 +19,16 @@ return [
     |  - "single": self-hosted install for one organisation, always the default tenant;
     |  - "multi": the tenant is looked up from the request host (tenant_domains.host).
     */
-    'mode' => env('TMS_MODE', 'single'),
+    'mode' => $mode,
 
     // Slug of the tenant used in "single" mode (created by the installer / seeder).
-    'default_tenant' => env('TMS_DEFAULT_TENANT', 'default'),
+    'default_tenant' => env('TMS_DEFAULT_TENANT') ?: 'default',
 
     // Recipient of the operational alerts (failed backups...), see `php artisan tms:alert`.
-    'alert_email' => env('TMS_ALERT_EMAIL'),
+    'alert_email' => env('TMS_ALERT_EMAIL') ?: null,
 
     // Follow the Vite dev server (public/hot) when it runs; false = always serve public/build (e2e stack).
-    'vite_hot' => (bool) env('TMS_VITE_HOT', true),
+    'vite_hot' => $bool('TMS_VITE_HOT', true),
 
     'tenancy' => [
 
@@ -47,11 +59,11 @@ return [
     'connectors' => [
 
         // Accept loopback / link-local SMTP hosts (a development mail catcher). Keep false in production.
-        'allow_internal_hosts' => (bool) env('TMS_ALLOW_INTERNAL_SMTP_HOSTS', false),
+        'allow_internal_hosts' => $bool('TMS_ALLOW_INTERNAL_SMTP_HOSTS', false),
 
         // Accept private-network SMTP hosts (RFC 1918, IPv6 ULA): a LAN relay. Allowed by default on a
         // self-hosted install (single mode), refused in multi mode (shared platform).
-        'allow_private_hosts' => (bool) env('TMS_ALLOW_PRIVATE_SMTP_HOSTS', env('TMS_MODE', 'single') === 'single'),
+        'allow_private_hosts' => $bool('TMS_ALLOW_PRIVATE_SMTP_HOSTS', $mode === 'single'),
     ],
 
 ];
