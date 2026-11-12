@@ -40,4 +40,21 @@ final class PhoneNumber
 
         return preg_match('/^0[1-9]\d{8}$/', $digits) === 1 ? '+33'.substr($digits, 1) : $input;
     }
+
+    /**
+     * A stored number as people read it: +33612345678 -> 06 12 34 56 78.
+     * Anything else is returned as stored.
+     */
+    public static function display(?string $stored): ?string
+    {
+        if ($stored === null || $stored === '') {
+            return null;
+        }
+
+        if (preg_match('/^\+33([1-9])(\d{8})$/', $stored, $m) !== 1) {
+            return $stored;
+        }
+
+        return trim(preg_replace('/(\d{2})(?=\d)/', '$1 ', '0'.$m[1].$m[2]) ?? $stored);
+    }
 }

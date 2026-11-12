@@ -2,8 +2,11 @@
 
 use App\Modules\Crm\Affiliations\AffiliationController;
 use App\Modules\Crm\Duplicates\MergeController;
+use App\Modules\Crm\Export\ExportController;
 use App\Modules\Crm\Organisations\OrganisationController;
 use App\Modules\Crm\People\PersonController;
+use App\Modules\Crm\Search\SavedFilterController;
+use App\Modules\Crm\Search\SearchController;
 use App\Modules\Crm\Timeline\AttachmentController;
 use App\Modules\Crm\Timeline\NoteController;
 use App\Modules\Crm\Timeline\TimelineController;
@@ -13,6 +16,7 @@ use Illuminate\Support\Facades\Route;
 Route::middleware(['auth'])->group(function () {
     Route::prefix('crm/organisations')->name('crm.organisations.')->group(function () {
         Route::get('/', [OrganisationController::class, 'index'])->middleware('can:crm.view')->name('index');
+        Route::get('export', [ExportController::class, 'organisations'])->middleware(['can:crm.export', 'throttle:10,1'])->name('export');
         Route::get('create', [OrganisationController::class, 'create'])->middleware('can:crm.create')->name('create');
         Route::post('/', [OrganisationController::class, 'store'])->middleware('can:crm.create')->name('store');
         Route::get('{organisation}', [OrganisationController::class, 'show'])->middleware('can:crm.view')->name('show');
@@ -40,6 +44,7 @@ Route::middleware(['auth'])->group(function () {
     Route::prefix('crm/people')->name('crm.people.')->group(function () {
         Route::get('/', [PersonController::class, 'index'])->middleware('can:crm.view')->name('index');
         Route::get('search', [PersonController::class, 'search'])->middleware('can:crm.view')->name('search');
+        Route::get('export', [ExportController::class, 'people'])->middleware(['can:crm.export', 'throttle:10,1'])->name('export');
         Route::get('create', [PersonController::class, 'create'])->middleware('can:crm.create')->name('create');
         Route::post('/', [PersonController::class, 'store'])->middleware('can:crm.create')->name('store');
         Route::get('{person}', [PersonController::class, 'show'])->middleware('can:crm.view')->name('show');
@@ -47,6 +52,15 @@ Route::middleware(['auth'])->group(function () {
         Route::put('{person}', [PersonController::class, 'update'])->middleware('can:crm.update')->name('update');
         Route::delete('{person}', [PersonController::class, 'destroy'])->middleware('can:crm.delete')->name('destroy');
         Route::post('{person}/restore', [PersonController::class, 'restore'])->middleware('can:crm.delete')->name('restore');
+    });
+
+    // Global search (Ctrl+K), saved filters; the Excel exports are above, next to their lists.
+    Route::get('crm/search', SearchController::class)->middleware(['can:crm.view', 'throttle:60,1'])->name('crm.search');
+    Route::prefix('crm/saved-filters')->name('crm.saved-filters.')->middleware('can:crm.view')->group(function () {
+        Route::get('/', [SavedFilterController::class, 'index'])->name('index');
+        Route::post('/', [SavedFilterController::class, 'store'])->name('store');
+        Route::put('{savedFilter}', [SavedFilterController::class, 'update'])->name('update');
+        Route::delete('{savedFilter}', [SavedFilterController::class, 'destroy'])->name('destroy');
     });
 
     // Merge of two duplicate fiches (irreversible).

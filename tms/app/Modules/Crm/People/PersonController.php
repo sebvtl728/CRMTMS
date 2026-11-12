@@ -12,6 +12,8 @@ use App\Modules\Crm\Duplicates\DuplicateGuard;
 use App\Modules\Crm\Organisations\Organisation;
 use App\Modules\Crm\Organisations\OrganisationStatus;
 use App\Modules\Crm\Permissions;
+use App\Modules\Crm\Search\CrmResource;
+use App\Modules\Crm\Search\ListExtras;
 use App\Modules\Crm\Support\FormOptions;
 use App\Modules\Crm\Visibility\CrmVisibility;
 use Illuminate\Database\Eloquent\Builder;
@@ -30,10 +32,6 @@ use Symfony\Component\HttpFoundation\Response as HttpResponse;
  */
 class PersonController extends Controller
 {
-    private const SORTS = ['name', 'city', 'last_contact_at', 'created_at'];
-
-    private const TYPES = ['individual', 'contact'];
-
     public function __construct(private readonly TenantContext $tenants, private readonly AuditRecorder $audit, private readonly DuplicateGuard $duplicates) {}
 
     public function index(Request $request): Response
@@ -41,41 +39,8 @@ class PersonController extends Controller
         $user = $this->user($request);
         $canDelete = $user->can(Permissions::DELETE);
 
-        $filters = [
-            'q' => is_string($request->query('q')) ? trim($request->query('q')) : '',
-            'type' => is_string($request->query('type')) && in_array($request->query('type'), self::TYPES, true) ? $request->query('type') : null,
-            'status' => is_string($request->query('status')) ? OrganisationStatus::tryFrom($request->query('status'))?->value : null,
-            'situation' => $this->idOrNull($request->query('situation')),
-            'funding' => $this->idOrNull($request->query('funding')),
-            'origin' => $this->idOrNull($request->query('origin')),
-            'responsible' => $this->idOrNull($request->query('responsible')),
-            'mine' => $request->boolean('mine'),
-            'trashed' => $canDelete && $request->boolean('trashed'),
-            'sort' => is_string($request->query('sort')) && in_array($request->query('sort'), self::SORTS, true) ? $request->query('sort') : 'name',
-            'dir' => $request->query('dir') === 'desc' ? 'desc' : 'asc',
-        ];
-
-        $query = CrmVisibility::people(Person::query(), $user)
-            ->with(['activeAffiliations.organisation', 'responsible'])
-            ->when($filters['trashed'], fn (Builder $q) => $q->onlyTrashed()->whereNull('merged_into_id'))
-            ->when($filters['q'] !== '', fn (Builder $q) => $q->search($filters['q']))
-            ->when($filters['type'] === 'individual', fn (Builder $q) => $q->where('is_individual', true))
-            ->when($filters['type'] === 'contact', fn (Builder $q) => $q->whereExists(fn ($sub) => $sub->select(DB::raw(1))->from('affiliations')
-                ->whereColumn('affiliations.person_id', 'people.id')->whereNull('affiliations.ended_on')->whereNull('affiliations.deleted_at')))
-            ->when($filters['status'], fn (Builder $q, string $v) => $q->where('status', $v))
-            ->when($filters['situation'], fn (Builder $q, string $v) => $q->where('professional_situation_id', $v))
-            ->when($filters['funding'], fn (Builder $q, string $v) => $q->where('funding_mode_id', $v))
-            ->when($filters['origin'], fn (Builder $q, string $v) => $q->where('origin_id', $v))
-            ->when($filters['responsible'], fn (Builder $q, string $v) => $q->where('responsible_user_id', $v))
-            ->when($filters['mine'], fn (Builder $q) => $q->where('responsible_user_id', $user->getKey()));
-
-        $dir = $filters['dir'];
-        match ($filters['sort']) {
-            'last_contact_at' => $query->orderByRaw("people.last_contact_at {$dir} nulls last"),
-            'name' => $query->orderBy('last_name', $dir)->orderBy('first_name', $dir),
-            default => $query->orderBy($filters['sort'], $dir),
-        };
-        $query->orderBy('last_name')->orderBy('first_name')->orderBy('id');
+        $filters = PersonListQuery::filters($request->query(), $user);
+        $query = PersonListQuery::build($filters, $user)->with(['activeAffiliations.organisation', 'responsible']);
 
         return Inertia::render('crm/people/index', [
             'people' => $query->paginate(25)->withQueryString()->through(fn (Person $p) => [
@@ -105,7 +70,8 @@ class PersonController extends Controller
                 'origin' => FormOptions::reference(ReferenceList::ContactOrigin),
                 'responsible' => FormOptions::responsible(),
             ],
-            'can' => ['create' => $user->can(Permissions::CREATE), 'delete' => $canDelete],
+            'can' => ['create' => $user->can(Permissions::CREATE), 'delete' => $canDelete, 'export' => $user->can(Permissions::EXPORT)],
+            ...ListExtras::for(CrmResource::People, $user),
             'status' => $request->session()->get('status'),
         ]);
     }

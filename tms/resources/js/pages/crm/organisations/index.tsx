@@ -1,4 +1,5 @@
 import { FilterSelect } from '@/components/crm/filter-select';
+import { ListToolbar, type ColumnChoice, type SavedFilterRow } from '@/components/crm/filters';
 import Heading from '@/components/heading';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -43,13 +44,15 @@ interface IndexProps {
     organisations: Paginated<Row>;
     filters: Filters;
     options: { status: Option[]; das: Option[]; sector: Option[]; origin: Option[]; responsible: Option[] };
-    can: { create: boolean; delete: boolean };
+    can: { create: boolean; delete: boolean; export: boolean };
+    savedFilters: SavedFilterRow[];
+    columns: ColumnChoice;
     status?: string;
 }
 
 const breadcrumbs: BreadcrumbItem[] = [{ title: 'Entreprises', href: '/crm/organisations' }];
 
-export default function OrganisationsIndex({ organisations, filters, options, can, status }: IndexProps) {
+export default function OrganisationsIndex({ organisations, filters, options, can, savedFilters, columns, status }: IndexProps) {
     const [search, setSearch] = useState(filters.q);
     const first = useRef(true);
 
@@ -113,6 +116,8 @@ export default function OrganisationsIndex({ organisations, filters, options, ca
                 </div>
 
                 {status && <div className="text-sm font-medium text-green-600">{status}</div>}
+
+                <ListToolbar resource="organisations" filters={filters} savedFilters={savedFilters} columns={columns} canExport={can.export} />
 
                 <section aria-label="Filtres" className="grid gap-3 rounded-xl border p-3 sm:grid-cols-2 lg:grid-cols-4">
                     <div className="grid gap-1 sm:col-span-2 lg:col-span-4">

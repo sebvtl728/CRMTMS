@@ -12,6 +12,7 @@ use App\Modules\Crm\Organisations\Organisation;
 use App\Modules\Crm\Organisations\OrganisationPolicy;
 use App\Modules\Crm\People\Person;
 use App\Modules\Crm\People\PersonPolicy;
+use App\Modules\Crm\Search\SavedFilter;
 use App\Modules\Crm\Timeline\Attachment;
 use App\Modules\Crm\Timeline\AttachmentsProvider;
 use App\Modules\Crm\Timeline\AuditProvider;
@@ -41,6 +42,7 @@ class CrmServiceProvider extends ServiceProvider
             'affiliation' => Affiliation::class,
             'note' => Note::class,
             'attachment' => Attachment::class,
+            'saved_filter' => SavedFilter::class,
         ]);
 
         // Sources of the « Historique »; later increments tag their own.
@@ -111,6 +113,18 @@ class CrmServiceProvider extends ServiceProvider
             }
 
             return $query->findOrFail($value);
+        });
+
+        // A saved filter is reachable when it is the user's own or shared.
+        Route::bind('savedFilter', function (string $value): SavedFilter {
+            if (! Str::isUuid($value)) {
+                throw (new ModelNotFoundException)->setModel(SavedFilter::class, [$value]);
+            }
+
+            $user = request()->user();
+            $query = SavedFilter::query();
+
+            return ($user instanceof User ? $query->visibleTo($user) : $query)->findOrFail($value);
         });
 
         // A note / attachment is reachable through the fiche it belongs to.

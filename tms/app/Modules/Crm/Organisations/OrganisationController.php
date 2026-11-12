@@ -11,9 +11,10 @@ use App\Modules\Core\Users\User;
 use App\Modules\Crm\Affiliations\Affiliation;
 use App\Modules\Crm\Duplicates\DuplicateGuard;
 use App\Modules\Crm\Permissions;
+use App\Modules\Crm\Search\CrmResource;
+use App\Modules\Crm\Search\ListExtras;
 use App\Modules\Crm\Support\FormOptions;
 use App\Modules\Crm\Visibility\CrmVisibility;
-use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -32,8 +33,6 @@ class OrganisationController extends Controller
 {
     private const RESTORE_CONFLICT = 'Impossible de restaurer cette entreprise : elle entre en conflit avec une autre fiche active.';
 
-    private const SORTS = ['name', 'city', 'last_contact_at', 'created_at'];
-
     public function __construct(private readonly TenantContext $tenants, private readonly AuditRecorder $audit, private readonly DuplicateGuard $duplicates) {}
 
     public function index(Request $request): Response
@@ -41,36 +40,8 @@ class OrganisationController extends Controller
         $user = $this->user($request);
         $canDelete = $user->can(Permissions::DELETE);
 
-        $filters = [
-            'q' => is_string($request->query('q')) ? trim($request->query('q')) : '',
-            'status' => $this->enumOrNull($request->query('status')),
-            'das' => $this->idOrNull($request->query('das')),
-            'sector' => $this->idOrNull($request->query('sector')),
-            'responsible' => $this->idOrNull($request->query('responsible')),
-            'origin' => $this->idOrNull($request->query('origin')),
-            'mine' => $request->boolean('mine'),
-            'trashed' => $canDelete && $request->boolean('trashed'),
-            'sort' => is_string($request->query('sort')) && in_array($request->query('sort'), self::SORTS, true) ? $request->query('sort') : 'name',
-            'dir' => $request->query('dir') === 'desc' ? 'desc' : 'asc',
-        ];
-
-        $query = CrmVisibility::organisations(Organisation::query(), $user)
-            ->with(['sector', 'responsible', 'das'])
-            ->when($filters['trashed'], fn (Builder $q) => $q->onlyTrashed()->whereNull('merged_into_id'))
-            ->when($filters['q'] !== '', fn (Builder $q) => $q->search($filters['q']))
-            ->when($filters['status'], fn (Builder $q, string $v) => $q->where('status', $v))
-            ->when($filters['sector'], fn (Builder $q, string $v) => $q->where('sector_id', $v))
-            ->when($filters['origin'], fn (Builder $q, string $v) => $q->where('origin_id', $v))
-            ->when($filters['responsible'], fn (Builder $q, string $v) => $q->where('responsible_user_id', $v))
-            ->when($filters['mine'], fn (Builder $q) => $q->where('responsible_user_id', $user->getKey()))
-            ->when($filters['das'], fn (Builder $q, string $v) => $q->whereIn('id', DB::table('organisation_das')->select('organisation_id')->where('das_id', $v)));
-
-        if ($filters['sort'] === 'last_contact_at') {
-            $query->orderByRaw('organisations.last_contact_at '.$filters['dir'].' nulls last');
-        } else {
-            $query->orderBy($filters['sort'], $filters['dir']);
-        }
-        $query->orderBy('name')->orderBy('id');
+        $filters = OrganisationListQuery::filters($request->query(), $user);
+        $query = OrganisationListQuery::build($filters, $user)->with(['sector', 'responsible', 'das']);
 
         return Inertia::render('crm/organisations/index', [
             'organisations' => $query->paginate(25)->withQueryString()->through(fn (Organisation $o) => [
@@ -95,7 +66,8 @@ class OrganisationController extends Controller
                 'responsible' => User::query()->whereNull('deactivated_at')->orderBy('name')->get(['id', 'name'])
                     ->map(fn (User $u) => ['value' => $u->id, 'label' => $u->name])->all(),
             ],
-            'can' => ['create' => $user->can(Permissions::CREATE), 'delete' => $canDelete],
+            'can' => ['create' => $user->can(Permissions::CREATE), 'delete' => $canDelete, 'export' => $user->can(Permissions::EXPORT)],
+            ...ListExtras::for(CrmResource::Organisations, $user),
             'status' => $request->session()->get('status'),
         ]);
     }
@@ -375,11 +347,6 @@ class OrganisationController extends Controller
         assert($user instanceof User);
 
         return $user;
-    }
-
-    private function enumOrNull(mixed $value): ?string
-    {
-        return is_string($value) ? OrganisationStatus::tryFrom($value)?->value : null;
     }
 
     private function idOrNull(mixed $value): ?string
