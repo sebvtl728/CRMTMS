@@ -26,6 +26,9 @@ export default defineConfig({
         strictPort: true,
         origin: 'http://localhost:5173',
         hmr: { host: 'localhost' },
+        // File events don't cross the Colima/Docker bind mount on macOS: poll instead,
+        // otherwise Vite keeps serving stale modules after edits.
+        watch: { usePolling: true, interval: 300 },
         cors: { origin: ['http://localhost:8080'] },
     },
 });
