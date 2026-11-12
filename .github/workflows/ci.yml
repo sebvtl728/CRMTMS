@@ -4,6 +4,7 @@ on:
   push:
     branches: [main, lot1a-socle]
   pull_request:
+  workflow_call: # reused by release.yml: a tag is published only if this passes
 
 defaults:
   run:

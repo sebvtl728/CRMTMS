@@ -1,12 +1,15 @@
 name: release
 
-# Publishes a version when a tag vMAJOR.MINOR.PATCH[-prerelease] is pushed:
-#   - image ghcr.io/<owner>/tms:<version> (amd64 + arm64), :latest unless pre-release, signed with cosign (keyless)
-#   - GitHub Release with tms-<version>.tar.gz, SHA256SUMS (+ cosign bundle), install.sh, proxmox.sh
-# Contract with the installer/updater: tms/docs/install.md ("Contenu d'une version"); how to cut one: docs/release.md.
+# Publishes a version when a tag vMAJOR.MINOR.PATCH[-prerelease] is pushed. Order matters, so a failure
+# never leaves a half-published version:
+#   check (tag valid, matches tms/VERSION, commit on main) + verify (full CI, reused) + bundle
+#   -> image (versioned tag only, signed by digest)
+#   -> release (SHA256SUMS signed; created as DRAFT, assets uploaded, then published)
+#   -> latest (only after the release exists, non-pre-release only: :latest is moved to the signed digest)
+# Contract with the installer/updater: tms/docs/install.md ("Contenu d'une version"); how to cut one: tms/docs/release.md.
 #
 # Actions are pinned to major versions (like ci.yml); Dependabot may bump them. For a stricter
-# supply chain, replace each tag by the full commit SHA.
+# supply chain, replace each tag by the full commit SHA. cosign itself is pinned (COSIGN_RELEASE).
 
 on:
   push:
@@ -18,19 +21,31 @@ concurrency:
 
 permissions: {}
 
+env:
+  COSIGN_RELEASE: v2.4.1
+
 jobs:
-  image:
+  check:
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    timeout-minutes: 10
     permissions:
       contents: read
-      packages: write
-      id-token: write # cosign keyless (OIDC)
     outputs:
       version: ${{ steps.meta.outputs.version }}
       prerelease: ${{ steps.meta.outputs.prerelease }}
+      image: ${{ steps.meta.outputs.image }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Tag commit must be on main
+        run: |
+          set -euo pipefail
+          git fetch --no-tags origin main
+          if ! git merge-base --is-ancestor "$GITHUB_SHA" origin/main; then
+            echo "::error::Commit $GITHUB_SHA is not on main: merge it first, then tag main."; exit 1
+          fi
 
       - name: Resolve version and image name
         id: meta
@@ -48,16 +63,49 @@ jobs:
             echo "::error::Tag $TAG does not match tms/VERSION ($(cat tms/VERSION)); bump VERSION and CHANGELOG first."; exit 1
           fi
           prerelease=false; [[ "$version" == *-* ]] && prerelease=true
-          image="ghcr.io/${OWNER,,}/tms"
-          tags="$image:$version"
-          [[ "$prerelease" == true ]] || tags="$tags"$'\n'"$image:latest"
           {
             echo "version=$version"
             echo "prerelease=$prerelease"
-            echo "image=$image"
-            echo "tags<<EOF"; echo "$tags"; echo "EOF"
+            echo "image=ghcr.io/${OWNER,,}/tms"
           } >> "$GITHUB_OUTPUT"
 
+  # The whole CI (PHP, JS, shell, bats integration) must pass on the tagged commit.
+  verify:
+    permissions:
+      contents: read
+    uses: ./.github/workflows/ci.yml
+
+  bundle:
+    needs: check
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build bundle and SHA256SUMS
+        env:
+          VERSION: ${{ needs.check.outputs.version }}
+        run: tms/ops/release/make-bundle.sh "$VERSION" dist
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release-files
+          path: dist/
+          if-no-files-found: error
+          retention-days: 7
+
+  image:
+    needs: [check, verify, bundle]
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    permissions:
+      contents: read
+      packages: write
+      id-token: write # cosign keyless (OIDC)
+    outputs:
+      digest: ${{ steps.build.outputs.digest }}
+    steps:
+      - uses: actions/checkout@v4
       - uses: docker/setup-qemu-action@v3
       - uses: docker/setup-buildx-action@v3
       - uses: docker/login-action@v3
@@ -66,7 +114,7 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Build and push (amd64, arm64)
+      - name: Build and push the versioned tag (amd64, arm64)
         id: build
         uses: docker/build-push-action@v6
         with:
@@ -76,27 +124,27 @@ jobs:
           platforms: linux/amd64,linux/arm64
           push: true
           build-args: |
-            APP_VERSION=${{ steps.meta.outputs.version }}
-          tags: ${{ steps.meta.outputs.tags }}
+            APP_VERSION=${{ needs.check.outputs.version }}
+          tags: ${{ needs.check.outputs.image }}:${{ needs.check.outputs.version }}
           labels: |
             org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
-            org.opencontainers.image.version=${{ steps.meta.outputs.version }}
+            org.opencontainers.image.version=${{ needs.check.outputs.version }}
             org.opencontainers.image.revision=${{ github.sha }}
           provenance: mode=max
           sbom: true
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
 
       - uses: sigstore/cosign-installer@v3
+        with:
+          cosign-release: ${{ env.COSIGN_RELEASE }}
 
       - name: Sign the image (keyless)
         env:
-          IMAGE: ${{ steps.meta.outputs.image }}
+          IMAGE: ${{ needs.check.outputs.image }}
           DIGEST: ${{ steps.build.outputs.digest }}
         run: cosign sign --yes "$IMAGE@$DIGEST"
 
   release:
-    needs: image
+    needs: [check, image]
     runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:
@@ -104,27 +152,51 @@ jobs:
       id-token: write # cosign keyless (OIDC)
     steps:
       - uses: actions/checkout@v4
-
-      - name: Build bundle and SHA256SUMS
-        env:
-          VERSION: ${{ needs.image.outputs.version }}
-        run: tms/ops/release/make-bundle.sh "$VERSION" dist
+      - uses: actions/download-artifact@v4
+        with:
+          name: release-files
+          path: dist
 
       - uses: sigstore/cosign-installer@v3
+        with:
+          cosign-release: ${{ env.COSIGN_RELEASE }}
 
       - name: Sign SHA256SUMS (keyless)
         # SHA256SUMS lists the archive, install.sh and proxmox.sh: one signature covers all of them.
         run: cosign sign-blob --yes --bundle dist/SHA256SUMS.cosign.bundle dist/SHA256SUMS
 
-      - name: Create the GitHub Release
+      - name: Create the release as a draft, upload the assets, then publish
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAG: ${{ github.ref_name }}
-          VERSION: ${{ needs.image.outputs.version }}
-          PRERELEASE: ${{ needs.image.outputs.prerelease }}
+          VERSION: ${{ needs.check.outputs.version }}
+          PRERELEASE: ${{ needs.check.outputs.prerelease }}
         run: |
           set -euo pipefail
           flags=()
           [[ "$PRERELEASE" == true ]] && flags+=(--prerelease)
-          gh release create "$TAG" --repo "$GITHUB_REPOSITORY" --verify-tag --title "$TAG" --generate-notes "${flags[@]}" \
+          gh release create "$TAG" --repo "$GITHUB_REPOSITORY" --verify-tag --draft --title "$TAG" --generate-notes "${flags[@]}" \
             "dist/tms-$VERSION.tar.gz" dist/SHA256SUMS dist/SHA256SUMS.cosign.bundle dist/install.sh dist/proxmox.sh
+          gh release edit "$TAG" --repo "$GITHUB_REPOSITORY" --draft=false
+
+  # Last step: installers using :latest only ever see a version whose release exists.
+  latest:
+    if: needs.check.outputs.prerelease == 'false'
+    needs: [check, image, release]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Point :latest at the signed digest
+        env:
+          IMAGE: ${{ needs.check.outputs.image }}
+          DIGEST: ${{ needs.image.outputs.digest }}
+        run: docker buildx imagetools create --tag "$IMAGE:latest" "$IMAGE@$DIGEST"

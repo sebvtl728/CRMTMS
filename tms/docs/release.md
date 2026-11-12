@@ -25,19 +25,22 @@ permissions) ; après la première publication, rendre le paquet `tms` visible/l
 1. Mettre à jour `VERSION` (par exemple `0.2.0`) et `CHANGELOG.md` (déplacer « Non publié » sous la nouvelle
    version, avec la date).
 2. Vérifier en local : `bats ops/tests` (depuis `tms/`) et la CI verte sur la branche.
-3. Fusionner dans `main`, puis :
+3. Fusionner dans `main` (le tag se pose sur un commit de `main`), puis :
 
    ```bash
    git tag v0.2.0-rc.1 && git push origin v0.2.0-rc.1   # pré-version : release marquée « pre-release », pas de :latest
    git tag v0.2.0 && git push origin v0.2.0             # version finale : :latest mis à jour
    ```
 
-   Le workflow refuse un tag dont la partie `X.Y.Z` ne correspond pas à `VERSION`.
-4. Le workflow : construit l'image `prod` (amd64 + arm64, `APP_VERSION` = version) → pousse
-   `ghcr.io/<propriétaire en minuscules>/tms:<version>` (+ `:latest` hors pré-version) → la signe avec cosign
-   (sans clé, identité OIDC du workflow) → construit `tms-<version>.tar.gz` et `SHA256SUMS` avec
-   `ops/release/make-bundle.sh` → signe `SHA256SUMS` → crée la release avec l'archive, `SHA256SUMS`,
-   `SHA256SUMS.cosign.bundle`, `install.sh` et `proxmox.sh`.
+   Le workflow refuse un tag dont la partie `X.Y.Z` ne correspond pas à `VERSION`, ou un commit qui n'est pas sur `main`.
+4. Le workflow, dans cet ordre (un échec ne laisse jamais une version à moitié publiée) : vérifie le tag
+   (format, correspondance avec `VERSION`, commit présent sur `main`) et fait passer toute la CI sur le commit →
+   construit `tms-<version>.tar.gz` et `SHA256SUMS` (`ops/release/make-bundle.sh`) → construit l'image `prod`
+   (amd64 + arm64, `APP_VERSION` = version), pousse **seulement** `ghcr.io/<propriétaire en minuscules>/tms:<version>`
+   et la signe avec cosign (sans clé, identité OIDC du workflow) → signe `SHA256SUMS`, crée la release en
+   **brouillon**, y attache l'archive, `SHA256SUMS`, `SHA256SUMS.cosign.bundle`, `install.sh`, `proxmox.sh`, puis la
+   publie → en dernier, hors pré-version, déplace `:latest` vers l'image signée. Si une étape échoue, corriger puis
+   re-pousser un nouveau tag (ou relancer le workflow) ; une release en brouillon restante se supprime à la main.
 5. Valider l'installation depuis la release (voir « Validation manuelle sur Proxmox » dans `install.md`).
 
 Construire les fichiers localement (sans rien publier) : `ops/release/make-bundle.sh 0.2.0 /tmp/release`.
@@ -48,7 +51,7 @@ Construire les fichiers localement (sans rien publier) : `ops/release/make-bundl
 OWNER=<propriétaire en minuscules>; REPO=<dépôt>; VERSION=0.2.0
 ID="https://github.com/$OWNER/$REPO/.github/workflows/release.yml@refs/tags/v$VERSION"
 
-# Image
+# Image (cosign 2.x ; le workflow utilise la version fixée par COSIGN_RELEASE)
 cosign verify "ghcr.io/$OWNER/tms:$VERSION" \
   --certificate-identity "$ID" \
   --certificate-oidc-issuer https://token.actions.githubusercontent.com
