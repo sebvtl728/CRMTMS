@@ -229,6 +229,23 @@ it('builds the transport from the configuration with a bounded timeout', functio
         ->and($transport->getStream()->getTimeout())->toBeLessThanOrEqual(10);
 });
 
+it('requires STARTTLS when the encryption is tls', function () {
+    $transport = (new SmtpTransportFactory)->make(['host' => '203.0.113.9', 'port' => 587, 'encryption' => 'tls'], []);
+
+    expect($transport)->toBeInstanceOf(EsmtpTransport::class)
+        ->and($transport->isTlsRequired())->toBeTrue()
+        ->and($transport->isAutoTls())->toBeTrue();
+});
+
+it('uses implicit TLS for ssl and no TLS at all for none', function () {
+    $ssl = (new SmtpTransportFactory)->make(['host' => '203.0.113.9', 'port' => 465, 'encryption' => 'ssl'], []);
+    $none = (new SmtpTransportFactory)->make(['host' => '203.0.113.9', 'port' => 25, 'encryption' => 'none'], []);
+
+    expect($ssl->getStream()->isTLS())->toBeTrue()
+        ->and($none->isAutoTls())->toBeFalse()
+        ->and($none->isTlsRequired())->toBeFalse();
+});
+
 describe('TenantMailer', function () {
     function mailerHost(?Company $company): string
     {

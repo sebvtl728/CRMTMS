@@ -34,8 +34,14 @@ class SmtpTransportFactory
             ($secrets['username'] ?? '') !== '' ? $secrets['username'] : null,
             ($secrets['password'] ?? '') !== '' ? $secrets['password'] : null,
             isset($settings['port']) ? (int) $settings['port'] : null,
-            // none: no STARTTLS upgrade either.
-            $encryption === 'none' ? ['auto_tls' => false] : [],
+            // tls: STARTTLS is mandatory (a server, or a MITM, that does not
+            // offer it makes the send fail instead of falling back to clear
+            // text with the password). none: no STARTTLS upgrade either.
+            match ($encryption) {
+                'tls' => ['require_tls' => true],
+                'none' => ['auto_tls' => false],
+                default => [],
+            },
         ));
 
         if ($transport instanceof EsmtpTransport && ($stream = $transport->getStream()) instanceof SocketStream) {
