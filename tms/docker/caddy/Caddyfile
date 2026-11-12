@@ -1,0 +1,51 @@
+# Production Caddyfile (compose.prod.yaml).
+# TMS_DOMAIN, TMS_ACME_EMAIL and TMS_TLS come from the container environment.
+{
+	email {$TMS_ACME_EMAIL}
+}
+
+# Certificates (TMS_TLS): "acme" (default) = Let's Encrypt / ZeroSSL, needs the
+# domain to resolve to this server and ports 80/443 reachable from the Internet;
+# "internal" = Caddy's local CA, for a LAN-only install (browsers must trust it).
+(tls_acme) {
+}
+
+(tls_internal) {
+	tls internal
+}
+
+{$TMS_DOMAIN} {
+	import tls_{$TMS_TLS:acme}
+
+	root * /srv/public
+	encode zstd gzip
+
+	# Static assets are served from the volume filled by the app container;
+	# PHP runs in the app container, whose document root differs.
+	php_fastcgi app:9000 {
+		root /var/www/html/public
+	}
+	file_server
+
+	# Never serve dotfiles or the framework internals if they ever land in public/.
+	@hidden path /.*
+	respond @hidden 404
+}
+
+# Internal endpoints (plain HTTP, not published on the host). /alive answers as soon as
+# Caddy runs: container healthcheck, so that Caddy does not turn "unhealthy" while the app
+# is stopped for a backup, restore or update. /health reaches the application: used by the
+# ops scripts (wait_health). Nothing else is served here.
+http://:8081 {
+	bind 127.0.0.1
+	root * /srv/public
+	handle /alive {
+		respond "ok" 200
+	}
+	handle /health {
+		php_fastcgi app:9000 {
+			root /var/www/html/public
+		}
+	}
+	respond 404
+}

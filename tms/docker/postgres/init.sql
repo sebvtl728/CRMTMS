@@ -1,0 +1,27 @@
+-- Executed by init.sh (psql variables :owner_password / :app_password).
+
+CREATE ROLE tms_owner LOGIN PASSWORD :'owner_password';
+CREATE ROLE tms_app LOGIN NOBYPASSRLS NOSUPERUSER NOCREATEDB NOCREATEROLE PASSWORD :'app_password';
+
+CREATE DATABASE tms OWNER tms_owner;
+\if :{?no_test_db}
+\else
+CREATE DATABASE tms_test OWNER tms_owner;
+\endif
+
+\c tms
+REVOKE ALL ON DATABASE tms FROM PUBLIC;
+GRANT CONNECT ON DATABASE tms TO tms_app;
+GRANT USAGE ON SCHEMA public TO tms_app;
+ALTER DEFAULT PRIVILEGES FOR ROLE tms_owner IN SCHEMA public GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO tms_app;
+ALTER DEFAULT PRIVILEGES FOR ROLE tms_owner IN SCHEMA public GRANT USAGE, SELECT ON SEQUENCES TO tms_app;
+
+\if :{?no_test_db}
+\else
+\c tms_test
+REVOKE ALL ON DATABASE tms_test FROM PUBLIC;
+GRANT CONNECT ON DATABASE tms_test TO tms_app;
+GRANT USAGE ON SCHEMA public TO tms_app;
+ALTER DEFAULT PRIVILEGES FOR ROLE tms_owner IN SCHEMA public GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO tms_app;
+ALTER DEFAULT PRIVILEGES FOR ROLE tms_owner IN SCHEMA public GRANT USAGE, SELECT ON SEQUENCES TO tms_app;
+\endif

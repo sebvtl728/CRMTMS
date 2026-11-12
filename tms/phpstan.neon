@@ -1,0 +1,13 @@
+includes:
+    - vendor/larastan/larastan/extension.neon
+
+parameters:
+    level: 6
+    paths:
+        - app
+        - bootstrap
+        - config
+        - routes
+        - database
+        # Fixtures use the tenancy traits (BelongsToTenant, TenantAwareJob) so they get analysed.
+        - tests/Fixtures
