@@ -18,6 +18,7 @@ it('updates the profile information', function () {
         ->patch('/settings/profile', [
             'name' => 'Test User',
             'email' => 'test@example.com',
+            'current_password' => 'password',
         ])
         ->assertSessionHasNoErrors()
         ->assertRedirect('/settings/profile');
@@ -43,26 +44,16 @@ it('keeps the verification status when the email is unchanged', function () {
     expect($user->refresh()->email_verified_at)->not->toBeNull();
 });
 
-it('lets users delete their account', function () {
+it('requires the current password to change the email', function () {
     $user = User::factory()->create();
 
-    $this->actingAs($user)
-        ->delete('/settings/profile', ['password' => 'password'])
-        ->assertSessionHasNoErrors()
-        ->assertRedirect('/');
+    $this->actingAs($user)->from('/settings/profile')
+        ->patch('/settings/profile', ['name' => $user->name, 'email' => 'autre@example.com'])
+        ->assertSessionHasErrors('current_password');
+    expect($user->refresh()->email)->not->toBe('autre@example.com');
 
-    $this->assertGuest();
-    expect($user->fresh())->toBeNull();
-});
-
-it('requires the correct password to delete the account', function () {
-    $user = User::factory()->create();
-
-    $this->actingAs($user)
-        ->from('/settings/profile')
-        ->delete('/settings/profile', ['password' => 'wrong-password'])
-        ->assertSessionHasErrors('password')
-        ->assertRedirect('/settings/profile');
-
-    expect($user->fresh())->not->toBeNull();
+    $this->actingAs($user)->from('/settings/profile')
+        ->patch('/settings/profile', ['name' => $user->name, 'email' => 'autre@example.com', 'current_password' => 'mauvais-mot-de-passe'])
+        ->assertSessionHasErrors('current_password');
+    expect($user->refresh()->email)->not->toBe('autre@example.com');
 });

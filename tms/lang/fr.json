@@ -3,6 +3,7 @@
     "(and :count more errors)": "(et :count erreur en plus)|(et :count erreurs en plus)|(et :count erreurs en plus)",
     ":inviterName has invited you to join the :teamName team.": ":inviterName has invited you to join the :teamName team.",
     "A decryption key is required.": "Une clé de déchiffrement est requise.",
+    "A reset link will be sent if the account exists.": "Si un compte correspond à cette adresse, un lien de réinitialisation vous a été envoyé.",
     "A Timeout Occurred": "Temps d'attente dépassé",
     "Accept": "Accept",
     "Accepted": "Accepté",

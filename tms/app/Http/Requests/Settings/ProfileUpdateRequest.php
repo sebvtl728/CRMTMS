@@ -28,6 +28,24 @@ class ProfileUpdateRequest extends FormRequest
                 // Unique per tenant (users of other tenants are invisible under RLS anyway).
                 Rule::unique(User::class)->where('tenant_id', $this->user()->tenant_id)->ignore($this->user()->id),
             ],
+
+            // The e-mail is the login identity: changing it needs the current password.
+            'current_password' => [
+                Rule::requiredIf(fn () => $this->string('email')->value() !== $this->user()->email),
+                'nullable',
+                'string',
+                'current_password',
+            ],
+        ];
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    public function messages(): array
+    {
+        return [
+            'current_password.required' => 'Saisissez votre mot de passe actuel pour changer d\'adresse e-mail.',
         ];
     }
 }

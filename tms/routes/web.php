@@ -3,9 +3,8 @@
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 
-Route::get('/', function () {
-    return Inertia::render('welcome');
-})->name('home');
+// No public landing page: guests go to the login, signed-in users to the dashboard.
+Route::get('/', fn () => auth()->check() ? to_route('dashboard') : to_route('login'))->name('home');
 
 Route::middleware(['auth'])->group(function () {
     Route::get('dashboard', function () {

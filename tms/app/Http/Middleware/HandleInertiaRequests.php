@@ -4,7 +4,6 @@ namespace App\Http\Middleware;
 
 use App\Modules\Core\Access\Permissions;
 use App\Modules\Core\Users\User;
-use Illuminate\Foundation\Inspiring;
 use Illuminate\Http\Request;
 use Inertia\Middleware;
 
@@ -39,12 +38,10 @@ class HandleInertiaRequests extends Middleware
     public function share(Request $request): array
     {
         $user = $request->user() instanceof User ? $request->user() : null;
-        [$message, $author] = str(Inspiring::quotes()->random())->explode('-');
 
         return array_merge(parent::share($request), [
             ...parent::share($request),
             'name' => config('app.name'),
-            'quote' => ['message' => trim($message), 'author' => trim($author)],
             'auth' => [
                 'user' => $user === null ? null : [
                     'id' => $user->id,
