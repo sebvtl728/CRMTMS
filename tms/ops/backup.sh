@@ -11,6 +11,8 @@
 # RESTIC_REMOTE_REPOSITORY, RESTIC_REMOTE_PASSWORD (default RESTIC_PASSWORD),
 # RESTIC_REMOTE_ENV_FILE (credentials of the remote backend, e.g. AWS_ACCESS_KEY_ID),
 # TMS_ALERT_EMAIL, TMS_BACKUP_TMPDIR (staging directory, default /var/tmp).
+# Takes the maintenance lock (shared with update.sh and restore.sh), waiting up to
+# TMS_BACKUP_LOCK_WAIT seconds (default 900) for a running operation to finish.
 set -euo pipefail
 
 # shellcheck source=lib.sh
@@ -35,6 +37,8 @@ while [[ $# -gt 0 ]]; do
         *) usage ;;
     esac
 done
+
+tms_lock "${TMS_BACKUP_LOCK_WAIT:-900}"
 
 send_alert() {
     local message="$1"

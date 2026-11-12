@@ -4,7 +4,9 @@
 #
 #   bash -c "$(curl -fsSL <release>/proxmox.sh)"                       # questions (whiptail)
 #   TMS_NONINTERACTIVE=1 TMS_DOMAIN=… TMS_ADMIN_EMAIL=… TMS_TENANT_NAME=… bash proxmox.sh
-#   proxmox.sh update <CTID>                                            # reserved (Task 12)
+#   proxmox.sh update <CTID> [--version X.Y.Z] [--force] [--allow-downgrade]
+#       pct snapshot pre-update-<date> (3 most recent kept), then ops/update.sh in the CT;
+#       its exit code is returned (1: update rolled back, 2: rollback failed).
 #
 # Settings (environment; asked interactively unless TMS_NONINTERACTIVE=1):
 #   CTID (next free id), CT_HOSTNAME=tms, CT_CORES=2, CT_RAM=4096 (Mo), CT_DISK=20 (Go),
@@ -56,10 +58,69 @@ checksum_of() {
     awk -v n="$2" '{ f = $2; sub(/^\*/, "", f); if (f == n) { print $1; exit } }' "$1"
 }
 
+# release_dist_url <version|latest>: folder holding the release files (TMS_DIST_URL wins).
+release_dist_url() {
+    if [[ -n "${TMS_DIST_URL:-}" ]]; then
+        printf '%s' "${TMS_DIST_URL%/}"
+    elif [[ -z "${TMS_GITHUB_REPO:-}" ]]; then
+        log_error "Adresse de téléchargement inconnue : définissez TMS_DIST_URL (dossier des fichiers de la version, ex. https://github.com/<propriétaire>/<dépôt>/releases/latest/download)."
+        return 1
+    elif [[ "$1" == "latest" ]]; then
+        printf 'https://github.com/%s/releases/latest/download' "$TMS_GITHUB_REPO"
+    else
+        printf 'https://github.com/%s/releases/download/v%s' "$TMS_GITHUB_REPO" "$1"
+    fi
+}
+
+# Directory of the installation inside the container (install.sh default).
+CT_TMS_DIR="${CT_TMS_DIR:-/opt/tms}"
+# Number of pre-update-* snapshots kept per container.
+KEEP_SNAPSHOTS=3
+
+# prune_snapshots <CTID>: deletes all but the KEEP_SNAPSHOTS most recent pre-update-* snapshots
+# (names sort chronologically); other snapshots are never touched.
+prune_snapshots() {
+    local ctid="$1" name
+    local -a names=()
+    while read -r name; do
+        [[ -n "$name" ]] && names+=("$name")
+    done < <(pct listsnapshot "$ctid" 2>/dev/null | grep -Eo 'pre-update-[0-9]{8}-[0-9]{6}' | sort -u)
+    local excess=$((${#names[@]} - KEEP_SNAPSHOTS)) i
+    for ((i = 0; i < excess; i++)); do
+        log_info "Suppression de l'ancien instantané ${names[$i]}."
+        pct delsnapshot "$ctid" "${names[$i]}" >&2 || log_error "Impossible de supprimer l'instantané ${names[$i]} (non bloquant)."
+    done
+}
+
 cmd_update() {
     local ctid="${1:-}"
-    [[ "$ctid" =~ ^[0-9]+$ ]] || die "Usage : proxmox.sh update <CTID>"
-    die "La commande « update » n'est pas encore disponible (mise à jour une ligne : ops/update.sh). En attendant : pct snapshot $ctid avant-maj, puis mise à jour manuelle dans le conteneur (pct enter $ctid)."
+    [[ "$ctid" =~ ^[0-9]+$ ]] || die "Usage : proxmox.sh update <CTID> [--version X.Y.Z] [--force] [--allow-downgrade] (CTID numérique)."
+    shift
+
+    local snap
+    snap="pre-update-$(date '+%Y%m%d-%H%M%S')"
+    log_info "Instantané $snap du conteneur $ctid…"
+    if pct snapshot "$ctid" "$snap" --description "Avant mise à jour TMS" >&2; then
+        prune_snapshots "$ctid"
+    else
+        log_error "Attention : instantané impossible (le stockage du conteneur ne gère peut-être pas les instantanés). La mise à jour continue, protégée par la sauvegarde restic qu'elle réalise."
+        snap=""
+    fi
+
+    local -a env_args=(TMS_PCT_SNAPSHOT="${snap:-none}")
+    [[ -z "${TMS_DIST_URL:-}" ]] || env_args+=(TMS_DIST_URL="$TMS_DIST_URL")
+    log_info "Mise à jour dans le conteneur $ctid…"
+    local status=0
+    pct exec "$ctid" -- env "${env_args[@]}" "$CT_TMS_DIR/ops/update.sh" "$@" || status=$?
+
+    if [[ "$status" -ne 0 ]]; then
+        if [[ -n "$snap" ]]; then
+            log_error "La mise à jour a échoué (code $status). En dernier recours, l'état complet du conteneur d'avant la mise à jour peut être rétabli : pct rollback $ctid $snap (puis pct start $ctid)."
+        else
+            log_error "La mise à jour a échoué (code $status). Aucun instantané n'a pu être pris : voir les messages ci-dessus pour la restauration restic."
+        fi
+    fi
+    exit "$status"
 }
 
 # ask <VAR> <question>: whiptail input box prefilled with the current value.
@@ -136,15 +197,7 @@ collect_settings() {
     TMS_VERSION="${TMS_VERSION#v}"
     local repo_owner=""
     [[ -n "$TMS_GITHUB_REPO" ]] && repo_owner="$(printf '%s' "${TMS_GITHUB_REPO%%/*}" | tr '[:upper:]' '[:lower:]')"
-    if [[ -z "${TMS_DIST_URL:-}" ]]; then
-        [[ -n "$TMS_GITHUB_REPO" ]] || die "Adresse de téléchargement inconnue : définissez TMS_DIST_URL (dossier des fichiers de la version, ex. https://github.com/<propriétaire>/<dépôt>/releases/latest/download)."
-        if [[ "$TMS_VERSION" == "latest" ]]; then
-            TMS_DIST_URL="https://github.com/$TMS_GITHUB_REPO/releases/latest/download"
-        else
-            TMS_DIST_URL="https://github.com/$TMS_GITHUB_REPO/releases/download/v$TMS_VERSION"
-        fi
-    fi
-    TMS_DIST_URL="${TMS_DIST_URL%/}"
+    TMS_DIST_URL="$(release_dist_url "$TMS_VERSION")" || exit 1
     TMS_IMAGE_OWNER="${TMS_IMAGE_OWNER:-$repo_owner}"
 }
 
@@ -247,4 +300,6 @@ main() {
     esac
 }
 
-main "$@"
+if [[ -z "${TMS_PROXMOX_NO_MAIN:-}" ]]; then
+    main "$@"
+fi

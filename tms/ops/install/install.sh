@@ -74,6 +74,20 @@ checksum_of() {
     awk -v n="$2" '{ f = $2; sub(/^\*/, "", f); if (f == n) { print $1; exit } }' "$1"
 }
 
+# release_dist_url <version|latest>: folder holding the release files (TMS_DIST_URL wins).
+release_dist_url() {
+    if [[ -n "${TMS_DIST_URL:-}" ]]; then
+        printf '%s' "${TMS_DIST_URL%/}"
+    elif [[ -z "${TMS_GITHUB_REPO:-}" ]]; then
+        log_error "Adresse de téléchargement inconnue : définissez TMS_DIST_URL (dossier des fichiers de la version, ex. https://github.com/<propriétaire>/<dépôt>/releases/latest/download)."
+        return 1
+    elif [[ "$1" == "latest" ]]; then
+        printf 'https://github.com/%s/releases/latest/download' "$TMS_GITHUB_REPO"
+    else
+        printf 'https://github.com/%s/releases/download/v%s' "$TMS_GITHUB_REPO" "$1"
+    fi
+}
+
 # load_settings_file <file>: KEY=VALUE lines for the known settings only, never
 # evaluated; values already present in the environment win.
 load_settings_file() {
@@ -138,15 +152,7 @@ check_settings() {
 
     local repo_owner=""
     [[ -n "$TMS_GITHUB_REPO" ]] && repo_owner="$(printf '%s' "${TMS_GITHUB_REPO%%/*}" | tr '[:upper:]' '[:lower:]')"
-    if [[ -z "${TMS_DIST_URL:-}" ]]; then
-        [[ -n "$TMS_GITHUB_REPO" ]] || die "Adresse de téléchargement inconnue : définissez TMS_DIST_URL (dossier des fichiers de la version, ex. https://github.com/<propriétaire>/<dépôt>/releases/latest/download)."
-        if [[ "$TMS_VERSION" == "latest" ]]; then
-            TMS_DIST_URL="https://github.com/$TMS_GITHUB_REPO/releases/latest/download"
-        else
-            TMS_DIST_URL="https://github.com/$TMS_GITHUB_REPO/releases/download/v$TMS_VERSION"
-        fi
-    fi
-    TMS_DIST_URL="${TMS_DIST_URL%/}"
+    TMS_DIST_URL="$(release_dist_url "$TMS_VERSION")" || exit 1
     TMS_IMAGE_OWNER="${TMS_IMAGE_OWNER:-$repo_owner}"
     [[ -n "${TMS_IMAGE:-}" || -n "$TMS_IMAGE_OWNER" ]] \
         || die "Image inconnue : définissez TMS_IMAGE_OWNER (image ghcr.io/<propriétaire>/tms) ou TMS_IMAGE."
@@ -231,7 +237,8 @@ fetch_bundle() {
         BUNDLE_ROOT="$(dirname "$sub")"
     fi
     local f
-    for f in compose.prod.yaml .env.prod.example ops/lib.sh ops/migrate.sh ops/backup.sh docker/caddy/Caddyfile docker/postgres/init.sh docker/postgres/init.sql; do
+    for f in compose.prod.yaml .env.prod.example ops/lib.sh ops/migrate.sh ops/backup.sh ops/restore.sh ops/update.sh \
+        docker/caddy/Caddyfile docker/postgres/init.sh docker/postgres/init.sql; do
         [[ -f "$BUNDLE_ROOT/$f" ]] || die "Archive invalide : $f manquant."
     done
 }

@@ -178,12 +178,60 @@ teardown_file() {
     [[ "$output" == *"APP_KEY"* ]]
     [[ "$output" == *"--with-app-key"* ]]
 
+    new_key=$(sed -n 's/^APP_KEY=//p' "$TMS_ENV_FILE")
     run "$TMS_ROOT/ops/restore.sh" --with-app-key "$snap"
     [ "$status" -eq 0 ]
     [ "$(sed -n 's/^APP_KEY=//p' "$TMS_ENV_FILE")" = "$old_key" ]
+    # the replaced .env is kept beside it, private
+    bak=$(ls "$TMS_ENV_FILE".bak-* | tail -n 1)
+    [ -f "$bak" ]
+    [ "$(sed -n 's/^APP_KEY=//p' "$bak")" = "$new_key" ]
+    [ "$(stat -c %a "$bak" 2>/dev/null || stat -f %Lp "$bak")" = "600" ]
     [ "$(stat -c %a "$TMS_ENV_FILE" 2>/dev/null || stat -f %Lp "$TMS_ENV_FILE")" = "600" ]
 
     run compose exec -T app php -r "$key_script"' echo decrypt(file_get_contents("storage/app/enc.txt"));'
     [ "$status" -eq 0 ]
     [ "$output" = "secret-ok" ]
+}
+
+@test "--with-app-key leaves .env untouched when the database restore fails" {
+    # A snapshot with an unreadable dump and another APP_KEY.
+    load_env
+    bad="$STACK_DIR/bad-snapshot"
+    mkdir -p "$bad"
+    echo "pas un dump" >"$bad/db.dump"
+    tar -cf "$bad/storage-app.tar" -C "$bad" db.dump
+    printf 'APP_KEY=base64:%s\nTMS_VERSION=bats\n' "$(openssl rand -base64 32)" >"$bad/meta.env"
+    run restic_run -v "$bad:/backup-data:ro" -- backup --host tms --json /backup-data
+    [ "$status" -eq 0 ]
+    snap=$(printf '%s\n' "$output" | sed -n 's/.*"snapshot_id":"\([0-9a-f]*\)".*/\1/p' | tail -n 1)
+    [ -n "$snap" ]
+
+    cp "$TMS_ENV_FILE" "$STACK_DIR/env.before"
+    run "$TMS_ROOT/ops/restore.sh" --with-app-key "$snap"
+    restore_status=$status
+    compose up -d --wait >&2
+    [ "$restore_status" -ne 0 ]
+    cmp "$STACK_DIR/env.before" "$TMS_ENV_FILE"
+}
+
+@test "restore applies the dumped privileges without widening them" {
+    # Narrow the default privileges of tms_app before the snapshot (no DELETE on new tables).
+    psql_owner "alter default privileges for role tms_owner in schema public revoke delete on tables from tms_app" >/dev/null
+    before=$(psql_owner "select coalesce(string_agg(defaclacl::text, ',' order by defaclobjtype), '') from pg_default_acl")
+    grants_before=$(psql_owner "select count(*) from information_schema.role_table_grants where grantee = 'tms_app'")
+
+    run "$TMS_ROOT/ops/backup.sh"
+    [ "$status" -eq 0 ]
+    snap="${lines[${#lines[@]}-1]}"
+    run "$TMS_ROOT/ops/restore.sh" "$snap"
+    [ "$status" -eq 0 ]
+
+    after=$(psql_owner "select coalesce(string_agg(defaclacl::text, ',' order by defaclobjtype), '') from pg_default_acl")
+    [ "$after" = "$before" ]
+    [ "$(psql_owner "select count(*) from information_schema.role_table_grants where grantee = 'tms_app'")" -eq "$grants_before" ]
+    [ "$(psql_owner "select has_schema_privilege('tms_app', 'public', 'USAGE')")" = "t" ]
+    [ "$(psql_owner "select has_schema_privilege('tms_app', 'public', 'CREATE')")" = "f" ]
+
+    psql_owner "alter default privileges for role tms_owner in schema public grant delete on tables to tms_app" >/dev/null
 }

@@ -100,9 +100,25 @@ case "$1" in
 esac
 exit 0'
 
+        # Snapshots live in $MOCK_LOG/snapshots (one name per line, oldest first).
         mock pct '
 echo "pct $*" >>"$MOCK_LOG/pct.log"
-if [ "$1" = "push" ]; then cp "$3" "$MOCK_LOG/push/${4##*/}"; fi
+case "$1" in
+  push) cp "$3" "$MOCK_LOG/push/${4##*/}" ;;
+  snapshot)
+    if [ -n "${MOCK_PCT_SNAPSHOT_FAIL:-}" ]; then echo "snapshot feature is not available" >&2; exit 1; fi
+    echo "$3" >>"$MOCK_LOG/snapshots" ;;
+  listsnapshot)
+    if [ -f "$MOCK_LOG/snapshots" ]; then
+      while read -r s; do printf "%s-> %s   2026-11-01 10:00:00   no-description\n" "\`" "$s"; done <"$MOCK_LOG/snapshots"
+    fi
+    printf " %s-> current   You are here!\n" "\`" ;;
+  delsnapshot)
+    grep -vx "$3" "$MOCK_LOG/snapshots" >"$MOCK_LOG/snapshots.tmp" || true
+    mv "$MOCK_LOG/snapshots.tmp" "$MOCK_LOG/snapshots" ;;
+  exec)
+    case "$*" in *ops/update.sh*) exit "${MOCK_PCT_EXEC_RC:-0}" ;; esac ;;
+esac
 exit 0'
     }
 }
@@ -354,9 +370,68 @@ env_value() {
     [[ "$output" == *"CT_GW"* ]] || false
 }
 
-@test "proxmox.sh update subcommand is reserved" {
+@test "proxmox.sh update snapshots the CT then runs update.sh inside it" {
+    TMS_DIST_URL="https://dist.example.test/x" run bash "$PROXMOX_SH" update 123 --version 1.2.3
+    [ "$status" -eq 0 ]
+    local snap
+    snap="$(grep '^pct snapshot 123 ' "$MOCK_LOG/pct.log" | awk '{ print $4 }')"
+    [[ "$snap" =~ ^pre-update-[0-9]{8}-[0-9]{6}$ ]] || false
+    grep -q "^pct exec 123 -- env TMS_PCT_SNAPSHOT=$snap TMS_DIST_URL=https://dist.example.test/x /opt/tms/ops/update.sh --version 1.2.3$" "$MOCK_LOG/pct.log"
+    # snapshot before update
+    [ "$(grep -n '^pct snapshot' "$MOCK_LOG/pct.log" | cut -d: -f1)" -lt "$(grep -n 'ops/update.sh' "$MOCK_LOG/pct.log" | cut -d: -f1)" ]
+    refute grep -q "^pct create" "$MOCK_LOG/pct.log"
+}
+
+@test "proxmox.sh update keeps only the 3 most recent pre-update snapshots" {
+    printf '%s\n' manuel pre-update-20260101-000000 pre-update-20260201-000000 pre-update-20260301-000000 \
+        pre-update-20260401-000000 >"$MOCK_LOG/snapshots"
     run bash "$PROXMOX_SH" update 123
+    [ "$status" -eq 0 ]
+    [ "$(grep -c '^pre-update-' "$MOCK_LOG/snapshots")" -eq 3 ]
+    grep -qx manuel "$MOCK_LOG/snapshots"
+    grep -qx pre-update-20260301-000000 "$MOCK_LOG/snapshots"
+    grep -qx pre-update-20260401-000000 "$MOCK_LOG/snapshots"
+    refute grep -qx pre-update-20260101-000000 "$MOCK_LOG/snapshots"
+    refute grep -qx pre-update-20260201-000000 "$MOCK_LOG/snapshots"
+    grep -q "^pct delsnapshot 123 pre-update-20260101-000000" "$MOCK_LOG/pct.log"
+}
+
+@test "proxmox.sh update propagates the update exit code and points to pct rollback" {
+    MOCK_PCT_EXEC_RC=1 run bash "$PROXMOX_SH" update 123
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"pct rollback 123 pre-update-"* ]] || false
+
+    MOCK_PCT_EXEC_RC=2 run bash "$PROXMOX_SH" update 123
+    [ "$status" -eq 2 ]
+    [[ "$output" == *"pct rollback 123 pre-update-"* ]] || false
+}
+
+@test "proxmox.sh update goes on with a warning when the storage cannot snapshot" {
+    MOCK_PCT_SNAPSHOT_FAIL=1 run bash "$PROXMOX_SH" update 123
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"instantané"* ]] || false
+    grep -q "ops/update.sh" "$MOCK_LOG/pct.log"
+    refute grep -q "^pct delsnapshot" "$MOCK_LOG/pct.log"
+}
+
+@test "proxmox.sh update refuses an invalid CTID" {
+    run bash "$PROXMOX_SH" update abc
     [ "$status" -ne 0 ]
-    [[ "$output" == *"update"* ]] || false
+    [[ "$output" == *"CTID"* ]] || false
     [ ! -f "$MOCK_LOG/pct.log" ]
+}
+
+# --- shared code ---------------------------------------------------------------
+
+@test "install.sh and proxmox.sh embed the same release helpers as ops/lib.sh" {
+    local fn ref
+    for fn in verify_checksum checksum_of release_dist_url download fetch_bundle; do
+        ref="$(bash -c 'source "$1" && declare -f "$2"' _ "$TMS_ROOT/ops/lib.sh" "$fn")"
+        [ -n "$ref" ]
+        [ "$(TMS_INSTALL_NO_MAIN=1 bash -c 'source "$1" && declare -f "$2"' _ "$INSTALL_SH" "$fn")" = "$ref" ]
+    done
+    for fn in verify_checksum checksum_of release_dist_url; do
+        ref="$(bash -c 'source "$1" && declare -f "$2"' _ "$TMS_ROOT/ops/lib.sh" "$fn")"
+        [ "$(TMS_PROXMOX_NO_MAIN=1 bash -c 'source "$1" && declare -f "$2"' _ "$PROXMOX_SH" "$fn")" = "$ref" ]
+    done
 }

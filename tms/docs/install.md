@@ -94,8 +94,7 @@ le modèle Debian 12 s'il manque (`pveam`), crée un conteneur **non privilégi�
 dans le conteneur. Les paramètres passent par un fichier copié avec `pct push` (mode 600, supprimé ensuite),
 jamais par la ligne de commande.
 
-`proxmox.sh update <CTID>` est réservé à la mise à jour (instantané `pct snapshot` puis `ops/update.sh` dans le
-conteneur) ; il n'est pas encore disponible.
+Pour mettre à jour un conteneur existant : `proxmox.sh update <CTID>` (voir « Mise à jour » ci-dessous).
 
 ### Sur Debian 12 / Ubuntu 24.04
 
@@ -164,6 +163,54 @@ L'installateur crée `tms-backup.service` et `tms-backup.timer` (systemd) : `ops
 `systemctl list-timers tms-backup.timer`, `journalctl -u tms-backup.service`. Pour une copie hors site, renseigner
 `RESTIC_REMOTE_REPOSITORY` dans `.env`. Sur Proxmox, une sauvegarde `vzdump` du conteneur complète restic.
 
+### Mise à jour
+
+En root, dans le conteneur ou sur la machine :
+
+```bash
+/opt/tms/ops/update.sh                    # dernière version publiée
+/opt/tms/ops/update.sh --version 1.4.0    # version précise
+```
+
+Tant que le dépôt de publication n'est pas renseigné dans les scripts (`TMS_GITHUB_REPO`), préfixer la commande par
+`TMS_DIST_URL=<dossier des fichiers de la version>`.
+
+Déroulement :
+
+1. Téléchargement de `SHA256SUMS` et de `tms-<version>.tar.gz`, vérification de la somme de contrôle (la version
+   « dernière » est déterminée une seule fois).
+2. Même version : rien à faire (code 0), sauf `--force`. Version plus ancienne : refusée, sauf `--allow-downgrade`
+   (les migrations ne se défont pas : pour revenir en arrière, préférer `ops/restore.sh` avec le snapshot étiqueté
+   `pre-update-<version>`).
+3. Téléchargement des images de la nouvelle version, avant toute modification.
+4. Arrêt de app/worker/scheduler (aucune écriture ne peut être perdue), puis sauvegarde restic étiquetée
+   `pre-update-<ancienne version>`. Si la sauvegarde échoue, les services redémarrent et rien n'est modifié.
+5. Remplacement des fichiers (`compose.prod.yaml`, `ops/`, `docker/caddy`, `docker/postgres`, `docs/` ; les précédents
+   sont gardés dans `/opt/tms/.bundle-previous`), `TMS_VERSION` dans `.env`, migrations, redémarrage, puis `/health`
+   doit répondre avec la nouvelle version sous 90 s : « Mise à jour vers X.Y.Z réussie ».
+
+**Retour arrière automatique** : si une étape du point 5 échoue, les fichiers et la `TMS_VERSION` précédents sont
+remis, la base et `storage/app` sont restaurés depuis la sauvegarde du point 4 (`ops/restore.sh`), la pile redémarre
+sur l'ancienne version ; code de sortie **1** et message « Échec de la mise à jour : retour à <ancienne> ». Si le
+retour arrière échoue lui-même : code **2**, le message donne l'identifiant du snapshot et la commande de
+restauration manuelle (`/opt/tms/ops/restore.sh <snapshot>`).
+
+Une mise à jour, une sauvegarde et une restauration ne peuvent pas tourner en même temps (verrou
+`/opt/tms/.ops.lock`) : la mise à jour et la restauration refusent immédiatement ; la sauvegarde attend jusqu'à
+15 minutes (`TMS_BACKUP_LOCK_WAIT`, en secondes).
+
+**Sur Proxmox**, depuis le nœud (recommandé) :
+
+```bash
+proxmox.sh update <CTID> [--version 1.4.0]
+```
+
+Il prend d'abord un instantané du conteneur `pre-update-<date>` (`pct snapshot`, les 3 plus récents sont gardés ;
+si le stockage ne gère pas les instantanés, un avertissement est affiché et la mise à jour continue, protégée par
+la sauvegarde restic), puis lance `ops/update.sh` dans le conteneur et renvoie son code de sortie. En cas d'échec
+(1 ou 2), le message rappelle le dernier recours : `pct rollback <CTID> <instantané>` puis `pct start <CTID>`
+(rétablit tout le conteneur, y compris les données écrites depuis).
+
 ### Étapes suivantes
 
 1. Ouvrir le lien d'activation affiché (valable 24 h, usage unique), choisir le mot de passe (12 caractères
@@ -220,14 +267,15 @@ dépôt **restic** chiffré (`RESTIC_REPOSITORY`, par défaut `/var/backups/tms`
 snapshot ; en cas d'échec un e-mail est envoyé à `TMS_ALERT_EMAIL` (`php artisan tms:alert`). Seul Docker est requis
 sur l'hôte (restic s'exécute via l'image officielle `restic/restic`).
 
-`ops/restore.sh <snapshot|latest>` arrête app/worker/scheduler, restaure la base (`pg_restore --clean --if-exists`, en
-une transaction, schéma `public` recréé : les objets créés après le snapshot disparaissent) et les fichiers, relance la pile et attend `/health`.
+`ops/restore.sh <snapshot|latest>` arrête app/worker/scheduler, restaure la base (schéma `public` supprimé et recréé
+puis export rejoué, le tout en une transaction : les objets créés après le snapshot disparaissent ; droits et
+privilèges par défaut repris tels qu'exportés) et les fichiers, relance la pile et attend `/health`.
 
 Tests d'intégration (pile jetable, secrets générés) : `bats ops/tests` depuis `tms/` (Docker requis).
 
 **À conserver HORS du serveur : `RESTIC_PASSWORD` et `APP_KEY`.** `APP_KEY` chiffre les secrets des connecteurs et les
 doubles authentifications ; le snapshot (chiffré) en contient une copie (`meta.env`). Sur un serveur neuf, la restauration
 refuse une `APP_KEY` différente ; `ops/restore.sh --with-app-key <snapshot>` adopte celle de la sauvegarde (écrite dans
-`.env`, mode 600). Les snapshots portent l'étiquette `version:<TMS_VERSION>` pour retrouver celui d'une version donnée.
+`.env`, mode 600, seulement une fois la base restaurée ; l'ancien fichier est gardé en `.env.bak-<date>`, mode 600). Les snapshots portent l'étiquette `version:<TMS_VERSION>` pour retrouver celui d'une version donnée.
 La sauvegarde lit le volume `storage` directement : elle fonctionne même si le conteneur `app` est arrêté, et l'alerte
 e-mail retombe sur un conteneur éphémère.

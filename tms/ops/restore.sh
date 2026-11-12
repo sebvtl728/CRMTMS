@@ -1,13 +1,16 @@
 #!/usr/bin/env bash
-# Restore a restic snapshot: database (pg_restore --clean --if-exists, as the owner
-# role, in one transaction) and storage/app. Stops app/worker/scheduler during the
-# restore, restarts them and waits for /health.
+# Restore a restic snapshot: database (schema public dropped and recreated, then the dump
+# replayed as the owner role, all in one transaction) and storage/app. Stops
+# app/worker/scheduler during the restore, restarts them and waits for /health.
+# Takes the maintenance lock (shared with update.sh and backup.sh).
 #
 #   ops/restore.sh [--with-app-key] <snapshot-id|latest>
 #
 # The snapshot carries the APP_KEY of the instance it came from (meta.env). If it differs
 # from the current .env the restore is refused (connector secrets and 2FA enrolments could
-# not be decrypted) unless --with-app-key is given: the snapshot key is then written into .env.set -euo pipefail
+# not be decrypted) unless --with-app-key is given: once the database is restored, the
+# snapshot key is written into .env (the previous file is kept as .env.bak-<timestamp>, mode 600).
+set -euo pipefail
 
 # shellcheck source=lib.sh
 source "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
@@ -21,6 +24,9 @@ fi
 SNAPSHOT="$1"
 STAGE=""
 STOPPED=0
+ADOPT_KEY=0
+
+tms_lock 0
 
 on_exit() {
     local status=$?
@@ -56,13 +62,7 @@ if [[ -n "$SNAP_KEY" && "$SNAP_KEY" != "${APP_KEY:-}" ]]; then
     if [[ "$WITH_APP_KEY" -ne 1 ]]; then
         die "La clé APP_KEY de cette sauvegarde diffère de celle de ce serveur. Sans la clé d'origine, les secrets des connecteurs et les doubles authentifications ne peuvent plus être déchiffrés. Relancez avec --with-app-key pour adopter la clé de la sauvegarde (elle sera écrite dans ${TMS_ENV_FILE})."
     fi
-    log_info "Adoption de la clé APP_KEY de la sauvegarde."
-    tmp_env="$(mktemp "${TMS_ENV_FILE}.XXXXXX")"
-    chmod 600 "$tmp_env"
-    { grep -v '^APP_KEY=' "$TMS_ENV_FILE" || true; printf 'APP_KEY=%s\n' "$SNAP_KEY"; } >"$tmp_env"
-    mv "$tmp_env" "$TMS_ENV_FILE"
-    chmod 600 "$TMS_ENV_FILE"
-    export APP_KEY="$SNAP_KEY"
+    ADOPT_KEY=1
 fi
 
 log_info "Arrêt de app, worker et scheduler."
@@ -74,11 +74,9 @@ log_info "Restauration de la base de données."
 # Clean schema, not pg_restore --clean: objects created after the snapshot (and their foreign
 # keys) must disappear too. The SQL script is generated first, then applied in ONE transaction,
 # so a failure leaves the database untouched.
+# Grants and default privileges come from the dump only (never widened here).
 PREFIX_SQL="DROP SCHEMA public CASCADE;
-CREATE SCHEMA public AUTHORIZATION tms_owner;
-GRANT USAGE ON SCHEMA public TO tms_app;
-ALTER DEFAULT PRIVILEGES FOR ROLE tms_owner IN SCHEMA public GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO tms_app;
-ALTER DEFAULT PRIVILEGES FOR ROLE tms_owner IN SCHEMA public GRANT USAGE, SELECT ON SEQUENCES TO tms_app;"
+CREATE SCHEMA public AUTHORIZATION pg_database_owner;"
 # shellcheck disable=SC2016  # expanded by the shell inside the container
 compose exec -T -e PREFIX_SQL="$PREFIX_SQL" postgres bash -c '
     set -euo pipefail
@@ -88,6 +86,20 @@ compose exec -T -e PREFIX_SQL="$PREFIX_SQL" postgres bash -c '
     PGPASSWORD="$POSTGRES_OWNER_PASSWORD" psql -h 127.0.0.1 -U tms_owner -d tms -q \
         --single-transaction -v ON_ERROR_STOP=1 -f "$script" >/dev/null' \
     <"$DUMP" >&2 || die "Échec de la restauration de la base (base inchangée)."
+
+# Only now that the database matches the snapshot: adopt its APP_KEY.
+if [[ "$ADOPT_KEY" -eq 1 ]]; then
+    log_info "Adoption de la clé APP_KEY de la sauvegarde."
+    bak="${TMS_ENV_FILE}.bak-$(date '+%Y%m%d-%H%M%S')"
+    (umask 077 && cp "$TMS_ENV_FILE" "$bak") || die "Copie de sécurité de ${TMS_ENV_FILE} impossible."
+    chmod 600 "$bak"
+    tmp_env="$(umask 077 && mktemp "${TMS_ENV_FILE}.XXXXXX")"
+    { grep -v '^APP_KEY=' "$TMS_ENV_FILE" || true; printf 'APP_KEY=%s\n' "$SNAP_KEY"; } >"$tmp_env"
+    chmod 600 "$tmp_env"
+    mv "$tmp_env" "$TMS_ENV_FILE"
+    export APP_KEY="$SNAP_KEY"
+    log_info "Ancien fichier conservé : ${bak}."
+fi
 
 log_info "Restauration de storage/app."
 # Extract beside, then swap: the current files survive an extraction failure.

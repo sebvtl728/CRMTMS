@@ -32,11 +32,16 @@
 	respond @hidden 404
 }
 
-# Internal health endpoint (plain HTTP, not published on the host): used by the
-# container healthcheck and by the ops scripts. Nothing else is served here.
+# Internal endpoints (plain HTTP, not published on the host). /alive answers as soon as
+# Caddy runs: container healthcheck, so that Caddy does not turn "unhealthy" while the app
+# is stopped for a backup, restore or update. /health reaches the application: used by the
+# ops scripts (wait_health). Nothing else is served here.
 http://:8081 {
 	bind 127.0.0.1
 	root * /srv/public
+	handle /alive {
+		respond "ok" 200
+	}
 	handle /health {
 		php_fastcgi app:9000 {
 			root /var/www/html/public

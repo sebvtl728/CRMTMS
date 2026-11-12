@@ -3,6 +3,8 @@
 #
 # Requires Docker. Environment knobs:
 #   TMS_TEST_SKIP_BUILD=1  reuse the existing image tms-ci:bats
+#   STACK_INSTALL=1        run the stack from a copy of the release bundle in
+#                          $STACK_DIR/tms (like /opt/tms), not from the source tree
 #   TMS_TEST_TMPDIR        base directory for the stack files (must be bind-mountable
 #                          by Docker; default ~/.cache/tms-bats)
 
@@ -21,9 +23,16 @@ stack_up() {
     export STACK_DIR
 
     export COMPOSE_PROJECT_NAME="tmsbats"
-    export TMS_DIR="$TMS_ROOT"
-    export TMS_ENV_FILE="$STACK_DIR/env"
-    export TMS_COMPOSE_FILE="$TMS_ROOT/compose.prod.yaml"
+    if [[ -n "${STACK_INSTALL:-}" ]]; then
+        export TMS_DIR="$STACK_DIR/tms"
+        copy_bundle "$TMS_DIR"
+        export TMS_ENV_FILE="$TMS_DIR/.env"
+    else
+        export TMS_DIR="$TMS_ROOT"
+        export TMS_ENV_FILE="$STACK_DIR/env"
+    fi
+    export TMS_COMPOSE_FILE="$TMS_DIR/compose.prod.yaml"
+    export TMS_LOCK_FILE="$STACK_DIR/ops.lock"
     export TMS_BACKUP_TMPDIR="$STACK_DIR/staging"
     mkdir -p "$TMS_BACKUP_TMPDIR"
 
@@ -45,6 +54,7 @@ RESTIC_PASSWORD=$(gen_secret 24)
 RESTIC_REPOSITORY=$STACK_DIR/restic
 TMS_BACKUP_TMPDIR=$STACK_DIR/staging
 ENV
+    chmod 600 "$TMS_ENV_FILE"
 
     if [[ -z "${TMS_TEST_SKIP_BUILD:-}" ]]; then
         docker build -f "$TMS_ROOT/docker/app.Dockerfile" --target prod \
@@ -55,6 +65,17 @@ ENV
     "$TMS_ROOT/ops/migrate.sh" >&2 || return 1
     compose exec -T app php artisan db:seed --force >&2 || return 1
     wait_health 120
+}
+
+# copy_bundle <dir>: the files of a release bundle (see docs/install.md), from the source tree.
+copy_bundle() {
+    local dest="$1"
+    mkdir -p "$dest/ops" "$dest/docker/caddy" "$dest/docker/postgres" "$dest/docs"
+    cp "$TMS_ROOT/compose.prod.yaml" "$TMS_ROOT/.env.prod.example" "$dest/"
+    cp "$TMS_ROOT"/ops/*.sh "$dest/ops/"
+    cp "$TMS_ROOT/docker/caddy/Caddyfile" "$dest/docker/caddy/"
+    cp "$TMS_ROOT/docker/postgres/init.sh" "$TMS_ROOT/docker/postgres/init.sql" "$dest/docker/postgres/"
+    cp "$TMS_ROOT/docs/install.md" "$dest/docs/"
 }
 
 stack_down() {
