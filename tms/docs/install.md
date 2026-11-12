@@ -1,4 +1,6 @@
-# Installation (développement)
+# Installation
+
+## Développement
 
 Prérequis : Docker avec Compose v2.
 
@@ -53,7 +55,146 @@ Les tests s'exécutent en tant que `tms_app` sur la base `tms_test` ; le schéma
 `pgsql_owner` (voir `tests/RefreshDatabaseAsOwner.php`). Les assets doivent avoir été
 compilés (`npm run build`).
 
-## Production (Docker Compose)
+## Production : installation en une ligne
+
+Deux scripts publiés avec chaque version : `proxmox.sh` (crée un conteneur LXC sur un nœud Proxmox VE et
+y lance l'installation) et `install.sh` (installe sur une machine Debian 12 ou Ubuntu 24.04). Ils refusent
+de s'exécuter sur une installation existante (`/opt/tms/.env` présent) : pour une nouvelle version, utiliser
+`ops/update.sh`.
+
+### Prérequis
+
+- Proxmox VE 8 (accès root au nœud) **ou** une machine Debian 12 / Ubuntu 24.04 vierge (root).
+- 2 cœurs, 4 Go de mémoire, 20 Go de disque (valeurs par défaut du conteneur).
+- Un nom de domaine (ex. `tms.example.org`) qui pointe vers l'adresse de la machine, et les ports **80 et 443**
+  joignables depuis Internet pour obtenir le certificat (voir « Réseau interne » sinon).
+- L'e-mail de l'administrateur et le nom de l'organisme.
+
+### Sur Proxmox VE (conteneur LXC)
+
+Sur le nœud, en root :
+
+```bash
+bash -c "$(curl -fsSL https://github.com/<propriétaire>/<dépôt>/releases/latest/download/proxmox.sh)"
+```
+
+Les questions s'affichent (whiptail). Sans questions :
+
+```bash
+TMS_NONINTERACTIVE=1 TMS_DOMAIN=tms.example.org TMS_ADMIN_EMAIL=admin@example.org \
+TMS_TENANT_NAME="CAP FORMATION" CT_IP=192.168.1.50/24 CT_GW=192.168.1.1 \
+TMS_DIST_URL=https://github.com/<propriétaire>/<dépôt>/releases/latest/download \
+  bash -c "$(curl -fsSL https://github.com/<propriétaire>/<dépôt>/releases/latest/download/proxmox.sh)"
+```
+
+Le script vérifie `pveversion`, prend le prochain identifiant libre (`pvesh get /cluster/nextid`), télécharge
+le modèle Debian 12 s'il manque (`pveam`), crée un conteneur **non privilégié** (`--unprivileged 1
+--features nesting=1,keyctl=1 --onboot 1`, nécessaire à Docker), le démarre, attend le réseau, puis y copie
+`install.sh` (vérifié avec `SHA256SUMS`) et l'exécute. Aucun secret ne transite par le nœud : ils sont générés
+dans le conteneur. Les paramètres passent par un fichier copié avec `pct push` (mode 600, supprimé ensuite),
+jamais par la ligne de commande.
+
+`proxmox.sh update <CTID>` est réservé à la mise à jour (instantané `pct snapshot` puis `ops/update.sh` dans le
+conteneur) ; il n'est pas encore disponible.
+
+### Sur Debian 12 / Ubuntu 24.04
+
+En root :
+
+```bash
+TMS_DOMAIN=tms.example.org TMS_ADMIN_EMAIL=admin@example.org TMS_TENANT_NAME="CAP FORMATION" \
+TMS_DIST_URL=https://github.com/<propriétaire>/<dépôt>/releases/latest/download \
+  bash -c "$(curl -fsSL https://github.com/<propriétaire>/<dépôt>/releases/latest/download/install.sh)"
+```
+
+Étapes : installation de Docker (dépôt officiel) si absent → téléchargement de `SHA256SUMS` et de
+`tms-<version>.tar.gz` → vérification de la somme de contrôle (arrêt si elle diffère) → extraction dans `/opt/tms`
+→ génération de `/opt/tms/.env` → `docker compose pull` → démarrage de PostgreSQL/Redis et migrations
+(`ops/migrate.sh`) → démarrage complet et attente de `/health` → `php artisan tms:install` (organisme,
+administrateur, référentiels CAP FORMATION) → minuterie de sauvegarde → affichage de l'adresse, du lien
+d'activation et des secrets à conserver.
+
+### Variables
+
+| Variable | Défaut | Rôle |
+|---|---|---|
+| `TMS_DOMAIN` | (obligatoire) | Nom de domaine servi (sans `https://`) |
+| `TMS_ADMIN_EMAIL` | (obligatoire) | Administrateur ; aussi contact ACME et destinataire des alertes |
+| `TMS_TENANT_NAME` | (obligatoire) | Nom de l'organisme |
+| `TMS_ADMIN_NAME` | `Administrateur` | Nom affiché de l'administrateur |
+| `TMS_TENANT_SLUG` | dérivé du nom | Identifiant de l'organisme (`TMS_DEFAULT_TENANT`) |
+| `TMS_VERSION` | `latest` | Version à installer (`latest` : lue dans `SHA256SUMS`) |
+| `TMS_DIST_URL` | releases GitHub | Dossier contenant les fichiers de la version |
+| `TMS_IMAGE_OWNER` / `TMS_IMAGE` | propriétaire du dépôt | Image `ghcr.io/<propriétaire>/tms` |
+| `TMS_SEED_CAP` | `1` | `0` : ne pas charger les référentiels CAP FORMATION |
+| `TMS_TLS` | `acme` | `internal` : certificat de l'autorité locale de Caddy |
+| `TMS_MODE` | `single` | `single` = un organisme ; `multi` = plateforme partagée (organisme trouvé par nom d'hôte) |
+| `TMS_PRINT_SECRETS` | `1` | `0` : ne pas afficher les secrets, seulement leur emplacement |
+| `TMS_NONINTERACTIVE` | `0` | `proxmox.sh` : `1` = pas de questions |
+| `CTID`, `CT_HOSTNAME`, `CT_CORES`, `CT_RAM`, `CT_DISK`, `CT_STORAGE`, `CT_BRIDGE`, `CT_IP`, `CT_GW`, `TEMPLATE_STORAGE` | prochain libre, `tms`, `2`, `4096`, `20`, 1er stockage actif, `vmbr0`, `dhcp`, —, `local` | `proxmox.sh` : conteneur (`CT_GW` obligatoire si `CT_IP` est une adresse fixe CIDR) |
+
+Tant que le dépôt GitHub n'est pas renseigné dans les scripts (`TMS_GITHUB_REPO`), `TMS_DIST_URL` et
+`TMS_IMAGE_OWNER` sont obligatoires ; l'installateur s'arrête avec un message clair sinon.
+
+### Nom de domaine, certificats et réseau interne
+
+Caddy obtient le certificat automatiquement (Let's Encrypt) **uniquement** si le domaine pointe vers le serveur
+et si les ports 80 et 443 sont joignables depuis Internet (redirection de ports sur le routeur si besoin).
+Pour une installation accessible seulement sur le réseau local, utiliser `TMS_TLS=internal` : Caddy signe le
+certificat avec sa propre autorité ; les navigateurs affichent un avertissement tant que cette autorité n'est
+pas approuvée (certificat racine : `docker compose -f /opt/tms/compose.prod.yaml exec caddy cat
+/data/caddy/pki/authorities/local/root.crt`). Le nom doit tout de même être résolu par le DNS local.
+
+### Où sont les secrets
+
+Tous les secrets sont générés sur la machine (aucune valeur par défaut) et écrits **uniquement** dans
+`/opt/tms/.env` (mode 600, root) : `APP_KEY`, mots de passe PostgreSQL (super-utilisateur, propriétaire,
+application), `REDIS_PASSWORD`, `RESTIC_PASSWORD`. Ils ne passent jamais en argument de commande et ne sont
+écrits dans aucun journal.
+
+**À conserver HORS du serveur : `RESTIC_PASSWORD` et `APP_KEY`.** L'installateur les affiche une seule fois à
+la fin (à copier dans un gestionnaire de mots de passe) ; `TMS_PRINT_SECRETS=0` n'affiche que leur emplacement.
+Sans `RESTIC_PASSWORD`, les sauvegardes sont illisibles ; sans `APP_KEY`, les secrets des connecteurs et les
+doubles authentifications sont perdus.
+
+### Sauvegardes
+
+L'installateur crée `tms-backup.service` et `tms-backup.timer` (systemd) : `ops/backup.sh` chaque nuit à 02:30
+(`Persistent=true` : rattrapée au démarrage si la machine était éteinte), dépôt `/var/backups/tms`. Vérifier :
+`systemctl list-timers tms-backup.timer`, `journalctl -u tms-backup.service`. Pour une copie hors site, renseigner
+`RESTIC_REMOTE_REPOSITORY` dans `.env`. Sur Proxmox, une sauvegarde `vzdump` du conteneur complète restic.
+
+### Étapes suivantes
+
+1. Ouvrir le lien d'activation affiché (valable 24 h, usage unique), choisir le mot de passe (12 caractères
+   minimum) et enrôler la double authentification.
+2. Configurer la messagerie de l'instance dans `/opt/tms/.env` (`MAIL_MAILER=smtp`, `MAIL_HOST`, `MAIL_PORT`,
+   `MAIL_USERNAME`, `MAIL_PASSWORD`, `MAIL_FROM_ADDRESS`), puis
+   `docker compose -f /opt/tms/compose.prod.yaml --env-file /opt/tms/.env up -d`. Tant qu'elle ne l'est pas
+   (`MAIL_MAILER=log`), les alertes de sauvegarde ne partent pas par e-mail.
+3. Compléter la fiche société, inviter les utilisateurs.
+
+### Installation interrompue
+
+Si l'installation échoue après la création de `.env`, le message indique comment repartir de zéro :
+`docker compose -f /opt/tms/compose.prod.yaml --env-file /opt/tms/.env down -v` puis supprimer `/opt/tms/.env`
+(**efface la base** : uniquement sur une installation neuve). Sur Proxmox : `pct stop <CTID> && pct destroy <CTID>`.
+
+### Contenu d'une version (contrat avec la publication)
+
+Fichiers attachés à chaque version : `tms-<version>.tar.gz` (à la racine de l'archive : `compose.prod.yaml`,
+`.env.prod.example`, `ops/`, `docker/caddy/Caddyfile`, `docker/postgres/init.sh`, `docker/postgres/init.sql`,
+`docs/install.md`), `SHA256SUMS` (format `sha256sum`, liste **l'archive et `install.sh`**), `install.sh`,
+`proxmox.sh`. Image : `ghcr.io/<propriétaire>/tms:<version>`.
+
+### Validation manuelle sur Proxmox (à réaliser à chaque version)
+
+Sur un nœud de test : `TMS_DIST_URL=<release de test> bash -c "$(curl -fsSL <release de test>/proxmox.sh)"`.
+Attendu : conteneur créé, `https://<domaine>/health` → `{"status":"ok",…}`, lien d'activation affiché,
+connexion de l'administrateur et enrôlement 2FA réussis, `systemctl list-timers` dans le conteneur montre
+`tms-backup.timer`.
+
+### Installation manuelle (Docker Compose)
 
 L'image de production est construite par la cible `prod` de `docker/app.Dockerfile`
 (assets Node 22, dépendances PHP sans outils de développement, utilisateur non root,
@@ -71,7 +212,7 @@ Seul Caddy publie des ports (80/443) ; PostgreSQL et Redis ne sont pas exposés.
 adresse de confiance pour `X-Forwarded-*` (`TRUSTED_PROXIES`), ce qui active HTTPS/HSTS et l'IP cliente
 correcte. `/health` est aussi servi en HTTP interne (conteneur `caddy`, port 8081, non publié).
 
-### Sauvegardes et restauration
+#### Sauvegardes et restauration
 
 `ops/backup.sh [--tag <libellé>]` exporte la base (`pg_dump -Fc`) et `storage/app`, puis les enregistre dans un
 dépôt **restic** chiffré (`RESTIC_REPOSITORY`, par défaut `/var/backups/tms`, copie distante optionnelle

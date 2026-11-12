@@ -109,6 +109,7 @@ services:
     environment:
       TMS_DOMAIN: ${TMS_DOMAIN}
       TMS_ACME_EMAIL: ${TMS_ACME_EMAIL:?TMS_ACME_EMAIL is required}
+      TMS_TLS: ${TMS_TLS:-acme}
     volumes:
       - ./docker/caddy/Caddyfile:/etc/caddy/Caddyfile:ro
       - public:/srv/public:ro

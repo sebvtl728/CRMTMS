@@ -1,10 +1,22 @@
 # Production Caddyfile (compose.prod.yaml).
-# TMS_DOMAIN and TMS_ACME_EMAIL come from the container environment.
+# TMS_DOMAIN, TMS_ACME_EMAIL and TMS_TLS come from the container environment.
 {
 	email {$TMS_ACME_EMAIL}
 }
 
+# Certificates (TMS_TLS): "acme" (default) = Let's Encrypt / ZeroSSL, needs the
+# domain to resolve to this server and ports 80/443 reachable from the Internet;
+# "internal" = Caddy's local CA, for a LAN-only install (browsers must trust it).
+(tls_acme) {
+}
+
+(tls_internal) {
+	tls internal
+}
+
 {$TMS_DOMAIN} {
+	import tls_{$TMS_TLS:acme}
+
 	root * /srv/public
 	encode zstd gzip
 
