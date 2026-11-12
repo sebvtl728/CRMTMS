@@ -24,10 +24,13 @@ docker compose exec app php artisan test                      # tests (rôle tms
 docker compose exec app php artisan test --filter=Nom         # test ciblé
 docker compose exec app php artisan migrate --database=pgsql_owner   # migrations : TOUJOURS via pgsql_owner
 docker compose exec app vendor/bin/pint                       # formatage PHP
-docker compose exec app vendor/bin/phpstan analyse            # analyse statique
+docker compose exec app vendor/bin/phpstan analyse --memory-limit=1G   # analyse statique
 docker compose run --rm vite sh -c "npm run lint && npm run types && npm run build"
 npm run e2e                                                    # Playwright (hôte, pile dédiée port 8081) : voir tms/docs/install.md
+shellcheck -x ops/*.sh ops/install/*.sh ops/release/*.sh && bats ops/tests   # scripts d'exploitation
 ```
+
+Scripts d'exploitation (installation, mise à jour, sauvegarde, publication) : `tms/ops/` (tests bats : `tms/ops/tests/`) ; publication : `.github/workflows/release.yml`.
 
 Installation dev complète : `tms/docs/install.md`. App : http://localhost:8080, santé : `/health`.
 
@@ -39,7 +42,10 @@ Installation dev complète : `tms/docs/install.md`. App : http://localhost:8080,
 4. **Sécurité** : cible OWASP ASVS niveau 2 ; mots de passe Argon2id ≥ 12 caractères ; 2FA obligatoire pour admin et direction ; journal d'audit append-only ; secrets des connecteurs chiffrés.
 5. **Connecteurs** : tout logiciel externe (Formevol, Sage, SoWeSign, Outlook…) passe par un adaptateur isolé dans `app/Modules/Connectors`, jamais codé en dur dans le métier.
 6. **TDD** : test d'abord, puis code ; tests verts avant chaque commit.
-7. Listes métier (DAS, étapes, origines…) = **référentiels paramétrables par organisme**, jamais des constantes en dur.
+7. Listes métier (DAS, étapes, origines…) = **référentiels paramétrables par organisme**, jamais des constantes en dur. Un module stocke l'**id** de la valeur (clé étrangère vers `reference_items`), jamais son code, et déclare la colonne avec `ReferenceUsage::register(...)` (une valeur utilisée ne se supprime pas).
+8. **Cache** : toute clé contenant des données d'un organisme est préfixée par l'id du tenant.
+9. **Files d'attente** : jobs et notifications reçoivent le tenant automatiquement par leur charge utile ; ne jamais appeler `TenantContext::set` de façon globale dans un worker.
+10. Tout nouveau modèle sur une table métier utilise `BelongsToTenant`.
 
 ## Conventions
 
