@@ -285,7 +285,10 @@ Fichiers attachés à chaque version (workflow `.github/workflows/release.yml`, 
 Contenu de l'archive (à la racine, noms triés, date et propriétaire fixes : reproductible) : la liste
 `ops/release/files.txt`, **source unique** lue par `ops/release/make-bundle.sh` (publication et tests) :
 `compose.prod.yaml`, `.env.prod.example`, `ops/{lib,migrate,backup,restore,update}.sh`, `docker/caddy/Caddyfile`,
-`docker/postgres/init.sh`, `docker/postgres/init.sql`, `docs/install.md`. `fetch_bundle` (`ops/lib.sh`, recopié dans
+`docker/postgres/init.sh`, `docker/postgres/init.sql`, `release.env` (généré : `TMS_IMAGE_DIGEST`, empreinte de
+l'image de la version), `docs/install.md`. L'installateur et `ops/update.sh` recopient cette empreinte dans `.env`
+(`TMS_IMAGE_DIGEST`) et `compose.prod.yaml` tire alors `…/tms:<version>@<empreinte>` (empreinte vérifiée par
+Docker) ; vide (construction locale), le tag seul est utilisé. `fetch_bundle` (`ops/lib.sh`, recopié dans
 `install.sh`) refuse une archive à laquelle manque l'un de ces fichiers ; `ops/tests/release.bats` vérifie que
 les deux listes concordent : **ajouter un fichier à l'archive = l'ajouter à `files.txt`** (et à `fetch_bundle` s'il
 est indispensable).

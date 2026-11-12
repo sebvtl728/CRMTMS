@@ -197,13 +197,25 @@ ensure_docker() {
     docker compose version >/dev/null 2>&1 || die "Docker Compose v2 introuvable (paquet docker-compose-plugin)."
 }
 
+# image_digest_of <bundle root>: TMS_IMAGE_DIGEST of the bundle's release.env (empty when the
+# version does not pin its image); fails on anything but sha256:<64 hex>.
+image_digest_of() {
+    local digest
+    digest="$(sed -n 's/^TMS_IMAGE_DIGEST=//p' "$1/release.env" 2>/dev/null | head -n 1)"
+    if [[ -n "$digest" && ! "$digest" =~ ^sha256:[0-9a-f]{64}$ ]]; then
+        log_error "Empreinte d'image illisible dans release.env : $digest"
+        return 1
+    fi
+    printf '%s' "$digest"
+}
+
 download() {
     log_info "Téléchargement de $1"
     curl -fsSL --retry 3 -o "$2" "$TMS_DIST_URL/$1" || die "Téléchargement impossible : $TMS_DIST_URL/$1"
 }
 
 # Downloads SHA256SUMS and the bundle, verifies it, extracts it into $1.
-# Sets TMS_VERSION (resolved when "latest") and BUNDLE_ROOT.
+# Sets TMS_VERSION (resolved when "latest"), BUNDLE_ROOT and BUNDLE_IMAGE_DIGEST.
 fetch_bundle() {
     local work="$1" sums="$1/SHA256SUMS" archive expected
     download SHA256SUMS "$sums"
@@ -238,9 +250,12 @@ fetch_bundle() {
     fi
     local f
     for f in compose.prod.yaml .env.prod.example ops/lib.sh ops/migrate.sh ops/backup.sh ops/restore.sh ops/update.sh \
-        docker/caddy/Caddyfile docker/postgres/init.sh docker/postgres/init.sql; do
+        docker/caddy/Caddyfile docker/postgres/init.sh docker/postgres/init.sql release.env; do
         [[ -f "$BUNDLE_ROOT/$f" ]] || die "Archive invalide : $f manquant."
     done
+    # Image of this version, pinned by digest (verified bundle -> .env -> compose).
+    # shellcheck disable=SC2034  # read by the installer (env_value) and the tests
+    BUNDLE_IMAGE_DIGEST="$(image_digest_of "$BUNDLE_ROOT")" || die "Archive invalide : release.env illisible."
 }
 
 install_bundle() {
@@ -256,6 +271,7 @@ env_value() {
         TMS_IMAGE) printf '%s' "${TMS_IMAGE:-}" ;;
         TMS_IMAGE_OWNER) printf '%s' "$TMS_IMAGE_OWNER" ;;
         TMS_VERSION) printf '%s' "$TMS_VERSION" ;;
+        TMS_IMAGE_DIGEST) printf '%s' "${BUNDLE_IMAGE_DIGEST:-}" ;;
         TMS_DOMAIN) printf '%s' "$TMS_DOMAIN" ;;
         TMS_ACME_EMAIL | TMS_ALERT_EMAIL) printf '%s' "$TMS_ADMIN_EMAIL" ;;
         TMS_TLS) printf '%s' "$TMS_TLS" ;;
@@ -278,7 +294,7 @@ env_value() {
     esac
 }
 
-INSTALLER_KEYS="TMS_IMAGE TMS_IMAGE_OWNER TMS_VERSION TMS_DOMAIN TMS_ACME_EMAIL TMS_TLS APP_KEY APP_ENV APP_DEBUG APP_URL
+INSTALLER_KEYS="TMS_IMAGE TMS_IMAGE_OWNER TMS_VERSION TMS_IMAGE_DIGEST TMS_DOMAIN TMS_ACME_EMAIL TMS_TLS APP_KEY APP_ENV APP_DEBUG APP_URL
 SESSION_SECURE_COOKIE TMS_MODE TMS_DEFAULT_TENANT TMS_ALERT_EMAIL TMS_NO_TEST_DB POSTGRES_SUPERUSER_PASSWORD
 POSTGRES_OWNER_PASSWORD POSTGRES_APP_PASSWORD REDIS_PASSWORD RESTIC_PASSWORD RESTIC_REPOSITORY MAIL_MAILER"
 

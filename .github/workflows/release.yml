@@ -2,8 +2,9 @@ name: release
 
 # Publishes a version when a tag vMAJOR.MINOR.PATCH[-prerelease] is pushed. Order matters, so a failure
 # never leaves a half-published version:
-#   check (tag valid, matches tms/VERSION, commit on main) + verify (full CI, reused) + bundle
+#   check (tag valid, matches tms/VERSION, commit on main) + verify (full CI, reused)
 #   -> image (versioned tag only, signed by digest)
+#   -> bundle (release.env pins that digest: installs and updates pull exactly the signed image)
 #   -> release (SHA256SUMS signed; created as DRAFT, assets uploaded, then published)
 #   -> latest (only after the release exists, non-pre-release only: :latest is moved to the signed digest)
 # Contract with the installer/updater: tms/docs/install.md ("Contenu d'une version"); how to cut one: tms/docs/release.md.
@@ -75,27 +76,8 @@ jobs:
       contents: read
     uses: ./.github/workflows/ci.yml
 
-  bundle:
-    needs: check
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    permissions:
-      contents: read
-    steps:
-      - uses: actions/checkout@v4
-      - name: Build bundle and SHA256SUMS
-        env:
-          VERSION: ${{ needs.check.outputs.version }}
-        run: tms/ops/release/make-bundle.sh "$VERSION" dist
-      - uses: actions/upload-artifact@v4
-        with:
-          name: release-files
-          path: dist/
-          if-no-files-found: error
-          retention-days: 7
-
   image:
-    needs: [check, verify, bundle]
+    needs: [check, verify]
     runs-on: ubuntu-latest
     timeout-minutes: 60
     permissions:
@@ -143,8 +125,33 @@ jobs:
           DIGEST: ${{ steps.build.outputs.digest }}
         run: cosign sign --yes "$IMAGE@$DIGEST"
 
-  release:
+  bundle:
     needs: [check, image]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build bundle (image digest in release.env) and SHA256SUMS
+        env:
+          VERSION: ${{ needs.check.outputs.version }}
+          DIGEST: ${{ needs.image.outputs.digest }}
+        run: |
+          set -euo pipefail
+          if [[ ! "$DIGEST" =~ ^sha256:[0-9a-f]{64}$ ]]; then
+            echo "::error::Image digest missing or malformed: '$DIGEST'"; exit 1
+          fi
+          tms/ops/release/make-bundle.sh "$VERSION" dist "$DIGEST"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release-files
+          path: dist/
+          if-no-files-found: error
+          retention-days: 7
+
+  release:
+    needs: [check, image, bundle]
     runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:

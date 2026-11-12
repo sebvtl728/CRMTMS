@@ -2,7 +2,9 @@
 # the installer generates it. Only caddy publishes ports (80/443).
 name: tms
 
-x-app-image: &app-image ${TMS_IMAGE:-ghcr.io/${TMS_IMAGE_OWNER:-OWNER}/tms}:${TMS_VERSION:?TMS_VERSION is required}
+# tag@digest when the release pins its image (TMS_IMAGE_DIGEST from the verified bundle): Docker
+# pulls by digest and refuses any other content; the tag alone for local builds.
+x-app-image: &app-image ${TMS_IMAGE:-ghcr.io/${TMS_IMAGE_OWNER:-OWNER}/tms}:${TMS_VERSION:?TMS_VERSION is required}${TMS_IMAGE_DIGEST:+@${TMS_IMAGE_DIGEST}}
 
 x-app-env: &app-env
   APP_NAME: ${APP_NAME:-TMS}

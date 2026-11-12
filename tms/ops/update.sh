@@ -74,6 +74,9 @@ BUNDLE_ITEMS="compose.prod.yaml .env.prod.example ops docker/caddy docker/postgr
 PREV_DIR="$TMS_DIR/.bundle-previous"
 NEW_DIR="$TMS_DIR/.bundle-new"
 STATE_FILE="$TMS_DIR/.update-in-progress"
+# Image digests (release.env of the bundles; empty = tag only).
+OLD_DIGEST=""
+NEW_DIGEST=""
 LOG_FILE="$TMS_DIR/logs/update.log"
 
 PHASE="prepare" # prepare -> stopped -> applying -> done
@@ -111,17 +114,20 @@ state_value() {
 
 # prepare_env: $WORK_DIR/env.new = current .env + keys of the new .env.prod.example that
 # .env lacks (default copied, __GENERATE__ -> random secret, empty -> skipped), TMS_VERSION
-# set to the target. Values never reach a command line or the log.
+# set to the target and TMS_IMAGE_DIGEST to the digest of the verified bundle (release.env).
+# Values never reach a command line or the log.
 prepare_env() {
     local line key value added=""
     NEW_ENV="$WORK_DIR/env.new"
     {
-        sed "s|^TMS_VERSION=.*|TMS_VERSION=${TARGET}|" "$TMS_ENV_FILE"
+        sed -e "s|^TMS_VERSION=.*|TMS_VERSION=${TARGET}|" -e '/^TMS_IMAGE_DIGEST=/d' "$TMS_ENV_FILE"
+        printf 'TMS_IMAGE_DIGEST=%s\n' "$NEW_DIGEST"
         while IFS= read -r line || [[ -n "$line" ]]; do
             [[ "$line" =~ ^([A-Z_][A-Z0-9_]*)=(.*)$ ]] || continue
             key="${BASH_REMATCH[1]}"
             value="${BASH_REMATCH[2]}"
             grep -q "^${key}=" "$TMS_ENV_FILE" && continue
+            [[ "$key" != TMS_IMAGE_DIGEST ]] || continue
             [[ "$value" != "__GENERATE__" ]] || value="$(gen_secret 32)"
             [[ -n "$value" ]] || continue
             [[ -n "$added" ]] || printf '\n# --- Added by the update to %s --------------------------------------------\n' "$TARGET"
@@ -182,7 +188,7 @@ roll_back() {
     local ok=1
     log_error "Retour arrière vers $OLD_VERSION (snapshot $SNAPSHOT)."
     restore_previous_files || { ok=0; log_error "Fichiers ou .env de la version $OLD_VERSION non rétablis (copie dans $PREV_DIR)."; }
-    export TMS_VERSION="$OLD_VERSION"
+    export TMS_VERSION="$OLD_VERSION" TMS_IMAGE_DIGEST="$OLD_DIGEST"
     if [[ -n "$SNAPSHOT" ]]; then
         "$TMS_DIR/ops/restore.sh" "$SNAPSHOT" >&2 || ok=0
     else
@@ -234,6 +240,7 @@ recover_interrupted() {
     trap '' INT TERM HUP
     set +e
     OLD_VERSION="$(state_value OLD_VERSION)"
+    OLD_DIGEST="$(state_value OLD_DIGEST)"
     TARGET="$(state_value TARGET)"
     SNAPSHOT="$(state_value SNAPSHOT)"
     WORK_DIR="$(state_value WORK_DIR)"
@@ -245,10 +252,11 @@ recover_interrupted() {
 
 # --- main ------------------------------------------------------------------------------
 
-# The current version comes from .env, never from an inherited environment.
-unset TMS_VERSION
+# The current version (and image digest) come from .env, never from an inherited environment.
+unset TMS_VERSION TMS_IMAGE_DIGEST
 load_env
 OLD_VERSION="${TMS_VERSION:-}"
+OLD_DIGEST="${TMS_IMAGE_DIGEST:-}"
 [[ -n "$OLD_VERSION" ]] || die "TMS_VERSION absent de $TMS_ENV_FILE : installation incomplète ?"
 
 tms_lock 0
@@ -286,6 +294,8 @@ if [[ ! -f "$BUNDLE_ROOT/compose.prod.yaml" ]]; then
     BUNDLE_ROOT="$(dirname "$(find "$WORK_DIR/bundle" -mindepth 2 -maxdepth 2 -name compose.prod.yaml -print | head -n 1)")"
 fi
 [[ -f "$BUNDLE_ROOT/compose.prod.yaml" && -f "$BUNDLE_ROOT/.env.prod.example" ]] || die "Dossier de la version introuvable : $WORK_DIR"
+# Image digest published with the verified bundle (empty: tag only).
+NEW_DIGEST="$(image_digest_of "$BUNDLE_ROOT")" || die "Empreinte d'image de la version $TARGET illisible : mise à jour annulée."
 
 # 2. Same version, downgrade.
 if [[ "$TARGET" == "$OLD_VERSION" && "$FORCE" -ne 1 ]]; then
@@ -307,7 +317,7 @@ prepare_env
 log_info "Téléchargement des images de la version $TARGET."
 pull_args=()
 [[ -z "${TMS_PULL_POLICY:-}" ]] || pull_args=(--policy "$TMS_PULL_POLICY")
-TMS_VERSION="$TARGET" docker compose --project-directory "$TMS_DIR" -f "$BUNDLE_ROOT/compose.prod.yaml" \
+TMS_VERSION="$TARGET" TMS_IMAGE_DIGEST="$NEW_DIGEST" docker compose --project-directory "$TMS_DIR" -f "$BUNDLE_ROOT/compose.prod.yaml" \
     --env-file "$NEW_ENV" pull ${pull_args[@]+"${pull_args[@]}"} >&2 \
     || die "Téléchargement des images (ou lecture de la configuration de la version $TARGET) impossible : mise à jour annulée, rien n'a été modifié."
 
@@ -328,12 +338,12 @@ mkdir -p "$PREV_DIR/docker"
 chmod 750 "$PREV_DIR"
 printf '%s\n' "$OLD_VERSION" >"$PREV_DIR/VERSION"
 write_private "$PREV_DIR/.env" <"$TMS_ENV_FILE"
-printf 'OLD_VERSION=%s\nTARGET=%s\nSNAPSHOT=%s\nWORK_DIR=%s\n' "$OLD_VERSION" "$TARGET" "$SNAPSHOT" "$WORK_DIR" \
+printf 'OLD_VERSION=%s\nOLD_DIGEST=%s\nTARGET=%s\nSNAPSHOT=%s\nWORK_DIR=%s\n' "$OLD_VERSION" "$OLD_DIGEST" "$TARGET" "$SNAPSHOT" "$WORK_DIR" \
     | write_private "$STATE_FILE"
 PHASE="applying"
 swap_bundle
 write_private "$TMS_ENV_FILE" <"$NEW_ENV"
-export TMS_VERSION="$TARGET"
+export TMS_VERSION="$TARGET" TMS_IMAGE_DIGEST="$NEW_DIGEST"
 # Test hook (bats): simulates a hard kill at this point.
 [[ "${TMS_UPDATE_TEST_KILL:-}" != "after-env" ]] || kill -9 $$
 log_info "Migrations de la base."

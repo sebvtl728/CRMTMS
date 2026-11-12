@@ -9,6 +9,7 @@ TMS_ROOT="$(cd "$BATS_TEST_DIRNAME/../.." && pwd)"
 INSTALL_SH="$TMS_ROOT/ops/install/install.sh"
 PROXMOX_SH="$TMS_ROOT/ops/install/proxmox.sh"
 FIXTURE_VERSION="9.9.9"
+FIXTURE_DIGEST="sha256:$(printf 'b%.0s' {1..64})"
 # shellcheck source=bundle.bash
 source "$BATS_TEST_DIRNAME/bundle.bash"
 
@@ -39,7 +40,7 @@ build_release() {
     local stage="$BATS_TEST_TMPDIR/stage"
     stage_src "$stage"
     echo "BATS_GENERATED_SECRET=__GENERATE__" >>"$stage/.env.prod.example"
-    bundle_src "$stage" "$FIXTURE_VERSION" "$MOCK_DIST"
+    bundle_src "$stage" "$FIXTURE_VERSION" "$MOCK_DIST" "$FIXTURE_DIGEST"
 }
 
 mock() {
@@ -215,6 +216,8 @@ env_value() {
     run bash "$INSTALL_SH"
     [ "$status" -eq 0 ]
     [ "$(env_value TMS_VERSION)" = "$FIXTURE_VERSION" ]
+    # The image is pulled by the digest published with the verified bundle.
+    [ "$(env_value TMS_IMAGE_DIGEST)" = "$FIXTURE_DIGEST" ]
     [ "$(env_value APP_ENV)" = "production" ]
     [ "$(env_value APP_DEBUG)" = "false" ]
     [ "$(env_value SESSION_SECURE_COOKIE)" = "true" ]
@@ -430,7 +433,7 @@ env_value() {
 
 @test "install.sh and proxmox.sh embed the same release helpers as ops/lib.sh" {
     local fn ref
-    for fn in verify_checksum checksum_of release_dist_url download fetch_bundle; do
+    for fn in verify_checksum checksum_of release_dist_url download image_digest_of fetch_bundle; do
         ref="$(bash -c 'source "$1" && declare -f "$2"' _ "$TMS_ROOT/ops/lib.sh" "$fn")"
         [ -n "$ref" ]
         [ "$(TMS_INSTALL_NO_MAIN=1 bash -c 'source "$1" && declare -f "$2"' _ "$INSTALL_SH" "$fn")" = "$ref" ]
