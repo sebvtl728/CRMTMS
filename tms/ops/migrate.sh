@@ -16,3 +16,8 @@ compose up -d --wait postgres redis >&2
 DB_OWNER_USERNAME=tms_owner DB_OWNER_PASSWORD="$POSTGRES_OWNER_PASSWORD" \
     compose run --rm --no-deps -T -e DB_OWNER_USERNAME -e DB_OWNER_PASSWORD \
     app php artisan migrate --database=pgsql_owner --force "$@"
+
+# New permissions / default matrix entries reach every organisme (idempotent,
+# never restores a permission an administrator removed). Runs as the runtime
+# role (tms_app, under row level security): no owner credentials here.
+compose run --rm --no-deps -T app php artisan tms:permissions:sync

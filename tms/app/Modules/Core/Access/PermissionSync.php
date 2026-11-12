@@ -1,0 +1,87 @@
+<?php
+
+namespace App\Modules\Core\Access;
+
+use App\Modules\Core\Tenancy\ForEachTenant;
+use App\Modules\Core\Tenancy\Tenant;
+use App\Modules\Core\Tenancy\TenantContext;
+use Illuminate\Support\Facades\DB;
+use Spatie\Permission\PermissionRegistrar;
+
+/**
+ * Brings every tenant's roles up to date with the permission catalogue
+ * (`php artisan tms:permissions:sync`, run by ops/migrate.sh after each
+ * migration; RoleSeeder for a new tenant).
+ *
+ *  - creates the missing permissions (global catalogue) and roles;
+ *  - grants each role the default permissions never offered to it yet, and
+ *    records them in role_permission_defaults_applied: a permission an
+ *    administrator removed is never granted again.
+ *
+ * Idempotent. Runs under RLS, in each tenant's context (runtime connection).
+ */
+final class PermissionSync
+{
+    public const TABLE = 'role_permission_defaults_applied';
+
+    public static function run(): void
+    {
+        self::ensurePermissions();
+
+        // Suspended tenants too: their matrix must be complete if reactivated.
+        ForEachTenant::run(fn () => self::syncCurrentTenant(), includeSuspended: true);
+    }
+
+    public static function forTenant(Tenant $tenant): void
+    {
+        self::ensurePermissions();
+
+        app(TenantContext::class)->run($tenant, fn () => self::syncCurrentTenant());
+    }
+
+    /**
+     * Read from the table, not spatie's cached catalogue (which may be stale).
+     */
+    private static function ensurePermissions(): void
+    {
+        foreach (Permissions::all() as $permission) {
+            PermissionModel::query()->firstOrCreate(['name' => $permission, 'guard_name' => RoleSeeder::GUARD]);
+        }
+    }
+
+    private static function syncCurrentTenant(): void
+    {
+        $tenantId = app(TenantContext::class)->id();
+        $registrar = app(PermissionRegistrar::class);
+
+        // The tenant's cached catalogue may predate permissions created above.
+        $registrar->forgetCachedPermissions();
+
+        DB::transaction(function () use ($tenantId): void {
+            $offered = DB::table(self::TABLE)->get(['role', 'permission'])
+                ->groupBy('role')
+                ->map(fn ($rows) => $rows->pluck('permission')->all());
+
+            foreach (Role::cases() as $role) {
+                $model = RoleModel::query()->where('name', $role->value)->where('guard_name', RoleSeeder::GUARD)->first()
+                    ?? RoleModel::create(['name' => $role->value, 'guard_name' => RoleSeeder::GUARD]);
+
+                $new = array_values(array_diff(Permissions::defaultsFor($role), $offered->get($role->value, [])));
+
+                if ($new === []) {
+                    continue;
+                }
+
+                $model->givePermissionTo($new);
+
+                DB::table(self::TABLE)->insertOrIgnore(array_map(fn (string $permission) => [
+                    'tenant_id' => $tenantId,
+                    'role' => $role->value,
+                    'permission' => $permission,
+                ], $new));
+            }
+        });
+
+        $registrar->forgetCachedPermissions();
+    }
+}

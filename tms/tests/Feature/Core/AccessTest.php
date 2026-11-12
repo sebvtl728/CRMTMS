@@ -26,11 +26,12 @@ it('defines the six roles with French labels and the 2FA requirement', function 
         ->toBe([Role::AdminOrganisme, Role::Direction]);
 });
 
-it('lists the lot 1a permission catalogue', function () {
-    expect(Permissions::all())->toBe([
+it('lists the core permission catalogue, then the modules\' permissions', function () {
+    expect(array_slice(Permissions::all(), 0, 7))->toBe([
         'users.manage', 'companies.manage', 'references.manage', 'connectors.manage',
         'audit.view', 'settings.manage', 'exports.run',
-    ]);
+    ])
+        ->and(array_slice(Permissions::all(), 7))->toBe(App\Modules\Crm\Permissions::all());
 });
 
 it('seeds the roles and the default matrix for a tenant', function () {
@@ -42,10 +43,11 @@ it('seeds the roles and the default matrix for a tenant', function () {
             'admin_organisme', 'assistant', 'charge_relations', 'commercial', 'direction', 'responsable_das',
         ]);
 
+        // Core permissions only (the modules' defaults are tested with PermissionSync).
         $matrix = RoleModel::query()->with('permissions')->get()
-            ->mapWithKeys(fn (RoleModel $r) => [$r->name => $r->permissions->pluck('name')->sort()->values()->all()]);
+            ->mapWithKeys(fn (RoleModel $r) => [$r->name => $r->permissions->pluck('name')->reject(fn ($p) => str_starts_with($p, 'crm.'))->sort()->values()->all()]);
 
-        expect($matrix['admin_organisme'])->toBe(collect(Permissions::all())->sort()->values()->all())
+        expect($matrix['admin_organisme'])->toBe(collect(Permissions::all())->reject(fn ($p) => str_starts_with($p, 'crm.'))->sort()->values()->all())
             ->and($matrix['direction'])->toBe(['audit.view', 'exports.run'])
             ->and($matrix['commercial'])->toBe([])
             ->and($matrix['charge_relations'])->toBe([])
@@ -60,7 +62,8 @@ it('does not overwrite the matrix of an existing role when seeding again', funct
 
     RoleSeeder::seedFor($tenant);
 
-    expect(RoleModel::findByName('direction')->permissions->pluck('name')->all())->toBe(['audit.view']);
+    expect(RoleModel::findByName('direction')->permissions->pluck('name')->all())
+        ->toEqualCanonicalizing(['audit.view', 'crm.view', 'crm.export', 'crm.gdpr']);
 });
 
 // ---------------------------------------------------------------- authorization
@@ -159,7 +162,7 @@ it('roles are isolated per tenant', function () {
             ->and(RoleModel::withoutGlobalScopes()->where('tenant_id', $a->id)->count())->toBe(0)
             ->and(DB::table('model_has_roles')->where('model_id', $adminA->id)->count())->toBe(0)
             ->and(DB::table('model_has_roles')->count())->toBe(2)
-            ->and(DB::table('role_has_permissions')->count())->toBe(count(Permissions::all()) + 2);
+            ->and(DB::table('role_has_permissions')->count())->toBe(collect(Role::cases())->sum(fn (Role $r) => count(Permissions::defaultsFor($r))));
 
         // A's user (loaded in A) has no role here, hence no permission.
         $adminA->unsetRelation('roles')->unsetRelation('permissions');
@@ -211,7 +214,7 @@ it('opens Horizon to platform administrators only', function () {
     $platform = User::factory()->create();
     $platform->forceFill(['is_platform_admin' => true])->save();
 
-    expect(Illuminate\Support\Facades\Gate::forUser($admin)->allows('viewHorizon'))->toBeFalse()
-        ->and(Illuminate\Support\Facades\Gate::forUser($platform)->allows('viewHorizon'))->toBeTrue()
-        ->and(Illuminate\Support\Facades\Gate::forUser(null)->allows('viewHorizon'))->toBeFalse();
+    expect(Gate::forUser($admin)->allows('viewHorizon'))->toBeFalse()
+        ->and(Gate::forUser($platform)->allows('viewHorizon'))->toBeTrue()
+        ->and(Gate::forUser(null)->allows('viewHorizon'))->toBeFalse();
 });
