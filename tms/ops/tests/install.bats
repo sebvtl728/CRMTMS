@@ -41,6 +41,7 @@ build_release() {
     cp "$TMS_ROOT/docker/caddy/Caddyfile" "$stage/docker/caddy/"
     cp "$TMS_ROOT/docker/postgres/init.sh" "$TMS_ROOT/docker/postgres/init.sql" "$stage/docker/postgres/"
     cp "$TMS_ROOT/docs/install.md" "$stage/docs/"
+    echo "BATS_GENERATED_SECRET=__GENERATE__" >>"$stage/.env.prod.example"
     tar -czf "$MOCK_DIST/tms-$FIXTURE_VERSION.tar.gz" -C "$stage" .
     cp "$INSTALL_SH" "$MOCK_DIST/install.sh"
     (cd "$MOCK_DIST" && shasum -a 256 "tms-$FIXTURE_VERSION.tar.gz" install.sh >SHA256SUMS)
@@ -197,6 +198,15 @@ env_value() {
     [ "$(printf '%s' "${key#base64:}" | openssl base64 -d -A | wc -c | tr -d ' ')" -eq 32 ]
     # all passwords differ
     [ "$(grep -E '^(POSTGRES_SUPERUSER_PASSWORD|POSTGRES_OWNER_PASSWORD|POSTGRES_APP_PASSWORD|REDIS_PASSWORD|RESTIC_PASSWORD)=' "$TMS_DIR/.env" | cut -d= -f2- | sort -u | wc -l | tr -d ' ')" -eq 5 ]
+}
+
+@test "KEY=__GENERATE__ in the template gets a random secret" {
+    run bash "$INSTALL_SH"
+    [ "$status" -eq 0 ]
+    local value
+    value="$(env_value BATS_GENERATED_SECRET)"
+    [ "${#value}" -ge 40 ]
+    [ "$value" != "__GENERATE__" ]
 }
 
 @test "env file is mode 600" {

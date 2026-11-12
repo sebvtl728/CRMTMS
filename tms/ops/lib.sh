@@ -121,6 +121,82 @@ fetch_bundle() {
     done
 }
 
+# --- Versions --------------------------------------------------------------------
+
+# semver_cmp <a> <b>: prints -1, 0 or 1 (semantic versioning precedence; build metadata
+# after "+" ignored). Core fields: numeric when both are numbers, else ASCII; missing
+# fields count as 0. A version without pre-release is greater than the same core with
+# one; pre-release identifiers: numeric < alphanumeric, numbers numerically, fewer
+# identifiers lower when all others are equal.
+semver_cmp() {
+    local a="${1%%+*}" b="${2%%+*}" a_pre="" b_pre="" r
+    [[ "$a" != *-* ]] || a_pre="${a#*-}"
+    [[ "$b" != *-* ]] || b_pre="${b#*-}"
+    r="$(semver_ids_cmp "${a%%-*}" "${b%%-*}" core)"
+    if [[ "$r" != 0 ]]; then
+        printf '%s' "$r"
+    elif [[ -z "$a_pre" && -z "$b_pre" ]]; then
+        printf '0'
+    elif [[ -z "$a_pre" ]]; then
+        printf '1'
+    elif [[ -z "$b_pre" ]]; then
+        printf -- '-1'
+    else
+        semver_ids_cmp "$a_pre" "$b_pre" pre
+    fi
+}
+
+# semver_ids_cmp <dotted a> <dotted b> <core|pre>
+semver_ids_cmp() {
+    local LC_ALL=C mode="$3" x y i=0
+    local -a xs ys
+    IFS=. read -r -a xs <<<"$1"
+    IFS=. read -r -a ys <<<"$2"
+    while ((i < ${#xs[@]} || i < ${#ys[@]})); do
+        x="${xs[$i]-}"
+        y="${ys[$i]-}"
+        if [[ "$mode" == "core" ]]; then
+            x="${x:-0}"
+            y="${y:-0}"
+        elif [[ -z "$x" ]]; then
+            printf -- '-1'
+            return 0
+        elif [[ -z "$y" ]]; then
+            printf '1'
+            return 0
+        fi
+        if [[ "$x" =~ ^[0-9]+$ && "$y" =~ ^[0-9]+$ ]]; then
+            x="$(printf '%s' "$x" | sed 's/^0*//')"
+            y="$(printf '%s' "$y" | sed 's/^0*//')"
+            # Compare as digit strings: length first, then lexically (no overflow).
+            if ((${#x} != ${#y})); then
+                ((${#x} < ${#y})) && printf -- '-1' || printf '1'
+                return 0
+            fi
+        elif [[ "$x" =~ ^[0-9]+$ ]]; then
+            printf -- '-1'
+            return 0
+        elif [[ "$y" =~ ^[0-9]+$ ]]; then
+            printf '1'
+            return 0
+        fi
+        if [[ "$x" < "$y" ]]; then
+            printf -- '-1'
+            return 0
+        elif [[ "$x" > "$y" ]]; then
+            printf '1'
+            return 0
+        fi
+        i=$((i + 1))
+    done
+    printf '0'
+}
+
+# version_lt <a> <b>: true when a precedes b (semver_cmp).
+version_lt() {
+    [[ "$(semver_cmp "$1" "$2")" == "-1" ]]
+}
+
 # --- Locking -------------------------------------------------------------------------
 
 # tms_lock [wait seconds]: takes the maintenance lock (fd 9) until the process exits, or

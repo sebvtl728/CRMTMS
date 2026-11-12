@@ -178,22 +178,38 @@ Tant que le dépôt de publication n'est pas renseigné dans les scripts (`TMS_G
 Déroulement :
 
 1. Téléchargement de `SHA256SUMS` et de `tms-<version>.tar.gz`, vérification de la somme de contrôle (la version
-   « dernière » est déterminée une seule fois).
-2. Même version : rien à faire (code 0), sauf `--force`. Version plus ancienne : refusée, sauf `--allow-downgrade`
-   (les migrations ne se défont pas : pour revenir en arrière, préférer `ops/restore.sh` avec le snapshot étiqueté
-   `pre-update-<version>`).
-3. Téléchargement des images de la nouvelle version, avant toute modification.
+   « dernière » est déterminée une seule fois). Le programme de mise à jour **de la nouvelle version** (vérifié)
+   prend alors le relais : les corrections du programme de mise à jour s'appliquent dès la mise à jour qui les
+   apporte.
+2. Même version : rien à faire (code 0), sauf `--force`. Version plus ancienne (ordre « semver » : `0.1.0-rc.1` <
+   `0.1.0` < `0.1.1`) : refusée, sauf `--allow-downgrade` (les migrations ne se défont pas : pour revenir en arrière,
+   préférer `ops/restore.sh` avec le snapshot étiqueté `pre-update-<version>`).
+3. Nouveaux paramètres : les clés de la nouvelle `.env.prod.example` absentes de `.env` y sont ajoutées
+   (`CLÉ=valeur` : valeur par défaut copiée ; `CLÉ=__GENERATE__` : secret aléatoire généré ; `CLÉ=` vide : rien
+   n'est ajouté, paramètre facultatif). Téléchargement des images de la nouvelle version. Rien n'est encore modifié.
 4. Arrêt de app/worker/scheduler (aucune écriture ne peut être perdue), puis sauvegarde restic étiquetée
    `pre-update-<ancienne version>`. Si la sauvegarde échoue, les services redémarrent et rien n'est modifié.
-5. Remplacement des fichiers (`compose.prod.yaml`, `ops/`, `docker/caddy`, `docker/postgres`, `docs/` ; les précédents
-   sont gardés dans `/opt/tms/.bundle-previous`), `TMS_VERSION` dans `.env`, migrations, redémarrage, puis `/health`
-   doit répondre avec la nouvelle version sous 90 s : « Mise à jour vers X.Y.Z réussie ».
+5. L'état de la mise à jour est noté dans `/opt/tms/.update-in-progress` ; fichiers et `.env` précédents gardés dans
+   `/opt/tms/.bundle-previous` ; remplacement des fichiers (`compose.prod.yaml`, `ops/`, `docker/caddy`,
+   `docker/postgres`, `docs/`), nouveau `.env`, migrations, redémarrage, puis `/health` doit répondre avec la
+   nouvelle version sous 90 s : « Mise à jour vers X.Y.Z réussie ».
 
-**Retour arrière automatique** : si une étape du point 5 échoue, les fichiers et la `TMS_VERSION` précédents sont
-remis, la base et `storage/app` sont restaurés depuis la sauvegarde du point 4 (`ops/restore.sh`), la pile redémarre
-sur l'ancienne version ; code de sortie **1** et message « Échec de la mise à jour : retour à <ancienne> ». Si le
-retour arrière échoue lui-même : code **2**, le message donne l'identifiant du snapshot et la commande de
-restauration manuelle (`/opt/tms/ops/restore.sh <snapshot>`).
+**Retour arrière automatique** : si une étape du point 5 échoue (ou en cas d'interruption : Ctrl-C, arrêt,
+déconnexion SSH), les fichiers et le `.env` précédents sont remis, la base et `storage/app` sont restaurés depuis la
+sauvegarde du point 4 (`ops/restore.sh`), la pile redémarre sur l'ancienne version ; code de sortie **1** et message
+« Échec de la mise à jour : retour à <ancienne> ». Si le retour arrière échoue lui-même : code **2**, le message
+donne l'identifiant du snapshot et la commande de restauration manuelle (`/opt/tms/ops/restore.sh <snapshot>`) ;
+supprimer `/opt/tms/.update-in-progress` une fois la situation rétablie.
+
+**Mise à jour interrompue brutalement** (coupure de courant, `kill -9`, `pct stop`, manque de mémoire) : le
+fichier `/opt/tms/.update-in-progress` reste en place. Relancer simplement `/opt/tms/ops/update.sh` : il effectue
+d'abord le retour arrière à partir de l'état noté (fichiers, `.env`, snapshot), puis s'arrête (code 1) ; relancer
+ensuite la mise à jour. Si `/opt/tms/ops/update.sh` est absent (interruption pendant le remplacement des fichiers) :
+`TMS_DIR=/opt/tms /opt/tms/.bundle-previous/ops/update.sh`. Si les services app/worker/scheduler restent arrêtés
+sans ce fichier (interruption pendant la sauvegarde), rien n'a changé :
+`docker compose -f /opt/tms/compose.prod.yaml --env-file /opt/tms/.env up -d`.
+
+Chaque exécution ajoute son résultat à `/opt/tms/logs/update.log`.
 
 Une mise à jour, une sauvegarde et une restauration ne peuvent pas tourner en même temps (verrou
 `/opt/tms/.ops.lock`) : la mise à jour et la restauration refusent immédiatement ; la sauvegarde attend jusqu'à
@@ -232,7 +248,10 @@ Si l'installation échoue après la création de `.env`, le message indique comm
 Fichiers attachés à chaque version : `tms-<version>.tar.gz` (à la racine de l'archive : `compose.prod.yaml`,
 `.env.prod.example`, `ops/`, `docker/caddy/Caddyfile`, `docker/postgres/init.sh`, `docker/postgres/init.sql`,
 `docs/install.md`), `SHA256SUMS` (format `sha256sum`, liste **l'archive et `install.sh`**), `install.sh`,
-`proxmox.sh`. Image : `ghcr.io/<propriétaire>/tms:<version>`.
+`proxmox.sh`. Image : `ghcr.io/<propriétaire>/tms:<version>`. Nouveau paramètre : l'ajouter à `.env.prod.example`
+(valeur par défaut, ou `__GENERATE__` pour un secret). Le programme de mise à jour de la version précédente lance
+`ops/update.sh` de la nouvelle avec `TMS_UPDATE_REEXEC=1 … --version <version> --bundle-dir <dossier>` : cette
+interface doit rester stable.
 
 ### Validation manuelle sur Proxmox (à réaliser à chaque version)
 

@@ -300,6 +300,8 @@ write_env() {
             if [[ "$line" =~ ^([A-Z_][A-Z0-9_]*)= ]]; then
                 key="${BASH_REMATCH[1]}"
                 value="$(env_value "$key")"
+                # Template convention: KEY=__GENERATE__ -> random secret.
+                [[ -n "$value" || "${line#*=}" != "__GENERATE__" ]] || value="$(gen_secret 32)"
                 if [[ -n "$value" ]]; then
                     printf '%s=%s\n' "$key" "$value"
                     written+="$key "

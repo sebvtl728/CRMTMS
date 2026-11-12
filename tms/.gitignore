@@ -24,3 +24,7 @@ Homestead.yaml
 npm-debug.log
 yarn-error.log
 /.ops.lock
+/.update-in-progress
+/.bundle-previous/
+/.bundle-new/
+/logs/

@@ -3,7 +3,9 @@
 # installed from a copy of the release bundle (STACK_INSTALL=1, see helpers.bash).
 #
 # The "releases" are served from a local directory (TMS_DIST_URL=file://…), no network:
-#   test-ok       current code + a harmless migration (creates bats_update_ok)
+#   test-ok       current code + a harmless migration (creates bats_update_ok); its bundle
+#                 adds two keys required by compose.prod.yaml (a default and a
+#                 __GENERATE__ secret) and an updater printing a marker (re-exec check)
 #   test-broken   current code + a migration that commits (bats_update_partial)
 #                 then one that throws
 #   test-sabotage bundle whose ops/migrate.sh wipes the restic snapshots then fails,
@@ -71,6 +73,15 @@ release_archive() {
     rm -rf "$stage"
     copy_bundle "$stage"
     printf '%s\n' "$version" >"$stage/docs/bats-release.txt"
+    if [[ "$version" == "test-ok" ]]; then
+        # The new release's own updater must be the one that runs.
+        awk '{ print } /^source .*lib\.sh"$/ { print "log_info \"bats-reexec : programme de mise à jour de la version publiée\"" }' \
+            "$TMS_ROOT/ops/update.sh" >"$stage/ops/update.sh"
+        # New settings, required by the new compose file.
+        printf 'BATS_NEW_KEY=valeur-par-defaut\nBATS_NEW_SECRET=__GENERATE__\nBATS_NEW_OPTIONAL=\n' >>"$stage/.env.prod.example"
+        awk '{ print } /^x-app-env: &app-env$/ { print "  BATS_NEW_KEY: ${BATS_NEW_KEY:?BATS_NEW_KEY is required}"; print "  BATS_NEW_SECRET: ${BATS_NEW_SECRET:?BATS_NEW_SECRET is required}" }' \
+            "$TMS_ROOT/compose.prod.yaml" >"$stage/compose.prod.yaml"
+    fi
     if [[ "$version" == "test-sabotage" ]]; then
         cat >"$stage/ops/migrate.sh" <<'SH'
 #!/usr/bin/env bash
@@ -188,6 +199,8 @@ refute() {
     load_env
     run restic_run -- snapshots --json --tag pre-update-bats
     [[ "$output" == *'"pre-update-bats"'* ]] || false
+    [ ! -f "$TMS_DIR/.update-in-progress" ]
+    grep -q "retour à bats effectué (code 1)" "$TMS_DIR/logs/update.log"
 }
 
 @test "a rollback that cannot restore exits 2 naming the snapshot and the manual command" {
@@ -195,19 +208,62 @@ refute() {
     [ "$status" -eq 2 ]
     [[ "$output" == *"ops/restore.sh "* ]] || false
     [[ "$output" =~ snapshot\ [0-9a-f]{8,} ]] || false
-    # files and version were put back anyway
+    # files and version were put back anyway; the state is kept for the next attempt
     [ "$(env_version)" = "bats" ]
     [ ! -f "$TMS_DIR/docs/bats-release.txt" ]
+    grep -q "^SNAPSHOT=[0-9a-f]" "$TMS_DIR/.update-in-progress"
+    grep -q "code 2" "$TMS_DIR/logs/update.log"
+    # operator side: state cleared once the situation is handled
+    rm -f "$TMS_DIR/.update-in-progress"
 
     # the migration never ran: restart the stack on the previous version for the next tests
     compose up -d --wait >&2
     wait_health 120 bats
 }
 
+@test "a hard kill during the switch is rolled back by the next run" {
+    TMS_UPDATE_TEST_KILL=after-env run "$TMS_DIR/ops/update.sh" --version test-ok
+    [ "$status" -eq 137 ]
+    # killed with the new .env and files in place and the services stopped
+    [ -f "$TMS_DIR/.update-in-progress" ]
+    [ "$(env_version)" = "test-ok" ]
+
+    run "$TMS_DIR/ops/update.sh" --version test-ok
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"Mise à jour interrompue détectée"* ]] || false
+    [[ "$output" == *"Échec de la mise à jour : retour à bats"* ]] || false
+    [[ "$output" != *"déjà en version"* ]] || false
+    [ ! -f "$TMS_DIR/.update-in-progress" ]
+    [ "$(env_version)" = "bats" ]
+    refute grep -q "^BATS_NEW_KEY=" "$TMS_ENV_FILE"
+    [ "$(file_mode "$TMS_ENV_FILE")" = "600" ]
+    [ ! -f "$TMS_DIR/docs/bats-release.txt" ]
+    [ "$(psql_owner "select count(*) from companies where name = 'bats-avant-maj'")" -eq 1 ]
+    run health
+    [[ "$output" == *'"status":"ok"'* ]] || false
+    [[ "$output" == *'"version":"bats"'* ]] || false
+}
+
 @test "update succeeds and records version" {
     run "$TMS_DIR/ops/update.sh" --version test-ok
     [ "$status" -eq 0 ]
     [[ "$output" == *"Mise à jour vers test-ok réussie"* ]] || false
+    # the verified updater of the new release ran (re-exec)
+    [[ "$output" == *"bats-reexec : programme de mise à jour de la version publiée"* ]] || false
+    # new settings merged into .env: default copied, secret generated, empty one skipped
+    grep -q "^BATS_NEW_KEY=valeur-par-defaut$" "$TMS_ENV_FILE"
+    secret=$(sed -n 's/^BATS_NEW_SECRET=//p' "$TMS_ENV_FILE")
+    [ "${#secret}" -ge 40 ]
+    [ "$secret" != "__GENERATE__" ]
+    refute grep -q "^BATS_NEW_OPTIONAL=" "$TMS_ENV_FILE"
+    [[ "$output" != *"$secret"* ]] || false
+    run compose exec -T app printenv BATS_NEW_KEY
+    [ "$output" = "valeur-par-defaut" ]
+    # previous .env kept, state cleared, outcome logged
+    refute grep -q "^BATS_NEW_KEY=" "$TMS_DIR/.bundle-previous/.env"
+    [ "$(file_mode "$TMS_DIR/.bundle-previous/.env")" = "600" ]
+    [ ! -f "$TMS_DIR/.update-in-progress" ]
+    grep -q "bats -> test-ok : réussie" "$TMS_DIR/logs/update.log"
 
     [ "$(env_version)" = "test-ok" ]
     [ "$(file_mode "$TMS_ENV_FILE")" = "600" ]
@@ -239,6 +295,12 @@ refute() {
     [ "$(env_version)" = "test-ok" ]
     run health
     [[ "$output" == *'"version":"test-ok"'* ]] || false
+}
+
+@test "--bundle-dir is refused outside the re-exec" {
+    run "$TMS_DIR/ops/update.sh" --version test-ok --bundle-dir /tmp
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"--bundle-dir"* ]] || false
 }
 
 @test "update rejects a tampered archive before changing anything" {
