@@ -8,7 +8,10 @@ use App\Modules\Connectors\Smtp\TenantMailer;
 use App\Modules\Core\Access\Role;
 use App\Modules\Core\Audit\AuditRecorder;
 use App\Modules\Core\Companies\Company;
+use App\Modules\Core\References\ReferenceItem;
+use App\Modules\Core\References\ReferenceList;
 use App\Modules\Core\Tenancy\TenantContext;
+use App\Modules\Crm\Visibility\CrmVisibility;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
@@ -31,8 +34,12 @@ class InvitationController extends Controller
             'status' => $request->session()->get('status'),
             'warning' => $request->session()->get('warning'),
             'activationLink' => $request->session()->get('activation_link'),
-            'users' => User::query()->orderBy('name')->get()->map(fn (User $user) => [
+            // « DAS suivis » of the Responsable DAS (CRM visibility), edited from this page.
+            'dasOptions' => ReferenceItem::options(ReferenceList::Das)->map(fn (ReferenceItem $i) => ['value' => $i->id, 'label' => $i->label])->values(),
+            'users' => User::query()->with('roles')->orderBy('name')->get()->map(fn (User $user) => [
                 'id' => $user->id,
+                'role' => $user->role()?->value,
+                'das_ids' => CrmVisibility::followedDas($user),
                 'name' => $user->name,
                 'email' => $user->email,
                 'active' => $user->isActive(),
