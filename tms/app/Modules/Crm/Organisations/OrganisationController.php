@@ -36,7 +36,7 @@ class OrganisationController extends Controller
         $canDelete = $user->can(Permissions::DELETE);
 
         $filters = [
-            'q' => trim((string) $request->query('q', '')),
+            'q' => is_string($request->query('q')) ? trim($request->query('q')) : '',
             'status' => $this->enumOrNull($request->query('status')),
             'das' => $this->idOrNull($request->query('das')),
             'sector' => $this->idOrNull($request->query('sector')),
@@ -44,7 +44,7 @@ class OrganisationController extends Controller
             'origin' => $this->idOrNull($request->query('origin')),
             'mine' => $request->boolean('mine'),
             'trashed' => $canDelete && $request->boolean('trashed'),
-            'sort' => in_array($request->query('sort'), self::SORTS, true) ? (string) $request->query('sort') : 'name',
+            'sort' => is_string($request->query('sort')) && in_array($request->query('sort'), self::SORTS, true) ? $request->query('sort') : 'name',
             'dir' => $request->query('dir') === 'desc' ? 'desc' : 'asc',
         ];
 
@@ -100,7 +100,7 @@ class OrganisationController extends Controller
 
         return Inertia::render('crm/organisations/form', [
             'organisation' => null,
-            'options' => $this->formOptions(),
+            'options' => $this->formOptions(null),
         ]);
     }
 
@@ -157,7 +157,7 @@ class OrganisationController extends Controller
                 'status' => $organisation->status->value,
                 'das_ids' => $organisation->das()->pluck('reference_items.id')->all(),
             ],
-            'options' => $this->formOptions(),
+            'options' => $this->formOptions($organisation),
         ]);
     }
 
@@ -280,29 +280,51 @@ class OrganisationController extends Controller
     }
 
     /**
+     * Select options of the form. The current value of the fiche stays
+     * listed (and labelled) when it is no longer offered: an inactive
+     * reference item, or a deactivated responsible.
+     *
      * @return array<string, list<array{value: string, label: string}>>
      */
-    private function formOptions(): array
+    private function formOptions(?Organisation $current): array
     {
+        $responsible = User::query()->whereNull('deactivated_at')->orderBy('name')->get(['id', 'name'])
+            ->map(fn (User $u) => ['value' => $u->id, 'label' => $u->name])->all();
+
+        if ($current?->responsible_user_id !== null && ! in_array($current->responsible_user_id, array_column($responsible, 'value'), true)) {
+            $user = User::query()->find($current->responsible_user_id);
+            if ($user !== null) {
+                $responsible[] = ['value' => $user->id, 'label' => $user->name.' (désactivé)'];
+            }
+        }
+
         return [
             'status' => OrganisationStatus::options(),
-            'legal_form' => $this->options(ReferenceList::LegalFormOrg),
-            'sector' => $this->options(ReferenceList::Sector),
-            'establishment_type' => $this->options(ReferenceList::EstablishmentType),
-            'company_size' => $this->options(ReferenceList::CompanySize),
-            'origin' => $this->options(ReferenceList::ContactOrigin),
-            'das' => $this->options(ReferenceList::Das),
-            'responsible' => User::query()->whereNull('deactivated_at')->orderBy('name')->get(['id', 'name'])
-                ->map(fn (User $u) => ['value' => $u->id, 'label' => $u->name])->all(),
+            'legal_form' => $this->options(ReferenceList::LegalFormOrg, $current?->legal_form_id),
+            'sector' => $this->options(ReferenceList::Sector, $current?->sector_id),
+            'establishment_type' => $this->options(ReferenceList::EstablishmentType, $current?->establishment_type_id),
+            'company_size' => $this->options(ReferenceList::CompanySize, $current?->company_size_id),
+            'origin' => $this->options(ReferenceList::ContactOrigin, $current?->origin_id),
+            'das' => $this->options(ReferenceList::Das, null, $current === null ? [] : $current->das()->pluck('reference_items.id')->all()),
+            'responsible' => $responsible,
         ];
     }
 
     /**
+     * Active items, plus the given current ones even when inactive.
+     *
+     * @param  list<string>  $currentIds
      * @return list<array{value: string, label: string}>
      */
-    private function options(ReferenceList $list): array
+    private function options(ReferenceList $list, ?string $currentId = null, array $currentIds = []): array
     {
-        return ReferenceItem::options($list)->map(fn (ReferenceItem $i) => ['value' => $i->id, 'label' => $i->label])->values()->all();
+        $keep = array_filter([...$currentIds, $currentId]);
+
+        return ReferenceItem::query()->where('list', $list)
+            ->where(fn ($q) => $q->where('is_active', true)->orWhereIn('id', $keep))
+            ->orderBy('position')->orderBy('label')->get()
+            ->map(fn (ReferenceItem $i) => ['value' => $i->id, 'label' => $i->is_active ? $i->label : $i->label.' (inactif)'])
+            ->values()->all();
     }
 
     private function user(Request $request): User
@@ -315,7 +337,7 @@ class OrganisationController extends Controller
 
     private function enumOrNull(mixed $value): ?string
     {
-        return OrganisationStatus::tryFrom((string) $value)?->value;
+        return is_string($value) ? OrganisationStatus::tryFrom($value)?->value : null;
     }
 
     private function idOrNull(mixed $value): ?string

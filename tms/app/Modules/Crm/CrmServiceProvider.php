@@ -9,9 +9,11 @@ use App\Modules\Core\Users\User;
 use App\Modules\Crm\Organisations\Organisation;
 use App\Modules\Crm\Organisations\OrganisationPolicy;
 use App\Modules\Crm\Visibility\CrmVisibility;
+use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\ServiceProvider;
+use Illuminate\Support\Str;
 
 class CrmServiceProvider extends ServiceProvider
 {
@@ -31,6 +33,11 @@ class CrmServiceProvider extends ServiceProvider
         // A fiche the user may not see is a 404, whatever the action. Trashed
         // fiches resolve too (show, restore): the controller decides.
         Route::bind('organisation', function (string $value): Organisation {
+            // A malformed id is a plain 404 (PostgreSQL would raise on the uuid cast).
+            if (! Str::isUuid($value)) {
+                throw (new ModelNotFoundException)->setModel(Organisation::class, [$value]);
+            }
+
             $query = Organisation::withTrashed();
             $user = request()->user();
 

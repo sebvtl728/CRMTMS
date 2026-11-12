@@ -102,6 +102,7 @@ function ActivationLinkNotice({ warning, link }: { warning: string; link?: strin
 function DasDialog({ user, options, onClose }: { user: UserRow | null; options: { value: string; label: string }[]; onClose: () => void }) {
     const [selected, setSelected] = useState<string[]>(user?.das_ids ?? []);
     const [saving, setSaving] = useState(false);
+    const [error, setError] = useState<string | null>(null);
 
     const toggle = (id: string, checked: boolean) => setSelected((current) => (checked ? [...current, id] : current.filter((d) => d !== id)));
 
@@ -120,6 +121,11 @@ function DasDialog({ user, options, onClose }: { user: UserRow | null; options: 
                         </Label>
                     ))}
                 </div>
+                {error && (
+                    <p role="alert" className="text-sm text-red-600 dark:text-red-400">
+                        {error}
+                    </p>
+                )}
                 <DialogFooter>
                     <Button variant="outline" onClick={onClose}>
                         Annuler
@@ -128,15 +134,15 @@ function DasDialog({ user, options, onClose }: { user: UserRow | null; options: 
                         disabled={saving}
                         onClick={() => {
                             setSaving(true);
+                            setError(null);
                             router.put(
                                 route('admin.users.das', user!.id),
                                 { das_ids: selected },
                                 {
                                     preserveScroll: true,
-                                    onFinish: () => {
-                                        setSaving(false);
-                                        onClose();
-                                    },
+                                    onSuccess: () => onClose(),
+                                    onError: (errors) => setError(Object.values(errors)[0] ?? 'Enregistrement impossible.'),
+                                    onFinish: () => setSaving(false),
                                 },
                             );
                         }}

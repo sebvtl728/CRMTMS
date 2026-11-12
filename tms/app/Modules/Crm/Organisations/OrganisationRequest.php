@@ -67,7 +67,7 @@ class OrganisationRequest extends FormRequest
             'company_size_id' => ['nullable', $this->reference(ReferenceList::CompanySize)],
             'origin_id' => ['nullable', $this->reference(ReferenceList::ContactOrigin)],
             'status' => ['sometimes', Rule::enum(OrganisationStatus::class)],
-            'responsible_user_id' => ['nullable', Rule::exists('users', 'id')->where('tenant_id', app(TenantContext::class)->id())->whereNull('deactivated_at')],
+            'responsible_user_id' => ['nullable', $this->responsibleRule()],
             'email' => ['nullable', 'string', 'email', 'max:255'],
             'phone' => ['nullable', 'string', 'max:30'],
             'website' => ['nullable', 'string', 'url:http,https', 'max:255'],
@@ -80,6 +80,20 @@ class OrganisationRequest extends FormRequest
             'das_ids' => ['sometimes', 'array'],
             'das_ids.*' => ['distinct', $this->reference(ReferenceList::Das)],
         ];
+    }
+
+    /**
+     * An active user of the organisme; a deactivated one only if he already is
+     * the responsible of this entreprise (he may stay until changed).
+     */
+    private function responsibleRule(): Exists
+    {
+        $current = $this->route('organisation');
+        $keep = $current instanceof Organisation ? $current->responsible_user_id : null;
+
+        return Rule::exists('users', 'id')
+            ->where('tenant_id', app(TenantContext::class)->id())
+            ->where(fn ($q) => $q->whereNull('deactivated_at')->when($keep, fn ($q2, $id) => $q2->orWhere('id', $id)));
     }
 
     private function reference(ReferenceList $list): Exists

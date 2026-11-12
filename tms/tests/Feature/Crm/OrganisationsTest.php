@@ -310,3 +310,44 @@ it('refuses DAS on a user who is not Responsable DAS and needs users.manage', fu
 it('shares crm.view with the sidebar for a commercial', function () {
     $this->actingAs(commercial())->get('/dashboard')->assertInertia(fn (Assert $page) => $page->where('auth.permissions', fn ($p) => collect($p)->contains('crm.view')));
 });
+
+it('keeps a deactivated responsible until changed but never assigns a new one', function () {
+    $gone = commercial();
+    $gone->forceFill(['deactivated_at' => now()])->save();
+    $other = commercial();
+    $other->forceFill(['deactivated_at' => now()])->save();
+    $org = org('Responsable parti', ['responsible_user_id' => $gone->id]);
+    $user = commercial();
+
+    $this->actingAs($user)->get("/crm/organisations/{$org->id}/edit")->assertInertia(fn (Assert $page) => $page
+        ->where('options.responsible', fn ($list) => collect($list)->contains(fn ($o) => $o['value'] === $gone->id && str_ends_with($o['label'], '(désactivé)'))));
+
+    $this->put("/crm/organisations/{$org->id}", ['name' => 'Renommée', 'responsible_user_id' => $gone->id])->assertRedirect();
+    expect($org->refresh()->name)->toBe('Renommée')->and($org->responsible_user_id)->toBe($gone->id);
+
+    $this->putJson("/crm/organisations/{$org->id}", ['name' => 'Renommée', 'responsible_user_id' => $other->id])->assertJsonValidationErrors('responsible_user_id');
+    $this->postJson('/crm/organisations', ['name' => 'Neuve', 'responsible_user_id' => $gone->id])->assertJsonValidationErrors('responsible_user_id');
+});
+
+it('shows and keeps an inactive reference value of the fiche', function () {
+    $sector = ref(ReferenceList::Sector, 'Industrie');
+    $org = org('Secteur éteint', ['sector_id' => $sector->id]);
+    $sector->update(['is_active' => false]);
+
+    $this->actingAs(commercial())->get("/crm/organisations/{$org->id}/edit")->assertInertia(fn (Assert $page) => $page
+        ->where('options.sector', fn ($list) => collect($list)->contains(fn ($o) => $o['value'] === $sector->id && $o['label'] === 'Industrie (inactif)')));
+    $this->get('/crm/organisations/create')->assertInertia(fn (Assert $page) => $page
+        ->where('options.sector', fn ($list) => ! collect($list)->contains(fn ($o) => $o['value'] === $sector->id)));
+
+    $this->put("/crm/organisations/{$org->id}", ['name' => 'Secteur éteint', 'sector_id' => $sector->id, 'city' => 'Nice'])->assertRedirect();
+    expect($org->refresh()->sector_id)->toBe($sector->id)->and($org->city)->toBe('Nice');
+});
+
+it('answers 404 to a malformed id and ignores array filters', function () {
+    org('Filtrable');
+    $this->actingAs(commercial());
+
+    $this->get('/crm/organisations/pas-un-uuid')->assertNotFound();
+    $this->get('/crm/organisations?q[]=x&status[]=x&das[]=x&sort[]=x&dir[]=x&sector[]=x&responsible[]=x&origin[]=x')
+        ->assertOk()->assertInertia(fn (Assert $page) => $page->has('organisations.data', 1));
+});
