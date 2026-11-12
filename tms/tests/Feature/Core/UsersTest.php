@@ -1,6 +1,7 @@
 <?php
 
 use App\Modules\Core\Access\Role;
+use App\Modules\Core\Audit\AuditLog;
 use App\Modules\Core\Tenancy\TenantContext;
 use App\Modules\Core\Users\ExternalIdentity;
 use App\Modules\Core\Users\Invitation;
@@ -410,4 +411,14 @@ it('external identities belong to a user of the current tenant', function () {
 
     app(TenantContext::class)->clear();
     expect(ExternalIdentity::withoutGlobalScopes()->count())->toBe(0);
+});
+
+it('audits the invitation event', function () {
+    inTenant();
+    $this->actingAs(admin(twoFactor: true))
+        ->post('/admin/users/invitations', ['email' => 'nouvelle@cap.test', 'name' => 'Nouvelle', 'role' => 'commercial'])
+        ->assertRedirect('/admin/users');
+
+    $log = AuditLog::query()->where('event', 'users.invitation_sent')->sole();
+    expect($log->new_values)->toEqual(['email' => 'nouvelle@cap.test', 'role' => 'commercial']);
 });

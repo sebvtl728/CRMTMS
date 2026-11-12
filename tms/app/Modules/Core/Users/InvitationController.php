@@ -4,6 +4,7 @@ namespace App\Modules\Core\Users;
 
 use App\Http\Controllers\Controller;
 use App\Modules\Core\Access\Role;
+use App\Modules\Core\Audit\AuditRecorder;
 use App\Modules\Core\Tenancy\TenantContext;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -17,7 +18,7 @@ use Inertia\Response;
  */
 class InvitationController extends Controller
 {
-    public function __construct(private readonly TenantContext $tenants) {}
+    public function __construct(private readonly TenantContext $tenants, private readonly AuditRecorder $audit) {}
 
     public function index(Request $request): Response
     {
@@ -76,6 +77,8 @@ class InvitationController extends Controller
             name: $invitation->name,
             organisation: $this->tenants->current()->name ?? (string) config('app.name'),
         ));
+
+        $this->audit->record('users.invitation_sent', $invitation, [], ['email' => $invitation->email, 'role' => $invitation->role->value]);
 
         return to_route('admin.users.index')->with('status', 'Invitation envoyée à '.$invitation->email.'.');
     }

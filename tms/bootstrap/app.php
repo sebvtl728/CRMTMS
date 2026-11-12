@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Middleware\HandleInertiaRequests;
+use App\Modules\Core\Security\EnforceIdleTimeout;
 use App\Modules\Core\Security\SecurityHeaders;
 use App\Modules\Core\Tenancy\ResolveTenant;
 use App\Modules\Core\Users\EnsureTwoFactorEnrolled;
@@ -41,6 +42,7 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->prependToPriorityList(before: EncryptCookies::class, prepend: ResolveTenant::class);
 
         $middleware->web(append: [
+            EnforceIdleTimeout::class,
             HandleInertiaRequests::class,
             AddLinkHeadersForPreloadedAssets::class,
             // Every web route, so a new route can never skip mandatory 2FA.

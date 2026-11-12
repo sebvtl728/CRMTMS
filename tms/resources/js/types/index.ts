@@ -2,13 +2,8 @@ import { LucideIcon } from 'lucide-react';
 
 export interface Auth {
     user: User;
-    can: {
-        manageUsers: boolean;
-        viewAudit: boolean;
-        manageCompanies: boolean;
-        manageReferences: boolean;
-        manageConnectors: boolean;
-    };
+    /** Permission names held by the user (e.g. "users.manage"). */
+    permissions: string[];
 }
 
 export interface BreadcrumbItem {
@@ -39,9 +34,9 @@ export interface User {
     id: string;
     name: string;
     email: string;
-    avatar?: string;
     email_verified_at: string | null;
-    created_at: string;
-    updated_at: string;
-    [key: string]: unknown; // This allows for additional properties...
+    /** Role label, null without role. */
+    role: string | null;
+    two_factor_enabled: boolean;
+    avatar?: string;
 }

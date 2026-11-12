@@ -2,6 +2,8 @@
 
 namespace App\Http\Middleware;
 
+use App\Modules\Core\Access\Permissions;
+use App\Modules\Core\Users\User;
 use Illuminate\Foundation\Inspiring;
 use Illuminate\Http\Request;
 use Inertia\Middleware;
@@ -36,6 +38,7 @@ class HandleInertiaRequests extends Middleware
      */
     public function share(Request $request): array
     {
+        $user = $request->user() instanceof User ? $request->user() : null;
         [$message, $author] = str(Inspiring::quotes()->random())->explode('-');
 
         return array_merge(parent::share($request), [
@@ -43,14 +46,16 @@ class HandleInertiaRequests extends Middleware
             'name' => config('app.name'),
             'quote' => ['message' => trim($message), 'author' => trim($author)],
             'auth' => [
-                'user' => $request->user(),
-                'can' => [
-                    'manageUsers' => $request->user()?->can('users.manage') ?? false,
-                    'manageCompanies' => $request->user()?->can('companies.manage') ?? false,
-                    'manageReferences' => $request->user()?->can('references.manage') ?? false,
-                    'manageConnectors' => $request->user()?->can('connectors.manage') ?? false,
-                    'viewAudit' => $request->user()?->can('audit.view') ?? false,
+                'user' => $user === null ? null : [
+                    'id' => $user->id,
+                    'name' => $user->name,
+                    'email' => $user->email,
+                    'email_verified_at' => $user->email_verified_at?->toIso8601String(),
+                    'role' => $user->role()?->label(),
+                    'two_factor_enabled' => $user->hasTwoFactorEnabled(),
                 ],
+                // Names only: the menu and pages adapt, the server stays the authority.
+                'permissions' => $user === null ? [] : array_values(array_filter(Permissions::all(), fn (string $p) => $user->can($p))),
             ],
         ]);
     }

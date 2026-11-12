@@ -15,6 +15,9 @@ return [
     // Recipient of the operational alerts (failed backups...), see `php artisan tms:alert`.
     'alert_email' => env('TMS_ALERT_EMAIL'),
 
+    // Follow the Vite dev server (public/hot) when it runs; false = always serve public/build (e2e stack).
+    'vite_hot' => (bool) env('TMS_VITE_HOT', true),
+
     'tenancy' => [
 
         // Database connection whose session carries app.tenant_id (runtime role tms_app).

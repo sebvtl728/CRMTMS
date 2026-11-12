@@ -1,42 +1,26 @@
-import { NavFooter } from '@/components/nav-footer';
 import { NavMain } from '@/components/nav-main';
 import { NavUser } from '@/components/nav-user';
 import { Sidebar, SidebarContent, SidebarFooter, SidebarHeader, SidebarMenu, SidebarMenuButton, SidebarMenuItem } from '@/components/ui/sidebar';
 import { type NavItem, type SharedData } from '@/types';
 import { Link, usePage } from '@inertiajs/react';
-import { BookOpen, Folder, Building2, History, LayoutGrid, ListChecks, Plug, Users } from 'lucide-react';
+import { Building2, History, LayoutGrid, ListChecks, Plug, ShieldCheck, Users } from 'lucide-react';
 import AppLogo from './app-logo';
 
-const mainNavItems: NavItem[] = [
-    {
-        title: 'Dashboard',
-        url: '/dashboard',
-        icon: LayoutGrid,
-    },
-];
+const homeNavItems: NavItem[] = [{ title: 'Accueil', url: '/dashboard', icon: LayoutGrid }];
 
-const footerNavItems: NavItem[] = [
-    {
-        title: 'Repository',
-        url: 'https://github.com/laravel/react-starter-kit',
-        icon: Folder,
-    },
-    {
-        title: 'Documentation',
-        url: 'https://laravel.com/docs/starter-kits',
-        icon: BookOpen,
-    },
+// Each entry is shown only when the user holds the permission (the server stays the authority).
+const adminNavItems: (NavItem & { permission: string })[] = [
+    { title: 'Sociétés', url: '/admin/companies', icon: Building2, permission: 'companies.manage' },
+    { title: 'Utilisateurs', url: '/admin/users', icon: Users, permission: 'users.manage' },
+    { title: 'Référentiels', url: '/admin/references', icon: ListChecks, permission: 'references.manage' },
+    { title: 'Connecteurs', url: '/admin/connectors', icon: Plug, permission: 'connectors.manage' },
+    { title: "Journal d'audit", url: '/admin/audit', icon: History, permission: 'audit.view' },
+    { title: 'Sécurité', url: '/admin/security', icon: ShieldCheck, permission: 'settings.manage' },
 ];
-
-const usersNavItem: NavItem = { title: 'Utilisateurs', url: '/admin/users', icon: Users };
-const companiesNavItem: NavItem = { title: 'Sociétés', url: '/admin/companies', icon: Building2 };
-const referencesNavItem: NavItem = { title: 'Référentiels', url: '/admin/references', icon: ListChecks };
-const connectorsNavItem: NavItem = { title: 'Connecteurs', url: '/admin/connectors', icon: Plug };
-const auditNavItem: NavItem = { title: "Journal d'audit", url: '/admin/audit', icon: History };
 
 export function AppSidebar() {
     const { auth } = usePage<SharedData>().props;
-    const navItems = [...mainNavItems, ...(auth.can.manageUsers ? [usersNavItem] : []), ...(auth.can.manageCompanies ? [companiesNavItem] : []), ...(auth.can.manageReferences ? [referencesNavItem] : []), ...(auth.can.manageConnectors ? [connectorsNavItem] : []), ...(auth.can.viewAudit ? [auditNavItem] : [])];
+    const adminItems = adminNavItems.filter((item) => auth.permissions.includes(item.permission));
 
     return (
         <Sidebar collapsible="icon" variant="inset">
@@ -53,11 +37,11 @@ export function AppSidebar() {
             </SidebarHeader>
 
             <SidebarContent>
-                <NavMain items={navItems} />
+                <NavMain items={homeNavItems} label="Navigation" />
+                {adminItems.length > 0 && <NavMain items={adminItems} label="Administration" />}
             </SidebarContent>
 
             <SidebarFooter>
-                <NavFooter items={footerNavItems} className="mt-auto" />
                 <NavUser />
             </SidebarFooter>
         </Sidebar>
