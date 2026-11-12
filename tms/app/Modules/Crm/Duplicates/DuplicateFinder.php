@@ -16,7 +16,8 @@ use Illuminate\Support\Collection;
  * postal code or city (score = similarity). At most 5, best first.
  *
  * Every query runs under RLS (current organisme only) on non-trashed fiches,
- * through an index (see migration 2026_11_17_000001) and with a LIMIT.
+ * with a LIMIT, through an index on a stored key column (migration
+ * 2026_11_19_000004: under RLS, expression indexes are not used).
  */
 class DuplicateFinder
 {
@@ -41,21 +42,22 @@ class DuplicateFinder
         $siret = self::text($attributes['siret'] ?? null);
         if ($siret !== null) {
             $siret = preg_replace('/[\s.]/u', '', $siret) ?? $siret;
-            $found = $found->concat($this->candidates($base()->where('siret', $siret), $label, 'siret', 1.0));
+            // Stored as char(14): compared as such, so the unique index is used
+            // (a text parameter would cast the column). Anything else matches nothing.
+            if (preg_match('/^\d{14}$/', $siret) === 1) {
+                $found = $found->concat($this->candidates($base()->whereRaw('organisations.siret = ?::char(14)', [$siret]), $label, 'siret', 1.0));
+            }
         }
 
         $email = self::email($attributes['email'] ?? null);
         if ($email !== null) {
-            $found = $found->concat($this->candidates($base()->whereNotNull('email')->whereRaw('lower(organisations.email) = ?', [$email]), $label, 'email', 0.95));
+            $found = $found->concat($this->candidates($base()->where('organisations.dup_email', $email), $label, 'email', 0.95));
         }
 
-        // Entreprise phones are stored as typed: compared on their digits.
+        // Entreprise phones are stored as typed: compared on their digits (dup_phone).
         $phones = self::phoneDigits($attributes['phone'] ?? null);
         if ($phones !== []) {
-            $placeholders = implode(',', array_fill(0, count($phones), '?'));
-            $found = $found->concat($this->candidates(
-                $base()->whereNotNull('phone')->whereRaw("regexp_replace(organisations.phone, '\\D', '', 'g') in ({$placeholders})", $phones),
-                $label, 'phone', 0.9));
+            $found = $found->concat($this->candidates($base()->whereIn('organisations.dup_phone', $phones), $label, 'phone', 0.9));
         }
 
         $name = self::text($attributes['name'] ?? null);
@@ -79,8 +81,7 @@ class DuplicateFinder
         $emails = array_values(array_unique(array_filter([self::email($attributes['email'] ?? null), self::email($attributes['email_secondary'] ?? null)])));
         foreach ($emails as $email) {
             $found = $found->concat($this->candidates($base()->where(fn (Builder $q) => $q
-                ->where(fn (Builder $e) => $e->whereNotNull('email')->whereRaw('lower(people.email) = ?', [$email]))
-                ->orWhere(fn (Builder $e) => $e->whereNotNull('email_secondary')->whereRaw('lower(people.email_secondary) = ?', [$email]))),
+                ->where('people.dup_email', $email)->orWhere('people.dup_email_secondary', $email)),
                 $label, 'email', 0.95));
         }
 
@@ -146,9 +147,10 @@ class DuplicateFinder
             ->selectRaw("similarity({$expression}, public.immutable_unaccent(lower(?))) as name_score", [$name])
             ->whereRaw("{$expression} % public.immutable_unaccent(lower(?))", [$name])
             ->whereRaw("similarity({$expression}, public.immutable_unaccent(lower(?))) >= ?", [$name, self::NAME_THRESHOLD])
+            // Narrowed on the place first (indexed stored keys, usable under RLS).
             ->where(fn (Builder $q) => $q
-                ->when($postalCode, fn (Builder $p, string $v) => $p->orWhereRaw("trim({$table}.postal_code) = ?", [$v]))
-                ->when($city, fn (Builder $c, string $v) => $c->orWhereRaw("public.immutable_unaccent(lower(trim({$table}.city))) = public.immutable_unaccent(lower(?))", [$v])))
+                ->when($postalCode, fn (Builder $p, string $v) => $p->orWhere("{$table}.dup_postal_code", $v))
+                ->when($city, fn (Builder $c, string $v) => $c->orWhereRaw("{$table}.dup_city = public.immutable_unaccent(lower(?))", [$v])))
             ->orderByDesc('name_score')
             ->orderBy("{$table}.id")
             ->limit(self::MAX)

@@ -55,11 +55,19 @@ class Organisation extends Model
     use Auditable, BelongsToTenant, HasUuids, SoftDeletes;
 
     /**
-     * Generated column and bookkeeping (last_contact_at follows the notes): not worth a journal line.
+     * Generated columns (search, duplicate keys: may hold personal data) and
+     * bookkeeping (last_contact_at follows the notes): not journaled.
      *
      * @var list<string>
      */
-    protected array $auditIgnore = ['search_vector', 'created_by', 'updated_by', 'last_contact_at', 'merged_sources'];
+    protected array $auditIgnore = ['search_vector', 'created_by', 'updated_by', 'last_contact_at', 'merged_sources', 'dup_email', 'dup_phone', 'dup_postal_code', 'dup_city'];
+
+    /**
+     * Generated comparison keys of the duplicate detection (never shown).
+     *
+     * @var list<string>
+     */
+    protected $hidden = ['search_vector', 'dup_email', 'dup_phone', 'dup_postal_code', 'dup_city'];
 
     /** @var list<string> */
     protected $fillable = [
