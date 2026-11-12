@@ -36,7 +36,7 @@ class NewPasswordController extends Controller
     {
         $request->validate([
             'token' => 'required',
-            'email' => 'required|email',
+            'email' => 'required|string|email|max:254',
             'password' => ['required', 'confirmed', Rules\Password::defaults()],
         ]);
 

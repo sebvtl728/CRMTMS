@@ -47,7 +47,11 @@ class AuthEventSubscriber
         $email = $event->credentials['email'] ?? null;
         $user = $event->user instanceof User ? $event->user : null;
 
-        $this->recorder->record('auth.failed', null, [], ['email' => is_string($email) ? $email : null], $user);
+        // Bounded: the attempted value comes from an unauthenticated request and
+        // lands in the append-only journal.
+        $email = is_string($email) ? mb_substr($email, 0, 254) : null;
+
+        $this->recorder->record('auth.failed', null, [], ['email' => $email], $user);
     }
 
     public function onTwoFactorEnabled(TwoFactorEnabled $event): void

@@ -56,7 +56,7 @@ class InvitationController extends Controller
 
         $validated = $request->validate([
             'email' => [
-                'required', 'string', 'email', 'max:255',
+                'required', 'string', 'email', 'max:254',
                 // An activated account already uses this address in this organisme.
                 Rule::unique('users', 'email')
                     ->where('tenant_id', $this->tenants->id())

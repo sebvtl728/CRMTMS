@@ -24,7 +24,7 @@ class ProfileUpdateRequest extends FormRequest
                 'string',
                 'lowercase',
                 'email',
-                'max:255',
+                'max:254',
                 // Unique per tenant (users of other tenants are invisible under RLS anyway).
                 Rule::unique(User::class)->where('tenant_id', $this->user()->tenant_id)->ignore($this->user()->id),
             ],

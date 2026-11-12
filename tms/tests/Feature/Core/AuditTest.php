@@ -139,6 +139,27 @@ it('records failed logins with the attempted email, never the password', functio
     expect(json_encode(AuditLog::all()))->not->toContain('faux-mot-de-passe-123');
 });
 
+it('bounds the attempted email of auth forms so audit rows stay small', function () {
+    inTenant();
+    $huge = str_repeat('a', 10000).'@example.test';
+
+    $this->post('/login', ['email' => $huge, 'password' => 'faux-mot-de-passe-123'])->assertSessionHasErrors('email');
+    $this->post('/forgot-password', ['email' => $huge])->assertSessionHasErrors('email');
+    $this->post('/reset-password', ['token' => 'x', 'email' => $huge, 'password' => 'p', 'password_confirmation' => 'p'])
+        ->assertSessionHasErrors('email');
+
+    expect(AuditLog::query()->where('event', 'auth.failed')->get()
+        ->filter(fn (AuditLog $log) => mb_strlen((string) ($log->new_values['email'] ?? '')) > 254))->toBeEmpty();
+});
+
+it('truncates the attempted email recorded on a failed login', function () {
+    inTenant();
+
+    event(new Illuminate\Auth\Events\Failed('web', null, ['email' => str_repeat('b', 5000)]));
+
+    expect(mb_strlen(lastAudit('auth.failed')->new_values['email']))->toBe(254);
+});
+
 it('records a failed login on a deactivated account', function () {
     inTenant();
     $user = User::factory()->create(['password' => AUDIT_PASSWORD, 'deactivated_at' => now()]);
