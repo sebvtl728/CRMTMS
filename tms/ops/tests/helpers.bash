@@ -52,7 +52,7 @@ ENV
     fi
 
     compose up -d --wait >&2 || return 1
-    compose exec -T app php artisan migrate --force --database=pgsql_owner >&2 || return 1
+    "$TMS_ROOT/ops/migrate.sh" >&2 || return 1
     compose exec -T app php artisan db:seed --force >&2 || return 1
     wait_health 120
 }

@@ -107,3 +107,83 @@ teardown_file() {
     [[ "$output" == *'"environment":"production"'* ]]
     [[ "$output" == *'"debug_mode":false'* ]]
 }
+
+@test "owner credentials are not in the long-running containers" {
+    for svc in app worker scheduler; do
+        run compose exec -T "$svc" printenv DB_OWNER_PASSWORD
+        [ -z "$output" ]
+        run compose exec -T "$svc" printenv DB_OWNER_USERNAME
+        [ -z "$output" ]
+    done
+}
+
+@test "restore drops objects created after the snapshot, even with a foreign key to a restored table" {
+    run "$TMS_ROOT/ops/backup.sh"
+    [ "$status" -eq 0 ]
+    snap="${lines[${#lines[@]}-1]}"
+
+    psql_owner "create table bats_extra (id serial primary key, company_id uuid references companies(id))" >/dev/null
+    [ "$(psql_owner "select to_regclass('public.bats_extra') is not null")" = "t" ]
+
+    run "$TMS_ROOT/ops/restore.sh" "$snap"
+    [ "$status" -eq 0 ]
+    [ "$(psql_owner "select to_regclass('public.bats_extra') is null")" = "t" ]
+    [ "$(psql_owner 'select count(*) from companies')" -ge 1 ]
+}
+
+@test "snapshots carry the version tag" {
+    load_env
+    run restic_run -- snapshots --json
+    [[ "$output" == *'"version:bats"'* ]]
+}
+
+@test "backup still succeeds with the app container stopped" {
+    compose stop app worker scheduler >&2
+    run "$TMS_ROOT/ops/backup.sh"
+    status_backup=$status
+    compose up -d --wait >&2
+    [ "$status_backup" -eq 0 ]
+}
+
+@test "failure alert falls back to a one-off container when app is down" {
+    sed -e '/^RESTIC_PASSWORD=/d' "$TMS_ENV_FILE" >"$STACK_DIR/env.alert"
+    echo "TMS_ALERT_EMAIL=ops@example.test" >>"$STACK_DIR/env.alert"
+    compose stop app >&2
+    TMS_ENV_FILE="$STACK_DIR/env.alert" run "$TMS_ROOT/ops/backup.sh"
+    compose up -d --wait >&2
+    [ "$status" -ne 0 ]
+    [[ "$output" == *"RESTIC_PASSWORD"* ]]
+    [[ "$output" == *"Alerte envoyée par e-mail à ops@example.test"* ]]
+}
+
+@test "APP_KEY travels with the snapshot: refused when different, adopted with --with-app-key" {
+    key_script='require "vendor/autoload.php"; $a = require "bootstrap/app.php"; $a->make(Illuminate\Contracts\Console\Kernel::class)->bootstrap();'
+    run compose exec -T app php -r "$key_script"' echo encrypt("secret-ok");'
+    [ "$status" -eq 0 ]
+    enc="$output"
+    compose exec -T app sh -c "printf '%s' '$enc' > storage/app/enc.txt"
+
+    run "$TMS_ROOT/ops/backup.sh"
+    [ "$status" -eq 0 ]
+    snap="${lines[${#lines[@]}-1]}"
+
+    # A "fresh server": another APP_KEY.
+    old_key=$(sed -n 's/^APP_KEY=//p' "$TMS_ENV_FILE")
+    sed -i.bak "s|^APP_KEY=.*|APP_KEY=base64:$(openssl rand -base64 32)|" "$TMS_ENV_FILE"
+    rm -f "$TMS_ENV_FILE.bak"
+    compose up -d --wait >&2
+
+    run "$TMS_ROOT/ops/restore.sh" "$snap"
+    [ "$status" -ne 0 ]
+    [[ "$output" == *"APP_KEY"* ]]
+    [[ "$output" == *"--with-app-key"* ]]
+
+    run "$TMS_ROOT/ops/restore.sh" --with-app-key "$snap"
+    [ "$status" -eq 0 ]
+    [ "$(sed -n 's/^APP_KEY=//p' "$TMS_ENV_FILE")" = "$old_key" ]
+    [ "$(stat -c %a "$TMS_ENV_FILE" 2>/dev/null || stat -f %Lp "$TMS_ENV_FILE")" = "600" ]
+
+    run compose exec -T app php -r "$key_script"' echo decrypt(file_get_contents("storage/app/enc.txt"));'
+    [ "$status" -eq 0 ]
+    [ "$output" = "secret-ok" ]
+}

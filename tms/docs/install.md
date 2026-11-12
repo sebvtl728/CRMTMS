@@ -64,7 +64,7 @@ vues) sont générés au démarrage du conteneur par `docker/entrypoint.sh`.
 docker build -f docker/app.Dockerfile --target prod --build-arg APP_VERSION=1.0.0 -t ghcr.io/<owner>/tms:1.0.0 .
 cp .env.prod.example .env      # puis renseigner les variables (voir le fichier)
 docker compose -f compose.prod.yaml --env-file .env up -d --wait
-docker compose -f compose.prod.yaml --env-file .env exec app php artisan migrate --force --database=pgsql_owner
+ops/migrate.sh   # rôle propriétaire dans un conteneur éphémère uniquement
 ```
 
 Seul Caddy publie des ports (80/443) ; PostgreSQL et Redis ne sont pas exposés. Caddy est la seule
@@ -80,6 +80,13 @@ snapshot ; en cas d'échec un e-mail est envoyé à `TMS_ALERT_EMAIL` (`php arti
 sur l'hôte (restic s'exécute via l'image officielle `restic/restic`).
 
 `ops/restore.sh <snapshot|latest>` arrête app/worker/scheduler, restaure la base (`pg_restore --clean --if-exists`, en
-une transaction) et les fichiers, relance la pile et attend `/health`.
+une transaction, schéma `public` recréé : les objets créés après le snapshot disparaissent) et les fichiers, relance la pile et attend `/health`.
 
 Tests d'intégration (pile jetable, secrets générés) : `bats ops/tests` depuis `tms/` (Docker requis).
+
+**À conserver HORS du serveur : `RESTIC_PASSWORD` et `APP_KEY`.** `APP_KEY` chiffre les secrets des connecteurs et les
+doubles authentifications ; le snapshot (chiffré) en contient une copie (`meta.env`). Sur un serveur neuf, la restauration
+refuse une `APP_KEY` différente ; `ops/restore.sh --with-app-key <snapshot>` adopte celle de la sauvegarde (écrite dans
+`.env`, mode 600). Les snapshots portent l'étiquette `version:<TMS_VERSION>` pour retrouver celui d'une version donnée.
+La sauvegarde lit le volume `storage` directement : elle fonctionne même si le conteneur `app` est arrêté, et l'alerte
+e-mail retombe sur un conteneur éphémère.

@@ -29,8 +29,7 @@ x-app-env: &app-env
   DB_DATABASE: tms
   DB_USERNAME: tms_app
   DB_PASSWORD: ${POSTGRES_APP_PASSWORD:?POSTGRES_APP_PASSWORD is required}
-  DB_OWNER_USERNAME: tms_owner
-  DB_OWNER_PASSWORD: ${POSTGRES_OWNER_PASSWORD:?POSTGRES_OWNER_PASSWORD is required}
+  # No owner credentials here: migrations run through ops/migrate.sh (one-off container).
   SESSION_DRIVER: database
   SESSION_SECURE_COOKIE: "true"
   SESSION_DOMAIN: "null"
@@ -133,9 +132,10 @@ services:
     restart: unless-stopped
     environment:
       POSTGRES_PASSWORD: ${POSTGRES_SUPERUSER_PASSWORD:?POSTGRES_SUPERUSER_PASSWORD is required}
-      POSTGRES_OWNER_PASSWORD: ${POSTGRES_OWNER_PASSWORD}
+      POSTGRES_OWNER_PASSWORD: ${POSTGRES_OWNER_PASSWORD:?POSTGRES_OWNER_PASSWORD is required}
       POSTGRES_APP_PASSWORD: ${POSTGRES_APP_PASSWORD}
       INIT_SQL: /opt/tms/init.sql
+      TMS_NO_TEST_DB: "1"
     volumes:
       - pgdata:/var/lib/postgresql/data
       - ./docker/postgres/init.sh:/docker-entrypoint-initdb.d/10-init.sh:ro

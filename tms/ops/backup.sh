@@ -39,9 +39,14 @@ done
 send_alert() {
     local message="$1"
     [[ -n "${TMS_ALERT_EMAIL:-}" ]] || { log_info "TMS_ALERT_EMAIL non défini : aucune alerte envoyée."; return 0; }
-    compose exec -T app php artisan tms:alert "$message" \
-        --subject="[TMS] Échec de la sauvegarde" >/dev/null 2>&1 \
-        || log_error "Impossible d'envoyer l'alerte par e-mail à ${TMS_ALERT_EMAIL}."
+    # The likeliest failure is a stopped or crash-looping app container: fall back to a
+    # one-off container of the same image when exec is impossible.
+    if compose exec -T app php artisan tms:alert "$message" --subject="[TMS] Échec de la sauvegarde" >/dev/null 2>&1 \
+        || compose run --rm --no-deps -T app php artisan tms:alert "$message" --subject="[TMS] Échec de la sauvegarde" >/dev/null 2>&1; then
+        log_info "Alerte envoyée par e-mail à ${TMS_ALERT_EMAIL}."
+    else
+        log_error "Impossible d'envoyer l'alerte par e-mail à ${TMS_ALERT_EMAIL}."
+    fi
 }
 
 on_exit() {
@@ -77,14 +82,25 @@ compose exec -T postgres pg_dump -U postgres -d tms -Fc \
 compose exec -T postgres pg_restore -l <"$STAGE/db.dump" >/dev/null || die "L'export de la base de données est illisible."
 
 log_info "Archivage de storage/app."
-compose exec -T app tar -C /var/www/html/storage -cf - app >"$STAGE/storage-app.tar" || die "Échec de l'archivage de storage/app."
+# Read straight from the storage volume: works even when the app container is down.
+project="$(compose config | sed -n 's/^name: *//p' | head -n 1)"
+volume="$(docker volume ls -q --filter "label=com.docker.compose.project=${project}" --filter "label=com.docker.compose.volume=storage" | head -n 1)"
+[[ -n "$volume" ]] || die "Volume storage introuvable pour le projet ${project}."
+docker run --rm -v "${volume}:/s:ro" --entrypoint tar "$RESTIC_IMAGE" -C /s -cf - app >"$STAGE/storage-app.tar" \
+    || die "Échec de l'archivage de storage/app."
 [[ -s "$STAGE/storage-app.tar" ]] || die "L'archive de storage/app est vide."
+
+# APP_KEY encrypts connector secrets and 2FA secrets: without it a restored database is
+# unusable on a fresh server. It travels inside the (encrypted) snapshot.
+printf 'APP_KEY=%s\nTMS_VERSION=%s\n' "${APP_KEY:-}" "${TMS_VERSION:-}" >"$STAGE/meta.env"
+chmod 600 "$STAGE/meta.env"
 
 ensure_repo
 
 log_info "Création du snapshot restic."
 tag_args=(--tag tms)
 [[ -z "$TAG" ]] || tag_args+=(--tag "$TAG")
+[[ -z "${TMS_VERSION:-}" ]] || tag_args+=(--tag "version:${TMS_VERSION}")
 summary="$(restic_run -v "$STAGE:/backup-data:ro" -- backup --host tms --json "${tag_args[@]}" /backup-data)" \
     || die "Échec de restic backup."
 snapshot_id="$(printf '%s\n' "$summary" | sed -n 's/.*"message_type":"summary".*"snapshot_id":"\([0-9a-f]*\)".*/\1/p' | tail -n 1)"
