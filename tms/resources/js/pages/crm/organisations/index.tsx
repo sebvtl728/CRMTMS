@@ -1,12 +1,12 @@
+import { FilterSelect } from '@/components/crm/filter-select';
 import Heading from '@/components/heading';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import AppLayout from '@/layouts/app-layout';
-import { formatDate, formatSiret, statusVariant, type Option, type StatusValue } from '@/lib/crm';
+import { formatDate, formatSiret, statusVariant, type Option, type Paginated, type StatusValue } from '@/lib/crm';
 import { type BreadcrumbItem } from '@/types';
 import { Head, Link, router } from '@inertiajs/react';
 import { ArrowDown, ArrowUp, ChevronLeft, ChevronRight, Plus } from 'lucide-react';
@@ -24,17 +24,6 @@ interface Row {
     last_contact_at: string | null;
     created_at: string | null;
     deleted: boolean;
-}
-
-interface Paginated<T> {
-    data: T[];
-    total: number;
-    from: number | null;
-    to: number | null;
-    current_page: number;
-    last_page: number;
-    prev_page_url: string | null;
-    next_page_url: string | null;
 }
 
 interface Filters {
@@ -59,38 +48,6 @@ interface IndexProps {
 }
 
 const breadcrumbs: BreadcrumbItem[] = [{ title: 'Entreprises', href: '/crm/organisations' }];
-const ALL = 'all';
-
-function FilterSelect({
-    label,
-    value,
-    options,
-    onChange,
-}: {
-    label: string;
-    value: string | null;
-    options: Option[];
-    onChange: (value: string | null) => void;
-}) {
-    return (
-        <div className="grid gap-1">
-            <Label className="text-xs">{label}</Label>
-            <Select value={value ?? ALL} onValueChange={(v) => onChange(v === ALL ? null : v)}>
-                <SelectTrigger aria-label={label}>
-                    <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                    <SelectItem value={ALL}>Tous</SelectItem>
-                    {options.map((o) => (
-                        <SelectItem key={o.value} value={o.value}>
-                            {o.label}
-                        </SelectItem>
-                    ))}
-                </SelectContent>
-            </Select>
-        </div>
-    );
-}
 
 export default function OrganisationsIndex({ organisations, filters, options, can, status }: IndexProps) {
     const [search, setSearch] = useState(filters.q);

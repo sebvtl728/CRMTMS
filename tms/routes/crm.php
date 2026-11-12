@@ -1,6 +1,8 @@
 <?php
 
+use App\Modules\Crm\Affiliations\AffiliationController;
 use App\Modules\Crm\Organisations\OrganisationController;
+use App\Modules\Crm\People\PersonController;
 use App\Modules\Crm\Visibility\UserDasController;
 use Illuminate\Support\Facades\Route;
 
@@ -14,6 +16,22 @@ Route::middleware(['auth'])->group(function () {
         Route::put('{organisation}', [OrganisationController::class, 'update'])->middleware('can:crm.update')->name('update');
         Route::delete('{organisation}', [OrganisationController::class, 'destroy'])->middleware('can:crm.delete')->name('destroy');
         Route::post('{organisation}/restore', [OrganisationController::class, 'restore'])->middleware('can:crm.delete')->name('restore');
+    });
+
+    Route::post('crm/organisations/{organisation}/affiliations', [AffiliationController::class, 'store'])->middleware('can:crm.update')->name('crm.affiliations.store');
+    Route::put('crm/affiliations/{affiliation}', [AffiliationController::class, 'update'])->middleware('can:crm.update')->name('crm.affiliations.update');
+    Route::delete('crm/affiliations/{affiliation}', [AffiliationController::class, 'destroy'])->middleware('can:crm.update')->name('crm.affiliations.destroy');
+
+    Route::prefix('crm/people')->name('crm.people.')->group(function () {
+        Route::get('/', [PersonController::class, 'index'])->middleware('can:crm.view')->name('index');
+        Route::get('search', [PersonController::class, 'search'])->middleware('can:crm.view')->name('search');
+        Route::get('create', [PersonController::class, 'create'])->middleware('can:crm.create')->name('create');
+        Route::post('/', [PersonController::class, 'store'])->middleware('can:crm.create')->name('store');
+        Route::get('{person}', [PersonController::class, 'show'])->middleware('can:crm.view')->name('show');
+        Route::get('{person}/edit', [PersonController::class, 'edit'])->middleware('can:crm.update')->name('edit');
+        Route::put('{person}', [PersonController::class, 'update'])->middleware('can:crm.update')->name('update');
+        Route::delete('{person}', [PersonController::class, 'destroy'])->middleware('can:crm.delete')->name('destroy');
+        Route::post('{person}/restore', [PersonController::class, 'restore'])->middleware('can:crm.delete')->name('restore');
     });
 
     // DAS followed by a Responsable DAS, set from the users administration page.

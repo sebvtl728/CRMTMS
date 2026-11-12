@@ -8,7 +8,9 @@ use App\Modules\Core\References\ReferenceItem;
 use App\Modules\Core\References\ReferenceList;
 use App\Modules\Core\Tenancy\TenantContext;
 use App\Modules\Core\Users\User;
+use App\Modules\Crm\Affiliations\Affiliation;
 use App\Modules\Crm\Permissions;
+use App\Modules\Crm\Support\FormOptions;
 use App\Modules\Crm\Visibility\CrmVisibility;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\UniqueConstraintViolationException;
@@ -121,6 +123,25 @@ class OrganisationController extends Controller
         $organisation->load(['legalForm', 'sector', 'establishmentType', 'companySize', 'origin', 'responsible', 'das']);
         $label = fn (?ReferenceItem $i) => $i === null ? null : ['id' => $i->id, 'label' => $i->label];
 
+        // Interlocuteurs: referents first, then by name. Ended ones apart.
+        $affiliations = $organisation->affiliations()->with(['person', 'decisionRole'])
+            ->whereHas('person')
+            ->get()
+            ->sortBy(fn (Affiliation $a) => [$a->is_referent ? 0 : 1, mb_strtolower((string) $a->person?->last_name), mb_strtolower((string) $a->person?->first_name)])
+            ->values();
+        $affiliationRow = fn (Affiliation $a) => [
+            'id' => $a->id,
+            'person' => ['id' => $a->person_id, 'name' => $a->person?->fullName(), 'civility' => $a->person?->civility],
+            'job_title' => $a->job_title,
+            'decision_role_id' => $a->decision_role_id,
+            'decision_role' => $label($a->decisionRole),
+            'work_email' => $a->work_email,
+            'work_phone' => $a->work_phone,
+            'is_referent' => $a->is_referent,
+            'started_on' => $a->started_on?->toDateString(),
+            'ended_on' => $a->ended_on?->toDateString(),
+        ];
+
         return Inertia::render('crm/organisations/show', [
             'organisation' => [
                 ...$this->fields($organisation),
@@ -137,7 +158,12 @@ class OrganisationController extends Controller
                 'updated_at' => $organisation->updated_at?->toIso8601String(),
                 'deleted' => $organisation->trashed(),
             ],
+            'affiliations' => $affiliations->whereNull('ended_on')->map($affiliationRow)->values()->all(),
+            'formerAffiliations' => $affiliations->whereNotNull('ended_on')->sortByDesc(fn (Affiliation $a) => $a->ended_on)->map($affiliationRow)->values()->all(),
+            'decisionRoles' => FormOptions::reference(ReferenceList::DecisionRole),
             'can' => [
+                'affiliate' => ! $organisation->trashed() && $user->can('update', $organisation),
+                'createPerson' => $user->can(Permissions::CREATE),
                 'update' => ! $organisation->trashed() && $user->can('update', $organisation),
                 'delete' => ! $organisation->trashed() && $user->can('delete', $organisation),
                 'restore' => $organisation->trashed() && $user->can('restore', $organisation),
@@ -288,16 +314,6 @@ class OrganisationController extends Controller
      */
     private function formOptions(?Organisation $current): array
     {
-        $responsible = User::query()->whereNull('deactivated_at')->orderBy('name')->get(['id', 'name'])
-            ->map(fn (User $u) => ['value' => $u->id, 'label' => $u->name])->all();
-
-        if ($current?->responsible_user_id !== null && ! in_array($current->responsible_user_id, array_column($responsible, 'value'), true)) {
-            $user = User::query()->find($current->responsible_user_id);
-            if ($user !== null) {
-                $responsible[] = ['value' => $user->id, 'label' => $user->name.' (désactivé)'];
-            }
-        }
-
         return [
             'status' => OrganisationStatus::options(),
             'legal_form' => $this->options(ReferenceList::LegalFormOrg, $current?->legal_form_id),
@@ -306,25 +322,17 @@ class OrganisationController extends Controller
             'company_size' => $this->options(ReferenceList::CompanySize, $current?->company_size_id),
             'origin' => $this->options(ReferenceList::ContactOrigin, $current?->origin_id),
             'das' => $this->options(ReferenceList::Das, null, $current === null ? [] : $current->das()->pluck('reference_items.id')->all()),
-            'responsible' => $responsible,
+            'responsible' => FormOptions::responsible($current?->responsible_user_id),
         ];
     }
 
     /**
-     * Active items, plus the given current ones even when inactive.
-     *
      * @param  list<string>  $currentIds
      * @return list<array{value: string, label: string}>
      */
     private function options(ReferenceList $list, ?string $currentId = null, array $currentIds = []): array
     {
-        $keep = array_filter([...$currentIds, $currentId]);
-
-        return ReferenceItem::query()->where('list', $list)
-            ->where(fn ($q) => $q->where('is_active', true)->orWhereIn('id', $keep))
-            ->orderBy('position')->orderBy('label')->get()
-            ->map(fn (ReferenceItem $i) => ['value' => $i->id, 'label' => $i->is_active ? $i->label : $i->label.' (inactif)'])
-            ->values()->all();
+        return FormOptions::reference($list, $currentId, $currentIds);
     }
 
     private function user(Request $request): User

@@ -3,14 +3,13 @@
 namespace App\Modules\Crm\Organisations;
 
 use App\Modules\Core\References\ReferenceList;
-use App\Modules\Core\Tenancy\TenantContext;
 use App\Modules\Core\Users\User;
+use App\Modules\Crm\Support\ReferenceRules;
 use App\Modules\Crm\Visibility\CrmVisibility;
 use App\Rules\Siret;
 use Illuminate\Contracts\Validation\Validator;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
-use Illuminate\Validation\Rules\Exists;
 
 /**
  * Validation of an entreprise (create and update). Authorisation is done by
@@ -57,17 +56,20 @@ class OrganisationRequest extends FormRequest
      */
     public function rules(): array
     {
+        $current = $this->route('organisation');
+        $current = $current instanceof Organisation ? $current : null;
+
         return [
             'name' => ['required', 'string', 'max:255'],
             'siret' => ['nullable', 'string', new Siret],
             'naf_code' => ['nullable', 'string', 'regex:/^\d{2}\.?\d{2}[A-Z]$/'],
-            'legal_form_id' => ['nullable', $this->reference(ReferenceList::LegalFormOrg)],
-            'sector_id' => ['nullable', $this->reference(ReferenceList::Sector)],
-            'establishment_type_id' => ['nullable', $this->reference(ReferenceList::EstablishmentType)],
-            'company_size_id' => ['nullable', $this->reference(ReferenceList::CompanySize)],
-            'origin_id' => ['nullable', $this->reference(ReferenceList::ContactOrigin)],
+            'legal_form_id' => ['nullable', ...ReferenceRules::item(ReferenceList::LegalFormOrg, $current?->legal_form_id)],
+            'sector_id' => ['nullable', ...ReferenceRules::item(ReferenceList::Sector, $current?->sector_id)],
+            'establishment_type_id' => ['nullable', ...ReferenceRules::item(ReferenceList::EstablishmentType, $current?->establishment_type_id)],
+            'company_size_id' => ['nullable', ...ReferenceRules::item(ReferenceList::CompanySize, $current?->company_size_id)],
+            'origin_id' => ['nullable', ...ReferenceRules::item(ReferenceList::ContactOrigin, $current?->origin_id)],
             'status' => ['sometimes', Rule::enum(OrganisationStatus::class)],
-            'responsible_user_id' => ['nullable', $this->responsibleRule()],
+            'responsible_user_id' => ['nullable', ...ReferenceRules::responsible($current?->responsible_user_id)],
             'email' => ['nullable', 'string', 'email', 'max:255'],
             'phone' => ['nullable', 'string', 'max:30'],
             'website' => ['nullable', 'string', 'url:http,https', 'max:255'],
@@ -78,30 +80,8 @@ class OrganisationRequest extends FormRequest
             'country' => ['nullable', 'string', 'size:2', 'alpha'],
             'notes_summary' => ['nullable', 'string', 'max:5000'],
             'das_ids' => ['sometimes', 'array'],
-            'das_ids.*' => ['distinct', $this->reference(ReferenceList::Das)],
+            'das_ids.*' => ['distinct', ...ReferenceRules::item(ReferenceList::Das, $current?->das()->pluck('reference_items.id')->all())],
         ];
-    }
-
-    /**
-     * An active user of the organisme; a deactivated one only if he already is
-     * the responsible of this entreprise (he may stay until changed).
-     */
-    private function responsibleRule(): Exists
-    {
-        $current = $this->route('organisation');
-        $keep = $current instanceof Organisation ? $current->responsible_user_id : null;
-
-        return Rule::exists('users', 'id')
-            ->where('tenant_id', app(TenantContext::class)->id())
-            ->where(fn ($q) => $q->whereNull('deactivated_at')->when($keep, fn ($q2, $id) => $q2->orWhere('id', $id)));
-    }
-
-    private function reference(ReferenceList $list): Exists
-    {
-        return Rule::exists('reference_items', 'id')
-            ->where('tenant_id', app(TenantContext::class)->id())
-            ->where('list', $list->value)
-            ->whereNull('deleted_at');
     }
 
     /**
@@ -120,6 +100,7 @@ class OrganisationRequest extends FormRequest
             'country.alpha' => 'Indiquez le code pays sur 2 lettres (FR).',
             'enum' => 'Cette valeur n\'est pas valide.',
             'distinct' => 'Cette valeur est en double.',
+            'uuid' => 'Cette valeur n\'existe pas ou n\'est plus disponible.',
         ];
     }
 

@@ -1,0 +1,351 @@
+<?php
+
+namespace App\Modules\Crm\People;
+
+use App\Http\Controllers\Controller;
+use App\Modules\Core\Audit\AuditRecorder;
+use App\Modules\Core\References\ReferenceItem;
+use App\Modules\Core\References\ReferenceList;
+use App\Modules\Core\Tenancy\TenantContext;
+use App\Modules\Core\Users\User;
+use App\Modules\Crm\Organisations\Organisation;
+use App\Modules\Crm\Organisations\OrganisationStatus;
+use App\Modules\Crm\Permissions;
+use App\Modules\Crm\Support\FormOptions;
+use App\Modules\Crm\Visibility\CrmVisibility;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Http\JsonResponse;
+use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Gate;
+use Inertia\Inertia;
+use Inertia\Response;
+
+/**
+ * « Personnes » screens (particuliers and interlocuteurs): list with
+ * filters, fiche, create / edit form, soft delete and restore.
+ */
+class PersonController extends Controller
+{
+    private const SORTS = ['name', 'city', 'last_contact_at', 'created_at'];
+
+    private const TYPES = ['individual', 'contact'];
+
+    public function __construct(private readonly TenantContext $tenants, private readonly AuditRecorder $audit) {}
+
+    public function index(Request $request): Response
+    {
+        $user = $this->user($request);
+        $canDelete = $user->can(Permissions::DELETE);
+
+        $filters = [
+            'q' => is_string($request->query('q')) ? trim($request->query('q')) : '',
+            'type' => is_string($request->query('type')) && in_array($request->query('type'), self::TYPES, true) ? $request->query('type') : null,
+            'status' => is_string($request->query('status')) ? OrganisationStatus::tryFrom($request->query('status'))?->value : null,
+            'situation' => $this->idOrNull($request->query('situation')),
+            'funding' => $this->idOrNull($request->query('funding')),
+            'origin' => $this->idOrNull($request->query('origin')),
+            'responsible' => $this->idOrNull($request->query('responsible')),
+            'mine' => $request->boolean('mine'),
+            'trashed' => $canDelete && $request->boolean('trashed'),
+            'sort' => is_string($request->query('sort')) && in_array($request->query('sort'), self::SORTS, true) ? $request->query('sort') : 'name',
+            'dir' => $request->query('dir') === 'desc' ? 'desc' : 'asc',
+        ];
+
+        $query = CrmVisibility::people(Person::query(), $user)
+            ->with(['activeAffiliations.organisation', 'responsible'])
+            ->when($filters['trashed'], fn (Builder $q) => $q->onlyTrashed())
+            ->when($filters['q'] !== '', fn (Builder $q) => $q->search($filters['q']))
+            ->when($filters['type'] === 'individual', fn (Builder $q) => $q->where('is_individual', true))
+            ->when($filters['type'] === 'contact', fn (Builder $q) => $q->whereExists(fn ($sub) => $sub->select(DB::raw(1))->from('affiliations')
+                ->whereColumn('affiliations.person_id', 'people.id')->whereNull('affiliations.ended_on')->whereNull('affiliations.deleted_at')))
+            ->when($filters['status'], fn (Builder $q, string $v) => $q->where('status', $v))
+            ->when($filters['situation'], fn (Builder $q, string $v) => $q->where('professional_situation_id', $v))
+            ->when($filters['funding'], fn (Builder $q, string $v) => $q->where('funding_mode_id', $v))
+            ->when($filters['origin'], fn (Builder $q, string $v) => $q->where('origin_id', $v))
+            ->when($filters['responsible'], fn (Builder $q, string $v) => $q->where('responsible_user_id', $v))
+            ->when($filters['mine'], fn (Builder $q) => $q->where('responsible_user_id', $user->getKey()));
+
+        $dir = $filters['dir'];
+        match ($filters['sort']) {
+            'last_contact_at' => $query->orderByRaw("people.last_contact_at {$dir} nulls last"),
+            'name' => $query->orderBy('last_name', $dir)->orderBy('first_name', $dir),
+            default => $query->orderBy($filters['sort'], $dir),
+        };
+        $query->orderBy('last_name')->orderBy('first_name')->orderBy('id');
+
+        return Inertia::render('crm/people/index', [
+            'people' => $query->paginate(25)->withQueryString()->through(fn (Person $p) => [
+                'id' => $p->id,
+                'civility' => $p->civility,
+                'first_name' => $p->first_name,
+                'last_name' => $p->last_name,
+                'name' => $p->fullName(),
+                'is_individual' => $p->is_individual,
+                'organisations' => $p->activeAffiliations->filter(fn ($a) => $a->organisation !== null)
+                    ->map(fn ($a) => ['id' => $a->organisation_id, 'name' => $a->organisation?->name, 'job_title' => $a->job_title])->values()->all(),
+                'email' => $p->email ?? $p->activeAffiliations->pluck('work_email')->filter()->first(),
+                'phone' => $p->mobile ?? $p->phone ?? $p->activeAffiliations->pluck('work_phone')->filter()->first(),
+                'city' => $p->city,
+                'status' => ['value' => $p->status->value, 'label' => $p->status->label()],
+                'responsible' => $p->responsible?->name,
+                'last_contact_at' => $p->last_contact_at?->toIso8601String(),
+                'created_at' => $p->created_at?->toIso8601String(),
+                'deleted' => $p->trashed(),
+            ]),
+            'filters' => $filters,
+            'options' => [
+                'type' => [['value' => 'individual', 'label' => 'Particuliers'], ['value' => 'contact', 'label' => 'Interlocuteurs']],
+                'status' => OrganisationStatus::options(),
+                'situation' => FormOptions::reference(ReferenceList::ProfessionalSituation),
+                'funding' => FormOptions::reference(ReferenceList::FundingMode),
+                'origin' => FormOptions::reference(ReferenceList::ContactOrigin),
+                'responsible' => FormOptions::responsible(),
+            ],
+            'can' => ['create' => $user->can(Permissions::CREATE), 'delete' => $canDelete],
+            'status' => $request->session()->get('status'),
+        ]);
+    }
+
+    /**
+     * People to attach to an entreprise (autocomplete of the interlocuteurs
+     * tab): visible people matching the text, minus those already attached.
+     */
+    public function search(Request $request): JsonResponse
+    {
+        $user = $this->user($request);
+        $term = is_string($request->query('q')) ? trim($request->query('q')) : '';
+        $organisationId = $this->idOrNull($request->query('organisation'));
+
+        if (mb_strlen($term) < 2) {
+            return response()->json(['people' => []]);
+        }
+
+        $people = CrmVisibility::people(Person::query(), $user)
+            ->with('activeAffiliations.organisation')
+            ->search($term)
+            ->when($organisationId, fn (Builder $q, string $id) => $q->whereNotExists(fn ($sub) => $sub->select(DB::raw(1))->from('affiliations')
+                ->whereColumn('affiliations.person_id', 'people.id')->where('affiliations.organisation_id', $id)
+                ->whereNull('affiliations.ended_on')->whereNull('affiliations.deleted_at')))
+            ->orderBy('last_name')->orderBy('first_name')
+            ->limit(10)->get();
+
+        return response()->json(['people' => $people->map(fn (Person $p) => [
+            'id' => $p->id,
+            'first_name' => $p->first_name,
+            'last_name' => $p->last_name,
+            'name' => $p->fullName(),
+            'email' => $p->email,
+            'organisations' => $p->activeAffiliations->map(fn ($a) => $a->organisation?->name)->filter()->values()->all(),
+        ])->all()]);
+    }
+
+    public function create(): Response
+    {
+        Gate::authorize('create', Person::class);
+
+        return Inertia::render('crm/people/form', [
+            'person' => null,
+            'options' => $this->formOptions(null),
+        ]);
+    }
+
+    public function store(PersonRequest $request): RedirectResponse
+    {
+        Gate::authorize('create', Person::class);
+
+        $person = $this->persist(new Person, $request);
+
+        return to_route('crm.people.show', $person)->with('status', 'Personne créée.');
+    }
+
+    public function show(Request $request, Person $person): Response
+    {
+        $user = $this->user($request);
+        Gate::authorize('view', $person);
+
+        $person->load(['professionalSituation', 'fundingMode', 'origin', 'responsible', 'das']);
+        $label = fn (?ReferenceItem $i) => $i === null ? null : ['id' => $i->id, 'label' => $i->label];
+
+        $affiliations = $person->affiliations()
+            ->with(['organisation', 'decisionRole'])
+            ->whereIn('organisation_id', CrmVisibility::organisations(Organisation::query(), $user)->select('organisations.id'))
+            ->orderByRaw('ended_on is not null')->orderByDesc('started_on')->orderByDesc('created_at')
+            ->get();
+
+        return Inertia::render('crm/people/show', [
+            'person' => [
+                ...$this->fields($person),
+                'name' => $person->fullName(),
+                'status' => ['value' => $person->status->value, 'label' => $person->status->label()],
+                'professional_situation' => $label($person->professionalSituation),
+                'funding_mode' => $label($person->fundingMode),
+                'origin' => $label($person->origin),
+                'responsible' => $person->responsible === null ? null : ['id' => $person->responsible->id, 'name' => $person->responsible->name],
+                'das' => $person->das->map($label)->all(),
+                'affiliations' => $affiliations->filter(fn ($a) => $a->organisation !== null)->map(fn ($a) => [
+                    'id' => $a->id,
+                    'organisation' => ['id' => $a->organisation_id, 'name' => $a->organisation?->name],
+                    'job_title' => $a->job_title,
+                    'decision_role' => $label($a->decisionRole),
+                    'work_email' => $a->work_email,
+                    'work_phone' => $a->work_phone,
+                    'is_referent' => $a->is_referent,
+                    'started_on' => $a->started_on?->toDateString(),
+                    'ended_on' => $a->ended_on?->toDateString(),
+                ])->values()->all(),
+                'last_contact_at' => $person->last_contact_at?->toIso8601String(),
+                'created_at' => $person->created_at?->toIso8601String(),
+                'updated_at' => $person->updated_at?->toIso8601String(),
+                'deleted' => $person->trashed(),
+            ],
+            'can' => [
+                'update' => ! $person->trashed() && $user->can('update', $person),
+                'delete' => ! $person->trashed() && $user->can('delete', $person),
+                'restore' => $person->trashed() && $user->can('restore', $person),
+            ],
+            'status' => $request->session()->get('status'),
+        ]);
+    }
+
+    public function edit(Person $person): Response
+    {
+        Gate::authorize('update', $person);
+        abort_if($person->trashed(), 404);
+
+        return Inertia::render('crm/people/form', [
+            'person' => [
+                ...$this->fields($person),
+                'status' => $person->status->value,
+                'das_ids' => $person->das()->pluck('reference_items.id')->all(),
+            ],
+            'options' => $this->formOptions($person),
+        ]);
+    }
+
+    public function update(PersonRequest $request, Person $person): RedirectResponse
+    {
+        Gate::authorize('update', $person);
+        abort_if($person->trashed(), 404);
+
+        $this->persist($person, $request);
+
+        return to_route('crm.people.show', $person)->with('status', 'Personne enregistrée.');
+    }
+
+    public function destroy(Person $person): RedirectResponse
+    {
+        Gate::authorize('delete', $person);
+        abort_if($person->trashed(), 404);
+
+        DB::transaction(fn () => $person->delete());
+
+        return to_route('crm.people.index')->with('status', 'Personne supprimée. Elle reste récupérable depuis la corbeille.');
+    }
+
+    public function restore(Person $person): RedirectResponse
+    {
+        Gate::authorize('restore', $person);
+        abort_unless($person->trashed(), 404);
+
+        DB::transaction(fn () => $person->restore());
+
+        return to_route('crm.people.show', $person)->with('status', 'Personne restaurée.');
+    }
+
+    private function persist(Person $person, PersonRequest $request): Person
+    {
+        $validated = $request->validated();
+        $dasIds = array_key_exists('das_ids', $validated) ? array_values($validated['das_ids']) : null;
+        unset($validated['das_ids']);
+        $validated['country'] ??= 'FR';
+        $validated['status'] ??= $person->exists ? $person->status->value : OrganisationStatus::Prospect->value;
+
+        DB::transaction(function () use ($person, $validated, $dasIds): void {
+            $person->fill($validated)->save();
+
+            if ($dasIds !== null) {
+                $this->syncDas($person, $dasIds);
+            }
+        });
+
+        return $person;
+    }
+
+    /**
+     * @param  list<string>  $dasIds
+     */
+    private function syncDas(Person $person, array $dasIds): void
+    {
+        $before = $person->das()->pluck('reference_items.id')->all();
+        $tenantId = $this->tenants->id();
+
+        $person->das()->sync(collect($dasIds)->mapWithKeys(fn (string $id) => [$id => ['tenant_id' => $tenantId]])->all());
+
+        sort($before);
+        $after = $dasIds;
+        sort($after);
+
+        if ($before !== $after) {
+            $this->audit->record('crm.person_das_changed', $person, ['das_ids' => $before], ['das_ids' => $after]);
+        }
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function fields(Person $p): array
+    {
+        return [
+            'id' => $p->id,
+            'civility' => $p->civility,
+            'first_name' => $p->first_name,
+            'last_name' => $p->last_name,
+            'email' => $p->email,
+            'email_secondary' => $p->email_secondary,
+            'phone' => $p->phone,
+            'mobile' => $p->mobile,
+            'address_line1' => $p->address_line1,
+            'address_line2' => $p->address_line2,
+            'postal_code' => $p->postal_code,
+            'city' => $p->city,
+            'country' => $p->country,
+            'birth_date' => $p->birth_date?->toDateString(),
+            'is_individual' => $p->is_individual,
+            'project' => $p->project,
+            'professional_situation_id' => $p->professional_situation_id,
+            'funding_mode_id' => $p->funding_mode_id,
+            'origin_id' => $p->origin_id,
+            'responsible_user_id' => $p->responsible_user_id,
+        ];
+    }
+
+    /**
+     * @return array<string, list<array{value: string, label: string}>>
+     */
+    private function formOptions(?Person $current): array
+    {
+        return [
+            'status' => OrganisationStatus::options(),
+            'professional_situation' => FormOptions::reference(ReferenceList::ProfessionalSituation, $current?->professional_situation_id),
+            'funding_mode' => FormOptions::reference(ReferenceList::FundingMode, $current?->funding_mode_id),
+            'origin' => FormOptions::reference(ReferenceList::ContactOrigin, $current?->origin_id),
+            'das' => FormOptions::reference(ReferenceList::Das, null, $current === null ? [] : $current->das()->pluck('reference_items.id')->all()),
+            'responsible' => FormOptions::responsible($current?->responsible_user_id),
+        ];
+    }
+
+    private function user(Request $request): User
+    {
+        $user = $request->user();
+        assert($user instanceof User);
+
+        return $user;
+    }
+
+    private function idOrNull(mixed $value): ?string
+    {
+        return is_string($value) && preg_match('/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i', $value) === 1 ? $value : null;
+    }
+}

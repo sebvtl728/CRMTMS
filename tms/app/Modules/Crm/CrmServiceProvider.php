@@ -6,8 +6,11 @@ use App\Modules\Core\Access\Permissions as CorePermissions;
 use App\Modules\Core\References\ReferenceList;
 use App\Modules\Core\References\ReferenceUsage;
 use App\Modules\Core\Users\User;
+use App\Modules\Crm\Affiliations\Affiliation;
 use App\Modules\Crm\Organisations\Organisation;
 use App\Modules\Crm\Organisations\OrganisationPolicy;
+use App\Modules\Crm\People\Person;
+use App\Modules\Crm\People\PersonPolicy;
 use App\Modules\Crm\Visibility\CrmVisibility;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Support\Facades\Gate;
@@ -29,6 +32,7 @@ class CrmServiceProvider extends ServiceProvider
         self::registerReferenceUsage();
 
         Gate::policy(Organisation::class, OrganisationPolicy::class);
+        Gate::policy(Person::class, PersonPolicy::class);
 
         // A fiche the user may not see is a 404, whatever the action. Trashed
         // fiches resolve too (show, restore): the controller decides.
@@ -43,6 +47,37 @@ class CrmServiceProvider extends ServiceProvider
 
             if ($user instanceof User) {
                 $query = CrmVisibility::organisations($query, $user);
+            }
+
+            return $query->findOrFail($value);
+        });
+
+        Route::bind('person', function (string $value): Person {
+            if (! Str::isUuid($value)) {
+                throw (new ModelNotFoundException)->setModel(Person::class, [$value]);
+            }
+
+            $query = Person::withTrashed();
+            $user = request()->user();
+
+            if ($user instanceof User) {
+                $query = CrmVisibility::people($query, $user);
+            }
+
+            return $query->findOrFail($value);
+        });
+
+        // An affiliation is reachable through the entreprise it belongs to.
+        Route::bind('affiliation', function (string $value): Affiliation {
+            if (! Str::isUuid($value)) {
+                throw (new ModelNotFoundException)->setModel(Affiliation::class, [$value]);
+            }
+
+            $query = Affiliation::query();
+            $user = request()->user();
+
+            if ($user instanceof User) {
+                $query->whereIn('organisation_id', CrmVisibility::organisations(Organisation::withTrashed(), $user)->select('organisations.id'));
             }
 
             return $query->findOrFail($value);
@@ -62,5 +97,10 @@ class CrmServiceProvider extends ServiceProvider
         ReferenceUsage::register(ReferenceList::ContactOrigin, 'organisations', 'origin_id');
         ReferenceUsage::register(ReferenceList::Das, 'organisation_das', 'das_id');
         ReferenceUsage::register(ReferenceList::Das, 'user_das', 'das_id');
+        ReferenceUsage::register(ReferenceList::ProfessionalSituation, 'people', 'professional_situation_id');
+        ReferenceUsage::register(ReferenceList::FundingMode, 'people', 'funding_mode_id');
+        ReferenceUsage::register(ReferenceList::ContactOrigin, 'people', 'origin_id');
+        ReferenceUsage::register(ReferenceList::Das, 'person_das', 'das_id');
+        ReferenceUsage::register(ReferenceList::DecisionRole, 'affiliations', 'decision_role_id');
     }
 }

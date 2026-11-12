@@ -1,10 +1,16 @@
 <?php
 
 use App\Modules\Core\Access\Role;
+use App\Modules\Core\References\ReferenceItem;
+use App\Modules\Core\References\ReferenceList;
 use App\Modules\Core\Tenancy\Tenant;
 use App\Modules\Core\Tenancy\TenantContext;
 use App\Modules\Core\Tenancy\TenantDomain;
 use App\Modules\Core\Users\User;
+use App\Modules\Crm\Affiliations\Affiliation;
+use App\Modules\Crm\Organisations\Organisation;
+use App\Modules\Crm\People\Person;
+use Illuminate\Support\Facades\DB;
 use PragmaRX\Google2FA\Google2FA;
 use Tests\RefreshDatabaseAsOwner;
 use Tests\TestCase;
@@ -132,4 +138,36 @@ function totp(User $user, ?int $timestamp = null): string
     return $timestamp === null
         ? $google2fa->getCurrentOtp((string) $user->two_factor_secret)
         : $google2fa->oathTotp((string) $user->two_factor_secret, intdiv($timestamp, 30));
+}
+
+/*
+|--------------------------------------------------------------------------
+| CRM helpers (people and affiliations tests)
+|--------------------------------------------------------------------------
+*/
+
+function crmItem(ReferenceList $list, string $label): ReferenceItem
+{
+    return ReferenceItem::query()->where('list', $list)->where('label', $label)->firstOrFail();
+}
+
+/**
+ * @param  array<string, mixed>  $attributes
+ */
+function makePerson(string $lastName, array $attributes = []): Person
+{
+    return Person::query()->create(['last_name' => $lastName, ...$attributes]);
+}
+
+/**
+ * @param  array<string, mixed>  $attributes
+ */
+function affiliate(Person $person, Organisation $organisation, array $attributes = []): Affiliation
+{
+    return Affiliation::query()->create(['person_id' => $person->id, 'organisation_id' => $organisation->id, ...$attributes]);
+}
+
+function followDas(User $user, ReferenceItem $das): void
+{
+    DB::table('user_das')->insert(['tenant_id' => tenant()->id, 'user_id' => $user->id, 'das_id' => $das->id]);
 }

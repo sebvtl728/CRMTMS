@@ -1,8 +1,9 @@
+import { OrganisationContacts, type AffiliationRow } from '@/components/crm/organisation-contacts';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import AppLayout from '@/layouts/app-layout';
-import { formatDate, formatDateTime, formatSiret, statusVariant, type StatusValue } from '@/lib/crm';
+import { formatDate, formatDateTime, formatPhone, formatSiret, statusVariant, type Option, type StatusValue } from '@/lib/crm';
 import { type BreadcrumbItem } from '@/types';
 import { Head, Link, router, usePage } from '@inertiajs/react';
 import { Pencil, RotateCcw, Trash2 } from 'lucide-react';
@@ -43,7 +44,10 @@ interface OrganisationData {
 
 interface ShowProps {
     organisation: OrganisationData;
-    can: { update: boolean; delete: boolean; restore: boolean };
+    affiliations: AffiliationRow[];
+    formerAffiliations: AffiliationRow[];
+    decisionRoles: Option[];
+    can: { affiliate: boolean; createPerson: boolean; update: boolean; delete: boolean; restore: boolean };
     status?: string;
 }
 
@@ -70,7 +74,7 @@ function safeLink(url: string | null): React.ReactNode {
     );
 }
 
-export default function OrganisationShow({ organisation: o, can, status }: ShowProps) {
+export default function OrganisationShow({ organisation: o, affiliations, formerAffiliations, decisionRoles, can, status }: ShowProps) {
     const [tab, setTab] = useState<(typeof TABS)[number]>('Informations');
     const [confirming, setConfirming] = useState(false);
     const errors = usePage().props.errors as Record<string, string | undefined>;
@@ -186,7 +190,7 @@ export default function OrganisationShow({ organisation: o, can, status }: ShowP
                                         </a>
                                     )}
                                 </Item>
-                                <Item label="Téléphone">{o.phone}</Item>
+                                <Item label="Téléphone">{o.phone ? formatPhone(o.phone) : null}</Item>
                                 <Item label="Site web">{safeLink(o.website)}</Item>
                                 <Item label="Adresse">{address.length ? address.map((l, i) => <div key={i}>{l}</div>) : null}</Item>
                             </dl>
@@ -203,14 +207,13 @@ export default function OrganisationShow({ organisation: o, can, status }: ShowP
                     </div>
                 )}
                 {tab === 'Interlocuteurs' && (
-                    <p
-                        role="tabpanel"
-                        id="panel-Interlocuteurs"
-                        aria-labelledby="tab-Interlocuteurs"
-                        className="text-muted-foreground rounded-xl border p-8 text-center text-sm"
-                    >
-                        Bientôt disponible
-                    </p>
+                    <OrganisationContacts
+                        organisationId={o.id}
+                        affiliations={affiliations}
+                        former={formerAffiliations}
+                        decisionRoles={decisionRoles}
+                        can={{ affiliate: can.affiliate, createPerson: can.createPerson }}
+                    />
                 )}
                 {tab === 'Historique' && (
                     <p

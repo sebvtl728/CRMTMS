@@ -6,11 +6,13 @@ use App\Modules\Core\Audit\Auditable;
 use App\Modules\Core\References\ReferenceItem;
 use App\Modules\Core\Tenancy\BelongsToTenant;
 use App\Modules\Core\Users\User;
+use App\Modules\Crm\Affiliations\Affiliation;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Auth;
@@ -82,6 +84,15 @@ class Organisation extends Model
                 $organisation->updated_by = Auth::id();
             }
         });
+
+        // People are never deleted with their entreprise: only the links go
+        // to the trash (and come back with a restore).
+        static::deleted(function (Organisation $organisation): void {
+            if (! $organisation->isForceDeleting()) {
+                Affiliation::cascadeDelete('organisation_id', $organisation);
+            }
+        });
+        static::restoring(fn (Organisation $organisation) => Affiliation::cascadeRestore('organisation_id', $organisation));
     }
 
     protected function casts(): array
@@ -98,6 +109,14 @@ class Organisation extends Model
     public function das(): BelongsToMany
     {
         return $this->belongsToMany(ReferenceItem::class, 'organisation_das', 'organisation_id', 'das_id')->withPivot('tenant_id')->orderBy('reference_items.position');
+    }
+
+    /**
+     * @return HasMany<Affiliation, $this>
+     */
+    public function affiliations(): HasMany
+    {
+        return $this->hasMany(Affiliation::class);
     }
 
     /**
