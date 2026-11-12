@@ -18,4 +18,14 @@ export default defineConfig({
     esbuild: {
         jsx: 'automatic',
     },
+    // In Docker the dev server listens on 0.0.0.0, but browsers refuse to load
+    // assets from http://0.0.0.0. Advertise localhost to the browser instead.
+    server: {
+        host: '0.0.0.0',
+        port: 5173,
+        strictPort: true,
+        origin: 'http://localhost:5173',
+        hmr: { host: 'localhost' },
+        cors: { origin: ['http://localhost:8080'] },
+    },
 });

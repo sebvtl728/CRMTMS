@@ -3,6 +3,8 @@
     <head>
         <meta charset="utf-8">
         <meta name="viewport" content="width=device-width, initial-scale=1">
+        {{-- Lets the Vite dev client tag the <style> elements it injects with the CSP nonce. --}}
+        <meta property="csp-nonce" nonce="{{ \Illuminate\Support\Facades\Vite::cspNonce() }}">
 
         <title inertia>{{ config('app.name', 'Laravel') }}</title>
 
