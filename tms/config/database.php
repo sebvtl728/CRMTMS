@@ -95,6 +95,8 @@ return [
             'prefix_indexes' => true,
             'search_path' => 'public',
             'sslmode' => 'prefer',
+            // Naive datetimes (bound as Y-m-d H:i:s, no offset) are read in the app zone.
+            'timezone' => env('APP_TIMEZONE', 'UTC'),
         ],
 
         // Owner role: migrations only (php artisan migrate --database=pgsql_owner).
@@ -111,6 +113,8 @@ return [
             'prefix_indexes' => true,
             'search_path' => 'public',
             'sslmode' => 'prefer',
+            // Naive datetimes (bound as Y-m-d H:i:s, no offset) are read in the app zone.
+            'timezone' => env('APP_TIMEZONE', 'UTC'),
         ],
 
         'sqlsrv' => [

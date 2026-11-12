@@ -30,7 +30,7 @@ it('records model changes with only dirty fields', function () {
 
     $log = lastAudit();
     expect($log->event)->toBe('updated')
-        ->and($log->auditable_type)->toBe(User::class)
+        ->and($log->auditable_type)->toBe('user')
         ->and($log->auditable_id)->toBe($user->id)
         ->and($log->old_values)->toBe(['name' => 'Avant'])
         ->and($log->new_values)->toBe(['name' => 'Après']);
@@ -282,9 +282,9 @@ it('lists and filters the journal, 50 per page', function () {
         ->has('logs.data', 50)
         ->where('logs.total', fn ($t) => $t >= 60));
 
-    $this->actingAs($admin)->get('/admin/audit?event=created&type='.urlencode(User::class))
+    $this->actingAs($admin)->get('/admin/audit?event=created&type='.'user')
         ->assertInertia(fn (Assert $p) => $p->where('logs.data.0.event', 'created')
-            ->where('logs.data.0.auditable_type', User::class));
+            ->where('logs.data.0.auditable_type', 'user'));
 
     $this->actingAs($admin)->get('/admin/audit?user='.$other->id)
         ->assertInertia(fn (Assert $p) => $p->has('logs.data', 0));

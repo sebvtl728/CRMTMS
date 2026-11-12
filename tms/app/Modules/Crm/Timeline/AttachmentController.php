@@ -12,6 +12,7 @@ use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 /**
@@ -59,6 +60,7 @@ class AttachmentController extends Controller
         $subject = $attachment->notable;
         abort_unless($subject instanceof Model, 404);
         Gate::authorize('update', $subject);
+        abort_if(method_exists($subject, 'trashed') && $subject->trashed(), 404);
 
         $attachment->delete();
 
@@ -73,13 +75,17 @@ class AttachmentController extends Controller
         $file = $request->file('file');
         assert($file instanceof UploadedFile);
 
-        $mime = AttachmentRequest::detectedMime($file);
-        abort_if($mime === null, 422);
+        // Already checked by the request; re-checked here so the stored type can never be unvetted.
+        $mime = AttachmentRequest::detectedMime($file) ?? throw ValidationException::withMessages(['file' => AttachmentRequest::TYPE_MESSAGE]);
 
         $directory = TenantStorage::path('attachments');
         $stored = Str::uuid()->toString();
         $path = TenantStorage::path('attachments', $stored);
-        Storage::disk(TenantStorage::DISK)->putFileAs($directory, $file, $stored);
+        if (Storage::disk(TenantStorage::DISK)->putFileAs($directory, $file, $stored) === false) {
+            report(new \RuntimeException('Attachment could not be written to the private disk.'));
+
+            throw ValidationException::withMessages(['file' => "Le fichier n'a pas pu être enregistré. Réessayez ou contactez l'administrateur."]);
+        }
 
         try {
             $attachment = new Attachment([

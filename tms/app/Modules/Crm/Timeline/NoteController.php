@@ -27,6 +27,7 @@ class NoteController extends Controller
         $subject = $note->notable;
         abort_unless($subject instanceof Model, 404);
         Gate::authorize('update', $subject);
+        abort_if(method_exists($subject, 'trashed') && $subject->trashed(), 404);
 
         $note->delete();
 

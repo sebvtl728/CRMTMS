@@ -18,8 +18,8 @@ return new class extends Migration
             $table->text('body');
             $table->foreignUuid('author_id')->nullable()->constrained('users')->nullOnDelete();
             // Microseconds: the timeline pages on the creation instant.
-            $table->timestamps(6);
-            $table->softDeletes();
+            $table->timestampsTz(6);
+            $table->softDeletesTz();
 
             $table->index(['notable_type', 'notable_id', 'created_at']);
         });

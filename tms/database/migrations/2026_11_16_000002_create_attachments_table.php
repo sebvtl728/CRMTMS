@@ -21,8 +21,8 @@ return new class extends Migration
             // Private disk, tenants/<tenant_id>/attachments/<uuid>.
             $table->string('path');
             $table->foreignUuid('uploaded_by')->nullable()->constrained('users')->nullOnDelete();
-            $table->timestamps(6);
-            $table->softDeletes();
+            $table->timestampsTz(6);
+            $table->softDeletesTz();
 
             $table->index(['notable_type', 'notable_id', 'created_at']);
         });

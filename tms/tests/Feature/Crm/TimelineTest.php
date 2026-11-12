@@ -253,3 +253,35 @@ it('refuses notes on a deleted fiche and a note of another organisme', function 
     $this->delete("/crm/notes/{$foreign->id}")->assertNotFound();
     $this->delete('/crm/notes/pas-un-uuid')->assertNotFound();
 });
+
+it('does not bring back, on the next page, audit entries newer than the cursor (timezone)', function () {
+    $this->actingAs(commercial());
+    $this->travelTo(CarbonImmutable::parse('2026-11-12 09:00:00'));
+    $org = tlOrg();
+    $this->travelTo(CarbonImmutable::parse('2026-11-12 10:00:00'));
+    tlNote($org, 'A');
+    $this->travelTo(CarbonImmutable::parse('2026-11-12 10:30:00'));
+    $org->update(['city' => 'Annecy']);
+    $this->travelTo(CarbonImmutable::parse('2026-11-12 11:00:00'));
+    tlNote($org, 'B');
+
+    $first = Timeline::for($org->fresh(), null, 3);
+    expect($first->pluck('title')->all())->toBe(['Note', 'Fiche modifiée (champs : Ville)', 'Note']);
+
+    $second = Timeline::for($org->fresh(), $first->last()->at, 3);
+    expect($second->pluck('title')->all())->toBe(['Fiche créée']);
+});
+
+it('stores last_contact_at at the exact instant of the note, in the application timezone', function () {
+    $this->actingAs(commercial());
+    $frozen = CarbonImmutable::parse('2026-11-12 10:30:00', 'Europe/Paris');
+    $this->travelTo($frozen);
+    $org = tlOrg();
+    tlNote($org);
+
+    $stored = $org->fresh()->last_contact_at;
+    expect($stored->equalTo($frozen))->toBeTrue()
+        ->and(DB::selectOne("select to_char(last_contact_at at time zone 'Europe/Paris', 'YYYY-MM-DD HH24:MI:SS') as v from organisations where id = ?", [$org->id])->v)
+        ->toBe('2026-11-12 10:30:00')
+        ->and(DB::selectOne("select current_setting('TimeZone') as v")->v)->toBe('Europe/Paris');
+});

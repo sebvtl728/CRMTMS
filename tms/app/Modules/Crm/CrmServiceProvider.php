@@ -3,6 +3,7 @@
 namespace App\Modules\Crm;
 
 use App\Modules\Core\Access\Permissions as CorePermissions;
+use App\Modules\Core\Audit\MorphAliases;
 use App\Modules\Core\References\ReferenceList;
 use App\Modules\Core\References\ReferenceUsage;
 use App\Modules\Core\Users\User;
@@ -32,6 +33,14 @@ class CrmServiceProvider extends ServiceProvider
         // In register(): the catalogue must be complete before
         // AccessServiceProvider::boot() defines one gate per permission.
         CorePermissions::registerModule('crm', Permissions::all(), Permissions::defaultsFor(...));
+
+        MorphAliases::register([
+            'organisation' => Organisation::class,
+            'person' => Person::class,
+            'affiliation' => Affiliation::class,
+            'note' => Note::class,
+            'attachment' => Attachment::class,
+        ]);
 
         // Sources of the « Historique »; later increments tag their own.
         $this->app->tag([NotesProvider::class, AttachmentsProvider::class, AuditProvider::class], Timeline::TAG);
