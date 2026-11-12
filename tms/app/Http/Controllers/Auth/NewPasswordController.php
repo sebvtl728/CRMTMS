@@ -3,12 +3,12 @@
 namespace App\Http\Controllers\Auth;
 
 use App\Http\Controllers\Controller;
+use App\Modules\Core\Users\User;
 use Illuminate\Auth\Events\PasswordReset;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Password;
-use Illuminate\Support\Str;
 use Illuminate\Validation\Rules;
 use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
@@ -45,11 +45,11 @@ class NewPasswordController extends Controller
         // database. Otherwise we will parse the error and return the response.
         $status = Password::reset(
             $request->only('email', 'password', 'password_confirmation', 'token'),
-            function ($user) use ($request) {
-                $user->forceFill([
-                    'password' => Hash::make($request->password),
-                    'remember_token' => Str::random(60),
-                ])->save();
+            function (User $user) use ($request) {
+                $user->forceFill(['password' => Hash::make($request->password)])->save();
+
+                // ASVS 3.3: whoever held a session (or a remember cookie) loses it.
+                $user->revokeOtherSessions(null);
 
                 event(new PasswordReset($user));
             }

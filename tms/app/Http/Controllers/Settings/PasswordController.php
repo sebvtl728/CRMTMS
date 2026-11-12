@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Settings;
 
 use App\Http\Controllers\Controller;
+use App\Modules\Core\Users\User;
 use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -34,9 +35,14 @@ class PasswordController extends Controller
             'password' => ['required', Password::defaults(), 'confirmed'],
         ]);
 
-        $request->user()->update([
-            'password' => Hash::make($validated['password']),
-        ]);
+        /** @var User $user */
+        $user = $request->user();
+        $user->update(['password' => Hash::make($validated['password'])]);
+
+        // ASVS 3.3: the other sessions (and remember cookies) end; this one
+        // continues under a new identifier.
+        $request->session()->regenerate();
+        $user->revokeOtherSessions($request->session()->getId());
 
         return back();
     }
