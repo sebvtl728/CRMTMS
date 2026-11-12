@@ -2,7 +2,9 @@
 
 use App\Modules\Core\Users\User;
 use Illuminate\Auth\Notifications\ResetPassword;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Notification;
+use Illuminate\Support\Str;
 
 // Accounts belong to an organisme: the test body acts for the default tenant.
 beforeEach(fn () => inTenant());
@@ -59,8 +61,8 @@ it('resets the password with a valid token', function () {
 it('revokes every session and the remember token after a password reset', function () {
     Notification::fake();
     $user = User::factory()->create(['remember_token' => 'ancien-jeton']);
-    $session = Illuminate\Support\Str::random(40);
-    Illuminate\Support\Facades\DB::table('sessions')->insert(['id' => $session, 'user_id' => $user->id, 'payload' => '', 'last_activity' => time()]);
+    $session = Str::random(40);
+    DB::table('sessions')->insert(['id' => $session, 'user_id' => $user->id, 'payload' => '', 'last_activity' => time()]);
 
     $this->post('/forgot-password', ['email' => $user->email]);
 
@@ -75,6 +77,6 @@ it('revokes every session and the remember token after a password reset', functi
         return true;
     });
 
-    expect(Illuminate\Support\Facades\DB::table('sessions')->where('id', $session)->exists())->toBeFalse()
+    expect(DB::table('sessions')->where('id', $session)->exists())->toBeFalse()
         ->and($user->fresh()->remember_token)->not->toBe('ancien-jeton');
 });

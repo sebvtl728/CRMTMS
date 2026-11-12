@@ -2,6 +2,7 @@
 
 use App\Modules\Core\Access\Role;
 use App\Modules\Core\Audit\AuditLog;
+use App\Modules\Core\Tenancy\Tenant;
 use App\Modules\Core\Tenancy\TenantContext;
 use App\Modules\Core\Users\Invitation;
 use App\Modules\Core\Users\User;
@@ -13,7 +14,7 @@ use Illuminate\Support\Str;
  * Runs $fn in $tenant's context (RLS) and leaves no context behind, like the
  * console where the commands run.
  */
-function inTenantOnce(App\Modules\Core\Tenancy\Tenant $tenant, callable $fn): mixed
+function inTenantOnce(Tenant $tenant, callable $fn): mixed
 {
     return app(TenantContext::class)->run($tenant, $fn);
 }
