@@ -55,3 +55,8 @@ export interface Paginated<T> {
 export function todayIso(): string {
     return new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Paris' }).format(new Date());
 }
+
+/** First error among the per-item keys of an array field (`das_ids.0`, `das_ids.1`…). */
+export function itemError(errors: Record<string, string | undefined>, field: string): string | undefined {
+    return Object.entries(errors).find(([key, message]) => key.startsWith(`${field}.`) && message)?.[1];
+}

@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import AppLayout from '@/layouts/app-layout';
-import { type Option } from '@/lib/crm';
+import { itemError, type Option } from '@/lib/crm';
 import { type BreadcrumbItem } from '@/types';
 import { Head, Link, useForm, usePage } from '@inertiajs/react';
 import { LoaderCircle } from 'lucide-react';
@@ -205,7 +205,7 @@ export default function OrganisationFormPage({ organisation, options }: FormProp
                                 </Label>
                             ))}
                         </div>
-                        <InputError message={errors.das_ids} />
+                        <InputError message={errors.das_ids ?? itemError(errors, 'das_ids')} />
                     </div>
                 </Section>
 

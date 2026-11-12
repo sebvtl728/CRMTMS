@@ -359,7 +359,7 @@ function AffiliationDialog({
                             <Button type="button" variant="outline" onClick={onClose}>
                                 Annuler
                             </Button>
-                            <Button type="submit" disabled={processing}>
+                            <Button type="submit" disabled={processing || (!editing && mode === 'existing' && !picked)}>
                                 {processing && <LoaderCircle className="h-4 w-4 animate-spin" />}
                                 Enregistrer
                             </Button>

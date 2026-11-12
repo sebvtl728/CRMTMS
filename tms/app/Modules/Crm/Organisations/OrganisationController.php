@@ -28,6 +28,8 @@ use Inertia\Response;
  */
 class OrganisationController extends Controller
 {
+    private const RESTORE_CONFLICT = 'Impossible de restaurer cette entreprise : elle entre en conflit avec une autre fiche active.';
+
     private const SORTS = ['name', 'city', 'last_contact_at', 'created_at'];
 
     public function __construct(private readonly TenantContext $tenants, private readonly AuditRecorder $audit) {}
@@ -202,7 +204,8 @@ class OrganisationController extends Controller
         Gate::authorize('delete', $organisation);
         abort_if($organisation->trashed(), 404);
 
-        $organisation->delete();
+        // Soft delete + cascade to the affiliations: all or nothing.
+        DB::transaction(fn () => $organisation->delete());
 
         return to_route('crm.organisations.index')->with('status', 'Entreprise supprimée. Elle reste récupérable depuis la corbeille.');
     }
@@ -214,7 +217,13 @@ class OrganisationController extends Controller
 
         try {
             DB::transaction(fn () => $organisation->restore());
-        } catch (UniqueConstraintViolationException) {
+        } catch (UniqueConstraintViolationException $e) {
+            // Only the SIRET has a message of its own; any other clash
+            // (e.g. the source identifier of an import) stays generic.
+            if (! str_contains($e->getMessage(), 'organisations_siret_unique')) {
+                throw ValidationException::withMessages(['restore' => self::RESTORE_CONFLICT])->redirectTo(route('crm.organisations.show', $organisation));
+            }
+
             // Another active entreprise took the SIRET in the meantime.
             $other = Organisation::query()->where('siret', $organisation->siret)->first();
             $errors = ['siret' => OrganisationRequest::DUPLICATE_SIRET];
