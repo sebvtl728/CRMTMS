@@ -31,6 +31,17 @@ final class TenantMailer
         return $mailer;
     }
 
+    /**
+     * True when nothing would actually be delivered: no active SMTP
+     * configuration and the instance mailer only logs or keeps messages in
+     * memory (MAIL_MAILER=log or array).
+     */
+    public static function deliversNowhere(?Company $company = null): bool
+    {
+        return self::activeConfig($company) === null
+            && in_array(config('mail.default'), [null, '', 'log', 'array'], true);
+    }
+
     private static function activeConfig(?Company $company): ?ConnectorConfig
     {
         $candidates = ConnectorConfig::query()

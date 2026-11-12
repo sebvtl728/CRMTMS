@@ -5,12 +5,12 @@ use App\Modules\Core\Audit\AuditLog;
 use App\Modules\Core\Tenancy\TenantContext;
 use App\Modules\Core\Users\ExternalIdentity;
 use App\Modules\Core\Users\Invitation;
-use App\Modules\Core\Users\InvitationNotification;
+use App\Modules\Core\Users\InvitationMail;
 use App\Modules\Core\Users\User;
 use Illuminate\Auth\Notifications\ResetPassword;
-use Illuminate\Notifications\AnonymousNotifiable;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Route;
 use Inertia\Testing\AssertableInertia as Assert;
@@ -343,7 +343,8 @@ it('lists only the users of the current tenant', function () {
 });
 
 it('invites a user by e-mail', function () {
-    Notification::fake();
+    config(['mail.default' => 'smtp']);
+    Mail::fake();
     $admin = admin(twoFactor: true);
 
     $this->actingAs($admin)->get('/admin/users/invite')->assertOk()
@@ -358,11 +359,9 @@ it('invites a user by e-mail', function () {
         ->and($invitation->role)->toBe(Role::Commercial)
         ->and($invitation->invited_by)->toBe($admin->id);
 
-    Notification::assertSentOnDemand(InvitationNotification::class, function (InvitationNotification $n, array $channels, AnonymousNotifiable $to) use ($invitation) {
-        return $to->routes['mail'] === 'nouveau@cap.test'
-            && hash('sha256', basename($n->url)) === $invitation->token_hash
-            && str_contains($n->url, '/activation/');
-    });
+    Mail::assertSent(InvitationMail::class, fn (InvitationMail $mail) => $mail->hasTo('nouveau@cap.test')
+        && hash('sha256', basename($mail->url)) === $invitation->token_hash
+        && str_contains($mail->url, '/activation/'));
 });
 
 it('validates invitations', function () {
@@ -415,6 +414,8 @@ it('external identities belong to a user of the current tenant', function () {
 
 it('audits the invitation event', function () {
     inTenant();
+    config(['mail.default' => 'smtp']);
+    Mail::fake();
     $this->actingAs(admin(twoFactor: true))
         ->post('/admin/users/invitations', ['email' => 'nouvelle@cap.test', 'name' => 'Nouvelle', 'role' => 'commercial'])
         ->assertRedirect('/admin/users');

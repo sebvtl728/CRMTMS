@@ -51,7 +51,7 @@ Pour chaque société : raison sociale, forme juridique, capital (montant et « 
 
 *Utilisateurs* liste les comptes (statut : actif, en attente d'activation, désactivé, dernière connexion) et les **invitations en attente**.
 
-Inviter : **Inviter un utilisateur** → nom, adresse e-mail, rôle → **Envoyer l'invitation**. Un e-mail contenant le lien d'activation (usage unique, 24 h) est envoyé ; l'invitation apparaît dans « Invitations en attente » avec sa date d'expiration. Il est impossible d'inviter une adresse qui a déjà un compte actif dans l'organisme. L'envoi est consigné dans le journal d'audit (« Invitation envoyée »).
+Inviter : **Inviter un utilisateur** → nom, adresse e-mail, rôle → **Envoyer l'invitation**. Un e-mail contenant le lien d'activation (usage unique, 24 h) est envoyé par le connecteur SMTP de l'organisme (voir *Connecteurs*), à défaut par la messagerie de l'instance ; l'invitation apparaît dans « Invitations en attente » avec sa date d'expiration. Si l'e-mail ne peut pas partir (serveur refusé, erreur SMTP) ou si aucune messagerie n'est configurée, l'invitation est conservée et le lien d'activation s'affiche une seule fois à l'écran, avec un bouton « Copier le lien » : transmettez-le vous-même à la personne invitée (journal : « Échec d'envoi de l'invitation », avec la raison). Il est impossible d'inviter une adresse qui a déjà un compte actif dans l'organisme. L'envoi est consigné dans le journal d'audit (« Invitation envoyée »).
 
 Rôles disponibles : Administrateur de l'organisme, Direction, Commercial, Chargé de relations, Assistant, Responsable DAS. Les changements de rôle sont consignés (« Changement de rôle »).
 

@@ -65,7 +65,9 @@ test('admin first run: activate, enrol 2FA, create SCOP company, invite user', a
     await page.getByRole('button', { name: "Envoyer l'invitation" }).click();
 
     await expect(page).toHaveURL(/\/admin\/users$/);
-    await expect(page.getByText(`Invitation envoyée à ${INVITED_EMAIL}.`)).toBeVisible();
+    // The e2e stack has no mail delivery (MAIL_MAILER=log): the link is shown to copy instead.
+    await expect(page.getByText(`Invitation créée pour ${INVITED_EMAIL}, mais aucun e-mail n'a été envoyé`, { exact: false })).toBeVisible();
+    await expect(page.getByLabel("Lien d'activation")).toHaveValue(/\/activation\/[0-9a-f]{128}$/);
     await expect(page.getByRole('row', { name: new RegExp(INVITED_EMAIL) })).toBeVisible();
 
     // 6. Security settings: change the idle timeout.
@@ -78,7 +80,7 @@ test('admin first run: activate, enrol 2FA, create SCOP company, invite user', a
     // 7. The audit journal lists the invitation and the settings change.
     await page.getByRole('link', { name: "Journal d'audit", exact: true }).first().click();
     await expect(page).toHaveURL(/\/admin\/audit$/);
-    const invitation = page.getByRole('row', { name: /Invitation envoyée/ });
+    const invitation = page.getByRole('row', { name: /Échec d'envoi de l'invitation/ });
     await expect(invitation).toBeVisible();
     await expect(invitation).toContainText(INVITED_EMAIL);
     await expect(invitation).toContainText('Admin E2E');

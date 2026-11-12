@@ -1,10 +1,12 @@
 import Heading from '@/components/heading';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
 import { Head, Link } from '@inertiajs/react';
-import { UserPlus } from 'lucide-react';
+import { Copy, UserPlus } from 'lucide-react';
+import { useState } from 'react';
 
 interface UserRow {
     id: string;
@@ -28,6 +30,8 @@ interface UsersIndexProps {
     users: UserRow[];
     invitations: InvitationRow[];
     status?: string;
+    warning?: string;
+    activationLink?: string;
 }
 
 const breadcrumbs: BreadcrumbItem[] = [{ title: 'Utilisateurs', href: '/admin/users' }];
@@ -50,7 +54,36 @@ function UserStatus({ user }: { user: UserRow }) {
     return <Badge variant="secondary">Actif</Badge>;
 }
 
-export default function UsersIndex({ users, invitations, status }: UsersIndexProps) {
+// Shown once when the invitation e-mail could not be sent: the administrator passes the link on.
+function ActivationLinkNotice({ warning, link }: { warning: string; link?: string }) {
+    const [copied, setCopied] = useState(false);
+
+    const copy = () => {
+        if (!link) return;
+        navigator.clipboard?.writeText(link).then(
+            () => setCopied(true),
+            () => setCopied(false),
+        );
+    };
+
+    return (
+        <div role="alert" className="space-y-2 rounded-lg border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900 dark:border-amber-700 dark:bg-amber-950 dark:text-amber-100">
+            <p className="font-medium">{warning}</p>
+            {link && (
+                <div className="flex flex-col gap-2 sm:flex-row">
+                    <Input readOnly value={link} aria-label="Lien d'activation" onFocus={(e) => e.currentTarget.select()} className="font-mono text-xs" />
+                    <Button type="button" variant="outline" onClick={copy}>
+                        <Copy className="h-4 w-4" />
+                        {copied ? 'Copié' : 'Copier le lien'}
+                    </Button>
+                </div>
+            )}
+            <p className="text-xs">Valable 24 heures, usage unique. Ne le transmettez qu'à la personne invitée.</p>
+        </div>
+    );
+}
+
+export default function UsersIndex({ users, invitations, status, warning, activationLink }: UsersIndexProps) {
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Utilisateurs" />
@@ -67,6 +100,7 @@ export default function UsersIndex({ users, invitations, status }: UsersIndexPro
                 </div>
 
                 {status && <div className="text-sm font-medium text-green-600">{status}</div>}
+                {warning && <ActivationLinkNotice warning={warning} link={activationLink} />}
 
                 <section className="overflow-x-auto rounded-xl border">
                     <table className="w-full text-sm">
