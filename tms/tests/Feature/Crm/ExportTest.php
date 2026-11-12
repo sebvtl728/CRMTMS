@@ -131,7 +131,9 @@ it('neutralises single cells through the exporter itself', function () {
         ->and(XlsxExporter::neutralise('hello'))->toBe('hello')
         ->and(XlsxExporter::neutralise(''))->toBe('')
         ->and(XlsxExporter::neutralise(null))->toBeNull()
-        ->and(XlsxExporter::neutralise(' =A1'))->toBe(' =A1');
+        ->and(XlsxExporter::neutralise(' =A1'))->toBe("' =A1")
+        ->and(XlsxExporter::neutralise("\n=A1"))->toBe("'\n=A1")
+        ->and(XlsxExporter::neutralise('a =A1'))->toBe('a =A1');
 });
 
 it('exports people with french headers, phones as shown on screen, organisations and dates', function () {
@@ -209,4 +211,35 @@ it('streams a large export in chunks', function () {
     $result = exRows($this->get('/crm/organisations/export?columns[]=name'));
 
     expect($result)->toHaveCount(1201)->and($result[1200][0])->toBe('Société 1199');
+});
+
+it('pre-flights an export as json without writing anything', function () {
+    $this->actingAs(commercial());
+    Organisation::query()->create(['name' => 'Alpha', 'status' => 'client']);
+    Organisation::query()->create(['name' => 'Beta']);
+
+    $this->getJson('/crm/organisations/export/check?status=client')->assertOk()
+        ->assertExactJson(['rows' => 1, 'max' => 50000, 'allowed' => true, 'message' => null]);
+    $this->getJson('/crm/people/export/check')->assertOk()->assertJsonPath('rows', 0);
+
+    config()->set('tms.crm.export_max_rows', 1);
+    $refused = $this->getJson('/crm/organisations/export/check')->assertOk()->assertJsonPath('allowed', false)->assertJsonPath('rows', 2);
+    expect($refused->json('message'))->toContain('Affinez les filtres');
+    expect(AuditLog::query()->where('event', 'export.run')->count())->toBe(0);
+});
+
+it('refuses the pre-flight without crm.export', function () {
+    $this->actingAs(assistant());
+
+    $this->getJson('/crm/organisations/export/check')->assertForbidden();
+    $this->getJson('/crm/people/export/check')->assertForbidden();
+});
+
+it('throttles exports with a french message', function () {
+    $this->actingAs(commercial());
+
+    foreach (range(1, 20) as $i) {
+        $this->getJson('/crm/organisations/export/check')->assertOk();
+    }
+    $this->getJson('/crm/organisations/export/check')->assertStatus(429)->assertJsonPath('message', 'Trop d\'exports en peu de temps. Réessayez dans une minute.');
 });

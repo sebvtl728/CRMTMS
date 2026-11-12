@@ -30,8 +30,8 @@ export interface ColumnChoice {
 type Criteria = Record<string, string | boolean | null | undefined>;
 
 const ROUTES = {
-    organisations: { index: 'crm.organisations.index', export: 'crm.organisations.export' },
-    people: { index: 'crm.people.index', export: 'crm.people.export' },
+    organisations: { index: 'crm.organisations.index', export: 'crm.organisations.export', check: 'crm.organisations.export.check' },
+    people: { index: 'crm.people.index', export: 'crm.people.export', check: 'crm.people.export.check' },
 } as const;
 
 const SAVABLE: Record<Resource, string[]> = {
@@ -92,6 +92,26 @@ function rememberColumns(resource: Resource, columns: string[]) {
 }
 
 /**
+ * Columns shown in the desktop table and exported: those of the active saved
+ * filter, else the ones remembered on this device, else the defaults. Always
+ * restricted to the columns the resource offers (same list as the export).
+ */
+export function useListColumns(resource: Resource, columns: ColumnChoice, savedFilters: SavedFilterRow[], activeId: string | null) {
+    const valid = columns.options.map((o) => o.value);
+    const [selected, setSelected] = useState<string[]>(() => {
+        const fromFilter = savedFilters.find((f) => f.id === activeId)?.columns?.filter((c) => valid.includes(c));
+
+        return fromFilter && fromFilter.length > 0 ? fromFilter : (storedColumns(resource, valid) ?? columns.defaults);
+    });
+    const change = (next: string[]) => {
+        setSelected(next);
+        rememberColumns(resource, next);
+    };
+
+    return [selected, change] as const;
+}
+
+/**
  * Toolbar of a CRM list: saved filters (own and shared), column choice and
  * Excel export. The list itself stays driven by the page's filters.
  */
@@ -101,20 +121,24 @@ export function ListToolbar({
     savedFilters,
     columns,
     canExport,
+    activeId,
+    selected,
+    onSelectedChange,
 }: {
     resource: Resource;
     filters: object;
     savedFilters: SavedFilterRow[];
     columns: ColumnChoice;
     canExport: boolean;
+    activeId: string | null;
+    selected: string[];
+    onSelectedChange: (next: string[]) => void;
 }) {
     const routes = ROUTES[resource];
     const page = usePage<{ errors: Record<string, string> }>();
     const exportError = page.props.errors?.export ?? page.props.errors?.columns;
-    const valid = columns.options.map((o) => o.value);
-
-    const [activeId, setActiveId] = useState<string | null>(null);
-    const [selected, setSelected] = useState<string[]>(() => storedColumns(resource, valid) ?? columns.defaults);
+    const [checking, setChecking] = useState(false);
+    const [refusal, setRefusal] = useState<string | null>(null);
     const [dialog, setDialog] = useState<'save' | 'columns' | 'delete' | null>(null);
 
     const active = savedFilters.find((f) => f.id === activeId) ?? null;
@@ -124,19 +148,38 @@ export function ListToolbar({
     const apply = (id: string) => {
         const filter = savedFilters.find((f) => f.id === id);
         if (!filter) {
-            setActiveId(null);
             router.get(route(routes.index));
 
             return;
         }
-        setActiveId(id);
-        if (filter.columns && filter.columns.length > 0) setSelected(filter.columns);
-        router.get(route(routes.index), toQuery(filter.filters));
+        // The server echoes ?saved= back as the active filter; the page remounts with its columns.
+        router.get(route(routes.index), { ...toQuery(filter.filters), saved: id });
     };
 
-    const changeColumns = (next: string[]) => {
-        setSelected(next);
-        rememberColumns(resource, next);
+    const changeColumns = onSelectedChange;
+
+    // The download is a plain navigation: a refusal (too many rows, throttle) would be lost,
+    // so a JSON pre-flight tells first and its message is shown here.
+    const download = async () => {
+        setRefusal(null);
+        setChecking(true);
+        try {
+            const response = await fetch(route(routes.check, toQuery(current)), {
+                headers: { Accept: 'application/json' },
+                credentials: 'same-origin',
+            });
+            const json = (await response.json().catch(() => ({}))) as { allowed?: boolean; message?: string | null };
+            if (!response.ok || json.allowed === false) {
+                setRefusal(json.message ?? 'Export impossible pour le moment.');
+
+                return;
+            }
+            window.location.assign(exportHref);
+        } catch {
+            setRefusal("L'export a échoué, réessayez.");
+        } finally {
+            setChecking(false);
+        }
     };
 
     const exportHref = route(routes.export, { ...toQuery(current), columns: selected });
@@ -198,16 +241,14 @@ export function ListToolbar({
 
             {/* Export hidden below 768 px: a download is a desktop task. */}
             {canExport && (
-                <Button asChild size="sm" className="hidden md:inline-flex">
-                    <a href={exportHref} download>
-                        <Download className="h-4 w-4" />
-                        Exporter (.xlsx)
-                    </a>
+                <Button type="button" size="sm" className="hidden md:inline-flex" onClick={download} disabled={checking}>
+                    <Download className="h-4 w-4" />
+                    Exporter (.xlsx)
                 </Button>
             )}
-            {exportError && (
+            {(refusal ?? exportError) && (
                 <p role="alert" className="text-destructive w-full text-sm">
-                    {exportError}
+                    {refusal ?? exportError}
                 </p>
             )}
 
@@ -247,10 +288,7 @@ export function ListToolbar({
                                 router.delete(route('crm.saved-filters.destroy', active.id), {
                                     preserveScroll: true,
                                     preserveState: true,
-                                    onSuccess: () => {
-                                        setActiveId(null);
-                                        setDialog(null);
-                                    },
+                                    onSuccess: () => setDialog(null),
                                 })
                             }
                         >

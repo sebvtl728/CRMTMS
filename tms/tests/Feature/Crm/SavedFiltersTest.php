@@ -5,6 +5,7 @@ use App\Modules\Core\Audit\AuditLog;
 use App\Modules\Core\References\CapFormationReferenceSeeder;
 use App\Modules\Core\Tenancy\TenantContext;
 use App\Modules\Crm\CrmServiceProvider;
+use App\Modules\Crm\Organisations\Organisation;
 use App\Modules\Crm\Search\SavedFilter;
 use Inertia\Testing\AssertableInertia as Assert;
 
@@ -161,4 +162,35 @@ it('passes the saved filters and export rights to the list pages', function () {
 
     $this->actingAs(assistant());
     $this->get('/crm/organisations')->assertInertia(fn (Assert $page) => $page->where('can.export', false));
+});
+
+it('tells the list page which saved filter is active and exposes every exportable cell', function () {
+    $this->actingAs(commercial());
+    $filter = sfFilter('Clients', ['is_shared' => true, 'columns' => ['name', 'city']]);
+    Organisation::query()->create(['name' => 'Alpha', 'city' => 'Lyon']);
+
+    $this->get('/crm/organisations?saved='.$filter->id)->assertInertia(fn (Assert $page) => $page
+        ->where('activeSavedId', $filter->id)
+        ->where('savedFilters.0.columns', ['name', 'city'])
+        ->where('organisations.data.0.cells.name', 'Alpha')
+        ->where('organisations.data.0.cells.city', 'Lyon')
+        ->has('organisations.data.0.cells.status'));
+    $this->get('/crm/organisations?saved=nope')->assertInertia(fn (Assert $page) => $page->where('activeSavedId', null));
+    $this->get('/crm/organisations?saved[]=x')->assertOk();
+    $this->get('/crm/people?saved='.$filter->id)->assertInertia(fn (Assert $page) => $page->where('activeSavedId', null));
+});
+
+it('does not expose another user private filter as active', function () {
+    $this->actingAs(commercial());
+    $private = sfFilter('Privé');
+
+    $this->actingAs(assistant());
+    $this->get('/crm/organisations?saved='.$private->id)->assertInertia(fn (Assert $page) => $page->where('activeSavedId', null));
+});
+
+it('does not fail on an array resource and caps long search terms', function () {
+    $this->actingAs(commercial());
+
+    $this->getJson('/crm/saved-filters?resource[]=x')->assertOk();
+    $this->get('/crm/organisations?q='.str_repeat('a', 300))->assertInertia(fn (Assert $page) => $page->where('filters.q', str_repeat('a', 100)));
 });

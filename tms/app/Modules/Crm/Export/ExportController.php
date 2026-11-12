@@ -7,6 +7,7 @@ use App\Modules\Core\Audit\AuditRecorder;
 use App\Modules\Core\Users\User;
 use App\Modules\Crm\People\Person;
 use App\Modules\Crm\Search\CrmResource;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\ValidationException;
 use Symfony\Component\HttpFoundation\StreamedResponse;
@@ -28,6 +29,36 @@ class ExportController extends Controller
     public function people(Request $request): StreamedResponse
     {
         return $this->run($request, CrmResource::People);
+    }
+
+    public function checkOrganisations(Request $request): JsonResponse
+    {
+        return $this->check($request, CrmResource::Organisations);
+    }
+
+    public function checkPeople(Request $request): JsonResponse
+    {
+        return $this->check($request, CrmResource::People);
+    }
+
+    /**
+     * Pre-flight of the download (the page calls it first): is the export
+     * allowed, and why not. Writes nothing, journals nothing.
+     */
+    private function check(Request $request, CrmResource $resource): JsonResponse
+    {
+        $user = $request->user();
+        assert($user instanceof User);
+
+        $size = $this->exporter->size($resource->query($resource->filters($request->query(), $user), $user));
+        $allowed = $size['rows'] <= $size['max'];
+
+        return response()->json([
+            'rows' => $size['rows'],
+            'max' => $size['max'],
+            'allowed' => $allowed,
+            'message' => $allowed ? null : XlsxExporter::tooManyRows($size['rows'], $size['max']),
+        ])->header('Cache-Control', 'no-store, private');
     }
 
     private function run(Request $request, CrmResource $resource): StreamedResponse

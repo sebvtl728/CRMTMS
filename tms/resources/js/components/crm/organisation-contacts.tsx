@@ -55,7 +55,19 @@ type AffiliationForm = {
 
 const NONE = 'none';
 
-function Field({ id, label, error, children, className }: { id: string; label: string; error?: string; children: React.ReactNode; className?: string }) {
+function Field({
+    id,
+    label,
+    error,
+    children,
+    className,
+}: {
+    id: string;
+    label: string;
+    error?: string;
+    children: React.ReactNode;
+    className?: string;
+}) {
     return (
         <div className={`grid gap-1.5 ${className ?? ''}`}>
             <Label htmlFor={id}>{label}</Label>
@@ -180,7 +192,9 @@ function AffiliationDialog({
                 <DialogHeader>
                     <DialogTitle>{editing ? `Modifier le rattachement de ${editing.person.name}` : 'Ajouter un interlocuteur'}</DialogTitle>
                     <DialogDescription>
-                        {editing ? 'Fonction, coordonnées professionnelles et dates dans cette entreprise.' : 'Seul le nom de la personne est obligatoire.'}
+                        {editing
+                            ? 'Fonction, coordonnées professionnelles et dates dans cette entreprise.'
+                            : 'Seul le nom de la personne est obligatoire.'}
                     </DialogDescription>
                 </DialogHeader>
 
@@ -220,7 +234,12 @@ function AffiliationDialog({
                             </Field>
                             <div className="hidden sm:block" />
                             <Field id="aff-first-name" label="Prénom" error={errors.first_name}>
-                                <Input id="aff-first-name" value={data.first_name} onChange={(e) => setData('first_name', e.target.value)} autoComplete="off" />
+                                <Input
+                                    id="aff-first-name"
+                                    value={data.first_name}
+                                    onChange={(e) => setData('first_name', e.target.value)}
+                                    autoComplete="off"
+                                />
                             </Field>
                             <Field id="aff-last-name" label="Nom *" error={errors.last_name}>
                                 <Input
@@ -289,7 +308,9 @@ function AffiliationDialog({
                                         </ul>
                                     )}
                                     {search.trim().length >= 2 && hits.length === 0 && (
-                                        <p className="text-muted-foreground text-xs">Aucune personne trouvée (ou déjà rattachée à cette entreprise).</p>
+                                        <p className="text-muted-foreground text-xs">
+                                            Aucune personne trouvée (ou déjà rattachée à cette entreprise).
+                                        </p>
                                     )}
                                 </>
                             )}
@@ -299,7 +320,12 @@ function AffiliationDialog({
 
                     <div className="grid gap-3 sm:grid-cols-2">
                         <Field id="aff-job" label="Fonction" error={errors.job_title}>
-                            <Input id="aff-job" value={data.job_title} onChange={(e) => setData('job_title', e.target.value)} placeholder="Directeur, gérante…" />
+                            <Input
+                                id="aff-job"
+                                value={data.job_title}
+                                onChange={(e) => setData('job_title', e.target.value)}
+                                placeholder="Directeur, gérante…"
+                            />
                         </Field>
                         <Field id="aff-role" label="Rôle dans la décision" error={errors.decision_role_id}>
                             <Select value={roleValue} onValueChange={(v) => setData('decision_role_id', v === NONE ? '' : v)}>
@@ -317,10 +343,23 @@ function AffiliationDialog({
                             </Select>
                         </Field>
                         <Field id="aff-email" label="E-mail professionnel" error={errors.work_email}>
-                            <Input id="aff-email" type="email" value={data.work_email} onChange={(e) => setData('work_email', e.target.value)} autoComplete="off" />
+                            <Input
+                                id="aff-email"
+                                type="email"
+                                value={data.work_email}
+                                onChange={(e) => setData('work_email', e.target.value)}
+                                autoComplete="off"
+                            />
                         </Field>
                         <Field id="aff-phone" label="Téléphone professionnel" error={errors.work_phone}>
-                            <Input id="aff-phone" type="tel" value={data.work_phone} onChange={(e) => setData('work_phone', e.target.value)} maxLength={30} autoComplete="off" />
+                            <Input
+                                id="aff-phone"
+                                type="tel"
+                                value={data.work_phone}
+                                onChange={(e) => setData('work_phone', e.target.value)}
+                                maxLength={30}
+                                autoComplete="off"
+                            />
                         </Field>
                         <Field id="aff-started" label="Début du rattachement" error={errors.started_on}>
                             <Input id="aff-started" type="date" value={data.started_on} onChange={(e) => setData('started_on', e.target.value)} />
@@ -343,7 +382,9 @@ function AffiliationDialog({
                                 <Button
                                     type="button"
                                     variant="destructive"
-                                    onClick={() => router.delete(route('crm.affiliations.destroy', editing.id), { preserveScroll: true, onSuccess: onClose })}
+                                    onClick={() =>
+                                        router.delete(route('crm.affiliations.destroy', editing.id), { preserveScroll: true, onSuccess: onClose })
+                                    }
                                 >
                                     Confirmer la suppression
                                 </Button>
@@ -507,7 +548,10 @@ export function OrganisationContacts({ organisationId, affiliations, former, dec
                                     {personLink(a)}
                                     <span className="text-muted-foreground">
                                         {' '}
-                                        · {[a.job_title, a.started_on && formatDate(a.started_on), a.ended_on && `→ ${formatDate(a.ended_on)}`].filter(Boolean).join(' · ')}
+                                        ·{' '}
+                                        {[a.job_title, a.started_on && formatDate(a.started_on), a.ended_on && `→ ${formatDate(a.ended_on)}`]
+                                            .filter(Boolean)
+                                            .join(' · ')}
                                     </span>
                                 </span>
                                 {can.affiliate && (

@@ -18,7 +18,7 @@ class SearchController extends Controller
         assert($user instanceof User);
         $term = $request->query('q');
 
-        return response()->json($search->query(is_string($term) ? $term : '', $user))
+        return response()->json($search->query(is_string($term) ? mb_substr($term, 0, 100) : '', $user))
             ->header('Cache-Control', 'no-store, private');
     }
 }

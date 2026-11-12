@@ -195,7 +195,10 @@ export function Timeline({ kind, subjectId, canEdit }: Props) {
             )}
 
             {failed && (
-                <div role="alert" className="rounded-lg border border-red-300 bg-red-50 p-3 text-sm text-red-900 dark:border-red-800 dark:bg-red-950 dark:text-red-100">
+                <div
+                    role="alert"
+                    className="rounded-lg border border-red-300 bg-red-50 p-3 text-sm text-red-900 dark:border-red-800 dark:bg-red-950 dark:text-red-100"
+                >
                     L’historique n’a pas pu être chargé.{' '}
                     <button type="button" className="underline" onClick={() => void load(null)}>
                         Réessayer

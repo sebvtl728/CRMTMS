@@ -1,5 +1,6 @@
 import { FilterSelect } from '@/components/crm/filter-select';
-import { ListToolbar, type ColumnChoice, type SavedFilterRow } from '@/components/crm/filters';
+import { ListToolbar, useListColumns, type ColumnChoice, type SavedFilterRow } from '@/components/crm/filters';
+import { ListTable, type TableRow } from '@/components/crm/list-table';
 import { PersonTypeBadges } from '@/components/crm/person-type-badges';
 import Heading from '@/components/heading';
 import { Badge } from '@/components/ui/badge';
@@ -11,7 +12,7 @@ import AppLayout from '@/layouts/app-layout';
 import { formatDate, formatPhone, statusVariant, type Option, type Paginated, type StatusValue } from '@/lib/crm';
 import { type BreadcrumbItem } from '@/types';
 import { Head, Link, router } from '@inertiajs/react';
-import { ArrowDown, ArrowUp, ChevronLeft, ChevronRight, Plus } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Plus } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 
 interface Row {
@@ -30,6 +31,7 @@ interface Row {
     last_contact_at: string | null;
     created_at: string | null;
     deleted: boolean;
+    cells: TableRow['cells'];
 }
 
 interface Filters {
@@ -52,15 +54,17 @@ interface IndexProps {
     options: { type: Option[]; status: Option[]; situation: Option[]; funding: Option[]; origin: Option[]; responsible: Option[] };
     can: { create: boolean; delete: boolean; export: boolean };
     savedFilters: SavedFilterRow[];
+    activeSavedId: string | null;
     columns: ColumnChoice;
     status?: string;
 }
 
 const breadcrumbs: BreadcrumbItem[] = [{ title: 'Personnes', href: '/crm/people' }];
 
-export default function PeopleIndex({ people, filters, options, can, savedFilters, columns, status }: IndexProps) {
+export default function PeopleIndex({ people, filters, options, can, savedFilters, activeSavedId, columns, status }: IndexProps) {
     const [search, setSearch] = useState(filters.q);
     const first = useRef(true);
+    const [selected, setSelected] = useListColumns('people', columns, savedFilters, activeSavedId);
 
     const visit = (changes: Partial<Filters>) => {
         const next = { ...filters, ...changes };
@@ -70,6 +74,7 @@ export default function PeopleIndex({ people, filters, options, can, savedFilter
             if (next[k]) query[k] = String(next[k]);
         });
         if (next.mine) query.mine = '1';
+        if (activeSavedId) query.saved = activeSavedId;
         if (next.trashed) query.trashed = '1';
         if (next.sort !== 'name' || next.dir !== 'asc') {
             query.sort = next.sort;
@@ -90,15 +95,6 @@ export default function PeopleIndex({ people, filters, options, can, savedFilter
     }, [search]);
 
     const sortBy = (column: string) => visit({ sort: column, dir: filters.sort === column && filters.dir === 'asc' ? 'desc' : 'asc' });
-
-    const SortHeader = ({ column, children }: { column: string; children: string }) => (
-        <th className="px-4 py-2 font-medium" aria-sort={filters.sort === column ? (filters.dir === 'asc' ? 'ascending' : 'descending') : undefined}>
-            <button type="button" className="inline-flex items-center gap-1 hover:underline" onClick={() => sortBy(column)}>
-                {children}
-                {filters.sort === column && (filters.dir === 'asc' ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />)}
-            </button>
-        </th>
-    );
 
     const filtered = Boolean(
         filters.q ||
@@ -133,7 +129,16 @@ export default function PeopleIndex({ people, filters, options, can, savedFilter
 
                 {status && <div className="text-sm font-medium text-green-600">{status}</div>}
 
-                <ListToolbar resource="people" filters={filters} savedFilters={savedFilters} columns={columns} canExport={can.export} />
+                <ListToolbar
+                    resource="people"
+                    filters={filters}
+                    savedFilters={savedFilters}
+                    columns={columns}
+                    canExport={can.export}
+                    activeId={activeSavedId}
+                    selected={selected}
+                    onSelectedChange={setSelected}
+                />
 
                 <section aria-label="Filtres" className="grid gap-3 rounded-xl border p-3 sm:grid-cols-2 lg:grid-cols-4">
                     <div className="grid gap-1 sm:col-span-2 lg:col-span-4">
@@ -186,52 +191,17 @@ export default function PeopleIndex({ people, filters, options, can, savedFilter
                 ) : (
                     <>
                         {/* Table from 768 px */}
-                        <div className="hidden overflow-x-auto rounded-xl border md:block">
-                            <table className="w-full text-sm">
-                                <thead className="bg-muted/50 text-left">
-                                    <tr>
-                                        <SortHeader column="name">Nom</SortHeader>
-                                        <th className="px-4 py-2 font-medium">Type</th>
-                                        <th className="px-4 py-2 font-medium">Entreprise</th>
-                                        <th className="px-4 py-2 font-medium">E-mail</th>
-                                        <th className="px-4 py-2 font-medium">Téléphone</th>
-                                        <th className="px-4 py-2 font-medium">Statut</th>
-                                        <th className="px-4 py-2 font-medium">Responsable</th>
-                                        <SortHeader column="last_contact_at">Dernier contact</SortHeader>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {people.data.map((p) => (
-                                        <tr key={p.id} className="hover:bg-muted/30 border-t">
-                                            <td className="px-4 py-2 font-medium">
-                                                <Link href={route('crm.people.show', p.id)} className="hover:underline">
-                                                    {p.civility ? `${p.civility} ` : ''}
-                                                    {p.name}
-                                                </Link>
-                                                {p.deleted && (
-                                                    <Badge variant="destructive" className="ml-2">
-                                                        Supprimée
-                                                    </Badge>
-                                                )}
-                                            </td>
-                                            <td className="px-4 py-2">
-                                                <div className="flex flex-wrap gap-1">
-                                                    <PersonTypeBadges individual={p.is_individual} contact={p.organisations.length > 0} />
-                                                </div>
-                                            </td>
-                                            <td className="px-4 py-2">{orgLine(p) || '—'}</td>
-                                            <td className="px-4 py-2 break-all">{p.email ?? '—'}</td>
-                                            <td className="px-4 py-2 whitespace-nowrap">{formatPhone(p.phone)}</td>
-                                            <td className="px-4 py-2">
-                                                <Badge variant={statusVariant(p.status.value)}>{p.status.label}</Badge>
-                                            </td>
-                                            <td className="px-4 py-2">{p.responsible ?? '—'}</td>
-                                            <td className="px-4 py-2">{formatDate(p.last_contact_at)}</td>
-                                        </tr>
-                                    ))}
-                                </tbody>
-                            </table>
-                        </div>
+                        <ListTable
+                            rows={people.data}
+                            options={columns.options}
+                            selected={selected}
+                            titleKeys={['last_name']}
+                            href={(id) => route('crm.people.show', id)}
+                            sortKeys={{ last_name: 'name', city: 'city', last_contact_at: 'last_contact_at', created_at: 'created_at' }}
+                            sort={filters.sort}
+                            dir={filters.dir}
+                            onSort={sortBy}
+                        />
 
                         {/* Cards below 768 px */}
                         <ul className="grid gap-3 md:hidden">

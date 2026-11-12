@@ -37,12 +37,21 @@ final class XlsxExporter
         $max = (int) config('tms.crm.export_max_rows', self::MAX_ROWS);
 
         if ($count > $max) {
-            throw ValidationException::withMessages([
-                'export' => 'Trop de lignes à exporter ('.number_format($count, 0, ',', ' ').', maximum '.number_format($max, 0, ',', ' ').'). Affinez les filtres.',
-            ]);
+            throw ValidationException::withMessages(['export' => self::tooManyRows($count, $max)]);
         }
 
         return $count;
+    }
+
+    /**
+     * Rows the query would export, and the maximum allowed (pre-flight check).
+     *
+     * @param  Builder<Model>  $query
+     * @return array{rows: int, max: int}
+     */
+    public function size(Builder $query): array
+    {
+        return ['rows' => (clone $query)->reorder()->count(), 'max' => (int) config('tms.crm.export_max_rows', self::MAX_ROWS)];
     }
 
     /**
@@ -51,7 +60,9 @@ final class XlsxExporter
      */
     public function export(Builder $query, ExportResource $resource, array $columns, string $filename, ?int $rows = null): StreamedResponse
     {
-        $rows ?? $this->count($query);
+        if ($rows === null) {
+            $this->count($query);
+        }
         $headers = array_map(fn (string $c) => self::neutralise($resource->columns()[$c]) ?? '', $columns);
 
         return response()->streamDownload(function () use ($query, $resource, $columns, $headers): void {
@@ -74,6 +85,11 @@ final class XlsxExporter
         ]);
     }
 
+    public static function tooManyRows(int $count, int $max): string
+    {
+        return 'Trop de lignes à exporter ('.number_format($count, 0, ',', ' ').', maximum '.number_format($max, 0, ',', ' ').'). Affinez les filtres.';
+    }
+
     /**
      * A value starting with = + - @ tab or CR could run as a formula when the
      * file is opened: it gets a leading apostrophe.
@@ -84,6 +100,9 @@ final class XlsxExporter
             return $value;
         }
 
-        return in_array($value[0], ['=', '+', '-', '@', "\t", "\r"], true) ? "'".$value : $value;
+        // Spreadsheets also skip leading blanks and line feeds before a formula.
+        $first = ltrim($value, " \t\r\n")[0] ?? '';
+
+        return in_array($value[0], ['=', '+', '-', '@', "\t", "\r"], true) || in_array($first, ['=', '+', '-', '@'], true) ? "'".$value : $value;
     }
 }

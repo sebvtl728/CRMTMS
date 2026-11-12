@@ -40,7 +40,7 @@ class PersonController extends Controller
         $canDelete = $user->can(Permissions::DELETE);
 
         $filters = PersonListQuery::filters($request->query(), $user);
-        $query = PersonListQuery::build($filters, $user)->with(['activeAffiliations.organisation', 'responsible']);
+        $query = PersonListQuery::build($filters, $user)->with(CrmResource::People->export()->with());
 
         return Inertia::render('crm/people/index', [
             'people' => $query->paginate(25)->withQueryString()->through(fn (Person $p) => [
@@ -60,6 +60,7 @@ class PersonController extends Controller
                 'last_contact_at' => $p->last_contact_at?->toIso8601String(),
                 'created_at' => $p->created_at?->toIso8601String(),
                 'deleted' => $p->trashed(),
+                'cells' => $this->cells($p),
             ]),
             'filters' => $filters,
             'options' => [
@@ -71,9 +72,21 @@ class PersonController extends Controller
                 'responsible' => FormOptions::responsible(),
             ],
             'can' => ['create' => $user->can(Permissions::CREATE), 'delete' => $canDelete, 'export' => $user->can(Permissions::EXPORT)],
-            ...ListExtras::for(CrmResource::People, $user),
+            ...ListExtras::for(CrmResource::People, $user, $request->query('saved')),
             'status' => $request->session()->get('status'),
         ]);
+    }
+
+    /**
+     * Every exportable column of a row: the desktop table shows the ones the user chose.
+     *
+     * @return array<string, ?string>
+     */
+    private function cells(Person $person): array
+    {
+        $export = CrmResource::People->export();
+
+        return collect(array_keys($export->columns()))->mapWithKeys(fn (string $c) => [$c => $export->value($person, $c)])->all();
     }
 
     /**

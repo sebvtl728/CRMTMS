@@ -41,7 +41,7 @@ class OrganisationController extends Controller
         $canDelete = $user->can(Permissions::DELETE);
 
         $filters = OrganisationListQuery::filters($request->query(), $user);
-        $query = OrganisationListQuery::build($filters, $user)->with(['sector', 'responsible', 'das']);
+        $query = OrganisationListQuery::build($filters, $user)->with(CrmResource::Organisations->export()->with());
 
         return Inertia::render('crm/organisations/index', [
             'organisations' => $query->paginate(25)->withQueryString()->through(fn (Organisation $o) => [
@@ -56,6 +56,7 @@ class OrganisationController extends Controller
                 'last_contact_at' => $o->last_contact_at?->toIso8601String(),
                 'created_at' => $o->created_at?->toIso8601String(),
                 'deleted' => $o->trashed(),
+                'cells' => $this->cells(CrmResource::Organisations, $o),
             ]),
             'filters' => $filters,
             'options' => [
@@ -67,7 +68,7 @@ class OrganisationController extends Controller
                     ->map(fn (User $u) => ['value' => $u->id, 'label' => $u->name])->all(),
             ],
             'can' => ['create' => $user->can(Permissions::CREATE), 'delete' => $canDelete, 'export' => $user->can(Permissions::EXPORT)],
-            ...ListExtras::for(CrmResource::Organisations, $user),
+            ...ListExtras::for(CrmResource::Organisations, $user, $request->query('saved')),
             'status' => $request->session()->get('status'),
         ]);
     }
@@ -330,6 +331,18 @@ class OrganisationController extends Controller
             'das' => $this->options(ReferenceList::Das, null, $current === null ? [] : $current->das()->pluck('reference_items.id')->all()),
             'responsible' => FormOptions::responsible($current?->responsible_user_id),
         ];
+    }
+
+    /**
+     * Every exportable column of a row: the desktop table shows the ones the user chose.
+     *
+     * @return array<string, ?string>
+     */
+    private function cells(CrmResource $resource, Organisation $organisation): array
+    {
+        $export = $resource->export();
+
+        return collect(array_keys($export->columns()))->mapWithKeys(fn (string $c) => [$c => $export->value($organisation, $c)])->all();
     }
 
     /**

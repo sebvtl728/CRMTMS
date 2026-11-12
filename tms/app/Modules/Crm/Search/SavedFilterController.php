@@ -20,7 +20,7 @@ class SavedFilterController extends Controller
     public function index(Request $request): JsonResponse
     {
         $user = $this->user($request);
-        $resource = CrmResource::tryFrom((string) $request->query('resource'));
+        $resource = is_string($request->query('resource')) ? CrmResource::tryFrom($request->query('resource')) : null;
 
         $filters = SavedFilter::visibleTo($user)->with('author')
             ->when($resource, fn ($q, CrmResource $r) => $q->where('resource', $r->value))

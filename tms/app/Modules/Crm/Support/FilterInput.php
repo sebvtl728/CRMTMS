@@ -10,7 +10,7 @@ final class FilterInput
 {
     public static function text(mixed $value): string
     {
-        return is_string($value) ? trim($value) : '';
+        return is_string($value) ? mb_substr(trim($value), 0, 100) : '';
     }
 
     public static function id(mixed $value): ?string

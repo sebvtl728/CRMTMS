@@ -20,10 +20,13 @@ use App\Modules\Crm\Timeline\Note;
 use App\Modules\Crm\Timeline\NotesProvider;
 use App\Modules\Crm\Timeline\Timeline;
 use App\Modules\Crm\Visibility\CrmVisibility;
+use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Http\Exceptions\HttpResponseException;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Support\Str;
@@ -52,6 +55,10 @@ class CrmServiceProvider extends ServiceProvider
     public function boot(): void
     {
         self::registerReferenceUsage();
+
+        // Check + download count together: 10 exports a minute per user.
+        RateLimiter::for('crm-export', fn (Request $request) => Limit::perMinute(20)->by('crm-export:'.($request->user()?->getAuthIdentifier() ?? $request->ip()))
+            ->response(fn (Request $request, array $headers) => response()->json(['message' => 'Trop d\'exports en peu de temps. Réessayez dans une minute.'], 429, $headers)));
 
         Gate::policy(Organisation::class, OrganisationPolicy::class);
         Gate::policy(Person::class, PersonPolicy::class);
