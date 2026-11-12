@@ -34,5 +34,6 @@
         <env name="HORIZON_ENABLED" value="false"/>
         <env name="SESSION_DRIVER" value="array"/>
         <env name="TELESCOPE_ENABLED" value="false"/>
+        <env name="TRUSTED_PROXIES" value="172.29.250.10"/>
     </php>
 </phpunit>

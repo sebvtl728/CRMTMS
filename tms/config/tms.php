@@ -12,6 +12,9 @@ return [
     // Slug of the tenant used in "single" mode (created by the installer / seeder).
     'default_tenant' => env('TMS_DEFAULT_TENANT', 'default'),
 
+    // Recipient of the operational alerts (failed backups...), see `php artisan tms:alert`.
+    'alert_email' => env('TMS_ALERT_EMAIL'),
+
     'tenancy' => [
 
         // Database connection whose session carries app.tenant_id (runtime role tms_app).

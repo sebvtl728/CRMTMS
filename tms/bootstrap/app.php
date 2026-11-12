@@ -9,6 +9,7 @@ use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
 use Illuminate\Http\Middleware\AddLinkHeadersForPreloadedAssets;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
 return Application::configure(basePath: dirname(__DIR__))
@@ -21,6 +22,17 @@ return Application::configure(basePath: dirname(__DIR__))
         },
     )
     ->withMiddleware(function (Middleware $middleware) {
+        // Behind Caddy only: X-Forwarded-* is honoured when the request comes from one of
+        // TRUSTED_PROXIES (comma-separated IPs/CIDRs, empty = nobody). Never '*'.
+        // HTTPS detection (HSTS) and the client IP (/health throttle) depend on it.
+        // Read from the process environment: the middleware runs before config is loaded.
+        $middleware->trustProxies(
+            // @phpstan-ignore larastan.noEnvCallsOutsideOfConfig
+            at: array_values(array_filter(array_map('trim', explode(',', (string) env('TRUSTED_PROXIES', ''))))),
+            headers: Request::HEADER_X_FORWARDED_FOR | Request::HEADER_X_FORWARDED_HOST
+                | Request::HEADER_X_FORWARDED_PORT | Request::HEADER_X_FORWARDED_PROTO,
+        );
+
         $middleware->append(SecurityHeaders::class);
 
         // Tenant first: session, authentication and everything after it run
