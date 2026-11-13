@@ -48,7 +48,7 @@ it('logs a database error without its bound values', function () {
         ->and($logged)->not->toContain(Person::query()->value('id'))
         ->and($logged)->toContain('23505')
         ->and($logged)->toContain('insert into \"people\"')
-        ->and($logged)->toContain("UniqueConstraintViolationException");
+        ->and($logged)->toContain('UniqueConstraintViolationException');
 });
 
 it('scrubs a database error wrapped in another exception', function () {

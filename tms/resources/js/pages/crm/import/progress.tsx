@@ -2,7 +2,7 @@ import { WizardPage, type BatchSummary } from '@/components/crm/import-wizard';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { router } from '@inertiajs/react';
+import { router, usePage } from '@inertiajs/react';
 import { AlertTriangle, Loader2 } from 'lucide-react';
 import { useEffect, useState } from 'react';
 
@@ -42,6 +42,7 @@ export default function ImportProgress(props: ProgressProps) {
     const { batch } = props;
     const [progress, setProgress] = useState<Progress>(props);
     const [confirming, setConfirming] = useState(false);
+    const errors = usePage<{ errors: Record<string, string> }>().props.errors ?? {};
     const text = TEXT[progress.phase ?? props.phase ?? 'run'];
 
     useEffect(() => {
@@ -79,6 +80,12 @@ export default function ImportProgress(props: ProgressProps) {
             description={`« ${batch.original_name} » · ${batch.target.label}`}
         >
             <div className="grid max-w-3xl gap-4" aria-live="polite">
+                {errors.batch && (
+                    <Alert variant="destructive">
+                        <AlertTriangle className="h-4 w-4" />
+                        <AlertDescription>{errors.batch}</AlertDescription>
+                    </Alert>
+                )}
                 {progress.stuck ? (
                     <Alert variant="destructive">
                         <AlertTriangle className="h-4 w-4" />

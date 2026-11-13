@@ -15,6 +15,7 @@ use App\Modules\Crm\Import\UndoImport;
 use App\Modules\Crm\Import\ValueMapper;
 use App\Modules\Crm\Organisations\Organisation;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\Storage;
 
 beforeEach(function () {
@@ -90,7 +91,8 @@ it('refuses to simulate or start a batch that already ran', function () {
     $batch = runImport("Raison sociale\nGarage Martin\n", ImportTarget::Organisations);
 
     expect($batch->status)->toBe(ImportBatch::DONE)
-        ->and(fn () => $batch->startSimulation(FieldMap::guess($batch->target, ['Raison sociale']), new ValueMapper))->toThrow(ImportFileException::class)
+        ->and($batch->startSimulation(FieldMap::guess($batch->target, ['Raison sociale']), new ValueMapper))->toBeFalse()
+        ->and($batch->refresh()->status)->toBe(ImportBatch::DONE)
         ->and(fn () => app(Simulator::class)->run($batch, $batch->fieldMap(), $batch->valueMapper()))->toThrow(ImportFileException::class);
 });
 
@@ -183,4 +185,34 @@ it('queues the simulation on the long-running queue, whose worker outlives the l
         ->and(config('horizon.defaults.supervisor-imports'))->toMatchArray(['connection' => 'redis-long', 'queue' => ['imports'], 'timeout' => $job->timeout])
         // The other jobs keep their 60 s worker timeout.
         ->and(config('horizon.defaults.supervisor-1.timeout'))->toBe(60);
+});
+
+it('never turns a batch that started running in the meantime back into a simulation', function () {
+    $batch = uploadImport("Raison sociale\nGarage Martin\n", ImportTarget::Organisations);
+    simulateImport($batch);
+    $batch->refresh();
+    DB::table('import_batches')->where('id', $batch->id)->update(['status' => ImportBatch::RUNNING]);
+
+    $started = $batch->startSimulation(FieldMap::guess($batch->target, ['Raison sociale']), new ValueMapper);
+
+    expect($started)->toBeFalse()
+        ->and($batch->refresh()->status)->toBe(ImportBatch::RUNNING)
+        ->and($batch->simulation)->not->toBeNull();
+});
+
+it('answers « Cet import a déjà été lancé. » when the run starts while the strategy is saved', function () {
+    $batch = uploadImport("Raison sociale\nGarage Martin\n", ImportTarget::Organisations);
+    simulateImport($batch);
+    // Another tab starts the run right after this request loaded the batch.
+    ImportBatch::retrieved(function (ImportBatch $b) {
+        DB::table('import_batches')->where('id', $b->id)->update(['status' => ImportBatch::RUNNING]);
+    });
+    Queue::fake();
+
+    $this->put("/crm/import/{$batch->id}/strategy", ['strategy' => 'skip'])
+        ->assertRedirect("/crm/import/{$batch->id}")
+        ->assertSessionHasErrors(['batch' => 'Cet import a déjà été lancé.']);
+
+    expect(DB::table('import_batches')->where('id', $batch->id)->value('status'))->toBe(ImportBatch::RUNNING);
+    Queue::assertNotPushed(SimulateImport::class);
 });

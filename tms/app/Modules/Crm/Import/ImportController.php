@@ -9,6 +9,7 @@ use App\Modules\Core\Users\User;
 use App\Modules\Crm\Import\Readers\CsvReader;
 use App\Modules\Crm\Organisations\OrganisationStatus;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Http\Exceptions\HttpResponseException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -30,6 +31,8 @@ use Symfony\Component\HttpFoundation\Response as HttpResponse;
  */
 class ImportController extends Controller
 {
+    private const ALREADY_RUN = 'Cet import a déjà été lancé.';
+
     public const MAX_MEGABYTES = 20;
 
     /** Distinct file values per list offered to the user at once. */
@@ -592,7 +595,9 @@ class ImportController extends Controller
      */
     private function startSimulation(ImportBatch $batch, FieldMap $map, ValueMapper $values): void
     {
-        $batch->startSimulation($map, $values);
+        if (! $batch->startSimulation($map, $values)) {
+            throw new HttpResponseException(to_route('crm.import.show', $batch->id)->withErrors(['batch' => self::ALREADY_RUN]));
+        }
         SimulateImport::dispatch($batch->id);
     }
 

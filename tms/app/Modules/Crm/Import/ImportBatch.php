@@ -173,12 +173,16 @@ class ImportBatch extends Model
      * « simulating » at once, so the wizard shows the progress right away.
      * The caller dispatches SimulateImport.
      *
-     * @throws ImportFileException once the batch was run
+     * Conditional update: a run started in the meantime (another tab, a
+     * double click) is never turned back into a simulation.
+     *
+     * @return bool false when the batch was already run (nothing written)
      */
-    public function startSimulation(FieldMap $map, ValueMapper $values): void
+    public function startSimulation(FieldMap $map, ValueMapper $values): bool
     {
-        if (! in_array($this->status, [self::UPLOADED, self::SIMULATED], true)) {
-            throw new ImportFileException('Cet import a déjà été lancé : il ne peut plus être simulé.');
+        $editable = [self::UPLOADED, self::SIMULATED];
+        if (! in_array($this->status, $editable, true)) {
+            return false;
         }
 
         $options = $this->options;
@@ -186,7 +190,16 @@ class ImportBatch extends Model
         $this->forceFill([
             'field_map' => $map->toArray(), 'value_map' => $values->toArray(), 'options' => $options,
             'simulation' => null, 'status' => self::SIMULATING, 'cursor_line' => 0, 'total' => 0,
-        ])->save();
+        ]);
+        $changed = self::query()->whereKey($this->id)->whereIn('status', $editable)->update($this->getDirty());
+        if ($changed === 0) {
+            $this->refresh();
+
+            return false;
+        }
+        $this->syncOriginal();
+
+        return true;
     }
 
     /**
