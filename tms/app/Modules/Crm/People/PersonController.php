@@ -70,7 +70,7 @@ class PersonController extends Controller
                 'origin' => FormOptions::reference(ReferenceList::ContactOrigin),
                 'responsible' => FormOptions::responsible(),
             ],
-            'can' => ['create' => $user->can(Permissions::CREATE), 'delete' => $canDelete, 'export' => $user->can(Permissions::EXPORT)],
+            'can' => ['create' => $user->can(Permissions::CREATE), 'delete' => $canDelete, 'export' => $user->can(Permissions::EXPORT), 'import' => $user->can(Permissions::IMPORT)],
             ...ListExtras::for(CrmResource::People, $user, $request->query('saved')),
             'status' => $request->session()->get('status'),
         ]);

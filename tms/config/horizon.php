@@ -210,6 +210,20 @@ return [
             'timeout' => 60,
             'nice' => 0,
         ],
+
+        // Simulation of an import file (SimulateImport): one job per file, up to a few minutes.
+        'supervisor-imports' => [
+            'connection' => 'redis-long',
+            'queue' => ['imports'],
+            'balance' => 'simple',
+            'maxProcesses' => 1,
+            'maxTime' => 0,
+            'maxJobs' => 0,
+            'memory' => 256,
+            'tries' => 1,
+            'timeout' => 900,
+            'nice' => 0,
+        ],
     ],
 
     'environments' => [
@@ -219,11 +233,17 @@ return [
                 'balanceMaxShift' => 1,
                 'balanceCooldown' => 3,
             ],
+            'supervisor-imports' => [
+                'maxProcesses' => 2,
+            ],
         ],
 
         'local' => [
             'supervisor-1' => [
                 'maxProcesses' => 3,
+            ],
+            'supervisor-imports' => [
+                'maxProcesses' => 1,
             ],
         ],
     ],

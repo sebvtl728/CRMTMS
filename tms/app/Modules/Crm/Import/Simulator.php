@@ -17,14 +17,17 @@ final class Simulator
     public function __construct(private readonly DuplicateFinder $finder, private readonly DasLinks $das) {}
 
     /**
+     * @param  (callable(int): void)|null  $progress  called after each chunk with the last file line handled
+     *
      * @throws ImportFileException once the batch was run (its mapping is then fixed)
      */
-    public function run(ImportBatch $batch, FieldMap $map, ValueMapper $values): SimulationReport
+    public function run(ImportBatch $batch, FieldMap $map, ValueMapper $values, ?callable $progress = null): SimulationReport
     {
         if (! $batch->canSimulate()) {
             throw new ImportFileException('Cet import a déjà été lancé : il ne peut plus être simulé.');
         }
 
+        $background = $batch->status === ImportBatch::SIMULATING;
         $report = new SimulationReport;
         $reader = $batch->reader();
         $report->warnings = $reader->warnings();
@@ -42,6 +45,9 @@ final class Simulator
                 $chunk[$line] = $row;
                 if (count($chunk) === RunImport::CHUNK) {
                     $this->simulateChunk($importer, $chunk, $report);
+                    if ($progress !== null) {
+                        $progress((int) $line);
+                    }
                     $chunk = [];
                 }
             }
@@ -54,10 +60,21 @@ final class Simulator
                 : $report->modifiedSinceImport.' fiches modifiées depuis leur import seront mises à jour avec les valeurs du fichier.';
         }
 
+        // Marked failed while it ran (stuck): leave the batch as it is.
+        if ($background && ImportBatch::query()->whereKey($batch->id)->value('status') !== ImportBatch::SIMULATING) {
+            return $report;
+        }
+
         $batch->field_map = $map->toArray();
         $batch->value_map = $values->toArray();
-        $batch->simulation = $report->summary();
+        $batch->simulation = [
+            ...$report->summary(),
+            // For the wizard: the first error lines, then the first lines ignored or with a warning.
+            'error_rows' => $report->errorRows,
+            'other_rows' => array_slice(array_values(array_filter($report->rows, fn (array $r) => $r['status'] !== ImportRow::ERROR)), 0, SimulationReport::MAX_ERROR_ROWS),
+        ];
         $batch->total = $report->total;
+        $batch->cursor_line = 0;
         $batch->status = $report->canRun() ? ImportBatch::SIMULATED : ImportBatch::UPLOADED;
         $batch->save();
 

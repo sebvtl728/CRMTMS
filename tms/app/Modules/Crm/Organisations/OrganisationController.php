@@ -66,7 +66,7 @@ class OrganisationController extends Controller
                 'responsible' => User::query()->whereNull('deactivated_at')->orderBy('name')->get(['id', 'name'])
                     ->map(fn (User $u) => ['value' => $u->id, 'label' => $u->name])->all(),
             ],
-            'can' => ['create' => $user->can(Permissions::CREATE), 'delete' => $canDelete, 'export' => $user->can(Permissions::EXPORT)],
+            'can' => ['create' => $user->can(Permissions::CREATE), 'delete' => $canDelete, 'export' => $user->can(Permissions::EXPORT), 'import' => $user->can(Permissions::IMPORT)],
             ...ListExtras::for(CrmResource::Organisations, $user, $request->query('saved')),
             'status' => $request->session()->get('status'),
         ]);

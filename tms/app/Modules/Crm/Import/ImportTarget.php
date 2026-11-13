@@ -173,6 +173,55 @@ enum ImportTarget: string
     }
 
     /**
+     * Fields the file must provide a column for.
+     *
+     * @return list<string>
+     */
+    public function requiredFields(): array
+    {
+        return match ($this) {
+            self::Organisations => ['name'],
+            self::People, self::Affiliations => ['last_name'],
+            self::Notes => ['body'],
+        };
+    }
+
+    /**
+     * Fields holding the identifier of the fiche in the software it comes from.
+     *
+     * @return list<string>
+     */
+    public function identifierFields(): array
+    {
+        return array_values(array_filter(['source_id', 'organisation.source_id', 'subject_source_id'], fn (string $f) => isset($this->fields()[$f])));
+    }
+
+    /**
+     * What stops an import with this mapping (French messages): a required
+     * field without column, notes without a way to find the fiche,
+     * identifiers without their source software.
+     *
+     * @return list<string>
+     */
+    public function blockingProblems(FieldMap $map, ?string $sourceSystem): array
+    {
+        $errors = [];
+        foreach ($this->requiredFields() as $field) {
+            if (! $map->has($field)) {
+                $errors[] = 'Associez une colonne au champ obligatoire « '.$this->fields()[$field].' ».';
+            }
+        }
+        if ($this === self::Notes && ! array_filter(['subject_siret', 'subject_email', 'subject_source_id'], fn ($f) => $map->has($f))) {
+            $errors[] = 'Associez une colonne permettant de retrouver la fiche : SIRET, e-mail ou identifiant source.';
+        }
+        if (array_filter($this->identifierFields(), fn ($f) => $map->has($f)) !== [] && $sourceSystem === null) {
+            $errors[] = 'Indiquez le logiciel d\'origine des identifiants (ex. : Formevol) pour pouvoir réimporter sans doublon.';
+        }
+
+        return $errors;
+    }
+
+    /**
      * Fields mapped through ValueMapper: reference lists, plus status and responsible.
      *
      * @return list<string>

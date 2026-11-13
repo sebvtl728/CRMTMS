@@ -11,7 +11,7 @@ import AppLayout from '@/layouts/app-layout';
 import { formatDate, statusVariant, type Option, type Paginated, type StatusValue } from '@/lib/crm';
 import { type BreadcrumbItem } from '@/types';
 import { Head, Link, router } from '@inertiajs/react';
-import { ChevronLeft, ChevronRight, Plus } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Plus, Upload } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 
 interface Row {
@@ -46,7 +46,7 @@ interface IndexProps {
     organisations: Paginated<Row>;
     filters: Filters;
     options: { status: Option[]; das: Option[]; sector: Option[]; origin: Option[]; responsible: Option[] };
-    can: { create: boolean; delete: boolean; export: boolean };
+    can: { create: boolean; delete: boolean; export: boolean; import: boolean };
     savedFilters: SavedFilterRow[];
     activeSavedId: string | null;
     columns: ColumnChoice;
@@ -101,14 +101,24 @@ export default function OrganisationsIndex({ organisations, filters, options, ca
             <div className="flex flex-col gap-4 p-4">
                 <div className="flex flex-wrap items-start justify-between gap-4">
                     <Heading title="Entreprises" description="Clients et prospects de votre organisme" />
-                    {can.create && (
-                        <Button asChild>
-                            <Link href={route('crm.organisations.create')}>
-                                <Plus className="h-4 w-4" />
-                                Nouvelle entreprise
-                            </Link>
-                        </Button>
-                    )}
+                    <div className="flex flex-wrap gap-2">
+                        {can.import && (
+                            <Button asChild variant="outline">
+                                <Link href={route('crm.import.create')}>
+                                    <Upload className="h-4 w-4" />
+                                    Importer
+                                </Link>
+                            </Button>
+                        )}
+                        {can.create && (
+                            <Button asChild>
+                                <Link href={route('crm.organisations.create')}>
+                                    <Plus className="h-4 w-4" />
+                                    Nouvelle entreprise
+                                </Link>
+                            </Button>
+                        )}
+                    </div>
                 </div>
 
                 {status && <div className="text-sm font-medium text-green-600">{status}</div>}

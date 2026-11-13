@@ -1,5 +1,9 @@
 import { expect, test } from '@playwright/test';
+import { mkdirSync } from 'node:fs';
 import { generate } from 'otplib';
+
+// The signed-in administrator session, reused by the following specs (crm.spec.ts).
+export const ADMIN_STATE = 'tests/e2e/.auth/admin.json';
 
 // The administrator chooses this password through the activation link (test value, e2e database only).
 const PASSWORD = 'e2e-Passphrase-2026!';
@@ -33,6 +37,8 @@ test('admin first run: activate, enrol 2FA, create SCOP company, invite user', a
     await expect(page.getByText('Conservez ces codes de récupération')).toBeVisible();
     await page.getByRole('link', { name: 'Continuer' }).click();
     await expect(page).toHaveURL(/\/dashboard$/);
+    mkdirSync('tests/e2e/.auth', { recursive: true });
+    await page.context().storageState({ path: ADMIN_STATE });
 
     // 3. The admin menu shows every administration entry.
     const nav = page.getByRole('navigation').or(page.locator('[data-sidebar="sidebar"]'));

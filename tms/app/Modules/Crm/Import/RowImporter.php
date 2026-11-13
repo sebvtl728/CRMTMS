@@ -92,26 +92,7 @@ final class RowImporter
      */
     public function blockingErrors(): array
     {
-        $errors = [];
-        $required = match ($this->batch->target) {
-            ImportTarget::Organisations => ['name'],
-            ImportTarget::People, ImportTarget::Affiliations => ['last_name'],
-            ImportTarget::Notes => ['body'],
-        };
-        foreach ($required as $field) {
-            if (! $this->map->has($field)) {
-                $errors[] = 'Associez une colonne au champ obligatoire « '.$this->batch->target->fields()[$field].' ».';
-            }
-        }
-        if ($this->batch->target === ImportTarget::Notes && ! array_filter(['subject_siret', 'subject_email', 'subject_source_id'], fn ($f) => $this->map->has($f))) {
-            $errors[] = 'Associez une colonne permettant de retrouver la fiche : SIRET, e-mail ou identifiant source.';
-        }
-        $usesSource = array_filter(['source_id', 'organisation.source_id', 'subject_source_id'], fn ($f) => $this->map->has($f));
-        if ($usesSource !== [] && $this->sourceSystem === null) {
-            $errors[] = 'Indiquez le logiciel d\'origine des identifiants (ex. : Formevol) pour pouvoir réimporter sans doublon.';
-        }
-
-        return $errors;
+        return $this->batch->target->blockingProblems($this->map, $this->sourceSystem);
     }
 
     /**

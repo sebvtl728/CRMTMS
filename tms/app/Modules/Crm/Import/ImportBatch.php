@@ -3,6 +3,7 @@
 namespace App\Modules\Crm\Import;
 
 use App\Modules\Core\Audit\Auditable;
+use App\Modules\Core\Audit\AuditRecorder;
 use App\Modules\Core\Tenancy\BelongsToTenant;
 use App\Modules\Core\Tenancy\TenantStorage;
 use App\Modules\Core\Users\User;
@@ -16,8 +17,10 @@ use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Storage;
 
 /**
- * One uploaded file and its import: uploaded -> simulated -> running ->
- * done | failed, then undoing -> undone.
+ * One uploaded file and its import: uploaded -> simulating -> simulated ->
+ * running -> done | failed, then undoing -> undone. A batch running,
+ * simulating or undoing without progress for STUCK_MINUTES is « stuck » and
+ * may be marked failed (what it created can then be undone).
  *
  * @property string $id
  * @property string $tenant_id
@@ -49,6 +52,8 @@ class ImportBatch extends Model
 
     public const UPLOADED = 'uploaded';
 
+    public const SIMULATING = 'simulating';
+
     public const SIMULATED = 'simulated';
 
     public const RUNNING = 'running';
@@ -60,6 +65,9 @@ class ImportBatch extends Model
     public const UNDOING = 'undoing';
 
     public const UNDONE = 'undone';
+
+    /** No progress for this long: the worker is considered dead. */
+    public const STUCK_MINUTES = 15;
 
     /** Original files (and raw row values) are kept this many days. */
     public const RETENTION_DAYS = 30;
@@ -154,10 +162,88 @@ class ImportBatch extends Model
         ]);
     }
 
-    /** The mapping can change until the run starts. */
+    /** The mapping can change until the run starts (SIMULATING: the background job itself). */
     public function canSimulate(): bool
     {
-        return in_array($this->status, [self::UPLOADED, self::SIMULATED], true);
+        return in_array($this->status, [self::UPLOADED, self::SIMULATING, self::SIMULATED], true);
+    }
+
+    /**
+     * Records the mapping and queues a (re)simulation: the status becomes
+     * « simulating » at once, so the wizard shows the progress right away.
+     * The caller dispatches SimulateImport.
+     *
+     * @throws ImportFileException once the batch was run
+     */
+    public function startSimulation(FieldMap $map, ValueMapper $values): void
+    {
+        if (! in_array($this->status, [self::UPLOADED, self::SIMULATED], true)) {
+            throw new ImportFileException('Cet import a déjà été lancé : il ne peut plus être simulé.');
+        }
+
+        $options = $this->options;
+        unset($options['simulation_error']);
+        $this->forceFill([
+            'field_map' => $map->toArray(), 'value_map' => $values->toArray(), 'options' => $options,
+            'simulation' => null, 'status' => self::SIMULATING, 'cursor_line' => 0, 'total' => 0,
+        ])->save();
+    }
+
+    /**
+     * Run requested: « running » at once with fresh counters (RunImport
+     * continues from here). The raw lines of the simulation are dropped.
+     */
+    public function start(): void
+    {
+        $simulation = $this->simulation ?? [];
+        unset($simulation['error_rows'], $simulation['other_rows']);
+        $this->forceFill(['status' => self::RUNNING, 'started_at' => now(), 'cursor_line' => 0, 'total' => 0, 'created' => 0,
+            'updated' => 0, 'skipped' => 0, 'errors' => 0, 'simulation' => $simulation])->save();
+    }
+
+    /**
+     * Undo requested: « undoing » at once (UndoImport continues from here).
+     */
+    public function startUndo(): void
+    {
+        $options = $this->options;
+        $options['undo'] = ['removed' => 0, 'kept' => 0];
+        $this->forceFill(['status' => self::UNDOING, 'cursor_line' => 0, 'options' => $options])->save();
+    }
+
+    /** Running, simulating or undoing with no progress for STUCK_MINUTES. */
+    public function isStuck(): bool
+    {
+        return in_array($this->status, [self::RUNNING, self::SIMULATING, self::UNDOING], true)
+            && $this->updated_at !== null
+            && $this->updated_at->lte(now()->subMinutes(self::STUCK_MINUTES));
+    }
+
+    /**
+     * A stuck run, simulation or undo is declared failed: what it created
+     * can then be undone. Conditional update: a worker that wrote progress
+     * in the meantime wins. Journaled (crm.import_failed_marked).
+     *
+     * @return bool false when the batch is progressing or not running
+     */
+    public function markFailed(User $by): bool
+    {
+        $options = $this->options;
+        $options['failure'] = 'Marqué comme échoué par '.$by->name.' : l\'import ne progressait plus.';
+        $changed = self::query()->whereKey($this->id)
+            ->whereIn('status', [self::RUNNING, self::SIMULATING, self::UNDOING])
+            ->where('updated_at', '<=', now()->subMinutes(self::STUCK_MINUTES))
+            ->update(['status' => self::FAILED, 'finished_at' => now(), 'updated_at' => now(), 'options' => json_encode($options, JSON_UNESCAPED_UNICODE)]);
+        if ($changed === 0) {
+            return false;
+        }
+
+        $this->refresh();
+        app(AuditRecorder::class)->record('crm.import_failed_marked', $this, [], [
+            'file' => $this->original_name, 'target' => $this->target->value, 'total' => $this->total, 'created' => $this->created,
+        ], $by);
+
+        return true;
     }
 
     public function canRun(): bool

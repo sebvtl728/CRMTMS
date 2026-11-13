@@ -56,6 +56,9 @@ const EVENT_LABELS: Record<string, string> = {
     'auth.2fa_reset_by_operator': 'Double authentification réinitialisée (exploitant)',
     'access.role_changed': 'Changement de rôle',
     'export.run': 'Export',
+    'crm.import_run': 'Import lancé',
+    'crm.import_undone': 'Import annulé',
+    'crm.import_failed_marked': 'Import marqué comme échoué',
     'users.invitation_sent': 'Invitation envoyée',
     'users.invitation_send_failed': "Échec d'envoi de l'invitation",
     'users.activation_reissued': "Lien d'activation réémis",
@@ -77,6 +80,8 @@ const TYPE_LABELS: Record<string, string> = {
     affiliation: 'Rattachement',
     note: 'Note',
     attachment: 'Pièce jointe',
+    import_batch: 'Import',
+    import_profile: 'Profil d\'import',
 };
 // Older journal rows hold the class name: show its last segment.
 const typeLabel = (type: string | null) => (type ? (TYPE_LABELS[type] ?? type.split('\\').pop() ?? type) : '—');

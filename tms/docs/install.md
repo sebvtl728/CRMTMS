@@ -59,7 +59,10 @@ compilés (`npm run build`).
 
 Le test `tests/e2e/admin.spec.ts` rejoue le parcours d'un administrateur dans un vrai navigateur : lien
 d'activation, mot de passe, enrôlement 2FA (code TOTP calculé avec `otplib`), création d'une société SCOP,
-invitation d'un utilisateur, journal d'audit.
+invitation d'un utilisateur, journal d'audit. Il enregistre la session de l'administrateur
+(`tests/e2e/.auth/admin.json`, ignoré par git) que réutilise `tests/e2e/crm.spec.ts` : import d'un CSV de
+3 lignes par l'assistant « Importer », fiches visibles dans la liste, annulation de l'import (les deux fichiers
+se lancent donc ensemble, dans cet ordre).
 
 Il s'exécute sur une pile dédiée (`compose.e2e.yaml` : application `app-e2e`, base `tms_e2e`, organisme `e2e`,
 port **8081**, assets compilés) : la base et les données de développement ne sont jamais touchées. Prérequis :

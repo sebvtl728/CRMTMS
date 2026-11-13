@@ -10,6 +10,9 @@ final class SimulationReport
     /** Problem rows kept for display (the counters cover every row). */
     public const MAX_ROWS = 500;
 
+    /** Error lines shown by the wizard. */
+    public const MAX_ERROR_ROWS = 100;
+
     public int $total = 0;
 
     public int $toCreate = 0;
@@ -32,6 +35,9 @@ final class SimulationReport
     /** @var list<array{line: int, status: string, messages: list<string>}> rows with an error, a warning or skipped */
     public array $rows = [];
 
+    /** @var list<array{line: int, status: string, messages: list<string>}> the first MAX_ERROR_ROWS rows in error, whatever came before */
+    public array $errorRows = [];
+
     /** @var array<string, list<string>> field => values without correspondence */
     public array $unknownValues = [];
 
@@ -47,6 +53,10 @@ final class SimulationReport
             ImportRow::SKIPPED => $this->toSkip++,
             default => $this->errors++,
         };
+
+        if ($outcome->status === ImportRow::ERROR && count($this->errorRows) < self::MAX_ERROR_ROWS) {
+            $this->errorRows[] = ['line' => $line, 'status' => $outcome->status, 'messages' => $outcome->texts()];
+        }
 
         if (($outcome->status !== ImportRow::CREATED || $outcome->messages !== []) && count($this->rows) < self::MAX_ROWS) {
             $this->rows[] = ['line' => $line, 'status' => $outcome->status, 'messages' => $outcome->texts()];
