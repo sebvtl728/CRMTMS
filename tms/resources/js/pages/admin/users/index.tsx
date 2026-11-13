@@ -20,6 +20,8 @@ interface UserRow {
     last_login_at: string | null;
     role: string | null;
     das_ids: string[];
+    is_self: boolean;
+    two_factor: boolean;
 }
 
 interface InvitationRow {
@@ -34,6 +36,7 @@ interface InvitationRow {
 interface UsersIndexProps {
     users: UserRow[];
     dasOptions: { value: string; label: string }[];
+    roleOptions: { value: string; label: string }[];
     invitations: InvitationRow[];
     status?: string;
     warning?: string;
@@ -155,8 +158,28 @@ function DasDialog({ user, options, onClose }: { user: UserRow | null; options: 
     );
 }
 
-export default function UsersIndex({ users, dasOptions, invitations, status, warning, activationLink }: UsersIndexProps) {
+export default function UsersIndex({ users, dasOptions, roleOptions, invitations, status, warning, activationLink }: UsersIndexProps) {
     const [dasUser, setDasUser] = useState<UserRow | null>(null);
+    const [error, setError] = useState<string | null>(null);
+
+    // Every action goes through here: the first validation message (last administrator, own account...) is shown above the list.
+    const act = (method: 'post' | 'patch' | 'delete', url: string, data: Record<string, string> = {}) => {
+        setError(null);
+        router[method](url, data, {
+            preserveScroll: true,
+            onError: (errors) => setError(Object.values(errors)[0] ?? 'Action impossible.'),
+        });
+    };
+
+    const changeRole = (user: UserRow, role: string) => act('patch', route('admin.users.role', user.id), { role });
+    const deactivate = (user: UserRow) => {
+        if (confirm(`Désactiver le compte de ${user.name} ? Ses sessions seront terminées.`)) act('post', route('admin.users.deactivate', user.id));
+    };
+    const revoke = (invitation: InvitationRow) => {
+        if (confirm(`Révoquer l'invitation de ${invitation.email} ? Son lien ne fonctionnera plus.`)) {
+            act('delete', route('admin.invitations.destroy', invitation.id));
+        }
+    };
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Utilisateurs" />
@@ -174,6 +197,11 @@ export default function UsersIndex({ users, dasOptions, invitations, status, war
 
                 {status && <div className="text-sm font-medium text-green-600">{status}</div>}
                 {warning && <ActivationLinkNotice warning={warning} link={activationLink} />}
+                {error && (
+                    <div role="alert" className="text-sm font-medium text-red-600 dark:text-red-400">
+                        {error}
+                    </div>
+                )}
 
                 <section className="overflow-x-auto rounded-xl border">
                     <table className="w-full text-sm">
@@ -181,9 +209,12 @@ export default function UsersIndex({ users, dasOptions, invitations, status, war
                             <tr>
                                 <th className="px-4 py-2 font-medium">Nom</th>
                                 <th className="px-4 py-2 font-medium">Adresse e-mail</th>
+                                <th className="px-4 py-2 font-medium">Rôle</th>
                                 <th className="px-4 py-2 font-medium">Statut</th>
+                                <th className="px-4 py-2 font-medium">2FA</th>
                                 <th className="px-4 py-2 font-medium">Dernière connexion</th>
                                 <th className="px-4 py-2 font-medium">DAS suivis</th>
+                                <th className="px-4 py-2 font-medium">Actions</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -192,8 +223,24 @@ export default function UsersIndex({ users, dasOptions, invitations, status, war
                                     <td className="px-4 py-2">{user.name}</td>
                                     <td className="px-4 py-2">{user.email}</td>
                                     <td className="px-4 py-2">
+                                        <select
+                                            aria-label={`Rôle de ${user.name}`}
+                                            className="border-input bg-background h-8 rounded-md border px-2 text-sm"
+                                            value={user.role ?? ''}
+                                            onChange={(e) => changeRole(user, e.target.value)}
+                                        >
+                                            {user.role === null && <option value="">—</option>}
+                                            {roleOptions.map((o) => (
+                                                <option key={o.value} value={o.value}>
+                                                    {o.label}
+                                                </option>
+                                            ))}
+                                        </select>
+                                    </td>
+                                    <td className="px-4 py-2">
                                         <UserStatus user={user} />
                                     </td>
+                                    <td className="px-4 py-2">{user.two_factor ? 'Activée' : '—'}</td>
                                     <td className="px-4 py-2">{formatDate(user.last_login_at)}</td>
                                     <td className="px-4 py-2">
                                         {user.role === 'responsable_das' ? (
@@ -207,6 +254,24 @@ export default function UsersIndex({ users, dasOptions, invitations, status, war
                                             </Button>
                                         ) : (
                                             '—'
+                                        )}
+                                    </td>
+                                    <td className="px-4 py-2">
+                                        {user.active ? (
+                                            !user.is_self && (
+                                                <Button type="button" variant="outline" size="sm" onClick={() => deactivate(user)}>
+                                                    Désactiver
+                                                </Button>
+                                            )
+                                        ) : (
+                                            <Button
+                                                type="button"
+                                                variant="outline"
+                                                size="sm"
+                                                onClick={() => act('post', route('admin.users.reactivate', user.id))}
+                                            >
+                                                Réactiver
+                                            </Button>
                                         )}
                                     </td>
                                 </tr>
@@ -228,6 +293,7 @@ export default function UsersIndex({ users, dasOptions, invitations, status, war
                                         <th className="px-4 py-2 font-medium">Adresse e-mail</th>
                                         <th className="px-4 py-2 font-medium">Rôle</th>
                                         <th className="px-4 py-2 font-medium">Expiration</th>
+                                        <th className="px-4 py-2 font-medium">Actions</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -242,6 +308,19 @@ export default function UsersIndex({ users, dasOptions, invitations, status, war
                                                 ) : (
                                                     formatDate(invitation.expires_at)
                                                 )}
+                                            </td>
+                                            <td className="flex gap-2 px-4 py-2">
+                                                <Button
+                                                    type="button"
+                                                    variant="outline"
+                                                    size="sm"
+                                                    onClick={() => act('post', route('admin.invitations.resend', invitation.id))}
+                                                >
+                                                    Renvoyer
+                                                </Button>
+                                                <Button type="button" variant="outline" size="sm" onClick={() => revoke(invitation)}>
+                                                    Révoquer
+                                                </Button>
                                             </td>
                                         </tr>
                                     ))}

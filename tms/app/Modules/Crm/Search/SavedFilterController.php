@@ -2,6 +2,7 @@
 
 namespace App\Modules\Crm\Search;
 
+use App\Exceptions\UserFacingHttpException;
 use App\Http\Controllers\Controller;
 use App\Modules\Core\Users\User;
 use Illuminate\Http\JsonResponse;
@@ -79,7 +80,9 @@ class SavedFilterController extends Controller
 
     private function mustBeAuthor(User $user, SavedFilter $filter): void
     {
-        abort_unless($filter->user_id === $user->getKey(), 403, 'Seul l\'auteur d\'un filtre peut le modifier ou le supprimer.');
+        if ($filter->user_id !== $user->getKey()) {
+            throw new UserFacingHttpException(403, 'Seul l\'auteur d\'un filtre peut le modifier ou le supprimer.');
+        }
     }
 
     private function user(Request $request): User

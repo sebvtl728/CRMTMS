@@ -148,3 +148,18 @@ it('refuses to reset the two-factor authentication of an unknown account', funct
         ->expectsOutputToContain('Aucun compte')
         ->assertFailed();
 });
+
+it('recovery commands require --tenant in multi mode', function () {
+    config(['tms.mode' => 'multi']);
+
+    $this->artisan('tms:user:activation-link', ['email' => 'x@cap.test', '--role' => 'admin_organisme'])
+        ->expectsOutputToContain('--tenant')
+        ->assertFailed();
+    $this->artisan('tms:user:reset-2fa', ['email' => 'x@cap.test'])
+        ->expectsOutputToContain('--tenant')
+        ->assertFailed();
+
+    // Explicit tenant works.
+    $this->artisan('tms:user:activation-link', ['email' => 'x@cap.test', '--role' => 'admin_organisme', '--tenant' => $this->tenant->slug])
+        ->assertSuccessful();
+});

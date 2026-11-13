@@ -21,8 +21,8 @@ use RuntimeException;
  */
 class ConnectorController extends Controller
 {
-    /** Settings that designate the remote server: changing one requires the secrets again. */
-    private const SERVER_SETTINGS = ['host', 'port'];
+    /** Settings that designate the remote server or how it is reached (a downgrade of the encryption would send the password in clear): changing one requires the secrets again. */
+    private const SERVER_SETTINGS = ['host', 'port', 'encryption'];
 
     public function __construct(private readonly ConnectorRegistry $registry) {}
 

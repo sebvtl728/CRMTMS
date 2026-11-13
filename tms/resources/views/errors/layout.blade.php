@@ -1,16 +1,13 @@
 @php
-    // Only the French messages our own code passes to abort() are shown (4xx).
-    // Framework messages (route not found, model not found, CSRF...) carry a
-    // previous exception or an English text and are never displayed, nor is
-    // anything from a server error.
+    // Only the French messages the application raises itself (UserFacingHttpException)
+    // are shown. Framework exceptions (routing, throttling, CSRF, model not found...)
+    // carry English texts and technical details: each status has its own French text.
     $status = isset($exception) && $exception instanceof \Symfony\Component\HttpKernel\Exception\HttpExceptionInterface
         ? $exception->getStatusCode() : ($status ?? 500);
     $detail = null;
     if (isset($exception) && $status < 500
-        && $exception instanceof \Symfony\Component\HttpKernel\Exception\HttpExceptionInterface
-        && $exception->getPrevious() === null
-        && $exception->getMessage() !== ''
-        && ! str_starts_with($exception->getMessage(), 'The route ')) {
+        && $exception instanceof \App\Exceptions\UserFacingHttpException
+        && $exception->getMessage() !== '') {
         $detail = $exception->getMessage();
     }
 @endphp

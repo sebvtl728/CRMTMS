@@ -3,6 +3,7 @@
 use App\Modules\Connectors\Core\ConnectorConfig;
 use App\Modules\Connectors\Smtp\SmtpHostRefused;
 use App\Modules\Connectors\Smtp\SmtpTransportFactory;
+use App\Modules\Connectors\Smtp\TenantMailer;
 use App\Modules\Core\Audit\AuditLog;
 use App\Modules\Core\Users\Invitation;
 use App\Modules\Core\Users\InvitationMail;
@@ -142,6 +143,25 @@ it('shows the link with a warning when no mail delivery is configured', function
     expect(Invitation::count())->toBe(1)
         ->and(AuditLog::query()->where('event', 'users.invitation_send_failed')->count())->toBe(1);
 })->with(['log', 'array']);
+
+it('failover mailer ending in log is treated as delivering nowhere', function () {
+    tenant();
+    config(['mail.default' => 'failover', 'mail.mailers.failover' => ['transport' => 'failover', 'mailers' => ['smtp', 'log']]]);
+    // A failed smtp send would silently land in the log: the link must be shown.
+    expect(TenantMailer::deliversNowhere(null))->toBeTrue();
+
+    config(['mail.mailers.failover.mailers' => ['log']]);
+    expect(TenantMailer::deliversNowhere(null))->toBeTrue();
+
+    config(['mail.mailers.failover.mailers' => ['log', 'smtp']]);
+    expect(TenantMailer::deliversNowhere(null))->toBeFalse();
+
+    config(['mail.default' => 'roundrobin', 'mail.mailers.roundrobin' => ['transport' => 'roundrobin', 'mailers' => ['smtp', 'array']]]);
+    expect(TenantMailer::deliversNowhere(null))->toBeTrue();
+
+    config(['mail.mailers.roundrobin.mailers' => ['smtp', 'ses']]);
+    expect(TenantMailer::deliversNowhere(null))->toBeFalse();
+});
 
 it('passes the warning and the link to the users page', function () {
     $admin = admin(twoFactor: true);

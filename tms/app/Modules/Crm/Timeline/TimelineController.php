@@ -2,6 +2,7 @@
 
 namespace App\Modules\Crm\Timeline;
 
+use App\Exceptions\UserFacingHttpException;
 use App\Http\Controllers\Controller;
 use App\Modules\Crm\Organisations\Organisation;
 use App\Modules\Crm\People\Person;
@@ -39,7 +40,7 @@ class TimelineController extends Controller
             try {
                 $before = CarbonImmutable::parse($cursor);
             } catch (\Throwable) {
-                abort(422, 'Curseur invalide.');
+                throw new UserFacingHttpException(422, 'Curseur invalide.');
             }
         }
 

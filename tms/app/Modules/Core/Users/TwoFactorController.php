@@ -2,6 +2,7 @@
 
 namespace App\Modules\Core\Users;
 
+use App\Exceptions\UserFacingHttpException;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -85,7 +86,9 @@ class TwoFactorController extends Controller
     {
         /** @var User $user */
         $user = $request->user();
-        abort_if($this->twoFactor->isRequiredFor($user), 403, 'La double authentification est obligatoire pour votre compte.');
+        if ($this->twoFactor->isRequiredFor($user)) {
+            throw new UserFacingHttpException(403, 'La double authentification est obligatoire pour votre compte.');
+        }
 
         $this->twoFactor->disable($user);
         TwoFactorDisabled::dispatch($user);
