@@ -240,3 +240,23 @@ it('registers the opportunities as linked data and their references as used', fu
         ->and(ReferenceUsage::isInUse(pipelineStage('Nouveau')))->toBeTrue()
         ->and(StageChange::query()->count())->toBe(1);
 });
+
+it('takes a particulier as person account, never an interlocuteur', function () {
+    $organisation = Organisation::query()->create(['name' => 'Le Bistrot']);
+    $interlocuteur = makePerson('Chef');
+    affiliate($interlocuteur, $organisation);
+    $particulier = makePerson('Martin', ['is_individual' => true]);
+
+    $this->actingAs(commercial())->postJson('/crm/opportunities', opportunityPayload(['person_id' => $interlocuteur->id]))
+        ->assertJsonValidationErrors(['person_id' => 'Cette personne n\'est pas un particulier : créez l\'opportunité sur son entreprise.']);
+    $this->get("/crm/opportunities/create?person={$interlocuteur->id}")->assertNotFound();
+    expect(Opportunity::count())->toBe(0);
+
+    $this->get("/crm/people/{$interlocuteur->id}")->assertInertia(fn (Assert $page) => $page->where('can.createOpportunity', false));
+    $this->get("/crm/people/{$particulier->id}")->assertInertia(fn (Assert $page) => $page->where('can.createOpportunity', true));
+
+    // The account picker only offers particuliers.
+    $makeChef = makePerson('Chef particulier', ['is_individual' => true]);
+    $names = collect($this->getJson('/crm/people/search?individual=1&q=chef')->json('people'))->pluck('id')->all();
+    expect($names)->toBe([$makeChef->id]);
+});

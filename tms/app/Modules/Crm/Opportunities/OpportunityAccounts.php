@@ -18,9 +18,20 @@ final class OpportunityAccounts
         return $id === null ? null : CrmVisibility::organisations(Organisation::query(), $user)->find($id);
     }
 
+    /**
+     * A particulier only: an interlocuteur's affaires belong to his entreprise.
+     */
     public static function person(?string $id, User $user): ?Person
     {
-        return $id === null ? null : CrmVisibility::people(Person::query(), $user)->find($id);
+        return $id === null ? null : CrmVisibility::people(Person::query(), $user)->where('is_individual', true)->find($id);
+    }
+
+    /**
+     * A visible person who is not a particulier (refusal message of the form).
+     */
+    public static function isInterlocuteur(string $id, User $user): bool
+    {
+        return CrmVisibility::people(Person::query(), $user)->where('is_individual', false)->whereKey($id)->exists();
     }
 
     /**

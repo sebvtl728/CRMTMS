@@ -29,12 +29,22 @@ class OpportunityPolicy
 
     public function update(User $user, Opportunity $opportunity): bool
     {
-        return $user->can(Permissions::UPDATE) && $this->visible($user, $opportunity);
+        return $user->can(Permissions::UPDATE) && $this->visible($user, $opportunity) && ! $this->ficheTrashed($opportunity);
     }
 
     public function delete(User $user, Opportunity $opportunity): bool
     {
-        return $user->can(Permissions::DELETE) && $this->visible($user, $opportunity);
+        return $user->can(Permissions::DELETE) && $this->visible($user, $opportunity) && ! $this->ficheTrashed($opportunity);
+    }
+
+    /**
+     * Like the fiche itself: nothing is edited on a trashed entreprise or person.
+     */
+    private function ficheTrashed(Opportunity $opportunity): bool
+    {
+        $fiche = $opportunity->organisation_id !== null ? $opportunity->organisation : $opportunity->person;
+
+        return $fiche === null || $fiche->trashed();
     }
 
     private function visible(User $user, Opportunity $opportunity): bool

@@ -83,13 +83,24 @@ function AccountPicker() {
             return;
         }
         const controller = new AbortController();
+        const get = (url: string) =>
+            fetch(url, { headers: { Accept: 'application/json' }, signal: controller.signal }).then((r) => (r.ok ? r.json() : null));
         const timer = setTimeout(() => {
-            fetch(`${route('crm.search')}?${new URLSearchParams({ q: term })}`, {
-                headers: { Accept: 'application/json' },
-                signal: controller.signal,
-            })
-                .then((r) => (r.ok ? r.json() : { organisations: [], people: [] }))
-                .then(setHits)
+            // Entreprises from the global search; people: particuliers only (an interlocuteur's affaire belongs to his entreprise).
+            Promise.all([
+                get(`${route('crm.search')}?${new URLSearchParams({ q: term })}`),
+                get(`${route('crm.people.search')}?${new URLSearchParams({ q: term, individual: '1' })}`),
+            ])
+                .then(([global, people]) =>
+                    setHits({
+                        organisations: global?.organisations ?? [],
+                        people: ((people?.people ?? []) as { id: string; name: string; email: string | null }[]).map((p) => ({
+                            id: p.id,
+                            name: p.name,
+                            subtitle: p.email,
+                        })),
+                    }),
+                )
                 .catch(() => undefined);
         }, 250);
         return () => {
@@ -127,7 +138,7 @@ function AccountPicker() {
                 {hits.people.map((h) => (
                     <li key={h.id}>
                         <button type="button" className="hover:bg-muted w-full rounded px-2 py-1 text-left" onClick={() => pick('person', h.id)}>
-                            {h.name} <span className="text-muted-foreground">· Personne{h.subtitle ? ` · ${h.subtitle}` : ''}</span>
+                            {h.name} <span className="text-muted-foreground">· Particulier{h.subtitle ? ` · ${h.subtitle}` : ''}</span>
                         </button>
                     </li>
                 ))}

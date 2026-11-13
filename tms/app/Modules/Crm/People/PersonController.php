@@ -100,6 +100,7 @@ class PersonController extends Controller
     /**
      * People to attach to an entreprise (autocomplete of the interlocuteurs
      * tab): visible people matching the text, minus those already attached.
+     * `individual=1` keeps the particuliers only (account of an opportunity).
      */
     public function search(Request $request): JsonResponse
     {
@@ -114,6 +115,7 @@ class PersonController extends Controller
         $people = CrmVisibility::people(Person::query(), $user)
             ->with(CrmVisibility::activeAffiliationsWith($user))
             ->search($term)
+            ->when(FilterInput::bool($request->query('individual')), fn (Builder $q) => $q->where('is_individual', true))
             ->when($organisationId, fn (Builder $q, string $id) => $q->whereNotExists(fn ($sub) => $sub->select(DB::raw(1))->from('affiliations')
                 ->whereColumn('affiliations.person_id', 'people.id')->where('affiliations.organisation_id', $id)
                 ->whereNull('affiliations.ended_on')->whereNull('affiliations.deleted_at')))
@@ -214,7 +216,7 @@ class PersonController extends Controller
             'similar' => $user->can(Permissions::MERGE) ? $this->duplicates->similarTo($person, $user) : [],
             'can' => [
                 'merge' => ! $person->trashed() && $person->anonymised_at === null && $user->can(Permissions::MERGE),
-                'createOpportunity' => ! $person->trashed() && $person->anonymised_at === null && $user->can(Permissions::CREATE),
+                'createOpportunity' => $person->is_individual && ! $person->trashed() && $person->anonymised_at === null && $user->can(Permissions::CREATE),
                 'update' => ! $person->trashed() && $user->can('update', $person),
                 'delete' => ! $person->trashed() && $user->can('delete', $person),
                 'restore' => $person->trashed() && $user->can('restore', $person),

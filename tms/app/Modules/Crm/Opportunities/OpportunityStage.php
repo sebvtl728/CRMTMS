@@ -60,6 +60,9 @@ final class OpportunityStage
         }
 
         $stage = ReferenceItem::withTrashed()->findOrFail($opportunity->stage_id);
+        if (self::outcome($stage) !== null) {
+            return; // won / lost: the stage sets it
+        }
         $opportunity->probability = $probability;
         $opportunity->probability_overridden = $probability !== self::defaultProbability($stage);
     }

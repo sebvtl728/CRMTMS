@@ -166,3 +166,20 @@ it('lets only crm.update move a stage', function () {
     $this->actingAs($responsable)->get("/crm/opportunities/{$opportunity->id}")->assertOk();
     $this->post("/crm/opportunities/{$opportunity->id}/stage", ['stage_id' => pipelineStage('Contacté')->id])->assertForbidden();
 });
+
+it('keeps the probability of a won or lost opportunity', function () {
+    $opportunity = stageOpportunity();
+    app(OpportunityStage::class)->move($opportunity, pipelineStage('Gagné'), null, null, null);
+    $payload = ['title' => $opportunity->title, 'das_id' => $opportunity->das_id];
+
+    $this->actingAs(commercial())->putJson("/crm/opportunities/{$opportunity->id}", [...$payload, 'probability' => 50])
+        ->assertJsonValidationErrors(['probability' => 'La probabilité d\'une opportunité gagnée ou perdue est fixée par son étape.']);
+    $this->put("/crm/opportunities/{$opportunity->id}", [...$payload, 'probability' => 100, 'title' => 'Renommée'])->assertSessionHasNoErrors();
+
+    // Direct callers are ignored too.
+    $stages = app(OpportunityStage::class);
+    $opportunity->refresh();
+    $stages->setProbability($opportunity, 30);
+    expect($opportunity->probability)->toBe(100)
+        ->and($opportunity->title)->toBe('Renommée');
+});

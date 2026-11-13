@@ -63,7 +63,7 @@ class OpportunityRequest extends FormRequest
         $rules = [
             'title' => ['required', 'string', 'max:200'],
             'das_id' => ['required', ...ReferenceRules::item(ReferenceList::Das, $current?->das_id), $this->followedDas($user, $current?->das_id)],
-            'probability' => ['nullable', 'integer', 'between:0,100'],
+            'probability' => ['nullable', 'integer', 'between:0,100', $this->closedProbability($current)],
             'amount' => ['nullable', 'numeric', 'decimal:0,2', 'min:0', 'max:9999999999.99'],
             'expected_close_on' => ['nullable', 'date_format:Y-m-d'],
             'priority_id' => ['nullable', ...ReferenceRules::item(ReferenceList::Priority, $current?->priority_id)],
@@ -75,7 +75,14 @@ class OpportunityRequest extends FormRequest
 
         if ($current === null) {
             $rules['organisation_id'] = ['nullable', 'bail', 'uuid', $this->visible(fn (string $id) => OpportunityAccounts::organisation($id, $user) !== null, 'Cette entreprise n\'existe pas ou n\'est plus disponible.')];
-            $rules['person_id'] = ['nullable', 'bail', 'uuid', $this->visible(fn (string $id) => OpportunityAccounts::person($id, $user) !== null, 'Cette personne n\'existe pas ou n\'est plus disponible.')];
+            $rules['person_id'] = ['nullable', 'bail', 'uuid', function (string $attribute, mixed $value, Closure $fail) use ($user): void {
+                if (is_string($value) && OpportunityAccounts::person($value, $user) !== null) {
+                    return;
+                }
+                $fail(is_string($value) && OpportunityAccounts::isInterlocuteur($value, $user)
+                    ? 'Cette personne n\'est pas un particulier : créez l\'opportunité sur son entreprise.'
+                    : 'Cette personne n\'existe pas ou n\'est plus disponible.');
+            }];
             $rules['stage_id'] = ['required', ...ReferenceRules::item(ReferenceList::PipelineStage), function (string $attribute, mixed $value, Closure $fail): void {
                 $stage = ReferenceItem::query()->find($value);
                 if ($stage !== null && OpportunityStage::outcome($stage) !== null) {
@@ -101,6 +108,22 @@ class OpportunityRequest extends FormRequest
                 $validator->errors()->add('account', 'Choisissez une entreprise ou un particulier.');
             }
         }];
+    }
+
+    /**
+     * A won or lost opportunity keeps the probability of its stage (100 / 0).
+     */
+    private function closedProbability(?Opportunity $current): Closure
+    {
+        return function (string $attribute, mixed $value, Closure $fail) use ($current): void {
+            if ($current === null || (int) $value === $current->probability) {
+                return;
+            }
+            $stage = ReferenceItem::withTrashed()->find($current->stage_id);
+            if ($stage !== null && OpportunityStage::outcome($stage) !== null) {
+                $fail('La probabilité d\'une opportunité gagnée ou perdue est fixée par son étape.');
+            }
+        };
     }
 
     /**

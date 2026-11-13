@@ -75,3 +75,19 @@ it('refuses to create on a fiche the user cannot see', function () {
     ])->assertJsonValidationErrors('organisation_id');
     expect(Opportunity::count())->toBe(0);
 });
+
+it('refuses to edit an opportunity of a trashed fiche', function () {
+    $organisation = Organisation::query()->create(['name' => 'Le Bistrot']);
+    $opportunity = makeOpportunity($organisation);
+    $organisation->delete();
+
+    // crm.delete reads it, but nothing is edited on a trashed fiche.
+    $this->actingAs(commercial())->get("/crm/opportunities/{$opportunity->id}")
+        ->assertOk()
+        ->assertInertia(fn ($page) => $page->where('can.update', false)->where('can.delete', false));
+    $this->get("/crm/opportunities/{$opportunity->id}/edit")->assertForbidden();
+    $this->put("/crm/opportunities/{$opportunity->id}", ['title' => 'X', 'das_id' => $opportunity->das_id])->assertForbidden();
+    $this->post("/crm/opportunities/{$opportunity->id}/stage", ['stage_id' => pipelineStage('Contacté')->id])->assertForbidden();
+    $this->delete("/crm/opportunities/{$opportunity->id}")->assertForbidden();
+    expect($opportunity->refresh()->stage_id)->toBe(pipelineStage('Nouveau')->id);
+});
