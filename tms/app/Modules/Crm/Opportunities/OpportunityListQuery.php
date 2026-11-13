@@ -2,17 +2,19 @@
 
 namespace App\Modules\Crm\Opportunities;
 
+use App\Modules\Core\References\ReferenceList;
 use App\Modules\Core\Users\User;
 use App\Modules\Crm\Organisations\Organisation;
 use App\Modules\Crm\People\Person;
 use App\Modules\Crm\Support\FilterInput;
+use App\Modules\Crm\Support\FormOptions;
 use App\Modules\Crm\Visibility\CrmVisibility;
 use Illuminate\Database\Eloquent\Builder;
 
 /**
- * The « Opportunités » list: filter reading and query building (the kanban
- * and the export of Task 4 reuse it). Opportunities of a trashed fiche are
- * left out, like the fiche itself.
+ * The « Opportunités » list: filter reading, filter choices and query
+ * building, shared by the list, the kanban and the Excel export.
+ * Opportunities of a trashed fiche are left out, like the fiche itself.
  */
 final class OpportunityListQuery
 {
@@ -38,6 +40,28 @@ final class OpportunityListQuery
             'mine' => FilterInput::bool($input['mine'] ?? false),
             'sort' => FilterInput::oneOf($input['sort'] ?? null, self::SORTS) ?? 'expected_close_on',
             'dir' => ($input['dir'] ?? null) === 'desc' ? 'desc' : 'asc',
+        ];
+    }
+
+    /**
+     * Choices of the filter bar (list and kanban).
+     *
+     * @return array<string, list<array<string, mixed>>>
+     */
+    public static function options(): array
+    {
+        return [
+            'target' => [['value' => 'organisation', 'label' => 'Entreprises'], ['value' => 'individual', 'label' => 'Particuliers']],
+            'das' => FormOptions::reference(ReferenceList::Das),
+            'stage' => FormOptions::reference(ReferenceList::PipelineStage),
+            'priority' => FormOptions::reference(ReferenceList::Priority),
+            'responsible' => FormOptions::responsible(),
+            'sort' => [
+                ['value' => 'expected_close_on', 'label' => 'Clôture prévue'],
+                ['value' => 'amount', 'label' => 'Montant'],
+                ['value' => 'weighted_amount', 'label' => 'Montant pondéré'],
+                ['value' => 'created_at', 'label' => 'Création'],
+            ],
         ];
     }
 

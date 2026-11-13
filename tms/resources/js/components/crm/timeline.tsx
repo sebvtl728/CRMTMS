@@ -2,8 +2,8 @@ import InputError from '@/components/input-error';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { formatDateTime } from '@/lib/crm';
-import { router } from '@inertiajs/react';
-import { FileText, History, LoaderCircle, Paperclip, StickyNote, Trash2 } from 'lucide-react';
+import { Link, router } from '@inertiajs/react';
+import { FileText, Handshake, History, LoaderCircle, Paperclip, StickyNote, Trash2 } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 const MAX_NOTE = 10000;
@@ -38,6 +38,7 @@ function EntryIcon({ type }: { type: string }) {
     const cls = 'text-muted-foreground mt-0.5 h-4 w-4 shrink-0';
     if (type === 'note') return <StickyNote className={cls} aria-hidden />;
     if (type === 'attachment') return <Paperclip className={cls} aria-hidden />;
+    if (type === 'opportunity') return <Handshake className={cls} aria-hidden />;
 
     return <History className={cls} aria-hidden />;
 }
@@ -228,6 +229,13 @@ export function Timeline({ kind, subjectId, canEdit }: Props) {
                                             {entry.title}
                                             <span className="text-muted-foreground ml-1 font-normal no-underline">{formatSize(entry.meta.size)}</span>
                                         </a>
+                                    ) : entry.type === 'opportunity' && typeof entry.meta.opportunity_id === 'string' ? (
+                                        <Link
+                                            href={route('crm.opportunities.show', entry.meta.opportunity_id)}
+                                            className="text-sm font-medium hover:underline"
+                                        >
+                                            {entry.title}
+                                        </Link>
                                     ) : (
                                         <span className="text-sm font-medium">{entry.title}</span>
                                     )}
@@ -238,7 +246,7 @@ export function Timeline({ kind, subjectId, canEdit }: Props) {
                                 </div>
                                 {entry.body && <p className="mt-1 text-sm break-words whitespace-pre-line">{entry.body}</p>}
                             </div>
-                            {canEdit && entry.type !== 'audit' && entry.meta.id && (
+                            {canEdit && (entry.type === 'note' || entry.type === 'attachment') && entry.meta.id && (
                                 <Button
                                     type="button"
                                     variant="ghost"

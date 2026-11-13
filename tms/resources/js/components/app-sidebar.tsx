@@ -3,7 +3,21 @@ import { NavUser } from '@/components/nav-user';
 import { Sidebar, SidebarContent, SidebarFooter, SidebarHeader, SidebarMenu, SidebarMenuButton, SidebarMenuItem } from '@/components/ui/sidebar';
 import { type NavItem, type SharedData } from '@/types';
 import { Link, usePage } from '@inertiajs/react';
-import { Building2, Contact, Factory, Handshake, History, LayoutGrid, ListChecks, Plug, ShieldAlert, ShieldCheck, Upload, Users } from 'lucide-react';
+import {
+    Building2,
+    Columns3,
+    Contact,
+    Factory,
+    Handshake,
+    History,
+    LayoutGrid,
+    ListChecks,
+    Plug,
+    ShieldAlert,
+    ShieldCheck,
+    Upload,
+    Users,
+} from 'lucide-react';
 import AppLogo from './app-logo';
 
 const homeNavItems: NavItem[] = [{ title: 'Accueil', url: '/dashboard', icon: LayoutGrid }];
@@ -12,6 +26,7 @@ const commercialNavItems: (NavItem & { permission: string })[] = [
     { title: 'Entreprises', url: '/crm/organisations', icon: Factory, permission: 'crm.view' },
     { title: 'Personnes', url: '/crm/people', icon: Contact, permission: 'crm.view' },
     { title: 'Opportunités', url: '/crm/opportunities', icon: Handshake, permission: 'crm.view' },
+    { title: 'Pipeline', url: '/crm/opportunities/kanban', icon: Columns3, permission: 'crm.view' },
     { title: 'Imports', url: '/crm/import', icon: Upload, permission: 'crm.import' },
     { title: 'RGPD', url: '/crm/gdpr', icon: ShieldAlert, permission: 'crm.gdpr' },
 ];

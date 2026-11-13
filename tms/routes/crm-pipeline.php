@@ -1,11 +1,16 @@
 <?php
 
+use App\Modules\Crm\Export\ExportController;
+use App\Modules\Crm\Opportunities\KanbanController;
 use App\Modules\Crm\Opportunities\OpportunityController;
 use Illuminate\Support\Facades\Route;
 
-// Pipeline: opportunities (list, fiche, stage moves).
+// Pipeline: opportunities (list, kanban, Excel export, fiche, stage moves).
 Route::middleware(['auth'])->prefix('crm/opportunities')->name('crm.opportunities.')->group(function () {
     Route::get('/', [OpportunityController::class, 'index'])->middleware('can:crm.view')->name('index');
+    Route::get('kanban', KanbanController::class)->middleware('can:crm.view')->name('kanban');
+    Route::get('export', [ExportController::class, 'opportunities'])->middleware(['can:crm.export', 'throttle:crm-export'])->name('export');
+    Route::get('export/check', [ExportController::class, 'checkOpportunities'])->middleware(['can:crm.export', 'throttle:crm-export'])->name('export.check');
     Route::get('create', [OpportunityController::class, 'create'])->middleware('can:crm.create')->name('create');
     Route::post('/', [OpportunityController::class, 'store'])->middleware('can:crm.create')->name('store');
     Route::get('{opportunity}', [OpportunityController::class, 'show'])->middleware('can:crm.view')->name('show');

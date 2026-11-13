@@ -43,20 +43,8 @@ class OpportunityController extends Controller
                 'weighted_amount' => number_format((float) ($totals->weighted ?? 0), 2, '.', ''),
             ],
             'filters' => $filters,
-            'options' => [
-                'target' => [['value' => 'organisation', 'label' => 'Entreprises'], ['value' => 'individual', 'label' => 'Particuliers']],
-                'das' => FormOptions::reference(ReferenceList::Das),
-                'stage' => FormOptions::reference(ReferenceList::PipelineStage),
-                'priority' => FormOptions::reference(ReferenceList::Priority),
-                'responsible' => FormOptions::responsible(),
-                'sort' => [
-                    ['value' => 'expected_close_on', 'label' => 'Clôture prévue'],
-                    ['value' => 'amount', 'label' => 'Montant'],
-                    ['value' => 'weighted_amount', 'label' => 'Montant pondéré'],
-                    ['value' => 'created_at', 'label' => 'Création'],
-                ],
-            ],
-            'can' => ['create' => $user->can(Permissions::CREATE)],
+            'options' => OpportunityListQuery::options(),
+            'can' => ['create' => $user->can(Permissions::CREATE), 'export' => $user->can(Permissions::EXPORT)],
             'status' => $request->session()->get('status'),
         ]);
     }
@@ -139,7 +127,7 @@ class OpportunityController extends Controller
                 'by' => $c->changer?->name,
                 'at' => $c->changed_at->toIso8601String(),
             ])->all(),
-            'stages' => self::stageOptions($opportunity->stage_id),
+            'stages' => OpportunityStage::options($opportunity->stage_id),
             'lossReasons' => FormOptions::reference(ReferenceList::LossReason),
             'can' => [
                 'update' => $user->can('update', $opportunity),
@@ -225,31 +213,13 @@ class OpportunityController extends Controller
     }
 
     /**
-     * Stages offered when moving: active ones (the current one kept), with their outcome.
-     *
-     * @return list<array{value: string, label: string, outcome: ?string, probability: int}>
-     */
-    private static function stageOptions(?string $currentId): array
-    {
-        return ReferenceItem::query()->where('list', ReferenceList::PipelineStage)
-            ->where(fn ($q) => $q->where('is_active', true)->when($currentId, fn ($q2, $id) => $q2->orWhere('id', $id)))
-            ->orderBy('position')->orderBy('label')->get()
-            ->map(fn (ReferenceItem $i) => [
-                'value' => $i->id,
-                'label' => $i->is_active ? $i->label : $i->label.' (inactif)',
-                'outcome' => OpportunityStage::outcome($i),
-                'probability' => OpportunityStage::defaultProbability($i),
-            ])->values()->all();
-    }
-
-    /**
      * Open stages (creation): active, without closing outcome.
      *
      * @return list<array{value: string, label: string, outcome: ?string, probability: int}>
      */
     private static function openStages(): array
     {
-        return array_values(array_filter(self::stageOptions(null), fn (array $s) => $s['outcome'] === null));
+        return array_values(array_filter(OpportunityStage::options(null), fn (array $s) => $s['outcome'] === null));
     }
 
     /**

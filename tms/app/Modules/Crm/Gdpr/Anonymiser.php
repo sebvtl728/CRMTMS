@@ -21,6 +21,9 @@ use Throwable;
  * - her notes and attachments (trashed too): rows deleted (files after the
  *   commit); notes on her entreprises stay;
  * - her consents: kept as history, their free text cleared;
+ * - her opportunities as particulier (trashed too): kept with amounts,
+ *   stages and history (statistics), the loss comment cleared; her rows as
+ *   contact of an opportunity deleted;
  * - imports: raw values (import_rows.source) of every row that touched her,
  *   her notes or links (or a fiche merged into her), and of every row whose
  *   values name her (failed rows: same e-mail, phone, or first + last name);
@@ -144,6 +147,8 @@ class Anonymiser
         DB::table('consents')->whereIn('person_id', $subjects)->whereNotNull('source')->update(['source' => null]);
         DB::table('affiliations')->whereIn('id', $links)->update(['work_email' => null, 'work_phone' => null, 'job_title' => null, 'updated_at' => now()]);
         DB::table('gdpr_pending')->where('person_id', $locked->id)->delete();
+        DB::table('opportunities')->whereIn('person_id', $subjects)->whereNotNull('loss_comment')->update(['loss_comment' => null, 'updated_at' => now()]);
+        DB::table('opportunity_contacts')->whereIn('person_id', $subjects)->delete();
 
         DB::table('people')->where('id', $locked->id)->update([
             ...array_fill_keys(Person::PERSONAL_FIELDS, null),

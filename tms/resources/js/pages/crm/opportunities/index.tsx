@@ -1,70 +1,34 @@
-import { FilterSelect } from '@/components/crm/filter-select';
+import {
+    isFiltered,
+    OpportunityExportButton,
+    OpportunityFilters,
+    opportunityQuery,
+    type OpportunityFilterOptions,
+    type OpportunityFilterValues,
+} from '@/components/crm/opportunity-filters';
 import { OpportunityCards, StageBadge, type OpportunityRow } from '@/components/crm/opportunity-list';
 import Heading from '@/components/heading';
 import { Button } from '@/components/ui/button';
-import { Checkbox } from '@/components/ui/checkbox';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import AppLayout from '@/layouts/app-layout';
-import { formatAmount, formatDate, formatDay, type Option, type Paginated } from '@/lib/crm';
+import { formatAmount, formatDate, formatDay, type Paginated } from '@/lib/crm';
 import { type BreadcrumbItem } from '@/types';
 import { Head, Link, router } from '@inertiajs/react';
-import { ArrowDown, ArrowUp, ChevronLeft, ChevronRight, Plus } from 'lucide-react';
-import { useEffect, useRef, useState } from 'react';
-
-interface Filters {
-    q: string;
-    das: string | null;
-    target: string | null;
-    responsible: string | null;
-    priority: string | null;
-    stage: string | null;
-    close_from: string | null;
-    close_to: string | null;
-    mine: boolean;
-    sort: string;
-    dir: 'asc' | 'desc';
-}
+import { ArrowDown, ArrowUp, ChevronLeft, ChevronRight, Columns3, Plus } from 'lucide-react';
 
 interface IndexProps {
     opportunities: Paginated<OpportunityRow>;
     totals: { amount: string; weighted_amount: string };
-    filters: Filters;
-    options: { target: Option[]; das: Option[]; stage: Option[]; priority: Option[]; responsible: Option[]; sort: Option[] };
-    can: { create: boolean };
+    filters: OpportunityFilterValues;
+    options: OpportunityFilterOptions;
+    can: { create: boolean; export: boolean };
     status?: string;
 }
 
 const breadcrumbs: BreadcrumbItem[] = [{ title: 'Opportunités', href: '/crm/opportunities' }];
 
 export default function OpportunitiesIndex({ opportunities, totals, filters, options, can, status }: IndexProps) {
-    const [search, setSearch] = useState(filters.q);
-    const first = useRef(true);
-
-    const visit = (changes: Partial<Filters>) => {
-        const next = { ...filters, ...changes };
-        const query: Record<string, string> = {};
-        if (next.q) query.q = next.q;
-        (['das', 'target', 'responsible', 'priority', 'stage', 'close_from', 'close_to'] as const).forEach((k) => {
-            if (next[k]) query[k] = String(next[k]);
-        });
-        if (next.mine) query.mine = '1';
-        if (next.sort !== 'expected_close_on' || next.dir !== 'asc') {
-            query.sort = next.sort;
-            query.dir = next.dir;
-        }
-        router.get(route('crm.opportunities.index'), query, { preserveState: true, replace: true });
-    };
-
-    useEffect(() => {
-        if (first.current) {
-            first.current = false;
-            return;
-        }
-        const timer = setTimeout(() => visit({ q: search }), 300);
-        return () => clearTimeout(timer);
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [search]);
+    const visit = (changes: Partial<OpportunityFilterValues>) =>
+        router.get(route('crm.opportunities.index'), opportunityQuery({ ...filters, ...changes }), { preserveState: true, replace: true });
 
     const sortBy = (column: string) => visit({ sort: column, dir: filters.sort === column && filters.dir === 'asc' ? 'desc' : 'asc' });
     const sortHeader = (column: string, label: string, className = '') => (
@@ -79,17 +43,7 @@ export default function OpportunitiesIndex({ opportunities, totals, filters, opt
         </th>
     );
 
-    const filtered = Boolean(
-        filters.q ||
-            filters.das ||
-            filters.target ||
-            filters.responsible ||
-            filters.priority ||
-            filters.stage ||
-            filters.close_from ||
-            filters.close_to ||
-            filters.mine,
-    );
+    const filtered = isFiltered(filters);
 
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
@@ -98,69 +52,28 @@ export default function OpportunitiesIndex({ opportunities, totals, filters, opt
             <div className="flex flex-col gap-4 p-4">
                 <div className="flex flex-wrap items-start justify-between gap-4">
                     <Heading title="Opportunités" description="Affaires en cours, gagnées et perdues" />
-                    {can.create && (
-                        <Button asChild>
-                            <Link href={route('crm.opportunities.create')}>
-                                <Plus className="h-4 w-4" />
-                                Nouvelle opportunité
+                    <div className="flex flex-wrap items-start gap-2">
+                        <Button asChild variant="outline">
+                            <Link href={route('crm.opportunities.kanban', opportunityQuery(filters))}>
+                                <Columns3 className="h-4 w-4" />
+                                Vue pipeline
                             </Link>
                         </Button>
-                    )}
+                        {can.export && <OpportunityExportButton filters={filters} />}
+                        {can.create && (
+                            <Button asChild>
+                                <Link href={route('crm.opportunities.create')}>
+                                    <Plus className="h-4 w-4" />
+                                    Nouvelle opportunité
+                                </Link>
+                            </Button>
+                        )}
+                    </div>
                 </div>
 
                 {status && <div className="text-sm font-medium text-green-600">{status}</div>}
 
-                <section aria-label="Filtres" className="grid gap-3 rounded-xl border p-3 sm:grid-cols-2 lg:grid-cols-4">
-                    <div className="grid gap-1 sm:col-span-2 lg:col-span-4">
-                        <Label htmlFor="q" className="text-xs">
-                            Recherche (objet, entreprise, personne)
-                        </Label>
-                        <Input id="q" type="search" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Ex. HACCP, bistrot…" />
-                    </div>
-                    <FilterSelect label="Cible" value={filters.target} options={options.target} onChange={(v) => visit({ target: v })} />
-                    <FilterSelect label="DAS" value={filters.das} options={options.das} onChange={(v) => visit({ das: v })} />
-                    <FilterSelect label="Étape" value={filters.stage} options={options.stage} onChange={(v) => visit({ stage: v })} />
-                    <FilterSelect label="Priorité" value={filters.priority} options={options.priority} onChange={(v) => visit({ priority: v })} />
-                    <FilterSelect
-                        label="Responsable"
-                        value={filters.responsible}
-                        options={options.responsible}
-                        onChange={(v) => visit({ responsible: v })}
-                    />
-                    <div className="grid gap-1">
-                        <Label htmlFor="close_from" className="text-xs">
-                            Clôture prévue à partir du
-                        </Label>
-                        <Input
-                            id="close_from"
-                            type="date"
-                            value={filters.close_from ?? ''}
-                            onChange={(e) => visit({ close_from: e.target.value || null })}
-                        />
-                    </div>
-                    <div className="grid gap-1">
-                        <Label htmlFor="close_to" className="text-xs">
-                            Clôture prévue jusqu'au
-                        </Label>
-                        <Input
-                            id="close_to"
-                            type="date"
-                            value={filters.close_to ?? ''}
-                            onChange={(e) => visit({ close_to: e.target.value || null })}
-                        />
-                    </div>
-                    <div className="flex items-end gap-4">
-                        <Label className="flex items-center gap-2 text-sm font-normal">
-                            <Checkbox checked={filters.mine} onCheckedChange={(c) => visit({ mine: c === true })} />
-                            Mes opportunités
-                        </Label>
-                        {filtered && (
-                            <Button type="button" variant="ghost" size="sm" onClick={() => router.get(route('crm.opportunities.index'))}>
-                                Réinitialiser
-                            </Button>
-                        )}
-                    </div>
-                </section>
+                <OpportunityFilters routeName="crm.opportunities.index" filters={filters} options={options} />
 
                 <p className="text-sm">
                     {opportunities.total} opportunité{opportunities.total > 1 ? 's' : ''} · Montant {formatAmount(totals.amount)} · Pondéré{' '}

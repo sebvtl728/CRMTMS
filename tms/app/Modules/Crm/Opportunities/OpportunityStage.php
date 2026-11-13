@@ -115,6 +115,25 @@ final class OpportunityStage
         });
     }
 
+    /**
+     * Stages offered when moving: active ones (the current one kept), in
+     * pipeline order, with their outcome and default probability.
+     *
+     * @return list<array{value: string, label: string, outcome: ?string, probability: int}>
+     */
+    public static function options(?string $currentId = null): array
+    {
+        return ReferenceItem::query()->where('list', ReferenceList::PipelineStage)
+            ->where(fn ($q) => $q->where('is_active', true)->when($currentId, fn ($q2, $id) => $q2->orWhere('id', $id)))
+            ->orderBy('position')->orderBy('label')->get()
+            ->map(fn (ReferenceItem $i) => [
+                'value' => $i->id,
+                'label' => $i->is_active ? $i->label : $i->label.' (inactif)',
+                'outcome' => self::outcome($i),
+                'probability' => self::defaultProbability($i),
+            ])->values()->all();
+    }
+
     public static function defaultProbability(ReferenceItem $stage): int
     {
         return max(0, min(100, (int) ($stage->meta['probability'] ?? 0)));
@@ -134,6 +153,7 @@ final class OpportunityStage
             'opportunity_id' => $opportunity->getKey(),
             'from_stage_id' => $from?->getKey(),
             'to_stage_id' => $to->getKey(),
+            'loss_reason_id' => $opportunity->loss_reason_id,
             'changed_by' => Auth::id(),
             'changed_at' => CarbonImmutable::now(),
         ]);

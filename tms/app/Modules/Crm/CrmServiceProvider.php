@@ -14,6 +14,7 @@ use App\Modules\Crm\Import\ImportBatch;
 use App\Modules\Crm\Import\ImportProfile;
 use App\Modules\Crm\Import\ImportRow;
 use App\Modules\Crm\Import\ImportStamp;
+use App\Modules\Crm\Opportunities\OpportunitiesProvider;
 use App\Modules\Crm\Opportunities\Opportunity;
 use App\Modules\Crm\Opportunities\OpportunityPolicy;
 use App\Modules\Crm\Opportunities\StageChange;
@@ -69,7 +70,7 @@ class CrmServiceProvider extends ServiceProvider
         ]);
 
         // Sources of the « Historique »; later increments tag their own.
-        $this->app->tag([NotesProvider::class, AttachmentsProvider::class, AuditProvider::class], Timeline::TAG);
+        $this->app->tag([NotesProvider::class, AttachmentsProvider::class, AuditProvider::class, OpportunitiesProvider::class], Timeline::TAG);
     }
 
     public function boot(): void
@@ -325,6 +326,7 @@ class CrmServiceProvider extends ServiceProvider
         ReferenceUsage::register(ReferenceList::PipelineStage, 'opportunities', 'stage_id');
         ReferenceUsage::register(ReferenceList::PipelineStage, 'opportunity_stage_changes', 'from_stage_id');
         ReferenceUsage::register(ReferenceList::PipelineStage, 'opportunity_stage_changes', 'to_stage_id');
+        ReferenceUsage::register(ReferenceList::LossReason, 'opportunity_stage_changes', 'loss_reason_id');
         ReferenceUsage::register(ReferenceList::Das, 'opportunities', 'das_id');
         ReferenceUsage::register(ReferenceList::Priority, 'opportunities', 'priority_id');
         ReferenceUsage::register(ReferenceList::FundingMode, 'opportunities', 'funding_mode_id');
