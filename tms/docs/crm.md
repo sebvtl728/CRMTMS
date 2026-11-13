@@ -110,7 +110,7 @@ Quand le fichier contient des valeurs inconnues (un secteur, un DAS, un statut, 
 
 ### Étape 4 : Vérifier la simulation
 
-Rien n'est encore écrit. La **simulation** annonce, pour votre fichier : les fiches qui seraient **créées**, **mises à jour**, **ignorées**, les lignes **en erreur** et les lignes **à vérifier**, avec le détail ligne par ligne. Lignes vides en fin de fichier : ignorées. SIRET abîmé par Excel (notation scientifique du type `7,32829E+13`) : la ligne est refusée avec un message clair, jamais devinée.
+Rien n'est encore écrit. La **simulation** annonce, pour votre fichier : les fiches qui seraient **créées** (Fiches créées), **mises à jour** (Fiches mises à jour), les lignes **ignorées** (Lignes ignorées) et les lignes **en erreur** (Lignes en erreur), avec le détail ligne par ligne. Lignes vides en fin de fichier : ignorées. SIRET abîmé par Excel (notation scientifique du type `7,32829E+13`) : la ligne est refusée avec un message clair, jamais devinée.
 
 Choisissez **Que faire quand la fiche existe déjà ?** :
 
