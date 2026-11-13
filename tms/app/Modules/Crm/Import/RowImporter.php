@@ -153,7 +153,7 @@ final class RowImporter
                 $table = (new $class)->getTable();
                 $placeholders = implode(',', array_fill(0, count($missing), '?'));
                 foreach (DB::select("select {$table}.id, elem->>'source_id' as source_id from {$table}, jsonb_array_elements({$table}.merged_sources) elem
-                    where elem->>'source_system' = ? and elem->>'source_id' in ({$placeholders})", [$this->sourceSystem, ...$missing]) as $hit) {
+                    where {$table}.merged_sources <> '[]'::jsonb and elem->>'source_system' = ? and elem->>'source_id' in ({$placeholders})", [$this->sourceSystem, ...$missing]) as $hit) {
                     $this->sources[$type][(string) $hit->source_id] ??= (string) $hit->id;
                 }
             }
@@ -190,6 +190,7 @@ final class RowImporter
                 throw new RetryChunk(previous: $e);
             }
             $outcome = match (true) {
+                $e instanceof SkipRow => (new RowOutcome(ImportRow::SKIPPED))->add('info', $e->getMessage()),
                 $e instanceof ImportRowException => RowOutcome::error($e->getMessage()),
                 $e instanceof UniqueConstraintViolationException => RowOutcome::error(self::conflict($e)),
                 default => throw $e,
@@ -536,7 +537,7 @@ final class RowImporter
         }
 
         if ($affiliation !== null) {
-            if ($this->fill($affiliation, $link, overwrite: false)) {
+            if ($this->fill($affiliation, $link, overwrite: false, outcome: $outcome)) {
                 $outcome->status = $outcome->status === ImportRow::CREATED ? ImportRow::CREATED : ImportRow::UPDATED;
             }
             $outcome->subject($affiliation, false);
@@ -681,6 +682,9 @@ final class RowImporter
 
             if (! $standalone && $certain && $this->strategy !== DuplicateStrategy::Create) {
                 // Interlocuteurs: the row is attached to the entreprise already known.
+                if ($kept !== null) {
+                    $this->guard($kept);
+                }
                 if ($this->strategy === DuplicateStrategy::Merge && $kept !== null) {
                     $this->update($kept, $attributes, $das, $outcome, overwrite: false);
                 }
@@ -700,7 +704,7 @@ final class RowImporter
                 if ($kept !== null) {
                     $this->update($kept, $attributes, $das, $outcome, overwrite: false);
                     $outcome->add('info', 'Fiche existante complétée ('.$reason.').');
-                    $this->claimSource($kept, $sourceId);
+                    $this->claimSource($kept, $sourceId, $outcome);
                 } else {
                     $outcome->status = $standalone ? ImportRow::UPDATED : $outcome->status;
                     $outcome->add('info', 'La fiche de la ligne '.$earlier.' sera complétée.');
@@ -766,6 +770,9 @@ final class RowImporter
             $kept = $candidate === null ? null : Person::query()->find($candidate->id);
 
             if (! $standalone && $certain && $this->strategy !== DuplicateStrategy::Create) {
+                if ($kept !== null) {
+                    $this->guard($kept);
+                }
                 if ($this->strategy === DuplicateStrategy::Merge && $kept !== null) {
                     $this->update($kept, $attributes, $das, $outcome, overwrite: false);
                 }
@@ -785,7 +792,7 @@ final class RowImporter
                 if ($kept !== null) {
                     $this->update($kept, $attributes, $das, $outcome, overwrite: false);
                     $outcome->add('info', 'Fiche existante complétée ('.$reason.').');
-                    $this->claimSource($kept, $sourceId);
+                    $this->claimSource($kept, $sourceId, $outcome);
                 } else {
                     $outcome->status = ImportRow::UPDATED;
                     $outcome->add('info', 'La fiche de la ligne '.$earlier.' sera complétée.');
@@ -825,31 +832,58 @@ final class RowImporter
      */
     private function update(Organisation|Person $fiche, array $attributes, array $das, RowOutcome $outcome, bool $overwrite): void
     {
+        $this->guard($fiche);
+
         if ($outcome->status !== ImportRow::CREATED) {
             $outcome->status = ImportRow::UPDATED;
         }
 
         if ($this->dryRun) {
+            // Overwriting a fiche someone changed since its import: counted for the warning.
+            $outcome->modifiedSinceImport = $outcome->modifiedSinceImport || ($overwrite && ImportStamps::modifiedSinceImport($fiche));
+
             return;
         }
 
+        $restored = false;
         if ($fiche->trashed()) {
+            // guard(): only a fiche trashed by an import undo comes back.
             $fiche->restore();
+            $restored = true;
             $outcome->add('info', 'Fiche restaurée depuis la corbeille.');
         }
 
         $changed = $this->fill($fiche, $attributes, $overwrite);
         $before = $fiche->das()->count();
         $this->das->add($fiche, $das);
+        if ($changed || $restored) {
+            $outcome->touched($fiche);
+        }
         if (! $changed && $fiche->das()->count() === $before && $outcome->status === ImportRow::UPDATED) {
             $outcome->add('info', 'Aucune modification.');
         }
     }
 
     /**
+     * A fiche an import must never touch: anonymised (GDPR), or deleted by a
+     * user (only a fiche deleted by the undo of an import may come back).
+     *
+     * @throws SkipRow
+     */
+    private function guard(Organisation|Person $fiche): void
+    {
+        if ($fiche->getAttribute('anonymised_at') !== null) {
+            throw new SkipRow('Fiche anonymisée (RGPD) : non réimportée.');
+        }
+        if ($fiche->trashed() && ! ImportStamps::trashedByUndo($fiche)) {
+            throw new SkipRow('Fiche supprimée par un utilisateur : non réimportée.');
+        }
+    }
+
+    /**
      * @param  array<string, mixed>  $attributes
      */
-    private function fill(Model $model, array $attributes, bool $overwrite): bool
+    private function fill(Model $model, array $attributes, bool $overwrite, ?RowOutcome $outcome = null): bool
     {
         if ($this->dryRun) {
             return $attributes !== [];
@@ -867,6 +901,7 @@ final class RowImporter
             return false;
         }
         $model->save();
+        $outcome?->touched($model);
 
         return true;
     }
@@ -874,18 +909,19 @@ final class RowImporter
     /**
      * A fiche completed by an import with identifiers takes them, if it has none.
      */
-    private function claimSource(Organisation|Person $fiche, ?string $sourceId): void
+    private function claimSource(Organisation|Person $fiche, ?string $sourceId, ?RowOutcome $outcome = null): void
     {
         if ($this->dryRun || $sourceId === null || $this->sourceSystem === null || $fiche->source_id !== null) {
             return;
         }
         $fiche->forceFill(['source_system' => $this->sourceSystem, 'source_id' => $sourceId])->save();
+        $outcome?->touched($fiche);
     }
 
     /**
      * The fiche holding a source identifier, followed to the fiche it was
-     * merged into (chain, at most 20 hops). Trashed fiches are returned (a
-     * re-import restores them).
+     * merged into (chain, at most 20 hops). Trashed fiches are returned
+     * (guard() decides whether they may come back).
      *
      * @template T of Organisation|Person
      *

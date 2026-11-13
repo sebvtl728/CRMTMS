@@ -170,3 +170,11 @@ it('detects the encoding of a sample', function (string $sample, string $expecte
     // A sample cut in the middle of a character is still UTF-8.
     'cut utf-8' => [substr('Hôtel é', 0, -1), 'UTF-8'],
 ]);
+
+it('detects repeated columns whatever their case', function () {
+    $reader = CsvReader::open(tempCsv("Ville;VILLE;ville \nLyon;Paris;Pau\n"));
+
+    expect($reader->headers())->toBe(['Ville'])
+        ->and($reader->warnings())->toBe(['La colonne « VILLE » apparaît plusieurs fois : seule la première est utilisée.'])
+        ->and(allRows($reader->rows()))->toBe([2 => ['Ville' => 'Lyon']]);
+});

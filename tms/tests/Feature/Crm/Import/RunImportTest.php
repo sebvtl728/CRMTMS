@@ -11,6 +11,7 @@ use App\Modules\Crm\Affiliations\Affiliation;
 use App\Modules\Crm\CrmServiceProvider;
 use App\Modules\Crm\Duplicates\Merger;
 use App\Modules\Crm\Import\ImportBatch;
+use App\Modules\Crm\Import\ImportFileException;
 use App\Modules\Crm\Import\ImportProfile;
 use App\Modules\Crm\Import\ImportRow;
 use App\Modules\Crm\Import\ImportTarget;
@@ -26,7 +27,7 @@ use Illuminate\Support\Facades\Storage;
 use OpenSpout\Reader\XLSX\Reader;
 
 beforeEach(function () {
-    Storage::fake('local');
+    fakeImportDisk();
     CrmServiceProvider::registerReferenceUsage();
     CapFormationReferenceSeeder::run(tenant());
     $this->user = commercial();
@@ -336,3 +337,59 @@ it('imports 10 000 rows in less than 60 seconds', function () {
         ->and(Organisation::query()->count())->toBe(10000)
         ->and($seconds)->toBeLessThan(60);
 })->group('slow');
+
+// --- Fix round 1: re-import never brings back what users removed ----------
+
+it('does not restore a fiche deleted by a user when re-importing', function (string $strategy) {
+    $file = "Identifiant;Raison sociale\nC1;Garage Martin\nC2;Café des Arts\n";
+    runImport($file, ImportTarget::Organisations, ['source_system' => 'formevol']);
+    $garage = Organisation::query()->where('source_id', 'C1')->sole();
+    $garage->delete();
+
+    $again = runImport($file, ImportTarget::Organisations, ['source_system' => 'formevol', 'strategy' => $strategy]);
+
+    expect($garage->refresh()->trashed())->toBeTrue()
+        ->and(Organisation::withTrashed()->count())->toBe(2)
+        ->and($again->rows()->where('line', 2)->value('status'))->toBe(ImportRow::SKIPPED)
+        ->and(rowMessages($again, 2))->toBe(['Fiche supprimée par un utilisateur : non réimportée.']);
+})->with(['skip', 'merge', 'create']);
+
+it('never updates an anonymised person', function () {
+    $file = "Identifiant;Nom;Ville\nP1;Lefèvre;Lyon\n";
+    runImport($file, ImportTarget::People, ['source_system' => 'formevol']);
+    $person = Person::query()->where('source_id', 'P1')->sole();
+    DB::table('people')->where('id', $person->id)->update(['last_name' => 'Anonyme', 'city' => null, 'anonymised_at' => now()]);
+
+    $again = runImport($file, ImportTarget::People, ['source_system' => 'formevol']);
+
+    expect($person->refresh()->last_name)->toBe('Anonyme')
+        ->and($person->city)->toBeNull()
+        ->and($again->rows()->value('status'))->toBe(ImportRow::SKIPPED)
+        ->and(rowMessages($again, 2))->toBe(['Fiche anonymisée (RGPD) : non réimportée.']);
+});
+
+it('warns in the simulation about fiches modified since their import', function () {
+    $file = "Identifiant;Raison sociale;Ville\nC1;Garage Martin;Pau\nC2;Café des Arts;Paris\n";
+    runImport($file, ImportTarget::Organisations, ['source_system' => 'formevol']);
+    $this->travel(1)->minutes();
+    Organisation::query()->where('source_id', 'C1')->sole()->update(['city' => 'Tarbes']);
+
+    $report = simulateImport(uploadImport($file, ImportTarget::Organisations, ['source_system' => 'formevol']));
+
+    expect($report->modifiedSinceImport)->toBe(1)
+        ->and($report->warnings)->toContain('1 fiche modifiée depuis son import sera mise à jour avec les valeurs du fichier.');
+});
+
+it('only simulates a batch not yet run, and only runs a simulated one', function () {
+    $batch = runImport("Raison sociale\nGarage Martin\n", ImportTarget::Organisations);
+    $map = $batch->field_map;
+
+    expect(fn () => simulateImport($batch, ['Raison sociale' => null]))->toThrow(ImportFileException::class, 'Cet import a déjà été lancé');
+    expect($batch->refresh()->field_map)->toBe($map)
+        ->and($batch->status)->toBe(ImportBatch::DONE);
+
+    $uploaded = uploadImport("Raison sociale\nCafé des Arts\n", ImportTarget::Organisations);
+    RunImport::dispatch($uploaded->id);
+    expect($uploaded->refresh()->status)->toBe(ImportBatch::UPLOADED)
+        ->and(Organisation::query()->count())->toBe(1);
+});

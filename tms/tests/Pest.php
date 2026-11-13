@@ -18,7 +18,9 @@ use App\Modules\Crm\Import\Simulator;
 use App\Modules\Crm\Import\ValueMapper;
 use App\Modules\Crm\Organisations\Organisation;
 use App\Modules\Crm\People\Person;
+use Illuminate\Filesystem\Filesystem;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 use PragmaRX\Google2FA\Google2FA;
 use Tests\RefreshDatabaseAsOwner;
 use Tests\TestCase;
@@ -254,4 +256,17 @@ function rowMessages(ImportBatch $batch, int $line): array
     $row = $batch->rows()->where('line', $line)->firstOrFail();
 
     return array_map(fn (array $m) => $m['text'], $row->messages);
+}
+
+/**
+ * A private disk « local » in the container's own temporary directory: the
+ * default fake lives on the host-mounted storage/, where a file just written
+ * is now and then not yet readable (Colima file sharing), which made the
+ * import tests flaky.
+ */
+function fakeImportDisk(): void
+{
+    $root = sys_get_temp_dir().'/tms-test-disk-'.getmypid();
+    (new Filesystem)->deleteDirectory($root);
+    Storage::set('local', Storage::createLocalDriver(['root' => $root, 'throw' => false]));
 }

@@ -13,10 +13,9 @@ use App\Modules\Crm\Import\ValueMapper;
 use App\Modules\Crm\Import\Values;
 use App\Modules\Crm\Organisations\Organisation;
 use App\Modules\Crm\People\Person;
-use Illuminate\Support\Facades\Storage;
 
 beforeEach(function () {
-    Storage::fake('local');
+    fakeImportDisk();
     CrmServiceProvider::registerReferenceUsage();
     CapFormationReferenceSeeder::run(tenant());
     $this->actingAs(commercial());

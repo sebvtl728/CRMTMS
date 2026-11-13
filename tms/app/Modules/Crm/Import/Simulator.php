@@ -16,8 +16,15 @@ final class Simulator
 {
     public function __construct(private readonly DuplicateFinder $finder, private readonly DasLinks $das) {}
 
+    /**
+     * @throws ImportFileException once the batch was run (its mapping is then fixed)
+     */
     public function run(ImportBatch $batch, FieldMap $map, ValueMapper $values): SimulationReport
     {
+        if (! $batch->canSimulate()) {
+            throw new ImportFileException('Cet import a déjà été lancé : il ne peut plus être simulé.');
+        }
+
         $report = new SimulationReport;
         $reader = $batch->reader();
         $report->warnings = $reader->warnings();
@@ -41,14 +48,17 @@ final class Simulator
             $this->simulateChunk($importer, $chunk, $report);
         }
         $report->unknownValues = $resolver->unknownValues();
+        if ($report->modifiedSinceImport > 0) {
+            $report->warnings[] = $report->modifiedSinceImport === 1
+                ? '1 fiche modifiée depuis son import sera mise à jour avec les valeurs du fichier.'
+                : $report->modifiedSinceImport.' fiches modifiées depuis leur import seront mises à jour avec les valeurs du fichier.';
+        }
 
         $batch->field_map = $map->toArray();
         $batch->value_map = $values->toArray();
         $batch->simulation = $report->summary();
         $batch->total = $report->total;
-        if (in_array($batch->status, [ImportBatch::UPLOADED, ImportBatch::SIMULATED], true)) {
-            $batch->status = $report->canRun() ? ImportBatch::SIMULATED : ImportBatch::UPLOADED;
-        }
+        $batch->status = $report->canRun() ? ImportBatch::SIMULATED : ImportBatch::UPLOADED;
         $batch->save();
 
         return $report;

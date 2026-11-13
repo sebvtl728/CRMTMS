@@ -3,6 +3,7 @@
 namespace App\Modules\Crm\Import;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Carbon;
 
 /**
  * Result of one file row (predicted by a simulation, or done by a run).
@@ -18,8 +19,14 @@ final class RowOutcome
 
     public bool $createdSubject = false;
 
-    /** @var list<array{type: string, id: string}> */
+    /** @var list<array{type: string, id: string, at: string|null}> */
     public array $createdRefs = [];
+
+    /** @var list<array{type: string, id: string, at: string|null}> fiches updated by the row */
+    public array $touchedRefs = [];
+
+    /** Simulation: the fiche to update was changed by someone since its import. */
+    public bool $modifiedSinceImport = false;
 
     public function __construct(public string $status = ImportRow::CREATED) {}
 
@@ -54,8 +61,32 @@ final class RowOutcome
     public function created(Model $model): void
     {
         if ($model->exists) {
-            $this->createdRefs[] = ['type' => $model->getMorphClass(), 'id' => (string) $model->getKey()];
+            $this->createdRefs[] = self::ref($model);
         }
+    }
+
+    public function touched(Model $model): void
+    {
+        if ($model->exists) {
+            $this->touchedRefs[] = self::ref($model);
+        }
+    }
+
+    /**
+     * The fiche and the updated_at the import left it with (to the second).
+     *
+     * @return array{type: string, id: string, at: string|null}
+     */
+    public static function ref(Model $model): array
+    {
+        return ['type' => $model->getMorphClass(), 'id' => (string) $model->getKey(), 'at' => self::stamp($model)];
+    }
+
+    public static function stamp(Model $model): ?string
+    {
+        $at = $model->getAttribute('updated_at');
+
+        return $at instanceof \DateTimeInterface ? Carbon::instance($at)->setTimezone(config('app.timezone'))->format('Y-m-d H:i:s') : null;
     }
 
     /**

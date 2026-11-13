@@ -17,7 +17,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 
 beforeEach(function () {
-    Storage::fake('local');
+    fakeImportDisk();
     CrmServiceProvider::registerReferenceUsage();
     CapFormationReferenceSeeder::run(tenant());
     $this->user = commercial();
@@ -131,4 +131,75 @@ it('purges uploaded files and raw values after 30 days', function () {
         ->and($old->canUndo())->toBeTrue()
         ->and(Storage::disk('local')->exists((string) $recent->stored_path))->toBeTrue()
         ->and($recent->stored_path)->toStartWith(TenantStorage::path('imports'));
+});
+
+// --- Fix round 1: undo never removes what users built on -------------------
+
+it('keeps an imported fiche that received a note after the import', function () {
+    $batch = runImport("Raison sociale\nGarage Martin\nCafé des Arts\n", ImportTarget::Organisations);
+    $garage = Organisation::query()->where('name', 'Garage Martin')->sole();
+    $note = new Note(['body' => 'Appel de suivi']);
+    $note->notable()->associate($garage);
+    $note->save();
+
+    UndoImport::dispatch($batch->id);
+
+    expect(Organisation::query()->pluck('name')->all())->toBe(['Garage Martin'])
+        ->and($note->refresh()->trashed())->toBeFalse()
+        ->and(rowMessages($batch, 2))->toBe([UndoImport::KEPT_LINKED]);
+});
+
+it('keeps an imported fiche given a link by a user, and the link survives', function () {
+    $batch = runImport('contacts.xlsx', ImportTarget::Affiliations);
+    $elodie = Person::query()->where('email', 'elodie.durand@bellevue.fr')->sole();
+    $other = Organisation::query()->create(['name' => 'Autre employeur']);
+    $userLink = affiliate($elodie, $other, ['job_title' => 'Consultante']);
+
+    UndoImport::dispatch($batch->id);
+
+    expect(Person::query()->pluck('id')->all())->toBe([$elodie->id])
+        ->and($userLink->refresh()->trashed())->toBeFalse()
+        // The link the import created (to Hôtel Bellevue) is undone.
+        ->and(Affiliation::query()->pluck('id')->all())->toBe([$userLink->id])
+        ->and(Organisation::query()->pluck('name')->all())->toBe(['Autre employeur']);
+});
+
+it('keeps a fiche edited by a user while the import was running', function () {
+    $this->travelTo(now()->setDate(2026, 11, 13)->setTime(10, 0));
+    $batch = runImport("Raison sociale\nGarage Martin\nCafé des Arts\n", ImportTarget::Organisations);
+    // A long run: it ended at 10:00:10; the user saved the fiche at 10:00:05.
+    $batch->forceFill(['finished_at' => now()->addSeconds(10)])->save();
+    $garage = Organisation::query()->where('name', 'Garage Martin')->sole();
+    $garage->update(['city' => 'Pau']);
+    DB::table('organisations')->where('id', $garage->id)->update(['updated_at' => now()->addSeconds(5)]);
+    $this->travel(1)->minutes();
+
+    UndoImport::dispatch($batch->id);
+
+    expect(Organisation::query()->pluck('name')->all())->toBe(['Garage Martin'])
+        ->and(rowMessages($batch, 2))->toBe([UndoImport::KEPT_MODIFIED]);
+});
+
+it('keeps a fiche that a later import linked to', function () {
+    $first = runImport("Raison sociale;SIRET;Ville\nHôtel Bellevue;73282932000074;Annecy\n", ImportTarget::Organisations);
+    $second = runImport('contacts.xlsx', ImportTarget::Affiliations);
+    $bellevue = Organisation::query()->where('siret', '73282932000074')->sole();
+    expect($bellevue->affiliations()->count())->toBe(2);
+
+    UndoImport::dispatch($first->id);
+
+    expect($bellevue->refresh()->trashed())->toBeFalse()
+        ->and($bellevue->affiliations()->count())->toBe(2)
+        ->and(rowMessages($first, 2))->toBe([UndoImport::KEPT_LINKED])
+        ->and($second->refresh()->status)->toBe(ImportBatch::DONE);
+});
+
+it('removes a fiche created then completed by the same import', function () {
+    $batch = runImport("Identifiant;Raison sociale;Ville\nC1;Garage Martin;\nC1;Garage Martin;Pau\n", ImportTarget::Organisations, ['source_system' => 'formevol']);
+    expect([$batch->created, $batch->updated])->toBe([1, 1]);
+    $this->travel(1)->minutes();
+
+    UndoImport::dispatch($batch->id);
+
+    expect(Organisation::query()->count())->toBe(0);
 });

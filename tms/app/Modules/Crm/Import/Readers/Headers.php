@@ -4,8 +4,8 @@ namespace App\Modules\Crm\Import\Readers;
 
 /**
  * Header row handling shared by the readers: names trimmed, empty ones
- * named « Colonne N », a repeated name kept once (first column wins) with a
- * warning.
+ * named « Colonne N », a repeated name (ignoring case) kept once (first
+ * column wins) with a warning.
  */
 final class Headers
 {
@@ -31,10 +31,10 @@ final class Headers
                 $name = 'Colonne '.($i + 1);
             }
 
-            if (in_array($name, $this->names, true)) {
-                if (! isset($reported[$name])) {
+            if (in_array(mb_strtolower($name), array_map(mb_strtolower(...), $this->names), true)) {
+                if (! isset($reported[mb_strtolower($name)])) {
                     $this->warnings[] = "La colonne « {$name} » apparaît plusieurs fois : seule la première est utilisée.";
-                    $reported[$name] = true;
+                    $reported[mb_strtolower($name)] = true;
                 }
 
                 continue;

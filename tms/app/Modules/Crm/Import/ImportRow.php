@@ -24,7 +24,8 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property string|null $subject_type morph alias
  * @property string|null $subject_id
  * @property bool $created_subject
- * @property list<array{type: string, id: string}> $created_refs every fiche created by the row
+ * @property list<array{type: string, id: string, at?: string|null}> $created_refs every fiche created by the row
+ * @property list<array{type: string, id: string, at?: string|null}> $touched_refs every fiche updated by the row
  */
 class ImportRow extends Model
 {
@@ -49,11 +50,11 @@ class ImportRow extends Model
 
     /** @var list<string> */
     protected array $auditIgnore = [
-        'id', 'tenant_id', 'batch_id', 'line', 'source', 'status', 'messages', 'subject_type', 'subject_id', 'created_subject', 'created_refs',
+        'id', 'tenant_id', 'batch_id', 'line', 'source', 'status', 'messages', 'subject_type', 'subject_id', 'created_subject', 'created_refs', 'touched_refs',
     ];
 
     /** @var list<string> */
-    protected $fillable = ['line', 'source', 'status', 'messages', 'subject_type', 'subject_id', 'created_subject', 'created_refs'];
+    protected $fillable = ['line', 'source', 'status', 'messages', 'subject_type', 'subject_id', 'created_subject', 'created_refs', 'touched_refs'];
 
     protected function casts(): array
     {
@@ -63,6 +64,7 @@ class ImportRow extends Model
             'messages' => 'array',
             'created_subject' => 'boolean',
             'created_refs' => 'array',
+            'touched_refs' => 'array',
         ];
     }
 

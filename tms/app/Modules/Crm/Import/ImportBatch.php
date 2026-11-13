@@ -154,6 +154,12 @@ class ImportBatch extends Model
         ]);
     }
 
+    /** The mapping can change until the run starts. */
+    public function canSimulate(): bool
+    {
+        return in_array($this->status, [self::UPLOADED, self::SIMULATED], true);
+    }
+
     public function canRun(): bool
     {
         return $this->status === self::SIMULATED;

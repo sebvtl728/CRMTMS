@@ -8,10 +8,12 @@ use App\Modules\Core\Tenancy\TenantContext;
 use App\Modules\Crm\Duplicates\DuplicateFinder;
 use App\Modules\Crm\Support\DasLinks;
 use Illuminate\Contracts\Queue\ShouldQueue;
+use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use Throwable;
 
@@ -109,7 +111,7 @@ class RunImport implements ShouldQueue
 
             return false;
         } catch (Throwable $e) {
-            report($e);
+            self::log($e, $batch);
             $batch->refresh();
             $options = $batch->options;
             $options['failure'] = $e instanceof ImportFileException ? $e->getMessage() : 'L\'import s\'est arrêté sur une erreur inattendue. Les lignes déjà traitées sont conservées (annulables).';
@@ -180,6 +182,7 @@ class RunImport implements ShouldQueue
                     'subject_id' => $outcome->subjectId,
                     'created_subject' => $outcome->createdSubject,
                     'created_refs' => json_encode($outcome->createdRefs, JSON_THROW_ON_ERROR),
+                    'touched_refs' => json_encode($outcome->touchedRefs, JSON_THROW_ON_ERROR),
                 ];
             }
 
@@ -197,6 +200,26 @@ class RunImport implements ShouldQueue
                 'errors' => $batch->errors + $counts[ImportRow::ERROR],
             ])->save();
         });
+    }
+
+    /**
+     * A database error message carries the bound values (file content,
+     * personal data): only its SQL state and statement are logged.
+     */
+    private static function log(Throwable $e, ImportBatch $batch): void
+    {
+        $sql = $e instanceof QueryException ? $e : ($e->getPrevious() instanceof QueryException ? $e->getPrevious() : null);
+        if ($sql === null) {
+            report($e);
+
+            return;
+        }
+
+        Log::error('Import CRM interrompu par une erreur de base de données', [
+            'batch_id' => $batch->id,
+            'sqlstate' => $sql->errorInfo[0] ?? null,
+            'sql' => $sql->getSql(),
+        ]);
     }
 
     /**

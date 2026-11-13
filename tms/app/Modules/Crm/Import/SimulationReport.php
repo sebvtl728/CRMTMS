@@ -20,6 +20,9 @@ final class SimulationReport
 
     public int $errors = 0;
 
+    /** Fiches changed by someone since their import that the file will overwrite. */
+    public int $modifiedSinceImport = 0;
+
     /** @var list<string> blocking problems of the file (no row can be imported) */
     public array $blocking = [];
 
@@ -35,6 +38,9 @@ final class SimulationReport
     public function add(int $line, RowOutcome $outcome): void
     {
         $this->total++;
+        if ($outcome->modifiedSinceImport) {
+            $this->modifiedSinceImport++;
+        }
         match ($outcome->status) {
             ImportRow::CREATED => $this->toCreate++,
             ImportRow::UPDATED => $this->toUpdate++,
@@ -65,6 +71,7 @@ final class SimulationReport
             'to_update' => $this->toUpdate,
             'to_skip' => $this->toSkip,
             'errors' => $this->errors,
+            'modified_since_import' => $this->modifiedSinceImport,
             'blocking' => $this->blocking,
             'warnings' => $this->warnings,
             'unknown_values' => $this->unknownValues,
