@@ -154,14 +154,20 @@ export interface UndoPreviewData {
 export function UndoDialog({ batchId, open, onOpenChange }: { batchId: string; open: boolean; onOpenChange: (open: boolean) => void }) {
     const [preview, setPreview] = useState<UndoPreviewData | null>(null);
     const [failed, setFailed] = useState(false);
+    const [expired, setExpired] = useState(false);
     const [busy, setBusy] = useState(false);
 
     useEffect(() => {
         if (!open) return;
         setPreview(null);
         setFailed(false);
+        setExpired(false);
         fetch(route('crm.import.undo.preview', batchId), { headers: { Accept: 'application/json' }, credentials: 'same-origin' })
-            .then((r) => (r.ok ? r.json() : Promise.reject(new Error('preview'))))
+            .then((r) => {
+                if (r.status === 401 || r.status === 419) setExpired(true);
+
+                return r.ok ? r.json() : Promise.reject(new Error('preview'));
+            })
             .then(setPreview)
             .catch(() => setFailed(true));
     }, [open, batchId]);
@@ -176,7 +182,8 @@ export function UndoDialog({ batchId, open, onOpenChange }: { batchId: string; o
                     <DialogTitle>Annuler cet import ?</DialogTitle>
                     <DialogDescription asChild>
                         <div className="space-y-2">
-                            {failed && <p>Impossible de calculer l&apos;effet de l&apos;annulation. Réessayez dans un instant.</p>}
+                            {failed && expired && <p>Session expirée, reconnectez-vous.</p>}
+                            {failed && !expired && <p>Impossible de calculer l&apos;effet de l&apos;annulation. Réessayez dans un instant.</p>}
                             {!failed && preview === null && <p>Calcul en cours…</p>}
                             {preview && (
                                 <>

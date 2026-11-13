@@ -14,6 +14,8 @@ use App\Modules\Crm\Import\Simulator;
 use App\Modules\Crm\Import\UndoImport;
 use App\Modules\Crm\Import\ValueMapper;
 use App\Modules\Crm\Organisations\Organisation;
+use Illuminate\Contracts\Queue\Job;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\Storage;
@@ -84,7 +86,41 @@ it('does not let a late simulation overwrite a batch marked as failed', function
 
     SimulateImport::dispatch($batch->id);
 
-    expect($batch->refresh()->status)->toBe(ImportBatch::FAILED)->and($batch->simulation)->toBeNull();
+    expect($batch->refresh()->status)->toBe(ImportBatch::UPLOADED)->and($batch->simulation)->toBeNull();
+});
+
+it('sends a stuck simulation back to the mapping step with an explanation instead of a dead end', function () {
+    $batch = uploadImport("Raison sociale\nGarage Martin\n", ImportTarget::Organisations);
+    $batch->startSimulation(FieldMap::guess($batch->target, ['Raison sociale']), new ValueMapper);
+    ageBatch($batch, 20);
+
+    $this->post("/crm/import/{$batch->id}/fail")->assertRedirect("/crm/import/{$batch->id}");
+
+    $batch->refresh();
+    expect($batch->status)->toBe(ImportBatch::UPLOADED)
+        ->and($batch->simulation)->toBeNull()
+        ->and($batch->options['simulation_error'])->toContain('simulation ne progressait plus')
+        ->and($batch->field_map)->toEqual(['Raison sociale' => 'name'])
+        ->and(AuditLog::query()->where('event', 'crm.import_failed_marked')->count())->toBe(1);
+    $this->get("/crm/import/{$batch->id}")->assertRedirect("/crm/import/{$batch->id}/mapping");
+    $this->get("/crm/import/{$batch->id}/mapping")->assertInertia(fn ($page) => $page->where('error', $batch->options['simulation_error']));
+});
+
+it('retries a simulation later when another worker holds the batch', function () {
+    $batch = uploadImport("Raison sociale\nGarage Martin\n", ImportTarget::Organisations);
+    $batch->startSimulation(FieldMap::guess($batch->target, ['Raison sociale']), new ValueMapper);
+    $lock = Cache::lock('crm-import:'.tenant()->id.':'.$batch->id, 60);
+    expect($lock->get())->toBeTrue();
+
+    $job = Mockery::mock(Job::class);
+    $job->shouldReceive('release')->once()->with(5);
+    $job->shouldReceive('isReleased', 'isDeleted', 'hasFailed')->andReturn(false);
+    $simulate = new SimulateImport($batch->id);
+    $simulate->setJob($job);
+    app()->call([$simulate, 'handle']);
+
+    expect($batch->refresh()->status)->toBe(ImportBatch::SIMULATING);
+    $lock->release();
 });
 
 it('refuses to simulate or start a batch that already ran', function () {

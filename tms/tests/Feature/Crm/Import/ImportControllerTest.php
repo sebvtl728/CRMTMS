@@ -197,6 +197,41 @@ it('keeps an identifier mapping with its source software, and saves a profile', 
     expect(ImportProfile::query()->count())->toBe(1)->and(ImportProfile::query()->sole()->field_map)->toEqual(['Raison sociale' => 'name']);
 });
 
+it('never overwrites a profile of another type of data with the same name', function () {
+    $people = ImportProfile::query()->create(['name' => 'Export Formevol', 'target' => ImportTarget::People,
+        'field_map' => ['Nom' => 'last_name'], 'value_map' => [], 'options' => []]);
+    $batch = uploaded($this->user);
+
+    $this->put("/crm/import/{$batch->id}/mapping", ['map' => ['Raison sociale' => 'name'], 'profile_name' => 'Export Formevol'])
+        ->assertSessionHasErrors(['profile_name' => 'Un profil « Export Formevol » existe déjà pour un autre type de données : choisissez un autre nom.']);
+
+    expect($people->refresh()->target)->toBe(ImportTarget::People)
+        ->and($people->field_map)->toEqual(['Nom' => 'last_name'])
+        ->and($batch->refresh()->status)->toBe(ImportBatch::UPLOADED);
+});
+
+it('lets only its author or an administrator overwrite a profile', function () {
+    $author = commercial();
+    $profile = ImportProfile::query()->create(['name' => 'Export Formevol', 'target' => ImportTarget::Organisations,
+        'field_map' => ['Ville' => 'city'], 'value_map' => [], 'options' => []]);
+    $profile->forceFill(['created_by' => $author->id])->save();
+
+    $batch = uploaded($this->user);
+    $this->put("/crm/import/{$batch->id}/mapping", ['map' => ['Raison sociale' => 'name'], 'profile_name' => 'Export Formevol'])
+        ->assertSessionHasErrors(['profile_name' => 'Le profil « Export Formevol » a été créé par un autre utilisateur : choisissez un autre nom.']);
+    expect($profile->refresh()->field_map)->toEqual(['Ville' => 'city']);
+
+    $mine = uploaded($author);
+    $this->put("/crm/import/{$mine->id}/mapping", ['map' => ['Raison sociale' => 'name'], 'profile_name' => 'Export Formevol'])->assertSessionHasNoErrors();
+    expect($profile->refresh()->field_map)->toEqual(['Raison sociale' => 'name']);
+
+    $admin = admin(twoFactor: true);
+    $theirs = uploaded($admin);
+    $this->put("/crm/import/{$theirs->id}/mapping", ['map' => ['Raison sociale' => 'name', 'Ville' => 'city'], 'profile_name' => 'Export Formevol'])->assertSessionHasNoErrors();
+    expect($profile->refresh()->field_map)->toEqual(['Raison sociale' => 'name', 'Ville' => 'city'])
+        ->and($profile->created_by)->toBe($author->id);
+});
+
 it('sends to the values step when the file has values without correspondence', function () {
     $batch = simulatedBatch($this->user);
 
@@ -510,4 +545,20 @@ it('shows the Importer link on the lists to users who may import', function () {
     $this->actingAs($this->user)->get('/crm/organisations')->assertInertia(fn (Assert $page) => $page->where('can.import', true));
     $this->actingAs($this->user)->get('/crm/people')->assertInertia(fn (Assert $page) => $page->where('can.import', true));
     $this->actingAs(assistant())->get('/crm/organisations')->assertInertia(fn (Assert $page) => $page->where('can.import', false));
+});
+
+it('throttles the polled status and undo preview of a batch', function (string $suffix) {
+    $batch = uploaded($this->user);
+
+    for ($i = 0; $i < 120; $i++) {
+        $this->getJson("/crm/import/{$batch->id}/{$suffix}")->assertOk();
+    }
+    $this->getJson("/crm/import/{$batch->id}/{$suffix}")->assertTooManyRequests();
+})->with(['status', 'undo']);
+
+it('answers 401 to the progress poller once the session expired', function () {
+    $batch = uploaded($this->user);
+    auth()->logout();
+
+    $this->getJson("/crm/import/{$batch->id}/status")->assertUnauthorized();
 });

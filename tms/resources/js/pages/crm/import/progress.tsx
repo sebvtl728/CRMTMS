@@ -24,6 +24,8 @@ interface ProgressProps extends Progress {
 }
 
 const POLL_MS = 2000;
+/** Unauthenticated (401) or CSRF token expired (419). */
+const SESSION_EXPIRED = [401, 419];
 const number = new Intl.NumberFormat('fr-FR');
 
 const TEXT = {
@@ -37,39 +39,52 @@ const TEXT = {
     undo: { step: 6, title: 'Annulation en cours', verb: 'fiches traitées', hint: 'Les fiches créées par cet import sont retirées.' },
 } as const;
 
-/** Polls the batch every 2 s and reloads the page when its step changes. */
+/** Polls the batch every 2 s (one request at a time) and reloads the page when its step changes; stops when the session expired. */
 export default function ImportProgress(props: ProgressProps) {
     const { batch } = props;
     const [progress, setProgress] = useState<Progress>(props);
     const [confirming, setConfirming] = useState(false);
+    const [expired, setExpired] = useState(false);
     const errors = usePage<{ errors: Record<string, string> }>().props.errors ?? {};
     const text = TEXT[progress.phase ?? props.phase ?? 'run'];
 
     useEffect(() => {
         let stopped = false;
+        let timer: ReturnType<typeof setTimeout> | undefined;
+        // One request at a time: the next one is scheduled once the previous answered.
+        const schedule = () => {
+            if (!stopped) timer = setTimeout(tick, POLL_MS);
+        };
         const tick = async () => {
             try {
                 const response = await fetch(route('crm.import.status', batch.id), {
                     headers: { Accept: 'application/json' },
                     credentials: 'same-origin',
                 });
-                if (!response.ok) return;
-                const data = (await response.json()) as Progress;
                 if (stopped) return;
-                if (data.finished) {
-                    router.visit(route('crm.import.show', batch.id), { replace: true });
-                    return;
+                if (SESSION_EXPIRED.includes(response.status)) {
+                    setExpired(true);
+                    return; // polling stops: every next call would fail too
                 }
-                setProgress(data);
+                if (response.ok) {
+                    const data = (await response.json()) as Progress;
+                    if (stopped) return;
+                    if (data.finished) {
+                        router.visit(route('crm.import.show', batch.id), { replace: true });
+                        return;
+                    }
+                    setProgress(data);
+                }
             } catch {
                 // Network hiccup: next tick.
             }
+            schedule();
         };
-        const timer = setInterval(tick, POLL_MS);
+        schedule();
 
         return () => {
             stopped = true;
-            clearInterval(timer);
+            clearTimeout(timer);
         };
     }, [batch.id]);
 
@@ -80,6 +95,18 @@ export default function ImportProgress(props: ProgressProps) {
             description={`« ${batch.original_name} » · ${batch.target.label}`}
         >
             <div className="grid max-w-3xl gap-4" aria-live="polite">
+                {expired && (
+                    <Alert variant="destructive">
+                        <AlertTriangle className="h-4 w-4" />
+                        <AlertTitle>Session expirée, reconnectez-vous</AlertTitle>
+                        <AlertDescription>
+                            <p>L&apos;import continue en arrière-plan. Reconnectez-vous pour suivre son avancement.</p>
+                            <Button size="sm" className="mt-3" onClick={() => window.location.assign(route('login'))}>
+                                Se reconnecter
+                            </Button>
+                        </AlertDescription>
+                    </Alert>
+                )}
                 {errors.batch && (
                     <Alert variant="destructive">
                         <AlertTriangle className="h-4 w-4" />

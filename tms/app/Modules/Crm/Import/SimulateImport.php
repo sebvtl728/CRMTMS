@@ -24,7 +24,10 @@ class SimulateImport implements ShouldQueue
 {
     use Dispatchable, Queueable, TenantAwareJob;
 
-    public int $tries = 1;
+    /** Lock waits are released, not failed (see handle()); one real attempt. */
+    public int $tries = 5;
+
+    public int $maxExceptions = 1;
 
     /** A 50 000-row file takes about a minute and a half. */
     public int $timeout = 900;
@@ -46,6 +49,10 @@ class SimulateImport implements ShouldQueue
     {
         $lock = Cache::lock('crm-import:'.$tenants->id().':'.$this->batchId, $this->timeout + 30);
         if (! $lock->get()) {
+            // Another worker still holds the batch (a previous attempt being
+            // released): try again shortly instead of dropping the simulation.
+            $this->release(5);
+
             return;
         }
 

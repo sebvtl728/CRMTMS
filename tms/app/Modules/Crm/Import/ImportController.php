@@ -3,6 +3,7 @@
 namespace App\Modules\Crm\Import;
 
 use App\Http\Controllers\Controller;
+use App\Modules\Core\Access\Permissions as CorePermissions;
 use App\Modules\Core\References\ReferenceItem;
 use App\Modules\Core\Tenancy\TenantStorage;
 use App\Modules\Core\Users\User;
@@ -224,9 +225,11 @@ class ImportController extends Controller
         $options['values_reviewed'] = false;
         $batch->options = $options;
 
+        $profileName = trim((string) ($input['profile_name'] ?? ''));
+        $this->checkProfileName($batch, $profileName, $this->user($request));
         $this->startSimulation($batch, $map, $batch->valueMapper());
-        if (! empty($input['profile_name'])) {
-            $this->saveProfile($batch, $input['profile_name']);
+        if ($profileName !== '') {
+            $this->saveProfile($batch, $profileName);
         }
 
         return to_route('crm.import.show', $batch->id);
@@ -303,9 +306,11 @@ class ImportController extends Controller
         $options = $batch->options;
         $options['values_reviewed'] = true;
         $batch->options = $options;
+        $profileName = trim((string) $request->input('profile_name', ''));
+        $this->checkProfileName($batch, $profileName, $this->user($request));
         $this->startSimulation($batch, $batch->fieldMap(), ValueMapper::fromArray($merged));
-        if ($request->filled('profile_name')) {
-            $this->saveProfile($batch, (string) $request->input('profile_name'));
+        if ($profileName !== '') {
+            $this->saveProfile($batch, $profileName);
         }
 
         return to_route('crm.import.show', $batch->id);
@@ -380,6 +385,9 @@ class ImportController extends Controller
 
         if (! $batch->markFailed($this->user($request))) {
             throw ValidationException::withMessages(['batch' => 'Cet import progresse encore. Il peut être marqué comme échoué après '.ImportBatch::STUCK_MINUTES.' minutes sans avancement.']);
+        }
+        if ($batch->status === ImportBatch::UPLOADED) {
+            return to_route('crm.import.show', $batch->id);
         }
 
         return to_route('crm.import.show', $batch->id)->with('status', 'L\'import est marqué comme échoué. Vous pouvez annuler ce qu\'il a créé.');
@@ -601,11 +609,36 @@ class ImportController extends Controller
         SimulateImport::dispatch($batch->id);
     }
 
+    /**
+     * A profile name is unique in the organisme: saving under an existing
+     * name overwrites that profile, which only makes sense for the same type
+     * of data, and only its author or an administrator (users.manage) may do it.
+     *
+     * @throws ValidationException
+     */
+    private function checkProfileName(ImportBatch $batch, string $name, User $user): void
+    {
+        if ($name === '') {
+            return;
+        }
+        $existing = ImportProfile::query()->where('name', $name)->first();
+        if ($existing === null) {
+            return;
+        }
+        if ($existing->target !== $batch->target) {
+            throw ValidationException::withMessages(['profile_name' => 'Un profil « '.$name.' » existe déjà pour un autre type de données : choisissez un autre nom.']);
+        }
+        if ($existing->created_by !== $user->id && ! $user->can(CorePermissions::USERS_MANAGE)) {
+            throw ValidationException::withMessages(['profile_name' => 'Le profil « '.$name.' » a été créé par un autre utilisateur : choisissez un autre nom.']);
+        }
+    }
+
+    /** Called after checkProfileName(). */
     private function saveProfile(ImportBatch $batch, string $name): void
     {
         $batch->refresh();
         $options = array_filter(['strategy' => $batch->strategy()->value, 'source_system' => $batch->sourceSystem()], fn ($v) => $v !== null);
-        $profile = ImportProfile::query()->firstOrNew(['name' => trim($name)]);
+        $profile = ImportProfile::query()->where('target', $batch->target)->firstOrNew(['name' => $name]);
         $profile->fill(['target' => $batch->target, 'field_map' => $batch->field_map ?? [], 'value_map' => $batch->value_map ?? [], 'options' => $options])->save();
     }
 
@@ -626,7 +659,7 @@ class ImportController extends Controller
     {
         $query = ImportBatch::query();
 
-        return $user->can('users.manage') ? $query : $query->where('user_id', $user->id);
+        return $user->can(CorePermissions::USERS_MANAGE) ? $query : $query->where('user_id', $user->id);
     }
 
     private function find(Request $request, string $id): ImportBatch

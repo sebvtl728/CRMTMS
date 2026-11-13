@@ -233,8 +233,9 @@ class ImportBatch extends Model
     }
 
     /**
-     * A stuck run, simulation or undo is declared failed: what it created
-     * can then be undone. Conditional update: a worker that wrote progress
+     * A stuck run or undo is declared failed: what it created can then be
+     * undone. A stuck simulation goes back to « uploaded » with
+     * options.simulation_error (the mapping page explains and relaunches). Conditional update: a worker that wrote progress
      * in the meantime wins. Journaled (crm.import_failed_marked).
      *
      * @return bool false when the batch is progressing or not running
@@ -242,11 +243,18 @@ class ImportBatch extends Model
     public function markFailed(User $by): bool
     {
         $options = $this->options;
-        $options['failure'] = 'Marqué comme échoué par '.$by->name.' : l\'import ne progressait plus.';
-        $changed = self::query()->whereKey($this->id)
-            ->whereIn('status', [self::RUNNING, self::SIMULATING, self::UNDOING])
-            ->where('updated_at', '<=', now()->subMinutes(self::STUCK_MINUTES))
-            ->update(['status' => self::FAILED, 'finished_at' => now(), 'updated_at' => now(), 'options' => json_encode($options, JSON_UNESCAPED_UNICODE)]);
+        $stale = self::query()->whereKey($this->id)->where('updated_at', '<=', now()->subMinutes(self::STUCK_MINUTES));
+
+        if ($this->status === self::SIMULATING) {
+            // A simulation created nothing: back to the mapping, to be relaunched.
+            $options['simulation_error'] = 'La simulation ne progressait plus et a été interrompue par '.$by->name.'. Vérifiez l\'association des colonnes puis relancez-la.';
+            $changed = $stale->where('status', self::SIMULATING)
+                ->update(['status' => self::UPLOADED, 'simulation' => null, 'cursor_line' => 0, 'updated_at' => now(), 'options' => json_encode($options, JSON_UNESCAPED_UNICODE)]);
+        } else {
+            $options['failure'] = 'Marqué comme échoué par '.$by->name.' : l\'import ne progressait plus.';
+            $changed = $stale->whereIn('status', [self::RUNNING, self::UNDOING])
+                ->update(['status' => self::FAILED, 'finished_at' => now(), 'updated_at' => now(), 'options' => json_encode($options, JSON_UNESCAPED_UNICODE)]);
+        }
         if ($changed === 0) {
             return false;
         }
