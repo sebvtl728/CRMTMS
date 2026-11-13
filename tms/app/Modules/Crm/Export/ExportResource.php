@@ -2,6 +2,7 @@
 
 namespace App\Modules\Crm\Export;
 
+use App\Modules\Core\Users\User;
 use Illuminate\Database\Eloquent\Model;
 
 /**
@@ -27,9 +28,12 @@ interface ExportResource
     public function defaults(): array;
 
     /**
-     * @return list<string>
+     * Relations to eager load for $user (what a restricted user does not see
+     * is left out).
+     *
+     * @return array<int|string, mixed>
      */
-    public function with(): array;
+    public function with(User $user): array;
 
     public function value(Model $model, string $column): ?string;
 }

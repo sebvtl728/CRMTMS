@@ -2,6 +2,7 @@
 
 namespace App\Modules\Crm\Export;
 
+use App\Modules\Core\Users\User;
 use App\Modules\Crm\Organisations\Organisation;
 use Illuminate\Database\Eloquent\Model;
 
@@ -48,7 +49,7 @@ final class OrganisationExport implements ExportResource
         return ['name', 'siret', 'status', 'sector', 'responsible', 'das', 'email', 'phone', 'postal_code', 'city', 'last_contact_at'];
     }
 
-    public function with(): array
+    public function with(User $user): array
     {
         return ['legalForm', 'sector', 'establishmentType', 'companySize', 'origin', 'responsible', 'das'];
     }

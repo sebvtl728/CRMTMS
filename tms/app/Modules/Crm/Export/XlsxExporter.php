@@ -2,6 +2,7 @@
 
 namespace App\Modules\Crm\Export;
 
+use App\Modules\Core\Users\User;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Validation\ValidationException;
@@ -58,20 +59,20 @@ final class XlsxExporter
      * @param  Builder<Model>  $query  already filtered and ordered
      * @param  list<string>  $columns  keys of $resource->columns(), validated by the caller
      */
-    public function export(Builder $query, ExportResource $resource, array $columns, string $filename, ?int $rows = null): StreamedResponse
+    public function export(Builder $query, ExportResource $resource, User $user, array $columns, string $filename, ?int $rows = null): StreamedResponse
     {
         if ($rows === null) {
             $this->count($query);
         }
         $headers = array_map(fn (string $c) => self::neutralise($resource->columns()[$c]) ?? '', $columns);
 
-        return response()->streamDownload(function () use ($query, $resource, $columns, $headers): void {
+        return response()->streamDownload(function () use ($query, $resource, $user, $columns, $headers): void {
             $writer = new Writer;
             $writer->openToFile('php://output');
             $writer->getCurrentSheet()->setName($resource->sheetName());
             $writer->addRow(Row::fromValues($headers, (new Style)->setFontBold()));
 
-            foreach ((clone $query)->with($resource->with())->lazy(self::CHUNK) as $model) {
+            foreach ((clone $query)->with($resource->with($user))->lazy(self::CHUNK) as $model) {
                 $writer->addRow(Row::fromValues(array_map(
                     fn (string $c) => self::neutralise($resource->value($model, $c)) ?? '',
                     $columns,

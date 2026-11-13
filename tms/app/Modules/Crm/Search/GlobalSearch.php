@@ -79,7 +79,7 @@ class GlobalSearch
     private function people(string $term, User $user, int $limit): array
     {
         $query = CrmVisibility::people(Person::query(), $user)
-            ->with('activeAffiliations.organisation')
+            ->with(CrmVisibility::activeAffiliationsWith($user))
             ->search($term)
             ->orderBy('last_name')->orderBy('first_name')->orderBy('id')
             ->limit($limit);

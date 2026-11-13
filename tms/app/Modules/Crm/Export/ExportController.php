@@ -80,7 +80,7 @@ class ExportController extends Controller
         }
         $this->audit->export($resource->auditName(), ['filters' => $journaled, 'columns' => $columns, 'rows' => $rows]);
 
-        return $this->exporter->export($query, $export, $columns, $export->fileName().'-'.now()->format('Ymd-Hi').'.xlsx', $rows);
+        return $this->exporter->export($query, $export, $user, $columns, $export->fileName().'-'.now()->format('Ymd-Hi').'.xlsx', $rows);
     }
 
     /**

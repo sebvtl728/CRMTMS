@@ -41,7 +41,7 @@ class OrganisationController extends Controller
         $canDelete = $user->can(Permissions::DELETE);
 
         $filters = OrganisationListQuery::filters($request->query(), $user);
-        $query = OrganisationListQuery::build($filters, $user)->with(CrmResource::Organisations->export()->with());
+        $query = OrganisationListQuery::build($filters, $user)->with(CrmResource::Organisations->export()->with($user));
 
         return Inertia::render('crm/organisations/index', [
             'organisations' => $query->paginate(25)->withQueryString()->through(fn (Organisation $o) => [

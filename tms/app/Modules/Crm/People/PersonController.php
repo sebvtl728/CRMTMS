@@ -44,7 +44,7 @@ class PersonController extends Controller
         $canDelete = $user->can(Permissions::DELETE);
 
         $filters = PersonListQuery::filters($request->query(), $user);
-        $query = PersonListQuery::build($filters, $user)->with(CrmResource::People->export()->with());
+        $query = PersonListQuery::build($filters, $user)->with(CrmResource::People->export()->with($user));
 
         return Inertia::render('crm/people/index', [
             'people' => $query->paginate(25)->withQueryString()->through(fn (Person $p) => [
@@ -110,7 +110,7 @@ class PersonController extends Controller
         }
 
         $people = CrmVisibility::people(Person::query(), $user)
-            ->with('activeAffiliations.organisation')
+            ->with(CrmVisibility::activeAffiliationsWith($user))
             ->search($term)
             ->when($organisationId, fn (Builder $q, string $id) => $q->whereNotExists(fn ($sub) => $sub->select(DB::raw(1))->from('affiliations')
                 ->whereColumn('affiliations.person_id', 'people.id')->where('affiliations.organisation_id', $id)

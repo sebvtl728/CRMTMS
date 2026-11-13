@@ -2,8 +2,10 @@
 
 namespace App\Modules\Crm\Export;
 
+use App\Modules\Core\Users\User;
 use App\Modules\Crm\People\Person;
 use App\Modules\Crm\People\PhoneNumber;
+use App\Modules\Crm\Visibility\CrmVisibility;
 use Illuminate\Database\Eloquent\Model;
 
 final class PersonExport implements ExportResource
@@ -51,9 +53,9 @@ final class PersonExport implements ExportResource
         return ['civility', 'last_name', 'first_name', 'type', 'organisations', 'email', 'mobile', 'phone', 'postal_code', 'city', 'responsible', 'last_contact_at'];
     }
 
-    public function with(): array
+    public function with(User $user): array
     {
-        return ['activeAffiliations.organisation', 'professionalSituation', 'fundingMode', 'origin', 'responsible'];
+        return [...CrmVisibility::activeAffiliationsWith($user), 'professionalSituation', 'fundingMode', 'origin', 'responsible'];
     }
 
     public function value(Model $model, string $column): ?string

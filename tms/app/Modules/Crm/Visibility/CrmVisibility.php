@@ -4,6 +4,7 @@ namespace App\Modules\Crm\Visibility;
 
 use App\Modules\Core\Access\Role;
 use App\Modules\Core\Users\User;
+use App\Modules\Crm\Organisations\Organisation;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\DB;
 
@@ -83,6 +84,27 @@ final class CrmVisibility
                     ->join('user_das', 'user_das.das_id', '=', 'person_das.das_id')
                     ->whereColumn('person_das.person_id', $personId)
                     ->where('user_das.user_id', $user->getKey()))));
+    }
+
+    /**
+     * Eager loads of a person's active affiliations and their entreprise,
+     * limited for a Responsable DAS to the entreprises he sees: a visible
+     * person may also work elsewhere, outside his DAS (name, function, work
+     * e-mail and phone of that link must not leak through lists, exports or
+     * searches).
+     *
+     * @return array<int|string, mixed>
+     */
+    public static function activeAffiliationsWith(User $user): array
+    {
+        if (! self::restricts($user)) {
+            return ['activeAffiliations.organisation'];
+        }
+
+        return [
+            'activeAffiliations' => fn ($q) => $q->whereIn('affiliations.organisation_id', self::organisations(Organisation::query(), $user)->select('organisations.id')),
+            'activeAffiliations.organisation',
+        ];
     }
 
     /**
