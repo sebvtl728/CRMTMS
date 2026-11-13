@@ -5,6 +5,7 @@ namespace App\Modules\Core\Users;
 use App\Http\Controllers\Controller;
 use App\Modules\Core\Access\Role;
 use App\Modules\Core\Audit\AuditRecorder;
+use App\Modules\Core\Tenancy\TenantContext;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -90,6 +91,13 @@ class UserController extends Controller
      */
     private function guardLastAdmin(User $target, bool $leavesAdmins): void
     {
+        // Role changes write model_has_roles, never the users row, so row locks alone
+        // do not serialise them and, in READ COMMITTED, a waiting transaction would keep
+        // a stale view of who is still an admin. A per-organisme advisory lock, taken
+        // before counting, makes every path that can remove an admin run one at a time;
+        // the count below is a fresh statement, so it sees what the previous one committed.
+        DB::select('select pg_advisory_xact_lock(hashtext(?))', ['last-admin:'.app(TenantContext::class)->id()]);
+
         $admins = User::query()
             ->whereNull('deactivated_at')
             ->whereNotNull('password')

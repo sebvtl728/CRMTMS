@@ -31,3 +31,12 @@ it('shows only the french message of the application own aborts', function () {
     $this->get('/_test/own')->assertStatus(422)->assertSee('Curseur invalide.');
     $this->get('/_test/english')->assertForbidden()->assertDontSee('This action is unauthorized.')->assertSee('droits nécessaires');
 });
+
+it('shows the french message of an anonymised fiche refusal', function () {
+    $admin = admin(twoFactor: true);
+    $person = makePerson('Durand');
+    $person->forceFill(['anonymised_at' => now()])->save();
+
+    $this->actingAs($admin)->post("/crm/people/{$person->id}/notes", ['body' => 'x'])
+        ->assertForbidden()->assertSee('Cette fiche est anonymisée.');
+});

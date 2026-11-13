@@ -166,3 +166,24 @@ it('never lets another organisme be managed', function () {
     $foreign = userIn($other, ['email' => 'x@autre.test']);
     $this->actingAs($this->admin)->postJson("/admin/users/{$foreign->id}/deactivate")->assertNotFound();
 });
+
+it('counts the active admins after taking the per-organisme advisory lock', function () {
+    $actor = direction(twoFactor: true);
+    $actor->givePermissionTo('users.manage');
+    $a = $this->admin;
+    $b = admin();
+
+    // Another transaction "commits" B's demotion right after we obtained the lock:
+    // the count must run afterwards, in a fresh statement, and see it.
+    $fired = false;
+    DB::listen(function ($query) use (&$fired, $b) {
+        if (! $fired && str_contains($query->sql, 'pg_advisory_xact_lock')) {
+            $fired = true;
+            DB::table('model_has_roles')->where('model_id', $b->id)->delete();
+        }
+    });
+
+    $this->actingAs($actor)->patchJson("/admin/users/{$a->id}/role", ['role' => 'direction'])
+        ->assertStatus(422)->assertJsonValidationErrors(['user' => 'Il doit rester au moins un administrateur actif.']);
+    expect($fired)->toBeTrue()->and($a->fresh()->role())->toBe(Role::AdminOrganisme);
+});

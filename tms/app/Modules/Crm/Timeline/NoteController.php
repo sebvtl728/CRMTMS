@@ -2,6 +2,7 @@
 
 namespace App\Modules\Crm\Timeline;
 
+use App\Exceptions\UserFacingHttpException;
 use App\Http\Controllers\Controller;
 use App\Modules\Crm\Organisations\Organisation;
 use App\Modules\Crm\People\Person;
@@ -19,7 +20,9 @@ class NoteController extends Controller
 
     public function storeForPerson(NoteRequest $request, Person $person): RedirectResponse
     {
-        abort_if($person->anonymised_at !== null, 403, 'Cette fiche est anonymisée.');
+        if ($person->anonymised_at !== null) {
+            throw new UserFacingHttpException(403, 'Cette fiche est anonymisée.');
+        }
 
         return $this->store($request, $person);
     }
