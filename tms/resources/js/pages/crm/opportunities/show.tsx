@@ -1,4 +1,6 @@
+import { ActivityList, type ActivityRow } from '@/components/crm/activity-list';
 import { StageBadge, type OpportunityRow } from '@/components/crm/opportunity-list';
+import { QuickActionFicheButton } from '@/components/crm/quick-action';
 import { StageDialog, type StageOption } from '@/components/crm/stage-dialog';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -25,6 +27,7 @@ interface OpportunityData extends OpportunityRow {
 interface ShowProps {
     opportunity: OpportunityData;
     history: { id: string; from: string | null; to: string | null; by: string | null; at: string }[];
+    activities: ActivityRow[];
     stages: StageOption[];
     lossReasons: Option[];
     can: { update: boolean; delete: boolean };
@@ -40,7 +43,7 @@ function Item({ label, children }: { label: string; children: React.ReactNode })
     );
 }
 
-export default function OpportunityShow({ opportunity: o, history, stages, lossReasons, can, status }: ShowProps) {
+export default function OpportunityShow({ opportunity: o, history, activities, stages, lossReasons, can, status }: ShowProps) {
     const [moving, setMoving] = useState(false);
     const [confirming, setConfirming] = useState(false);
 
@@ -77,6 +80,7 @@ export default function OpportunityShow({ opportunity: o, history, stages, lossR
                                 Changer d'étape
                             </Button>
                         )}
+                        <QuickActionFicheButton context={{ opportunity_id: o.id }} available={can.update} />
                         {can.update && (
                             <Button asChild variant="outline">
                                 <Link href={route('crm.opportunities.edit', o.id)}>
@@ -137,6 +141,10 @@ export default function OpportunityShow({ opportunity: o, history, stages, lossR
                                 ))}
                             </ul>
                         )}
+                    </section>
+                    <section className="rounded-xl border p-4 lg:col-span-2">
+                        <h2 className="mb-3 text-sm font-semibold">Actions</h2>
+                        <ActivityList activities={activities} canEdit={can.update} />
                     </section>
                     <section className="rounded-xl border p-4 lg:col-span-2">
                         <h2 className="mb-3 text-sm font-semibold">Historique des étapes</h2>

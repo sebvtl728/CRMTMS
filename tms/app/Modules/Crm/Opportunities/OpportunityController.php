@@ -6,9 +6,12 @@ use App\Http\Controllers\Controller;
 use App\Modules\Core\References\ReferenceItem;
 use App\Modules\Core\References\ReferenceList;
 use App\Modules\Core\Users\User;
+use App\Modules\Crm\Activities\Activity;
+use App\Modules\Crm\Activities\ActivityRows;
 use App\Modules\Crm\Permissions;
 use App\Modules\Crm\Support\FilterInput;
 use App\Modules\Crm\Support\FormOptions;
+use App\Modules\Crm\Visibility\CrmVisibility;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -127,6 +130,11 @@ class OpportunityController extends Controller
                 'by' => $c->changer?->name,
                 'at' => $c->changed_at->toIso8601String(),
             ])->all(),
+            // Its actions (the 100 latest), those the user sees.
+            'activities' => CrmVisibility::activities(Activity::query(), $user)->with(ActivityRows::WITH)
+                ->where('opportunity_id', $opportunity->id)
+                ->orderByDesc('happened_at')->orderByDesc('id')->limit(100)->get()
+                ->map(fn (Activity $a) => ActivityRows::row($a))->all(),
             'stages' => OpportunityStage::options($opportunity->stage_id),
             'lossReasons' => FormOptions::reference(ReferenceList::LossReason),
             'can' => [

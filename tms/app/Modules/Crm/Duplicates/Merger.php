@@ -4,6 +4,7 @@ namespace App\Modules\Crm\Duplicates;
 
 use App\Modules\Core\Audit\AuditRecorder;
 use App\Modules\Core\Tenancy\TenantContext;
+use App\Modules\Crm\Activities\Activity;
 use App\Modules\Crm\Affiliations\Affiliation;
 use App\Modules\Crm\Opportunities\Opportunity;
 use App\Modules\Crm\Organisations\Organisation;
@@ -25,9 +26,9 @@ use InvalidArgumentException;
  * keeps $keep's value unless it is empty), affiliations moved (one active
  * link per pair: the oldest survives, completed by the other), notes and
  * attachments moved, opportunities and opportunity contacts moved (a
- * person holding opportunities stays a particulier), DAS united, source
- * identifiers kept in merged_sources, $drop trashed for good with
- * merged_into_id, journal crm.merged (ids only).
+ * person holding opportunities stays a particulier), actions moved, DAS
+ * united, source identifiers kept in merged_sources, $drop trashed for
+ * good with merged_into_id, journal crm.merged (ids only).
  */
 class Merger
 {
@@ -164,6 +165,7 @@ class Merger
             $this->moveAffiliations($isPerson ? 'person_id' : 'organisation_id', $isPerson ? 'organisation_id' : 'person_id', $k->id, $d->id);
             $this->moveTimeline($k, $d);
             $this->moveOpportunities($k, $d);
+            $this->moveActivities($k, $d);
             $this->uniteDas($k, $d, $isPerson);
 
             // Values retained on $keep, read before the absorbed fiche is scrubbed.
@@ -301,6 +303,16 @@ class Merger
                 ->delete();
             DB::table('opportunity_contacts')->where('person_id', $drop->id)->update(['person_id' => $keep->id]);
         }
+    }
+
+    /**
+     * Actions (trashed ones too) follow the fiche. Written in SQL: neither
+     * the journal nor the contact date need them (merged at the end).
+     */
+    private function moveActivities(Organisation|Person $keep, Organisation|Person $drop): void
+    {
+        $column = $keep instanceof Person ? 'person_id' : 'organisation_id';
+        Activity::withTrashed()->where($column, $drop->id)->toBase()->update([$column => $keep->id, 'updated_at' => now()]);
     }
 
     private function uniteDas(Organisation|Person $keep, Organisation|Person $drop, bool $isPerson): void

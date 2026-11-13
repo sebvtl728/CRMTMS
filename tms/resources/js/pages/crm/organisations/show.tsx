@@ -1,6 +1,7 @@
 import { SimilarFiches, type DuplicateCandidate } from '@/components/crm/duplicate-warning';
 import { FicheOpportunities, type OpportunityRow } from '@/components/crm/opportunity-list';
 import { OrganisationContacts, type AffiliationRow } from '@/components/crm/organisation-contacts';
+import { QuickActionFicheButton } from '@/components/crm/quick-action';
 import { Timeline } from '@/components/crm/timeline';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -132,6 +133,7 @@ export default function OrganisationShow({
                         </div>
                     </div>
                     <div className="flex flex-wrap gap-2">
+                        <QuickActionFicheButton context={{ organisation_id: o.id }} available={!o.deleted} />
                         {can.update && (
                             <Button asChild variant="outline">
                                 <Link href={route('crm.organisations.edit', o.id)}>

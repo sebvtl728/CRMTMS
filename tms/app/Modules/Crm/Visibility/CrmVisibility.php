@@ -4,7 +4,9 @@ namespace App\Modules\Crm\Visibility;
 
 use App\Modules\Core\Access\Role;
 use App\Modules\Core\Users\User;
+use App\Modules\Crm\Opportunities\Opportunity;
 use App\Modules\Crm\Organisations\Organisation;
+use App\Modules\Crm\People\Person;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\DB;
 
@@ -110,6 +112,30 @@ final class CrmVisibility
         return $query->whereIn($query->getModel()->qualifyColumn('das_id'), DB::table('user_das')
             ->select('das_id')
             ->where('user_id', $user->getKey()));
+    }
+
+    /**
+     * A Responsable DAS sees an action when he sees at least one of what it
+     * hangs on: its entreprise, its person or its opportunity (trashed ones
+     * are left to the caller: readable with crm.delete only).
+     *
+     * @template TModel of \Illuminate\Database\Eloquent\Model
+     *
+     * @param  Builder<TModel>  $query
+     * @return Builder<TModel>
+     */
+    public static function activities(Builder $query, User $user): Builder
+    {
+        if (! self::restricts($user)) {
+            return $query;
+        }
+
+        $model = $query->getModel();
+
+        return $query->where(fn (Builder $q) => $q
+            ->whereIn($model->qualifyColumn('organisation_id'), self::organisations(Organisation::withTrashed(), $user)->select('organisations.id'))
+            ->orWhereIn($model->qualifyColumn('person_id'), self::people(Person::withTrashed(), $user)->select('people.id'))
+            ->orWhereIn($model->qualifyColumn('opportunity_id'), self::opportunities(Opportunity::withTrashed(), $user)->select('opportunities.id')));
     }
 
     /**
