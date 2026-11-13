@@ -21,3 +21,4 @@ require __DIR__.'/connectors.php';
 require __DIR__.'/security.php';
 require __DIR__.'/crm.php';
 require __DIR__.'/crm-import.php';
+require __DIR__.'/crm-pipeline.php';

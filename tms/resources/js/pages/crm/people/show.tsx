@@ -1,4 +1,5 @@
 import { SimilarFiches, type DuplicateCandidate } from '@/components/crm/duplicate-warning';
+import { FicheOpportunities, type OpportunityRow } from '@/components/crm/opportunity-list';
 import { PersonGdpr, type GdprData } from '@/components/crm/person-gdpr';
 import { PersonTypeBadges } from '@/components/crm/person-type-badges';
 import { Timeline } from '@/components/crm/timeline';
@@ -68,7 +69,17 @@ interface ShowProps {
     similar: DuplicateCandidate[];
     person: PersonData;
     gdpr: GdprData;
-    can: { update: boolean; delete: boolean; restore: boolean; merge: boolean; consent: boolean; gdpr: boolean; anonymise: boolean };
+    opportunities: OpportunityRow[];
+    can: {
+        update: boolean;
+        delete: boolean;
+        restore: boolean;
+        merge: boolean;
+        createOpportunity: boolean;
+        consent: boolean;
+        gdpr: boolean;
+        anonymise: boolean;
+    };
     status?: string;
 }
 
@@ -81,7 +92,7 @@ function Item({ label, children }: { label: string; children: React.ReactNode })
     );
 }
 
-const TABS = ['Informations', 'Historique'] as const;
+const TABS = ['Informations', 'Opportunités', 'Historique'] as const;
 
 const mail = (email: string | null) =>
     email && (
@@ -97,7 +108,7 @@ const tel = (phone: string | null) =>
         </a>
     );
 
-export default function PersonShow({ person: p, similar, gdpr, can, status }: ShowProps) {
+export default function PersonShow({ person: p, similar, gdpr, opportunities, can, status }: ShowProps) {
     const [confirming, setConfirming] = useState(false);
     const [tab, setTab] = useState<(typeof TABS)[number]>('Informations');
 
@@ -205,6 +216,12 @@ export default function PersonShow({ person: p, similar, gdpr, can, status }: Sh
                     ))}
                 </div>
 
+                {tab === 'Opportunités' && (
+                    <FicheOpportunities
+                        rows={opportunities}
+                        createHref={can.createOpportunity ? `${route('crm.opportunities.create')}?person=${p.id}` : null}
+                    />
+                )}
                 {tab === 'Historique' && <Timeline kind="person" subjectId={p.id} canEdit={can.update} />}
 
                 <div

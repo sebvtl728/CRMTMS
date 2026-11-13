@@ -16,6 +16,8 @@ use App\Modules\Crm\Import\RunImport;
 use App\Modules\Crm\Import\SimulationReport;
 use App\Modules\Crm\Import\Simulator;
 use App\Modules\Crm\Import\ValueMapper;
+use App\Modules\Crm\Opportunities\Opportunity;
+use App\Modules\Crm\Opportunities\OpportunityStage;
 use App\Modules\Crm\Organisations\Organisation;
 use App\Modules\Crm\People\Person;
 use Illuminate\Filesystem\Filesystem;
@@ -269,4 +271,32 @@ function fakeImportDisk(): void
     $root = sys_get_temp_dir().'/tms-test-disk-'.getmypid();
     (new Filesystem)->deleteDirectory($root);
     Storage::set('local', Storage::createLocalDriver(['root' => $root, 'throw' => false]));
+}
+
+/*
+|--------------------------------------------------------------------------
+| CRM pipeline helpers (opportunities tests)
+|--------------------------------------------------------------------------
+*/
+
+function pipelineStage(string $label): ReferenceItem
+{
+    return crmItem(ReferenceList::PipelineStage, $label);
+}
+
+/**
+ * An opportunity created through the model (stage « Nouveau », DAS
+ * « Hôtellerie-restauration » by default), with its first history row.
+ *
+ * @param  array<string, mixed>  $attributes
+ */
+function makeOpportunity(Organisation|Person $account, array $attributes = []): Opportunity
+{
+    return app(OpportunityStage::class)->create([
+        $account instanceof Organisation ? 'organisation_id' : 'person_id' => $account->id,
+        'title' => 'Formation HACCP',
+        'das_id' => crmItem(ReferenceList::Das, 'Hôtellerie-restauration')->id,
+        'stage_id' => pipelineStage('Nouveau')->id,
+        ...$attributes,
+    ]);
 }

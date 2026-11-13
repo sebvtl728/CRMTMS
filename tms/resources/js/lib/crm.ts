@@ -83,3 +83,28 @@ export function isValidSiret(value: string): boolean {
 
     return sum % 10 === 0;
 }
+
+const euros = new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR', minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const decimal = new Intl.NumberFormat('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+/** Stored decimal (« 12500.00 ») shown as « 12 500,00 € ». */
+export function formatAmount(value: string | number | null | undefined): string {
+    if (value === null || value === undefined || value === '') return '—';
+
+    return euros.format(Number(value));
+}
+
+/** Stored decimal (« 12500.00 ») as typed in a form (« 12 500,00 »). */
+export function amountInput(value: string | number | null | undefined): string {
+    if (value === null || value === undefined || value === '') return '';
+
+    return decimal.format(Number(value));
+}
+
+/** A date-only value (YYYY-MM-DD) as « 15/12/2026 », without time zone shift. */
+export function formatDay(value: string | null | undefined): string {
+    if (!value) return '—';
+    const [y, m, d] = value.split('-');
+
+    return `${d}/${m}/${y}`;
+}

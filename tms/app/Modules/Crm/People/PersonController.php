@@ -11,6 +11,7 @@ use App\Modules\Crm\Gdpr\Consent;
 use App\Modules\Crm\Gdpr\ConsentChannel;
 use App\Modules\Crm\Gdpr\GdprPending;
 use App\Modules\Crm\Gdpr\LegalBasis;
+use App\Modules\Crm\Opportunities\OpportunityRows;
 use App\Modules\Crm\Organisations\Organisation;
 use App\Modules\Crm\Organisations\OrganisationStatus;
 use App\Modules\Crm\Permissions;
@@ -209,9 +210,11 @@ class PersonController extends Controller
                 'anonymised_at' => $person->anonymised_at?->toIso8601String(),
             ],
             'gdpr' => $this->gdpr($person, $user),
+            'opportunities' => OpportunityRows::forFiche($person, $user),
             'similar' => $user->can(Permissions::MERGE) ? $this->duplicates->similarTo($person, $user) : [],
             'can' => [
                 'merge' => ! $person->trashed() && $person->anonymised_at === null && $user->can(Permissions::MERGE),
+                'createOpportunity' => ! $person->trashed() && $person->anonymised_at === null && $user->can(Permissions::CREATE),
                 'update' => ! $person->trashed() && $user->can('update', $person),
                 'delete' => ! $person->trashed() && $user->can('delete', $person),
                 'restore' => $person->trashed() && $user->can('restore', $person),

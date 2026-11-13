@@ -93,6 +93,26 @@ final class CrmVisibility
     }
 
     /**
+     * A Responsable DAS sees the opportunities whose DAS he follows (the DAS
+     * of the opportunity, whatever the DAS of its fiche).
+     *
+     * @template TModel of \Illuminate\Database\Eloquent\Model
+     *
+     * @param  Builder<TModel>  $query
+     * @return Builder<TModel>
+     */
+    public static function opportunities(Builder $query, User $user): Builder
+    {
+        if (! self::restricts($user)) {
+            return $query;
+        }
+
+        return $query->whereIn($query->getModel()->qualifyColumn('das_id'), DB::table('user_das')
+            ->select('das_id')
+            ->where('user_id', $user->getKey()));
+    }
+
+    /**
      * Eager loads of a person's active affiliations and their entreprise,
      * limited for a Responsable DAS to the entreprises he sees: a visible
      * person may also work elsewhere, outside his DAS (name, function, work

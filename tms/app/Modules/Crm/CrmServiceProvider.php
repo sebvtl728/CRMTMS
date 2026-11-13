@@ -14,6 +14,9 @@ use App\Modules\Crm\Import\ImportBatch;
 use App\Modules\Crm\Import\ImportProfile;
 use App\Modules\Crm\Import\ImportRow;
 use App\Modules\Crm\Import\ImportStamp;
+use App\Modules\Crm\Opportunities\Opportunity;
+use App\Modules\Crm\Opportunities\OpportunityPolicy;
+use App\Modules\Crm\Opportunities\StageChange;
 use App\Modules\Crm\Organisations\Organisation;
 use App\Modules\Crm\Organisations\OrganisationPolicy;
 use App\Modules\Crm\People\Person;
@@ -33,6 +36,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Http\Exceptions\HttpResponseException;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\RateLimiter;
@@ -60,6 +64,8 @@ class CrmServiceProvider extends ServiceProvider
             'import_row' => ImportRow::class,
             'import_stamp' => ImportStamp::class,
             'consent' => Consent::class,
+            'opportunity' => Opportunity::class,
+            'opportunity_stage_change' => StageChange::class,
         ]);
 
         // Sources of the « Historique »; later increments tag their own.
@@ -79,6 +85,7 @@ class CrmServiceProvider extends ServiceProvider
 
         Gate::policy(Organisation::class, OrganisationPolicy::class);
         Gate::policy(Person::class, PersonPolicy::class);
+        Gate::policy(Opportunity::class, OpportunityPolicy::class);
 
         // A fiche the user may not see is a 404, whatever the action. Trashed
         // fiches resolve too (show, restore): the controller decides.
@@ -150,6 +157,27 @@ class CrmServiceProvider extends ServiceProvider
             $query = SavedFilter::query();
 
             return ($user instanceof User ? $query->visibleTo($user) : $query)->findOrFail($value);
+        });
+
+        // An opportunity: DAS visibility; on a trashed fiche only with crm.delete.
+        Route::bind('opportunity', function (string $value): Opportunity {
+            if (! Str::isUuid($value)) {
+                throw (new ModelNotFoundException)->setModel(Opportunity::class, [$value]);
+            }
+
+            $user = request()->user();
+            $query = Opportunity::query();
+            if ($user instanceof User) {
+                $query = CrmVisibility::opportunities($query, $user);
+            }
+            $opportunity = $query->with(['organisation', 'person'])->findOrFail($value);
+
+            $fiche = $opportunity->organisation ?? $opportunity->person;
+            if ($user instanceof User && ($fiche === null || $fiche->trashed()) && ! $user->can(Permissions::DELETE)) {
+                throw (new ModelNotFoundException)->setModel(Opportunity::class, [$value]);
+            }
+
+            return $opportunity;
         });
 
         // A note / attachment is reachable through the fiche it belongs to.
@@ -269,6 +297,9 @@ class CrmServiceProvider extends ServiceProvider
             Note::query()->where('notable_type', $fiche->getMorphClass())->where('notable_id', $fiche->getKey()), $ids)->exists());
         LinkedData::register('crm.attachments', fn (Organisation|Person $fiche, array $ids): bool => $except(
             Attachment::query()->where('notable_type', $fiche->getMorphClass())->where('notable_id', $fiche->getKey()), $ids)->exists());
+        LinkedData::register('crm.opportunities', fn (Organisation|Person $fiche, array $ids): bool => $except(
+            Opportunity::withTrashed()->where($fiche instanceof Organisation ? 'organisation_id' : 'person_id', $fiche->getKey()), $ids)->exists()
+            || ($fiche instanceof Person && DB::table('opportunity_contacts')->where('person_id', $fiche->getKey())->exists()));
         LinkedData::register('crm.consents', fn (Organisation|Person $fiche, array $ids): bool => $fiche instanceof Person
             && $except(Consent::query()->where('person_id', $fiche->getKey()), $ids)->exists());
     }
@@ -291,5 +322,12 @@ class CrmServiceProvider extends ServiceProvider
         ReferenceUsage::register(ReferenceList::ContactOrigin, 'people', 'origin_id');
         ReferenceUsage::register(ReferenceList::Das, 'person_das', 'das_id');
         ReferenceUsage::register(ReferenceList::DecisionRole, 'affiliations', 'decision_role_id');
+        ReferenceUsage::register(ReferenceList::PipelineStage, 'opportunities', 'stage_id');
+        ReferenceUsage::register(ReferenceList::PipelineStage, 'opportunity_stage_changes', 'from_stage_id');
+        ReferenceUsage::register(ReferenceList::PipelineStage, 'opportunity_stage_changes', 'to_stage_id');
+        ReferenceUsage::register(ReferenceList::Das, 'opportunities', 'das_id');
+        ReferenceUsage::register(ReferenceList::Priority, 'opportunities', 'priority_id');
+        ReferenceUsage::register(ReferenceList::FundingMode, 'opportunities', 'funding_mode_id');
+        ReferenceUsage::register(ReferenceList::LossReason, 'opportunities', 'loss_reason_id');
     }
 }
