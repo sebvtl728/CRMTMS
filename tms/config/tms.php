@@ -56,6 +56,12 @@ return [
         ],
     ],
 
+    'crm' => [
+
+        // Above this many rows an Excel export is refused (« Affinez les filtres »).
+        'export_max_rows' => 50000,
+    ],
+
     'connectors' => [
 
         // Accept loopback / link-local SMTP hosts (a development mail catcher). Keep false in production.

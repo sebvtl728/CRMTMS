@@ -1,0 +1,199 @@
+<?php
+
+use App\Modules\Core\Access\Role;
+use App\Modules\Core\Access\RoleModel;
+use App\Modules\Core\Tenancy\Tenant;
+use App\Modules\Core\Tenancy\TenantContext;
+use App\Modules\Crm\Organisations\Organisation;
+use App\Modules\Crm\Timeline\Attachment;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
+
+beforeEach(function () {
+    tenant();
+    Storage::fake('local');
+});
+
+const PDF = "%PDF-1.4\n1 0 obj\n<< /Type /Catalog >>\nendobj\ntrailer\n<< /Root 1 0 R >>\n%%EOF\n";
+
+function attOrg(): Organisation
+{
+    return Organisation::query()->create(['name' => 'Hôtel du Lac']);
+}
+
+function pdf(string $name = 'Devis été.pdf'): UploadedFile
+{
+    return UploadedFile::fake()->createWithContent($name, PDF);
+}
+
+it('stores an upload on the private disk under the tenant, named by uuid', function () {
+    $org = attOrg();
+    $user = commercial();
+
+    $this->actingAs($user)->post("/crm/organisations/{$org->id}/attachments", ['file' => pdf()])->assertRedirect();
+
+    $attachment = Attachment::query()->sole();
+    expect($attachment->original_name)->toBe('Devis été.pdf')
+        ->and($attachment->mime)->toBe('application/pdf')
+        ->and($attachment->size)->toBe(strlen(PDF))
+        ->and($attachment->uploaded_by)->toBe($user->id)
+        ->and($attachment->notable_id)->toBe($org->id)
+        ->and($attachment->path)->toStartWith('tenants/'.tenant()->id.'/attachments/')
+        ->and(basename($attachment->path))->toMatch('/^[0-9a-f-]{36}$/')
+        ->and($attachment->path)->not->toContain('Devis');
+    Storage::disk('local')->assertExists($attachment->path);
+    expect(Storage::disk('local')->get($attachment->path))->toBe(PDF);
+});
+
+it('attaches to a person too', function () {
+    $person = makePerson('Roux');
+    $this->actingAs(commercial())->post("/crm/people/{$person->id}/attachments", ['file' => pdf('cv.pdf')])->assertRedirect();
+    expect(Attachment::query()->sole()->notable_id)->toBe($person->id);
+});
+
+it('refuses a script renamed .pdf, and any content that does not match its extension', function () {
+    $org = attOrg();
+    $this->actingAs(commercial());
+
+    $this->postJson("/crm/organisations/{$org->id}/attachments", ['file' => UploadedFile::fake()->createWithContent('facture.pdf', '<?php echo system($_GET["c"]);')])
+        ->assertJsonValidationErrors('file');
+    $this->postJson("/crm/organisations/{$org->id}/attachments", ['file' => UploadedFile::fake()->createWithContent('page.txt', '<html><script>alert(1)</script></html>')])
+        ->assertJsonValidationErrors('file');
+    $this->postJson("/crm/organisations/{$org->id}/attachments", ['file' => UploadedFile::fake()->createWithContent('photo.png', PDF)])
+        ->assertJsonValidationErrors('file');
+    $this->postJson("/crm/organisations/{$org->id}/attachments", ['file' => UploadedFile::fake()->createWithContent('vide.txt', '')])
+        ->assertJsonValidationErrors('file');
+
+    expect(Attachment::count())->toBe(0)->and(Storage::disk('local')->allFiles())->toBe([]);
+});
+
+it('refuses extensions outside the list, double extensions and oversize files', function () {
+    $org = attOrg();
+    $this->actingAs(commercial());
+
+    foreach (['malware.exe', 'run.php', 'page.html', 'icone.svg', 'archive.zip', 'sans-extension', 'devis.pdf.php'] as $name) {
+        $this->postJson("/crm/organisations/{$org->id}/attachments", ['file' => UploadedFile::fake()->createWithContent($name, PDF)])
+            ->assertJsonValidationErrors('file');
+    }
+    $this->postJson("/crm/organisations/{$org->id}/attachments", ['file' => UploadedFile::fake()->create('gros.pdf', 20 * 1024 + 1, 'application/pdf')])
+        ->assertJsonValidationErrors('file');
+    $this->postJson("/crm/organisations/{$org->id}/attachments", [])->assertJsonValidationErrors('file');
+
+    expect(Attachment::count())->toBe(0);
+});
+
+it('accepts the allowed formats', function () {
+    $org = attOrg();
+    $this->actingAs(commercial());
+    $png = base64_decode('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==');
+
+    foreach ([['a.txt', "Bonjour\n"], ['b.csv', "a;b\n1;2\n"], ['c.png', $png]] as [$name, $content]) {
+        $this->post("/crm/organisations/{$org->id}/attachments", ['file' => UploadedFile::fake()->createWithContent($name, $content)])
+            ->assertSessionHasNoErrors();
+    }
+
+    expect(Attachment::query()->orderBy('original_name')->pluck('mime', 'original_name')->all())
+        ->toBe(['a.txt' => 'text/plain', 'b.csv' => 'text/csv', 'c.png' => 'image/png']);
+});
+
+it('downloads as an attachment, without sniffing, with the original name', function () {
+    $org = attOrg();
+    $this->actingAs(commercial())->post("/crm/organisations/{$org->id}/attachments", ['file' => pdf()]);
+    $attachment = Attachment::query()->sole();
+
+    $response = $this->get("/crm/attachments/{$attachment->id}")->assertOk();
+
+    expect($response->headers->get('Content-Disposition'))->toContain('attachment;')->toContain("filename*=UTF-8''Devis%20%C3%A9t%C3%A9.pdf")
+        ->and($response->headers->get('X-Content-Type-Options'))->toBe('nosniff')
+        ->and($response->headers->get('Content-Type'))->toStartWith('application/pdf')
+        ->and($response->streamedContent())->toBe(PDF);
+});
+
+it('keeps hostile file names harmless', function () {
+    $org = attOrg();
+    $this->actingAs(commercial())->post("/crm/organisations/{$org->id}/attachments", ['file' => UploadedFile::fake()->createWithContent("../../etc/\"x\r\n.pdf", PDF)]);
+    $attachment = Attachment::query()->sole();
+
+    $response = $this->get("/crm/attachments/{$attachment->id}")->assertOk();
+
+    expect($attachment->original_name)->not->toContain('/')->not->toContain("\r")
+        ->and($attachment->path)->toStartWith('tenants/')
+        ->and($response->headers->get('Content-Disposition'))->not->toContain("\r")->not->toContain("\n");
+});
+
+it('forbids the upload and the removal without crm.update', function () {
+    $org = attOrg();
+    $this->actingAs(commercial())->post("/crm/organisations/{$org->id}/attachments", ['file' => pdf()]);
+    $attachment = Attachment::query()->sole();
+
+    $this->actingAs(userWithRole(Role::Direction, twoFactor: true))->get("/crm/attachments/{$attachment->id}")->assertOk();
+    $this->post("/crm/organisations/{$org->id}/attachments", ['file' => pdf()])->assertForbidden();
+    $this->delete("/crm/attachments/{$attachment->id}")->assertForbidden();
+
+    expect(Attachment::count())->toBe(1);
+});
+
+it('answers 403 to the download of a user without crm.view', function () {
+    $org = attOrg();
+    $this->actingAs(commercial())->post("/crm/organisations/{$org->id}/attachments", ['file' => pdf()]);
+    $attachment = Attachment::query()->sole();
+
+    RoleModel::findByName('direction')->revokePermissionTo('crm.view');
+
+    $this->actingAs(userWithRole(Role::Direction, twoFactor: true))->get("/crm/attachments/{$attachment->id}")->assertForbidden();
+});
+
+it('answers 404 for the file of another organisme, whatever the user', function () {
+    $other = Tenant::factory()->create();
+    $foreign = app(TenantContext::class)->run($other, function () {
+        $attachment = new Attachment(['original_name' => 'secret.pdf', 'mime' => 'application/pdf', 'size' => 10, 'path' => 'tenants/'.tenant()->id.'/attachments/'.fake()->uuid()]);
+        $attachment->notable()->associate(Organisation::query()->create(['name' => 'Autre']));
+        $attachment->save();
+
+        return $attachment;
+    });
+    inTenant();
+
+    $this->actingAs(admin(twoFactor: true))->get("/crm/attachments/{$foreign->id}")->assertNotFound();
+    $this->delete("/crm/attachments/{$foreign->id}")->assertNotFound();
+    $this->get('/crm/attachments/pas-un-uuid')->assertNotFound();
+});
+
+it('answers 404 when the file is missing on disk', function () {
+    $org = attOrg();
+    $this->actingAs(commercial())->post("/crm/organisations/{$org->id}/attachments", ['file' => pdf()]);
+    $attachment = Attachment::query()->sole();
+    Storage::disk('local')->delete($attachment->path);
+
+    $this->get("/crm/attachments/{$attachment->id}")->assertNotFound();
+});
+
+it('soft-deletes the row and keeps the file for the GDPR purge', function () {
+    $org = attOrg();
+    $this->actingAs(commercial())->post("/crm/organisations/{$org->id}/attachments", ['file' => pdf()]);
+    $attachment = Attachment::query()->sole();
+
+    $this->delete("/crm/attachments/{$attachment->id}")->assertRedirect();
+
+    expect(Attachment::count())->toBe(0)->and(Attachment::withTrashed()->count())->toBe(1);
+    Storage::disk('local')->assertExists($attachment->path);
+    $this->get("/crm/attachments/{$attachment->id}")->assertNotFound();
+});
+
+it('never writes the file name or the path in the journal', function () {
+    $org = attOrg();
+    $this->actingAs(commercial())->post("/crm/organisations/{$org->id}/attachments", ['file' => pdf('CV Dupont.pdf')]);
+
+    $dump = json_encode(DB::table('audit_logs')->get(), JSON_UNESCAPED_UNICODE);
+
+    expect($dump)->not->toContain('Dupont')->not->toContain('attachments/');
+});
+
+it('stores nothing outside the private disk', function () {
+    $org = attOrg();
+    $this->actingAs(commercial())->post("/crm/organisations/{$org->id}/attachments", ['file' => pdf()]);
+
+    expect(glob(public_path('*.pdf')))->toBe([])
+        ->and(config('filesystems.disks.local.root'))->not->toContain('public');
+});

@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Middleware\HandleInertiaRequests;
+use App\Modules\Core\Security\DatabaseErrorLog;
 use App\Modules\Core\Security\EnforceIdleTimeout;
 use App\Modules\Core\Security\SecurityHeaders;
 use App\Modules\Core\Tenancy\ResolveTenant;
@@ -9,6 +10,7 @@ use Illuminate\Cookie\Middleware\EncryptCookies;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
+use Illuminate\Http\Exceptions\ThrottleRequestsException;
 use Illuminate\Http\Middleware\AddLinkHeadersForPreloadedAssets;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
@@ -49,5 +51,15 @@ return Application::configure(basePath: dirname(__DIR__))
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions) {
-        //
+        // Database errors embed the bound values (personal data) in their
+        // message: logged scrubbed, and the default report is stopped.
+        // Every throttled JSON/XHR request answers in French (HTML uses errors/429).
+        $exceptions->render(function (ThrottleRequestsException $e, Request $request) {
+            if (! $request->expectsJson()) {
+                return null;
+            }
+
+            return response()->json(['message' => 'Trop de requêtes, réessayez dans quelques instants.'], 429, $e->getHeaders());
+        });
+        $exceptions->report(fn (Throwable $e) => DatabaseErrorLog::report($e));
     })->create();

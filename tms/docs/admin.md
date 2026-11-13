@@ -11,7 +11,7 @@ Ce guide s'adresse à l'**administrateur de l'organisme** (rôle « Administrate
 | Journal d'audit | `/admin/audit` | `audit.view` |
 | Sécurité | `/admin/security` | `settings.manage` |
 
-Par défaut, l'administrateur détient toutes les permissions ; la direction a seulement `audit.view` et `exports.run` ; les autres rôles n'ont aucune permission d'administration.
+Par défaut, l'administrateur détient toutes les permissions d'administration ; la direction a seulement `audit.view` et `exports.run` ; les autres rôles n'ont aucune permission d'administration. Les droits propres au CRM (fiches, import, RGPD) font l'objet de la section 10 ci-dessous.
 
 ## 1. Première connexion
 
@@ -54,6 +54,13 @@ Pour chaque société : raison sociale, forme juridique, capital (montant et « 
 Inviter : **Inviter un utilisateur** → nom, adresse e-mail, rôle → **Envoyer l'invitation**. Un e-mail contenant le lien d'activation (usage unique, 24 h) est envoyé par le connecteur SMTP de l'organisme (voir *Connecteurs*), à défaut par la messagerie de l'instance ; l'invitation apparaît dans « Invitations en attente » avec sa date d'expiration. Si l'e-mail ne peut pas partir (serveur refusé, erreur SMTP) ou si aucune messagerie n'est configurée, l'invitation est conservée et le lien d'activation s'affiche une seule fois à l'écran, avec un bouton « Copier le lien » : transmettez-le vous-même à la personne invitée (journal : « Échec d'envoi de l'invitation », avec la raison). Il est impossible d'inviter une adresse qui a déjà un compte actif dans l'organisme. L'envoi est consigné dans le journal d'audit (« Invitation envoyée »).
 
 Rôles disponibles : Administrateur de l'organisme, Direction, Commercial, Chargé de relations, Assistant, Responsable DAS. Les changements de rôle sont consignés (« Changement de rôle »).
+
+Autres actions de la liste :
+
+- **Changer le rôle** : la personne est déconnectée de ses autres sessions pour que ses nouveaux droits s'appliquent aussitôt.
+- **Désactiver** / **Réactiver** un compte (sessions révoquées à la désactivation). Vous ne pouvez pas désactiver votre propre compte, et **il doit toujours rester au moins un administrateur actif** : l'application refuse sinon, avec un message.
+- **Renvoyer** une invitation (le lien précédent est annulé, nouveau délai de 24 h) ou la **Révoquer**.
+- **DAS suivis** : pour un utilisateur au rôle *Responsable DAS*, choisissez les DAS qu'il suit. Il ne voit alors dans le CRM que les entreprises rattachées à ces DAS, et les personnes liées à ces entreprises ou, sans entreprise, rattachées à l'un de ces DAS. Sans DAS suivi, il ne voit aucune fiche. Les autres rôles voient toutes les fiches de l'organisme, quel que soit leur DAS. Un DAS utilisé comme DAS suivi ne peut pas être supprimé des référentiels (désactivez-le).
 
 ## 5. Référentiels
 
@@ -115,3 +122,45 @@ docker compose -f compose.prod.yaml --env-file .env exec app php artisan tms:use
 - `tms:user:activation-link` affiche le lien à transmettre au seul titulaire de l'adresse ; tout lien précédent est annulé. Un compte déjà activé est refusé : utilisez « Mot de passe oublié » sur la page de connexion. Journal : « Lien d'activation réémis » (`users.activation_reissued`).
 - `tms:user:reset-2fa` efface le secret et les codes de récupération ; un administrateur ou un membre de la direction devra enrôler un nouvel appareil à sa prochaine connexion. Journal : `auth.2fa_reset_by_operator`.
 - Rôles possibles pour `--role` : `admin_organisme`, `direction`, `commercial`, `charge_relations`, `assistant`, `responsable_das`.
+
+## 10. Droits du CRM par rôle
+
+Le CRM (fiches, import, export, RGPD) ajoute huit permissions, accordées par défaut selon le rôle :
+
+| Permission | Ce qu'elle permet | Admin. | Direction | Commercial / Chargé de relations | Assistant | Resp. DAS |
+|---|---|:-:|:-:|:-:|:-:|:-:|
+| `crm.view` | Voir les entreprises, personnes, historiques ; rechercher ; menu Commercial | oui | oui | oui | oui | oui (ses DAS) |
+| `crm.create` | Créer entreprises, personnes, rattachements ; ajouter notes et pièces jointes | oui | non | oui | oui | non |
+| `crm.update` | Modifier les fiches | oui | non | oui | oui | non |
+| `crm.delete` | Supprimer et restaurer les fiches, retirer notes et pièces jointes | oui | non | oui | non | non |
+| `crm.merge` | Fusionner deux fiches | oui | non | oui | non | non |
+| `crm.import` | Menu **Imports** : importer, annuler un import | oui | non | oui | non | non |
+| `crm.export` | **Exporter (.xlsx)** les listes | oui | oui | oui | non | oui |
+| `crm.gdpr` | Écran **RGPD** (liste à anonymiser, conservation), export de données d'une personne, anonymisation, durée de conservation | oui | oui | non | non | non |
+
+Le rôle *Responsable DAS* garde la lecture seule et l'export, limités à ses DAS suivis.
+
+**Mises à jour et personnalisation.** À chaque installation ou mise à jour (`ops/migrate.sh` lance `php artisan tms:permissions:sync`), la synchronisation des permissions accorde à chaque organisme les droits par défaut **nouveaux** de chaque rôle, une seule fois : un droit que vous avez retiré à un rôle n'est pas rétabli par une mise à jour. La matrice rôle → permission est propre à chaque organisme.
+
+## 11. RGPD : durée de conservation et anonymisation
+
+Depuis l'écran **RGPD** (permission `crm.gdpr`), le champ **Années après le dernier contact** fixe la durée de conservation des personnes **sans relation contractuelle** :
+
+- de **1 à 10 ans**, **3 ans** par défaut ; la valeur est propre à l'organisme (réglage `gdpr.retention_years`) ;
+- chaque modification est consignée dans le journal d'audit (« settings.gdpr_changed », valeurs avant / après) ;
+- chaque nuit à 3 h 30 (heure de Paris), le traitement `tms:crm:gdpr-retention` inscrit les personnes dont le dernier contact (ou, à défaut, la création) dépasse la durée sur la liste **À anonymiser**, puis anonymise celles qui y figurent depuis **30 jours** et restent dépassées. Il envoie aux détenteurs de `crm.gdpr` un e-mail avec le nombre de personnes nouvellement listées (sans noms) ;
+- sont **exclues** : les clients (particuliers clients, interlocuteurs rattachés à une entreprise cliente), les personnes déjà anonymisées ou fusionnées, et celles marquées **Conserver** jusqu'à une date ;
+- une anonymisation est reportée à la nuit suivante si un import est en cours ;
+- l'anonymisation est **irréversible** : elle efface les données personnelles de la fiche, de son historique, des pièces jointes et des lignes d'import ; le journal d'audit ne contenant jamais de valeur personnelle en clair, il n'a rien à effacer. Un import peut encore être annulé pour ses autres lignes.
+
+Ce traitement repose sur le **planificateur** (service `scheduler` de `compose.prod.yaml`) et sur le *worker* ; vérifiez qu'ils tournent (`docker compose ps`).
+
+## 12. Imports : file d'attente et conservation
+
+Les imports de fichiers (CRM) s'exécutent en arrière-plan.
+
+- **Simulation** : file `imports` (superviseur Horizon `supervisor-imports`, connexion `redis-long`, 1 processus en développement, 2 en production, délai maximal de 15 minutes par fichier). L'**exécution** et l'**annulation** d'un import passent par la file par défaut, par tranches, et reprennent là où elles se sont arrêtées en cas d'interruption.
+- **Suivre l'activité** : le tableau de bord **Horizon** de l'installation montre les files `default` et `imports` et les tâches en échec. Un import qui n'avance plus affiche un message d'arrêt et peut être relancé ou marqué en échec depuis son rapport.
+- **Taille** : le fichier déposé est limité en poids (le message de l'écran **Déposer le fichier** donne la limite) ; les gros fichiers sont lus en continu.
+- **Conservation** : le traitement quotidien `tms:crm:purge-imports` (3 h 30) supprime le **fichier importé et les valeurs brutes** des lignes de plus de **30 jours** ; les totaux, le rapport et l'historique restent. Le rapport Excel téléchargeable est conservé.
+- **Stockage** : les pièces jointes et fichiers d'import sont rangés par organisme dans le stockage privé de l'application (hors dossier public) et sont inclus dans la sauvegarde restic.

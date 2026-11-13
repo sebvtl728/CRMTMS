@@ -81,7 +81,9 @@ Une configuration par `(organisme, connecteur, société)`. `company_id` vide = 
 `SmtpConnector` (clé `smtp`, type envoi). Paramètres : `host`, `port`, `encryption` (`tls`, `ssl`, `none`), `from_address`, `from_name` ; secrets : `username`, `password`.
 
 `TenantMailer::for(?Company $company)` renvoie le mailer à utiliser : configuration active de la société, sinon de l'organisme, sinon mailer par défaut de l'instance (`MAIL_*`). 
-### Politique réseau des hôtes SMTP (`SmtpHostPolicy`)
+### Politique réseau des hôtes SMTP (`SmtpHostPolicy` → `Core\HostPolicy`)
+
+La politique est généralisée dans `App\Modules\Connectors\Core\HostPolicy` (résolution A/AAAA, classification, `violation($ips, strict: false)`) ; `SmtpHostPolicy` n'en est plus qu'une façade (comportement SMTP inchangé). Avec `strict: true`, les réglages `allow_*` sont ignorés : seules les adresses publiques passent (utilisé par Sirene).
 
 Appliquée à l'enregistrement (règle `SmtpHost`, qui résout l'hôte en A/AAAA) **et** à chaque envoi (`SmtpTransportFactory::make`, donc aussi `TenantMailer`) :
 
@@ -91,3 +93,27 @@ Appliquée à l'enregistrement (règle `SmtpHost`, qui résout l'hôte en A/AAAA
 - Un nom qui ne résout pas est accepté à l'enregistrement mais refusé au test et à l'envoi (message français).
 - Les messages d'erreur du test sont toujours rédigés par l'application ; le texte brut du serveur (qui peut contenir l'identifiant) n'est jamais relayé.
 - Risque résiduel connu : le « DNS rebinding » (un nom qui change d'adresse entre la vérification et la connexion).
+
+## Connecteur Sirene (préremplissage par SIRET)
+
+`SireneConnector` (clé `sirene`, type import, aucun secret). Appelle l'API publique « Recherche d'entreprises » (`GET {base_url}/search?q=<siret>&per_page=1`, sans clé, vérifiée en novembre 2026). Réglage unique : `base_url` (vide = `https://recherche-entreprises.api.gouv.fr`). **Aucune configuration n'est nécessaire** : la première recherche d'un organisme crée sa configuration, activée ; un administrateur peut la désactiver ou changer l'adresse dans `/admin/connectors`.
+
+- Route : `GET /crm/sirene/{siret}` (droit `crm.create` ou `crm.update`, 30 requêtes/minute/utilisateur). 422 si le SIRET n'a pas 14 chiffres ou échoue au contrôle Luhn ; 404 « Aucune entreprise trouvée pour ce SIRET. » ; 503 « Service de l'annuaire indisponible, saisissez les informations manuellement. » (API en panne, délai de 5 s dépassé, réponse illisible, connecteur désactivé).
+- Le formulaire d'entreprise propose « Compléter depuis le SIRET » (SIRET valide) : seuls les champs **vides** sont remplis, la liste des champs complétés est affichée, l'utilisateur valide en enregistrant.
+- Adresse appelée : `base_url` doit être `https://` + hôte seul (ni identifiant, port, chemin) résolvant **uniquement vers des adresses publiques** (`HostPolicy` strict : aucun réglage ne permet un hôte local ou privé). Revérifié à chaque appel ; redirections non suivies.
+- Cache (par organisme) : clé `tenant:<tenant_id>:sirene:<siret>`, 24 h pour un résultat, 1 h pour « introuvable » ; les erreurs ne sont jamais mises en cache, ni les entrepreneurs individuels (nom = personne physique).
+- Journal : seul un appel distant réel est journalisé (`connector_runs`, sens `in`), résumé « SIRET … : entreprise trouvée / aucune entreprise trouvée ». Ni raison sociale, ni adresse, ni dirigeants ne sont conservés (les dirigeants de l'API ne sont jamais lus).
+
+### Correspondance de la réponse
+
+| Champ du TMS | Champ de l'API |
+|---|---|
+| raison sociale | `nom_raison_sociale` (sinon `nom_complet`) |
+| SIRET | `siret` de l'établissement trouvé (parmi `siege` et `matching_etablissements`) |
+| code NAF | `activite_principale` de l'établissement (sinon de l'entreprise), sans le point (`58.29C` → `5829C`) |
+| adresse (ligne 1) | `adresse` de l'établissement, sans le « code postal + commune » final |
+| code postal / ville | `code_postal` / `libelle_commune` |
+| forme juridique | `nature_juridique` (code INSEE) traduite par `InseeCodes::legalFormLabel` (EI, EURL, SARL, SAS, SASU, SA, SCOP, Association, Collectivité territoriale, Établissement public ; sinon vide), puis rapprochée par libellé (sans accents ni casse) du référentiel `legal_form_org` |
+| taille | `tranche_effectif_salarie` (code INSEE → « 20 à 49 salariés »), rapprochée du référentiel `company_size` par libellé identique, sinon par la première tranche (« 10-49 », « 250 et plus ») qui contient toute la fourchette ; sinon vide |
+
+L'effectif est celui de l'établissement (non diffusé ou inconnu : vide). Les adresses sont reprises telles que l'API les donne (majuscules).

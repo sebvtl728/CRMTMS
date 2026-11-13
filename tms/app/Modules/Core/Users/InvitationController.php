@@ -5,12 +5,16 @@ namespace App\Modules\Core\Users;
 use App\Http\Controllers\Controller;
 use App\Modules\Connectors\Smtp\SmtpHostRefused;
 use App\Modules\Connectors\Smtp\TenantMailer;
-use App\Modules\Core\Companies\Company;
 use App\Modules\Core\Access\Role;
 use App\Modules\Core\Audit\AuditRecorder;
+use App\Modules\Core\Companies\Company;
+use App\Modules\Core\References\ReferenceItem;
+use App\Modules\Core\References\ReferenceList;
 use App\Modules\Core\Tenancy\TenantContext;
+use App\Modules\Crm\Visibility\CrmVisibility;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\Rule;
 use Inertia\Inertia;
@@ -31,11 +35,18 @@ class InvitationController extends Controller
             'status' => $request->session()->get('status'),
             'warning' => $request->session()->get('warning'),
             'activationLink' => $request->session()->get('activation_link'),
-            'users' => User::query()->orderBy('name')->get()->map(fn (User $user) => [
+            // « DAS suivis » of the Responsable DAS (CRM visibility), edited from this page.
+            'roleOptions' => Role::options(),
+            'dasOptions' => ReferenceItem::options(ReferenceList::Das)->map(fn (ReferenceItem $i) => ['value' => $i->id, 'label' => $i->label])->values(),
+            'users' => User::query()->with('roles')->orderBy('name')->get()->map(fn (User $user) => [
                 'id' => $user->id,
+                'role' => $user->role()?->value,
+                'das_ids' => CrmVisibility::followedDas($user),
                 'name' => $user->name,
                 'email' => $user->email,
                 'active' => $user->isActive(),
+                'is_self' => $user->is($request->user()),
+                'two_factor' => $user->hasTwoFactorEnabled(),
                 'activated' => $user->password !== null,
                 'last_login_at' => $user->last_login_at?->toIso8601String(),
             ]),
@@ -79,9 +90,48 @@ class InvitationController extends Controller
         $inviter = $request->user();
         $invitation = Invitation::issue($validated['email'], $validated['name'], Role::from($validated['role']), $inviter);
 
+        return $this->deliver($invitation, 'sent');
+    }
+
+    /**
+     * New link for a pending invitation: the previous token stops working at
+     * once (issue() replaces the pending invitation) and the 24 h restart.
+     */
+    public function resend(Request $request, Invitation $invitation): RedirectResponse
+    {
+        abort_if($invitation->accepted_at !== null, 404);
+
+        /** @var User $inviter */
+        $inviter = $request->user();
+        $fresh = DB::transaction(fn () => Invitation::issue($invitation->email, $invitation->name, $invitation->role, $inviter));
+
+        return $this->deliver($fresh, 'resent');
+    }
+
+    public function destroy(Invitation $invitation): RedirectResponse
+    {
+        abort_if($invitation->accepted_at !== null, 404);
+
+        DB::transaction(function () use ($invitation) {
+            $this->audit->record('users.invitation_revoked', $invitation, [], ['email' => $invitation->email, 'role' => $invitation->role->value]);
+            $invitation->delete();
+        });
+
+        return to_route('admin.users.index')->with('status', 'Invitation à '.$invitation->email.' révoquée : son lien ne fonctionne plus.');
+    }
+
+    /**
+     * Sends the activation link; when nothing can be delivered, keeps the
+     * invitation and shows the link to the administrator (once).
+     *
+     * @param  'sent'|'resent'  $kind
+     */
+    private function deliver(Invitation $invitation, string $kind): RedirectResponse
+    {
         $url = route('activation.show', $invitation->plainToken);
         $company = Company::query()->where('is_default', true)->first();
         $audited = ['email' => $invitation->email, 'role' => $invitation->role->value];
+        $verb = $kind === 'resent' ? 'renvoyée' : 'envoyée';
 
         if (TenantMailer::deliversNowhere($company)) {
             // MAIL_MAILER=log/array: sending would only write the link to the logs.
@@ -106,9 +156,9 @@ class InvitationController extends Controller
             return $this->withLink($url, 'L\'e-mail d\'invitation à '.$invitation->email.' n\'a pas pu être envoyé ('.rtrim($reason, '.').'). L\'invitation est conservée : transmettez-lui ce lien d\'activation :');
         }
 
-        $this->audit->record('users.invitation_sent', $invitation, [], $audited);
+        $this->audit->record($kind === 'resent' ? 'users.invitation_resent' : 'users.invitation_sent', $invitation, [], $audited);
 
-        return to_route('admin.users.index')->with('status', 'Invitation envoyée à '.$invitation->email.'.');
+        return to_route('admin.users.index')->with('status', 'Invitation '.$verb.' à '.$invitation->email.'.');
     }
 
     /**

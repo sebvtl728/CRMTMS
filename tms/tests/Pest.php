@@ -1,10 +1,26 @@
 <?php
 
 use App\Modules\Core\Access\Role;
+use App\Modules\Core\References\ReferenceItem;
+use App\Modules\Core\References\ReferenceList;
 use App\Modules\Core\Tenancy\Tenant;
 use App\Modules\Core\Tenancy\TenantContext;
 use App\Modules\Core\Tenancy\TenantDomain;
 use App\Modules\Core\Users\User;
+use App\Modules\Crm\Affiliations\Affiliation;
+use App\Modules\Crm\Import\FieldMap;
+use App\Modules\Crm\Import\ImportBatch;
+use App\Modules\Crm\Import\ImportTarget;
+use App\Modules\Crm\Import\ImportUploads;
+use App\Modules\Crm\Import\RunImport;
+use App\Modules\Crm\Import\SimulationReport;
+use App\Modules\Crm\Import\Simulator;
+use App\Modules\Crm\Import\ValueMapper;
+use App\Modules\Crm\Organisations\Organisation;
+use App\Modules\Crm\People\Person;
+use Illuminate\Filesystem\Filesystem;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 use PragmaRX\Google2FA\Google2FA;
 use Tests\RefreshDatabaseAsOwner;
 use Tests\TestCase;
@@ -132,4 +148,125 @@ function totp(User $user, ?int $timestamp = null): string
     return $timestamp === null
         ? $google2fa->getCurrentOtp((string) $user->two_factor_secret)
         : $google2fa->oathTotp((string) $user->two_factor_secret, intdiv($timestamp, 30));
+}
+
+/*
+|--------------------------------------------------------------------------
+| CRM helpers (people and affiliations tests)
+|--------------------------------------------------------------------------
+*/
+
+function crmItem(ReferenceList $list, string $label): ReferenceItem
+{
+    return ReferenceItem::query()->where('list', $list)->where('label', $label)->firstOrFail();
+}
+
+/**
+ * @param  array<string, mixed>  $attributes
+ */
+function makePerson(string $lastName, array $attributes = []): Person
+{
+    return Person::query()->create(['last_name' => $lastName, ...$attributes]);
+}
+
+/**
+ * @param  array<string, mixed>  $attributes
+ */
+function affiliate(Person $person, Organisation $organisation, array $attributes = []): Affiliation
+{
+    return Affiliation::query()->create(['person_id' => $person->id, 'organisation_id' => $organisation->id, ...$attributes]);
+}
+
+function followDas(User $user, ReferenceItem $das): void
+{
+    DB::table('user_das')->insert(['tenant_id' => tenant()->id, 'user_id' => $user->id, 'das_id' => $das->id]);
+}
+
+/*
+|--------------------------------------------------------------------------
+| CRM import helpers
+|--------------------------------------------------------------------------
+*/
+
+/**
+ * Path of a fixture file, or of a temporary file holding $content.
+ */
+function importSource(string $fixtureOrContent, string $extension = 'csv'): string
+{
+    $fixture = base_path('tests/Fixtures/imports/'.$fixtureOrContent);
+    if (! str_contains($fixtureOrContent, "\n") && is_file($fixture)) {
+        return $fixture;
+    }
+    $path = tempnam(sys_get_temp_dir(), 'imp').'.'.$extension;
+    file_put_contents($path, $fixtureOrContent);
+
+    return $path;
+}
+
+/**
+ * An uploaded batch for the authenticated user.
+ *
+ * @param  array<string, mixed>  $options
+ */
+function uploadImport(string $fixtureOrContent, ImportTarget $target, array $options = [], ?string $name = null): ImportBatch
+{
+    $path = importSource($fixtureOrContent);
+    $name ??= is_file(base_path('tests/Fixtures/imports/'.$fixtureOrContent)) ? $fixtureOrContent : 'fichier.csv';
+    $user = auth()->user();
+    assert($user instanceof User);
+
+    return app(ImportUploads::class)->store($user, $path, $name, $target, $options);
+}
+
+/**
+ * Simulates with the proposed mapping (overridden by $map entries).
+ *
+ * @param  array<string, string|null>  $map  column => field
+ * @param  array<string, array<string, string>>  $values
+ */
+function simulateImport(ImportBatch $batch, array $map = [], array $values = []): SimulationReport
+{
+    $guess = FieldMap::guess($batch->target, $batch->reader()->headers())->toArray();
+    $fieldMap = FieldMap::fromArray($batch->target, array_merge($guess, $map));
+
+    return app(Simulator::class)->run($batch, $fieldMap, new ValueMapper($values));
+}
+
+/**
+ * Uploads, simulates and runs (sync queue); returns the refreshed batch.
+ *
+ * @param  array<string, mixed>  $options
+ * @param  array<string, string|null>  $map
+ * @param  array<string, array<string, string>>  $values
+ */
+function runImport(string $fixtureOrContent, ImportTarget $target, array $options = [], array $map = [], array $values = []): ImportBatch
+{
+    $batch = uploadImport($fixtureOrContent, $target, $options);
+    simulateImport($batch, $map, $values);
+    RunImport::dispatch($batch->id);
+
+    return $batch->refresh();
+}
+
+/**
+ * @return list<string> messages of the import row at $line
+ */
+function rowMessages(ImportBatch $batch, int $line): array
+{
+    $row = $batch->rows()->where('line', $line)->firstOrFail();
+
+    return array_map(fn (array $m) => $m['text'], $row->messages);
+}
+
+/**
+ * A private disk « local » in the container's own temporary directory: the
+ * default fake lives on the host-mounted storage/, where a file just written
+ * is now and then not yet readable (Colima file sharing), which made the
+ * import tests flaky.
+ */
+function fakeImportDisk(): void
+{
+    $root = sys_get_temp_dir().'/tms-test-disk-'.getmypid();
+    (new Filesystem)->deleteDirectory($root);
+    Storage::set('local', Storage::createLocalDriver(['root' => $root, 'throw' => false]));
 }

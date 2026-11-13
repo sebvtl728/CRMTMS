@@ -212,10 +212,10 @@ it('creates a configuration and keeps stored secrets when the field is left empt
     $config = ConnectorConfig::query()->sole();
     expect($config->secrets['password'])->toBe('s3cret')->and($config->company_id)->toBeNull();
 
-    $this->putJson('/admin/connectors/smtp', smtpForm(['secrets' => ['username' => '', 'password' => ''], 'settings' => ['host' => 'smtp.example.test', 'port' => 587, 'encryption' => 'ssl', 'from_address' => 'a@cap.test', 'from_name' => '']]))->assertRedirect();
+    $this->putJson('/admin/connectors/smtp', smtpForm(['secrets' => ['username' => '', 'password' => ''], 'settings' => ['host' => 'smtp.example.test', 'port' => 587, 'encryption' => 'tls', 'from_address' => 'a@cap.test', 'from_name' => '']]))->assertRedirect();
     $config->refresh();
     expect($config->secrets)->toBe(['username' => 'cap-user', 'password' => 's3cret'])
-        ->and($config->settings['encryption'])->toBe('ssl')
+        ->and($config->settings['from_address'])->toBe('a@cap.test')
         ->and(ConnectorConfig::query()->count())->toBe(1);
 
     $this->putJson('/admin/connectors/smtp', smtpForm(['secrets' => ['password' => 'n3w']]))->assertRedirect();
@@ -240,6 +240,22 @@ it('requires the stored secrets again when the host or the port changes', functi
     $this->putJson('/admin/connectors/smtp', $moved(['host' => 'mail.cap.test', 'port' => 465], ['username' => 'cap-user', 'password' => 'n3w']))->assertRedirect();
     expect($config->refresh()->settings['host'])->toBe('mail.cap.test')
         ->and($config->secrets['password'])->toBe('n3w');
+});
+
+it('changing smtp encryption requires re-entering the password', function () {
+    $this->actingAs(admin(twoFactor: true));
+    $this->putJson('/admin/connectors/smtp', smtpForm())->assertRedirect();
+    $config = ConnectorConfig::query()->sole();
+
+    $downgrade = smtpForm(['settings' => [...smtpForm()['settings'], 'encryption' => 'none'], 'secrets' => ['username' => '', 'password' => '']]);
+
+    $this->putJson('/admin/connectors/smtp', $downgrade)
+        ->assertUnprocessable()->assertJsonValidationErrors(['secrets.password']);
+    expect($config->refresh()->settings['encryption'])->toBe('tls');
+
+    $downgrade['secrets'] = ['username' => 'cap-user', 'password' => 'n3w'];
+    $this->putJson('/admin/connectors/smtp', $downgrade)->assertRedirect();
+    expect($config->refresh()->settings['encryption'])->toBe('none');
 });
 
 it('clears one secret on explicit request only', function () {

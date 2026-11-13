@@ -30,3 +30,6 @@ yarn-error.log
 /logs/
 /playwright-report
 /test-results
+
+# Signed-in administrator session saved by the e2e tests
+/tests/e2e/.auth

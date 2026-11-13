@@ -138,6 +138,16 @@ class User extends Authenticatable
     }
 
     /**
+     * Lifts the block. Sessions and "remember me" cookies revoked at
+     * deactivation stay revoked and two-factor settings are untouched: the
+     * user signs in again.
+     */
+    public function reactivate(): void
+    {
+        $this->forceFill(['deactivated_at' => null])->save();
+    }
+
+    /**
      * Revokes every other session of the user after a security change (2FA
      * enabled, disabled, new recovery codes): rotates the remember token and
      * deletes the database session rows except $keepSessionId.

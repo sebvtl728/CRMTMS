@@ -2,6 +2,7 @@
 
 namespace App\Modules\Core\Users;
 
+use App\Exceptions\UserFacingHttpException;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -68,8 +69,12 @@ class ActivationController extends Controller
     {
         $invitation = Invitation::findPendingByToken($token);
 
-        abort_if($invitation === null, 404, 'Ce lien d\'activation n\'est pas valide ou a déjà été utilisé.');
-        abort_if($invitation->isExpired(), 410, 'Ce lien d\'activation a expiré. Demandez une nouvelle invitation à votre administrateur.');
+        if ($invitation === null) {
+            throw new UserFacingHttpException(404, 'Ce lien d\'activation n\'est pas valide ou a déjà été utilisé.');
+        }
+        if ($invitation->isExpired()) {
+            throw new UserFacingHttpException(410, 'Ce lien d\'activation a expiré. Demandez une nouvelle invitation à votre administrateur.');
+        }
 
         return $invitation;
     }

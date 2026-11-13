@@ -2,6 +2,7 @@
 
 use App\Modules\Core\Access\Role;
 use App\Modules\Core\Audit\AuditLog;
+use App\Modules\Core\Tenancy\Tenant;
 use App\Modules\Core\Tenancy\TenantContext;
 use App\Modules\Core\Users\Invitation;
 use App\Modules\Core\Users\User;
@@ -13,7 +14,7 @@ use Illuminate\Support\Str;
  * Runs $fn in $tenant's context (RLS) and leaves no context behind, like the
  * console where the commands run.
  */
-function inTenantOnce(App\Modules\Core\Tenancy\Tenant $tenant, callable $fn): mixed
+function inTenantOnce(Tenant $tenant, callable $fn): mixed
 {
     return app(TenantContext::class)->run($tenant, $fn);
 }
@@ -146,4 +147,19 @@ it('refuses to reset the two-factor authentication of an unknown account', funct
     $this->artisan('tms:user:reset-2fa', ['email' => 'personne@cap.test'])
         ->expectsOutputToContain('Aucun compte')
         ->assertFailed();
+});
+
+it('recovery commands require --tenant in multi mode', function () {
+    config(['tms.mode' => 'multi']);
+
+    $this->artisan('tms:user:activation-link', ['email' => 'x@cap.test', '--role' => 'admin_organisme'])
+        ->expectsOutputToContain('--tenant')
+        ->assertFailed();
+    $this->artisan('tms:user:reset-2fa', ['email' => 'x@cap.test'])
+        ->expectsOutputToContain('--tenant')
+        ->assertFailed();
+
+    // Explicit tenant works.
+    $this->artisan('tms:user:activation-link', ['email' => 'x@cap.test', '--role' => 'admin_organisme', '--tenant' => $this->tenant->slug])
+        ->assertSuccessful();
 });

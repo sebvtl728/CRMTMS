@@ -14,7 +14,7 @@ RUN apt-get update \
     && rm -rf /var/lib/apt/lists/* \
     && install-php-extensions pdo_pgsql redis intl zip gd bcmath pcntl opcache
 
-RUN { echo 'expose_php=Off'; echo 'date.timezone=Europe/Paris'; } > /usr/local/etc/php/conf.d/zz-tms.ini
+RUN { echo 'expose_php=Off'; echo 'date.timezone=Europe/Paris'; echo 'upload_max_filesize=25M'; echo 'post_max_size=30M'; } > /usr/local/etc/php/conf.d/zz-tms.ini
 
 # ---------------------------------------------------------------------------
 # dev: the application source is bind-mounted at /var/www/html

@@ -8,3 +8,6 @@
 
 CHANGELOG.md export-ignore
 README.md export-ignore
+
+# Import fixtures keep their exact bytes (CRLF, Windows-1252, BOM).
+/tests/Fixtures/imports/** -text

@@ -32,14 +32,40 @@ final class TenantMailer
     }
 
     /**
-     * True when nothing would actually be delivered: no active SMTP
+     * True when a message could end up delivered nowhere: no active SMTP
      * configuration and the instance mailer only logs or keeps messages in
-     * memory (MAIL_MAILER=log or array).
+     * memory (MAIL_MAILER=log or array), or a failover chain ending in such a
+     * mailer (a failed send is silently swallowed) or a round-robin including
+     * one (some sends vanish).
      */
     public static function deliversNowhere(?Company $company = null): bool
     {
         return self::activeConfig($company) === null
-            && in_array(config('mail.default'), [null, '', 'log', 'array'], true);
+            && self::mailerDeliversNowhere((string) config('mail.default'));
+    }
+
+    private static function mailerDeliversNowhere(string $name, int $depth = 0): bool
+    {
+        if (in_array($name, ['', 'log', 'array'], true)) {
+            return true;
+        }
+
+        $config = config("mail.mailers.{$name}");
+        $transport = is_array($config) ? ($config['transport'] ?? null) : null;
+
+        if ($depth > 5 || ! in_array($transport, ['failover', 'roundrobin'], true)) {
+            return in_array($transport, ['log', 'array'], true);
+        }
+
+        /** @var list<string> $members */
+        $members = array_values(array_filter((array) ($config['mailers'] ?? []), 'is_string'));
+        if ($members === []) {
+            return true;
+        }
+
+        return $transport === 'failover'
+            ? self::mailerDeliversNowhere(end($members), $depth + 1)
+            : collect($members)->contains(fn (string $m) => self::mailerDeliversNowhere($m, $depth + 1));
     }
 
     private static function activeConfig(?Company $company): ?ConnectorConfig

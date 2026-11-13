@@ -1,4 +1,4 @@
-# Dictionnaire de données — lot 1a (socle)
+# Dictionnaire de données — lots 1a (socle) et 1b (fiches, import, RGPD)
 
 Identifiants : UUID v7 (`uuid`). Dates : `timestamp` (UTC en base ; affichage en heure de Paris). Suppression logique : colonne `deleted_at` (les lignes supprimées restent en base).
 
@@ -10,7 +10,7 @@ Toute table métier porte `tenant_id uuid not null` (clé étrangère vers `tena
 tenant_id = nullif(current_setting('app.tenant_id', true), '')::uuid   -- using ET with check
 ```
 
-`ENABLE` et `FORCE ROW LEVEL SECURITY` s'appliquent, y compris au propriétaire. L'application se connecte avec `tms_app` (non propriétaire, `NOBYPASSRLS`) ; la requête positionne `app.tenant_id` avant toute lecture. Sans organisme courant, aucune ligne n'est visible ni écrivable. Seules les migrations utilisent `tms_owner`. Un test d'architecture échoue si une table métier n'a pas `tenant_id` + RLS ; les tables hors périmètre sont listées dans `config/tms.php` (`tenancy.unscoped_tables`) : `tenants`, `tenant_domains`, `migrations`, `jobs`, `job_batches`, `failed_jobs`, `cache`, `cache_locks`, `sessions`, `permissions`.
+`ENABLE` et `FORCE ROW LEVEL SECURITY` s'appliquent, y compris au propriétaire. L'application se connecte avec `tms_app` (non propriétaire, `NOBYPASSRLS`) ; la requête positionne `app.tenant_id` avant toute lecture. Sans organisme courant, aucune ligne n'est visible ni écrivable. Seules les migrations utilisent `tms_owner`. Un test d'architecture échoue si une table métier n'a pas `tenant_id` + RLS ; les tables hors périmètre sont listées dans `config/tms.php` (`tenancy.unscoped_tables`) : `tenants`, `tenant_domains`, `migrations`, `jobs`, `job_batches`, `failed_jobs`, `cache`, `cache_locks`, `sessions`, `permissions`. Les tables du lot 1b (section « CRM » ci-dessous) sont toutes soumises à la RLS.
 
 ## Plateforme (hors RLS)
 
@@ -21,7 +21,7 @@ tenant_id = nullif(current_setting('app.tenant_id', true), '')::uuid   -- using 
 | `name` | string | Nom de l'organisme |
 | `slug` | string, unique | Identifiant court (`TMS_DEFAULT_TENANT` en mode `single`) |
 | `status` | enum `active` / `suspended` | Un organisme suspendu est inaccessible (503) |
-| `settings` | jsonb, défaut `{}` | Paramètres : `security.force_2fa` (bool), `security.idle_timeout_minutes` (15–480, défaut 120) |
+| `settings` | jsonb, défaut `{}` | Paramètres : `security.force_2fa` (bool), `security.idle_timeout_minutes` (15–480, défaut 120), `gdpr.retention_years` (entier 1–10, défaut 3 : conservation RGPD, lot 1b) |
 | `created_at`, `updated_at` | timestamp | |
 
 ### `tenant_domains` — noms d'hôte (mode `multi`)
@@ -118,7 +118,7 @@ Mêmes colonnes que ci-dessus avec `permission_id`. Non utilisée au lot 1a.
 |---|---|---|
 | `id`, `tenant_id` | uuid | |
 | `user_id` | uuid, null | Auteur (null : système ou connexion échouée) |
-| `event` | string | `created`, `updated`, `deleted`, `restored`, `auth.login`, `auth.failed`, `auth.logout`, `auth.2fa_enabled`, `auth.2fa_disabled`, `access.role_changed`, `users.invitation_sent`, `settings.security_changed`, `export.run` |
+| `event` | string | `created`, `updated`, `deleted`, `restored`, `auth.login`, `auth.failed`, `auth.logout`, `auth.2fa_enabled`, `auth.2fa_disabled`, `access.role_changed`, `users.invitation_sent`, `users.invitation_resent`, `users.invitation_revoked`, `users.deactivated`, `users.reactivated`, `settings.security_changed`, `settings.gdpr_changed`, `export.run`, `gdpr.kept`, `crm.import_undone` (et d'autres évènements `crm.*` du module) |
 | `auditable_type`, `auditable_id` | string, null | Objet concerné |
 | `old_values`, `new_values` | jsonb, null | Valeurs avant / après (secrets : « [masqué] ») |
 | `ip` | inet, null | Adresse IP |
@@ -126,3 +126,115 @@ Mêmes colonnes que ci-dessus avec `permission_id`. Non utilisée au lot 1a.
 | `created_at` | timestamptz(6) | Date de l'évènement |
 
 Un déclencheur (`audit_logs_immutable`) refuse tout `UPDATE` et `DELETE`, même pour le propriétaire de la table. Index sur (`tenant_id`, `created_at` / `event` / `user_id` / objet).
+
+## CRM : entreprises, personnes, rattachements (lot 1b, RLS)
+
+Conventions communes : UUID v7, `tenant_id`, suppression logique (`deleted_at`) sur les fiches, `created_by` / `updated_by` (FK `users`, `ON DELETE SET NULL`). Les listes de valeurs (forme juridique, secteur, DAS…) sont des **clés étrangères vers `reference_items`** (jamais un code). Les valeurs des champs personnels ne sont jamais écrites en clair dans `audit_logs` : le journal enregistre le nom du champ avec la valeur `[donnée personnelle]`.
+
+**Colonnes générées (clés de recherche et de détection de doublons).** Sous RLS, PostgreSQL n'utilise un index que pour des conditions faites de fonctions « leakproof » : `lower()`, `regexp_replace()` ou `unaccent()` ne le sont pas, un index d'expression ne servirait donc à rien. Les clés de comparaison sont donc des **colonnes générées stockées** (comparaison `=` sur du texte, leakproof) avec leur index partiel (`where … is not null and deleted_at is null`). L'application ne les écrit jamais.
+
+### `organisations` — entreprises (clients et prospects)
+| Colonne | Type | Rôle |
+|---|---|---|
+| `id`, `tenant_id` | uuid | |
+| `name` | string | Raison sociale (seul champ obligatoire) |
+| `siret` | char(14), null | 14 chiffres (CHECK) ; **unique par organisme** parmi les fiches non supprimées (`organisations_siret_unique`) |
+| `naf_code` | string(6), null | Code NAF |
+| `legal_form_id`, `sector_id`, `establishment_type_id`, `company_size_id`, `origin_id` | uuid, null | FK `reference_items` (listes `legal_form_org`, `sector`, `establishment_type`, `company_size`, `contact_origin`) |
+| `status` | string | `prospect` (défaut), `client`, `inactif` (CHECK) |
+| `responsible_user_id` | uuid, null | FK `users` (`SET NULL`) |
+| `email`, `phone`, `website` | string, null | Coordonnées |
+| `address_line1`, `address_line2`, `postal_code`, `city`, `country` | string, null ; `country` char(2) défaut `FR` | Adresse |
+| `notes_summary` | text, null | Résumé libre |
+| `last_contact_at` | timestamptz, null | Dernier contact (mis à jour par les notes ; base du calcul RGPD) |
+| `source_system`, `source_id` | string, null | Origine d'un import (unique par organisme quand renseignés) : permet de remettre à jour la même fiche |
+| `merged_into_id` | uuid, null | Fiche qui a absorbé celle-ci (fusion) |
+| `merged_sources` | jsonb | Origine des champs fusionnés |
+| `search_vector` | text, générée | Nom, ville, SIRET sans accents ni majuscules ; index trigramme (recherche) |
+| `dup_email`, `dup_phone`, `dup_postal_code`, `dup_city` | text, générées | Clés de détection des doublons (e-mail en minuscules, téléphone en chiffres, code postal, ville sans accents) |
+| `created_at`, `updated_at`, `deleted_at` | timestamp | |
+
+### `organisation_das` — DAS d'une entreprise
+`tenant_id` · `organisation_id` (FK, cascade) · `das_id` (FK `reference_items`) ; PK (`organisation_id`, `das_id`).
+
+### `user_das` — DAS suivis par un utilisateur
+`tenant_id` · `user_id` (FK, cascade) · `das_id` (FK `reference_items`) ; PK (`user_id`, `das_id`). Un utilisateur au rôle **Responsable DAS** ne voit que les fiches rattachées aux DAS de cette table. Géré depuis **Administration › Utilisateurs** (« DAS suivis »).
+
+### `people` — personnes (particuliers et interlocuteurs)
+| Colonne | Type | Rôle |
+|---|---|---|
+| `id`, `tenant_id` | uuid | |
+| `civility` | string(5), null | `M.` ou `Mme` (CHECK) |
+| `first_name`, `last_name` | string | Nom obligatoire, prénom facultatif |
+| `email`, `email_secondary`, `phone`, `mobile` | string, null | Coordonnées (téléphones normalisés) |
+| `address_line1`, `address_line2`, `postal_code`, `city`, `country` | | Adresse |
+| `birth_date` | date, null | Date de naissance |
+| `is_individual` | bool | Particulier (peut être aussi interlocuteur) |
+| `project` | text, null | Projet de formation |
+| `professional_situation_id`, `funding_mode_id`, `origin_id` | uuid, null | FK `reference_items` |
+| `status` | string | `prospect`, `client`, `inactif` (CHECK) |
+| `responsible_user_id` | uuid, null | FK `users` |
+| `last_contact_at` | timestamptz, null | Dernier contact (base de la conservation RGPD) |
+| `source_system`, `source_id` | string, null | Origine d'un import |
+| `anonymised_at` | timestamptz, null | Date d'anonymisation (les données personnelles sont alors effacées) |
+| `legal_basis` | string(30) | Base légale : `interet_legitime` (défaut), `consentement`, `contrat`, `obligation_legale` (CHECK) |
+| `prospecting_opt_out_at` | timestamptz, null | Opposition à la prospection |
+| `gdpr_kept_until`, `gdpr_kept_reason` | timestamptz / string(500), null | Conservation prolongée décidée dans l'écran RGPD, et son motif |
+| `merged_into_id`, `merged_sources` | | Comme `organisations` |
+| `search_vector`, `dup_email`, `dup_email_secondary`, `dup_postal_code`, `dup_city` | text, générées | Comme `organisations` |
+| horodatages, `deleted_at` | | |
+
+### `person_das` — DAS d'une personne
+`tenant_id` · `person_id` (FK, cascade) · `das_id` ; PK (`person_id`, `das_id`).
+
+### `affiliations` — rattachement d'une personne à une entreprise
+`id`, `tenant_id` · `person_id`, `organisation_id` (FK, cascade) · `job_title` · `decision_role_id` (FK `reference_items`, liste `decision_role`) · `work_email`, `work_phone` · `is_referent` (bool) · `started_on`, `ended_on` (dates ; un rattachement terminé est conservé comme ancien) · `created_by`, `updated_by` · horodatages, `deleted_at`. Index unique partiel (`tenant_id`, `person_id`, `organisation_id`) tant que le rattachement est actif et non supprimé : une personne n'a qu'un rattachement actif par entreprise.
+
+### `notes` — notes de l'historique
+`id`, `tenant_id` · `notable_type`, `notable_id` (fiche concernée : alias `organisation` ou `person`) · `body` (text) · `author_id` (FK `users`) · `created_at`, `updated_at` (timestamptz, µs), `deleted_at`.
+
+### `attachments` — pièces jointes
+`id`, `tenant_id` · `notable_type`, `notable_id` · `original_name`, `mime`, `size` (octets), `path` (chemin dans le stockage de l'organisme, hors dossier public) · `uploaded_by` · horodatages, `deleted_at`. Le fichier est lu uniquement via l'application (contrôle des droits).
+
+### `saved_filters` — filtres enregistrés
+`id`, `tenant_id` · `user_id` (auteur, cascade) · `resource` (`organisations` ou `people`, CHECK) · `name` (100) · `filters` (jsonb, clés validées) · `columns` (jsonb, null : colonnes de liste et d'export) · `is_shared` (visible de tout l'organisme) · horodatages. Le journal ne garde pas les termes de recherche.
+
+### `recent_views` — dernières fiches consultées
+`id` (entier) · `tenant_id` · `user_id` (FK, cascade) · `subject_type` (alias `organisation` ou `person`), `subject_id` · `viewed_at` (timestamptz, µs). Unique (`user_id`, `subject_type`, `subject_id`) ; **20 lignes conservées par utilisateur**, 5 affichées sur l'**Accueil**. Aucun nom ni donnée de la fiche n'est copié : l'affichage relit la fiche, et ne montre pas celles qui sont supprimées, fusionnées ou hors du périmètre de l'utilisateur.
+
+## CRM : import (lot 1b, RLS)
+
+### `import_profiles` — profils d'import
+`id`, `tenant_id` · `name` (100, unique par organisme) · `target` (`organisations`, `people`, `affiliations`, `notes`) · `field_map` (jsonb : colonne du fichier → champ) · `value_map` (jsonb : valeurs du fichier → valeurs des listes) · `options` (jsonb : séparateur, encodage, stratégie de doublon) · `created_by` · horodatages. Un profil d'import Formevol est un simple enregistrement de cette table.
+
+### `import_batches` — imports
+| Colonne | Rôle |
+|---|---|
+| `id`, `tenant_id`, `user_id` | Import et auteur |
+| `target`, `profile_id` | Type de données et profil utilisé |
+| `original_name`, `stored_path` | Nom du fichier et chemin de stockage (purgés au bout de 30 jours) |
+| `status` | `uploaded`, `simulated`, `running`, `done`, `failed`, `undoing`, `undone` (CHECK ; l'état transitoire de simulation figure aussi) |
+| `options`, `field_map`, `value_map` | Réglages choisis dans l'assistant |
+| `simulation` | Résultat de la simulation (jsonb) |
+| `total`, `created`, `updated`, `skipped`, `errors` | Compteurs |
+| `cursor_line` | Reprise de l'import après interruption |
+| `report_path` | Rapport Excel |
+| `started_at`, `finished_at`, `undone_at` | Dates |
+
+### `import_rows` — lignes d'un import
+`id`, `tenant_id`, `batch_id` (cascade) · `line` (numéro de ligne du fichier) · `source` (jsonb : valeurs brutes de la ligne, **effacées** avec le fichier ou à l'anonymisation de la personne) · `status` (`created`, `updated`, `skipped`, `error`) · `messages` (jsonb) · `subject_type`, `subject_id` (fiche concernée) · `created_subject` · `created_refs`, `touched_refs` (jsonb : objets créés / modifiés, index GIN `jsonb_path_ops`).
+
+### `import_stamps` — traces par fiche
+`id` (entier, l'ordre d'insertion fait foi), `tenant_id`, `batch_id` · `subject_type`, `subject_id` · `stamped_at` (date de mise à jour laissée par l'import : détecte une modification ultérieure) · `created` · `batch_undone` · `trashed_by_undo_at`. Colonnes simples et indexées : un `@>` sur du jsonb n'est pas leakproof et ne serait pas utilisé sous RLS. Sert à l'annulation d'un import et à la réimportation.
+
+## CRM : RGPD (lot 1b, RLS)
+
+### `consents` — consentements
+`id`, `tenant_id` · `person_id` (FK, cascade) · `channel` (`email`, `sms`, `phone`, `prospecting`) · `granted` (bool) · `source` (facultatif) · `recorded_by` · `recorded_at` (µs). **Historique en ajout** : un nouveau choix s'ajoute, le dernier par canal fait foi.
+
+### `gdpr_pending` — liste « À anonymiser »
+`person_id` (PK, FK cascade) · `tenant_id` · `listed_at`. Une personne y est inscrite par le traitement de nuit quand sa durée de conservation est dépassée ; elle est anonymisée 30 jours après `listed_at` si elle y est toujours.
+
+## Permissions CRM (catalogue global `permissions`)
+
+`crm.view`, `crm.create`, `crm.update`, `crm.delete`, `crm.merge`, `crm.import`, `crm.export`, `crm.gdpr`. La matrice par rôle est dans `admin.md`. `role_permission_defaults_applied` (`tenant_id`, `role`, `permission`) mémorise les droits par défaut déjà accordés à chaque organisme, pour qu'une mise à jour n'ajoute que les nouveaux droits sans rétablir ceux qu'un administrateur a retirés.

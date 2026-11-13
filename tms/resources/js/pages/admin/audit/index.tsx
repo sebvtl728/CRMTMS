@@ -56,6 +56,9 @@ const EVENT_LABELS: Record<string, string> = {
     'auth.2fa_reset_by_operator': 'Double authentification réinitialisée (exploitant)',
     'access.role_changed': 'Changement de rôle',
     'export.run': 'Export',
+    'crm.import_run': 'Import lancé',
+    'crm.import_undone': 'Import annulé',
+    'crm.import_failed_marked': 'Import marqué comme échoué',
     'users.invitation_sent': 'Invitation envoyée',
     'users.invitation_send_failed': "Échec d'envoi de l'invitation",
     'users.activation_reissued': "Lien d'activation réémis",
@@ -65,7 +68,23 @@ const EVENT_LABELS: Record<string, string> = {
 const dateTime = new Intl.DateTimeFormat('fr-FR', { dateStyle: 'short', timeStyle: 'medium', timeZone: 'Europe/Paris' });
 
 const eventLabel = (event: string) => EVENT_LABELS[event] ?? event;
-const typeLabel = (type: string | null) => (type ? (type.split('\\').pop() ?? type) : '—');
+const TYPE_LABELS: Record<string, string> = {
+    tenant: 'Organisme',
+    user: 'Utilisateur',
+    invitation: 'Invitation',
+    company: 'Société',
+    reference_item: 'Référentiel',
+    connector_config: 'Connecteur',
+    organisation: 'Entreprise',
+    person: 'Personne',
+    affiliation: 'Rattachement',
+    note: 'Note',
+    attachment: 'Pièce jointe',
+    import_batch: 'Import',
+    import_profile: 'Profil d\'import',
+};
+// Older journal rows hold the class name: show its last segment.
+const typeLabel = (type: string | null) => (type ? (TYPE_LABELS[type] ?? type.split('\\').pop() ?? type) : '—');
 
 function Values({ old, current }: { old: Record<string, unknown> | null; current: Record<string, unknown> | null }) {
     const keys = Array.from(new Set([...Object.keys(old ?? {}), ...Object.keys(current ?? {})]));

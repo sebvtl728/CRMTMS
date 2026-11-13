@@ -3,14 +3,14 @@
 namespace App\Modules\Core\Access;
 
 use App\Modules\Core\Tenancy\Tenant;
-use App\Modules\Core\Tenancy\TenantContext;
 
 /**
  * Creates the roles of a tenant with the default permission matrix
  * (called by tms:install and tms:tenant:create).
  *
- * Idempotent: missing permissions and roles are created; an existing role
- * keeps its permissions (a tenant's customised matrix is never overwritten).
+ * Idempotent, delegated to PermissionSync: missing permissions and roles are
+ * created, and a role only receives the default permissions never offered to
+ * it before (a tenant's customised matrix is never overwritten).
  */
 final class RoleSeeder
 {
@@ -18,19 +18,6 @@ final class RoleSeeder
 
     public static function seedFor(Tenant $tenant): void
     {
-        foreach (Permissions::all() as $permission) {
-            PermissionModel::findOrCreate($permission, self::GUARD);
-        }
-
-        app(TenantContext::class)->run($tenant, function (): void {
-            foreach (Role::cases() as $role) {
-                if (RoleModel::query()->where('name', $role->value)->where('guard_name', self::GUARD)->exists()) {
-                    continue;
-                }
-
-                RoleModel::create(['name' => $role->value, 'guard_name' => self::GUARD])
-                    ->syncPermissions(Permissions::defaultsFor($role));
-            }
-        });
+        PermissionSync::forTenant($tenant);
     }
 }

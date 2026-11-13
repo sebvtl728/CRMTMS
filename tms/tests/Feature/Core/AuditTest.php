@@ -6,6 +6,7 @@ use App\Modules\Core\Audit\AuditRecorder;
 use App\Modules\Core\Tenancy\TenantContext;
 use App\Modules\Core\Users\Invitation;
 use App\Modules\Core\Users\User;
+use Illuminate\Auth\Events\Failed;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -29,7 +30,7 @@ it('records model changes with only dirty fields', function () {
 
     $log = lastAudit();
     expect($log->event)->toBe('updated')
-        ->and($log->auditable_type)->toBe(User::class)
+        ->and($log->auditable_type)->toBe('user')
         ->and($log->auditable_id)->toBe($user->id)
         ->and($log->old_values)->toBe(['name' => 'Avant'])
         ->and($log->new_values)->toBe(['name' => 'Après']);
@@ -155,7 +156,7 @@ it('bounds the attempted email of auth forms so audit rows stay small', function
 it('truncates the attempted email recorded on a failed login', function () {
     inTenant();
 
-    event(new Illuminate\Auth\Events\Failed('web', null, ['email' => str_repeat('b', 5000)]));
+    event(new Failed('web', null, ['email' => str_repeat('b', 5000)]));
 
     expect(mb_strlen(lastAudit('auth.failed')->new_values['email']))->toBe(254);
 });
@@ -281,9 +282,9 @@ it('lists and filters the journal, 50 per page', function () {
         ->has('logs.data', 50)
         ->where('logs.total', fn ($t) => $t >= 60));
 
-    $this->actingAs($admin)->get('/admin/audit?event=created&type='.urlencode(User::class))
+    $this->actingAs($admin)->get('/admin/audit?event=created&type='.'user')
         ->assertInertia(fn (Assert $p) => $p->where('logs.data.0.event', 'created')
-            ->where('logs.data.0.auditable_type', User::class));
+            ->where('logs.data.0.auditable_type', 'user'));
 
     $this->actingAs($admin)->get('/admin/audit?user='.$other->id)
         ->assertInertia(fn (Assert $p) => $p->has('logs.data', 0));

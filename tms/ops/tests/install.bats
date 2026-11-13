@@ -246,6 +246,10 @@ env_value() {
     # order: pull < migrate < full start < tms:install
     [ "$(grep -n ' pull' "$log" | head -1 | cut -d: -f1)" -lt "$(grep -n 'migrate --database' "$log" | cut -d: -f1)" ]
     [ "$(grep -n 'migrate --database' "$log" | cut -d: -f1)" -lt "$(grep -n 'tms:install' "$log" | cut -d: -f1)" ]
+    # permission sync right after the migrations, without the owner credentials
+    grep -q "run --rm --no-deps -T app php artisan tms:permissions:sync" "$log"
+    [ "$(grep -n 'migrate --database' "$log" | cut -d: -f1)" -lt "$(grep -n 'tms:permissions:sync' "$log" | cut -d: -f1)" ]
+    [ -z "$(grep 'tms:permissions:sync' "$log" | grep DB_OWNER)" ]
 
     grep -q "OnCalendar=\*-\*-\* 02:30:00" "$TMS_SYSTEMD_DIR/tms-backup.timer"
     grep -q "Persistent=true" "$TMS_SYSTEMD_DIR/tms-backup.timer"

@@ -13,11 +13,19 @@ use Illuminate\Database\Eloquent\Model;
  * covered by auth.login) is dropped; an update that only touches ignored
  * fields writes nothing.
  *
+ * A model may also declare `protected array $auditPersonal` (personal data:
+ * names, contacts, birth date...). The field name is journaled but any value
+ * is replaced by "[donnée personnelle]" (distinct from "[masqué]", which is
+ * for secrets), so the journal never holds personal data and can outlive an
+ * anonymisation. Unset (null) values stay null: nothing to protect.
+ *
  * @mixin Model
  */
 trait Auditable
 {
     public const AUDIT_MASK = '[masqué]';
+
+    public const AUDIT_PERSONAL_MASK = '[donnée personnelle]';
 
     public static function bootAuditable(): void
     {
@@ -83,6 +91,15 @@ trait Auditable
         foreach ($secrets as $secret) {
             if (array_key_exists($secret, $values)) {
                 $values[$secret] = self::AUDIT_MASK;
+            }
+        }
+
+        // @phpstan-ignore function.alreadyNarrowedType
+        $personal = property_exists($this, 'auditPersonal') ? $this->auditPersonal : [];
+
+        foreach ($personal as $field) {
+            if (isset($values[$field])) {
+                $values[$field] = self::AUDIT_PERSONAL_MASK;
             }
         }
 

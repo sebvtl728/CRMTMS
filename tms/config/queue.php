@@ -72,6 +72,17 @@ return [
             'after_commit' => false,
         ],
 
+        // Long jobs (import simulation: a whole file in one go, up to a few minutes).
+        // retry_after must exceed the longest job or it would be handed to a second worker.
+        'redis-long' => [
+            'driver' => 'redis',
+            'connection' => env('REDIS_QUEUE_CONNECTION', 'default'),
+            'queue' => 'imports',
+            'retry_after' => (int) env('REDIS_QUEUE_LONG_RETRY_AFTER', 1800),
+            'block_for' => null,
+            'after_commit' => false,
+        ],
+
     ],
 
     /*

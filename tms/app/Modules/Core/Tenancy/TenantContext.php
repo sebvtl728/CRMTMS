@@ -11,7 +11,8 @@ use Illuminate\Database\DatabaseManager;
  * Registered as a singleton. Every change is mirrored into the PostgreSQL
  * session setting app.tenant_id on the runtime connection, which is what the
  * RLS policies (Rls::enable) compare tenant_id against. No tenant means the
- * setting is '' and every RLS-protected table reads as empty.
+ * setting is '' and every RLS-protected table reads as empty. It is also
+ * mirrored into the shared log context (TenantLogContext).
  *
  * The setting is session-level (set_config(..., false)) so it survives the
  * transactions of a request; see TenancyServiceProvider for how it is kept in
@@ -28,6 +29,7 @@ class TenantContext
         // Database first: if it fails, PHP must not believe a tenant is active.
         $this->writeSetting($tenant->id);
         $this->tenant = $tenant;
+        TenantLogContext::apply($tenant->id);
     }
 
     public function current(): ?Tenant
@@ -47,6 +49,7 @@ class TenantContext
     {
         // PHP first: fail closed even if the database call fails.
         $this->tenant = null;
+        TenantLogContext::apply(null);
         $this->writeSetting('');
     }
 
@@ -70,6 +73,7 @@ class TenantContext
             // PHP state first: if the write fails (e.g. $fn left the transaction
             // aborted), the rollback listener re-syncs the database from it.
             $this->tenant = $previous;
+            TenantLogContext::apply($previous?->id);
             $this->syncDatabaseSetting();
         }
     }
