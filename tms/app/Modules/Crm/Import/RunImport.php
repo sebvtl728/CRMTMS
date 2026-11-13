@@ -3,12 +3,12 @@
 namespace App\Modules\Crm\Import;
 
 use App\Modules\Core\Audit\AuditRecorder;
+use App\Modules\Core\Security\DatabaseErrorLog;
 use App\Modules\Core\Tenancy\TenantAwareJob;
 use App\Modules\Core\Tenancy\TenantContext;
 use App\Modules\Crm\Duplicates\DuplicateFinder;
 use App\Modules\Crm\Support\DasLinks;
 use Illuminate\Contracts\Queue\ShouldQueue;
-use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Support\Facades\Cache;
@@ -211,18 +211,13 @@ class RunImport implements ShouldQueue
      */
     private static function log(Throwable $e, ImportBatch $batch): void
     {
-        $sql = $e instanceof QueryException ? $e : ($e->getPrevious() instanceof QueryException ? $e->getPrevious() : null);
-        if ($sql === null) {
+        if (DatabaseErrorLog::queryException($e) === null) {
             report($e);
 
             return;
         }
 
-        Log::error('Import CRM interrompu par une erreur de base de données', [
-            'batch_id' => $batch->id,
-            'sqlstate' => $sql->errorInfo[0] ?? null,
-            'sql' => $sql->getSql(),
-        ]);
+        Log::error('Import CRM interrompu par une erreur de base de données', ['batch_id' => $batch->id, ...DatabaseErrorLog::context($e)]);
     }
 
     /**

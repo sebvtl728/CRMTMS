@@ -2,6 +2,7 @@
 
 namespace App\Modules\Core\Tenancy;
 
+use App\Modules\Core\Security\DatabaseErrorLog;
 use Illuminate\Support\Facades\Log;
 use Throwable;
 
@@ -34,7 +35,7 @@ final class ForEachTenant
                 Log::error('Échec du traitement pour un organisme', [
                     'tenant_id' => $tenant->id,
                     'tenant' => $tenant->slug,
-                    'exception' => $e,
+                    ...DatabaseErrorLog::context($e),
                 ]);
             }
         }

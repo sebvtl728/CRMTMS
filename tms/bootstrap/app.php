@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Middleware\HandleInertiaRequests;
+use App\Modules\Core\Security\DatabaseErrorLog;
 use App\Modules\Core\Security\EnforceIdleTimeout;
 use App\Modules\Core\Security\SecurityHeaders;
 use App\Modules\Core\Tenancy\ResolveTenant;
@@ -49,5 +50,7 @@ return Application::configure(basePath: dirname(__DIR__))
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions) {
-        //
+        // Database errors embed the bound values (personal data) in their
+        // message: logged scrubbed, and the default report is stopped.
+        $exceptions->report(fn (Throwable $e) => DatabaseErrorLog::report($e));
     })->create();

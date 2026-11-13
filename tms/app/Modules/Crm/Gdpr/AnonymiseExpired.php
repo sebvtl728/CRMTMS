@@ -3,6 +3,7 @@
 namespace App\Modules\Crm\Gdpr;
 
 use App\Modules\Connectors\Smtp\TenantMailer;
+use App\Modules\Core\Security\DatabaseErrorLog;
 use App\Modules\Core\Tenancy\TenantAwareJob;
 use App\Modules\Core\Tenancy\TenantContext;
 use App\Modules\Core\Users\User;
@@ -124,7 +125,7 @@ class AnonymiseExpired implements ShouldQueue
                             throw $e;
                         } catch (Throwable $e) {
                             $this->skip[] = $person->id;
-                            Log::error('Anonymisation impossible, personne ignorée jusqu\'à la prochaine exécution', ['person_id' => $person->id, 'exception' => $e]);
+                            Log::error('Anonymisation impossible, personne ignorée jusqu\'à la prochaine exécution', ['person_id' => $person->id, ...DatabaseErrorLog::context($e)]);
                         }
                     }
                 }

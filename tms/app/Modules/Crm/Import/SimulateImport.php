@@ -2,12 +2,14 @@
 
 namespace App\Modules\Crm\Import;
 
+use App\Modules\Core\Security\DatabaseErrorLog;
 use App\Modules\Core\Tenancy\TenantAwareJob;
 use App\Modules\Core\Tenancy\TenantContext;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Log;
 use Throwable;
 
 /**
@@ -69,7 +71,7 @@ class SimulateImport implements ShouldQueue
     private function fail(ImportBatch $batch, Throwable $e): void
     {
         if (! $e instanceof ImportFileException) {
-            report($e);
+            Log::error('Simulation d\'import interrompue', ['batch_id' => $batch->id, ...DatabaseErrorLog::context($e)]);
         }
         $options = $batch->options;
         $options['simulation_error'] = $e instanceof ImportFileException || $e instanceof \InvalidArgumentException
