@@ -216,3 +216,33 @@ it('keeps a person whose consent was recorded since the import', function () {
     expect(Person::query()->pluck('last_name')->all())->toBe(['Martin'])
         ->and(rowMessages($batch, 2))->toBe([UndoImport::KEPT_LINKED]);
 });
+
+it('purges the files of stuck batches but never of a batch still progressing', function () {
+    $make = function (string $status, int $idleMinutes) {
+        $batch = uploadImport("Raison sociale;Origine\nGarage Martin;Salon de Jeanne Dupont\n", ImportTarget::Organisations);
+        simulateImport($batch);
+        $batch->refresh();
+        DB::table('import_batches')->where('id', $batch->id)->update([
+            'status' => $status, 'created_at' => now()->subDays(31), 'updated_at' => now()->subMinutes($idleMinutes),
+        ]);
+
+        return $batch;
+    };
+    $stuckRun = $make(ImportBatch::RUNNING, ImportBatch::STUCK_MINUTES + 5);
+    $stuckSimulation = $make(ImportBatch::SIMULATING, ImportBatch::STUCK_MINUTES + 5);
+    $activeRun = $make(ImportBatch::RUNNING, 1);
+    $activeSimulation = $make(ImportBatch::SIMULATING, 1);
+    $activeUndo = $make(ImportBatch::UNDOING, 1);
+    expect($stuckRun->simulation['unknown_values'] ?? [])->not->toBe([]);
+
+    Artisan::call('tms:crm:purge-imports');
+
+    foreach ([$stuckRun, $stuckSimulation] as $batch) {
+        $batch->refresh();
+        expect($batch->stored_path)->toBeNull()
+            ->and(json_encode($batch->simulation))->not->toContain('Jeanne Dupont');
+    }
+    foreach ([$activeRun, $activeSimulation, $activeUndo] as $batch) {
+        expect($batch->refresh()->stored_path)->not->toBeNull();
+    }
+});
