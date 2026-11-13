@@ -39,7 +39,8 @@ final class InseeCodes
         return match (true) {
             $code[0] === '1' => 'EI',
             in_array($code, ['5458', '5558', '5658'], true) => 'SCOP',
-            in_array($code, ['5410', '5498'], true) => 'EURL',
+            // 5498 is the unipersonal SARL; 5410 « SARL nationale » is a plain SARL.
+            $code === '5498' => 'EURL',
             str_starts_with($code, '54') => 'SARL',
             $code === '5710' => 'SAS',
             $code === '5720' => 'SASU',

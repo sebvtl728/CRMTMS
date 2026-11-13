@@ -35,7 +35,7 @@ class SireneLookupController extends Controller
         try {
             $result = $sirene->lookup($siret);
         } catch (SireneUnavailable $e) {
-            return response()->json(['message' => $e->getMessage()], 503);
+            return response()->json(['message' => $e->getMessage()], $e->getCode() === 404 ? 404 : 503);
         }
 
         if ($result === null) {

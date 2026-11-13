@@ -5,6 +5,7 @@ use App\Modules\Core\References\CapFormationReferenceSeeder;
 use App\Modules\Core\Tenancy\TenantStorage;
 use App\Modules\Crm\Affiliations\Affiliation;
 use App\Modules\Crm\CrmServiceProvider;
+use App\Modules\Crm\Gdpr\Consent;
 use App\Modules\Crm\Import\ImportBatch;
 use App\Modules\Crm\Import\ImportRow;
 use App\Modules\Crm\Import\ImportTarget;
@@ -208,7 +209,7 @@ it('keeps a person whose consent was recorded since the import', function () {
     $batch = runImport("Nom;Prénom;E-mail\nMartin;Jeanne;jeanne@exemple.test\nDurand;Paul;paul@exemple.test\n", ImportTarget::People);
     expect($batch->created)->toBe(2);
     $jeanne = Person::query()->where('last_name', 'Martin')->sole();
-    App\Modules\Crm\Gdpr\Consent::query()->create(['person_id' => $jeanne->id, 'channel' => 'email', 'granted' => true, 'source' => 'Formulaire']);
+    Consent::query()->create(['person_id' => $jeanne->id, 'channel' => 'email', 'granted' => true, 'source' => 'Formulaire']);
 
     $this->travel(1)->minutes();
     UndoImport::dispatch($batch->id);

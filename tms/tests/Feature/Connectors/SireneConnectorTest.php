@@ -4,6 +4,7 @@ use App\Modules\Connectors\Core\ConnectorConfig;
 use App\Modules\Connectors\Core\ConnectorRegistry;
 use App\Modules\Connectors\Core\ConnectorRun;
 use App\Modules\Connectors\Core\HostPolicy;
+use App\Modules\Connectors\Sirene\InseeCodes;
 use App\Modules\Connectors\Sirene\SireneClient;
 use App\Modules\Connectors\Sirene\SireneConnector;
 use App\Modules\Connectors\Sirene\SireneUnavailable;
@@ -333,3 +334,45 @@ it('exposes the client as a service that raises SireneUnavailable', function () 
 
     expect(fn () => app(SireneClient::class)->lookup(SIEGE_SIRET))->toThrow(SireneUnavailable::class);
 });
+
+it('maps « SARL nationale » to SARL and only the unipersonal SARL to EURL', function () {
+    expect(InseeCodes::legalFormLabel('5410'))->toBe('SARL')
+        ->and(InseeCodes::legalFormLabel('5499'))->toBe('SARL')
+        ->and(InseeCodes::legalFormLabel('5498'))->toBe('EURL');
+});
+
+it('stops answering from the cache once the organisme disabled the connector', function () {
+    fakeSirene();
+    $this->actingAs(commercial())->getJson('/crm/sirene/'.SIEGE_SIRET)->assertOk();
+    ConnectorConfig::query()->where('connector_key', 'sirene')->update(['enabled' => false]);
+
+    $this->getJson('/crm/sirene/'.SIEGE_SIRET)
+        ->assertStatus(503)
+        ->assertJsonPath('message', 'Le préremplissage par SIRET est désactivé pour votre organisme.');
+});
+
+it('treats a non-diffusible entreprise as not found and never prefills its placeholders', function (Closure $hide) {
+    $body = sireneFixture('dassault-systemes');
+    $hide($body['results'][0]);
+    freshHttp();
+    Http::fake(['*' => Http::response($body)]);
+
+    $this->actingAs(commercial())->getJson('/crm/sirene/'.SIEGE_SIRET)
+        ->assertNotFound()
+        ->assertJsonPath('message', 'Entreprise non diffusible : saisissez les informations manuellement')
+        ->assertJsonMissingPath('data');
+    // Same answer from the cache.
+    $this->getJson('/crm/sirene/'.SIEGE_SIRET)->assertNotFound()
+        ->assertJsonPath('message', 'Entreprise non diffusible : saisissez les informations manuellement');
+})->with([
+    'company status P' => [function (array &$c) {
+        $c['statut_diffusion'] = 'P';
+    }],
+    'establishment status P' => [function (array &$c) {
+        $c['siege']['statut_diffusion_etablissement'] = 'P';
+    }],
+    'placeholder name' => [function (array &$c) {
+        $c['nom_raison_sociale'] = '[NON-DIFFUSIBLE]';
+        $c['nom_complet'] = '[NON-DIFFUSIBLE]';
+    }],
+]);

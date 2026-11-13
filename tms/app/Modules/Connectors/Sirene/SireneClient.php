@@ -17,8 +17,11 @@ use RuntimeException;
  * (GET {base}/search?q=<siret>).
  *
  *  - answers are cached per organisme (key tenant:<id>:sirene:<siret>): a
- *    hit for 24 h, "not found" for 1 h; errors are never cached, nor are
- *    sole traders (their name is a natural person's);
+ *    hit for 24 h, "not found" and "not diffusible" for 1 h; errors are never
+ *    cached, nor are sole traders (their name is a natural person's); the
+ *    cache is only read while the connector is enabled;
+ *  - a non-diffusible entreprise raises SireneUnavailable::notDiffusible()
+ *    (nothing is prefilled);
  *  - only real remote calls are journaled (connector_runs, summary = SIRET
  *    and outcome; never names, addresses or managers);
  *  - the host is re-checked at call time (public addresses only) and
@@ -46,31 +49,46 @@ class SireneClient
      */
     public function lookup(string $siret): ?CompanyLookupResult
     {
+        // Disabled first: a cached answer must not outlive the switch.
+        $config = $this->config();
+        if (! $config->enabled) {
+            throw SireneUnavailable::disabled();
+        }
+
         $tenantId = $this->tenants->id();
         $key = self::cacheKey($tenantId, $siret);
 
         $cached = Cache::get($key);
         if (is_array($cached)) {
+            if ($cached['hidden'] ?? false) {
+                throw SireneUnavailable::notDiffusible();
+            }
+
             return ($cached['found'] ?? false) ? CompanyLookupResult::fromArray($cached['data']) : null;
         }
 
-        $config = $this->config();
-        if (! $config->enabled) {
-            throw SireneUnavailable::disabled();
-        }
         $baseUrl = $this->baseUrl($config);
 
         $result = null;
         $run = ConnectorRun::track($config, 'in', function () use ($baseUrl, $siret, &$result): string {
             $result = $this->fetch($baseUrl, $siret);
 
-            return "SIRET {$siret} : ".($result === null ? 'aucune entreprise trouvée' : 'entreprise trouvée');
+            return "SIRET {$siret} : ".match (true) {
+                $result === null => 'aucune entreprise trouvée',
+                $result === false => 'entreprise non diffusible',
+                default => 'entreprise trouvée',
+            };
         });
 
         if ($run->failed()) {
             throw SireneUnavailable::generic();
         }
 
+        if ($result === false) {
+            Cache::put($key, ['found' => false, 'hidden' => true], now()->addHours(self::CACHE_MISS_TTL_HOURS));
+
+            throw SireneUnavailable::notDiffusible();
+        }
         if ($result === null) {
             Cache::put($key, ['found' => false], now()->addHours(self::CACHE_MISS_TTL_HOURS));
         } elseif (! str_starts_with((string) $result->legalFormCode, '1')) {
@@ -129,9 +147,12 @@ class SireneClient
     }
 
     /**
+     * @return CompanyLookupResult|false|null false when the establishment is
+     *                                        not diffusible (statut « P »)
+     *
      * @throws RuntimeException on any failure to get a usable answer
      */
-    private function fetch(string $baseUrl, string $siret): ?CompanyLookupResult
+    private function fetch(string $baseUrl, string $siret): CompanyLookupResult|false|null
     {
         try {
             $response = Http::acceptJson()
@@ -162,8 +183,9 @@ class SireneClient
 
     /**
      * @param  array<string, mixed>  $company
+     * @return CompanyLookupResult|false|null false for a non-diffusible entreprise
      */
-    private function parse(array $company, string $siret): ?CompanyLookupResult
+    private function parse(array $company, string $siret): CompanyLookupResult|false|null
     {
         $establishments = array_merge(
             is_array($company['siege'] ?? null) ? [$company['siege']] : [],
@@ -179,6 +201,13 @@ class SireneClient
         $name = $company['nom_raison_sociale'] ?? $company['nom_complet'] ?? null;
         if ($establishment === null || ! is_string($name) || $name === '') {
             return null;
+        }
+        // Protected by its owner (statut de diffusion « P »): the directory
+        // answers placeholders (« [NON-DIFFUSIBLE] ») that must never be
+        // prefilled as if they were the entreprise's data.
+        if (($company['statut_diffusion'] ?? null) === 'P' || ($establishment['statut_diffusion_etablissement'] ?? null) === 'P'
+            || str_contains(mb_strtoupper($name), 'NON-DIFFUSIBLE') || str_contains(mb_strtoupper((string) json_encode($establishment)), 'NON-DIFFUSIBLE')) {
+            return false;
         }
 
         $naf = $establishment['activite_principale'] ?? $company['activite_principale'] ?? null;
