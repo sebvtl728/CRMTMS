@@ -250,6 +250,8 @@ class Merger
                     $survivor->setAttribute($field, $loser->getAttribute($field));
                 }
             }
+            // « Référent » is a flag, not an empty-or-not field: either link carries it.
+            $survivor->is_referent = $survivor->is_referent || $loser->is_referent;
 
             // The trashed duplicate link keeps no personal contact data.
             $loser->delete();

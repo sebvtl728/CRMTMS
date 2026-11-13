@@ -116,6 +116,23 @@ it('merges two entreprises field by field and moves everything to the kept one',
         ->assertJsonFragment(['body' => 'Appel']);
 });
 
+it('keeps « référent » when only the dropped duplicate link had it', function () {
+    $this->actingAs(commercial());
+    $org = mgOrg('Hôtel du Lac');
+    $keep = makePerson('Dupont', ['first_name' => 'Jean']);
+    $drop = makePerson('Dupond', ['first_name' => 'Jean']);
+    $keepLink = affiliate($keep, $org, ['started_on' => '2020-01-01', 'is_referent' => false]);
+    $dropLink = affiliate($drop, $org, ['started_on' => '2024-01-01', 'is_referent' => true]);
+
+    $this->post('/crm/merge/person', ['keep' => $keep->id, 'drop' => $drop->id, 'fields' => []])
+        ->assertRedirect(route('crm.people.show', $keep));
+
+    $active = Affiliation::query()->where('person_id', $keep->id)->where('organisation_id', $org->id)->whereNull('ended_on')->sole();
+    expect($active->id)->toBe($keepLink->id)
+        ->and($active->is_referent)->toBeTrue()
+        ->and(Affiliation::withTrashed()->findOrFail($dropLink->id)->trashed())->toBeTrue();
+});
+
 it('merging people deduplicates affiliations', function () {
     $this->actingAs(commercial());
     $org = mgOrg('Hôtel du Lac');
