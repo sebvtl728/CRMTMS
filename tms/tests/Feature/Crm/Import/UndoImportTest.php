@@ -203,3 +203,16 @@ it('removes a fiche created then completed by the same import', function () {
 
     expect(Organisation::query()->count())->toBe(0);
 });
+
+it('keeps a person whose consent was recorded since the import', function () {
+    $batch = runImport("Nom;Prénom;E-mail\nMartin;Jeanne;jeanne@exemple.test\nDurand;Paul;paul@exemple.test\n", ImportTarget::People);
+    expect($batch->created)->toBe(2);
+    $jeanne = Person::query()->where('last_name', 'Martin')->sole();
+    App\Modules\Crm\Gdpr\Consent::query()->create(['person_id' => $jeanne->id, 'channel' => 'email', 'granted' => true, 'source' => 'Formulaire']);
+
+    $this->travel(1)->minutes();
+    UndoImport::dispatch($batch->id);
+
+    expect(Person::query()->pluck('last_name')->all())->toBe(['Martin'])
+        ->and(rowMessages($batch, 2))->toBe([UndoImport::KEPT_LINKED]);
+});

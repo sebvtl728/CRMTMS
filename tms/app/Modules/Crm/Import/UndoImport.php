@@ -7,6 +7,7 @@ use App\Modules\Core\Tenancy\TenantAwareJob;
 use App\Modules\Core\Tenancy\TenantContext;
 use App\Modules\Core\Users\User;
 use App\Modules\Crm\Affiliations\Affiliation;
+use App\Modules\Crm\Gdpr\Consent;
 use App\Modules\Crm\Organisations\Organisation;
 use App\Modules\Crm\People\Person;
 use App\Modules\Crm\Timeline\Attachment;
@@ -171,6 +172,8 @@ class UndoImport implements ShouldQueue
     /**
      * Notes, links or attachments still on the fiche: not created by this
      * import, or kept by this undo (the earlier phases removed the others).
+     * Consents are never created by an import: any consent of the person
+     * was recorded since, and must stay with her fiche (proof, RGPD).
      */
     private function hasForeignData(Organisation|Person $fiche): bool
     {
@@ -178,7 +181,8 @@ class UndoImport implements ShouldQueue
 
         return Affiliation::query()->where($column, $fiche->getKey())->exists()
             || Note::query()->where('notable_type', $fiche->getMorphClass())->where('notable_id', $fiche->getKey())->exists()
-            || Attachment::query()->where('notable_type', $fiche->getMorphClass())->where('notable_id', $fiche->getKey())->exists();
+            || Attachment::query()->where('notable_type', $fiche->getMorphClass())->where('notable_id', $fiche->getKey())->exists()
+            || ($fiche instanceof Person && Consent::query()->where('person_id', $fiche->getKey())->exists());
     }
 
     /**
