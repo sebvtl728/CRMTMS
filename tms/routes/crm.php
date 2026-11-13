@@ -69,10 +69,10 @@ Route::middleware(['auth'])->group(function () {
     Route::put('crm/gdpr/retention', [GdprController::class, 'retention'])->middleware(['can:crm.gdpr', 'can:settings.manage'])->name('crm.gdpr.retention');
 
     // Prefill an entreprise from its SIRET (Sirene connector); create or update right, 30/min/user.
-    Route::get('crm/sirene/{siret}', SireneLookupController::class)->middleware('throttle:30,1')->name('crm.sirene');
+    Route::get('crm/sirene/{siret}', SireneLookupController::class)->middleware('throttle:crm-sirene')->name('crm.sirene');
 
     // Global search (Ctrl+K), saved filters; the Excel exports are above, next to their lists.
-    Route::get('crm/search', SearchController::class)->middleware(['can:crm.view', 'throttle:60,1'])->name('crm.search');
+    Route::get('crm/search', SearchController::class)->middleware(['can:crm.view', 'throttle:crm-search'])->name('crm.search');
     Route::prefix('crm/saved-filters')->name('crm.saved-filters.')->middleware('can:crm.view')->group(function () {
         Route::get('/', [SavedFilterController::class, 'index'])->name('index');
         Route::post('/', [SavedFilterController::class, 'store'])->name('store');

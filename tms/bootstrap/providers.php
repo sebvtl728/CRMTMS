@@ -8,10 +8,12 @@ use App\Modules\Core\Users\UsersServiceProvider;
 use App\Modules\Crm\CrmServiceProvider;
 use App\Providers\AppServiceProvider;
 use App\Providers\HorizonServiceProvider;
+use App\Providers\RateLimitServiceProvider;
 
 return [
     AppServiceProvider::class,
     HorizonServiceProvider::class,
+    RateLimitServiceProvider::class,
     TenancyServiceProvider::class,
     UsersServiceProvider::class,
     AccessServiceProvider::class,

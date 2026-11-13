@@ -45,6 +45,7 @@ export function GlobalSearch() {
     const [results, setResults] = useState<Results>(EMPTY);
     const [loading, setLoading] = useState(false);
     const [failed, setFailed] = useState(false);
+    const [throttled, setThrottled] = useState(false);
     const [active, setActive] = useState(0);
     const listRef = useRef<HTMLDivElement>(null);
 
@@ -78,6 +79,7 @@ export function GlobalSearch() {
             setResults(EMPTY);
             setLoading(false);
             setFailed(false);
+            setThrottled(false);
 
             return;
         }
@@ -93,12 +95,14 @@ export function GlobalSearch() {
                 .then((json) => {
                     setResults(json);
                     setFailed(false);
+                    setThrottled(false);
                     setActive(0);
                     setLoading(false);
                 })
                 .catch((error: unknown) => {
                     if (error instanceof DOMException && error.name === 'AbortError') return;
                     setFailed(true);
+                    setThrottled(error instanceof Error && error.message === '429');
                     setLoading(false);
                 });
         }, 250);
@@ -224,7 +228,7 @@ export function GlobalSearch() {
                         )}
                         {failed && (
                             <p role="alert" className="text-destructive px-3 py-6 text-center text-sm">
-                                La recherche a échoué, réessayez.
+                                {throttled ? 'Trop de requêtes, réessayez dans quelques instants.' : 'La recherche a échoué, réessayez.'}
                             </p>
                         )}
                         {trimmed.length >= MIN_LENGTH && !loading && !failed && flat.length === 0 && (

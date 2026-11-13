@@ -6,7 +6,7 @@ use App\Modules\Core\Users\UserController;
 use Illuminate\Support\Facades\Route;
 
 // Account activation from an invitation link (no account yet: no auth).
-Route::middleware('throttle:10,1')->group(function () {
+Route::middleware('throttle:activation')->group(function () {
     Route::get('activation/{token}', [ActivationController::class, 'show'])->name('activation.show');
     Route::post('activation/{token}', [ActivationController::class, 'store'])->name('activation.store');
 });
