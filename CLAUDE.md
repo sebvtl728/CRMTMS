@@ -6,7 +6,7 @@ TMS (Training Management System) multi-organismes pour organismes de formation, 
 
 - Spécifications sources : `Cdc/Cartographie projet – TMS sur mesure.md` (périmètre TMS complet) et `Cdc/cdc-activité-commercial.md` (gestion commerciale détaillée).
 - Conception validée : `docs/superpowers/specs/2026-11-11-tms-design.md` — **autorité** en cas de doute.
-- Plans d'implémentation : `docs/superpowers/plans/` (un plan par incrément : 1a socle, 1b fiches/import, 1c pipeline, 1d devis, 1e pilotage).
+- Plans d'implémentation : `docs/superpowers/plans/` (un plan par incrément : 1a socle, 1b fiches/import, 1c pipeline, 1d devis, 1e pilotage). Documentation d'exploitation et utilisateur : `tms/docs/` (`install`, `admin`, `crm`, `connectors`, `data-dictionary`, `release`).
 
 ## Stack
 
@@ -46,6 +46,21 @@ Installation dev complète : `tms/docs/install.md`. App : http://localhost:8080,
 8. **Cache** : toute clé contenant des données d'un organisme est préfixée par l'id du tenant.
 9. **Files d'attente** : jobs et notifications reçoivent le tenant automatiquement par leur charge utile ; ne jamais appeler `TenantContext::set` de façon globale dans un worker.
 10. Tout nouveau modèle sur une table métier utilise `BelongsToTenant`.
+
+## Module Crm (lot 1b) : points d'architecture à connaître
+
+Code dans `tms/app/Modules/Crm/` (Organisations, People, Affiliations, Timeline, Duplicates, Search, Export, Import, Gdpr, Visibility). Guide utilisateur : `tms/docs/crm.md` ; tables : `tms/docs/data-dictionary.md`.
+
+- **Historique** : chaque source est un `TimelineProvider` taggé `Timeline::TAG` dans `CrmServiceProvider::register()` (notes, pièces jointes, audit). Un futur module (actions, devis…) ajoute son fournisseur au tag, sans toucher au Crm.
+- **Tenancy hors requête** : `ForEachTenant::run()` pour tout traitement planifié ou de maintenance (une erreur sur un organisme n'arrête pas les autres) ; `TenantStorage` pour tout chemin de fichier (`tenants/<tenant_id>/<zone>/`, disque privé) ; jamais de chemin construit à la main. `PermissionSync` (`tms:permissions:sync`, lancé par `ops/migrate.sh`) accorde **une fois** les nouveaux droits par défaut de chaque rôle ; un module déclare ses permissions via `Core\Access\Permissions::registerModule()` dans `register()` (avant `AccessServiceProvider::boot`).
+- **Types polymorphes** : `MorphAliases::register()` par module, `enforceMorphMap` actif : un modèle sans alias lève une exception ; on stocke l'alias (`organisation`, `person`…), jamais la classe.
+- **RLS et fonctions non « leakproof »** : sous FORCE RLS, un index d'expression (`lower()`, `unaccent()`, `regexp_replace()`, `@>` jsonb) n'est pas utilisé. Les clés de recherche et de doublons sont donc des **colonnes générées stockées** (`search_vector`, `dup_*`) comparées par `=` ; `import_stamps` remplace une recherche jsonb. Ne pas réintroduire d'index d'expression sur une table RLS sans vérifier le plan (`EXPLAIN`) avec le rôle `tms_app`.
+- **Fuseau** : le fuseau PostgreSQL de session suit `APP_TIMEZONE` (`Europe/Paris`, `config/database.php`) : dates, `now()` SQL et PHP concordent. Ne jamais comparer des horodatages sans fuseau.
+- **Connecteurs sortants** : toute adresse appelée (SMTP, Sirene…) passe par `Connectors\Core\HostPolicy` (adresses internes/privées refusées, vérifié à l'enregistrement et à l'appel).
+- **Import** : `Import/` lit CSV/XLSX en continu, simule puis exécute par tranches reprenables (files `imports` et `default`, `TenantAwareJob`). `ImportStamps` (table `import_stamps`) enregistre ce que chaque import a fait à chaque fiche : c'est ce qui permet d'annuler sans écraser le travail des utilisateurs. Un import Formevol = un enregistrement `import_profiles`, pas de code.
+- **Erreurs** : `abort()` avec un message affiché à l'utilisateur lève `App\Exceptions\UserFacingHttpException` (message en français) ; toute autre `HttpException` n'affiche que le texte fixe de son code.
+- **Données personnelles** : aucune valeur de champ personnel en clair dans `audit_logs` (`Auditable::$auditPersonal`, valeur `[donnée personnelle]`) ni dans les logs ; l'anonymisation (`Gdpr/Anonymiser`) purge aussi les lignes d'import et les pièces jointes.
+- **Visibilité** : toute requête sur une fiche passe par `CrmVisibility` (le Responsable DAS ne voit que ses DAS suivis) ; les `Route::bind` du `CrmServiceProvider` renvoient 404 pour une fiche hors périmètre.
 
 ## Conventions
 

@@ -21,6 +21,9 @@ interface Results {
 const EMPTY: Results = { organisations: [], people: [] };
 const MIN_LENGTH = 2;
 
+/** Dispatch on window to open the palette from anywhere (e.g. the dashboard). */
+export const OPEN_EVENT = 'crm:open-search';
+
 /** True when the key press happens while the user is typing somewhere. */
 function isTyping(target: EventTarget | null): boolean {
     if (!(target instanceof HTMLElement)) return false;
@@ -57,9 +60,15 @@ export function GlobalSearch() {
                 setOpen(true);
             }
         };
+        // The « Rechercher » button of the dashboard asks for the palette.
+        const onRequest = () => setOpen(true);
         window.addEventListener('keydown', onKey);
+        window.addEventListener(OPEN_EVENT, onRequest);
 
-        return () => window.removeEventListener('keydown', onKey);
+        return () => {
+            window.removeEventListener('keydown', onKey);
+            window.removeEventListener(OPEN_EVENT, onRequest);
+        };
     }, [allowed]);
 
     // Debounced lookup (250 ms), the previous request is cancelled.

@@ -11,6 +11,7 @@ use App\Modules\Crm\Duplicates\DuplicateGuard;
 use App\Modules\Crm\Permissions;
 use App\Modules\Crm\Search\CrmResource;
 use App\Modules\Crm\Search\ListExtras;
+use App\Modules\Crm\Search\RecentViews;
 use App\Modules\Crm\Support\DasLinks;
 use App\Modules\Crm\Support\FormOptions;
 use App\Modules\Crm\Visibility\CrmVisibility;
@@ -109,6 +110,7 @@ class OrganisationController extends Controller
     {
         $user = $this->user($request);
         Gate::authorize('view', $organisation);
+        RecentViews::record($user, $organisation);
 
         $organisation->load(['legalForm', 'sector', 'establishmentType', 'companySize', 'origin', 'responsible', 'das']);
         $label = fn (?ReferenceItem $i) => $i === null ? null : ['id' => $i->id, 'label' => $i->label];

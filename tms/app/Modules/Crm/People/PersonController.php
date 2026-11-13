@@ -16,6 +16,7 @@ use App\Modules\Crm\Organisations\OrganisationStatus;
 use App\Modules\Crm\Permissions;
 use App\Modules\Crm\Search\CrmResource;
 use App\Modules\Crm\Search\ListExtras;
+use App\Modules\Crm\Search\RecentViews;
 use App\Modules\Crm\Support\DasLinks;
 use App\Modules\Crm\Support\FormOptions;
 use App\Modules\Crm\Visibility\CrmVisibility;
@@ -165,6 +166,7 @@ class PersonController extends Controller
     {
         $user = $this->user($request);
         Gate::authorize('view', $person);
+        RecentViews::record($user, $person);
 
         $person->load(['professionalSituation', 'fundingMode', 'origin', 'responsible', 'das']);
         $label = fn (?ReferenceItem $i) => $i === null ? null : ['id' => $i->id, 'label' => $i->label];
