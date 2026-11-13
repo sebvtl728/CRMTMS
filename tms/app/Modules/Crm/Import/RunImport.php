@@ -165,11 +165,13 @@ class RunImport implements ShouldQueue
         DB::transaction(function () use ($batch, $importer, $chunk, $isolated): void {
             $importer->prefetch($chunk);
             $records = [];
+            $outcomes = [];
             $counts = [ImportRow::CREATED => 0, ImportRow::UPDATED => 0, ImportRow::SKIPPED => 0, ImportRow::ERROR => 0];
 
             foreach ($chunk as $line => $row) {
                 $outcome = $importer->import($line, $row, $isolated);
                 $counts[$outcome->status]++;
+                $outcomes[] = $outcome;
                 $records[] = [
                     'id' => (string) Str::uuid7(),
                     'tenant_id' => $batch->tenant_id,
@@ -190,6 +192,7 @@ class RunImport implements ShouldQueue
             foreach (array_chunk($records, 250) as $part) {
                 DB::table('import_rows')->insert($part);
             }
+            ImportStamps::record($batch, $outcomes);
 
             $batch->forceFill([
                 'cursor_line' => (int) array_key_last($chunk),

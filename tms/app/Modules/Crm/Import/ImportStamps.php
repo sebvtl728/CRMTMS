@@ -2,50 +2,57 @@
 
 namespace App\Modules\Crm\Import;
 
+use App\Modules\Core\Tenancy\TenantContext;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 
 /**
- * What the imports know about a fiche: the updated_at each import left it
- * with (« at » of created_refs / touched_refs), and whether an undo trashed it.
+ * What the imports know about a fiche, kept in import_stamps (plain
+ * indexed columns: usable under RLS, unlike a jsonb lookup in import_rows):
+ * the updated_at each import left it with, and whether an undo trashed it.
+ * One instance per run, filled once per chunk (prefetch()).
  */
 final class ImportStamps
 {
+    /** @var array<string, array{stamp: string|null, trashed_by_undo_at: Carbon|null}> "type:id" => what the imports left */
+    private array $cache = [];
+
+    /**
+     * Loads, in one query per type, what the imports left on these fiches
+     * (call once per chunk; later lookups of other fiches query one by one).
+     *
+     * @param  array<string, list<string>>  $ids  morph alias => fiche ids
+     */
+    public function prefetch(array $ids): void
+    {
+        $this->cache = [];
+        foreach ($ids as $type => $list) {
+            $list = array_values(array_unique($list));
+            if ($list === []) {
+                continue;
+            }
+            foreach ($list as $id) {
+                $this->cache[$type.':'.$id] = ['stamp' => null, 'trashed_by_undo_at' => null];
+            }
+            $this->load($type, $list);
+        }
+    }
+
     /**
      * The last stamp an import (not undone) left on the fiche, or null.
      */
-    public static function lastStamp(Model $fiche): ?string
+    public function lastStamp(Model $fiche): ?string
     {
-        $needle = json_encode([['id' => (string) $fiche->getKey()]], JSON_THROW_ON_ERROR);
-        $row = DB::table('import_rows as r')->join('import_batches as b', 'b.id', '=', 'r.batch_id')
-            ->where(fn ($q) => $q->whereRaw('r.created_refs @> ?::jsonb', [$needle])->orWhereRaw('r.touched_refs @> ?::jsonb', [$needle]))
-            ->where('b.status', '<>', ImportBatch::UNDONE)
-            ->orderByDesc('b.created_at')->orderByDesc('r.line')
-            ->first(['r.created_refs', 'r.touched_refs']);
-
-        if ($row === null) {
-            return null;
-        }
-
-        $stamp = null;
-        foreach ([$row->created_refs, $row->touched_refs] as $refs) {
-            foreach (json_decode((string) $refs, true, flags: JSON_THROW_ON_ERROR) as $ref) {
-                if (($ref['id'] ?? null) === (string) $fiche->getKey() && is_string($ref['at'] ?? null)) {
-                    $stamp = $ref['at'];
-                }
-            }
-        }
-
-        return $stamp;
+        return $this->facts($fiche)['stamp'];
     }
 
     /**
      * Changed by someone (screen, merge...) since an import last wrote it.
      */
-    public static function modifiedSinceImport(Model $fiche): bool
+    public function modifiedSinceImport(Model $fiche): bool
     {
-        $stamp = self::lastStamp($fiche);
+        $stamp = $this->lastStamp($fiche);
 
         return $stamp !== null && $stamp !== RowOutcome::stamp($fiche);
     }
@@ -53,20 +60,85 @@ final class ImportStamps
     /**
      * Trashed by the undo of an import (and not deleted again by a user since).
      */
-    public static function trashedByUndo(Model $fiche): bool
+    public function trashedByUndo(Model $fiche): bool
     {
         $deletedAt = $fiche->getAttribute('deleted_at');
-        if (! $deletedAt instanceof Carbon) {
-            return false;
-        }
-        // The undo marks what it trashed; a later deletion by a user is newer than the undo.
-        $needle = json_encode([['id' => (string) $fiche->getKey(), 'undone' => true]], JSON_THROW_ON_ERROR);
+        $undoneAt = $this->facts($fiche)['trashed_by_undo_at'];
 
-        return DB::table('import_rows as r')->join('import_batches as b', 'b.id', '=', 'r.batch_id')
-            ->whereRaw('r.created_refs @> ?::jsonb', [$needle])
-            ->where('b.status', ImportBatch::UNDONE)
-            ->where('b.undone_at', '>=', $deletedAt->copy()->startOfSecond())
-            ->exists();
+        return $deletedAt instanceof Carbon && $undoneAt !== null && $undoneAt->greaterThanOrEqualTo($deletedAt->copy()->startOfSecond());
+    }
+
+    /**
+     * Records what a chunk of rows created or updated (bulk insert).
+     *
+     * @param  list<RowOutcome>  $outcomes
+     */
+    public static function record(ImportBatch $batch, array $outcomes): void
+    {
+        $records = [];
+        foreach ($outcomes as $outcome) {
+            foreach ([[$outcome->createdRefs, true], [$outcome->touchedRefs, false]] as [$refs, $created]) {
+                foreach ($refs as $ref) {
+                    $records[] = ['tenant_id' => $batch->tenant_id, 'batch_id' => $batch->id, 'subject_type' => $ref['type'],
+                        'subject_id' => $ref['id'], 'stamped_at' => $ref['at'], 'created' => $created];
+                }
+            }
+        }
+        foreach (array_chunk($records, 500) as $part) {
+            DB::table('import_stamps')->insert($part);
+        }
+    }
+
+    /**
+     * @param  list<string>  $ids  fiches trashed by this undo
+     */
+    public static function markTrashedByUndo(ImportBatch $batch, array $ids): void
+    {
+        if ($ids !== []) {
+            DB::table('import_stamps')->where('batch_id', $batch->id)->where('created', true)->whereIn('subject_id', $ids)
+                ->update(['trashed_by_undo_at' => now()]);
+        }
+    }
+
+    public static function markUndone(ImportBatch $batch): void
+    {
+        DB::table('import_stamps')->where('batch_id', $batch->id)->update(['batch_undone' => true]);
+    }
+
+    /**
+     * @return array{stamp: string|null, trashed_by_undo_at: Carbon|null}
+     */
+    private function facts(Model $fiche): array
+    {
+        $key = $fiche->getMorphClass().':'.$fiche->getKey();
+        if (! array_key_exists($key, $this->cache)) {
+            $this->cache[$key] = ['stamp' => null, 'trashed_by_undo_at' => null];
+            $this->load($fiche->getMorphClass(), [(string) $fiche->getKey()]);
+        }
+
+        return $this->cache[$key];
+    }
+
+    /**
+     * Index (tenant_id, subject_type, subject_id), plain equalities: usable under RLS.
+     *
+     * @param  list<string>  $ids
+     */
+    private function load(string $type, array $ids): void
+    {
+        foreach (DB::table('import_stamps')->where('subject_type', $type)->whereIn('subject_id', $ids)
+            ->where('tenant_id', app(TenantContext::class)->id())
+            ->orderBy('id')->get(['subject_id', 'stamped_at', 'batch_undone', 'trashed_by_undo_at']) as $row) {
+            $key = $type.':'.$row->subject_id;
+            if (! $row->batch_undone && $row->stamped_at !== null) {
+                $this->cache[$key]['stamp'] = $row->stamped_at; // last one wins (insertion order)
+            }
+            if ($row->trashed_by_undo_at !== null) {
+                $at = Carbon::parse($row->trashed_by_undo_at);
+                $previous = $this->cache[$key]['trashed_by_undo_at'];
+                $this->cache[$key]['trashed_by_undo_at'] = $previous === null || $at->greaterThan($previous) ? $at : $previous;
+            }
+        }
     }
 
     /**

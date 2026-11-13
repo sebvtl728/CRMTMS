@@ -11,6 +11,7 @@ use App\Modules\Crm\Affiliations\Affiliation;
 use App\Modules\Crm\Import\ImportBatch;
 use App\Modules\Crm\Import\ImportProfile;
 use App\Modules\Crm\Import\ImportRow;
+use App\Modules\Crm\Import\ImportStamp;
 use App\Modules\Crm\Organisations\Organisation;
 use App\Modules\Crm\Organisations\OrganisationPolicy;
 use App\Modules\Crm\People\Person;
@@ -52,6 +53,7 @@ class CrmServiceProvider extends ServiceProvider
             'import_profile' => ImportProfile::class,
             'import_batch' => ImportBatch::class,
             'import_row' => ImportRow::class,
+            'import_stamp' => ImportStamp::class,
         ]);
 
         // Sources of the « Historique »; later increments tag their own.

@@ -114,6 +114,7 @@ class UndoImport implements ShouldQueue
                 }
 
                 $this->annotate($notes, $undone);
+                ImportStamps::markTrashedByUndo($batch, array_merge([], ...array_values($undone)));
                 $options = $batch->options;
                 $options['undo'] = ['removed' => ($options['undo']['removed'] ?? 0) + $removed, 'kept' => ($options['undo']['kept'] ?? 0) + $kept];
                 $batch->forceFill(['cursor_line' => $batch->cursor_line + count($part), 'options' => $options])->save();
@@ -124,6 +125,7 @@ class UndoImport implements ShouldQueue
             }
         }
 
+        ImportStamps::markUndone($batch);
         $batch->forceFill(['status' => ImportBatch::UNDONE, 'undone_at' => now()])->save();
         $audit->record('crm.import_undone', $batch, [], [
             'file' => $batch->original_name,

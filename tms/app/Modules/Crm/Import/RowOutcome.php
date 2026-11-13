@@ -73,7 +73,7 @@ final class RowOutcome
     }
 
     /**
-     * The fiche and the updated_at the import left it with (to the second).
+     * The fiche and the updated_at the import left it with (stored precision).
      *
      * @return array{type: string, id: string, at: string|null}
      */
@@ -86,7 +86,13 @@ final class RowOutcome
     {
         $at = $model->getAttribute('updated_at');
 
-        return $at instanceof \DateTimeInterface ? Carbon::instance($at)->setTimezone(config('app.timezone'))->format('Y-m-d H:i:s') : null;
+        if (! $at instanceof \DateTimeInterface) {
+            return null;
+        }
+        // The precision the column keeps: seconds, or microseconds (notes).
+        $format = str_contains($model->getDateFormat(), '.u') ? 'Y-m-d H:i:s.u' : 'Y-m-d H:i:s';
+
+        return Carbon::instance($at)->setTimezone(config('app.timezone'))->format($format);
     }
 
     /**

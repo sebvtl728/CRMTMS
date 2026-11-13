@@ -63,6 +63,11 @@ final class RowImporter
     /** @var array<string, array<string, string>> dry run: type => source_id => line */
     private array $seenSources = ['organisation' => [], 'person' => []];
 
+    /** @var array<string, array<string, Organisation|Person>> type => id => fiche (chunk cache) */
+    private array $fiches = ['organisation' => [], 'person' => []];
+
+    private readonly ImportStamps $stamps;
+
     private readonly DuplicateStrategy $strategy;
 
     private readonly ?string $sourceSystem;
@@ -76,6 +81,7 @@ final class RowImporter
         private readonly DasLinks $das,
     ) {
         $this->strategy = $batch->strategy();
+        $this->stamps = new ImportStamps;
         $this->sourceSystem = $batch->sourceSystem();
     }
 
@@ -121,6 +127,7 @@ final class RowImporter
         }
 
         $this->sources = ['organisation' => [], 'person' => []];
+        $this->fiches = ['organisation' => [], 'person' => []];
         $wanted = ['organisation' => [], 'person' => []];
         foreach ($rows as $row) {
             $values = $this->map->values($row);
@@ -158,6 +165,17 @@ final class RowImporter
                 }
             }
         }
+
+        // The fiches themselves and what the imports left on them: one query each.
+        foreach (['organisation' => Organisation::class, 'person' => Person::class] as $type => $class) {
+            $ids = array_values(array_unique($this->sources[$type]));
+            if ($ids !== []) {
+                foreach ($class::withTrashed()->whereIn('id', $ids)->get() as $fiche) {
+                    $this->fiches[$type][(string) $fiche->getKey()] = $fiche;
+                }
+            }
+        }
+        $this->stamps->prefetch(array_map(fn (array $fiches) => array_keys($fiches), $this->fiches));
     }
 
     /**
@@ -567,6 +585,9 @@ final class RowImporter
     private function noteRow(array $values): RowOutcome
     {
         $subject = $this->noteSubject($values);
+        if ($subject->getAttribute('anonymised_at') !== null) {
+            throw new SkipRow('Fiche anonymisée (RGPD) : non réimportée.');
+        }
         $body = (string) $values['body'];
         $date = $values['date'] ?? null;
 
@@ -840,7 +861,7 @@ final class RowImporter
 
         if ($this->dryRun) {
             // Overwriting a fiche someone changed since its import: counted for the warning.
-            $outcome->modifiedSinceImport = $outcome->modifiedSinceImport || ($overwrite && ImportStamps::modifiedSinceImport($fiche));
+            $outcome->modifiedSinceImport = $outcome->modifiedSinceImport || ($overwrite && $this->stamps->modifiedSinceImport($fiche));
 
             return;
         }
@@ -875,7 +896,7 @@ final class RowImporter
         if ($fiche->getAttribute('anonymised_at') !== null) {
             throw new SkipRow('Fiche anonymisée (RGPD) : non réimportée.');
         }
-        if ($fiche->trashed() && ! ImportStamps::trashedByUndo($fiche)) {
+        if ($fiche->trashed() && ! $this->stamps->trashedByUndo($fiche)) {
             throw new SkipRow('Fiche supprimée par un utilisateur : non réimportée.');
         }
     }
@@ -935,7 +956,7 @@ final class RowImporter
             return null;
         }
 
-        $fiche = $class::withTrashed()->find($id);
+        $fiche = $this->fiches[$type][$id] ?? $class::withTrashed()->find($id);
         for ($hops = 0; $fiche !== null && $fiche->merged_into_id !== null && $hops < 20; $hops++) {
             $fiche = $class::withTrashed()->find($fiche->merged_into_id);
         }

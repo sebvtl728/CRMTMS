@@ -393,3 +393,42 @@ it('only simulates a batch not yet run, and only runs a simulated one', function
     expect($uploaded->refresh()->status)->toBe(ImportBatch::UPLOADED)
         ->and(Organisation::query()->count())->toBe(1);
 });
+
+// --- Fix round 2 ------------------------------------------------------------
+
+it('re-simulates a large re-import with a bounded number of queries', function () {
+    $lines = ['Identifiant;Raison sociale;Ville'];
+    for ($i = 0; $i < 2000; $i++) {
+        $lines[] = "C{$i};Entreprise {$i};Ville {$i}";
+    }
+    runImport(implode("\n", $lines)."\n", ImportTarget::Organisations, ['source_system' => 'formevol']);
+    $this->travel(1)->minutes();
+    Organisation::query()->where('source_id', 'C7')->sole()->update(['city' => 'Changée']);
+
+    $batch = uploadImport(str_replace('Ville ', 'Commune ', implode("\n", $lines))."\n", ImportTarget::Organisations, ['source_system' => 'formevol']);
+    $queries = 0;
+    DB::listen(function () use (&$queries): void {
+        $queries++;
+    });
+    $started = microtime(true);
+    $report = simulateImport($batch);
+    $seconds = microtime(true) - $started;
+    fwrite(STDERR, sprintf("\nre-simulation of 2 000 rows: %d queries, %.1f s\n", $queries, $seconds));
+
+    expect($report->toUpdate)->toBe(2000)
+        ->and($report->modifiedSinceImport)->toBe(1)
+        // A few queries per 500-row chunk, never one per row.
+        ->and($queries)->toBeLessThan(60)
+        ->and($seconds)->toBeLessThan(5.0);
+});
+
+it('never attaches an imported note to an anonymised person', function () {
+    $person = makePerson('Martin', ['email' => 'paul@exemple.fr']);
+    DB::table('people')->where('id', $person->id)->update(['anonymised_at' => now()]);
+
+    $batch = runImport("E-mail;Note\npaul@exemple.fr;Rappel\n", ImportTarget::Notes);
+
+    expect(Note::query()->count())->toBe(0)
+        ->and($batch->rows()->value('status'))->toBe(ImportRow::SKIPPED)
+        ->and(rowMessages($batch, 2))->toBe(['Fiche anonymisée (RGPD) : non réimportée.']);
+});
