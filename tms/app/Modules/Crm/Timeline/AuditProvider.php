@@ -34,12 +34,12 @@ final class AuditProvider implements TimelineProvider
         'crm.organisation_das_changed', 'crm.person_das_changed', 'crm.merged',
     ];
 
-    public function entriesFor(Model $subject, ?CarbonImmutable $before, int $limit): Collection
+    public function entriesFor(Model $subject, ?TimelineCursor $before, int $limit): Collection
     {
         return AuditLog::query()->with('user')
             ->where('auditable_type', $subject->getMorphClass())->where('auditable_id', $subject->getKey())
             ->whereIn('event', self::EVENTS)
-            ->when($before, fn ($q) => $q->where('created_at', '<', Timeline::bound($before)))
+            ->tap(fn ($q) => Timeline::after($q, $before, 'audit'))
             ->orderByDesc('created_at')->orderByDesc('id')->limit($limit)->get()
             ->map(fn (AuditLog $log) => new TimelineEntry(
                 'audit',

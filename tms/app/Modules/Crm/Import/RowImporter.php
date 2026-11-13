@@ -35,6 +35,8 @@ use Illuminate\Support\Facades\Validator;
  */
 final class RowImporter
 {
+    public const FUTURE_DATE = 'Date future ramenée à aujourd\'hui';
+
     /** Fields whose stored column differs from the field code. */
     private const COLUMNS = [
         'legal_form' => 'legal_form_id', 'sector' => 'sector_id', 'establishment_type' => 'establishment_type_id',
@@ -252,7 +254,16 @@ final class RowImporter
                 $date === null ? $errors[] = "{$label} : date invalide (format attendu JJ/MM/AAAA)." : $values[$field] = $date->toDateString();
             } elseif ($base === 'date') {
                 $date = Values::date($raw, true);
-                $date === null ? $errors[] = "{$label} : date invalide (format attendu JJ/MM/AAAA)." : $values[$field] = $date;
+                if ($date === null) {
+                    $errors[] = "{$label} : date invalide (format attendu JJ/MM/AAAA).";
+                } elseif ($date->isFuture()) {
+                    // A contact cannot be in the future (last contact, GDPR clock): today, with a warning.
+                    $values[$field] = CarbonImmutable::now();
+                    $values['date_clamped'] = true;
+                    $warnings[] = self::FUTURE_DATE;
+                } else {
+                    $values[$field] = $date;
+                }
             } elseif (in_array($base, ['is_individual', 'is_referent'], true)) {
                 $bool = Values::bool($raw);
                 $bool === null ? $errors[] = "{$label} : répondez par Oui ou Non." : $values[$field] = $bool;
@@ -335,10 +346,6 @@ final class RowImporter
                 $errors[] = 'Note : ce champ est obligatoire.';
             } elseif (mb_strlen($body) > Note::MAX_LENGTH) {
                 $errors[] = 'Note : le texte dépasse '.Note::MAX_LENGTH.' caractères.';
-            }
-            $date = $values['date'] ?? null;
-            if ($date instanceof CarbonImmutable && $date->isAfter(now()->addMinute())) {
-                $errors[] = 'Date : la date est dans le futur.';
             }
         }
 
@@ -558,8 +565,9 @@ final class RowImporter
 
     /**
      * A note on the fiche found by source identifier, SIRET or e-mail. Its
-     * date (if any) becomes the note's date; the last contact only moves
-     * forward. A note already present (same fiche, text and date) is skipped.
+     * date (if any) becomes the note's date (a future date is brought back
+     * to now, with a warning); the last contact only moves forward. A note
+     * already present (same fiche, text and date) is skipped.
      *
      * @param  array<string, mixed>  $values
      */
@@ -574,7 +582,8 @@ final class RowImporter
 
         $existing = Note::query()->where('notable_type', $subject->getMorphClass())->where('notable_id', $subject->getKey())
             ->where('body', $body)
-            ->when($date instanceof CarbonImmutable, fn ($q) => $q->where('created_at', $date))
+            // A date brought back to today changes at each run: the text alone identifies the note.
+            ->when($date instanceof CarbonImmutable && ! ($values['date_clamped'] ?? false), fn ($q) => $q->where('created_at', $date))
             ->exists();
         if ($existing) {
             return (new RowOutcome(ImportRow::SKIPPED))->add('info', 'Note déjà importée : ligne ignorée.')->subject($subject);

@@ -52,6 +52,7 @@ export function Timeline({ kind, subjectId, canEdit }: Props) {
     const timelineUrl = route(`${base}.timeline`, subjectId);
 
     const [entries, setEntries] = useState<TimelineEntryData[]>([]);
+    /** Opaque cursor from the server (position of the last entry shown), sent back as is. */
     const [next, setNext] = useState<string | null>(null);
     const [loading, setLoading] = useState(true);
     const [failed, setFailed] = useState(false);
@@ -64,6 +65,7 @@ export function Timeline({ kind, subjectId, canEdit }: Props) {
 
     const load = useCallback(
         async (before: string | null) => {
+            // A failed « Voir plus » keeps the entries already shown; a first load replaces them.
             setLoading(true);
             setFailed(false);
             try {

@@ -6,11 +6,10 @@ use App\Modules\Core\Audit\AuditRecorder;
 use App\Modules\Core\Tenancy\TenantAwareJob;
 use App\Modules\Core\Tenancy\TenantContext;
 use App\Modules\Core\Users\User;
-use App\Modules\Crm\Affiliations\Affiliation;
-use App\Modules\Crm\Gdpr\Consent;
 use App\Modules\Crm\Organisations\Organisation;
 use App\Modules\Crm\People\Person;
-use App\Modules\Crm\Timeline\Attachment;
+use App\Modules\Crm\Support\LinkedData;
+use App\Modules\Crm\Timeline\LastContact;
 use App\Modules\Crm\Timeline\Note;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Database\Eloquent\Model;
@@ -26,10 +25,13 @@ use Illuminate\Support\Facades\DB;
  * on its row) when:
  * - someone changed it: its updated_at is not the one the import left
  *   (stamps in created_refs / touched_refs), even during the run;
- * - something not created by this import hangs on it (note, link,
- *   attachment, e.g. added by a user or by a later import);
+ * - something not created by this import hangs on it (LinkedData: note,
+ *   link, attachment, consent, and what later modules register), e.g.
+ *   added by a user or by a later import;
  * - it was merged since.
  * Fiches the import only updated are left as they are; nothing is restored.
+ * The last contact of a fiche whose imported notes were removed is
+ * recomputed from what remains (LastContact::recompute).
  * A fiche is only trashed once nothing hangs on it, so the model cascade
  * never removes a link or a note the import did not create. Trashed fiches
  * are marked (« undone ») so that a re-import may bring them back (and only
@@ -52,6 +54,14 @@ class UndoImport implements ShouldQueue
     public int $tries = 1;
 
     public int $timeout = 85;
+
+    /**
+     * Fiches whose imported notes this chunk removed: their last contact is
+     * recomputed before the chunk commits.
+     *
+     * @var array<string, array{0: string, 1: string}>
+     */
+    private array $recontacted = [];
 
     public function __construct(public string $batchId, public ?string $userId = null)
     {
@@ -114,6 +124,11 @@ class UndoImport implements ShouldQueue
                     }
                 }
 
+                foreach ($this->recontacted as $subject) {
+                    LastContact::recompute($subject[0], $subject[1]);
+                }
+                $this->recontacted = [];
+
                 $this->annotate($notes, $undone);
                 ImportStamps::markTrashedByUndo($batch, array_merge([], ...array_values($undone)));
                 $options = $batch->options;
@@ -160,29 +175,16 @@ class UndoImport implements ShouldQueue
         if ($stamp !== null && $stamp !== RowOutcome::stamp($model)) {
             return self::KEPT_MODIFIED;
         }
-        if (($model instanceof Organisation || $model instanceof Person) && $this->hasForeignData($model)) {
+        if (($model instanceof Organisation || $model instanceof Person) && LinkedData::any($model)) {
             return self::KEPT_LINKED;
         }
 
         $model->delete();
+        if ($model instanceof Note) {
+            $this->recontacted[$model->notable_type.':'.$model->notable_id] = [$model->notable_type, $model->notable_id];
+        }
 
         return true;
-    }
-
-    /**
-     * Notes, links or attachments still on the fiche: not created by this
-     * import, or kept by this undo (the earlier phases removed the others).
-     * Consents are never created by an import: any consent of the person
-     * was recorded since, and must stay with her fiche (proof, RGPD).
-     */
-    private function hasForeignData(Organisation|Person $fiche): bool
-    {
-        $column = $fiche instanceof Organisation ? 'organisation_id' : 'person_id';
-
-        return Affiliation::query()->where($column, $fiche->getKey())->exists()
-            || Note::query()->where('notable_type', $fiche->getMorphClass())->where('notable_id', $fiche->getKey())->exists()
-            || Attachment::query()->where('notable_type', $fiche->getMorphClass())->where('notable_id', $fiche->getKey())->exists()
-            || ($fiche instanceof Person && Consent::query()->where('person_id', $fiche->getKey())->exists());
     }
 
     /**

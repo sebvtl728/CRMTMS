@@ -18,6 +18,7 @@ use App\Modules\Crm\Organisations\OrganisationPolicy;
 use App\Modules\Crm\People\Person;
 use App\Modules\Crm\People\PersonPolicy;
 use App\Modules\Crm\Search\SavedFilter;
+use App\Modules\Crm\Support\LinkedData;
 use App\Modules\Crm\Timeline\Attachment;
 use App\Modules\Crm\Timeline\AttachmentsProvider;
 use App\Modules\Crm\Timeline\AuditProvider;
@@ -65,6 +66,7 @@ class CrmServiceProvider extends ServiceProvider
     public function boot(): void
     {
         self::registerReferenceUsage();
+        self::registerLinkedData();
 
         // Check + download count together: 10 exports a minute per user.
         RateLimiter::for('crm-export', fn (Request $request) => Limit::perMinute(20)->by('crm-export:'.($request->user()?->getAuthIdentifier() ?? $request->ip()))
@@ -209,6 +211,25 @@ class CrmServiceProvider extends ServiceProvider
         }
 
         return $query->findOrFail($value);
+    }
+
+    /**
+     * Data hanging on a fiche (LinkedData): an import undo keeps the fiche.
+     * Consents are never created by an import: any consent of the person was
+     * recorded since, and must stay with her fiche (proof, RGPD).
+     */
+    public static function registerLinkedData(): void
+    {
+        $except = fn (Builder $query, array $ids): Builder => $ids === [] ? $query : $query->whereKeyNot($ids);
+
+        LinkedData::register('crm.affiliations', fn (Organisation|Person $fiche, array $ids): bool => $except(
+            Affiliation::query()->where($fiche instanceof Organisation ? 'organisation_id' : 'person_id', $fiche->getKey()), $ids)->exists());
+        LinkedData::register('crm.notes', fn (Organisation|Person $fiche, array $ids): bool => $except(
+            Note::query()->where('notable_type', $fiche->getMorphClass())->where('notable_id', $fiche->getKey()), $ids)->exists());
+        LinkedData::register('crm.attachments', fn (Organisation|Person $fiche, array $ids): bool => $except(
+            Attachment::query()->where('notable_type', $fiche->getMorphClass())->where('notable_id', $fiche->getKey()), $ids)->exists());
+        LinkedData::register('crm.consents', fn (Organisation|Person $fiche, array $ids): bool => $fiche instanceof Person
+            && $except(Consent::query()->where('person_id', $fiche->getKey()), $ids)->exists());
     }
 
     /**

@@ -13,6 +13,8 @@ use App\Modules\Crm\Import\UndoImport;
 use App\Modules\Crm\Organisations\Organisation;
 use App\Modules\Crm\People\Person;
 use App\Modules\Crm\Timeline\Note;
+use Carbon\CarbonImmutable;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
@@ -85,6 +87,63 @@ it('undoes imported notes', function () {
 
     expect(Note::query()->count())->toBe(0)
         ->and(Note::onlyTrashed()->count())->toBe(1);
+});
+
+it('recomputes the last contact when imported notes are undone', function () {
+    $this->travelTo(CarbonImmutable::parse('2026-11-13 09:00:00'));
+    $org = Organisation::query()->create(['name' => 'Hôtel du Lac', 'siret' => '73282932000074']);
+    $person = makePerson('Roux');
+    affiliate($person, $org);
+    $earlier = new Note(['body' => 'Appel manuel']);
+    $earlier->notable()->associate($org);
+    $earlier->created_at = Carbon::parse('2026-10-01 10:00:00');
+    $earlier->save();
+    $personNote = new Note(['body' => 'Rendez-vous']);
+    $personNote->notable()->associate($person);
+    $personNote->created_at = Carbon::parse('2026-10-05 15:00:00');
+    $personNote->save();
+    DB::table('people')->where('id', $person->id)->update(['last_contact_at' => null]);
+    DB::table('organisations')->where('id', $org->id)->update(['last_contact_at' => '2026-10-01 10:00:00']);
+
+    $batch = runImport("SIRET;Date;Note\n73282932000074;12/11/2026 16:30;Échange importé\n", ImportTarget::Notes);
+    expect($org->refresh()->last_contact_at?->toDateTimeString())->toBe('2026-11-12 16:30:00');
+
+    $this->travel(1)->minutes();
+    UndoImport::dispatch($batch->id);
+
+    // Back to the latest remaining contact: the note of its active contact.
+    expect(Note::query()->count())->toBe(2)
+        ->and($org->refresh()->last_contact_at?->toDateTimeString())->toBe('2026-10-05 15:00:00')
+        ->and($person->refresh()->last_contact_at)->toBeNull();
+});
+
+it('empties the last contact when the only notes were imported then undone', function () {
+    Organisation::query()->create(['name' => 'Hôtel du Lac', 'siret' => '73282932000074']);
+    $batch = runImport("SIRET;Date;Note\n73282932000074;12/11/2026;Premier échange\n", ImportTarget::Notes);
+    $org = Organisation::query()->sole();
+    expect($org->last_contact_at)->not->toBeNull();
+
+    UndoImport::dispatch($batch->id);
+
+    expect($org->refresh()->last_contact_at)->toBeNull();
+});
+
+it('brings an imported note dated in the future back to today, with a warning', function () {
+    $this->travelTo(CarbonImmutable::parse('2026-11-13 11:00:00'));
+    $org = Organisation::query()->create(['name' => 'Hôtel du Lac', 'siret' => '73282932000074']);
+
+    $batch = runImport("SIRET;Date;Note\n73282932000074;15/03/2027;Rendez-vous prévu\n", ImportTarget::Notes);
+
+    $note = Note::query()->sole();
+    expect([$batch->created, $batch->errors])->toBe([1, 0])
+        ->and($note->created_at->toDateTimeString())->toBe('2026-11-13 11:00:00')
+        ->and($org->refresh()->last_contact_at?->toDateTimeString())->toBe('2026-11-13 11:00:00')
+        ->and(rowMessages($batch, 2))->toContain("Date future ramenée à aujourd'hui");
+
+    // Importing the same file again does not duplicate the note.
+    $this->travel(1)->hours();
+    $again = runImport("SIRET;Date;Note\n73282932000074;15/03/2027;Rendez-vous prévu\n", ImportTarget::Notes);
+    expect(Note::query()->count())->toBe(1)->and($again->created)->toBe(0);
 });
 
 it('undoes only a finished import, and only once', function () {
