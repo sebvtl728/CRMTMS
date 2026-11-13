@@ -29,7 +29,14 @@ class PersonPolicy
 
     public function update(User $user, Person $person): bool
     {
-        return $user->can(Permissions::UPDATE) && $this->visible($user, $person);
+        // An anonymised fiche is never filled again.
+        return $user->can(Permissions::UPDATE) && $person->anonymised_at === null && $this->visible($user, $person);
+    }
+
+    /** Data export, anonymisation, « Conserver ». */
+    public function gdpr(User $user, Person $person): bool
+    {
+        return $user->can(Permissions::GDPR) && $this->visible($user, $person);
     }
 
     public function delete(User $user, Person $person): bool

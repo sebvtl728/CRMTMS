@@ -19,6 +19,8 @@ class AffiliationController extends Controller
 {
     private const PERSON_FIELDS = ['civility', 'first_name', 'last_name'];
 
+    public const ANONYMISED = 'Cette personne est anonymisée (RGPD) : ses coordonnées ne peuvent plus être saisies.';
+
     public function store(AffiliationRequest $request, Organisation $organisation): RedirectResponse
     {
         Gate::authorize('update', $organisation);
@@ -29,6 +31,8 @@ class AffiliationController extends Controller
 
         if ($personId === null) {
             Gate::authorize('create', Person::class);
+        } elseif (Person::query()->whereKey($personId)->whereNotNull('anonymised_at')->exists()) {
+            throw ValidationException::withMessages(['person_id' => self::ANONYMISED]);
         }
 
         try {
@@ -59,9 +63,19 @@ class AffiliationController extends Controller
     public function update(AffiliationRequest $request, Affiliation $affiliation): RedirectResponse
     {
         $organisation = $this->organisation($affiliation);
+        $validated = $request->validated();
+
+        // An anonymised person's link keeps its dates and role, never contact data again.
+        if (Person::withTrashed()->whereKey($affiliation->person_id)->whereNotNull('anonymised_at')->exists()) {
+            foreach (['job_title', 'work_email', 'work_phone'] as $field) {
+                if (($validated[$field] ?? null) !== null && $validated[$field] !== '') {
+                    throw ValidationException::withMessages([$field => self::ANONYMISED]);
+                }
+            }
+        }
 
         try {
-            $affiliation->fill($request->validated())->save();
+            $affiliation->fill($validated)->save();
         } catch (UniqueConstraintViolationException) {
             throw ValidationException::withMessages(['ended_on' => AffiliationRequest::ALREADY_ACTIVE]);
         }

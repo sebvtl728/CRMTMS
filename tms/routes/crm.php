@@ -3,6 +3,8 @@
 use App\Modules\Crm\Affiliations\AffiliationController;
 use App\Modules\Crm\Duplicates\MergeController;
 use App\Modules\Crm\Export\ExportController;
+use App\Modules\Crm\Gdpr\GdprController;
+use App\Modules\Crm\Gdpr\PersonGdprController;
 use App\Modules\Crm\Organisations\OrganisationController;
 use App\Modules\Crm\Organisations\SireneLookupController;
 use App\Modules\Crm\People\PersonController;
@@ -56,6 +58,15 @@ Route::middleware(['auth'])->group(function () {
         Route::delete('{person}', [PersonController::class, 'destroy'])->middleware('can:crm.delete')->name('destroy');
         Route::post('{person}/restore', [PersonController::class, 'restore'])->middleware('can:crm.delete')->name('restore');
     });
+
+    // GDPR: consents, opposition, data export, anonymisation, retention list.
+    Route::post('crm/people/{person}/consents', [PersonGdprController::class, 'storeConsent'])->middleware('can:crm.update')->name('crm.people.consents.store');
+    Route::post('crm/people/{person}/prospecting-opt-out', [PersonGdprController::class, 'optOut'])->middleware('can:crm.update')->name('crm.people.opt-out');
+    Route::get('crm/people/{person}/gdpr-export', [PersonGdprController::class, 'export'])->middleware(['can:crm.gdpr', 'throttle:crm-export'])->name('crm.people.gdpr-export');
+    Route::post('crm/people/{person}/anonymise', [PersonGdprController::class, 'anonymise'])->middleware('can:crm.gdpr')->name('crm.people.anonymise');
+    Route::get('crm/gdpr', [GdprController::class, 'index'])->middleware('can:crm.gdpr')->name('crm.gdpr.index');
+    Route::post('crm/gdpr/{person}/keep', [GdprController::class, 'keep'])->middleware('can:crm.gdpr')->name('crm.gdpr.keep');
+    Route::put('crm/gdpr/retention', [GdprController::class, 'retention'])->middleware(['can:crm.gdpr', 'can:settings.manage'])->name('crm.gdpr.retention');
 
     // Prefill an entreprise from its SIRET (Sirene connector); create or update right, 30/min/user.
     Route::get('crm/sirene/{siret}', SireneLookupController::class)->middleware('throttle:30,1')->name('crm.sirene');

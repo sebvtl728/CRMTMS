@@ -15,6 +15,10 @@ import { Head, Link, router } from '@inertiajs/react';
 import { ChevronLeft, ChevronRight, Plus, Upload } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 
+/** GDPR badges of a person in the list. */
+const personBadges = (p: { prospecting_opt_out: boolean; anonymised: boolean }) =>
+    [p.anonymised ? 'Anonymisée' : null, p.prospecting_opt_out ? 'Opposé à la prospection' : null].filter((b): b is string => b !== null);
+
 interface Row {
     id: string;
     civility: string | null;
@@ -31,6 +35,8 @@ interface Row {
     last_contact_at: string | null;
     created_at: string | null;
     deleted: boolean;
+    prospecting_opt_out: boolean;
+    anonymised: boolean;
     cells: TableRow['cells'];
 }
 
@@ -202,7 +208,7 @@ export default function PeopleIndex({ people, filters, options, can, savedFilter
                     <>
                         {/* Table from 768 px */}
                         <ListTable
-                            rows={people.data}
+                            rows={people.data.map((p) => ({ ...p, badges: personBadges(p) }))}
                             options={columns.options}
                             selected={selected}
                             titleKeys={['last_name']}
@@ -227,6 +233,11 @@ export default function PeopleIndex({ people, filters, options, can, savedFilter
                                         </div>
                                         <div className="mt-1 flex flex-wrap gap-1">
                                             <PersonTypeBadges individual={p.is_individual} contact={p.organisations.length > 0} />
+                                            {personBadges(p).map((b) => (
+                                                <Badge key={b} variant="outline">
+                                                    {b}
+                                                </Badge>
+                                            ))}
                                         </div>
                                         {orgLine(p) && <p className="text-muted-foreground mt-1 text-sm">{orgLine(p)}</p>}
                                         <p className="text-muted-foreground mt-1 text-sm break-all">

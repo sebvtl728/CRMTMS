@@ -35,6 +35,7 @@ type PersonForm = {
     responsible_user_id: string;
     das_ids: string[];
     project: string;
+    legal_basis: string;
 };
 
 interface PersonData extends Record<string, string | boolean | string[] | null> {
@@ -52,6 +53,7 @@ interface FormProps {
         origin: Option[];
         das: Option[];
         responsible: Option[];
+        legal_basis: Option[];
     };
     duplicates: DuplicateCandidate[];
     canMerge: boolean;
@@ -117,6 +119,7 @@ export default function PersonFormPage({ person, options, duplicates, canMerge }
         responsible_user_id: str('responsible_user_id'),
         das_ids: person?.das_ids ?? [],
         project: str('project'),
+        legal_basis: str('legal_basis'),
     });
 
     const breadcrumbs: BreadcrumbItem[] = [
@@ -206,6 +209,12 @@ export default function PersonFormPage({ person, options, duplicates, canMerge }
                     </Label>
                     {pick('status', 'Statut', options.status, 'Prospect')}
                     {pick('responsible_user_id', 'Responsable', options.responsible, 'Sans responsable')}
+                    {pick(
+                        'legal_basis',
+                        'Base légale (RGPD)',
+                        options.legal_basis,
+                        editing ? 'Inchangée' : 'Par défaut (consentement pour un particulier, sinon intérêt légitime)',
+                    )}
                 </Section>
 
                 <Section title="Contact">

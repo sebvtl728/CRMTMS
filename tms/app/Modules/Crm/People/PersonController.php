@@ -7,6 +7,10 @@ use App\Modules\Core\References\ReferenceItem;
 use App\Modules\Core\References\ReferenceList;
 use App\Modules\Core\Users\User;
 use App\Modules\Crm\Duplicates\DuplicateGuard;
+use App\Modules\Crm\Gdpr\Consent;
+use App\Modules\Crm\Gdpr\ConsentChannel;
+use App\Modules\Crm\Gdpr\GdprPending;
+use App\Modules\Crm\Gdpr\LegalBasis;
 use App\Modules\Crm\Organisations\Organisation;
 use App\Modules\Crm\Organisations\OrganisationStatus;
 use App\Modules\Crm\Permissions;
@@ -59,6 +63,8 @@ class PersonController extends Controller
                 'last_contact_at' => $p->last_contact_at?->toIso8601String(),
                 'created_at' => $p->created_at?->toIso8601String(),
                 'deleted' => $p->trashed(),
+                'prospecting_opt_out' => $p->prospecting_opt_out_at !== null,
+                'anonymised' => $p->anonymised_at !== null,
                 'cells' => $this->cells($p),
             ]),
             'filters' => $filters,
@@ -117,6 +123,7 @@ class PersonController extends Controller
             'last_name' => $p->last_name,
             'name' => $p->fullName(),
             'email' => $p->email,
+            'prospecting_opt_out' => $p->prospecting_opt_out_at !== null,
             'organisations' => $p->activeAffiliations->map(fn ($a) => $a->organisation?->name)->filter()->values()->all(),
         ])->all()]);
     }
@@ -193,13 +200,21 @@ class PersonController extends Controller
                 'created_at' => $person->created_at?->toIso8601String(),
                 'updated_at' => $person->updated_at?->toIso8601String(),
                 'deleted' => $person->trashed(),
+                'legal_basis' => ['value' => $person->legal_basis->value, 'label' => $person->legal_basis->label()],
+                'prospecting_opt_out_at' => $person->prospecting_opt_out_at?->toIso8601String(),
+                'anonymised' => $person->anonymised_at !== null,
+                'anonymised_at' => $person->anonymised_at?->toIso8601String(),
             ],
+            'gdpr' => $this->gdpr($person, $user),
             'similar' => $user->can(Permissions::MERGE) ? $this->duplicates->similarTo($person, $user) : [],
             'can' => [
-                'merge' => ! $person->trashed() && $user->can(Permissions::MERGE),
+                'merge' => ! $person->trashed() && $person->anonymised_at === null && $user->can(Permissions::MERGE),
                 'update' => ! $person->trashed() && $user->can('update', $person),
                 'delete' => ! $person->trashed() && $user->can('delete', $person),
                 'restore' => $person->trashed() && $user->can('restore', $person),
+                'consent' => ! $person->trashed() && $user->can('update', $person),
+                'gdpr' => $user->can('gdpr', $person),
+                'anonymise' => $person->anonymised_at === null && $user->can('gdpr', $person),
             ],
             'status' => $request->session()->get('status'),
         ]);
@@ -262,6 +277,9 @@ class PersonController extends Controller
         $validated = $request->validated();
         $dasIds = array_key_exists('das_ids', $validated) ? array_values($validated['das_ids']) : null;
         unset($validated['das_ids']);
+        if (array_key_exists('legal_basis', $validated) && $validated['legal_basis'] === null) {
+            unset($validated['legal_basis']); // creation: default from the type of person
+        }
         $validated['country'] ??= 'FR';
         $validated['status'] ??= $person->exists ? $person->status->value : OrganisationStatus::Prospect->value;
 
@@ -302,6 +320,34 @@ class PersonController extends Controller
             'funding_mode_id' => $p->funding_mode_id,
             'origin_id' => $p->origin_id,
             'responsible_user_id' => $p->responsible_user_id,
+            'legal_basis' => $p->legal_basis->value,
+        ];
+    }
+
+    /**
+     * RGPD section of the fiche: consents (newest first), listing and keep.
+     *
+     * @return array<string, mixed>
+     */
+    private function gdpr(Person $person, User $user): array
+    {
+        $pending = GdprPending::query()->find($person->id);
+
+        return [
+            'consents' => Consent::query()->with('recorder:id,name')->where('person_id', $person->id)
+                ->orderByDesc('recorded_at')->orderByDesc('id')->get()
+                ->map(fn (Consent $c) => [
+                    'id' => $c->id,
+                    'channel' => ['value' => $c->channel->value, 'label' => $c->channel->label()],
+                    'granted' => $c->granted,
+                    'source' => $c->source,
+                    'recorded_at' => $c->recorded_at->toIso8601String(),
+                    'recorded_by' => $c->recorder?->name,
+                ])->all(),
+            'channels' => ConsentChannel::options(),
+            'pending' => $pending === null ? null : ['listed_at' => $pending->listed_at->toDateString(), 'planned_at' => $pending->plannedAt()->toDateString()],
+            'kept_until' => $person->gdpr_kept_until !== null && $person->gdpr_kept_until->isFuture() ? $person->gdpr_kept_until->toDateString() : null,
+            'kept_reason' => $user->can('gdpr', $person) && $person->gdpr_kept_until?->isFuture() ? $person->gdpr_kept_reason : null,
         ];
     }
 
@@ -317,6 +363,7 @@ class PersonController extends Controller
             'origin' => FormOptions::reference(ReferenceList::ContactOrigin, $current?->origin_id),
             'das' => FormOptions::reference(ReferenceList::Das, null, $current === null ? [] : $current->das()->pluck('reference_items.id')->all()),
             'responsible' => FormOptions::responsible($current?->responsible_user_id),
+            'legal_basis' => LegalBasis::options(),
         ];
     }
 

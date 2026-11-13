@@ -7,6 +7,7 @@ use App\Modules\Core\References\ReferenceItem;
 use App\Modules\Core\Tenancy\BelongsToTenant;
 use App\Modules\Core\Users\User;
 use App\Modules\Crm\Affiliations\Affiliation;
+use App\Modules\Crm\Gdpr\LegalBasis;
 use App\Modules\Crm\Organisations\OrganisationStatus;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
@@ -49,6 +50,10 @@ use Illuminate\Support\Facades\DB;
  * @property string|null $source_system
  * @property string|null $source_id
  * @property Carbon|null $anonymised_at
+ * @property LegalBasis $legal_basis
+ * @property Carbon|null $prospecting_opt_out_at
+ * @property Carbon|null $gdpr_kept_until « Conserver » : out of the retention list until then
+ * @property string|null $gdpr_kept_reason
  * @property string|null $created_by
  * @property string|null $updated_by
  * @property string|null $merged_into_id the fiche this one was merged into (then trashed for good)
@@ -80,7 +85,7 @@ class Person extends Model
      *
      * @var list<string>
      */
-    protected array $auditIgnore = ['search_vector', 'created_by', 'updated_by', 'last_contact_at', 'merged_sources', 'dup_email', 'dup_email_secondary', 'dup_postal_code', 'dup_city'];
+    protected array $auditIgnore = ['search_vector', 'created_by', 'updated_by', 'last_contact_at', 'merged_sources', 'dup_email', 'dup_email_secondary', 'dup_postal_code', 'dup_city', 'gdpr_kept_until', 'gdpr_kept_reason'];
 
     /**
      * Generated comparison keys of the duplicate detection (never shown).
@@ -94,7 +99,7 @@ class Person extends Model
         'civility', 'first_name', 'last_name', 'email', 'email_secondary', 'phone', 'mobile',
         'address_line1', 'address_line2', 'postal_code', 'city', 'country', 'birth_date', 'is_individual', 'project',
         'professional_situation_id', 'funding_mode_id', 'origin_id', 'status', 'responsible_user_id',
-        'last_contact_at', 'source_system', 'source_id',
+        'last_contact_at', 'source_system', 'source_id', 'legal_basis',
     ];
 
     /** @var array<string, mixed> */
@@ -107,6 +112,10 @@ class Person extends Model
     protected static function booted(): void
     {
         static::creating(function (Person $person): void {
+            // Default legal basis: legitimate interest (interlocuteur), consent (particulier).
+            if (! array_key_exists('legal_basis', $person->getAttributes())) {
+                $person->legal_basis = LegalBasis::defaultFor((bool) $person->is_individual);
+            }
             $person->created_by ??= Auth::id();
             $person->updated_by ??= Auth::id();
         });
@@ -145,6 +154,9 @@ class Person extends Model
             'last_contact_at' => 'datetime',
             'merged_sources' => 'array',
             'anonymised_at' => 'datetime',
+            'legal_basis' => LegalBasis::class,
+            'prospecting_opt_out_at' => 'datetime',
+            'gdpr_kept_until' => 'datetime',
         ];
     }
 

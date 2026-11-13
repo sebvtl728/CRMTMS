@@ -19,6 +19,8 @@ class NoteController extends Controller
 
     public function storeForPerson(NoteRequest $request, Person $person): RedirectResponse
     {
+        abort_if($person->anonymised_at !== null, 403, 'Cette fiche est anonymisée.');
+
         return $this->store($request, $person);
     }
 

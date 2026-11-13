@@ -3,6 +3,7 @@
 namespace App\Modules\Crm\People;
 
 use App\Modules\Core\References\ReferenceList;
+use App\Modules\Crm\Gdpr\LegalBasis;
 use App\Modules\Crm\Organisations\OrganisationStatus;
 use App\Modules\Crm\Support\ReferenceRules;
 use Illuminate\Foundation\Http\FormRequest;
@@ -100,6 +101,7 @@ class PersonRequest extends FormRequest
 
         return [
             ...self::fieldRules(),
+            'legal_basis' => ['sometimes', 'nullable', Rule::enum(LegalBasis::class)],
             'professional_situation_id' => ['nullable', ...ReferenceRules::item(ReferenceList::ProfessionalSituation, $current?->professional_situation_id)],
             'funding_mode_id' => ['nullable', ...ReferenceRules::item(ReferenceList::FundingMode, $current?->funding_mode_id)],
             'origin_id' => ['nullable', ...ReferenceRules::item(ReferenceList::ContactOrigin, $current?->origin_id)],

@@ -86,11 +86,15 @@ class GlobalSearch
 
         return $query->get()->map(function (Person $p) {
             $organisations = $p->activeAffiliations->map(fn ($a) => $a->organisation?->name)->filter()->unique()->implode(', ');
+            $subtitle = $organisations !== '' ? $organisations : (collect([$p->is_individual ? 'Particulier' : null, $p->city])->filter()->implode(' · ') ?: null);
+            if ($p->prospecting_opt_out_at !== null) {
+                $subtitle = collect([$subtitle, 'Opposé à la prospection'])->filter()->implode(' · ');
+            }
 
             return [
                 'id' => $p->id,
                 'name' => $p->fullName(),
-                'subtitle' => $organisations !== '' ? $organisations : (collect([$p->is_individual ? 'Particulier' : null, $p->city])->filter()->implode(' · ') ?: null),
+                'subtitle' => $subtitle,
                 'url' => route('crm.people.show', $p->id, false),
             ];
         })->all();

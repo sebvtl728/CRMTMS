@@ -7,6 +7,8 @@ export interface TableRow {
     id: string;
     deleted: boolean;
     cells: Record<string, string | null>;
+    /** Extra badges next to the title (e.g. « Opposé à la prospection »). */
+    badges?: string[];
 }
 
 /**
@@ -87,6 +89,11 @@ export function ListTable({
                                                     Supprimée
                                                 </Badge>
                                             )}
+                                            {row.badges?.map((b) => (
+                                                <Badge key={b} variant="outline" className="ml-2">
+                                                    {b}
+                                                </Badge>
+                                            ))}
                                         </>
                                     ) : (
                                         (row.cells[c] ?? '—')

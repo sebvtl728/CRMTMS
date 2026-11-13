@@ -1,4 +1,5 @@
 import { SimilarFiches, type DuplicateCandidate } from '@/components/crm/duplicate-warning';
+import { PersonGdpr, type GdprData } from '@/components/crm/person-gdpr';
 import { PersonTypeBadges } from '@/components/crm/person-type-badges';
 import { Timeline } from '@/components/crm/timeline';
 import { Badge } from '@/components/ui/badge';
@@ -57,12 +58,17 @@ interface PersonData {
     created_at: string | null;
     updated_at: string | null;
     deleted: boolean;
+    legal_basis: { value: string; label: string };
+    prospecting_opt_out_at: string | null;
+    anonymised: boolean;
+    anonymised_at: string | null;
 }
 
 interface ShowProps {
     similar: DuplicateCandidate[];
     person: PersonData;
-    can: { update: boolean; delete: boolean; restore: boolean; merge: boolean };
+    gdpr: GdprData;
+    can: { update: boolean; delete: boolean; restore: boolean; merge: boolean; consent: boolean; gdpr: boolean; anonymise: boolean };
     status?: string;
 }
 
@@ -91,7 +97,7 @@ const tel = (phone: string | null) =>
         </a>
     );
 
-export default function PersonShow({ person: p, similar, can, status }: ShowProps) {
+export default function PersonShow({ person: p, similar, gdpr, can, status }: ShowProps) {
     const [confirming, setConfirming] = useState(false);
     const [tab, setTab] = useState<(typeof TABS)[number]>('Informations');
 
@@ -146,6 +152,8 @@ export default function PersonShow({ person: p, similar, can, status }: ShowProp
                             <Badge variant={statusVariant(p.status.value)}>{p.status.label}</Badge>
                             <PersonTypeBadges individual={p.is_individual} contact={active.length > 0} />
                             {p.deleted && <Badge variant="destructive">Supprimée</Badge>}
+                            {p.anonymised && <Badge variant="destructive">Anonymisée</Badge>}
+                            {p.prospecting_opt_out_at && <Badge variant="outline">Opposé à la prospection</Badge>}
                             {p.das.map((d) => (
                                 <Badge key={d.id} variant="outline">
                                     {d.label}
@@ -245,6 +253,16 @@ export default function PersonShow({ person: p, similar, can, status }: ShowProp
                             </div>
                         )}
                     </section>
+
+                    <PersonGdpr
+                        personId={p.id}
+                        name={p.name}
+                        legalBasis={p.legal_basis}
+                        optOutAt={p.prospecting_opt_out_at}
+                        anonymisedAt={p.anonymised_at}
+                        gdpr={gdpr}
+                        can={can}
+                    />
 
                     <section className="rounded-xl border p-4 lg:col-span-2">
                         <h2 className="mb-3 text-sm font-semibold">Suivi</h2>
