@@ -115,9 +115,11 @@ final class CrmVisibility
     }
 
     /**
-     * A Responsable DAS sees an action when he sees at least one of what it
-     * hangs on: its entreprise, its person or its opportunity (trashed ones
-     * are left to the caller: readable with crm.delete only).
+     * A Responsable DAS sees an action of an opportunity only when he sees
+     * that opportunity (its DAS), whatever its fiches: the fiche of the
+     * opportunity is stamped on every such action. An action without
+     * opportunity is seen when its entreprise or its person is. Trashed
+     * fiches are left to the caller (readable with crm.delete only).
      *
      * @template TModel of \Illuminate\Database\Eloquent\Model
      *
@@ -131,11 +133,15 @@ final class CrmVisibility
         }
 
         $model = $query->getModel();
+        $opportunity = $model->qualifyColumn('opportunity_id');
 
         return $query->where(fn (Builder $q) => $q
-            ->whereIn($model->qualifyColumn('organisation_id'), self::organisations(Organisation::withTrashed(), $user)->select('organisations.id'))
-            ->orWhereIn($model->qualifyColumn('person_id'), self::people(Person::withTrashed(), $user)->select('people.id'))
-            ->orWhereIn($model->qualifyColumn('opportunity_id'), self::opportunities(Opportunity::withTrashed(), $user)->select('opportunities.id')));
+            ->where(fn (Builder $o) => $o->whereNotNull($opportunity)
+                ->whereIn($opportunity, self::opportunities(Opportunity::withTrashed(), $user)->select('opportunities.id')))
+            ->orWhere(fn (Builder $f) => $f->whereNull($opportunity)
+                ->where(fn (Builder $w) => $w
+                    ->whereIn($model->qualifyColumn('organisation_id'), self::organisations(Organisation::withTrashed(), $user)->select('organisations.id'))
+                    ->orWhereIn($model->qualifyColumn('person_id'), self::people(Person::withTrashed(), $user)->select('people.id')))));
     }
 
     /**

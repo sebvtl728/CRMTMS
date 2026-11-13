@@ -8,6 +8,7 @@ use App\Modules\Core\References\ReferenceUsage;
 use App\Modules\Crm\Activities\ActivitiesProvider;
 use App\Modules\Crm\Activities\Activity;
 use App\Modules\Crm\CrmServiceProvider;
+use App\Modules\Crm\Gdpr\PersonDataExport;
 use App\Modules\Crm\Organisations\Organisation;
 use App\Modules\Crm\Support\LinkedData;
 use App\Modules\Crm\Visibility\CrmVisibility;
@@ -415,4 +416,38 @@ it('lists the actions of an opportunity on its page', function () {
             ->where('activities.0.subject', 'Relancer')
             ->where('activities.0.status', 'todo')
             ->where('activities.1.subject', 'Devis envoyé'));
+});
+
+it('hides from a Responsable DAS the actions of an opportunity outside his DAS, even on a fiche he sees', function () {
+    $mine = crmItem(ReferenceList::Das, 'Hôtellerie-restauration');
+    $other = crmItem(ReferenceList::Das, 'Métiers supports');
+    $org = Organisation::query()->create(['name' => 'Visible']);
+    $org->das()->sync([$mine->id => ['tenant_id' => tenant()->id]]);
+    $person = makePerson('Dupont', ['first_name' => 'Jean']);
+    affiliate($person, $org);
+    $this->actingAs(commercial());
+    $foreign = makeOpportunity($org, ['title' => 'Autre DAS', 'das_id' => $other->id]);
+    $hidden = makeActivity(['organisation_id' => $org->id, 'person_id' => $person->id, 'opportunity_id' => $foreign->id,
+        'subject' => 'Action cachée', 'report' => 'Secret DAS B']);
+    $plain = makeActivity(['organisation_id' => $org->id, 'person_id' => $person->id, 'subject' => 'Action visible']);
+
+    $responsable = userWithRole(Role::ResponsableDas);
+    followDas($responsable, $mine);
+    expect(CrmVisibility::activities(Activity::query(), $responsable)->pluck('id')->all())->toBe([$plain->id]);
+
+    $this->actingAs($responsable);
+    $this->getJson("/crm/activities/{$hidden->id}")->assertNotFound();
+    $this->put("/crm/activities/{$hidden->id}", ['type_id' => actionType('Appel'), 'subject' => 'x'])->assertNotFound();
+    $this->delete("/crm/activities/{$hidden->id}")->assertNotFound();
+    $this->post("/crm/activities/{$hidden->id}/done")->assertNotFound();
+    $this->getJson("/crm/activities/{$plain->id}")->assertOk();
+
+    foreach (["/crm/organisations/{$org->id}/timeline", "/crm/people/{$person->id}/timeline"] as $url) {
+        $titles = collect($this->getJson($url)->assertOk()->json('entries'))->where('type', 'activity')->pluck('title')->all();
+        expect($titles)->toBe(['Action visible']);
+    }
+    expect(array_column(PersonDataExport::for($person->refresh(), $responsable)['actions'], 'objet'))->toBe(['Action visible']);
+
+    // System-level: the contact date still counts the hidden action.
+    expect($org->refresh()->last_contact_at)->not->toBeNull();
 });

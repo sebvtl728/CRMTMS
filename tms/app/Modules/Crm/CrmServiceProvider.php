@@ -190,8 +190,8 @@ class CrmServiceProvider extends ServiceProvider
             return $opportunity;
         });
 
-        // An action: visible when what it hangs on is (one of its fiches or its
-        // opportunity); on a trashed fiche only with crm.delete.
+        // An action: visible with its opportunity when it has one (its DAS),
+        // otherwise with one of its fiches; on a trashed fiche only with crm.delete.
         Route::bind('activity', function (string $value): Activity {
             if (! Str::isUuid($value)) {
                 throw (new ModelNotFoundException)->setModel(Activity::class, [$value]);
