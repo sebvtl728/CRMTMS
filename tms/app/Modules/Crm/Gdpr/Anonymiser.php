@@ -31,7 +31,7 @@ use Throwable;
  * Journal: gdpr.anonymised (reason and counts, no value). The journal holds
  * no personal value of hers (masked from the start).
  */
-final class Anonymiser
+class Anonymiser
 {
     public const NAME = 'Anonyme';
 
@@ -236,7 +236,9 @@ final class Anonymiser
 
     private static function ensureNoActiveImport(): void
     {
-        if (ImportBatch::query()->whereIn('status', [ImportBatch::RUNNING, ImportBatch::SIMULATING, ImportBatch::UNDOING])->exists()) {
+        // A stuck batch (no progress for STUCK_MINUTES: dead worker) blocks nothing.
+        if (ImportBatch::query()->whereIn('status', [ImportBatch::RUNNING, ImportBatch::SIMULATING, ImportBatch::UNDOING])
+            ->where('updated_at', '>', now()->subMinutes(ImportBatch::STUCK_MINUTES))->exists()) {
             throw new AnonymisationPostponed;
         }
     }

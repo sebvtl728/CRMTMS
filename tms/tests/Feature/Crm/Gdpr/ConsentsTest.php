@@ -1,9 +1,12 @@
 <?php
 
 use App\Modules\Core\Audit\AuditLog;
+use App\Modules\Crm\Duplicates\Merger;
 use App\Modules\Crm\Gdpr\Consent;
 use App\Modules\Crm\Gdpr\ConsentChannel;
+use App\Modules\Crm\Gdpr\ConsentRecorder;
 use App\Modules\Crm\Gdpr\LegalBasis;
+use App\Modules\Crm\Gdpr\PersonDataExport;
 use App\Modules\Crm\Organisations\Organisation;
 use App\Modules\Crm\People\Person;
 
@@ -109,4 +112,33 @@ it('shows the opposition in the global search too', function () {
     $person->forceFill(['prospecting_opt_out_at' => now()])->save();
 
     $this->actingAs(commercial())->getJson('/crm/search?q=roux')->assertJsonPath('people.0.subtitle', 'Pau · Opposé à la prospection');
+});
+
+it('carries the opposition to prospecting and the consents through a merge', function () {
+    $keep = makePerson('Roux', ['first_name' => 'Anne']);
+    $drop = makePerson('Roux', ['first_name' => 'A.']);
+    $this->actingAs(commercial());
+    app(ConsentRecorder::class)->record($keep, ConsentChannel::Email, true, 'Salon');
+    $this->travel(1)->minutes();
+    app(ConsentRecorder::class)->record($drop, ConsentChannel::Prospecting, false, null);
+    $optOut = $drop->refresh()->prospecting_opt_out_at;
+    expect($optOut)->not->toBeNull();
+
+    app(Merger::class)->people($keep, $drop, []);
+
+    expect($keep->refresh()->prospecting_opt_out_at?->toIso8601String())->toBe($optOut->toIso8601String())
+        ->and(Consent::query()->where('person_id', $keep->id)->count())->toBe(2)
+        ->and(Consent::query()->where('person_id', $drop->id)->count())->toBe(0)
+        ->and(PersonDataExport::for($keep)['consentements'])->toHaveCount(2);
+});
+
+it('keeps the earliest opposition when both fiches have one', function () {
+    $keep = makePerson('Roux');
+    $drop = makePerson('Roux');
+    $keep->forceFill(['prospecting_opt_out_at' => now()->subDay()])->save();
+    $drop->forceFill(['prospecting_opt_out_at' => now()->subYear()])->save();
+
+    app(Merger::class)->people($keep, $drop, []);
+
+    expect($keep->refresh()->prospecting_opt_out_at?->toDateString())->toBe(now()->subYear()->toDateString());
 });

@@ -83,7 +83,9 @@ class GdprController extends Controller
         DB::transaction(function () use ($person, $reason, $until): void {
             $person->forceFill(['gdpr_kept_until' => $until, 'gdpr_kept_reason' => $reason])->save();
             GdprPending::query()->whereKey($person->id)->delete();
-            $this->audit->record('gdpr.kept', $person, [], ['until' => $until->toDateString(), 'reason' => $reason]);
+            // The reason is free text: kept on the fiche (scrubbed by the
+            // anonymisation), masked in the immutable journal.
+            $this->audit->record('gdpr.kept', $person, [], ['until' => $until->toDateString(), 'reason' => Person::AUDIT_PERSONAL_MASK]);
         });
 
         return back()->with('status', 'Fiche conservée jusqu\'au '.$until->format('d/m/Y').'.');

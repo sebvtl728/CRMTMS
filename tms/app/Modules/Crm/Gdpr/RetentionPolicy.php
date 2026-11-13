@@ -45,7 +45,10 @@ final class RetentionPolicy
         return Person::withTrashed()
             ->whereNull('people.anonymised_at')
             ->whereNull('people.merged_into_id')
-            ->where('people.status', '!=', OrganisationStatus::Client->value)
+            // A particulier client has a contractual relation himself; an
+            // interlocuteur's status is copied from his entreprise at creation
+            // and never re-synced: only his active links to a client count.
+            ->where(fn ($q) => $q->where('people.is_individual', false)->orWhere('people.status', '!=', OrganisationStatus::Client->value))
             ->whereRaw('coalesce(people.last_contact_at, people.created_at) < ?', [now()->subYears($years)])
             ->where(fn ($q) => $q->whereNull('people.gdpr_kept_until')->orWhere('people.gdpr_kept_until', '<=', now()))
             ->whereNotExists(fn ($s) => $s->select(DB::raw(1))->from('affiliations')

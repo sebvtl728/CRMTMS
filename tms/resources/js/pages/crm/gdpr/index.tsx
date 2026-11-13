@@ -208,7 +208,7 @@ export default function GdprIndex({ pending, pendingTotal, kept, retention, stat
                             <DialogTitle>Conserver « {keeping?.name} » ?</DialogTitle>
                             <DialogDescription>
                                 La fiche sort de la liste pour {retention.years} an{retention.years > 1 ? 's' : ''}, puis sera réexaminée. Le motif
-                                est inscrit au journal : n’y mettez pas de donnée personnelle.
+                                reste sur la fiche, visible des gestionnaires RGPD, et sera effacé si elle est anonymisée.
                             </DialogDescription>
                         </DialogHeader>
                         <div className="grid gap-2">

@@ -184,6 +184,16 @@ class Merger
             $d->save();
             $d->delete();
 
+            // GDPR: the opposition to prospecting survives the merge (the
+            // earliest one), and the consent history follows the person
+            // (append-only rows: moved in SQL, not through the model). The
+            // legal basis stays the kept fiche's.
+            if ($k instanceof Person && $d instanceof Person) {
+                $optOut = collect([$k->prospecting_opt_out_at, $d->prospecting_opt_out_at])->filter()->min();
+                $k->prospecting_opt_out_at = $optOut instanceof Carbon ? $optOut : null;
+                DB::table('consents')->where('person_id', $d->id)->update(['person_id' => $k->id]);
+            }
+
             $last = collect([$k->last_contact_at, $d->last_contact_at])->filter()->max();
             $k->last_contact_at = $last instanceof Carbon ? $last : null;
             $k->merged_sources = [

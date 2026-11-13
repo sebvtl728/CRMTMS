@@ -3,6 +3,7 @@
 use App\Modules\Core\Audit\AuditLog;
 use App\Modules\Core\Tenancy\Tenant;
 use App\Modules\Crm\Gdpr\AnonymiseExpired;
+use App\Modules\Crm\Gdpr\Anonymiser;
 use App\Modules\Crm\Gdpr\GdprPending;
 use App\Modules\Crm\Gdpr\GdprPendingMail;
 use App\Modules\Crm\Gdpr\RetentionPolicy;
@@ -13,6 +14,7 @@ use App\Modules\Crm\People\Person;
 use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
 
 beforeEach(function () {
@@ -91,6 +93,15 @@ it('never lists a client, an anonymised, a merged or a kept person', function ()
     expect(expiredNames())->toBe(['AncienChezClient', 'ChezProspect', 'Corbeille']);
 });
 
+it('lists an interlocuteur whose status is client but who has no active link to a client', function () {
+    $client = Organisation::query()->create(['name' => 'Client SA', 'status' => 'client']);
+    // Status copied from the entreprise at creation, then the link ended.
+    affiliate(agedPerson('AncienInterlocuteur', 6, attributes: ['status' => 'client']), $client, ['ended_on' => now()->subYears(5)->toDateString()]);
+    affiliate(agedPerson('InterlocuteurActuel', 6, attributes: ['status' => 'client']), $client);
+
+    expect(expiredNames())->toBe(['AncienInterlocuteur']);
+});
+
 it('lists first, then anonymises after 30 days only', function () {
     $person = agedPerson('Ancien', 4, attributes: ['email' => 'ancien@example.test']);
 
@@ -163,7 +174,10 @@ it('keeps a person on request: removed from the list, audited, re-evaluated afte
     expect(GdprPending::query()->count())->toBe(0)
         ->and($person->refresh()->gdpr_kept_until?->toDateString())->toBe(now()->addYears(3)->toDateString());
     $audit = AuditLog::query()->where('event', 'gdpr.kept')->sole();
-    expect($audit->new_values['reason'])->toBe('Formation financée en cours');
+    // Free text: kept on the fiche (scrubbed by the anonymisation), never in the immutable journal.
+    expect(json_encode([$audit->old_values, $audit->new_values], JSON_UNESCAPED_UNICODE))->not->toContain('Formation financée')
+        ->and($audit->new_values)->toMatchArray(['until' => now()->addYears(3)->toDateString(), 'reason' => '[donnée personnelle]'])
+        ->and($person->gdpr_kept_reason)->toBe('Formation financée en cours');
 
     $this->travel(40)->days();
     AnonymiseExpired::dispatch();
@@ -229,6 +243,80 @@ it('postpones a person while an import is running', function () {
     $batch->forceFill(['status' => ImportBatch::DONE])->save();
     AnonymiseExpired::dispatch();
     expect($person->refresh()->anonymised_at)->not->toBeNull();
+});
+
+it('ignores a stuck import', function () {
+    $person = agedPerson('Ancien', 4);
+    AnonymiseExpired::dispatch();
+    $this->travel(31)->days();
+
+    $this->actingAs(commercial());
+    fakeImportDisk();
+    $batch = uploadImport("Nom\nMartin\n", ImportTarget::People);
+    $batch->forceFill(['status' => ImportBatch::RUNNING])->save();
+    DB::table('import_batches')->where('id', $batch->id)->update(['updated_at' => now()->subHour()]);
+
+    AnonymiseExpired::dispatch();
+    expect($person->refresh()->anonymised_at)->not->toBeNull();
+});
+
+it('tells the managers how many anonymisations a live import postponed', function () {
+    admin();
+    agedPerson('Ancien', 4);
+    agedPerson('Autre', 5);
+    AnonymiseExpired::dispatch();
+    $this->travel(31)->days();
+    agedPerson('Nouveau', 4);
+
+    $this->actingAs(commercial());
+    fakeImportDisk();
+    $batch = uploadImport("Nom\nMartin\n", ImportTarget::People);
+    $batch->forceFill(['status' => ImportBatch::RUNNING])->save();
+    Log::spy();
+    Mail::fake();
+
+    AnonymiseExpired::dispatch();
+
+    Mail::assertSent(GdprPendingMail::class, fn (GdprPendingMail $m) => $m->count === 1 && $m->postponed === 2);
+    Log::shouldHaveReceived('warning')->withArgs(fn ($message) => str_contains($message, 'report'))->once();
+    expect((new GdprPendingMail(1, now(), 2))->render())->toContain('2 anonymisations')->toContain('import');
+
+    // Postponed only: mailed even when nothing new is listed.
+    Mail::fake();
+    AnonymiseExpired::dispatch();
+    Mail::assertSent(GdprPendingMail::class, fn (GdprPendingMail $m) => $m->count === 0 && $m->postponed === 2);
+});
+
+it('skips a person whose anonymisation fails and goes on with the others', function () {
+    $broken = agedPerson('Casse', 5);
+    $fine = agedPerson('Normal', 4);
+    AnonymiseExpired::dispatch();
+    $this->travel(31)->days();
+
+    $real = app(Anonymiser::class);
+    app()->instance(Anonymiser::class, new class($real, $broken->id) extends Anonymiser
+    {
+        public function __construct(private Anonymiser $inner, private string $brokenId) {}
+
+        public function anonymiseAll(iterable $people, string $reason): int
+        {
+            foreach ($people as $p) {
+                if ($p->id === $this->brokenId) {
+                    throw new RuntimeException('boom');
+                }
+            }
+
+            return $this->inner->anonymiseAll($people, $reason);
+        }
+    });
+    Log::spy();
+
+    AnonymiseExpired::dispatch();
+
+    expect($fine->refresh()->anonymised_at)->not->toBeNull()
+        ->and($broken->refresh()->anonymised_at)->toBeNull()
+        ->and(GdprPending::query()->pluck('person_id')->all())->toBe([$broken->id]);
+    Log::shouldHaveReceived('error')->once();
 });
 
 it('never touches another organisme', function () {
