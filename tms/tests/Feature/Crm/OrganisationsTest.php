@@ -9,9 +9,13 @@ use App\Modules\Core\Tenancy\Tenant;
 use App\Modules\Core\Tenancy\TenantContext;
 use App\Modules\Crm\CrmServiceProvider;
 use App\Modules\Crm\Organisations\Organisation;
+use App\Modules\Crm\Timeline\Attachment;
+use App\Modules\Crm\Timeline\Note;
 use App\Rules\Siret;
 use Illuminate\Database\UniqueConstraintViolationException;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 use Inertia\Testing\AssertableInertia as Assert;
 
 beforeEach(function () {
@@ -365,4 +369,36 @@ it('shows a trashed fiche by url only to who may delete', function () {
     $this->actingAs(commercial());
     $this->get("/crm/organisations/{$org->id}")->assertOk();
     $this->get("/crm/people/{$person->id}")->assertOk();
+});
+
+it('reaches the notes, attachments and affiliations of a trashed fiche only with crm.delete', function () {
+    Storage::fake('local');
+    $org = Organisation::query()->create(['name' => 'Disparue']);
+    $person = makePerson('Liée');
+    $affiliation = affiliate($person, $org);
+    $this->actingAs(commercial());
+    $this->post("/crm/organisations/{$org->id}/notes", ['body' => 'Note'])->assertRedirect();
+    $this->post("/crm/organisations/{$org->id}/attachments", ['file' => UploadedFile::fake()->createWithContent('a.pdf', "%PDF-1.4\n1 0 obj\n<< /Type /Catalog >>\nendobj\ntrailer\n<< /Root 1 0 R >>\n%%EOF\n")])->assertRedirect();
+    $note = Note::query()->sole();
+    $attachment = Attachment::query()->sole();
+    $org->delete();
+
+    $this->actingAs(assistant());
+    $this->get("/crm/attachments/{$attachment->id}")->assertNotFound();
+    $this->delete("/crm/notes/{$note->id}")->assertNotFound();
+    $this->delete("/crm/attachments/{$attachment->id}")->assertNotFound();
+    $this->put("/crm/affiliations/{$affiliation->id}", ['job_title' => 'X'])->assertNotFound();
+    $this->delete("/crm/affiliations/{$affiliation->id}")->assertNotFound();
+
+    $this->actingAs(commercial());
+    $this->get("/crm/attachments/{$attachment->id}")->assertOk();
+});
+
+it('also hides the notes of a trashed person from who may not delete', function () {
+    $person = makePerson('Effacée');
+    $this->actingAs(commercial())->post("/crm/people/{$person->id}/notes", ['body' => 'Note'])->assertRedirect();
+    $note = Note::query()->sole();
+    $person->delete();
+
+    $this->actingAs(assistant())->delete("/crm/notes/{$note->id}")->assertNotFound();
 });

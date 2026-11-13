@@ -237,3 +237,10 @@ it('lets tms:user:reset-2fa leave the administrators untouched', function () {
 
     expect($this->admin->fresh()->isActive())->toBeTrue()->and($this->admin->fresh()->role())->toBe(Role::AdminOrganisme);
 });
+
+it('refuses to run the last-admin guard outside a transaction', function () {
+    // The suite wraps each test in a transaction: pretend autocommit.
+    DB::partialMock()->shouldReceive('transactionLevel')->andReturn(0);
+
+    expect(fn () => app(LastAdminGuard::class)->ensureStays($this->admin))->toThrow(LogicException::class);
+});

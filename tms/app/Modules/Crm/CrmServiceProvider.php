@@ -133,7 +133,8 @@ class CrmServiceProvider extends ServiceProvider
             $user = request()->user();
 
             if ($user instanceof User) {
-                $query->whereIn('organisation_id', CrmVisibility::organisations(Organisation::withTrashed(), $user)->select('organisations.id'));
+                // Trashed entreprises: only with crm.delete, like the fiche itself.
+                $query->whereIn('organisation_id', CrmVisibility::organisations(self::organisationsFor($user), $user)->select('organisations.id'));
             }
 
             return $query->findOrFail($value);
@@ -154,6 +155,22 @@ class CrmServiceProvider extends ServiceProvider
         // A note / attachment is reachable through the fiche it belongs to.
         Route::bind('note', fn (string $value): Note => self::bindOnSubject(Note::query(), $value, Note::class));
         Route::bind('attachment', fn (string $value): Attachment => self::bindOnSubject(Attachment::query(), $value, Attachment::class));
+    }
+
+    /**
+     * @return Builder<Organisation>
+     */
+    private static function organisationsFor(User $user): Builder
+    {
+        return $user->can(Permissions::DELETE) ? Organisation::withTrashed() : Organisation::query();
+    }
+
+    /**
+     * @return Builder<Person>
+     */
+    private static function peopleFor(User $user): Builder
+    {
+        return $user->can(Permissions::DELETE) ? Person::withTrashed() : Person::query();
     }
 
     /**
@@ -225,12 +242,13 @@ class CrmServiceProvider extends ServiceProvider
 
         $user = request()->user();
 
-        if ($user instanceof User && CrmVisibility::restricts($user)) {
+        // Subjects: the fiches the user sees, trashed ones only with crm.delete.
+        if ($user instanceof User && (CrmVisibility::restricts($user) || ! $user->can(Permissions::DELETE))) {
             $query->where(fn (Builder $q) => $q
                 ->where(fn (Builder $o) => $o->where('notable_type', (new Organisation)->getMorphClass())
-                    ->whereIn('notable_id', CrmVisibility::organisations(Organisation::withTrashed(), $user)->select('organisations.id')))
+                    ->whereIn('notable_id', CrmVisibility::organisations(self::organisationsFor($user), $user)->select('organisations.id')))
                 ->orWhere(fn (Builder $p) => $p->where('notable_type', (new Person)->getMorphClass())
-                    ->whereIn('notable_id', CrmVisibility::people(Person::withTrashed(), $user)->select('people.id'))));
+                    ->whereIn('notable_id', CrmVisibility::people(self::peopleFor($user), $user)->select('people.id'))));
         }
 
         return $query->findOrFail($value);

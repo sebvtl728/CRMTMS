@@ -6,6 +6,7 @@ use App\Modules\Core\Access\Role;
 use App\Modules\Core\Tenancy\TenantContext;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
+use LogicException;
 
 /**
  * Rule: an organisme always keeps at least one active administrator. Every
@@ -30,9 +31,14 @@ class LastAdminGuard
      * @param  bool  $leavesAdmins  false when the change keeps the target an active administrator
      *
      * @throws ValidationException
+     * @throws LogicException outside a transaction (the locks would be released at once)
      */
     public function ensureStays(User $target, bool $leavesAdmins = true): void
     {
+        if (DB::transactionLevel() === 0) {
+            throw new LogicException('LastAdminGuard::ensureStays() doit s\'exécuter dans une transaction.');
+        }
+
         // Role changes write model_has_roles, never the users row, so row locks alone
         // do not serialise them and, in READ COMMITTED, a waiting transaction would keep
         // a stale view of who is still an admin. A per-organisme advisory lock, taken
