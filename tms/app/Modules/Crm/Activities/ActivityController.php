@@ -93,6 +93,13 @@ class ActivityController extends Controller
         return back()->with('status', 'Action modifiée.');
     }
 
+    public function postpone(PostponeRequest $request, Activity $activity): RedirectResponse
+    {
+        DB::transaction(fn () => $activity->forceFill(['due_at' => $request->dueAt()])->save());
+
+        return back()->with('status', 'Action reportée.');
+    }
+
     public function complete(CompleteRequest $request, Activity $activity): RedirectResponse
     {
         $next = $this->recorder->complete($activity, $request->values(), $request->next());

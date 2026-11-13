@@ -1,6 +1,7 @@
 <?php
 
 use App\Modules\Crm\Activities\ActivityController;
+use App\Modules\Crm\Activities\TodoController;
 use App\Modules\Crm\Export\ExportController;
 use App\Modules\Crm\Opportunities\KanbanController;
 use App\Modules\Crm\Opportunities\OpportunityController;
@@ -21,6 +22,9 @@ Route::middleware(['auth'])->prefix('crm/opportunities')->name('crm.opportunitie
     Route::post('{opportunity}/stage', [OpportunityController::class, 'stage'])->middleware('can:crm.update')->name('stage');
 });
 
+// « À faire »: my actions to do (the team's for direction and admin).
+Route::middleware(['auth', 'can:crm.view'])->get('crm/todo', TodoController::class)->name('crm.todo');
+
 // Actions: quick entry from anywhere, « Fait » with the next follow-up, edit, removal.
 Route::middleware(['auth'])->prefix('crm/activities')->name('crm.activities.')->group(function () {
     Route::get('options', [ActivityController::class, 'options'])->middleware('can:crm.create')->name('options');
@@ -28,5 +32,6 @@ Route::middleware(['auth'])->prefix('crm/activities')->name('crm.activities.')->
     Route::get('{activity}', [ActivityController::class, 'show'])->middleware('can:crm.view')->name('show');
     Route::put('{activity}', [ActivityController::class, 'update'])->middleware('can:crm.update')->name('update');
     Route::delete('{activity}', [ActivityController::class, 'destroy'])->middleware('can:crm.update')->name('destroy');
+    Route::patch('{activity}/due', [ActivityController::class, 'postpone'])->middleware('can:crm.update')->name('postpone');
     Route::post('{activity}/done', [ActivityController::class, 'complete'])->middleware('can:crm.update')->name('done');
 });

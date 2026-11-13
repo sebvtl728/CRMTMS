@@ -61,7 +61,7 @@ const SHORTCUTS = [
  * YYYY-MM-DD + n days / months, on the calendar (no time zone shift). A
  * month later is clamped to the last day of the target month (31/01 → 28/02).
  */
-function shiftDay(iso: string, days: number, months = 0): string {
+export function shiftDay(iso: string, days: number, months = 0): string {
     const [y, m, d] = iso.split('-').map(Number);
     const lastDay = new Date(Date.UTC(y, m - 1 + months + 1, 0)).getUTCDate();
     const date = new Date(Date.UTC(y, m - 1 + months, Math.min(d, lastDay) + days));

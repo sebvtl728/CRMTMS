@@ -20,6 +20,7 @@ class ProfileController extends Controller
         return Inertia::render('settings/profile', [
             'mustVerifyEmail' => $request->user() instanceof MustVerifyEmail,
             'status' => $request->session()->get('status'),
+            'daily_digest' => (bool) $request->user()?->daily_digest,
         ]);
     }
 
@@ -32,6 +33,11 @@ class ProfileController extends Controller
 
         if ($request->user()->isDirty('email')) {
             $request->user()->email_verified_at = null;
+        }
+
+        // Opt-in to the daily summary: only changed when the form sends it.
+        if ($request->has('daily_digest')) {
+            $request->user()->daily_digest = $request->boolean('daily_digest');
         }
 
         $request->user()->save();

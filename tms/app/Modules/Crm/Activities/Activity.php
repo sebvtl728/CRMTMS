@@ -96,6 +96,18 @@ class Activity extends Model
             }
         });
         static::deleted(fn (Activity $activity) => $activity->done_at !== null ? $activity->recomputeContact() : null);
+
+        // The menu badge of the responsible(s) (new and previous one) is recounted.
+        $forgetBadge = function (Activity $activity): void {
+            TodoQuery::forget($activity->responsible_user_id);
+            $before = $activity->getOriginal('responsible_user_id');
+            if (is_string($before) && $before !== $activity->responsible_user_id) {
+                TodoQuery::forget($before);
+            }
+        };
+        static::saved($forgetBadge);
+        static::deleted($forgetBadge);
+        static::restored($forgetBadge);
     }
 
     protected function casts(): array
