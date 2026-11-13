@@ -4,6 +4,7 @@ namespace App\Modules\Crm\Search;
 
 use App\Http\Controllers\Controller;
 use App\Modules\Core\Users\User;
+use App\Modules\Crm\Support\FilterInput;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -16,9 +17,8 @@ class SearchController extends Controller
     {
         $user = $request->user();
         assert($user instanceof User);
-        $term = $request->query('q');
 
-        return response()->json($search->query(is_string($term) ? mb_substr($term, 0, 100) : '', $user))
+        return response()->json($search->query(FilterInput::text($request->query('q')), $user))
             ->header('Cache-Control', 'no-store, private');
     }
 }

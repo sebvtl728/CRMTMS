@@ -60,11 +60,15 @@ final class CrmVisibility
 
         $personId = $query->getModel()->qualifyColumn('id');
 
+        // A link to a trashed entreprise is as good as none: it neither opens
+        // the person nor hides her individual (person_das) rule.
         $activeAffiliations = fn () => DB::table('affiliations')
             ->select(DB::raw(1))
+            ->join('organisations', 'organisations.id', '=', 'affiliations.organisation_id')
             ->whereColumn('affiliations.person_id', $personId)
             ->whereNull('affiliations.ended_on')
-            ->whereNull('affiliations.deleted_at');
+            ->whereNull('affiliations.deleted_at')
+            ->whereNull('organisations.deleted_at');
 
         return $query->where(fn (Builder $q) => $q
             ->whereExists(fn ($sub) => $sub
@@ -72,9 +76,11 @@ final class CrmVisibility
                 ->from('affiliations')
                 ->join('organisation_das', 'organisation_das.organisation_id', '=', 'affiliations.organisation_id')
                 ->join('user_das', 'user_das.das_id', '=', 'organisation_das.das_id')
+                ->join('organisations', 'organisations.id', '=', 'affiliations.organisation_id')
                 ->whereColumn('affiliations.person_id', $personId)
                 ->whereNull('affiliations.ended_on')
                 ->whereNull('affiliations.deleted_at')
+                ->whereNull('organisations.deleted_at')
                 ->where('user_das.user_id', $user->getKey()))
             ->orWhere(fn (Builder $unaffiliated) => $unaffiliated
                 ->whereNotExists($activeAffiliations())
@@ -112,6 +118,6 @@ final class CrmVisibility
      */
     public static function followedDas(User $user): array
     {
-        return DB::table('user_das')->where('user_id', $user->getKey())->pluck('das_id')->all();
+        return FollowedDas::ids($user);
     }
 }

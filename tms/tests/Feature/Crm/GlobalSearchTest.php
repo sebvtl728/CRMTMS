@@ -167,3 +167,19 @@ it('never returns fiches of another tenant', function () {
 
     expect(app(GlobalSearch::class)->query('hotel', $user)['organisations'])->toBe([]);
 });
+
+it('answers a plain page, not a 500, to array or oversized search terms', function () {
+    $user = commercial();
+    $this->actingAs($user);
+    Organisation::query()->create(['name' => 'Hôtel du Lac']);
+    makePerson('Dupont');
+
+    $this->getJson('/crm/search?q[]=hotel')->assertOk()->assertJson(['organisations' => [], 'people' => []]);
+    $this->getJson('/crm/search?q='.str_repeat('a', 500))->assertOk();
+    $this->getJson('/crm/people/search?q[]=du&organisation[]=x')->assertOk()->assertJson(['people' => []]);
+    $this->getJson('/crm/people/search?q='.str_repeat('a', 500))->assertOk();
+    $this->get('/crm/organisations?q[]=x&status[]=a&das[]=b')->assertOk();
+    $this->get('/crm/organisations?q='.str_repeat('a', 500))->assertOk();
+    $this->get('/crm/people?q[]=x&sort[]=a')->assertOk();
+    $this->get('/crm/people?q='.str_repeat('a', 500))->assertOk();
+});

@@ -13,7 +13,15 @@ class PermissionsSync extends Command
 
     public function handle(): int
     {
-        PermissionSync::run();
+        $failed = PermissionSync::run();
+
+        foreach ($failed as $tenant) {
+            $this->error("Échec pour l'organisme {$tenant->slug}");
+        }
+
+        if ($failed !== []) {
+            return self::FAILURE;
+        }
 
         $this->info('Permissions synchronisées.');
 

@@ -8,10 +8,7 @@ use App\Modules\Connectors\Smtp\TenantMailer;
 use App\Modules\Core\Access\Role;
 use App\Modules\Core\Audit\AuditRecorder;
 use App\Modules\Core\Companies\Company;
-use App\Modules\Core\References\ReferenceItem;
-use App\Modules\Core\References\ReferenceList;
 use App\Modules\Core\Tenancy\TenantContext;
-use App\Modules\Crm\Visibility\CrmVisibility;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -35,13 +32,12 @@ class InvitationController extends Controller
             'status' => $request->session()->get('status'),
             'warning' => $request->session()->get('warning'),
             'activationLink' => $request->session()->get('activation_link'),
-            // « DAS suivis » of the Responsable DAS (CRM visibility), edited from this page.
             'roleOptions' => Role::options(),
-            'dasOptions' => ReferenceItem::options(ReferenceList::Das)->map(fn (ReferenceItem $i) => ['value' => $i->id, 'label' => $i->label])->values(),
+            // Modules add their own props/columns (« DAS suivis » of the CRM).
+            ...UserPageExtensions::pageProps($request),
             'users' => User::query()->with('roles')->orderBy('name')->get()->map(fn (User $user) => [
                 'id' => $user->id,
                 'role' => $user->role()?->value,
-                'das_ids' => CrmVisibility::followedDas($user),
                 'name' => $user->name,
                 'email' => $user->email,
                 'active' => $user->isActive(),
@@ -49,6 +45,7 @@ class InvitationController extends Controller
                 'two_factor' => $user->hasTwoFactorEnabled(),
                 'activated' => $user->password !== null,
                 'last_login_at' => $user->last_login_at?->toIso8601String(),
+                ...UserPageExtensions::rowData($user),
             ]),
             'invitations' => Invitation::query()->pending()->orderBy('email')->get()->map(fn (Invitation $invitation) => [
                 'id' => $invitation->id,

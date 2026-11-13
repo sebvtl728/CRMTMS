@@ -18,6 +18,7 @@ use App\Modules\Crm\Search\CrmResource;
 use App\Modules\Crm\Search\ListExtras;
 use App\Modules\Crm\Search\RecentViews;
 use App\Modules\Crm\Support\DasLinks;
+use App\Modules\Crm\Support\FilterInput;
 use App\Modules\Crm\Support\FormOptions;
 use App\Modules\Crm\Visibility\CrmVisibility;
 use Illuminate\Database\Eloquent\Builder;
@@ -102,7 +103,7 @@ class PersonController extends Controller
     public function search(Request $request): JsonResponse
     {
         $user = $this->user($request);
-        $term = is_string($request->query('q')) ? trim($request->query('q')) : '';
+        $term = FilterInput::text($request->query('q'));
         $organisationId = $this->idOrNull($request->query('organisation'));
 
         if (mb_strlen($term) < 2) {

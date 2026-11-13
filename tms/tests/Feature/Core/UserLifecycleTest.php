@@ -2,13 +2,17 @@
 
 use App\Modules\Core\Access\Role;
 use App\Modules\Core\Audit\AuditLog;
+use App\Modules\Core\References\CapFormationReferenceSeeder;
+use App\Modules\Core\References\ReferenceList;
 use App\Modules\Core\Users\Invitation;
 use App\Modules\Core\Users\InvitationMail;
+use App\Modules\Core\Users\LastAdminGuard;
 use App\Modules\Core\Users\User;
 use App\Modules\Core\Users\UserController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Mail;
+use Illuminate\Validation\ValidationException;
 
 function fakeSession(User $user, string $id): void
 {
@@ -186,4 +190,50 @@ it('counts the active admins after taking the per-organisme advisory lock', func
     $this->actingAs($actor)->patchJson("/admin/users/{$a->id}/role", ['role' => 'direction'])
         ->assertStatus(422)->assertJsonValidationErrors(['user' => 'Il doit rester au moins un administrateur actif.']);
     expect($fired)->toBeTrue()->and($a->fresh()->role())->toBe(Role::AdminOrganisme);
+});
+
+it('empties the followed DAS when a user leaves the Responsable DAS role, with an audit trail', function () {
+    CapFormationReferenceSeeder::run(tenant());
+    $user = userWithRole(Role::ResponsableDas);
+    $das = crmItem(ReferenceList::Das, 'Hôtellerie-restauration');
+    followDas($user, $das);
+
+    $this->actingAs($this->admin)->patchJson("/admin/users/{$user->id}/role", ['role' => 'commercial'])->assertRedirect();
+
+    $event = AuditLog::query()->where('event', 'users.das_changed')->where('auditable_id', $user->id)->sole();
+    expect(DB::table('user_das')->where('user_id', $user->id)->count())->toBe(0)
+        ->and($event->old_values['das_ids'])->toBe([$das->id])
+        ->and($event->new_values['das_ids'])->toBe([]);
+
+    // Back to Responsable DAS: starts from nothing.
+    $this->actingAs($this->admin)->patchJson("/admin/users/{$user->id}/role", ['role' => 'responsable_das'])->assertRedirect();
+    expect(DB::table('user_das')->where('user_id', $user->id)->count())->toBe(0);
+});
+
+it('serves the DAS suivis column through the Crm extension, not through Core imports', function () {
+    CapFormationReferenceSeeder::run(tenant());
+    $user = userWithRole(Role::ResponsableDas);
+    $das = crmItem(ReferenceList::Das, 'Hôtellerie-restauration');
+    followDas($user, $das);
+
+    $this->actingAs($this->admin)->get('/admin/users')->assertInertia(fn ($page) => $page
+        ->has('dasOptions')
+        ->where('users', fn ($users) => collect($users)->firstWhere('id', $user->id)['das_ids'] === [$das->id]));
+});
+
+it('keeps the last-admin guard reusable for every path that removes an admin', function () {
+    $guard = app(LastAdminGuard::class);
+
+    expect(fn () => DB::transaction(fn () => $guard->ensureStays($this->admin)))
+        ->toThrow(ValidationException::class, 'Il doit rester au moins un administrateur actif.');
+
+    $second = admin(twoFactor: true);
+    DB::transaction(fn () => $guard->ensureStays($this->admin));
+    expect($second->isActive())->toBeTrue();
+});
+
+it('lets tms:user:reset-2fa leave the administrators untouched', function () {
+    $this->artisan('tms:user:reset-2fa', ['email' => $this->admin->email, '--tenant' => tenant()->slug])->assertSuccessful();
+
+    expect($this->admin->fresh()->isActive())->toBeTrue()->and($this->admin->fresh()->role())->toBe(Role::AdminOrganisme);
 });

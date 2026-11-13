@@ -351,3 +351,18 @@ it('answers 404 to a malformed id and ignores array filters', function () {
     $this->get('/crm/organisations?q[]=x&status[]=x&das[]=x&sort[]=x&dir[]=x&sector[]=x&responsible[]=x&origin[]=x')
         ->assertOk()->assertInertia(fn (Assert $page) => $page->has('organisations.data', 1));
 });
+
+it('shows a trashed fiche by url only to who may delete', function () {
+    $org = Organisation::query()->create(['name' => 'Disparue']);
+    $org->delete();
+    $person = makePerson('Effacé');
+    $person->delete();
+
+    $this->actingAs(assistant());
+    $this->get("/crm/organisations/{$org->id}")->assertNotFound();
+    $this->get("/crm/people/{$person->id}")->assertNotFound();
+
+    $this->actingAs(commercial());
+    $this->get("/crm/organisations/{$org->id}")->assertOk();
+    $this->get("/crm/people/{$person->id}")->assertOk();
+});

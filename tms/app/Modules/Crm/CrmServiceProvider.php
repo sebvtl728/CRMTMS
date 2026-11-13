@@ -3,6 +3,7 @@
 namespace App\Modules\Crm;
 
 use App\Modules\Core\Access\Permissions as CorePermissions;
+use App\Modules\Core\Access\PrimaryRoleChanged;
 use App\Modules\Core\Audit\MorphAliases;
 use App\Modules\Core\References\ReferenceList;
 use App\Modules\Core\References\ReferenceUsage;
@@ -26,11 +27,13 @@ use App\Modules\Crm\Timeline\Note;
 use App\Modules\Crm\Timeline\NotesProvider;
 use App\Modules\Crm\Timeline\Timeline;
 use App\Modules\Crm\Visibility\CrmVisibility;
+use App\Modules\Crm\Visibility\FollowedDas;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Http\Exceptions\HttpResponseException;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\Route;
@@ -67,6 +70,8 @@ class CrmServiceProvider extends ServiceProvider
     {
         self::registerReferenceUsage();
         self::registerLinkedData();
+        FollowedDas::registerOnUsersPage();
+        Event::listen(PrimaryRoleChanged::class, FollowedDas::onRoleChanged(...));
 
         // Check + download count together: 10 exports a minute per user.
         RateLimiter::for('crm-export', fn (Request $request) => Limit::perMinute(20)->by('crm-export:'.($request->user()?->getAuthIdentifier() ?? $request->ip()))
@@ -95,7 +100,7 @@ class CrmServiceProvider extends ServiceProvider
                 $query = CrmVisibility::organisations($query, $user);
             }
 
-            return $query->findOrFail($value);
+            return self::unlessTrashedForbidden($query->findOrFail($value), $user);
         });
 
         Route::bind('person', function (string $value): Person {
@@ -115,7 +120,7 @@ class CrmServiceProvider extends ServiceProvider
                 $query = CrmVisibility::people($query, $user);
             }
 
-            return $query->findOrFail($value);
+            return self::unlessTrashedForbidden($query->findOrFail($value), $user);
         });
 
         // An affiliation is reachable through the entreprise it belongs to.
@@ -149,6 +154,24 @@ class CrmServiceProvider extends ServiceProvider
         // A note / attachment is reachable through the fiche it belongs to.
         Route::bind('note', fn (string $value): Note => self::bindOnSubject(Note::query(), $value, Note::class));
         Route::bind('attachment', fn (string $value): Attachment => self::bindOnSubject(Attachment::query(), $value, Attachment::class));
+    }
+
+    /**
+     * A trashed fiche is readable by URL only with crm.delete, like the
+     * « corbeille » filter of the lists: anybody else gets a 404.
+     *
+     * @template TModel of Organisation|Person
+     *
+     * @param  TModel  $fiche
+     * @return TModel
+     */
+    private static function unlessTrashedForbidden(Organisation|Person $fiche, mixed $user): Organisation|Person
+    {
+        if ($fiche->trashed() && $user instanceof User && ! $user->can(Permissions::DELETE)) {
+            throw (new ModelNotFoundException)->setModel($fiche::class, [$fiche->getKey()]);
+        }
+
+        return $fiche;
     }
 
     /**

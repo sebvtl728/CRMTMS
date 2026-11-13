@@ -16,6 +16,9 @@ use Illuminate\Support\Facades\DB;
  * clears the secret and the recovery codes and closes every session. A role
  * that requires 2FA (administrator, direction) is sent to the enrolment at
  * its next login (EnsureTwoFactorEnrolled).
+ *
+ * No last-admin guard (LastAdminGuard): the account stays active and keeps its
+ * role, so this command never removes an administrator.
  */
 class UserResetTwoFactor extends Command
 {

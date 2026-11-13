@@ -19,7 +19,7 @@ interface UserRow {
     activated: boolean;
     last_login_at: string | null;
     role: string | null;
-    das_ids: string[];
+    das_ids?: string[];
     is_self: boolean;
     two_factor: boolean;
 }
@@ -35,7 +35,8 @@ interface InvitationRow {
 
 interface UsersIndexProps {
     users: UserRow[];
-    dasOptions: { value: string; label: string }[];
+    // Provided by the CRM module: without it the « DAS suivis » column is hidden.
+    dasOptions?: { value: string; label: string }[];
     roleOptions: { value: string; label: string }[];
     invitations: InvitationRow[];
     status?: string;
@@ -213,7 +214,7 @@ export default function UsersIndex({ users, dasOptions, roleOptions, invitations
                                 <th className="px-4 py-2 font-medium">Statut</th>
                                 <th className="px-4 py-2 font-medium">2FA</th>
                                 <th className="px-4 py-2 font-medium">Dernière connexion</th>
-                                <th className="px-4 py-2 font-medium">DAS suivis</th>
+                                {dasOptions && <th className="px-4 py-2 font-medium">DAS suivis</th>}
                                 <th className="px-4 py-2 font-medium">Actions</th>
                             </tr>
                         </thead>
@@ -242,20 +243,22 @@ export default function UsersIndex({ users, dasOptions, roleOptions, invitations
                                     </td>
                                     <td className="px-4 py-2">{user.two_factor ? 'Activée' : '—'}</td>
                                     <td className="px-4 py-2">{formatDate(user.last_login_at)}</td>
-                                    <td className="px-4 py-2">
-                                        {user.role === 'responsable_das' ? (
-                                            <Button type="button" variant="outline" size="sm" onClick={() => setDasUser(user)}>
-                                                {user.das_ids.length === 0
-                                                    ? 'Aucun (à définir)'
-                                                    : dasOptions
-                                                          .filter((o) => user.das_ids.includes(o.value))
-                                                          .map((o) => o.label)
-                                                          .join(', ')}
-                                            </Button>
-                                        ) : (
-                                            '—'
-                                        )}
-                                    </td>
+                                    {dasOptions && (
+                                        <td className="px-4 py-2">
+                                            {user.role === 'responsable_das' ? (
+                                                <Button type="button" variant="outline" size="sm" onClick={() => setDasUser(user)}>
+                                                    {(user.das_ids ?? []).length === 0
+                                                        ? 'Aucun (à définir)'
+                                                        : dasOptions
+                                                              .filter((o) => (user.das_ids ?? []).includes(o.value))
+                                                              .map((o) => o.label)
+                                                              .join(', ')}
+                                                </Button>
+                                            ) : (
+                                                '—'
+                                            )}
+                                        </td>
+                                    )}
                                     <td className="px-4 py-2">
                                         {user.active ? (
                                             !user.is_self && (
@@ -330,7 +333,7 @@ export default function UsersIndex({ users, dasOptions, roleOptions, invitations
                     )}
                 </section>
             </div>
-            {dasUser && <DasDialog key={dasUser.id} user={dasUser} options={dasOptions} onClose={() => setDasUser(null)} />}
+            {dasUser && dasOptions && <DasDialog key={dasUser.id} user={dasUser} options={dasOptions} onClose={() => setDasUser(null)} />}
         </AppLayout>
     );
 }
