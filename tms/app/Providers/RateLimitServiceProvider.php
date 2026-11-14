@@ -25,6 +25,7 @@ class RateLimitServiceProvider extends ServiceProvider
         'email-verify' => 6,
         'email-verification-send' => 6,
         'activation' => 10,
+        'calendar-feed' => 30,
     ];
 
     public function boot(): void
@@ -37,8 +38,20 @@ class RateLimitServiceProvider extends ServiceProvider
     public static function key(string $name, Request $request): string
     {
         $tenant = app(TenantContext::class)->current()?->id ?: 'none';
-        $who = $request->user()?->getAuthIdentifier() ?? $request->ip();
+        $who = $request->user()?->getAuthIdentifier() ?? self::feed($name, $request) ?? $request->ip();
 
         return $name.'|'.$tenant.'|'.$who;
+    }
+
+    /**
+     * The iCal feed counts per link, not per address: the calendar servers
+     * (Google, Microsoft) and an office behind one NAT share a few IPs. The
+     * hash of the token, never the token itself, goes into the cache key.
+     */
+    private static function feed(string $name, Request $request): ?string
+    {
+        $token = $request->route('token');
+
+        return $name === 'calendar-feed' && is_string($token) ? 'feed:'.hash('sha256', $token) : null;
     }
 }

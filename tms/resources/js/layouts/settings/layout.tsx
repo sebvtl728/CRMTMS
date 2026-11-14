@@ -2,8 +2,8 @@ import Heading from '@/components/heading';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { cn } from '@/lib/utils';
-import { type NavItem } from '@/types';
-import { Link } from '@inertiajs/react';
+import { type NavItem, type SharedData } from '@/types';
+import { Link, usePage } from '@inertiajs/react';
 
 const sidebarNavItems: NavItem[] = [
     {
@@ -28,8 +28,17 @@ const sidebarNavItems: NavItem[] = [
     },
 ];
 
+// The iCal feed lists CRM meetings and calls: for the users of the CRM only.
+const calendarNavItem: NavItem = {
+    title: 'Mon agenda',
+    url: '/settings/calendar',
+    icon: null,
+};
+
 export default function SettingsLayout({ children }: { children: React.ReactNode }) {
     const currentPath = window.location.pathname;
+    const { auth } = usePage<SharedData>().props;
+    const navItems = auth.permissions.includes('crm.view') ? [...sidebarNavItems, calendarNavItem] : sidebarNavItems;
 
     return (
         <div className="px-4 py-6">
@@ -38,7 +47,7 @@ export default function SettingsLayout({ children }: { children: React.ReactNode
             <div className="flex flex-col space-y-8 lg:flex-row lg:space-y-0 lg:space-x-12">
                 <aside className="w-full max-w-xl lg:w-48">
                     <nav className="flex flex-col space-y-1 space-x-0">
-                        {sidebarNavItems.map((item) => (
+                        {navItems.map((item) => (
                             <Button
                                 key={item.url}
                                 size="sm"

@@ -21,6 +21,7 @@ return Application::configure(basePath: dirname(__DIR__))
         commands: __DIR__.'/../routes/console.php',
         then: function () {
             Route::group([], base_path('routes/health.php'));
+            Route::group([], base_path('routes/calendar-feed.php'));
         },
     )
     ->withMiddleware(function (Middleware $middleware) {
