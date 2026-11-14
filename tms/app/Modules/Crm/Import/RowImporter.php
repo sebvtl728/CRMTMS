@@ -233,15 +233,17 @@ final class RowImporter
 
     /**
      * The database is unavailable, not the row at fault (SQL state class 08
-     * connection, 53 insufficient resources, 57 operator intervention or
-     * shutdown): no further row can succeed, the run stops and stays
-     * resumable instead of turning every remaining row into an error.
+     * connection, 53 insufficient resources, 57P01-57P03 server shutting
+     * down or not accepting connections): no further row can succeed, the
+     * run stops and stays resumable instead of turning every remaining row
+     * into an error. A cancelled statement (57014, timeout) is the row's.
      */
     public static function transient(\Throwable $e): bool
     {
         $sql = DatabaseErrorLog::queryException($e);
+        $state = $sql === null ? '' : (string) ($sql->errorInfo[0] ?? '');
 
-        return $sql !== null && in_array(substr((string) ($sql->errorInfo[0] ?? ''), 0, 2), ['08', '53', '57'], true);
+        return in_array(substr($state, 0, 2), ['08', '53'], true) || in_array($state, ['57P01', '57P02', '57P03'], true);
     }
 
     /**

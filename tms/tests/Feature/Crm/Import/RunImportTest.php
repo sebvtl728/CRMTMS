@@ -170,7 +170,21 @@ it('stops, resumable, on a database out of resources or shutting down instead of
         ->and([$batch->cursor_line, $batch->errors])->toBe([0, 0])
         ->and(ImportRow::query()->count())->toBe(0)
         ->and(Organisation::query()->count())->toBe(0);
-})->with(['out of memory (53200)' => '53200', 'admin shutdown (57P01)' => '57P01']);
+})->with(['out of memory (53200)' => '53200', 'admin shutdown (57P01)' => '57P01', 'crash shutdown (57P02)' => '57P02', 'cannot connect now (57P03)' => '57P03']);
+
+it('turns a row cancelled by a statement timeout (57014) into an error row and goes on', function () {
+    Organisation::creating(function (Organisation $organisation): void {
+        if ($organisation->name === 'Lente') {
+            DB::select("do $$ begin raise exception 'délai' using errcode = '57014'; end $$");
+        }
+    });
+
+    $batch = runImport("Raison sociale\nA\nLente\nC\n", ImportTarget::Organisations);
+
+    expect($batch->status)->toBe(ImportBatch::DONE)
+        ->and([$batch->created, $batch->errors])->toBe([2, 1])
+        ->and(rowMessages($batch, 3))->toBe(['Ligne non importée : la base de données l\'a refusée (code 57014).']);
+});
 
 it('turns a row failing on any database error into an error row and goes on', function () {
     // A database error that is not a uniqueness conflict, on one row only.
