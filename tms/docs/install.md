@@ -55,6 +55,14 @@ Les tests s'exécutent en tant que `tms_app` sur la base `tms_test` ; le schéma
 `pgsql_owner` (voir `tests/RefreshDatabaseAsOwner.php`). Les assets doivent avoir été
 compilés (`npm run build`).
 
+Les tests de volume (groupe `slow` : import de 10 000 lignes en moins de 60 s, recherche sur
+50 000 fiches en moins d'une seconde sous RLS) sont exclus de la commande ci-dessus
+(`phpunit.xml`) ; la CI les lance à part :
+
+```bash
+docker compose exec app php artisan test --group=slow
+```
+
 ### Tests de bout en bout (Playwright)
 
 Le test `tests/e2e/admin.spec.ts` rejoue le parcours d'un administrateur dans un vrai navigateur : lien

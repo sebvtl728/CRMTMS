@@ -15,6 +15,12 @@
             <directory>tests/Arch</directory>
         </testsuite>
     </testsuites>
+    <!-- Volume tests (import of 10 000 rows, search over 50 000 fiches), run apart: php artisan test with the option group=slow (see docs/install.md) -->
+    <groups>
+        <exclude>
+            <group>slow</group>
+        </exclude>
+    </groups>
     <source>
         <include>
             <directory>app</directory>

@@ -82,6 +82,8 @@ jobs:
       - run: vendor/bin/phpstan analyse --memory-limit=1G
       # No --parallel: tms_app cannot create the per-process databases.
       - run: php artisan test
+      # Volume tests (excluded from the default run, phpunit.xml).
+      - run: php artisan test --group=slow
 
   js:
     runs-on: ubuntu-latest
