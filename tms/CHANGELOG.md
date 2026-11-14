@@ -5,6 +5,53 @@ Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) ; ve
 
 ## [Non publié]
 
+## [0.4.0] - 2026-11-14
+
+Lot 1d : catalogue de formations et devis.
+
+### Ajouté
+
+- **Catalogue de formations** (menu Commercial › **Catalogue**) : intitulé, code, DAS, durées, public visé,
+  prérequis, **tarifs entreprise et particulier**, modes de financement possibles ; filtres, tri, **export Excel** ;
+  désactivation (la formation reste sur les opportunités et devis qui l'ont) ; suppression refusée pour une formation
+  utilisée. Consultation pour tous, gestion par l'administrateur et la direction.
+- **Import du catalogue** (type « Catalogue de formations ») : formations retrouvées par identifiant source puis par
+  code, financements séparés par `,` ou `;`, simulation et annulation (une formation utilisée depuis est conservée).
+- **Formations d'une opportunité** avec leur quantité, filtre et colonne d'export « Formations » ; **Calculer le
+  montant proposé** (tarif × quantité selon le compte) et **Reporter dans le montant estimé**.
+- **Sociétés** : logo, **préfixe de numérotation** propre à chaque société, durée de validité, conditions générales
+  et pied de page des devis.
+- **Devis** créés depuis une opportunité, préremplis avec ses formations : lignes avec unité, remise et TVA (20 %,
+  10 %, 5,5 %, 2,1 %, 0 %, ou société exonérée avec la mention légale), totaux exacts au centime avec TVA par taux,
+  numéro `<préfixe>-<année>-<numéro>` sans trou, par préfixe et par année (heure de Paris).
+- **PDF du devis** : aperçu marqué « BROUILLON », PDF **figé et archivé** à l'envoi (il ne change plus même si la
+  société ou le client changent).
+- **Envoi par e-mail** avec le PDF joint (messagerie de l'organisme), suivi de l'envoi et **Renvoyer** en cas
+  d'échec, **Relancer** ; l'opportunité avance d'elle-même à l'étape du devis envoyé (« Proposition » chez CAP
+  FORMATION, réglable dans les référentiels).
+- **Réponse du client** : « Accepté » propose de passer l'opportunité en **Gagné** avec le montant du devis, « Refusé »
+  propose **Perdu** avec un motif ; **expiration** automatique chaque nuit (heure de Paris) ; **Nouvelle version**
+  (l'ancien devis est marqué « Remplacé par »).
+- Liste **Devis** filtrable avec **taux de réussite** du mois, du trimestre ou de l'année et **export Excel** ; onglet
+  **Devis** des fiches et section **Devis** des opportunités ; devis dans l'historique ; tuile **Devis** du mois sur
+  l'accueil.
+- Menu **Commercial** : Pipeline, Opportunités, Devis, À faire, Planning, Compte rendu de RDV, Catalogue,
+  Entreprises, Personnes, Imports, RGPD.
+- Fusion, export des données d'une personne et anonymisation couvrent les devis (le PDF archivé d'une personne
+  anonymisée est supprimé).
+- Documentation : guide utilisateur (catalogue, devis), guide d'administration (réglages des devis, **régime de
+  TVA à choisir à l'installation**, étape du devis envoyé, droits du catalogue), dictionnaire de données, installation
+  derrière un proxy (Nginx Proxy Manager). Test de bout en bout du parcours devis.
+
+### Sécurité et fiabilité
+
+- Service **Gotenberg** (conversion des devis en PDF) ajouté à la pile, sans JavaScript ni accès réseau, non exposé ;
+  documents autonomes (logo intégré), textes saisis toujours échappés.
+- Logo des sociétés contrôlé (PNG ou JPEG réels, 1 Mo au plus), rangé dans le stockage privé de l'organisme.
+- Échecs d'envoi d'e-mail enregistrés sans adresse ni texte du serveur ; aucune donnée personnelle des devis en clair
+  dans le journal d'audit.
+- Numérotation des devis sûre en cas d'envois simultanés (aucun doublon, aucun trou).
+
 ## [0.3.1] - 2026-11-14
 
 Première publication installable (Proxmox / serveur) ; la 0.3.0 n'a pas pu être publiée.
@@ -134,7 +181,8 @@ Lot 1a : socle de l'application.
   mise à jour avec retour arrière automatique.
 - Publication : image multi-architecture signée (cosign), archive de version, sommes de contrôle.
 
-[Non publié]: https://github.com/sebvtl728/CRMTMS/compare/v0.3.1...HEAD
+[Non publié]: https://github.com/sebvtl728/CRMTMS/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/sebvtl728/CRMTMS/compare/v0.3.1...v0.4.0
 [0.3.1]: https://github.com/sebvtl728/CRMTMS/compare/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/sebvtl728/CRMTMS/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/sebvtl728/CRMTMS/compare/v0.1.0...v0.2.0

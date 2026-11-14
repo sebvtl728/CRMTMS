@@ -11,7 +11,7 @@ Ce guide s'adresse à l'**administrateur de l'organisme** (rôle « Administrate
 | Journal d'audit | `/admin/audit` | `audit.view` |
 | Sécurité | `/admin/security` | `settings.manage` |
 
-Par défaut, l'administrateur détient toutes les permissions d'administration ; la direction a seulement `audit.view` et `exports.run` ; les autres rôles n'ont aucune permission d'administration. Les droits propres au CRM (fiches, import, RGPD) font l'objet de la section 10 ci-dessous.
+Par défaut, l'administrateur détient toutes les permissions d'administration ; la direction a seulement `audit.view` et `exports.run` ; les autres rôles n'ont aucune permission d'administration. Les droits propres au CRM (fiches, import, RGPD, devis) et au catalogue font l'objet de la section 10 ci-dessous.
 
 ## 1. Première connexion
 
@@ -47,6 +47,15 @@ Pour chaque société : raison sociale, forme juridique, capital (montant et « 
 - Le SIRET est obligatoire à l'enregistrement.
 - Exactement **une société par défaut** par organisme ; pour en changer, cochez « Société par défaut » sur une autre société.
 
+**Section « Devis »** de la société :
+
+- **Logo** : PNG ou JPEG, 1 Mo au maximum (un SVG ou un fichier renommé est refusé) ; enregistrez d'abord la société, puis ajoutez-le. Il est intégré au PDF des devis. **Supprimer le logo** le retire. Chaque changement est journalisé (nom, taille et empreinte du fichier, jamais son contenu).
+- **Préfixe de numérotation** : lettres majuscules et chiffres, 10 caractères au plus (`DEV` par défaut). Les numéros sont `<préfixe>-<année>-<numéro sur 4 chiffres>` (`CF-2026-0001`), sans trou, avec un compteur par préfixe et par année civile (heure de Paris) qui repart à 1 le 1er janvier. **Chaque société a son propre préfixe** dans l'organisme : un préfixe déjà pris est refusé (« Ce préfixe est déjà celui d'une autre société »). Pour une nouvelle société, remplacez donc le `DEV` proposé, déjà porté par la société créée à l'installation. Changer de préfixe ne renumérote pas les devis existants.
+- **Durée de validité (jours)** : 1 à 365, 30 par défaut ; date « Valable jusqu'au » proposée sur un nouveau devis.
+- **Conditions générales** et **Pied de page** (5 000 caractères chacun) : imprimés sur chaque devis, sous les lignes et en bas du document.
+
+**Régime de TVA : à décider à l'installation.** Le **régime de TVA** de la société (« Assujetti à la TVA » ou « Exonéré de TVA ») commande les devis : exonérée, toutes les lignes sont à 0 % et le devis porte la mention « TVA non applicable, art. 261-4-4° a du CGI » ; assujettie, chaque ligne a son taux (20 %, 10 %, 5,5 %, 2,1 % ou 0 %, 20 % proposé). Un organisme de formation peut relever de l'exonération de l'article 261-4-4° a du CGI ou être assujetti : **pour CAP FORMATION, faire confirmer le régime par l'expert-comptable et le régler sur chaque société avant le premier devis.** Un brouillon suit le régime actuel de sa société ; un devis envoyé garde celui de son envoi (PDF archivé).
+
 ## 4. Utilisateurs et rôles
 
 *Utilisateurs* liste les comptes (statut : actif, en attente d'activation, désactivé, dernière connexion) et les **invitations en attente**.
@@ -68,6 +77,7 @@ Les listes de valeurs (DAS, étapes du pipeline, types et résultats d'action, o
 
 - Les étapes du pipeline portent une **probabilité de closing** (0 à 100), reprise par une opportunité à chaque changement d'étape ; les étapes « gagné » et « perdu » ont une probabilité fixe (100 / 0) et un **motif de perte** est exigé pour « perdu » (liste **Motifs de perte**). Une étape désactivée disparaît des colonnes du pipeline ; les opportunités qui y sont gardent leur étape.
 - Les **types d'action** ont un champ **Planning commercial** : *Rendez-vous* (planning de la semaine, **Compte rendu de RDV**, accueil « Prochains rendez-vous », agenda iCal / Outlook) ou *Appel* (planning et agenda, s'il a une échéance) ; vide, le type n'y apparaît pas. Chez CAP FORMATION : « Prise de rendez-vous » et « Rendez-vous physique » (rendez-vous), « Appel » (appel). Le réglage s'applique aussitôt, y compris aux actions existantes.
+- **Étape d'un devis envoyé** (étapes du pipeline) : une seule étape ouverte porte cette case (badge « Étape du devis envoyé ») ; à l'envoi d'un devis, l'opportunité y avance si elle est à une étape antérieure (jamais en arrière, jamais depuis une affaire close). Cocher une autre étape retire la case de la précédente ; une étape gagnée ou perdue ne peut pas la porter ; sans étape cochée, l'envoi ne déplace pas l'opportunité. Chez CAP FORMATION : « Proposition » (posée à l'installation et par la mise à jour, sans écraser un choix déjà fait).
 - Une valeur **système** ne peut être ni désactivée ni supprimée.
 - Une valeur **déjà utilisée** ne peut pas être supprimée : désactivez-la, elle n'est plus proposée mais l'historique reste lisible.
 - Les libellés sont uniques au sein d'une liste.
@@ -132,16 +142,23 @@ Le CRM (fiches, import, export, RGPD) ajoute huit permissions, accordées par d�
 
 | Permission | Ce qu'elle permet | Admin. | Direction | Commercial / Chargé de relations | Assistant | Resp. DAS |
 |---|---|:-:|:-:|:-:|:-:|:-:|
-| `crm.view` | Voir les entreprises, personnes, opportunités, pipeline, historiques ; rechercher ; **À faire**, **Planning**, **Mon agenda** (iCal, Outlook) ; menu Commercial | oui | oui | oui | oui | oui (ses DAS) |
-| `crm.create` | Créer entreprises, personnes, rattachements, **opportunités** et **actions** (« + Action ») ; ajouter notes et pièces jointes | oui | non | oui | oui | non |
-| `crm.update` | Modifier les fiches et les opportunités, **changer d'étape**, marquer une action **faite**, la **reporter** ou la supprimer ; **Compte rendu de RDV** | oui | non | oui | oui | non |
-| `crm.delete` | Supprimer et restaurer les fiches, supprimer une opportunité, retirer notes et pièces jointes | oui | non | oui | non | non |
+| `crm.view` | Voir les entreprises, personnes, opportunités, pipeline, historiques, **devis** et leur PDF ; rechercher ; **À faire**, **Planning**, **Mon agenda** (iCal, Outlook) ; menu Commercial | oui | oui | oui | oui | oui (ses DAS) |
+| `crm.create` | Créer entreprises, personnes, rattachements, **opportunités**, **actions** (« + Action ») et **devis** (dont **Nouvelle version**) ; ajouter notes et pièces jointes | oui | non | oui | oui | non |
+| `crm.update` | Modifier les fiches, les opportunités et les devis brouillons, **changer d'étape**, marquer une action **faite**, la **reporter** ou la supprimer ; **Compte rendu de RDV** ; **envoyer**, **relancer**, **renvoyer** un devis, enregistrer son **acceptation** ou son **refus** | oui | non | oui | oui | non |
+| `crm.delete` | Supprimer et restaurer les fiches, supprimer une opportunité ou un devis brouillon, retirer notes et pièces jointes | oui | non | oui | non | non |
 | `crm.merge` | Fusionner deux fiches | oui | non | oui | non | non |
 | `crm.import` | Menu **Imports** : importer, annuler un import | oui | non | oui | non | non |
-| `crm.export` | **Exporter (.xlsx)** les listes (entreprises, personnes, opportunités) | oui | oui | oui | non | oui |
+| `crm.export` | **Exporter (.xlsx)** les listes (entreprises, personnes, opportunités, devis ; catalogue avec `catalogue.view`) | oui | oui | oui | non | oui |
 | `crm.gdpr` | Écran **RGPD** (liste à anonymiser, conservation), export de données d'une personne, anonymisation, durée de conservation | oui | oui | non | non | non |
 
-Le rôle *Responsable DAS* garde la lecture seule et l'export, limités à ses DAS suivis : il voit les opportunités de ses DAS (et leurs actions), et les actions sans opportunité des fiches qu'il voit. La **direction** et l'**administrateur** voient en plus les actions de toute l'équipe (**À faire › Équipe**) et le planning d'un **collègue**.
+Le **catalogue de formations** a deux permissions à part :
+
+| Permission | Ce qu'elle permet | Admin. | Direction | Commercial / Chargé de relations | Assistant | Resp. DAS |
+|---|---|:-:|:-:|:-:|:-:|:-:|
+| `catalogue.view` | Menu **Catalogue** : voir les formations (tout le catalogue, quel que soit le DAS) | oui | oui | oui | oui | oui |
+| `catalogue.manage` | Créer, modifier, désactiver, supprimer une formation ; importer un catalogue (avec `crm.import`) | oui | oui | non | non | non |
+
+Le rôle *Responsable DAS* garde la lecture seule et l'export, limités à ses DAS suivis (devis compris : ceux des opportunités de ses DAS) : il voit les opportunités de ses DAS (et leurs actions), et les actions sans opportunité des fiches qu'il voit. La **direction** et l'**administrateur** voient en plus les actions de toute l'équipe (**À faire › Équipe**) et le planning d'un **collègue**.
 
 **Mises à jour et personnalisation.** À chaque installation ou mise à jour (`ops/migrate.sh` lance `php artisan tms:permissions:sync`), la synchronisation des permissions accorde à chaque organisme les droits par défaut **nouveaux** de chaque rôle, une seule fois : un droit que vous avez retiré à un rôle n'est pas rétabli par une mise à jour. La matrice rôle → permission est propre à chaque organisme.
 
@@ -178,3 +195,10 @@ Les imports de fichiers (CRM) s'exécutent en arrière-plan.
 - **Envoi vers Outlook** : file par défaut, en arrière-plan, quelques instants après chaque modification d'une action ; une indisponibilité de Microsoft est retentée pendant 24 h (journal d'exécution du connecteur, sans donnée personnelle).
 - **Lien iCal** : l'adresse est privée (jeton aléatoire dont seule l'empreinte est stockée) et limitée en nombre d'appels ; un utilisateur désactivé ou sans `crm.view` n'obtient plus rien. Révoquer un lien : l'utilisateur le fait lui-même dans **Mon agenda** ; désactiver son compte coupe aussi le flux.
 - Ces traitements reposent, comme les autres, sur le **planificateur** et le *worker* (voir § 11).
+
+## 14. Devis : envoi, expiration et archives
+
+- **Envoi des e-mails** : file par défaut, en arrière-plan, juste après l'enregistrement. Un envoi qui échoue est tenté 3 fois en tout (nouvel essai après 1 puis 5 minutes) ; ensuite le devis affiche « L'e-mail n'est pas parti » avec une raison fixe en français (code SMTP au plus, jamais le texte du serveur ni les adresses) et **Renvoyer**. Chaque essai figure dans le journal d'exécution du connecteur SMTP.
+- **Expiration** : chaque nuit à **0 h 05** (heure de Paris), `tms:crm:expire-quotes` passe **Expiré** les devis envoyés ou relancés dont la validité est dépassée, dans chaque organisme (journalisé, visible dans l'historique).
+- **PDF** : rendus par le service **Gotenberg** de la pile (voir `install.md`). Le PDF d'un devis envoyé est archivé dans le stockage privé (`tenants/<organisme>/quotes/<devis>/<numéro>.pdf`, inclus dans la sauvegarde) et n'est plus jamais régénéré. L'anonymisation d'une personne supprime les PDF de ses devis ; leur page affiche alors « Document supprimé (données anonymisées) ».
+- Comme les autres traitements, l'envoi et l'expiration reposent sur le **planificateur** et le *worker* (voir § 11).

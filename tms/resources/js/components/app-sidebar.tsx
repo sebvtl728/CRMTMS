@@ -27,15 +27,15 @@ import AppLogo from './app-logo';
 
 const homeNavItems: NavItem[] = [{ title: 'Accueil', url: '/dashboard', icon: LayoutGrid }];
 
-// « Commercial », in the order of a working day: the pipeline, the actions to do, the catalogue, then the fiches.
+// « Commercial », in the order of a working day: the pipeline and its quotes, the actions to do, the catalogue, then the fiches.
 const commercialNavItems: (NavItem & { permission: string })[] = [
     { title: 'Pipeline', url: '/crm/opportunities/kanban', icon: Columns3, permission: 'crm.view' },
     { title: 'Opportunités', url: '/crm/opportunities', icon: Handshake, permission: 'crm.view' },
     { title: 'Devis', url: '/crm/quotes', icon: FileText, permission: 'crm.view' },
     { title: 'À faire', url: '/crm/todo', icon: CalendarCheck, permission: 'crm.view' },
     { title: 'Planning', url: '/crm/planning', icon: CalendarRange, permission: 'crm.view' },
-    { title: 'Catalogue', url: '/catalogue', icon: BookOpen, permission: 'catalogue.view' },
     { title: 'Compte rendu de RDV', url: '/crm/report', icon: ClipboardPen, permission: 'crm.update' },
+    { title: 'Catalogue', url: '/catalogue', icon: BookOpen, permission: 'catalogue.view' },
     { title: 'Entreprises', url: '/crm/organisations', icon: Factory, permission: 'crm.view' },
     { title: 'Personnes', url: '/crm/people', icon: Contact, permission: 'crm.view' },
     { title: 'Imports', url: '/crm/import', icon: Upload, permission: 'crm.import' },

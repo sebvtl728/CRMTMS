@@ -56,6 +56,8 @@ test('admin first run: activate, enrol 2FA, create SCOP company, invite user', a
     await page.getByLabel('Capital variable').click();
     await page.getByLabel('SIRET').fill('73282932000074');
     await page.getByLabel('Ville du RCS').fill('Lyon');
+    // Its own quote prefix: « DEV » is already the installer's placeholder company's (one company per prefix).
+    await page.getByLabel('Préfixe de numérotation').fill('CF');
     await page.getByRole('button', { name: 'Enregistrer' }).click();
 
     await expect(page).toHaveURL(/\/admin\/companies$/);

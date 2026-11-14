@@ -1,4 +1,4 @@
-# Dictionnaire de données — lots 1a (socle), 1b (fiches, import, RGPD) et 1c (pipeline, actions, agenda)
+# Dictionnaire de données — lots 1a (socle), 1b (fiches, import, RGPD), 1c (pipeline, actions, agenda) et 1d (catalogue, devis)
 
 Identifiants : UUID v7 (`uuid`). Dates : `timestamp` (UTC en base ; affichage en heure de Paris). Suppression logique : colonne `deleted_at` (les lignes supprimées restent en base).
 
@@ -97,6 +97,10 @@ Mêmes colonnes que ci-dessus avec `permission_id`. Non utilisée au lot 1a.
 | `address_country` | char(2) | Code ISO, défaut `FR` |
 | `email`, `phone` | string, null | Contact |
 | `is_default` | bool | Société par défaut ; **une seule** par organisme (index unique partiel) |
+| `logo_path` | string, null | Logo des devis (PNG / JPEG ≤ 1 Mo) : chemin dans le stockage privé `tenants/<id>/companies/<company_id>/logo.<png\|jpg>` ; hors journal générique (évènements `company.logo_changed` / `company.logo_deleted`, sans contenu) |
+| `quote_prefix` | string(10), défaut `DEV` | Préfixe des numéros de devis, `^[A-Z0-9]{1,10}$` (CHECK) ; **unique par organisme** parmi les sociétés non supprimées (index unique partiel `companies_quote_prefix_unique`) |
+| `quote_validity_days` | smallint, défaut 30 | Validité proposée d'un devis, 1–365 (CHECK) |
+| `quote_terms`, `quote_footer` | text, null | Conditions générales et pied de page imprimés sur les devis (≤ 5 000 caractères) |
 | `created_at`, `updated_at`, `deleted_at` | timestamp | Suppression logique |
 
 ## Référentiels (RLS)
@@ -264,10 +268,90 @@ Index : (`tenant_id`, `stage_id`), (`tenant_id`, `das_id`), (`tenant_id`, `respo
 
 Index : partiel « À faire » (`tenant_id`, `responsible_user_id`, `due_at`) `where done_at is null and deleted_at is null` ; (`tenant_id`, `happened_at`) ; `organisation_id`, `person_id`, `opportunity_id`. Une action faite met à jour `last_contact_at` des fiches concernées (supprimée ou avancée : recalcul).
 
+## Catalogue de formations (lot 1d, RLS)
+
+Module `Catalogue` : le Crm ne lit jamais ces tables directement (service `Catalogue\Trainings`, test d'architecture).
+
+### `trainings` — formations
+| Colonne | Type | Rôle |
+|---|---|---|
+| `id`, `tenant_id` | uuid | |
+| `code` | string(20), null | Code, en majuscules ; unique par organisme parmi les formations non supprimées (index unique partiel `trainings_code_unique`) |
+| `title` | string(200) | Intitulé |
+| `das_id` | uuid (FK `reference_items`) | DAS (`ReferenceUsage`) |
+| `duration_hours`, `duration_days` | numeric(6,2) / numeric(5,2), null | Durées (CHECK ≥ 0) |
+| `audience`, `prerequisites` | text, null | Public visé, prérequis |
+| `price_company`, `price_individual` | numeric(12,2), null | Tarifs HT par stagiaire, entreprise et particulier (CHECK ≥ 0) |
+| `is_active` | bool, défaut `true` | Désactivée : plus proposée, reste sur les opportunités et devis existants |
+| `source_system`, `source_id` | string(50) / string(255), null | Identifiant d'origine (import) ; unique partiel par organisme (`trainings_source_unique`) |
+| `created_by`, `updated_by` | uuid, null (FK `users`) | |
+| `created_at`, `updated_at`, `deleted_at` | timestamp | Suppression logique ; refusée si la formation est utilisée (`Catalogue\TrainingUsage` : opportunités, lignes de devis, supprimées comprises) |
+
+Index : (`tenant_id`, `das_id`), (`tenant_id`, `title`). Journalisée (`training`). Cible d'import `trainings` (« Catalogue de formations »).
+
+### `training_funding_modes` — financements possibles d'une formation
+`tenant_id` · `training_id` (FK, cascade) · `funding_mode_id` (FK `reference_items`, `ReferenceUsage`) ; PK (`training_id`, `funding_mode_id`), index `funding_mode_id`.
+
+## CRM : devis (lot 1d, RLS)
+
+### `quote_sequences` — compteurs de numérotation
+`tenant_id` (FK `tenants`, cascade) · `prefix` string(10) · `year` smallint (année civile de Paris, CHECK 2000–2999) · `last_number` int (CHECK > 0) · `created_at`, `updated_at`. PK (`tenant_id`, `prefix`, `year`). Incrément atomique (`insert … on conflict do update … returning`) dans la transaction de création du devis : numéros sans trou ; un numéro annulé par une transaction en échec est réutilisé. L'année est celle du jour de création (heure de Paris), pas la date du devis.
+
+### `quotes` — devis
+| Colonne | Type | Rôle |
+|---|---|---|
+| `id`, `tenant_id` | uuid | |
+| `number` | string(30) | `<préfixe>-<AAAA>-<NNNN>` ; unique (`tenant_id`, `number`) |
+| `company_id` | uuid (FK `companies`) | Société émettrice (fixée à la création) |
+| `opportunity_id` | uuid (FK `opportunities`) | Opportunité ; la visibilité d'un devis est celle de son opportunité (`CrmVisibility::quotes`) |
+| `organisation_id`, `person_id` | uuid, null (FK) | Compte copié de l'opportunité : **exactement un** des deux (CHECK `quotes_account_check`) |
+| `contact_person_id` | uuid, null (FK `people`) | Destinataire (interlocuteur ou particulier) |
+| `status` | string(20), défaut `draft` | `draft`, `sent`, `reminded`, `accepted`, `refused`, `expired` (CHECK) |
+| `issued_on`, `valid_until` | date | Date du devis et validité (CHECK `valid_until >= issued_on`) |
+| `sent_at`, `reminded_at` | timestamptz, null | Envoi et dernière relance (dernier contact des fiches, taux de réussite) |
+| `accepted_on`, `refused_on` | date, null | Réponse du client |
+| `refusal_reason` | text, null | Motif du refus (donnée personnelle possible : masquée au journal) ; « Remplacé par N » pour une nouvelle version |
+| `replaced_by_id` | uuid, null (FK `quotes`) | Nouvelle version qui remplace ce devis |
+| `vat_exempt` | bool | Régime de la société, recopié à chaque enregistrement du brouillon, figé à l'envoi |
+| `total_ht`, `total_vat`, `total_ttc` | numeric(12,2) | Totaux calculés en centimes entiers (CHECK ≥ 0 et `total_ttc = total_ht + total_vat`) |
+| `recipient_snapshot` | jsonb, null | Destinataire figé à l'envoi (nom, adresse, « à l'attention de », e-mail) ; donnée personnelle (masquée au journal, effacée à l'anonymisation) |
+| `pdf_path` | string, null | PDF archivé à l'envoi, `tenants/<id>/quotes/<quote_id>/<numéro>.pdf` (stockage privé) ; null après anonymisation (PDF supprimé, réponse 410) |
+| `notes` | text, null | Mentions particulières (donnée personnelle possible) |
+| `email_message` | jsonb, null | Dernier message : type, `to`, `cc`, objet, corps (pour **Renvoyer**) ; hors journal |
+| `email_status` | string(10), null | `pending`, `sent`, `failed` (CHECK) ; hors journal |
+| `email_sent_at` | timestamptz, null | Remise au serveur d'envoi |
+| `email_error` | string(255), null | Raison fixe en français (code SMTP au plus) |
+| `created_by`, `updated_by` | uuid, null (FK `users`) | |
+| `created_at`, `updated_at`, `deleted_at` | timestamp | Suppression logique (brouillons seulement) |
+
+Index : `opportunity_id`, `organisation_id`, `person_id`, `contact_person_id`, (`tenant_id`, `issued_on`), (`tenant_id`, `status`). Journalisé (`quote`) : les changements de statut alimentent l'**Historique** des fiches et de l'opportunité. Fusion : `organisation_id`, `person_id` et `contact_person_id` suivent la fiche conservée (le destinataire figé ne change pas).
+
+### `quote_lines` — lignes d'un devis
+| Colonne | Type | Rôle |
+|---|---|---|
+| `id`, `tenant_id` | uuid | |
+| `quote_id` | uuid (FK, cascade) | |
+| `position` | smallint | Ordre |
+| `training_id` | uuid, null (FK `trainings`, restrict) | Formation du catalogue (ligne libre sinon) ; lue par `Catalogue\Trainings` |
+| `das_id` | uuid, null (FK `reference_items`) | DAS de la formation (`ReferenceUsage`) |
+| `label` | string(300) | Libellé |
+| `description` | text, null | Description (donnée personnelle possible : masquée au journal) |
+| `quantity` | numeric(8,2) | CHECK > 0 (saisie ≤ 9 999,99) |
+| `unit` | string(20) | `stagiaire`, `jour`, `heure`, `forfait`, `session` (CHECK) |
+| `unit_price` | numeric(12,2) | Prix unitaire HT (CHECK ≥ 0) |
+| `discount_percent` | numeric(5,2), défaut 0 | Remise, 0–100 (CHECK) |
+| `vat_rate` | numeric(4,2) | 20, 10, 5,5, 2,1 ou 0 (CHECK) ; 0 sur un devis exonéré |
+| `total_ht` | numeric(12,2) | Quantité × prix × (1 − remise), arrondi au centime (demi supérieur) |
+| `created_at`, `updated_at` | timestamp | |
+
+Index : `quote_id`, `training_id`, `das_id`. Journalisée (`quote_line`). La TVA se calcule **par taux** sur la somme des lignes du même taux, pas ligne par ligne.
+
+Étape « devis envoyé » : clé `meta.quote_stage = true` sur une seule valeur `pipeline_stage` de `reference_items` par organisme.
+
 ## CRM : import (lot 1b, RLS)
 
 ### `import_profiles` — profils d'import
-`id`, `tenant_id` · `name` (100, unique par organisme) · `target` (`organisations`, `people`, `affiliations`, `notes`) · `field_map` (jsonb : colonne du fichier → champ) · `value_map` (jsonb : valeurs du fichier → valeurs des listes) · `options` (jsonb : séparateur, encodage, stratégie de doublon) · `created_by` · horodatages. Un profil d'import Formevol est un simple enregistrement de cette table.
+`id`, `tenant_id` · `name` (100, unique par organisme) · `target` (`organisations`, `people`, `affiliations`, `notes`, `trainings` ; CHECK, même liste pour `import_batches`) · `field_map` (jsonb : colonne du fichier → champ) · `value_map` (jsonb : valeurs du fichier → valeurs des listes) · `options` (jsonb : séparateur, encodage, stratégie de doublon) · `created_by` · horodatages. Un profil d'import Formevol est un simple enregistrement de cette table.
 
 ### `import_batches` — imports
 | Colonne | Rôle |
@@ -299,4 +383,4 @@ Index : partiel « À faire » (`tenant_id`, `responsible_user_id`, `due_at`) `w
 
 ## Permissions CRM (catalogue global `permissions`)
 
-`crm.view`, `crm.create`, `crm.update`, `crm.delete`, `crm.merge`, `crm.import`, `crm.export`, `crm.gdpr`. La matrice par rôle est dans `admin.md`. `role_permission_defaults_applied` (`tenant_id`, `role`, `permission`) mémorise les droits par défaut déjà accordés à chaque organisme, pour qu'une mise à jour n'ajoute que les nouveaux droits sans rétablir ceux qu'un administrateur a retirés.
+`crm.view`, `crm.create`, `crm.update`, `crm.delete`, `crm.merge`, `crm.import`, `crm.export`, `crm.gdpr` ; catalogue : `catalogue.view`, `catalogue.manage`. La matrice par rôle est dans `admin.md`. `role_permission_defaults_applied` (`tenant_id`, `role`, `permission`) mémorise les droits par défaut déjà accordés à chaque organisme, pour qu'une mise à jour n'ajoute que les nouveaux droits sans rétablir ceux qu'un administrateur a retirés.
