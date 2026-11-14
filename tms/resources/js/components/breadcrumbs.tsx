@@ -6,20 +6,21 @@ export function Breadcrumbs({ breadcrumbs }: { breadcrumbs: BreadcrumbItemType[]
     return (
         <>
             {breadcrumbs.length > 0 && (
-                <Breadcrumb>
-                    <BreadcrumbList>
+                // On a phone only the current page shows, cut to the width left by the header buttons.
+                <Breadcrumb className="min-w-0">
+                    <BreadcrumbList className="flex-nowrap">
                         {breadcrumbs.map((item, index) => {
                             const isLast = index === breadcrumbs.length - 1;
                             return (
                                 <Fragment key={index}>
-                                    <BreadcrumbItem>
+                                    <BreadcrumbItem className={isLast ? 'min-w-0' : 'hidden md:inline-flex'}>
                                         {isLast ? (
-                                            <BreadcrumbPage>{item.title}</BreadcrumbPage>
+                                            <BreadcrumbPage className="block truncate">{item.title}</BreadcrumbPage>
                                         ) : (
                                             <BreadcrumbLink href={item.href}>{item.title}</BreadcrumbLink>
                                         )}
                                     </BreadcrumbItem>
-                                    {!isLast && <BreadcrumbSeparator />}
+                                    {!isLast && <BreadcrumbSeparator className="hidden md:block" />}
                                 </Fragment>
                             );
                         })}
