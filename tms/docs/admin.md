@@ -66,12 +66,13 @@ Autres actions de la liste :
 
 Les listes de valeurs (DAS, étapes du pipeline, types et résultats d'action, origines de contact, motifs de perte, types d'établissement, secteurs, tailles d'entreprise, priorités, modes de financement, situations professionnelles, formes juridiques des organisations clientes, rôles dans la décision) sont **propres à votre organisme**. Pour chaque liste vous pouvez ajouter, renommer, réordonner, désactiver / réactiver et supprimer des valeurs.
 
-- Les étapes du pipeline portent une **probabilité de closing** (0 à 100) ; les étapes « gagné » et « perdu » ont une probabilité fixe.
+- Les étapes du pipeline portent une **probabilité de closing** (0 à 100), reprise par une opportunité à chaque changement d'étape ; les étapes « gagné » et « perdu » ont une probabilité fixe (100 / 0) et un **motif de perte** est exigé pour « perdu » (liste **Motifs de perte**). Une étape désactivée disparaît des colonnes du pipeline ; les opportunités qui y sont gardent leur étape.
+- Les **types d'action** ont un champ **Planning commercial** : *Rendez-vous* (planning de la semaine, **Compte rendu de RDV**, accueil « Prochains rendez-vous », agenda iCal / Outlook) ou *Appel* (planning et agenda, s'il a une échéance) ; vide, le type n'y apparaît pas. Chez CAP FORMATION : « Prise de rendez-vous » et « Rendez-vous physique » (rendez-vous), « Appel » (appel). Le réglage s'applique aussitôt, y compris aux actions existantes.
 - Une valeur **système** ne peut être ni désactivée ni supprimée.
 - Une valeur **déjà utilisée** ne peut pas être supprimée : désactivez-la, elle n'est plus proposée mais l'historique reste lisible.
 - Les libellés sont uniques au sein d'une liste.
 
-## 6. Connecteurs (messagerie SMTP)
+## 6. Connecteurs (messagerie SMTP, Microsoft 365)
 
 *Connecteurs* regroupe les liens avec les logiciels externes. Le connecteur **SMTP** fait envoyer les e-mails (devis, invitations) par votre propre serveur de messagerie.
 
@@ -81,6 +82,8 @@ Les listes de valeurs (DAS, étapes du pipeline, types et résultats d'action, o
 4. Cochez **Activé** et enregistrez.
 
 Un réglage peut s'appliquer à tout l'organisme ou à une société précise (la société prend alors le pas). Les identifiants sont stockés **chiffrés** et ne sont jamais réaffichés : laisser un champ vide conserve la valeur actuelle ; l'effacement est une action explicite. Les adresses locales ou de réseau interne sont refusées selon la politique de l'installation (`TMS_ALLOW_INTERNAL_SMTP_HOSTS`, `TMS_ALLOW_PRIVATE_SMTP_HOSTS`). Chaque envoi ou test est tracé dans le journal d'exécution du connecteur, et une exécution en échec peut être rejouée. Pour ajouter un autre connecteur, voir `connectors.md`.
+
+Le connecteur **Microsoft 365** envoie les rendez-vous et appels planifiés des utilisateurs qui ont **connecté Outlook** (**Paramètres › Mon agenda**) dans leur agenda Outlook. Il demande une application déclarée dans Azure (identifiant de l'annuaire, identifiant client, secret) : la procédure pas à pas est dans `connectors.md`, section « Connecteur Microsoft 365 ». Sans ce connecteur, chacun peut toujours s'abonner à son **lien iCal** privé (même écran), qui ne demande aucun réglage.
 
 ## 7. Journal d'audit
 
@@ -129,16 +132,16 @@ Le CRM (fiches, import, export, RGPD) ajoute huit permissions, accordées par d�
 
 | Permission | Ce qu'elle permet | Admin. | Direction | Commercial / Chargé de relations | Assistant | Resp. DAS |
 |---|---|:-:|:-:|:-:|:-:|:-:|
-| `crm.view` | Voir les entreprises, personnes, historiques ; rechercher ; menu Commercial | oui | oui | oui | oui | oui (ses DAS) |
-| `crm.create` | Créer entreprises, personnes, rattachements ; ajouter notes et pièces jointes | oui | non | oui | oui | non |
-| `crm.update` | Modifier les fiches | oui | non | oui | oui | non |
-| `crm.delete` | Supprimer et restaurer les fiches, retirer notes et pièces jointes | oui | non | oui | non | non |
+| `crm.view` | Voir les entreprises, personnes, opportunités, pipeline, historiques ; rechercher ; **À faire**, **Planning**, **Mon agenda** (iCal, Outlook) ; menu Commercial | oui | oui | oui | oui | oui (ses DAS) |
+| `crm.create` | Créer entreprises, personnes, rattachements, **opportunités** et **actions** (« + Action ») ; ajouter notes et pièces jointes | oui | non | oui | oui | non |
+| `crm.update` | Modifier les fiches et les opportunités, **changer d'étape**, marquer une action **faite**, la **reporter** ou la supprimer ; **Compte rendu de RDV** | oui | non | oui | oui | non |
+| `crm.delete` | Supprimer et restaurer les fiches, supprimer une opportunité, retirer notes et pièces jointes | oui | non | oui | non | non |
 | `crm.merge` | Fusionner deux fiches | oui | non | oui | non | non |
 | `crm.import` | Menu **Imports** : importer, annuler un import | oui | non | oui | non | non |
-| `crm.export` | **Exporter (.xlsx)** les listes | oui | oui | oui | non | oui |
+| `crm.export` | **Exporter (.xlsx)** les listes (entreprises, personnes, opportunités) | oui | oui | oui | non | oui |
 | `crm.gdpr` | Écran **RGPD** (liste à anonymiser, conservation), export de données d'une personne, anonymisation, durée de conservation | oui | oui | non | non | non |
 
-Le rôle *Responsable DAS* garde la lecture seule et l'export, limités à ses DAS suivis.
+Le rôle *Responsable DAS* garde la lecture seule et l'export, limités à ses DAS suivis : il voit les opportunités de ses DAS (et leurs actions), et les actions sans opportunité des fiches qu'il voit. La **direction** et l'**administrateur** voient en plus les actions de toute l'équipe (**À faire › Équipe**) et le planning d'un **collègue**.
 
 **Mises à jour et personnalisation.** À chaque installation ou mise à jour (`ops/migrate.sh` lance `php artisan tms:permissions:sync`), la synchronisation des permissions accorde à chaque organisme les droits par défaut **nouveaux** de chaque rôle, une seule fois : un droit que vous avez retiré à un rôle n'est pas rétabli par une mise à jour. La matrice rôle → permission est propre à chaque organisme.
 
@@ -168,3 +171,10 @@ Les imports de fichiers (CRM) s'exécutent en arrière-plan.
 - **Conservation** : le traitement quotidien `tms:crm:purge-imports` (3 h 30) supprime le **fichier importé et les valeurs brutes** des lignes de plus de **30 jours**, et remplace le nom du fichier par `fichier-import.<ext>` (il peut contenir un nom de personne) ; les totaux, le rapport et l'historique restent. Le rapport Excel téléchargeable est conservé.
 - **Pièces jointes des fiches en corbeille** : le traitement quotidien `tms:crm:purge-attachments` (3 h 45) efface du stockage les fichiers joints des entreprises et personnes **en corbeille depuis plus de 12 mois** ; la ligne reste dans l'historique avec la mention « Fichier supprimé » (même si la fiche est restaurée ensuite).
 - **Stockage** : les pièces jointes et fichiers d'import sont rangés par organisme dans le stockage privé de l'application (hors dossier public) et sont inclus dans la sauvegarde restic.
+
+## 13. Pipeline et relances : traitements planifiés
+
+- **Récapitulatif quotidien** : chaque jour à **7 h 30** (heure de Paris), `tms:crm:daily-digest` envoie à chaque utilisateur qui l'a demandé (**Paramètres › Profil › Recevoir le récapitulatif quotidien**, désactivé par défaut) la liste de ses actions en retard et du jour. Aucun e-mail aux comptes désactivés, sans droit `crm.view`, ni les jours sans action. L'envoi passe par la messagerie de l'organisme (connecteur SMTP).
+- **Envoi vers Outlook** : file par défaut, en arrière-plan, quelques instants après chaque modification d'une action ; une indisponibilité de Microsoft est retentée pendant 24 h (journal d'exécution du connecteur, sans donnée personnelle).
+- **Lien iCal** : l'adresse est privée (jeton aléatoire dont seule l'empreinte est stockée) et limitée en nombre d'appels ; un utilisateur désactivé ou sans `crm.view` n'obtient plus rien. Révoquer un lien : l'utilisateur le fait lui-même dans **Mon agenda** ; désactiver son compte coupe aussi le flux.
+- Ces traitements reposent, comme les autres, sur le **planificateur** et le *worker* (voir § 11).

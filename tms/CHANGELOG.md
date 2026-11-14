@@ -5,6 +5,59 @@ Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) ; ve
 
 ## [Non publié]
 
+## [0.3.0] - à publier
+
+Lot 1c : pipeline commercial, actions et relances, planning, agenda.
+
+### Ajouté
+
+- **Opportunités** sur une entreprise ou un particulier : objet, DAS, étape, montant estimé et **montant pondéré**,
+  clôture prévue, priorité, mode de financement, interlocuteurs, responsable. Liste filtrable avec totaux et
+  **export Excel**.
+- **Étapes du pipeline** paramétrables avec leur probabilité : la probabilité suit l'étape (une saisie manuelle est
+  gardée jusqu'au changement suivant), « Gagné » demande la date de gain, « Perdu » **exige un motif de perte**.
+  Chaque changement est tracé dans l'historique de la fiche.
+- **Pipeline (kanban)** : une colonne par étape avec nombre, montant et pondéré ; glisser-déposer à la souris ou au
+  clavier ; affaires gagnées et perdues des 90 derniers jours ; liste par étape sur téléphone.
+- **Actions** (appel, rendez-vous, e-mail, rappel…) et **saisie rapide « + Action »** depuis n'importe quel écran du
+  CRM, préremplie avec la fiche ouverte : fait maintenant ou à faire, résultat, compte rendu, **prochaine relance**
+  en un clic (demain, dans une semaine, dans un mois). Les actions faites mettent à jour le dernier contact.
+- **« À faire »** : vos actions en retard, du jour et de la semaine (jours à l'heure de Paris), « Fait »,
+  « Reporter », vue **Équipe** pour la direction ; compteur dans le menu.
+- **Récapitulatif quotidien** par e-mail à 7 h 30, sur demande (profil).
+- **Planning de la semaine** (rendez-vous et appels planifiés, jour par jour sur téléphone, planning d'un collègue
+  pour la direction) ; les types d'action concernés se règlent dans les référentiels (« Planning commercial »).
+- **Compte rendu de RDV** au téléphone en un seul formulaire : résultat, compte rendu, étape de l'opportunité et
+  prochaine relance enregistrés ensemble.
+- **Mon agenda** : lien d'abonnement **iCal** privé (Outlook, Google Agenda, Apple Calendrier) et, avec Microsoft
+  365, **envoi direct des rendez-vous dans Outlook** (connecteur à déclarer dans Azure, voir `docs/connectors.md`).
+- **Accueil** : « Mes relances » (en retard / aujourd'hui), **pipeline pondéré du mois**, **prochains
+  rendez-vous**, dans le périmètre de chacun.
+- Menu **Commercial** réorganisé : Pipeline, Opportunités, À faire, Planning, Compte rendu de RDV, Entreprises,
+  Personnes, Imports, RGPD.
+- Fusion, export RGPD et anonymisation couvrent les opportunités et les actions.
+- Documentation : guide utilisateur (pipeline, relances, planning, compte rendu, agenda), guide d'administration,
+  dictionnaire de données. Tests de bout en bout du parcours pipeline et du compte rendu sur téléphone.
+
+### Modifié
+
+- L'historique d'une fiche se pagine sans perte ni doublon, même pour des évènements à la même microseconde.
+- Les fiches sont lisibles sur un téléphone de 375 px sans défilement horizontal (fil d'Ariane raccourci).
+- L'export des personnes propose aussi le système source, l'identifiant source et la base légale.
+
+### Sécurité et fiabilité
+
+- **Imports** : surveillance des imports bloqués (reprise automatique une fois, puis échec signalé), une ligne
+  refusée par la base passe en erreur sans arrêter l'import, contrôle du contenu réel des fichiers déposés, nom du
+  fichier d'origine masqué au journal et remplacé au bout de 30 jours.
+- **Connecteurs** : les connexions sortantes (Sirene, Microsoft, SMTP) sont attachées aux adresses vérifiées
+  (protection contre la redirection DNS).
+- **Pièces jointes** des fiches en corbeille depuis plus de 12 mois effacées du stockage (« Fichier supprimé »).
+- Lien iCal : jeton aléatoire dont seule l'empreinte est stockée, limité en nombre d'appels ; jetons Microsoft
+  chiffrés, jamais journalisés.
+- Responsable DAS : opportunités, actions et chiffres de l'accueil limités à ses DAS.
+- Test de volume : recherche sur 50 000 fiches en moins d'une seconde sous isolation des organismes.
+
 ## [0.2.0] - à publier
 
 Lot 1b : fiches commerciales, import, export et RGPD.

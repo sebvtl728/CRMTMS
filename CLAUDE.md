@@ -22,11 +22,12 @@ Moteur Docker local : Colima (`colima start` si `docker info` échoue).
 docker compose up -d                                          # démarrer la stack
 docker compose exec app php artisan test                      # tests (rôle tms_app, base tms_test)
 docker compose exec app php artisan test --filter=Nom         # test ciblé
+docker compose exec app php artisan test --group=slow          # tests de volume (exclus par défaut, lancés à part par la CI)
 docker compose exec app php artisan migrate --database=pgsql_owner   # migrations : TOUJOURS via pgsql_owner
 docker compose exec app vendor/bin/pint                       # formatage PHP
 docker compose exec app vendor/bin/phpstan analyse --memory-limit=1G   # analyse statique
 docker compose run --rm vite sh -c "npm run lint && npm run types && npm run build"
-npm run e2e                                                    # Playwright (hôte, pile dédiée port 8081) : voir tms/docs/install.md
+npm ci && npm run e2e                                          # Playwright (hôte, pile dédiée port 8081, node_modules de l'hôte) : voir tms/docs/install.md
 shellcheck -x ops/*.sh ops/install/*.sh ops/release/*.sh && bats ops/tests   # scripts d'exploitation
 ```
 
@@ -47,11 +48,15 @@ Installation dev complète : `tms/docs/install.md`. App : http://localhost:8080,
 9. **Files d'attente** : jobs et notifications reçoivent le tenant automatiquement par leur charge utile ; ne jamais appeler `TenantContext::set` de façon globale dans un worker.
 10. Tout nouveau modèle sur une table métier utilise `BelongsToTenant`.
 
-## Module Crm (lot 1b) : points d'architecture à connaître
+## Module Crm (lots 1b et 1c) : points d'architecture à connaître
 
-Code dans `tms/app/Modules/Crm/` (Organisations, People, Affiliations, Timeline, Duplicates, Search, Export, Import, Gdpr, Visibility). Guide utilisateur : `tms/docs/crm.md` ; tables : `tms/docs/data-dictionary.md`.
+Code dans `tms/app/Modules/Crm/` (Organisations, People, Affiliations, Opportunities, Activities, Dashboard, Timeline, Duplicates, Search, Export, Import, Gdpr, Visibility, Support). Guide utilisateur : `tms/docs/crm.md` ; tables : `tms/docs/data-dictionary.md`.
 
-- **Historique** : chaque source est un `TimelineProvider` taggé `Timeline::TAG` dans `CrmServiceProvider::register()` (notes, pièces jointes, audit). Un futur module (actions, devis…) ajoute son fournisseur au tag, sans toucher au Crm.
+- **Historique** : chaque source est un `TimelineProvider` taggé `Timeline::TAG` dans `CrmServiceProvider::register()` (notes, pièces jointes, audit, étapes d'opportunités, actions). Un futur module (devis…) ajoute son fournisseur au tag, sans toucher au Crm. Pagination par **curseur composite opaque** (`TimelineCursor` : instant µs, type, id) : un fournisseur filtre avec `Timeline::after($query, $before, 'type', 'colonne_date')` ; un curseur mal formé renvoie la première page.
+- **Données liées** : `Support\LinkedData::register('module.cle', fn ($fiche, $exceptIds) => bool)` déclare ce qui rattache une fiche (rattachements, notes, opportunités, actions…) ; l'annulation d'un import la conserve si `LinkedData::any()` est vrai. Même principe pour le dernier contact : `Timeline\LastContact::registerSource()` (les actions faites y contribuent) et `LastContact::recompute()` après suppression.
+- **Opportunités** (`Opportunities/`) : compte = entreprise **ou** particulier (CHECK, une personne non particulier est refusée) ; tout changement d'étape passe par `OpportunityStage::move()` (motif obligatoire pour perdu, gagné/perdu forcent 100/0, historique `opportunity_stage_changes`, `probability_overridden` gardé un seul déplacement) ; issue d'une étape = `meta.outcome` (`won`/`lost`) du référentiel, jamais un code. `OpportunityListQuery::build()` est l'unique requête (liste, kanban, export, accueil) : visibilité DAS et fiches en corbeille exclues.
+- **Actions** (`Activities/`) : visibilité (`CrmVisibility::activities`) = celle de l'opportunité si `opportunity_id`, sinon celle d'une fiche liée. `TodoQuery` (jours de Paris, badge en cache 60 s préfixé tenant, `onLiveFiches()`), `WeekPlanning::types()` lit le drapeau `meta.planning` (`meeting`/`call`) des types d'action — jamais de code de type en dur côté serveur. Création/complétion via `ActivityRecorder` (relance suivante incluse) ; `QuickReport` fait tout dans une transaction. L'évènement `Activities\Events\ActivityChanged` (après commit) est la seule porte vers Outlook ; le module Connectors lit les actions par `CalendarEvents` (service public, sans compte rendu).
+- **Accueil** : `Dashboard\CommercialSummary` (relances, pipeline pondéré du mois de Paris, prochains RDV) réutilise `TodoQuery`, `OpportunityListQuery` et `WeekPlanning` ; rien sans `crm.view`.
 - **Tenancy hors requête** : `ForEachTenant::run()` pour tout traitement planifié ou de maintenance (une erreur sur un organisme n'arrête pas les autres) ; `TenantStorage` pour tout chemin de fichier (`tenants/<tenant_id>/<zone>/`, disque privé) ; jamais de chemin construit à la main. `PermissionSync` (`tms:permissions:sync`, lancé par `ops/migrate.sh`) accorde **une fois** les nouveaux droits par défaut de chaque rôle ; un module déclare ses permissions via `Core\Access\Permissions::registerModule()` dans `register()` (avant `AccessServiceProvider::boot`).
 - **Types polymorphes** : `MorphAliases::register()` par module, `enforceMorphMap` actif : un modèle sans alias lève une exception ; on stocke l'alias (`organisation`, `person`…), jamais la classe.
 - **RLS et fonctions non « leakproof »** : sous FORCE RLS, un index d'expression (`lower()`, `unaccent()`, `regexp_replace()`, `@>` jsonb) n'est pas utilisé. Les clés de recherche et de doublons sont donc des **colonnes générées stockées** (`search_vector`, `dup_*`) comparées par `=` ; `import_stamps` remplace une recherche jsonb. Ne pas réintroduire d'index d'expression sur une table RLS sans vérifier le plan (`EXPLAIN`) avec le rôle `tms_app`.

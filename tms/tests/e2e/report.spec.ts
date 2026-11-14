@@ -100,7 +100,7 @@ test('phone: meeting report in fewer than 6 interactions, then seen in the plann
     await expect(page.getByText('Besoin confirmé : 6 cuisiniers en février.').first()).toBeVisible();
     await expect(page.getByText(/Rappel – E2E Brasserie du Port/).first()).toBeVisible();
     await page.goto('/crm/planning');
-    await expect(day.getByText('Fait', { exact: true })).toBeVisible();
+    await expect(day.locator('li', { hasText: 'E2E Brasserie du Port' }).getByText('Fait', { exact: true })).toBeVisible();
 
     await context.close();
 });

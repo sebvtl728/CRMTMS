@@ -1,4 +1,4 @@
-# Dictionnaire de données — lots 1a (socle) et 1b (fiches, import, RGPD)
+# Dictionnaire de données — lots 1a (socle), 1b (fiches, import, RGPD) et 1c (pipeline, actions, agenda)
 
 Identifiants : UUID v7 (`uuid`). Dates : `timestamp` (UTC en base ; affichage en heure de Paris). Suppression logique : colonne `deleted_at` (les lignes supprimées restent en base).
 
@@ -10,7 +10,7 @@ Toute table métier porte `tenant_id uuid not null` (clé étrangère vers `tena
 tenant_id = nullif(current_setting('app.tenant_id', true), '')::uuid   -- using ET with check
 ```
 
-`ENABLE` et `FORCE ROW LEVEL SECURITY` s'appliquent, y compris au propriétaire. L'application se connecte avec `tms_app` (non propriétaire, `NOBYPASSRLS`) ; la requête positionne `app.tenant_id` avant toute lecture. Sans organisme courant, aucune ligne n'est visible ni écrivable. Seules les migrations utilisent `tms_owner`. Un test d'architecture échoue si une table métier n'a pas `tenant_id` + RLS ; les tables hors périmètre sont listées dans `config/tms.php` (`tenancy.unscoped_tables`) : `tenants`, `tenant_domains`, `migrations`, `jobs`, `job_batches`, `failed_jobs`, `cache`, `cache_locks`, `sessions`, `permissions`. Les tables du lot 1b (section « CRM » ci-dessous) sont toutes soumises à la RLS.
+`ENABLE` et `FORCE ROW LEVEL SECURITY` s'appliquent, y compris au propriétaire. L'application se connecte avec `tms_app` (non propriétaire, `NOBYPASSRLS`) ; la requête positionne `app.tenant_id` avant toute lecture. Sans organisme courant, aucune ligne n'est visible ni écrivable. Seules les migrations utilisent `tms_owner`. Un test d'architecture échoue si une table métier n'a pas `tenant_id` + RLS ; les tables hors périmètre sont listées dans `config/tms.php` (`tenancy.unscoped_tables`) : `tenants`, `tenant_domains`, `migrations`, `jobs`, `job_batches`, `failed_jobs`, `cache`, `cache_locks`, `sessions`, `permissions`. Les tables des lots 1b et 1c (sections « CRM » et « Connecteurs : agenda » ci-dessous) sont toutes soumises à la RLS.
 
 ## Plateforme (hors RLS)
 
@@ -53,6 +53,7 @@ tenant_id = nullif(current_setting('app.tenant_id', true), '')::uuid   -- using 
 | `two_factor_recovery_codes` | text, null | Empreintes sha256 des codes non utilisés, JSON **chiffré** |
 | `two_factor_confirmed_at` | timestamp, null | 2FA active quand renseigné |
 | `two_factor_last_used_step` | bigint, null | Dernier pas TOTP accepté (anti-rejeu) |
+| `daily_digest` | bool, défaut `false` | Récapitulatif quotidien des actions par e-mail (7 h 30, Paris), choisi par l'utilisateur dans son profil |
 | `created_at`, `updated_at` | timestamp | |
 
 ### `password_reset_tokens` — réinitialisation de mot de passe
@@ -101,7 +102,7 @@ Mêmes colonnes que ci-dessus avec `permission_id`. Non utilisée au lot 1a.
 ## Référentiels (RLS)
 
 ### `reference_items` — valeurs des listes paramétrables
-`id`, `tenant_id` · `list` (liste : `das`, `pipeline_stage`, `action_type`, `action_result`, `contact_origin`, `loss_reason`, `establishment_type`, `sector`, `company_size`, `priority`, `funding_mode`, `professional_situation`, `legal_form_org`, `decision_role`) · `code` (slug, CHECK `^[a-z0-9]+(-[a-z0-9]+)*$`) · `label` · `position` (ordre) · `is_system` (non modifiable / supprimable) · `is_active` · `meta` (jsonb : `probability`, `outcome`, `color` selon la liste) · horodatages · `deleted_at`. Unique (`tenant_id`, `list`, `code`) — le code d'une valeur supprimée reste réservé.
+`id`, `tenant_id` · `list` (liste : `das`, `pipeline_stage`, `action_type`, `action_result`, `contact_origin`, `loss_reason`, `establishment_type`, `sector`, `company_size`, `priority`, `funding_mode`, `professional_situation`, `legal_form_org`, `decision_role`) · `code` (slug, CHECK `^[a-z0-9]+(-[a-z0-9]+)*$`) · `label` · `position` (ordre) · `is_system` (non modifiable / supprimable) · `is_active` · `meta` (jsonb selon la liste : `probability` et `outcome` (`won` / `lost`) des étapes du pipeline ; `planning` (`meeting` / `call`) des types d'action affichés au planning, dans le flux iCal et envoyés vers Outlook ; `color`) · horodatages · `deleted_at`. Unique (`tenant_id`, `list`, `code`) — le code d'une valeur supprimée reste réservé.
 
 ## Connecteurs (RLS)
 
@@ -110,6 +111,17 @@ Mêmes colonnes que ci-dessus avec `permission_id`. Non utilisée au lot 1a.
 
 ### `connector_runs` — journal d'exécution
 `id`, `tenant_id` · `connector_config_id` (FK, cascade) · `direction` (`in` / `out`) · `status` (`pending` / `success` / `failed`) · `summary` · `error` (sans secret) · `payload_ref` · `started_at`, `finished_at` · horodatages ; index (`tenant_id`, `started_at`).
+
+## Connecteurs : agenda (lot 1c, RLS)
+
+### `calendar_tokens` — liens d'abonnement iCal (« Mon agenda »)
+`id`, `tenant_id` · `user_id` (FK, cascade) · `token_hash` (char 64, unique : **empreinte sha256** du jeton ; le jeton lui-même n'est jamais stocké ni journalisé) · `created_at`, `last_used_at` (au plus une écriture par minute), `revoked_at` (timestamptz, µs). Index unique partiel (`user_id`) tant que `revoked_at` est null : un seul lien actif par utilisateur ; en créer un nouveau révoque l'ancien.
+
+### `calendar_links` — connexion Microsoft 365 d'un utilisateur
+`id`, `tenant_id` · `user_id` (FK, cascade, unique) · `provider` (`microsoft365`) · `status` (`active`, `reconnect` : Microsoft a refusé le renouvellement, jetons effacés) · `access_token`, `refresh_token` (text, **chiffrés** `APP_KEY`) · `expires_at`, `connected_at` · horodatages (timestamptz, µs). **Volontairement hors journal d'audit** (pas `Auditable`) : la ligne porte des jetons ; la connexion, la déconnexion et la reconnexion demandée sont journalisées à part (`calendar.outlook_*`, sans jeton).
+
+### `calendar_link_events` — évènements Outlook créés pour une action
+`id`, `tenant_id` · `calendar_link_id` (FK, cascade : déconnecter supprime les lignes) · `activity_id` (uuid de l'action du CRM, **sans clé étrangère** : le module Connecteurs ne lit le CRM que par son service public) · `transaction_id` (uuid envoyé à Microsoft Graph, créé avant l'envoi pour qu'une reprise ne duplique pas l'évènement) · `outlook_event_id` (512, null tant que Graph n'a pas répondu) · horodatages. Unique (`calendar_link_id`, `activity_id`).
 
 ## Audit (RLS)
 
@@ -201,6 +213,53 @@ Conventions communes : UUID v7, `tenant_id`, suppression logique (`deleted_at`) 
 
 ### `recent_views` — dernières fiches consultées
 `id` (entier) · `tenant_id` · `user_id` (FK, cascade) · `subject_type` (alias `organisation` ou `person`), `subject_id` · `viewed_at` (timestamptz, µs). Unique (`user_id`, `subject_type`, `subject_id`) ; **20 lignes conservées par utilisateur**, 5 affichées sur l'**Accueil**. Aucun nom ni donnée de la fiche n'est copié : l'affichage relit la fiche, et ne montre pas celles qui sont supprimées, fusionnées ou hors du périmètre de l'utilisateur.
+
+## CRM : pipeline et actions (lot 1c, RLS)
+
+### `opportunities` — opportunités (affaires)
+| Colonne | Type | Rôle |
+|---|---|---|
+| `id`, `tenant_id` | uuid | |
+| `organisation_id`, `person_id` | uuid, null (FK, cascade) | Compte : **exactement un** des deux (CHECK `opportunities_account_check`) ; une personne n'est compte que si elle est **particulier** |
+| `title` | string 200 | Objet (conservé après l'anonymisation d'un particulier : ne pas y mettre de nom) |
+| `das_id`, `stage_id` | uuid (FK `reference_items`) | DAS (visibilité du Responsable DAS) et étape (`pipeline_stage`) |
+| `probability` | smallint 0–100 (CHECK) | Probabilité ; suit l'étape, forcée à 100 / 0 sur gagné / perdu |
+| `probability_overridden` | bool, défaut `false` | Probabilité saisie à la main depuis le dernier changement d'étape (remise à `false` à chaque changement) |
+| `amount` | numeric(12,2), null (CHECK ≥ 0) | Montant estimé |
+| `weighted_amount` | numeric(12,2), **générée stockée** | `round(amount × probability / 100, 2)` |
+| `expected_close_on` | date, null | Clôture prévue |
+| `priority_id`, `funding_mode_id` | uuid, null (FK `reference_items`) | Priorité, mode de financement |
+| `loss_reason_id`, `loss_comment` | uuid / text, null | Motif (obligatoire pour perdu) et commentaire de perte (donnée personnelle possible : masqué au journal, effacé à l'anonymisation) |
+| `won_on`, `lost_on` | date, null | Dates de gain / de perte (effacées si l'affaire est rouverte) |
+| `responsible_user_id`, `created_by`, `updated_by` | uuid, null (FK `users`) | |
+| `source_system`, `source_id` | string, null | Identifiant d'origine (import) ; unique partiel par organisme |
+| `created_at`, `updated_at`, `deleted_at` | timestamp | Suppression logique |
+
+Index : (`tenant_id`, `stage_id`), (`tenant_id`, `das_id`), (`tenant_id`, `responsible_user_id`), (`tenant_id`, `expected_close_on`), `organisation_id`, `person_id`.
+
+### `opportunity_contacts` — interlocuteurs d'une opportunité
+`tenant_id` · `opportunity_id` (FK, cascade) · `person_id` (FK, cascade) ; PK (`opportunity_id`, `person_id`). Un particulier est automatiquement son propre contact.
+
+### `opportunity_stage_changes` — historique des étapes
+`id`, `tenant_id` · `opportunity_id` (FK, cascade) · `from_stage_id` (null à la création), `to_stage_id` (FK `reference_items`) · `loss_reason_id` (null ; motif donné lors de ce passage à perdu, gardé même si l'affaire est rouverte) · `changed_by` · `changed_at` (timestamptz, µs). Index (`opportunity_id`, `changed_at`). Alimente l'**Historique** des fiches.
+
+### `activities` — actions (appels, rendez-vous, e-mails, relances)
+| Colonne | Type | Rôle |
+|---|---|---|
+| `id`, `tenant_id` | uuid | |
+| `type_id`, `result_id` | uuid (FK `reference_items` : `action_type`, `action_result`) | Type ; résultat (null) |
+| `subject` | string 200 | Objet (« Appel – Hôtel du Lac » par défaut) ; masqué au journal, remis au libellé du type à l'anonymisation |
+| `report` | text, null | Compte rendu ; masqué au journal, effacé à l'anonymisation |
+| `location` | string 255, null | Lieu ; masqué au journal, effacé à l'anonymisation |
+| `organisation_id`, `person_id`, `opportunity_id` | uuid, null (FK, cascade) | Au moins un (CHECK `activities_subject_check`) |
+| `due_at` | timestamptz(6), null | Échéance (action à faire) |
+| `done_at` | timestamptz(6), null | Réalisation ; au moins une des deux dates (CHECK `activities_date_check`) ; jamais dans le futur |
+| `happened_at` | timestamptz(6), **générée stockée** | `coalesce(done_at, due_at)` : ordre et curseur de l'historique |
+| `duration_minutes` | smallint, null (CHECK 1–1440) | Durée |
+| `responsible_user_id`, `created_by` | uuid, null (FK `users`) | |
+| `created_at`, `updated_at`, `deleted_at` | timestamptz(6) | Suppression logique |
+
+Index : partiel « À faire » (`tenant_id`, `responsible_user_id`, `due_at`) `where done_at is null and deleted_at is null` ; (`tenant_id`, `happened_at`) ; `organisation_id`, `person_id`, `opportunity_id`. Une action faite met à jour `last_contact_at` des fiches concernées (supprimée ou avancée : recalcul).
 
 ## CRM : import (lot 1b, RLS)
 
