@@ -126,7 +126,8 @@ class Opportunity extends Model
         $created = CarbonImmutable::instance($this->created_at)->setTimezone($tz)->startOfDay();
         $won = CarbonImmutable::parse($this->won_on->toDateString(), $tz)->startOfDay();
 
-        return (int) $created->diffInDays($won);
+        // Won before it was entered in the CRM (dated afterwards): no negative cycle.
+        return max(0, (int) $created->diffInDays($won));
     }
 
     /**

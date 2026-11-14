@@ -183,3 +183,13 @@ it('keeps the probability of a won or lost opportunity', function () {
     expect($opportunity->probability)->toBe(100)
         ->and($opportunity->title)->toBe('Renommée');
 });
+
+it('never computes a negative cycle when won before it was entered', function () {
+    $this->travelTo(CarbonImmutable::parse('2026-11-13 09:00', 'Europe/Paris'));
+    $opportunity = stageOpportunity();
+    $this->actingAs(commercial())->post("/crm/opportunities/{$opportunity->id}/stage", ['stage_id' => pipelineStage('Gagné')->id, 'won_on' => '2026-11-02'])
+        ->assertSessionHasNoErrors();
+
+    expect($opportunity->refresh()->won_on?->toDateString())->toBe('2026-11-02')
+        ->and($opportunity->cycleDays())->toBe(0);
+});
