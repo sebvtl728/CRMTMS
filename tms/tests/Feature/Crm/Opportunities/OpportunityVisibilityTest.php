@@ -4,6 +4,7 @@ use App\Modules\Core\Access\Role;
 use App\Modules\Core\References\CapFormationReferenceSeeder;
 use App\Modules\Core\References\ReferenceList;
 use App\Modules\Crm\CrmServiceProvider;
+use App\Modules\Crm\Opportunities\OpportunitiesProvider;
 use App\Modules\Crm\Opportunities\Opportunity;
 use App\Modules\Crm\Organisations\Organisation;
 use App\Modules\Crm\Visibility\CrmVisibility;
@@ -90,4 +91,14 @@ it('refuses to edit an opportunity of a trashed fiche', function () {
     $this->post("/crm/opportunities/{$opportunity->id}/stage", ['stage_id' => pipelineStage('Contacté')->id])->assertForbidden();
     $this->delete("/crm/opportunities/{$opportunity->id}")->assertForbidden();
     expect($opportunity->refresh()->stage_id)->toBe(pipelineStage('Nouveau')->id);
+});
+
+it('the opportunity history provider fails closed without a signed-in user', function () {
+    $this->actingAs(commercial());
+    $org = Organisation::query()->create(['name' => 'Hôtel du Lac']);
+    makeOpportunity($org, ['title' => 'HACCP']);
+    expect(app(OpportunitiesProvider::class)->entriesFor($org, null, 30))->toHaveCount(1);
+    auth()->logout();
+
+    expect(app(OpportunitiesProvider::class)->entriesFor($org, null, 30))->toHaveCount(0);
 });

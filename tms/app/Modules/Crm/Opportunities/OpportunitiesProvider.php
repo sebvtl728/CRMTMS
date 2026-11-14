@@ -18,8 +18,8 @@ use Illuminate\Support\Facades\Auth;
  * « Historique » of an entreprise or a particulier: the stage history of the
  * opportunities it holds (created, « Étude → Proposition », won, lost with
  * the reason given then). Deleted opportunities are left out; a Responsable
- * DAS only sees those of his DAS. The loss comment is never shown (it may
- * describe the person).
+ * DAS only sees those of his DAS; none without a signed-in viewer. The
+ * loss comment is never shown (it may describe the person).
  */
 final class OpportunitiesProvider implements TimelineProvider
 {
@@ -27,15 +27,15 @@ final class OpportunitiesProvider implements TimelineProvider
 
     public function entriesFor(Model $subject, ?TimelineCursor $before, int $limit): Collection
     {
-        if (! $subject instanceof Organisation && ! $subject instanceof Person) {
+        $user = Auth::user();
+        if ((! $subject instanceof Organisation && ! $subject instanceof Person) || ! $user instanceof User) {
             return collect();
         }
 
-        $opportunities = Opportunity::query()->where($subject instanceof Organisation ? 'organisation_id' : 'person_id', $subject->getKey());
-        $user = Auth::user();
-        if ($user instanceof User) {
-            $opportunities = CrmVisibility::opportunities($opportunities, $user);
-        }
+        $opportunities = CrmVisibility::opportunities(
+            Opportunity::query()->where($subject instanceof Organisation ? 'organisation_id' : 'person_id', $subject->getKey()),
+            $user,
+        );
 
         return StageChange::query()->with(['opportunity:id,title', 'fromStage', 'toStage', 'lossReason', 'changer:id,name'])
             ->whereIn('opportunity_id', $opportunities->select('opportunities.id'))
