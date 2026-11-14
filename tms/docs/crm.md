@@ -69,7 +69,7 @@ Depuis la fiche, onglet **Opportunités**, **Nouvelle opportunité** (ou depuis 
 
 Les étapes (Nouveau, Contacté, Étude, Proposition, Négociation, Gagné, Perdu chez CAP FORMATION) sont paramétrées par l'administrateur, chacune avec une **probabilité** par défaut. Le **montant pondéré** = montant × probabilité.
 
-- À chaque changement d'étape, la probabilité reprend celle de la nouvelle étape. Une probabilité saisie à la main est gardée jusqu'au changement d'étape suivant.
+- À chaque changement d'étape, la probabilité reprend celle de la nouvelle étape. Une probabilité saisie à la main est conservée au prochain changement d'étape, puis l'étape reprend la main (Gagné et Perdu imposent toujours la leur).
 - **Gagné** fixe la probabilité à 100 % et demande la **date de gain** (aujourd'hui par défaut, jamais dans le futur).
 - **Perdu** fixe la probabilité à 0 % et **exige un motif de perte** (liste paramétrable : Prix, Financement refusé, Concurrent…), avec un commentaire facultatif. Sans motif, le changement est refusé.
 - Rouvrir une affaire gagnée ou perdue efface la date, le motif et le commentaire ; l'historique garde le motif donné à l'époque.

@@ -15,7 +15,7 @@ Lot 1c : pipeline commercial, actions et relances, planning, agenda.
   clôture prévue, priorité, mode de financement, interlocuteurs, responsable. Liste filtrable avec totaux et
   **export Excel**.
 - **Étapes du pipeline** paramétrables avec leur probabilité : la probabilité suit l'étape (une saisie manuelle est
-  gardée jusqu'au changement suivant), « Gagné » demande la date de gain, « Perdu » **exige un motif de perte**.
+  conservée au prochain changement d'étape, puis l'étape reprend la main), « Gagné » demande la date de gain, « Perdu » **exige un motif de perte**.
   Chaque changement est tracé dans l'historique de la fiche.
 - **Pipeline (kanban)** : une colonne par étape avec nombre, montant et pondéré ; glisser-déposer à la souris ou au
   clavier ; affaires gagnées et perdues des 90 derniers jours ; liste par étape sur téléphone.
