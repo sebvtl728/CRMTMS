@@ -578,7 +578,7 @@ class ImportController extends Controller
         if ($target === ImportTarget::Trainings) {
             return match ($strategy) {
                 DuplicateStrategy::Skip => 'Si une formation du catalogue a le même code, la ligne est ignorée : la formation n\'est pas touchée.',
-                DuplicateStrategy::Merge => 'Si une formation du catalogue a le même code, elle est mise à jour avec les valeurs non vides du fichier.',
+                DuplicateStrategy::Merge => 'Si une formation du catalogue a le même code, elle est mise à jour avec les valeurs non vides du fichier ; une cellule « Financements » non vide remplace les financements enregistrés.',
                 DuplicateStrategy::Create => 'Une nouvelle formation est créée ; une ligne dont le code est déjà utilisé est refusée.',
             };
         }

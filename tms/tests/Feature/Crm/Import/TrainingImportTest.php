@@ -206,8 +206,10 @@ it('undoes an import except a training used or modified since', function () {
     $this->travel(5)->minutes();
     trainingByCode('EXCEL')->update(['title' => 'Excel perfectionnement']);
 
-    expect(UndoPreview::for($batch)['removable'])->toBe(2)
-        ->and(UndoPreview::for($batch)['keptModified'])->toBe(1);
+    // The preview matches the undo: SST (used) and EXCEL (edited) are kept.
+    expect(UndoPreview::for($batch)['removable'])->toBe(1)
+        ->and(UndoPreview::for($batch)['keptModified'])->toBe(2)
+        ->and(UndoPreview::for($batch)['byType'])->toBe(['training' => 1]);
 
     UndoImport::dispatch($batch->id, $this->user->id);
 
@@ -245,7 +247,8 @@ it('describes the duplicate strategies in catalogue terms', function () {
     $this->get("/crm/import/{$batch->id}")->assertInertia(fn (Assert $page) => $page
         ->component('crm/import/simulation')
         ->where('strategy.options.1.label', 'Mettre à jour la formation existante')
-        ->where('strategy.options.1.description', fn (string $d) => str_contains($d, 'même code')));
+        ->where('strategy.options.1.description', fn (string $d) => str_contains($d, 'même code')
+            && str_contains($d, 'une cellule « Financements » non vide remplace les financements enregistrés')));
 });
 
 it('guesses the usual headers of a catalogue file', function () {

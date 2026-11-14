@@ -3,6 +3,7 @@
 namespace App\Modules\Crm\Import;
 
 use App\Modules\Catalogue\Trainings;
+use App\Modules\Catalogue\TrainingUsage;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\Relation;
 
@@ -64,8 +65,9 @@ final class UndoPreview
     }
 
     /**
-     * Trainings, read through the catalogue's public service (a training used
-     * since is only known when removing, like the linked data of a fiche).
+     * Trainings, read through the catalogue's public services: one modified
+     * or used since the import is counted as kept (keptModified), as the
+     * undo keeps it.
      *
      * @param  list<string>  $ids
      * @param  array<string, string>  $stamps
@@ -80,7 +82,8 @@ final class UndoPreview
                 continue;
             }
             $stamp = $stamps[Trainings::MORPH_ALIAS.':'.$id] ?? null;
-            if ($stamp !== null && $stamp !== $training->updated_at) {
+            // Kept like the undo does: modified, or used since (TrainingUsage).
+            if (($stamp !== null && $stamp !== $training->updated_at) || TrainingUsage::isUsed($id)) {
                 $result['keptModified']++;
             } else {
                 $result['removable']++;
