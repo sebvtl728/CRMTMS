@@ -51,7 +51,7 @@ final class OpportunityExport implements ExportResource
         return [...OpportunityRows::WITH, 'fundingMode', 'lossReason'];
     }
 
-    public function value(Model $model, string $column): ?string
+    public function value(Model $model, string $column): string|ExportCell|null
     {
         assert($model instanceof Opportunity);
 
@@ -61,24 +61,18 @@ final class OpportunityExport implements ExportResource
             'target' => $model->isIndividual() ? 'Particulier' : 'Entreprise',
             'das' => $model->das?->label,
             'stage' => $model->stage?->label,
-            'probability' => (string) $model->probability,
-            'amount' => self::amount($model->amount),
-            'weighted_amount' => self::amount($model->weighted_amount),
-            'expected_close_on' => $model->expected_close_on?->format('d/m/Y'),
+            'probability' => ExportCell::integer($model->probability),
+            'amount' => ExportCell::amount($model->amount),
+            'weighted_amount' => ExportCell::amount($model->weighted_amount),
+            'expected_close_on' => ExportCell::date($model->expected_close_on),
             'priority' => $model->priority?->label,
             'responsible' => $model->responsible?->name,
             'funding_mode' => $model->fundingMode?->label,
-            'won_on' => $model->won_on?->format('d/m/Y'),
-            'lost_on' => $model->lost_on?->format('d/m/Y'),
+            'won_on' => ExportCell::date($model->won_on),
+            'lost_on' => ExportCell::date($model->lost_on),
             'loss_reason' => $model->lossReason?->label,
-            'created_at' => $model->created_at?->format('d/m/Y'),
+            'created_at' => ExportCell::date($model->created_at),
             default => null,
         };
-    }
-
-    /** French amount, « 1 234,50 ». */
-    private static function amount(?string $value): ?string
-    {
-        return $value === null ? null : number_format((float) $value, 2, ',', ' ');
     }
 }

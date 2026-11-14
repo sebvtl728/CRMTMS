@@ -31,7 +31,7 @@ function exRows(TestResponse $response): array
     $rows = [];
     foreach ($reader->getSheetIterator() as $sheet) {
         foreach ($sheet->getRowIterator() as $row) {
-            $rows[] = array_map(fn ($v) => (string) $v, $row->toArray());
+            $rows[] = array_map(fn ($v) => $v instanceof DateTimeInterface ? $v->format('d/m/Y') : (string) $v, $row->toArray());
         }
         break;
     }

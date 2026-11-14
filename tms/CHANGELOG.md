@@ -46,6 +46,8 @@ Lot 1c : pipeline commercial, actions et relances, planning, agenda.
 - L'historique d'une fiche se pagine sans perte ni doublon, même pour des évènements à la même microseconde.
 - Les fiches sont lisibles sur un téléphone de 375 px sans défilement horizontal (fil d'Ariane raccourci).
 - L'export des personnes propose aussi le système source, l'identifiant source et la base légale.
+- Les exports Excel écrivent montants, probabilités et dates comme de vrais nombres et de vraies dates (format
+  français) : ils s'additionnent, se trient et se filtrent dans Excel.
 
 ### Sécurité et fiabilité
 

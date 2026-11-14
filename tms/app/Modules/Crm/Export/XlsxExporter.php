@@ -3,9 +3,13 @@
 namespace App\Modules\Crm\Export;
 
 use App\Modules\Core\Users\User;
+use DateTimeInterface;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Validation\ValidationException;
+use OpenSpout\Common\Entity\Cell;
+use OpenSpout\Common\Entity\Cell\DateTimeCell;
+use OpenSpout\Common\Entity\Cell\NumericCell;
 use OpenSpout\Common\Entity\Row;
 use OpenSpout\Common\Entity\Style\Style;
 use OpenSpout\Writer\XLSX\Writer;
@@ -14,9 +18,10 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
 /**
  * Streams a list as an .xlsx download (OpenSpout, constant memory).
  *
- * Every cell is written as text, so a SIRET never turns into 7,32829E+13.
- * Text a spreadsheet could read as a formula is neutralised (OWASP CSV
- * injection): see neutralise().
+ * Cells are text unless the resource types them (ExportCell: amounts,
+ * percentages, dates, with their French display format): a SIRET never
+ * turns into 7,32829E+13. Text a spreadsheet could read as a formula is
+ * neutralised (OWASP CSV injection): see neutralise().
  */
 final class XlsxExporter
 {
@@ -72,9 +77,10 @@ final class XlsxExporter
             $writer->getCurrentSheet()->setName($resource->sheetName());
             $writer->addRow(Row::fromValues($headers, (new Style)->setFontBold()));
 
+            $styles = [];
             foreach ((clone $query)->with($resource->with($user))->lazy(self::CHUNK) as $model) {
-                $writer->addRow(Row::fromValues(array_map(
-                    fn (string $c) => self::neutralise($resource->value($model, $c)) ?? '',
+                $writer->addRow(new Row(array_map(
+                    fn (string $c) => self::cell($resource->value($model, $c), $styles),
                     $columns,
                 )));
             }
@@ -84,6 +90,21 @@ final class XlsxExporter
             'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
             'Cache-Control' => 'no-store, private',
         ]);
+    }
+
+    /**
+     * @param  array<string, Style>  $styles  one style per number format, reused
+     */
+    private static function cell(string|ExportCell|null $value, array &$styles): Cell
+    {
+        if (! $value instanceof ExportCell) {
+            return Cell::fromValue(self::neutralise($value) ?? '');
+        }
+        $style = $styles[$value->format] ??= (new Style)->setFormat($value->format);
+
+        return $value->value instanceof DateTimeInterface
+            ? new DateTimeCell($value->value, $style)
+            : new NumericCell($value->value, $style);
     }
 
     public static function tooManyRows(int $count, int $max): string

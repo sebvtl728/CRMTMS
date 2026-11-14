@@ -35,5 +35,8 @@ interface ExportResource
      */
     public function with(User $user): array;
 
-    public function value(Model $model, string $column): ?string;
+    /**
+     * The cell of $column: text, or a typed number / date (ExportCell).
+     */
+    public function value(Model $model, string $column): string|ExportCell|null;
 }

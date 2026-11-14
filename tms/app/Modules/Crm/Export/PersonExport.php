@@ -61,7 +61,7 @@ final class PersonExport implements ExportResource
         return [...CrmVisibility::activeAffiliationsWith($user), 'professionalSituation', 'fundingMode', 'origin', 'responsible'];
     }
 
-    public function value(Model $model, string $column): ?string
+    public function value(Model $model, string $column): string|ExportCell|null
     {
         assert($model instanceof Person);
         $affiliations = $model->activeAffiliations;
@@ -87,8 +87,8 @@ final class PersonExport implements ExportResource
             'funding' => $model->fundingMode?->label,
             'origin' => $model->origin?->label,
             'responsible' => $model->responsible?->name,
-            'last_contact_at' => $model->last_contact_at?->format('d/m/Y'),
-            'created_at' => $model->created_at?->format('d/m/Y'),
+            'last_contact_at' => ExportCell::date($model->last_contact_at),
+            'created_at' => ExportCell::date($model->created_at),
             'source_system' => $model->source_system,
             'source_id' => $model->source_id,
             'legal_basis' => $model->legal_basis->label(),

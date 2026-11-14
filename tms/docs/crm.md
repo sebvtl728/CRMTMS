@@ -238,7 +238,7 @@ L'historique des imports est conservé ; le fichier d'origine (et les valeurs br
 
 ## 10. Exporter
 
-Dans les listes **Entreprises**, **Personnes** et **Opportunités** (sur ordinateur), **Exporter (.xlsx)** télécharge un fichier Excel de **la liste telle qu'elle est filtrée**, avec les colonnes choisies dans **Colonnes**. Un contrôle préalable refuse l'export, avec un message, s'il dépasse la limite de lignes (50 000 par défaut) ou si vous exportez trop souvent. Chaque export est tracé dans le journal d'audit. Les valeurs commençant par `=`, `+`, `-` ou `@` sont neutralisées pour ne pas être exécutées par Excel. Les dates et montants sont au format français. L'export des personnes propose aussi les colonnes **Système source**, **Identifiant source** (fiches importées) et **Base légale** (RGPD).
+Dans les listes **Entreprises**, **Personnes** et **Opportunités** (sur ordinateur), **Exporter (.xlsx)** télécharge un fichier Excel de **la liste telle qu'elle est filtrée**, avec les colonnes choisies dans **Colonnes**. Un contrôle préalable refuse l'export, avec un message, s'il dépasse la limite de lignes (50 000 par défaut) ou si vous exportez trop souvent. Chaque export est tracé dans le journal d'audit. Les valeurs commençant par `=`, `+`, `-` ou `@` sont neutralisées pour ne pas être exécutées par Excel. Les montants, probabilités et dates sont de vrais nombres et de vraies dates (affichés « 1 234,50 € » et « 20/12/2026 ») : Excel peut les additionner, les trier et les filtrer. Les autres colonnes (SIRET, téléphones…) restent du texte. L'export des personnes propose aussi les colonnes **Système source**, **Identifiant source** (fiches importées) et **Base légale** (RGPD).
 
 ## 11. RGPD
 

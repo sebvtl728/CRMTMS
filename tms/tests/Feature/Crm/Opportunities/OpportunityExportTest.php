@@ -9,6 +9,10 @@ use App\Modules\Crm\Opportunities\OpportunityStage;
 use App\Modules\Crm\Organisations\Organisation;
 use Carbon\CarbonImmutable;
 use Illuminate\Testing\TestResponse;
+use OpenSpout\Common\Entity\Cell\DateTimeCell;
+use OpenSpout\Common\Entity\Cell\EmptyCell;
+use OpenSpout\Common\Entity\Cell\NumericCell;
+use OpenSpout\Common\Entity\Cell\StringCell;
 use OpenSpout\Reader\XLSX\Reader;
 
 beforeEach(function () {
@@ -29,7 +33,7 @@ function oxRows(TestResponse $response): array
     $rows = [];
     foreach ($reader->getSheetIterator() as $sheet) {
         foreach ($sheet->getRowIterator() as $row) {
-            $rows[] = array_map(fn ($v) => (string) $v, $row->toArray());
+            $rows[] = array_map(fn ($v) => $v instanceof DateTimeInterface ? $v->format('d/m/Y') : (string) $v, $row->toArray());
         }
         break;
     }
@@ -51,7 +55,7 @@ it('exports the opportunities with french headers and values', function () {
     expect($response->headers->get('content-disposition'))->toContain('opportunites-20261114-1530.xlsx');
     expect(oxRows($response))->toBe([
         ['Objet', 'Compte', 'Type de compte', 'DAS', 'Étape', 'Probabilité (%)', 'Montant (€)', 'Montant pondéré (€)', 'Clôture prévue', 'Priorité', 'Responsable'],
-        ['HACCP', 'Le Bistrot', 'Entreprise', 'Hôtellerie-restauration', 'Nouveau', '10', '1 234,50', '123,45', '20/12/2026', 'Élevé', $user->name],
+        ['HACCP', 'Le Bistrot', 'Entreprise', 'Hôtellerie-restauration', 'Nouveau', '10', '1234.5', '123.45', '20/12/2026', 'Élevé', $user->name],
     ]);
 
     $this->get('/crm/opportunities/export?columns[]=password')->assertSessionHasErrors('columns');
@@ -112,4 +116,47 @@ it('needs crm.export and pre-flights like the other lists', function () {
     config()->set('tms.crm.export_max_rows', 0);
     $this->getJson('/crm/opportunities/export/check')->assertOk()->assertJson(['allowed' => false]);
     expect(AuditLog::query()->where('event', 'export.run')->count())->toBe(0);
+});
+
+it('writes amounts, probability and dates as real numbers and dates with french formats', function () {
+    $user = commercial();
+    $this->actingAs($user);
+    $this->travelTo(CarbonImmutable::parse('2026-11-14 00:30', 'Europe/Paris'));
+    $org = Organisation::query()->create(['name' => 'Le Bistrot']);
+    makeOpportunity($org, ['title' => 'HACCP', 'amount' => '1234.5', 'expected_close_on' => '2026-12-20']);
+
+    $response = $this->get('/crm/opportunities/export?columns[]=title&columns[]=probability&columns[]=amount&columns[]=weighted_amount&columns[]=expected_close_on&columns[]=created_at&columns[]=won_on');
+    $response->assertOk();
+    $path = tempnam(sys_get_temp_dir(), 'xlsx').'.xlsx';
+    file_put_contents($path, $response->streamedContent());
+
+    $reader = new Reader;
+    $reader->open($path);
+    $cells = [];
+    foreach ($reader->getSheetIterator() as $sheet) {
+        foreach ($sheet->getRowIterator() as $i => $row) {
+            if ($i === 2) {
+                $cells = $row->getCells();
+            }
+        }
+        break;
+    }
+    $reader->close();
+
+    expect($cells[0])->toBeInstanceOf(StringCell::class)
+        ->and($cells[1])->toBeInstanceOf(NumericCell::class)->and($cells[1]->getValue())->toBe(10)
+        ->and($cells[2])->toBeInstanceOf(NumericCell::class)->and($cells[2]->getValue())->toBe(1234.5)
+        ->and($cells[3])->toBeInstanceOf(NumericCell::class)->and($cells[3]->getValue())->toBe(123.45)
+        ->and($cells[4])->toBeInstanceOf(DateTimeCell::class)->and($cells[4]->getValue()->format('Y-m-d H:i'))->toBe('2026-12-20 00:00')
+        // Created at 00:30 in Paris (23:30 UTC the day before): the Paris day.
+        ->and($cells[5])->toBeInstanceOf(DateTimeCell::class)->and($cells[5]->getValue()->format('Y-m-d'))->toBe('2026-11-14')
+        ->and($cells[6])->toBeInstanceOf(EmptyCell::class);
+
+    // Number formats: « 1 234,50 € » and « 20/12/2026 » in a french Excel.
+    $zip = new ZipArchive;
+    $zip->open($path);
+    $styles = (string) $zip->getFromName('xl/styles.xml');
+    $zip->close();
+    unlink($path);
+    expect($styles)->toContain('formatCode="#,##0.00\\ &quot;€&quot;"')->toContain('formatCode="dd/mm/yyyy"');
 });
