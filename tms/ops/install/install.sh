@@ -28,7 +28,7 @@ set -euo pipefail
 
 # GitHub repository publishing the releases ("owner/repo"). Set once the
 # repository exists; until then TMS_DIST_URL and TMS_IMAGE_OWNER are required.
-TMS_GITHUB_REPO="${TMS_GITHUB_REPO:-}"
+TMS_GITHUB_REPO="${TMS_GITHUB_REPO:-sebvtl728/CRMTMS}"
 
 TMS_DIR="${TMS_DIR:-/opt/tms}"
 TMS_SYSTEMD_DIR="${TMS_SYSTEMD_DIR:-/etc/systemd/system}"

@@ -5,7 +5,7 @@ Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) ; ve
 
 ## [Non publié]
 
-## [0.3.0] - à publier
+## [0.3.0] - 2026-11-14
 
 Lot 1c : pipeline commercial, actions et relances, planning, agenda.
 
@@ -123,6 +123,7 @@ Lot 1a : socle de l'application.
   mise à jour avec retour arrière automatique.
 - Publication : image multi-architecture signée (cosign), archive de version, sommes de contrôle.
 
-[Non publié]: https://github.com/OWNER/REPO/compare/v0.2.0...HEAD
-[0.2.0]: https://github.com/OWNER/REPO/compare/v0.1.0...v0.2.0
-[0.1.0]: https://github.com/OWNER/REPO/releases/tag/v0.1.0
+[Non publié]: https://github.com/sebvtl728/CRMTMS/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/sebvtl728/CRMTMS/compare/v0.2.0...v0.3.0
+[0.2.0]: https://github.com/sebvtl728/CRMTMS/compare/v0.1.0...v0.2.0
+[0.1.0]: https://github.com/sebvtl728/CRMTMS/releases/tag/v0.1.0

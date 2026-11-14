@@ -13,7 +13,7 @@ RESTIC_IMAGE="${RESTIC_IMAGE:-restic/restic:0.18.0}"
 TMS_LOCK_FILE="${TMS_LOCK_FILE:-$TMS_DIR/.ops.lock}"
 # GitHub repository publishing the releases ("owner/repo"); same constant in
 # install/install.sh and install/proxmox.sh. Until set, TMS_DIST_URL is required.
-TMS_GITHUB_REPO="${TMS_GITHUB_REPO:-}"
+TMS_GITHUB_REPO="${TMS_GITHUB_REPO:-sebvtl728/CRMTMS}"
 
 export LAST_ERROR=""
 

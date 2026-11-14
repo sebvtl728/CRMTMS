@@ -119,7 +119,7 @@ de s'exécuter sur une installation existante (`/opt/tms/.env` présent) : pour 
 Sur le nœud, en root :
 
 ```bash
-bash -c "$(curl -fsSL https://github.com/<propriétaire>/<dépôt>/releases/latest/download/proxmox.sh)"
+bash -c "$(curl -fsSL https://github.com/sebvtl728/CRMTMS/releases/latest/download/proxmox.sh)"
 ```
 
 Les questions s'affichent (whiptail). Sans questions :
@@ -127,8 +127,8 @@ Les questions s'affichent (whiptail). Sans questions :
 ```bash
 TMS_NONINTERACTIVE=1 TMS_DOMAIN=tms.example.org TMS_ADMIN_EMAIL=admin@example.org \
 TMS_TENANT_NAME="CAP FORMATION" CT_IP=192.168.1.50/24 CT_GW=192.168.1.1 \
-TMS_DIST_URL=https://github.com/<propriétaire>/<dépôt>/releases/latest/download \
-  bash -c "$(curl -fsSL https://github.com/<propriétaire>/<dépôt>/releases/latest/download/proxmox.sh)"
+TMS_DIST_URL=https://github.com/sebvtl728/CRMTMS/releases/latest/download \
+  bash -c "$(curl -fsSL https://github.com/sebvtl728/CRMTMS/releases/latest/download/proxmox.sh)"
 ```
 
 Le script vérifie `pveversion`, prend le prochain identifiant libre (`pvesh get /cluster/nextid`), télécharge
@@ -146,8 +146,8 @@ En root :
 
 ```bash
 TMS_DOMAIN=tms.example.org TMS_ADMIN_EMAIL=admin@example.org TMS_TENANT_NAME="CAP FORMATION" \
-TMS_DIST_URL=https://github.com/<propriétaire>/<dépôt>/releases/latest/download \
-  bash -c "$(curl -fsSL https://github.com/<propriétaire>/<dépôt>/releases/latest/download/install.sh)"
+TMS_DIST_URL=https://github.com/sebvtl728/CRMTMS/releases/latest/download \
+  bash -c "$(curl -fsSL https://github.com/sebvtl728/CRMTMS/releases/latest/download/install.sh)"
 ```
 
 Étapes : installation de Docker (dépôt officiel) si absent → téléchargement de `SHA256SUMS` et de
