@@ -14,18 +14,17 @@ use Illuminate\Database\Eloquent\Builder;
  * (an « Appel » with a due date), Monday to Sunday on Paris calendar days,
  * placed at their due date (when they were planned), else when done.
  *
- * Meetings and calls are recognised by the stable code of their action
- * type (the label is the organisme's, the code never changes): the types
- * « Prise de rendez-vous » and « Rendez-vous physique », and « Appel ».
+ * Meetings and calls are the action types the organisme flagged so in its
+ * reference list (meta.planning « meeting » / « call »; CAP FORMATION:
+ * « Prise de rendez-vous », « Rendez-vous physique » and « Appel »).
  * Always filtered by the visibility of the viewer, whoever's planning it
  * is; actions on a fiche in the trash are left out (as in « À faire »).
  */
 final class WeekPlanning
 {
-    /** @var list<string> */
-    public const MEETING_CODES = ['prise-de-rendez-vous', 'rendez-vous-physique'];
+    public const MEETING = 'meeting';
 
-    public const CALL_CODE = 'appel';
+    public const CALL = 'call';
 
     /** Rows of a week, at most. */
     public const LIMIT = 500;
@@ -71,7 +70,7 @@ final class WeekPlanning
     public static function days(User $viewer, User $owner, CarbonImmutable $monday): array
     {
         $types = self::types();
-        $meetings = array_keys(array_filter($types, fn (string $code) => $code !== self::CALL_CODE));
+        $meetings = array_keys(array_filter($types, fn (string $kind) => $kind === self::MEETING));
         $nextMonday = $monday->addDays(7)->startOfDay();
         $format = fn (CarbonImmutable $at): string => $at->format('Y-m-d H:i:sP');
 
@@ -92,7 +91,7 @@ final class WeekPlanning
             unset($row['report']); // a list: the report stays on the fiche
             $byDay[$at->toDateString()][] = [
                 ...$row,
-                'kind' => ($types[$activity->type_id] ?? '') === self::CALL_CODE ? 'call' : 'meeting',
+                'kind' => $types[$activity->type_id] ?? self::MEETING,
                 'at' => $at->toIso8601String(),
                 'time' => $at->format('H:i'),
             ];
@@ -112,17 +111,22 @@ final class WeekPlanning
     }
 
     /**
-     * Ids of the meeting and call types (deleted ones too: old actions keep
-     * their type), with their code.
+     * Ids of the action types flagged for the planning (deleted ones too:
+     * old actions keep their type), with their kind (meeting / call).
      *
      * @return array<string, string>
      */
     public static function types(): array
     {
-        /** @var array<string, string> */
-        return ReferenceItem::withTrashed()->where('list', ReferenceList::ActionType)
-            ->whereIn('code', [...self::MEETING_CODES, self::CALL_CODE])
-            ->pluck('code', 'id')->all();
+        $types = [];
+        foreach (ReferenceItem::withTrashed()->where('list', ReferenceList::ActionType)->get(['id', 'meta']) as $item) {
+            $kind = $item->meta['planning'] ?? null;
+            if ($kind === self::MEETING || $kind === self::CALL) {
+                $types[$item->id] = $kind;
+            }
+        }
+
+        return $types;
     }
 
     /**
@@ -132,7 +136,7 @@ final class WeekPlanning
      */
     public static function meetingTypes(): array
     {
-        return array_keys(array_filter(self::types(), fn (string $code) => $code !== self::CALL_CODE));
+        return array_keys(array_filter(self::types(), fn (string $kind) => $kind === self::MEETING));
     }
 
     private static function tz(): string

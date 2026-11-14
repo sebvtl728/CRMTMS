@@ -2,6 +2,7 @@
 
 use App\Modules\Core\Access\Role;
 use App\Modules\Core\References\CapFormationReferenceSeeder;
+use App\Modules\Core\References\ReferenceItem;
 use App\Modules\Core\References\ReferenceList;
 use App\Modules\Core\Users\User;
 use App\Modules\Crm\Activities\Activity;
@@ -123,6 +124,23 @@ it('shows meetings to do or done and planned calls, nothing else', function () {
         ->and($rdv)->not->toHaveKey('report')
         ->and($page['days'][3]['items'][1]['kind'])->toBe('call')
         ->and($page['days'][0]['items'][0]['status'])->toBe('done');
+});
+
+it('follows the planning flag of the action types, not their codes', function () {
+    $this->travelTo(planAt('2026-11-18 10:00:00'));
+    $user = commercial();
+    $this->actingAs($user);
+    $visit = ReferenceItem::query()->create(['list' => ReferenceList::ActionType, 'code' => 'visite-client', 'label' => 'Visite client', 'position' => 20, 'meta' => ['planning' => 'meeting']]);
+    $demo = ReferenceItem::query()->create(['list' => ReferenceList::ActionType, 'code' => 'demo', 'label' => 'Démo', 'position' => 21]);
+    $call = crmItem(ReferenceList::ActionType, 'Appel');
+    $call->update(['meta' => null]); // the organisme took calls out of the planning
+    planAction($user, 'Visite client', '2026-11-19 09:00:00', ['subject' => 'Visite', 'type_id' => $visit->id]);
+    planAction($user, 'Démo', '2026-11-19 10:00:00', ['subject' => 'Démo', 'type_id' => $demo->id]);
+    planAction($user, 'Appel', '2026-11-19 11:00:00', ['subject' => 'Appel']);
+
+    $page = $this->get('/crm/planning')->assertOk()->viewData('page')['props'];
+    expect(planningSubjects($page)['2026-11-19'])->toBe(['Visite'])
+        ->and($page['days'][3]['items'][0]['kind'])->toBe('meeting');
 });
 
 it('shows the planning of a colleague only to direction and admin', function () {

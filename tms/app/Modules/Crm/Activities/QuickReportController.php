@@ -37,7 +37,7 @@ class QuickReportController extends Controller
             return [
                 ...$row,
                 'time' => $at->format('H:i'),
-                'opportunities' => QuickReport::opportunitiesFor($user, $a->opportunity_id, $a->organisation_id, $a->organisation_id === null ? $a->person_id : null),
+                'opportunities' => QuickReport::opportunitiesFor($user, $a->opportunity_id, $a->organisation_id, $a->person_id),
             ];
         })->values()->all();
 

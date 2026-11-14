@@ -315,3 +315,55 @@ it('the dev DatabaseSeeder provisions a demo tenant with CAP FORMATION reference
     expect($tenant->slug)->toBe(config('tms.default_tenant'))
         ->and(app(TenantContext::class)->run($tenant, fn () => ReferenceItem::query()->count()))->toBe(90);
 });
+
+it('flags the CAP FORMATION meeting and call types for the planning', function () {
+    seedCap();
+    $planning = ReferenceItem::query()->where('list', ReferenceList::ActionType)->orderBy('position')->get()
+        ->mapWithKeys(fn (ReferenceItem $i) => [$i->code => $i->meta['planning'] ?? null])->filter()->all();
+
+    expect($planning)->toBe(['prise-de-rendez-vous' => 'meeting', 'rendez-vous-physique' => 'meeting', 'appel' => 'call']);
+});
+
+it('lets the admin set or clear the planning kind of an action type, only on that list', function () {
+    seedCap();
+    $this->actingAs(admin(twoFactor: true));
+
+    $this->postJson('/admin/references/action_type', ['label' => 'Visite client', 'meta' => ['planning' => 'meeting']])->assertRedirect();
+    $visit = ReferenceItem::query()->where('list', ReferenceList::ActionType)->where('code', 'visite-client')->sole();
+    expect($visit->meta)->toBe(['planning' => 'meeting']);
+
+    $this->putJson("/admin/references/action_type/{$visit->id}", ['label' => 'Visite client', 'meta' => ['planning' => 'call', 'color' => '#ff8800']])->assertRedirect();
+    expect($visit->fresh()->meta)->toBe(['color' => '#ff8800', 'planning' => 'call']);
+    $this->putJson("/admin/references/action_type/{$visit->id}", ['label' => 'Visite client', 'meta' => ['planning' => null]])->assertRedirect();
+    expect($visit->fresh()->meta)->toBe(['color' => '#ff8800']);
+
+    // A label-only update (e.g. deactivation from the list) keeps the flag.
+    $call = ReferenceItem::query()->where('list', ReferenceList::ActionType)->where('code', 'appel')->sole();
+    $this->putJson("/admin/references/action_type/{$call->id}", ['label' => 'Appel', 'is_active' => true])->assertRedirect();
+    expect($call->fresh()->meta)->toBe(['planning' => 'call']);
+
+    $this->postJson('/admin/references/action_type', ['label' => 'Autre', 'meta' => ['planning' => 'party']])->assertStatus(422)->assertJsonValidationErrors('meta.planning');
+    $this->postJson('/admin/references/contact_origin', ['label' => 'Salon pro', 'meta' => ['planning' => 'meeting']])->assertRedirect();
+    expect(ReferenceItem::query()->where('code', 'salon-pro')->sole()->meta)->toBeNull();
+
+    $this->get('/admin/references')->assertInertia(fn (Assert $p) => $p->where('lists.action_type.has_planning', true)->where('lists.das.has_planning', false));
+});
+
+it('flags the meeting and call types of existing organismes by migration', function () {
+    seedCap();
+    ReferenceItem::query()->where('list', ReferenceList::ActionType)->get()->each(fn (ReferenceItem $i) => $i->update(['meta' => null]));
+    $edited = ReferenceItem::query()->where('list', ReferenceList::ActionType)->where('code', 'appel')->sole();
+    $edited->update(['meta' => ['color' => '#ff8800']]);
+    $unflagged = ReferenceItem::query()->where('list', ReferenceList::ActionType)->where('code', 'rendez-vous-physique')->sole();
+    $unflagged->update(['meta' => ['planning' => null]]); // the organisme removed the flag: kept removed
+
+    (require database_path('migrations/2026_11_26_000001_flag_planning_action_types.php'))->up();
+
+    $planning = ReferenceItem::query()->where('list', ReferenceList::ActionType)->orderBy('position')->get()
+        ->mapWithKeys(fn (ReferenceItem $i) => [$i->code => $i->meta])->filter()->all();
+    expect($planning)->toBe([
+        'prise-de-rendez-vous' => ['planning' => 'meeting'],
+        'rendez-vous-physique' => ['planning' => null],
+        'appel' => ['color' => '#ff8800', 'planning' => 'call'],
+    ]);
+});

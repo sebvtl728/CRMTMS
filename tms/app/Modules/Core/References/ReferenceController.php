@@ -30,6 +30,7 @@ class ReferenceController extends Controller
                 'key' => $list->value,
                 'label' => $list->label(),
                 'has_probability' => $list->hasProbability(),
+                'has_planning' => $list->hasPlanning(),
                 'items' => ($items[$list->value] ?? collect())->map(fn (ReferenceItem $i) => [
                     'id' => $i->id,
                     'code' => $i->code,
@@ -146,6 +147,7 @@ class ReferenceController extends Controller
             'meta' => ['nullable', 'array'],
             'meta.probability' => [Rule::requiredIf(fn () => $list->hasProbability() && ! ($item !== null && ($item->meta['outcome'] ?? null) !== null)), 'nullable', 'integer', 'between:0,100'],
             'meta.color' => ['nullable', 'string', 'regex:/^#[0-9a-fA-F]{6}$/'],
+            'meta.planning' => ['nullable', Rule::in(array_keys(ReferenceItem::PLANNING_KINDS))],
         ], [
             'label.required' => 'Le libellé est obligatoire.',
             'label.unique' => 'Une valeur portant ce libellé existe déjà dans cette liste.',
@@ -153,6 +155,7 @@ class ReferenceController extends Controller
             'meta.probability.between' => 'La probabilité doit être comprise entre 0 et 100.',
             'meta.probability.integer' => 'La probabilité doit être un nombre entier.',
             'meta.color.regex' => 'La couleur doit être au format #RRGGBB.',
+            'meta.planning.in' => 'Choisissez Rendez-vous, Appel ou rien pour le planning.',
         ]);
     }
 
@@ -172,6 +175,13 @@ class ReferenceController extends Controller
             $meta += ['outcome' => null];
             if (($meta['outcome'] ?? null) === null) {
                 $meta['probability'] = (int) $input['probability'];
+            }
+        }
+        // Planning kind of an action type: kept unless the form sends it (null clears it).
+        if ($list->hasPlanning() && array_key_exists('planning', $input)) {
+            $meta['planning'] = $input['planning'];
+            if ($meta['planning'] === null) {
+                unset($meta['planning']);
             }
         }
         if (array_key_exists('color', $input)) {

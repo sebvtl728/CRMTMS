@@ -169,7 +169,11 @@ class QuickReportRequest extends FormRequest
 
     private function findMeeting(string $id, User $user): ?Activity
     {
-        $meeting = CrmVisibility::activities(Activity::query(), $user)->find($id);
+        // The user's own meetings (types flagged meeting), as listed by the form.
+        $meeting = CrmVisibility::activities(Activity::query(), $user)
+            ->where('responsible_user_id', $user->id)
+            ->whereIn('type_id', WeekPlanning::meetingTypes())
+            ->find($id);
 
         return $meeting instanceof Activity && $user->can('update', $meeting) ? $meeting : null;
     }

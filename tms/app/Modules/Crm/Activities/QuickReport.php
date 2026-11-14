@@ -49,6 +49,10 @@ final class QuickReport
 
             if ($move !== null) {
                 $this->stages->move($move['opportunity'], $move['stage'], $move['loss_reason_id'], $move['loss_comment'], null);
+                // The next step is about the opportunity that moved, even when the meeting was not.
+                if ($followUp !== null && $followUp->opportunity_id === null) {
+                    $followUp->forceFill(['opportunity_id' => $move['opportunity']->id])->save();
+                }
             }
 
             return [$done, $followUp];
@@ -79,25 +83,27 @@ final class QuickReport
     }
 
     /**
-     * Opportunities a report may move: the meeting's own, else those of
-     * its fiche (entreprise, or particulier) the user sees.
+     * Opportunities a report may move (the rule of QuickReportRequest): the
+     * meeting's own, else those of its entreprise and of its person
+     * (particulier), that the user sees and may update.
      *
      * @return list<array{id: string, name: string, stage_id: string}>
      */
     public static function opportunitiesFor(User $user, ?string $opportunityId, ?string $organisationId, ?string $personId): array
     {
-        $query = CrmVisibility::opportunities(Opportunity::query(), $user);
+        $query = CrmVisibility::opportunities(Opportunity::query(), $user)->with(['organisation', 'person']);
         if ($opportunityId !== null) {
             $query->whereKey($opportunityId);
-        } elseif ($organisationId !== null) {
-            $query->where('organisation_id', $organisationId);
-        } elseif ($personId !== null) {
-            $query->where('person_id', $personId);
+        } elseif ($organisationId !== null || $personId !== null) {
+            $query->where(fn ($q) => $q
+                ->when($organisationId !== null, fn ($w) => $w->orWhere('organisation_id', $organisationId))
+                ->when($personId !== null, fn ($w) => $w->orWhere('person_id', $personId)));
         } else {
             return [];
         }
 
-        return $query->orderByDesc('updated_at')->orderBy('id')->limit(20)->get(['id', 'title', 'stage_id'])
+        return $query->orderByDesc('updated_at')->orderBy('id')->limit(20)->get()
+            ->filter(fn (Opportunity $o) => $user->can('update', $o))
             ->map(fn (Opportunity $o) => ['id' => $o->id, 'name' => $o->title, 'stage_id' => $o->stage_id])
             ->values()->all();
     }
