@@ -18,6 +18,8 @@ use App\Modules\Crm\Import\ImportBatch;
 use App\Modules\Crm\Import\ImportProfile;
 use App\Modules\Crm\Import\ImportRow;
 use App\Modules\Crm\Import\ImportStamp;
+use App\Modules\Crm\Interests\FicheTraining;
+use App\Modules\Crm\Interests\FicheTrainings;
 use App\Modules\Crm\Opportunities\OpportunitiesProvider;
 use App\Modules\Crm\Opportunities\Opportunity;
 use App\Modules\Crm\Opportunities\OpportunityPolicy;
@@ -80,6 +82,7 @@ class CrmServiceProvider extends ServiceProvider
             'opportunity' => Opportunity::class,
             'opportunity_stage_change' => StageChange::class,
             'opportunity_training' => OpportunityTraining::class,
+            'fiche_training' => FicheTraining::class,
             'activity' => Activity::class,
             'quote' => Quote::class,
             'quote_line' => QuoteLine::class,
@@ -378,17 +381,21 @@ class CrmServiceProvider extends ServiceProvider
             Quote::withTrashed()->where(fn (Builder $q) => $fiche instanceof Organisation
                 ? $q->where('organisation_id', $fiche->getKey())
                 : $q->where('person_id', $fiche->getKey())->orWhere('contact_person_id', $fiche->getKey())), $ids)->exists());
+        LinkedData::register('crm.interest_trainings', fn (Organisation|Person $fiche, array $ids): bool => $except(
+            FicheTraining::query()->where(FicheTrainings::column($fiche), $fiche->getKey()), $ids)->exists());
         LinkedData::register('crm.consents', fn (Organisation|Person $fiche, array $ids): bool => $fiche instanceof Person
             && $except(Consent::query()->where('person_id', $fiche->getKey()), $ids)->exists());
     }
 
     /**
      * A training on an opportunity or a quote (a trashed one too: its lines
-     * stay) is in use: the catalogue refuses to delete it.
+     * stay), or of interest to a fiche, is in use: the catalogue refuses to delete it.
      */
     public static function registerTrainingUsage(): void
     {
         TrainingUsage::register('opportunities', fn (string $trainingId): bool => OpportunityTraining::query()->where('training_id', $trainingId)->exists());
+        // « Formations d'intérêt » of an entreprise or a person.
+        TrainingUsage::register('fiches', fn (string $trainingId): bool => FicheTrainings::uses($trainingId));
         // Lines of a trashed quote stay too.
         TrainingUsage::register('quotes', fn (string $trainingId): bool => QuoteLine::query()->where('training_id', $trainingId)->exists());
     }

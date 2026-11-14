@@ -9,6 +9,7 @@ use App\Modules\Core\Users\User;
 use App\Modules\Crm\Activities\CalendarAnnouncements;
 use App\Modules\Crm\Affiliations\Affiliation;
 use App\Modules\Crm\Gdpr\LegalBasis;
+use App\Modules\Crm\Interests\FicheTraining;
 use App\Modules\Crm\Organisations\OrganisationStatus;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
@@ -190,6 +191,16 @@ class Person extends Model
     public function das(): BelongsToMany
     {
         return $this->belongsToMany(ReferenceItem::class, 'person_das', 'person_id', 'das_id')->withPivot('tenant_id')->orderBy('reference_items.position');
+    }
+
+    /**
+     * « Formations d'intérêt » (training ids; titles through Catalogue\Trainings).
+     *
+     * @return HasMany<FicheTraining, $this>
+     */
+    public function interestTrainings(): HasMany
+    {
+        return $this->hasMany(FicheTraining::class);
     }
 
     /**

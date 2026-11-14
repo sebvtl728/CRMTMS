@@ -5,6 +5,7 @@ namespace App\Modules\Crm\Export;
 use App\Modules\Core\Exports\ExportCell;
 use App\Modules\Core\Exports\ExportResource;
 use App\Modules\Core\Users\User;
+use App\Modules\Crm\Interests\TrainingTitles;
 use App\Modules\Crm\People\Person;
 use App\Modules\Crm\People\PhoneNumber;
 use App\Modules\Crm\Visibility\CrmVisibility;
@@ -12,6 +13,13 @@ use Illuminate\Database\Eloquent\Model;
 
 final class PersonExport implements ExportResource
 {
+    private readonly TrainingTitles $titles;
+
+    public function __construct()
+    {
+        $this->titles = new TrainingTitles;
+    }
+
     public function fileName(): string
     {
         return 'personnes';
@@ -44,6 +52,7 @@ final class PersonExport implements ExportResource
             'situation' => 'Situation professionnelle',
             'funding' => 'Mode de financement',
             'origin' => 'Origine',
+            'interest_trainings' => "Formations d'intérêt",
             'responsible' => 'Responsable',
             'last_contact_at' => 'Dernier contact',
             'created_at' => 'Création',
@@ -60,7 +69,7 @@ final class PersonExport implements ExportResource
 
     public function with(User $user): array
     {
-        return [...CrmVisibility::activeAffiliationsWith($user), 'professionalSituation', 'fundingMode', 'origin', 'responsible'];
+        return [...CrmVisibility::activeAffiliationsWith($user), 'professionalSituation', 'fundingMode', 'origin', 'responsible', 'interestTrainings'];
     }
 
     public function value(Model $model, string $column): string|ExportCell|null
@@ -94,6 +103,7 @@ final class PersonExport implements ExportResource
             'source_system' => $model->source_system,
             'source_id' => $model->source_id,
             'legal_basis' => $model->legal_basis->label(),
+            'interest_trainings' => $this->titles->of($model->interestTrainings),
             default => null,
         };
     }

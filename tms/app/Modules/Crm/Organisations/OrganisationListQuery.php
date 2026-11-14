@@ -3,6 +3,7 @@
 namespace App\Modules\Crm\Organisations;
 
 use App\Modules\Core\Users\User;
+use App\Modules\Crm\Interests\FicheTrainings;
 use App\Modules\Crm\Permissions;
 use App\Modules\Crm\Support\FilterInput;
 use App\Modules\Crm\Visibility\CrmVisibility;
@@ -19,11 +20,11 @@ final class OrganisationListQuery
     public const SORTS = ['name', 'city', 'last_contact_at', 'created_at'];
 
     /** Filters a saved filter may hold (trashed is a view, never saved). */
-    public const SAVABLE = ['q', 'status', 'das', 'sector', 'responsible', 'origin', 'mine', 'sort', 'dir'];
+    public const SAVABLE = ['q', 'status', 'das', 'sector', 'responsible', 'origin', 'training', 'mine', 'sort', 'dir'];
 
     /**
      * @param  array<array-key, mixed>  $input  query string or saved filter
-     * @return array{q: string, status: ?string, das: ?string, sector: ?string, responsible: ?string, origin: ?string, mine: bool, trashed: bool, sort: string, dir: string}
+     * @return array{q: string, status: ?string, das: ?string, sector: ?string, responsible: ?string, origin: ?string, training: ?string, mine: bool, trashed: bool, sort: string, dir: string}
      */
     public static function filters(array $input, User $user): array
     {
@@ -33,6 +34,7 @@ final class OrganisationListQuery
             'das' => FilterInput::id($input['das'] ?? null),
             'sector' => FilterInput::id($input['sector'] ?? null),
             'responsible' => FilterInput::id($input['responsible'] ?? null),
+            'training' => FilterInput::id($input['training'] ?? null),
             'origin' => FilterInput::id($input['origin'] ?? null),
             'mine' => FilterInput::bool($input['mine'] ?? false),
             'trashed' => $user->can(Permissions::DELETE) && FilterInput::bool($input['trashed'] ?? false),
@@ -54,6 +56,7 @@ final class OrganisationListQuery
             'das' => ['uuid'],
             'sector' => ['uuid'],
             'responsible' => ['uuid'],
+            'training' => ['uuid'],
             'origin' => ['uuid'],
             'mine' => ['boolean'],
             'sort' => [Rule::in(self::SORTS)],
@@ -62,7 +65,7 @@ final class OrganisationListQuery
     }
 
     /**
-     * @param  array{q: string, status: ?string, das: ?string, sector: ?string, responsible: ?string, origin: ?string, mine: bool, trashed: bool, sort: string, dir: string}  $filters
+     * @param  array{q: string, status: ?string, das: ?string, sector: ?string, responsible: ?string, origin: ?string, training: ?string, mine: bool, trashed: bool, sort: string, dir: string}  $filters
      * @return Builder<Organisation>
      */
     public static function build(array $filters, User $user): Builder
@@ -74,6 +77,7 @@ final class OrganisationListQuery
             ->when($filters['sector'], fn (Builder $q, string $v) => $q->where('sector_id', $v))
             ->when($filters['origin'], fn (Builder $q, string $v) => $q->where('origin_id', $v))
             ->when($filters['responsible'], fn (Builder $q, string $v) => $q->where('responsible_user_id', $v))
+            ->when($filters['training'], fn (Builder $q, string $v) => FicheTrainings::filter($q, $v, 'organisations'))
             ->when($filters['mine'], fn (Builder $q) => $q->where('responsible_user_id', $user->getKey()))
             ->when($filters['das'], fn (Builder $q, string $v) => $q->whereIn('id', DB::table('organisation_das')->select('organisation_id')->where('das_id', $v)));
 

@@ -7,6 +7,7 @@ use App\Modules\Core\Tenancy\TenantContext;
 use App\Modules\Crm\Activities\Activity;
 use App\Modules\Crm\Activities\CalendarAnnouncements;
 use App\Modules\Crm\Affiliations\Affiliation;
+use App\Modules\Crm\Interests\FicheTrainings;
 use App\Modules\Crm\Opportunities\Opportunity;
 use App\Modules\Crm\Organisations\Organisation;
 use App\Modules\Crm\People\Person;
@@ -30,7 +31,7 @@ use InvalidArgumentException;
  * attachments moved, opportunities and opportunity contacts moved (a
  * person holding opportunities stays a particulier), quotes moved (account
  * and recipient; the frozen recipient copy is kept), actions moved, DAS
- * united, source identifiers kept in merged_sources, $drop trashed for
+ * and trainings of interest united, source identifiers kept in merged_sources, $drop trashed for
  * good with merged_into_id, journal crm.merged (ids only).
  */
 class Merger
@@ -62,7 +63,7 @@ class Merger
     /** Affiliation fields completed from the duplicate link when empty on the surviving one. */
     private const LINK_FIELDS = ['job_title', 'decision_role_id', 'work_email', 'work_phone', 'started_on'];
 
-    public function __construct(private readonly AuditRecorder $audit, private readonly TenantContext $tenants) {}
+    public function __construct(private readonly AuditRecorder $audit, private readonly TenantContext $tenants, private readonly FicheTrainings $interests) {}
 
     /**
      * @param  array<string, string>  $fieldChoices
@@ -171,6 +172,7 @@ class Merger
             $this->moveQuotes($k, $d);
             $this->moveActivities($k, $d);
             $this->uniteDas($k, $d, $isPerson);
+            $this->interests->merge($k, $d);
             // Calendars (Outlook) now show the kept fiche (moves above are raw SQL).
             CalendarAnnouncements::announceFor($isPerson ? 'person_id' : 'organisation_id', [$k->id, $d->id]);
 

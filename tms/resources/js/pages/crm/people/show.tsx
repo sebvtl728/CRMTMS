@@ -1,4 +1,5 @@
 import { SimilarFiches, type DuplicateCandidate } from '@/components/crm/duplicate-warning';
+import { InterestTrainings, type InterestTraining, type InterestTrainingOption } from '@/components/crm/interest-trainings';
 import { FicheOpportunities, type OpportunityRow } from '@/components/crm/opportunity-list';
 import { PersonGdpr, type GdprData } from '@/components/crm/person-gdpr';
 import { PersonTypeBadges } from '@/components/crm/person-type-badges';
@@ -73,6 +74,9 @@ interface ShowProps {
     gdpr: GdprData;
     opportunities: OpportunityRow[];
     quotes: QuoteRow[];
+    interestTrainings: InterestTraining[];
+    trainingOptions: InterestTrainingOption[];
+    ficheDasIds: string[];
     can: {
         update: boolean;
         delete: boolean;
@@ -111,7 +115,18 @@ const tel = (phone: string | null) =>
         </a>
     );
 
-export default function PersonShow({ person: p, similar, gdpr, opportunities, quotes, can, status }: ShowProps) {
+export default function PersonShow({
+    person: p,
+    similar,
+    gdpr,
+    opportunities,
+    quotes,
+    interestTrainings,
+    trainingOptions,
+    ficheDasIds,
+    can,
+    status,
+}: ShowProps) {
     const [confirming, setConfirming] = useState(false);
     const [tab, setTab] = useState<(typeof TABS)[number]>('Informations');
 
@@ -275,6 +290,14 @@ export default function PersonShow({ person: p, similar, gdpr, opportunities, qu
                             </div>
                         )}
                     </section>
+
+                    <InterestTrainings
+                        trainings={interestTrainings}
+                        options={trainingOptions}
+                        ficheDasIds={ficheDasIds}
+                        updateUrl={route('crm.people.trainings.update', p.id)}
+                        canUpdate={can.update}
+                    />
 
                     <PersonGdpr
                         personId={p.id}

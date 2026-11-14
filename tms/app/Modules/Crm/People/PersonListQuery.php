@@ -3,6 +3,7 @@
 namespace App\Modules\Crm\People;
 
 use App\Modules\Core\Users\User;
+use App\Modules\Crm\Interests\FicheTrainings;
 use App\Modules\Crm\Organisations\OrganisationStatus;
 use App\Modules\Crm\Permissions;
 use App\Modules\Crm\Support\FilterInput;
@@ -22,11 +23,11 @@ final class PersonListQuery
     public const TYPES = ['individual', 'contact'];
 
     /** Filters a saved filter may hold (trashed is a view, never saved). */
-    public const SAVABLE = ['q', 'type', 'status', 'situation', 'funding', 'origin', 'responsible', 'mine', 'sort', 'dir'];
+    public const SAVABLE = ['q', 'type', 'status', 'situation', 'funding', 'origin', 'responsible', 'training', 'mine', 'sort', 'dir'];
 
     /**
      * @param  array<array-key, mixed>  $input  query string or saved filter
-     * @return array{q: string, type: ?string, status: ?string, situation: ?string, funding: ?string, origin: ?string, responsible: ?string, mine: bool, trashed: bool, sort: string, dir: string}
+     * @return array{q: string, type: ?string, status: ?string, situation: ?string, funding: ?string, origin: ?string, responsible: ?string, training: ?string, mine: bool, trashed: bool, sort: string, dir: string}
      */
     public static function filters(array $input, User $user): array
     {
@@ -38,6 +39,7 @@ final class PersonListQuery
             'funding' => FilterInput::id($input['funding'] ?? null),
             'origin' => FilterInput::id($input['origin'] ?? null),
             'responsible' => FilterInput::id($input['responsible'] ?? null),
+            'training' => FilterInput::id($input['training'] ?? null),
             'mine' => FilterInput::bool($input['mine'] ?? false),
             'trashed' => $user->can(Permissions::DELETE) && FilterInput::bool($input['trashed'] ?? false),
             'sort' => FilterInput::oneOf($input['sort'] ?? null, self::SORTS) ?? 'name',
@@ -60,6 +62,7 @@ final class PersonListQuery
             'funding' => ['uuid'],
             'origin' => ['uuid'],
             'responsible' => ['uuid'],
+            'training' => ['uuid'],
             'mine' => ['boolean'],
             'sort' => [Rule::in(self::SORTS)],
             'dir' => [Rule::in(['asc', 'desc'])],
@@ -67,7 +70,7 @@ final class PersonListQuery
     }
 
     /**
-     * @param  array{q: string, type: ?string, status: ?string, situation: ?string, funding: ?string, origin: ?string, responsible: ?string, mine: bool, trashed: bool, sort: string, dir: string}  $filters
+     * @param  array{q: string, type: ?string, status: ?string, situation: ?string, funding: ?string, origin: ?string, responsible: ?string, training: ?string, mine: bool, trashed: bool, sort: string, dir: string}  $filters
      * @return Builder<Person>
      */
     public static function build(array $filters, User $user): Builder
@@ -83,6 +86,7 @@ final class PersonListQuery
             ->when($filters['funding'], fn (Builder $q, string $v) => $q->where('funding_mode_id', $v))
             ->when($filters['origin'], fn (Builder $q, string $v) => $q->where('origin_id', $v))
             ->when($filters['responsible'], fn (Builder $q, string $v) => $q->where('responsible_user_id', $v))
+            ->when($filters['training'], fn (Builder $q, string $v) => FicheTrainings::filter($q, $v, 'people'))
             ->when($filters['mine'], fn (Builder $q) => $q->where('responsible_user_id', $user->getKey()));
 
         $dir = $filters['dir'];

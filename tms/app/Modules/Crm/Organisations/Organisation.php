@@ -8,6 +8,7 @@ use App\Modules\Core\Tenancy\BelongsToTenant;
 use App\Modules\Core\Users\User;
 use App\Modules\Crm\Activities\CalendarAnnouncements;
 use App\Modules\Crm\Affiliations\Affiliation;
+use App\Modules\Crm\Interests\FicheTraining;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Model;
@@ -125,6 +126,16 @@ class Organisation extends Model
     public function das(): BelongsToMany
     {
         return $this->belongsToMany(ReferenceItem::class, 'organisation_das', 'organisation_id', 'das_id')->withPivot('tenant_id')->orderBy('reference_items.position');
+    }
+
+    /**
+     * « Formations d'intérêt » (training ids; titles through Catalogue\Trainings).
+     *
+     * @return HasMany<FicheTraining, $this>
+     */
+    public function interestTrainings(): HasMany
+    {
+        return $this->hasMany(FicheTraining::class);
     }
 
     /**

@@ -6,6 +6,8 @@ use App\Modules\Core\References\ReferenceItem;
 use App\Modules\Core\Users\User;
 use App\Modules\Crm\Activities\Activity;
 use App\Modules\Crm\Affiliations\Affiliation;
+use App\Modules\Crm\Interests\FicheTraining;
+use App\Modules\Crm\Interests\FicheTrainings;
 use App\Modules\Crm\Opportunities\Opportunity;
 use App\Modules\Crm\Organisations\Organisation;
 use App\Modules\Crm\People\Person;
@@ -23,7 +25,7 @@ use Illuminate\Support\Facades\DB;
  * stage, amount), quotes (as particulier or recipient: number, date, status,
  * total TTC), actions (hers or on her opportunities as particulier:
  * type, subject, status, result, report, place), notes, consents, attachments (listed, not their
- * content), DAS and dates. Trashed items are included (still held), flagged.
+ * content), trainings of interest (« Formations d'intérêt »), DAS and dates. Trashed items are included (still held), flagged.
  * Fiches merged into her are listed by id (their data now lives here).
  * Visibility rules apply: for a restricted viewer (Responsable DAS), only
  * the links to entreprises he may see.
@@ -59,6 +61,8 @@ final class PersonDataExport
             ->where(fn ($q) => $q->where('person_id', $person->id)->orWhere('contact_person_id', $person->id))
             ->when($viewer !== null, fn ($q) => CrmVisibility::quotes($q, $viewer))
             ->orderBy('issued_on')->orderBy('number')->get();
+        $trainings = app(FicheTrainings::class)->rows($person);
+        $addedOn = FicheTraining::query()->where('person_id', $person->id)->pluck('created_at', 'training_id');
         $consents = Consent::query()->where('person_id', $person->id)->orderBy('recorded_at')->get();
 
         return [
@@ -102,6 +106,12 @@ final class PersonDataExport
                 'fin' => $a->ended_on?->toDateString(),
                 'supprime' => $a->trashed(),
             ])->all(),
+            'formations_d_interet' => array_map(fn (array $t) => [
+                'formation' => $t['title'],
+                'code' => $t['code'],
+                'das' => $t['das'],
+                'ajoutee_le' => $date($addedOn[$t['id']] ?? null),
+            ], $trainings),
             'opportunites' => $opportunities->map(fn (Opportunity $o) => [
                 'titre' => $o->title,
                 'role' => $o->person_id === $person->id ? 'Compte (particulier)' : 'Contact',

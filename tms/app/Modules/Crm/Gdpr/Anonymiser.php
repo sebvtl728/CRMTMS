@@ -6,6 +6,7 @@ use App\Modules\Core\Audit\AuditRecorder;
 use App\Modules\Core\Tenancy\TenantStorage;
 use App\Modules\Crm\Activities\Events\ActivityChanged;
 use App\Modules\Crm\Import\ImportBatch;
+use App\Modules\Crm\Interests\FicheTrainings;
 use App\Modules\Crm\People\Person;
 use App\Modules\Crm\Quotes\QuoteAnonymisation;
 use Illuminate\Support\Facades\DB;
@@ -20,6 +21,7 @@ use Throwable;
  *   « Anonyme »; id, status, type, references, DAS, dates and links kept
  *   (statistics); the generated search / duplicate keys follow;
  * - her links (trashed ones too): work e-mail, work phone and job title;
+ * - her trainings of interest: rows deleted;
  * - her notes and attachments (trashed too): rows deleted (files after the
  *   commit); notes on her entreprises stay;
  * - her consents: kept as history, their free text cleared;
@@ -158,6 +160,7 @@ class Anonymiser
         DB::table('gdpr_pending')->where('person_id', $locked->id)->delete();
         DB::table('opportunities')->whereIn('person_id', $subjects)->whereNotNull('loss_comment')->update(['loss_comment' => null, 'updated_at' => now()]);
         DB::table('opportunity_contacts')->whereIn('person_id', $subjects)->delete();
+        FicheTrainings::forgetPeople($subjects);
         $quotes = QuoteAnonymisation::scrub($subjects, $traces->emails);
         $files = [...$files, ...$quotes['files']];
         $activities = DB::table('activities')

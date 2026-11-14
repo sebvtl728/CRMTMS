@@ -8,6 +8,7 @@ use App\Modules\Core\References\ReferenceList;
 use App\Modules\Core\Users\User;
 use App\Modules\Crm\Activities\Activity;
 use App\Modules\Crm\Activities\ActivityRows;
+use App\Modules\Crm\Interests\FicheTrainings;
 use App\Modules\Crm\Permissions;
 use App\Modules\Crm\Quotes\Quote;
 use App\Modules\Crm\Quotes\QuoteRows;
@@ -85,6 +86,8 @@ class OpportunityController extends Controller
                 'funding_mode_id' => $person?->funding_mode_id,
                 'responsible_user_id' => $user->id,
                 'contact_ids' => $person !== null ? [$person->id] : [],
+                // The fiche's active trainings of interest, editable on the form.
+                'training_lines' => ($organisation ?? $person) === null ? [] : app(FicheTrainings::class)->opportunityLines($organisation ?? $person),
             ],
             'contactOptions' => OpportunityAccounts::contactOptions($organisation?->id, $person?->id),
             'options' => [...$this->formOptions(null), 'training' => OpportunityTrainings::options(null, $person !== null)],

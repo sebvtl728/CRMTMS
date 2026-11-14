@@ -5,11 +5,19 @@ namespace App\Modules\Crm\Export;
 use App\Modules\Core\Exports\ExportCell;
 use App\Modules\Core\Exports\ExportResource;
 use App\Modules\Core\Users\User;
+use App\Modules\Crm\Interests\TrainingTitles;
 use App\Modules\Crm\Organisations\Organisation;
 use Illuminate\Database\Eloquent\Model;
 
 final class OrganisationExport implements ExportResource
 {
+    private readonly TrainingTitles $titles;
+
+    public function __construct()
+    {
+        $this->titles = new TrainingTitles;
+    }
+
     public function fileName(): string
     {
         return 'entreprises';
@@ -34,6 +42,7 @@ final class OrganisationExport implements ExportResource
             'origin' => 'Origine',
             'responsible' => 'Responsable',
             'das' => 'DAS',
+            'interest_trainings' => "Formations d'intérêt",
             'email' => 'E-mail',
             'phone' => 'Téléphone',
             'website' => 'Site web',
@@ -53,7 +62,7 @@ final class OrganisationExport implements ExportResource
 
     public function with(User $user): array
     {
-        return ['legalForm', 'sector', 'establishmentType', 'companySize', 'origin', 'responsible', 'das'];
+        return ['legalForm', 'sector', 'establishmentType', 'companySize', 'origin', 'responsible', 'das', 'interestTrainings'];
     }
 
     public function value(Model $model, string $column): string|ExportCell|null
@@ -81,6 +90,7 @@ final class OrganisationExport implements ExportResource
             'country' => $model->country,
             'last_contact_at' => ExportCell::date($model->last_contact_at),
             'created_at' => ExportCell::date($model->created_at),
+            'interest_trainings' => $this->titles->of($model->interestTrainings),
             default => null,
         };
     }

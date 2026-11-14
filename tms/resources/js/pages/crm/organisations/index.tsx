@@ -36,6 +36,7 @@ interface Filters {
     sector: string | null;
     responsible: string | null;
     origin: string | null;
+    training: string | null;
     mine: boolean;
     trashed: boolean;
     sort: string;
@@ -45,7 +46,7 @@ interface Filters {
 interface IndexProps {
     organisations: Paginated<Row>;
     filters: Filters;
-    options: { status: Option[]; das: Option[]; sector: Option[]; origin: Option[]; responsible: Option[] };
+    options: { status: Option[]; das: Option[]; sector: Option[]; origin: Option[]; responsible: Option[]; training: Option[] };
     can: { create: boolean; delete: boolean; export: boolean; import: boolean };
     savedFilters: SavedFilterRow[];
     activeSavedId: string | null;
@@ -64,7 +65,7 @@ export default function OrganisationsIndex({ organisations, filters, options, ca
         const next = { ...filters, ...changes };
         const query: Record<string, string> = {};
         if (next.q) query.q = next.q;
-        (['status', 'das', 'sector', 'responsible', 'origin'] as const).forEach((k) => {
+        (['status', 'das', 'sector', 'responsible', 'origin', 'training'] as const).forEach((k) => {
             if (next[k]) query[k] = String(next[k]);
         });
         if (next.mine) query.mine = '1';
@@ -91,7 +92,15 @@ export default function OrganisationsIndex({ organisations, filters, options, ca
     const sortBy = (column: string) => visit({ sort: column, dir: filters.sort === column && filters.dir === 'asc' ? 'desc' : 'asc' });
 
     const filtered = Boolean(
-        filters.q || filters.status || filters.das || filters.sector || filters.responsible || filters.origin || filters.mine || filters.trashed,
+        filters.q ||
+            filters.status ||
+            filters.das ||
+            filters.sector ||
+            filters.responsible ||
+            filters.origin ||
+            filters.training ||
+            filters.mine ||
+            filters.trashed,
     );
 
     return (
@@ -157,6 +166,12 @@ export default function OrganisationsIndex({ organisations, filters, options, ca
                         onChange={(v) => visit({ responsible: v })}
                     />
                     <FilterSelect label="Origine" value={filters.origin} options={options.origin} onChange={(v) => visit({ origin: v })} />
+                    <FilterSelect
+                        label="Formation d'intérêt"
+                        value={filters.training}
+                        options={options.training}
+                        onChange={(v) => visit({ training: v })}
+                    />
                     <div className="flex items-end gap-4 sm:col-span-2">
                         <Label className="flex items-center gap-2 text-sm font-normal">
                             <Checkbox checked={filters.mine} onCheckedChange={(c) => visit({ mine: c === true })} />

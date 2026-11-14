@@ -4,6 +4,7 @@ namespace App\Modules\Crm\People;
 
 use App\Http\Controllers\Controller;
 use App\Modules\Core\Exports\ExportCell;
+use App\Modules\Core\Exports\ExportResource;
 use App\Modules\Core\References\ReferenceItem;
 use App\Modules\Core\References\ReferenceList;
 use App\Modules\Core\Users\User;
@@ -12,7 +13,9 @@ use App\Modules\Crm\Gdpr\Consent;
 use App\Modules\Crm\Gdpr\ConsentChannel;
 use App\Modules\Crm\Gdpr\GdprPending;
 use App\Modules\Crm\Gdpr\LegalBasis;
+use App\Modules\Crm\Interests\FicheTrainings;
 use App\Modules\Crm\Opportunities\OpportunityRows;
+use App\Modules\Crm\Opportunities\OpportunityTrainings;
 use App\Modules\Crm\Organisations\Organisation;
 use App\Modules\Crm\Organisations\OrganisationStatus;
 use App\Modules\Crm\Permissions;
@@ -40,7 +43,7 @@ use Symfony\Component\HttpFoundation\Response as HttpResponse;
  */
 class PersonController extends Controller
 {
-    public function __construct(private readonly DuplicateGuard $duplicates, private readonly DasLinks $das) {}
+    public function __construct(private readonly DuplicateGuard $duplicates, private readonly DasLinks $das, private readonly FicheTrainings $trainings) {}
 
     public function index(Request $request): Response
     {
@@ -48,7 +51,8 @@ class PersonController extends Controller
         $canDelete = $user->can(Permissions::DELETE);
 
         $filters = PersonListQuery::filters($request->query(), $user);
-        $query = PersonListQuery::build($filters, $user)->with(CrmResource::People->export()->with($user));
+        $export = CrmResource::People->export();
+        $query = PersonListQuery::build($filters, $user)->with($export->with($user));
 
         return Inertia::render('crm/people/index', [
             'people' => $query->paginate(25)->withQueryString()->through(fn (Person $p) => [
@@ -70,7 +74,7 @@ class PersonController extends Controller
                 'deleted' => $p->trashed(),
                 'prospecting_opt_out' => $p->prospecting_opt_out_at !== null,
                 'anonymised' => $p->anonymised_at !== null,
-                'cells' => $this->cells($p),
+                'cells' => $this->cells($export, $p),
             ]),
             'filters' => $filters,
             'options' => [
@@ -80,6 +84,7 @@ class PersonController extends Controller
                 'funding' => FormOptions::reference(ReferenceList::FundingMode),
                 'origin' => FormOptions::reference(ReferenceList::ContactOrigin),
                 'responsible' => FormOptions::responsible(),
+                'training' => OpportunityTrainings::filterOptions($filters['training']),
             ],
             'can' => ['create' => $user->can(Permissions::CREATE), 'delete' => $canDelete, 'export' => $user->can(Permissions::EXPORT), 'import' => $user->can(Permissions::IMPORT)],
             ...ListExtras::for(CrmResource::People, $user, $request->query('saved')),
@@ -88,14 +93,29 @@ class PersonController extends Controller
     }
 
     /**
+     * « Formations d'intérêt » block: the trainings, and the choices of the
+     * editor when the user may change them.
+     *
+     * @return array{interestTrainings: list<array<string, mixed>>, trainingOptions: list<array<string, mixed>>, ficheDasIds: list<string>}
+     */
+    private function interests(Person $person, User $user): array
+    {
+        $editable = ! $person->trashed() && $user->can('update', $person);
+
+        return [
+            'interestTrainings' => $this->trainings->rows($person),
+            'trainingOptions' => $editable ? $this->trainings->options($person) : [],
+            'ficheDasIds' => $person->das->pluck('id')->values()->all(),
+        ];
+    }
+
+    /**
      * Every exportable column of a row: the desktop table shows the ones the user chose.
      *
      * @return array<string, ?string>
      */
-    private function cells(Person $person): array
+    private function cells(ExportResource $export, Person $person): array
     {
-        $export = CrmResource::People->export();
-
         return collect(array_keys($export->columns()))->mapWithKeys(fn (string $c) => [$c => ExportCell::display($export->value($person, $c))])->all();
     }
 
@@ -214,6 +234,7 @@ class PersonController extends Controller
                 'anonymised_at' => $person->anonymised_at?->toIso8601String(),
             ],
             'gdpr' => $this->gdpr($person, $user),
+            ...$this->interests($person, $user),
             'opportunities' => OpportunityRows::forFiche($person, $user),
             'quotes' => QuoteRows::forFiche($person, $user),
             'similar' => $user->can(Permissions::MERGE) ? $this->duplicates->similarTo($person, $user) : [],

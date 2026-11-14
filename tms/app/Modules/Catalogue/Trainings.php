@@ -35,6 +35,24 @@ final class Trainings
     }
 
     /**
+     * The trainings of these ids (active or not, as find()), keyed by id;
+     * unknown ids are left out. One query, for lists and exports.
+     *
+     * @param  list<string>  $ids
+     * @return array<string, TrainingData>
+     */
+    public function findMany(array $ids): array
+    {
+        $ids = array_values(array_unique(array_filter($ids, fn (string $id) => Str::isUuid($id))));
+        if ($ids === []) {
+            return [];
+        }
+
+        return Training::query()->with('das')->whereIn('trainings.id', $ids)->get()
+            ->mapWithKeys(fn (Training $t) => [$t->id => TrainingData::fromModel($t)])->all();
+    }
+
+    /**
      * Active trainings whose code or title holds every word of $q
      * (accent-insensitive), optionally in one DAS.
      *
