@@ -6,6 +6,7 @@ use App\Modules\Connectors\Core\ConnectorConfig;
 use App\Modules\Connectors\Core\ConnectorRun;
 use App\Modules\Core\Tenancy\SetTenantForJob;
 use App\Modules\Core\Tenancy\TenantAwareJob;
+use App\Modules\Core\Tenancy\TenantUrl;
 use App\Modules\Crm\Activities\CalendarEvent;
 use App\Modules\Crm\Activities\CalendarEvents;
 use DateTimeInterface;
@@ -40,9 +41,9 @@ class PushActivityToOutlook implements ShouldQueue
     public const BACKOFF = [30, 120, 600, 1800, 3600];
 
     /**
-     * @param  string  $rootUrl  root of the links to the fiche (the organisme's address)
+     * @param  string|null  $rootUrl  no longer used (jobs queued before 0.3.0 carry it): the address is the tenant's
      */
-    public function __construct(public string $activityId, public string $rootUrl)
+    public function __construct(public string $activityId, public ?string $rootUrl = null)
     {
         $this->captureTenant();
     }
@@ -116,12 +117,15 @@ class PushActivityToOutlook implements ShouldQueue
     private function currentEvent(): ?CalendarEvent
     {
         // Links to the fiche on the organisme's address, not the worker's.
-        URL::forceRootUrl($this->rootUrl);
+        $root = TenantUrl::root();
+        URL::forceRootUrl($root);
+        URL::forceScheme((string) parse_url($root, PHP_URL_SCHEME));
 
         try {
             return CalendarEvents::find($this->activityId);
         } finally {
             URL::forceRootUrl(null);
+            URL::forceScheme(null);
         }
     }
 

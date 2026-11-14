@@ -24,7 +24,7 @@ final class QueueOutlookPush
             || CalendarLinkEvent::query()->where('activity_id', $event->activityId)->exists();
 
         if ($concerned) {
-            PushActivityToOutlook::dispatch($event->activityId, url('/'))->afterCommit();
+            PushActivityToOutlook::dispatch($event->activityId)->afterCommit();
         }
     }
 }

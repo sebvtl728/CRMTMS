@@ -100,7 +100,7 @@ class Microsoft365Connector implements Connector, HasFormLabels, Retryable
     public function retry(ConnectorRun $run): void
     {
         if (preg_match('/^activity:([0-9a-f-]{36})$/', (string) $run->payload_ref, $m) === 1) {
-            PushActivityToOutlook::dispatch($m[1], url('/'));
+            PushActivityToOutlook::dispatch($m[1]);
         }
     }
 }

@@ -2,6 +2,7 @@
 
 namespace App\Modules\Crm\Activities;
 
+use App\Modules\Core\Tenancy\TenantUrl;
 use Illuminate\Mail\Mailable;
 use Illuminate\Support\Collection;
 
@@ -19,7 +20,13 @@ class DailyDigestMail extends Mailable
      * @param  Collection<int, Activity>  $overdue
      * @param  Collection<int, Activity>  $today
      */
-    public function __construct(private readonly string $name, private readonly Collection $overdue, private readonly Collection $today) {}
+    public function __construct(private readonly string $name, private readonly Collection $overdue, private readonly Collection $today)
+    {
+        // Built in the worker, for the organisme of the job: its address, not APP_URL.
+        $this->url = TenantUrl::route('crm.todo');
+    }
+
+    private readonly string $url;
 
     public function build(): self
     {
@@ -37,7 +44,7 @@ class DailyDigestMail extends Mailable
                 'name' => $this->name,
                 'overdue' => $this->overdue->map($line)->all(),
                 'today' => $this->today->map($line)->all(),
-                'url' => route('crm.todo'),
+                'url' => $this->url,
             ]);
     }
 }

@@ -13,6 +13,7 @@ use App\Modules\Connectors\Core\HostPolicy;
 use App\Modules\Core\Audit\AuditLog;
 use App\Modules\Core\References\CapFormationReferenceSeeder;
 use App\Modules\Core\References\ReferenceList;
+use App\Modules\Core\Tenancy\TenantDomain;
 use App\Modules\Core\Users\User;
 use App\Modules\Crm\Activities\Activity;
 use App\Modules\Crm\CrmServiceProvider;
@@ -673,4 +674,19 @@ it('deletes the outlook event when its opportunity goes to the trash', function 
     DB::transaction(fn () => $opportunity->restore());
     [$post] = graphRequests();
     expect($post->method())->toBe('POST');
+});
+
+it('links the outlook event to the organisme address, not APP_URL', function () {
+    config(['tms.mode' => 'multi', 'app.url' => 'http://worker.invalid']);
+    TenantDomain::factory()->for(tenant())->create(['host' => 'cap.example.test']);
+    m365Config();
+    $user = commercial();
+    m365Link($user);
+    m365Http(graphCreated());
+
+    $meeting = m365Meeting($user);
+
+    [$post] = graphRequests();
+    expect($post->data()['body']['content'])->toContain('https://cap.example.test/crm/organisations/'.$meeting->organisation_id)
+        ->not->toContain('worker.invalid');
 });

@@ -4,6 +4,7 @@ use App\Modules\Core\Access\Role;
 use App\Modules\Core\References\CapFormationReferenceSeeder;
 use App\Modules\Core\References\ReferenceList;
 use App\Modules\Core\Tenancy\TenantContext;
+use App\Modules\Core\Tenancy\TenantDomain;
 use App\Modules\Core\Users\User;
 use App\Modules\Crm\Activities\Activity;
 use App\Modules\Crm\Activities\DailyDigest;
@@ -147,4 +148,16 @@ it('lets a user opt in and out from the settings', function () {
 
     $this->patch('/settings/profile', ['name' => $user->name, 'email' => $user->email, 'daily_digest' => false])->assertSessionHasNoErrors();
     expect($user->refresh()->daily_digest)->toBeFalse();
+});
+
+it('links to the organisme address, not APP_URL, from the worker', function () {
+    config(['tms.mode' => 'multi', 'app.url' => 'http://worker.invalid']);
+    TenantDomain::factory()->for(tenant())->create(['host' => 'cap.example.test']);
+    $user = optIn(commercial());
+    digestAction($user, '2026-11-16 14:30:00');
+
+    Artisan::call('tms:crm:daily-digest');
+
+    Mail::assertSent(DailyDigestMail::class, fn (DailyDigestMail $mail) => str_contains($mail->render(), 'https://cap.example.test/crm/todo')
+        && ! str_contains($mail->render(), 'worker.invalid'));
 });

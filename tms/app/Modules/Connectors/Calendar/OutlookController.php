@@ -86,7 +86,7 @@ class OutlookController extends Controller
         // What is already planned goes to Outlook too.
         $now = CarbonImmutable::now();
         foreach (CalendarEvents::for($user, $now->subDay(), $now->addDays(IcalFeed::DAYS_AFTER)) as $event) {
-            PushActivityToOutlook::dispatch($event->id, url('/'));
+            PushActivityToOutlook::dispatch($event->id);
         }
 
         return to_route('calendar.settings')->with('status', 'Outlook connecté : vos rendez-vous et appels planifiés y seront envoyés.');
