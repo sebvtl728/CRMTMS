@@ -51,6 +51,11 @@ Lot 1d : catalogue de formations et devis.
 - Échecs d'envoi d'e-mail enregistrés sans adresse ni texte du serveur ; aucune donnée personnelle des devis en clair
   dans le journal d'audit.
 - Numérotation des devis sûre en cas d'envois simultanés (aucun doublon, aucun trou).
+- Un brouillon ne part pas si le **régime de TVA de la société a changé** depuis son enregistrement (le brouillon
+  et son formulaire le signalent) ni si sa **date de validité est dépassée** ; un devis dont le PDF archivé est
+  introuvable ne se relance ni ne se renvoie (« Le PDF archivé est introuvable : contactez l'administrateur. »).
+- Le taux de réussite ne compte pas les devis remplacés par une nouvelle version ; une nouvelle société reçoit
+  d'emblée le premier préfixe de numérotation libre.
 
 ## [0.3.1] - 2026-11-14
 

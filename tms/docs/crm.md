@@ -129,6 +129,8 @@ Si la société est **exonérée de TVA** (régime choisi par l'administrateur),
 - **Envoyer** : destinataire (prérempli avec l'e-mail du destinataire, ou à défaut de l'entreprise), jusqu'à 5 adresses en copie, objet et message préremplis, modifiables. Le message part en texte simple avec le PDF joint, par la messagerie de l'organisme (connecteur SMTP de la société, sinon de l'organisme) ; sans serveur d'envoi configuré, la fenêtre prévient que le message ne partira pas réellement. Le devis passe **Envoyé** ; l'opportunité avance d'elle-même à l'étape du devis envoyé (« Proposition » chez CAP FORMATION, réglage de l'administrateur) si elle était à une étape antérieure ; la date de **dernier contact** des fiches est mise à jour.
 - L'envoi se fait en arrière-plan : « E-mail en cours d'envoi… » s'affiche quelques instants. S'il échoue (serveur refusé…), le bandeau **L'e-mail n'est pas parti** donne la raison et **Renvoyer** réessaie le même message. Le devis reste envoyé.
 - **Relancer** (devis envoyé ou déjà relancé) : nouveau message, même PDF ; le devis passe **Relancé**. Impossible tant qu'un envoi est en cours ou en échec (utilisez **Renvoyer**).
+- **Envoyer** est indisponible (la raison s'affiche) quand la **date de validité est dépassée** (modifiez les dates) ou quand le **régime de TVA de la société a changé** depuis l'enregistrement du brouillon : ouvrez-le, vérifiez les taux (une société devenue assujettie laisse les lignes à 0 % : choisissez le taux de chaque ligne) et enregistrez-le.
+- Si le PDF archivé d'un devis envoyé est introuvable, **PDF**, **Relancer** et **Renvoyer** sont indisponibles (« Le PDF archivé est introuvable : contactez l'administrateur. ») : le devis n'est jamais régénéré avec les données du jour.
 
 ### Réponse du client
 
@@ -150,7 +152,7 @@ Chaque nuit à **0 h 05** (heure de Paris), un devis **envoyé** ou **relancé**
 
 **Devis** liste les devis visibles (un Responsable DAS ne voit que ceux des opportunités de ses DAS). Filtres : recherche (numéro, objet de l'opportunité, nom du compte), **Statut**, **Société**, **DAS**, **Responsable**, date du devis du / au ; tri par date, numéro ou total.
 
-Le bandeau **Taux de réussite** donne, pour la période choisie (**Mois**, **Trimestre**, **Année**, heure de Paris), le nombre de devis **envoyés** dans la période et la part de ceux qui ont été **acceptés** (quelle que soit la date d'acceptation), dans les filtres de la liste. **Exporter (.xlsx)** exporte la liste filtrée : numéro, dates, statut, société, compte, opportunité, DAS, responsable, totaux HT / TVA / TTC, dates d'envoi et de réponse (ni texte libre, ni coordonnées).
+Le bandeau **Taux de réussite** donne, pour la période choisie (**Mois**, **Trimestre**, **Année**, heure de Paris), le nombre de devis **envoyés** dans la période et la part de ceux qui ont été **acceptés** (quelle que soit la date d'acceptation), dans les filtres de la liste. Un devis remplacé par une **nouvelle version** n'est pas compté : seule la nouvelle version compte, une fois envoyée. **Exporter (.xlsx)** exporte la liste filtrée : numéro, dates, statut, société, compte, opportunité, DAS, responsable, totaux HT / TVA / TTC, dates d'envoi et de réponse (ni texte libre, ni coordonnées).
 
 ### Fusion et RGPD
 
