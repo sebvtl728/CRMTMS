@@ -20,7 +20,9 @@ use Carbon\CarbonImmutable;
 use Illuminate\Http\Client\Factory;
 use Illuminate\Http\Client\Request;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Log\Events\MessageLogged;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Storage;
 
@@ -243,11 +245,40 @@ it('sent quote is frozen against company changes', function () {
         ->and([$quote->total_vat, $quote->total_ttc])->toBe(['1270.00', '14870.00'])
         ->and($quote->recipient_snapshot['name'])->toBe('Le Bistrot');
 
-    // Rendered again (archive lost), it still uses the frozen recipient and VAT.
+    // Its html still uses the frozen recipient and VAT.
     $html = app(QuotePdf::class)->html($quote);
     expect($html)->toContain('Le Bistrot')->not->toContain('Bistrot renommé')
         ->not->toContain(LegalMentions::vatExemptionNotice())
         ->not->toContain('BROUILLON');
+});
+
+it('never renders again a sent quote whose archive is lost: 410 and a warning', function () {
+    fakeGotenberg();
+    $quote = pdfQuote();
+    DB::transaction(fn () => app(QuoteFreezer::class)->freeze($quote));
+    $quote->forceFill(['status' => QuoteStatus::Sent, 'sent_at' => now()])->save();
+    $quote->company->update(['name' => 'Nouveau nom']);
+    Storage::disk(TenantStorage::DISK)->delete((string) $quote->refresh()->pdf_path);
+    $logged = [];
+    Event::listen(MessageLogged::class, function (MessageLogged $e) use (&$logged) {
+        $logged[] = [$e->level, $e->message, $e->context];
+    });
+
+    $this->actingAs(commercial());
+    $this->get("/crm/quotes/{$quote->id}/pdf")->assertStatus(410)
+        ->assertSee('Document supprimé (données anonymisées).')
+        ->assertDontSee('Nouveau nom');
+    Http::assertSentCount(1); // the freeze only
+
+    expect($logged)->toHaveCount(1)
+        ->and($logged[0][0])->toBe('warning')
+        ->and($logged[0][1])->toBe('Archive PDF du devis introuvable')
+        ->and(array_keys($logged[0][2]))->toEqualCanonicalizing(['tenant_id', 'quote_id']);
+
+    // A draft is still previewed on the fly.
+    $draft = makeQuote($quote->opportunity, $quote->company);
+    $this->get("/crm/quotes/{$draft->id}/pdf")->assertOk();
+    Http::assertSentCount(2);
 });
 
 it('answers 404 for a quote outside the das of a responsable, or of another organisme', function () {

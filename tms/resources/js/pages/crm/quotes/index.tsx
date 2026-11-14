@@ -8,7 +8,7 @@ import AppLayout from '@/layouts/app-layout';
 import { formatAmount, formatDay, type Option, type Paginated } from '@/lib/crm';
 import { type BreadcrumbItem } from '@/types';
 import { Head, Link, router } from '@inertiajs/react';
-import { ArrowDown, ArrowUp, ChevronLeft, ChevronRight } from 'lucide-react';
+import { ArrowDown, ArrowUp, ChevronLeft, ChevronRight, Download } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 
 interface Filters {
@@ -23,17 +23,33 @@ interface Filters {
     dir: 'asc' | 'desc';
 }
 
+interface SuccessRate {
+    sent: number;
+    accepted: number;
+    /** In %, null when no quote was sent in the period. */
+    rate: number | null;
+    period: string;
+    label: string;
+    periods: Option[];
+}
+
 interface IndexProps {
     quotes: Paginated<QuoteRow>;
     filters: Filters;
     options: { status: Option[]; company: Option[]; das: Option[]; responsible: Option[]; sort: Option[] };
+    success_rate: SuccessRate;
+    can: { export: boolean };
     status?: string;
 }
 
+const percent = new Intl.NumberFormat('fr-FR', { maximumFractionDigits: 1 });
+const count = new Intl.NumberFormat('fr-FR');
+
 const breadcrumbs: BreadcrumbItem[] = [{ title: 'Devis', href: '/crm/quotes' }];
 
-function quoteQuery(filters: Filters): Record<string, string> {
+function quoteQuery(filters: Filters, period?: string): Record<string, string> {
     const query: Record<string, string> = {};
+    if (period && period !== 'month') query.period = period;
     if (filters.q) query.q = filters.q;
     (['status', 'company', 'das', 'responsible', 'issued_from', 'issued_to'] as const).forEach((k) => {
         if (filters[k]) query[k] = String(filters[k]);
@@ -46,12 +62,88 @@ function quoteQuery(filters: Filters): Record<string, string> {
     return query;
 }
 
-export default function QuotesIndex({ quotes, filters, options, status }: IndexProps) {
+/**
+ * Excel export of the filtered quotes (default columns). A JSON pre-flight
+ * tells first when the export is refused (too many rows, throttle).
+ */
+function QuoteExportButton({ filters }: { filters: Filters }) {
+    const [checking, setChecking] = useState(false);
+    const [refusal, setRefusal] = useState<string | null>(null);
+
+    const download = async () => {
+        setRefusal(null);
+        setChecking(true);
+        try {
+            const response = await fetch(route('crm.quotes.export.check', quoteQuery(filters)), {
+                headers: { Accept: 'application/json' },
+                credentials: 'same-origin',
+            });
+            const json = (await response.json().catch(() => ({}))) as { allowed?: boolean; message?: string | null };
+            if (!response.ok || json.allowed === false) {
+                setRefusal(json.message ?? 'Export impossible pour le moment.');
+
+                return;
+            }
+            window.location.assign(route('crm.quotes.export', quoteQuery(filters)));
+        } catch {
+            setRefusal("L'export a échoué, réessayez.");
+        } finally {
+            setChecking(false);
+        }
+    };
+
+    return (
+        <div className="hidden md:block">
+            <Button type="button" variant="outline" onClick={download} disabled={checking}>
+                <Download className="h-4 w-4" />
+                Exporter (.xlsx)
+            </Button>
+            {refusal && (
+                <p role="alert" className="text-destructive mt-1 text-sm">
+                    {refusal}
+                </p>
+            )}
+        </div>
+    );
+}
+
+/** « Taux de réussite » of the quotes sent in the period (within the list filters). */
+function SuccessRateBanner({ rate, onPeriod }: { rate: SuccessRate; onPeriod: (period: string) => void }) {
+    return (
+        <section aria-label="Taux de réussite" className="flex flex-wrap items-center justify-between gap-3 rounded-xl border p-3">
+            <div className="flex flex-wrap items-baseline gap-x-6 gap-y-1">
+                <div>
+                    <span className="text-muted-foreground text-sm">Taux de réussite · {rate.label}</span>{' '}
+                    <span className="text-2xl font-semibold tabular-nums">{rate.rate === null ? '—' : `${percent.format(rate.rate)} %`}</span>
+                </div>
+                <span className="text-sm">
+                    {count.format(rate.sent)} envoyé{rate.sent > 1 ? 's' : ''}, {count.format(rate.accepted)} accepté{rate.accepted > 1 ? 's' : ''}
+                </span>
+            </div>
+            <div role="group" aria-label="Période" className="flex gap-1">
+                {rate.periods.map((p) => (
+                    <Button
+                        key={p.value}
+                        type="button"
+                        size="sm"
+                        variant={p.value === rate.period ? 'default' : 'outline'}
+                        aria-pressed={p.value === rate.period}
+                        onClick={() => onPeriod(p.value)}
+                    >
+                        {p.label}
+                    </Button>
+                ))}
+            </div>
+        </section>
+    );
+}
+
+export default function QuotesIndex({ quotes, filters, options, success_rate, can, status }: IndexProps) {
     const [search, setSearch] = useState(filters.q);
     const first = useRef(true);
 
-    const visit = (changes: Partial<Filters>) =>
-        router.get(route('crm.quotes.index'), quoteQuery({ ...filters, ...changes }), { preserveState: true, replace: true });
+    const visit = (changes: Partial<Filters>, period = success_rate.period) =>
+        router.get(route('crm.quotes.index'), quoteQuery({ ...filters, ...changes }, period), { preserveState: true, replace: true });
 
     useEffect(() => {
         if (first.current) {
@@ -86,7 +178,10 @@ export default function QuotesIndex({ quotes, filters, options, status }: IndexP
             <Head title="Devis" />
 
             <div className="flex flex-col gap-4 p-4">
-                <Heading title="Devis" description="Propositions commerciales, créées depuis les opportunités" />
+                <div className="flex flex-wrap items-start justify-between gap-2">
+                    <Heading title="Devis" description="Propositions commerciales, créées depuis les opportunités" />
+                    {can.export && <QuoteExportButton filters={filters} />}
+                </div>
 
                 {status && <div className="text-sm font-medium text-green-600">{status}</div>}
 
@@ -136,12 +231,14 @@ export default function QuotesIndex({ quotes, filters, options, status }: IndexP
                     </div>
                     <div className="flex items-end">
                         {filtered && (
-                            <Button type="button" variant="ghost" size="sm" onClick={() => router.get(route('crm.quotes.index'))}>
+                            <Button type="button" variant="ghost" size="sm" onClick={() => router.get(route('crm.quotes.index'), success_rate.period === 'month' ? {} : { period: success_rate.period })}>
                                 Réinitialiser
                             </Button>
                         )}
                     </div>
                 </section>
+
+                <SuccessRateBanner rate={success_rate} onPeriod={(period) => visit({}, period)} />
 
                 <p className="text-sm">{quotes.total} devis</p>
 

@@ -9,6 +9,7 @@ use App\Modules\Core\Exports\XlsxExporter;
 use App\Modules\Core\Users\User;
 use App\Modules\Crm\Opportunities\OpportunityListQuery;
 use App\Modules\Crm\People\Person;
+use App\Modules\Crm\Quotes\QuoteListQuery;
 use App\Modules\Crm\Search\CrmResource;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
@@ -18,7 +19,7 @@ use Illuminate\Validation\ValidationException;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 /**
- * Excel export of « Entreprises », « Personnes » and « Opportunités »
+ * Excel export of « Entreprises », « Personnes », « Opportunités » and « Devis »
  * (crm.export): the same filters, visibility and sort as the list, any
  * number of columns among the ones the resource offers. Audited with the filters and the row count.
  */
@@ -47,6 +48,26 @@ class ExportController extends Controller
 
         // A search term may be the name of a particulier.
         return $this->run($request, new OpportunityExport, 'crm.opportunities', $filters, $query, true);
+    }
+
+    /** Quotes: the filters, visibility and sort of their list. */
+    public function quotes(Request $request): StreamedResponse
+    {
+        $filters = QuoteListQuery::filters($request->query());
+
+        /** @var Builder<Model> $query */
+        $query = QuoteListQuery::build($filters, $this->user($request));
+
+        // A search term may be the name of a particulier.
+        return $this->run($request, new QuoteExport, 'crm.quotes', $filters, $query, true);
+    }
+
+    public function checkQuotes(Request $request): JsonResponse
+    {
+        /** @var Builder<Model> $query */
+        $query = QuoteListQuery::build(QuoteListQuery::filters($request->query()), $this->user($request));
+
+        return $this->check($query);
     }
 
     public function checkOrganisations(Request $request): JsonResponse

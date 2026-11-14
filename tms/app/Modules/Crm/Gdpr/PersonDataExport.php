@@ -9,6 +9,7 @@ use App\Modules\Crm\Affiliations\Affiliation;
 use App\Modules\Crm\Opportunities\Opportunity;
 use App\Modules\Crm\Organisations\Organisation;
 use App\Modules\Crm\People\Person;
+use App\Modules\Crm\Quotes\Quote;
 use App\Modules\Crm\Timeline\Attachment;
 use App\Modules\Crm\Timeline\Note;
 use App\Modules\Crm\Visibility\CrmVisibility;
@@ -19,7 +20,8 @@ use Illuminate\Support\Facades\DB;
  * Everything the organisme holds about a person (right of access and
  * portability, GDPR art. 15 and 20): identity, contact details, links with
  * the entreprise names, opportunities (as particulier or contact: title,
- * stage, amount), actions (hers or on her opportunities as particulier:
+ * stage, amount), quotes (as particulier or recipient: number, date, status,
+ * total TTC), actions (hers or on her opportunities as particulier:
  * type, subject, status, result, report, place), notes, consents, attachments (listed, not their
  * content), DAS and dates. Trashed items are included (still held), flagged.
  * Fiches merged into her are listed by id (their data now lives here).
@@ -53,6 +55,10 @@ final class PersonDataExport
                 ->orWhereIn('opportunity_id', DB::table('opportunities')->select('id')->where('person_id', $person->id)))
             ->when($viewer !== null, fn ($q) => CrmVisibility::activities($q, $viewer))
             ->orderBy('happened_at')->orderBy('id')->get();
+        $quotes = Quote::withTrashed()
+            ->where(fn ($q) => $q->where('person_id', $person->id)->orWhere('contact_person_id', $person->id))
+            ->when($viewer !== null, fn ($q) => CrmVisibility::quotes($q, $viewer))
+            ->orderBy('issued_on')->orderBy('number')->get();
         $consents = Consent::query()->where('person_id', $person->id)->orderBy('recorded_at')->get();
 
         return [
@@ -102,6 +108,14 @@ final class PersonDataExport
                 'etape' => $label($o->stage),
                 'montant' => $o->amount,
                 'supprimee' => $o->trashed(),
+            ])->all(),
+            'devis' => $quotes->map(fn (Quote $q) => [
+                'numero' => $q->number,
+                'date' => $q->issued_on->toDateString(),
+                'role' => $q->person_id === $person->id ? 'Compte (particulier)' : 'Destinataire',
+                'statut' => $q->status->label(),
+                'total_ttc' => $q->total_ttc,
+                'supprime' => $q->trashed(),
             ])->all(),
             'actions' => $actions->map(fn (Activity $a) => [
                 'date' => $date($a->done_at ?? $a->due_at),

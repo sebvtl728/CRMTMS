@@ -16,7 +16,7 @@ use Inertia\Response;
 
 /**
  * « Accueil »: shortcuts, counters, the commercial summary (« Mes relances »,
- * weighted pipeline of the month, next meetings) and the last fiches the
+ * weighted pipeline and quotes of the month, next meetings) and the last fiches the
  * user opened. Everything follows what the user may see (Responsable DAS:
  * his DAS only); nothing CRM without crm.view.
  */

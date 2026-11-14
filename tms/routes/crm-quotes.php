@@ -1,5 +1,6 @@
 <?php
 
+use App\Modules\Crm\Export\ExportController;
 use App\Modules\Crm\Quotes\QuoteController;
 use App\Modules\Crm\Quotes\QuoteTransitionController;
 use Illuminate\Support\Facades\Route;
@@ -10,6 +11,8 @@ Route::middleware(['auth'])->group(function () {
 
     Route::prefix('crm/quotes')->name('crm.quotes.')->group(function () {
         Route::get('/', [QuoteController::class, 'index'])->middleware('can:crm.view')->name('index');
+        Route::get('export', [ExportController::class, 'quotes'])->middleware(['can:crm.export', 'throttle:crm-export'])->name('export');
+        Route::get('export/check', [ExportController::class, 'checkQuotes'])->middleware(['can:crm.export', 'throttle:crm-export'])->name('export.check');
         Route::post('/', [QuoteController::class, 'store'])->middleware('can:crm.create')->name('store');
         Route::get('{quote}', [QuoteController::class, 'show'])->middleware('can:crm.view')->name('show');
         Route::get('{quote}/edit', [QuoteController::class, 'edit'])->middleware('can:crm.update')->name('edit');

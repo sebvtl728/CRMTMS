@@ -11,11 +11,14 @@ use App\Modules\Core\Tenancy\TenantStorage;
 use App\Modules\Core\Users\User;
 use App\Modules\Crm\Opportunities\Opportunity;
 use App\Modules\Crm\Opportunities\OpportunityStage;
+use App\Modules\Crm\Permissions;
 use App\Modules\Crm\Support\FormOptions;
+use Carbon\CarbonImmutable;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -28,6 +31,8 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
  */
 class QuoteController extends Controller
 {
+    public const DOCUMENT_GONE = 'Document supprimé (données anonymisées).';
+
     public function __construct(
         private readonly QuoteWriter $writer,
         private readonly QuoteForm $form,
@@ -43,6 +48,8 @@ class QuoteController extends Controller
                 ->through(fn (Quote $q) => QuoteRows::row($q)),
             'filters' => $filters,
             'options' => QuoteListQuery::options(),
+            'success_rate' => QuoteSuccessRate::banner($user, $request->query('period'), CarbonImmutable::now(), $filters),
+            'can' => ['export' => $user->can(Permissions::EXPORT)],
             'status' => $request->session()->get('status'),
         ]);
     }
@@ -207,7 +214,9 @@ class QuoteController extends Controller
 
     /**
      * The archived PDF of a sent quote, else (a draft) a preview rendered on
-     * the fly with a watermark. Shown in the browser, never cached.
+     * the fly with a watermark. Shown in the browser, never cached. A sent
+     * quote without its archive (purged by the anonymisation, or lost)
+     * answers 410: it is never rendered again with today's data.
      */
     public function pdf(Quote $quote, QuotePdf $pdf): StreamedResponse
     {
@@ -231,6 +240,17 @@ class QuoteController extends Controller
                     fclose($stream);
                 }
             }, 200, [...$headers, 'Content-Length' => (string) $disk->size($archived)]);
+        }
+
+        // A sent quote is only ever served from its archive: never rendered
+        // again with today's company or fiches. Purged by the anonymisation
+        // (pdf_path cleared), or lost (warned: it should be there).
+        if (! $quote->isDraft()) {
+            if ($quote->pdf_path !== null) {
+                Log::warning('Archive PDF du devis introuvable', ['quote_id' => $quote->id]);
+            }
+
+            throw new UserFacingHttpException(410, self::DOCUMENT_GONE);
         }
 
         $bytes = $pdf->render($quote);

@@ -126,7 +126,7 @@ it('lists first, then anonymises after 30 days only', function () {
 
     $audit = AuditLog::query()->where('event', 'gdpr.anonymised')->sole();
     expect($audit->auditable_id)->toBe($person->id)
-        ->and($audit->new_values)->toEqualCanonicalizing(['reason' => 'retention', 'notes' => 0, 'attachments' => 0]);
+        ->and($audit->new_values)->toEqualCanonicalizing(['reason' => 'retention', 'notes' => 0, 'attachments' => 0, 'quotes' => 0]);
 });
 
 it('is idempotent and mails the gdpr managers the number listed, without personal data', function () {

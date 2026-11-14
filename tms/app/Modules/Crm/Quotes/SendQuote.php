@@ -16,6 +16,7 @@ use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\Jobs\SyncJob;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use RuntimeException;
 use Symfony\Component\Mailer\Exception\TransportExceptionInterface;
@@ -27,6 +28,9 @@ use Throwable;
  * company's SMTP first). Reads the CURRENT quote: a replay after success, or
  * a message already sent, does nothing (email_status is no longer pending).
  *
+ * Without its archived PDF (purged by the anonymisation, or lost) nothing
+ * is sent: email_status « failed » at once, no PDF rendered again.
+ *
  * Failures are rethrown as QuoteMailFailed (reason and SMTP code only).
  * Three tries with a backoff, then email_status « failed » and a fixed
  * French reason (the SMTP code at most): the quote stays « Envoyé » and its
@@ -37,6 +41,8 @@ use Throwable;
 class SendQuote implements ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, TenantAwareJob;
+
+    public const NO_DOCUMENT = 'Le PDF archivé du devis est introuvable : l\'e-mail n\'est pas parti.';
 
     public int $tries = 3;
 
@@ -61,11 +67,20 @@ class SendQuote implements ShouldQueue
             return;
         }
 
+        // Only the archived document is sent, never one rendered again with
+        // today's data (purged by the anonymisation, or lost): no retry.
+        $archived = $pdf->archived($quote);
+        if ($archived === null) {
+            Log::warning('Archive PDF du devis introuvable', ['quote_id' => $quote->id]);
+            $this->failed(new QuoteMailFailed(self::NO_DOCUMENT));
+
+            return;
+        }
+
         $error = null;
-        $send = function () use ($quote, $message, $pdf, &$error): string {
+        $send = function () use ($quote, $message, $archived, &$error): string {
             try {
-                $archived = $pdf->archived($quote);
-                $bytes = $archived !== null ? (string) Storage::disk(TenantStorage::DISK)->get($archived) : $pdf->render($quote);
+                $bytes = (string) Storage::disk(TenantStorage::DISK)->get($archived);
 
                 TenantMailer::for($quote->company)
                     ->to($message['to'])
