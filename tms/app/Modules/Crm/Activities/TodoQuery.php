@@ -50,6 +50,22 @@ final class TodoQuery
     }
 
     /**
+     * Number of the user's own actions overdue and due today (« Mes relances » of the dashboard).
+     *
+     * @return array{overdue: int, today: int}
+     */
+    public static function counts(User $user, CarbonImmutable $now): array
+    {
+        [$today, $tomorrow] = self::bounds($now);
+        $row = self::base($user, false)->toBase()
+            ->selectRaw('count(*) filter (where due_at < ?::timestamptz) as overdue', [$today])
+            ->selectRaw('count(*) filter (where due_at >= ?::timestamptz and due_at < ?::timestamptz) as today', [$today, $tomorrow])
+            ->first();
+
+        return ['overdue' => (int) ($row->overdue ?? 0), 'today' => (int) ($row->today ?? 0)];
+    }
+
+    /**
      * Overdue + today of the user's own actions.
      */
     public static function count(User $user, CarbonImmutable $now): int
