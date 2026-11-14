@@ -299,3 +299,16 @@ it('proposes the active interest trainings of the fiche on a new opportunity', f
     $this->get('/crm/opportunities/create')->assertOk()->assertInertia(fn (Assert $page) => $page
         ->where('defaults.training_lines', []));
 });
+
+it('journals one event per change of the interest trainings', function () {
+    $this->actingAs(commercial());
+    $organisation = Organisation::query()->create(['name' => 'Le Bistrot']);
+    $haccp = ftTraining('HACCP');
+    $hygiene = ftTraining('Hygiène');
+    $before = AuditLog::query()->count();
+
+    $this->put("/crm/organisations/{$organisation->id}/trainings", ['training_ids' => [$haccp->id, $hygiene->id]])->assertSessionHasNoErrors();
+
+    expect(AuditLog::query()->count() - $before)->toBe(1)
+        ->and(AuditLog::query()->where('auditable_type', 'fiche_training')->exists())->toBeFalse();
+});

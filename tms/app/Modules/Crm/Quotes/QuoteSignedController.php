@@ -52,6 +52,8 @@ class QuoteSignedController extends Controller
             'Content-Disposition' => 'inline; filename="'.$quote->number.'-signe.'.$copy['extension'].'"',
             'Cache-Control' => 'private, no-store',
             'X-Content-Type-Options' => 'nosniff',
+            // Opened inline: no script, no form, no same-origin access, whatever the file holds.
+            'Content-Security-Policy' => 'sandbox',
         ]);
     }
 }

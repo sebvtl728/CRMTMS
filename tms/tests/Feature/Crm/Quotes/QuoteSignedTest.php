@@ -177,3 +177,11 @@ it('keeps the previous signed copy intact when saving the replacement fails', fu
     expect($disk->get($path))->toBe(signedPdf())
         ->and(collect($disk->files(dirname($path)))->filter(fn (string $f) => str_starts_with(basename($f), '.tmp-'))->all())->toBe([]);
 });
+
+it('serves the signed copy in a sandbox', function () {
+    $quote = signedSentQuote();
+    $this->post("/crm/quotes/{$quote->id}/accept", ['signed' => signedUpload('scan.pdf', signedPdf())])->assertSessionHasNoErrors();
+
+    $csp = (string) $this->get("/crm/quotes/{$quote->id}/signe")->headers->get('Content-Security-Policy');
+    expect($csp)->toContain('sandbox')->toContain("default-src 'self'");
+});

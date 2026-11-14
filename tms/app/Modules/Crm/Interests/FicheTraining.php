@@ -30,4 +30,12 @@ class FicheTraining extends Model
 
     /** @var list<string> */
     protected $fillable = ['organisation_id', 'person_id', 'training_id', 'created_by'];
+
+    /**
+     * Rows are journaled through their fiche (one crm.*_trainings_changed
+     * event per change, FicheTrainings), not one by one.
+     *
+     * @var list<string>
+     */
+    protected array $auditIgnore = ['id', 'tenant_id', 'organisation_id', 'person_id', 'training_id', 'created_by'];
 }
