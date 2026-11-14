@@ -17,7 +17,7 @@ final class ImportReport
 {
     public const HEADERS = ['Ligne', 'Statut', 'Messages', 'Fiche', 'Identifiant de la fiche'];
 
-    private const TYPES = ['organisation' => 'Entreprise', 'person' => 'Personne', 'affiliation' => 'Rattachement', 'note' => 'Note'];
+    private const TYPES = ['organisation' => 'Entreprise', 'person' => 'Personne', 'affiliation' => 'Rattachement', 'note' => 'Note', 'training' => 'Formation'];
 
     public static function write(ImportBatch $batch): string
     {

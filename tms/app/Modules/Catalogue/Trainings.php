@@ -4,6 +4,7 @@ namespace App\Modules\Catalogue;
 
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
 
 /**
  * Public service of the catalogue, the only way other modules (Crm:
@@ -13,6 +14,15 @@ use Illuminate\Support\Str;
  */
 final class Trainings
 {
+    /** Morph alias of a training (import rows, history). */
+    public const MORPH_ALIAS = 'training';
+
+    /** Right needed to change the catalogue (an import of trainings included). */
+    public const MANAGE_PERMISSION = Permissions::MANAGE;
+
+    /** Keys of the values an import gives (see TrainingImport). */
+    public const IMPORT_KEYS = TrainingImport::KEYS;
+
     public function find(string $id): ?TrainingData
     {
         if (! Str::isUuid($id)) {
@@ -51,6 +61,67 @@ final class Trainings
     public function options(): array
     {
         return self::data(self::active());
+    }
+
+    // ------------------------------------------------------------ import
+
+    /**
+     * The training (not deleted) holding this identifier of another software.
+     */
+    public function findBySource(string $sourceSystem, string $sourceId): ?TrainingData
+    {
+        $training = TrainingImport::bySource($sourceSystem, $sourceId);
+
+        return $training === null ? null : TrainingData::fromModel($training);
+    }
+
+    /**
+     * The training (not deleted, active or not) of this code, case-insensitive.
+     */
+    public function findByCode(string $code): ?TrainingData
+    {
+        $training = TrainingImport::byCode($code);
+
+        return $training === null ? null : TrainingData::fromModel($training);
+    }
+
+    /**
+     * French messages per key (IMPORT_KEYS) for these import values, checked
+     * against the training $existingId (null: a creation, title and DAS
+     * required, the code free).
+     *
+     * @param  array<string, mixed>  $values
+     * @return array<string, list<string>>
+     */
+    public function importErrors(array $values, ?string $existingId): array
+    {
+        $current = $existingId === null || ! Str::isUuid($existingId) ? null : Training::query()->find($existingId);
+
+        return TrainingImport::errors(TrainingImport::normalise($values), $current);
+    }
+
+    /**
+     * Creates or updates (same source identifier, else same code) the
+     * training of these import values; absent keys are left as they are.
+     *
+     * @param  array<string, mixed>  $values  keys of IMPORT_KEYS
+     *
+     * @throws ValidationException (French messages) on an invalid value
+     */
+    public function upsertFromImport(array $values, ?string $sourceSystem, ?string $sourceId): TrainingData
+    {
+        $training = TrainingImport::upsert($values, $sourceSystem, $sourceId);
+
+        return TrainingData::fromModel($training->load('das'));
+    }
+
+    /**
+     * Sends to the trash a training an import created (its undo); refused
+     * (false) when it is used (TrainingUsage) or already deleted.
+     */
+    public function deleteImported(string $id): bool
+    {
+        return Str::isUuid($id) && TrainingImport::delete($id);
     }
 
     /**

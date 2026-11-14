@@ -44,7 +44,18 @@ final class ImportStamps
      */
     public function lastStamp(Model $fiche): ?string
     {
-        return $this->facts($fiche)['stamp'];
+        return $this->facts($fiche->getMorphClass(), (string) $fiche->getKey())['stamp'];
+    }
+
+    /**
+     * Same as modifiedSinceImport(), for a record of another module given by
+     * its alias, id and current stamp (updated_at to the second).
+     */
+    public function modifiedSinceImportOf(string $type, string $id, ?string $current): bool
+    {
+        $stamp = $this->facts($type, $id)['stamp'];
+
+        return $stamp !== null && $stamp !== $current;
     }
 
     /**
@@ -63,7 +74,7 @@ final class ImportStamps
     public function trashedByUndo(Model $fiche): bool
     {
         $deletedAt = $fiche->getAttribute('deleted_at');
-        $undoneAt = $this->facts($fiche)['trashed_by_undo_at'];
+        $undoneAt = $this->facts($fiche->getMorphClass(), (string) $fiche->getKey())['trashed_by_undo_at'];
 
         return $deletedAt instanceof Carbon && $undoneAt !== null && $undoneAt->greaterThanOrEqualTo($deletedAt->copy()->startOfSecond());
     }
@@ -108,12 +119,12 @@ final class ImportStamps
     /**
      * @return array{stamp: string|null, trashed_by_undo_at: Carbon|null}
      */
-    private function facts(Model $fiche): array
+    private function facts(string $type, string $id): array
     {
-        $key = $fiche->getMorphClass().':'.$fiche->getKey();
+        $key = $type.':'.$id;
         if (! array_key_exists($key, $this->cache)) {
             $this->cache[$key] = ['stamp' => null, 'trashed_by_undo_at' => null];
-            $this->load($fiche->getMorphClass(), [(string) $fiche->getKey()]);
+            $this->load($type, [$id]);
         }
 
         return $this->cache[$key];

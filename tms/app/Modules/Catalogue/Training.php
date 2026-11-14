@@ -31,7 +31,10 @@ use Illuminate\Support\Facades\Auth;
  * @property bool $is_active
  * @property string|null $created_by
  * @property string|null $updated_by
+ * @property string|null $source_system software an import took it from
+ * @property string|null $source_id its identifier there
  * @property Carbon|null $created_at
+ * @property Carbon|null $updated_at
  * @property Carbon|null $deleted_at
  */
 class Training extends Model

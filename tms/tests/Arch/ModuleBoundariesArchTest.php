@@ -34,7 +34,8 @@ it('keeps Catalogue free of any import of the Crm module', function () {
 });
 
 it('lets Crm reach the catalogue through its public service only', function () {
-    // Trainings (reads), TrainingData (its result), TrainingUsage (delete guard).
+    // Trainings (reads, import writes), TrainingData (its result), TrainingUsage (delete guard).
     expect(moduleFilesMatching('Crm', '/^\s*use\s+App\\\\Modules\\\\Catalogue\\\\(?!(Trainings|TrainingData|TrainingUsage);)/m'))->toBe([])
-        ->and(moduleFilesMatching('Crm', '/[\'"](trainings|training_funding_modes)[\'"]/'))->toBe([]);
+        // The import target « trainings » (ImportTarget::Trainings) names the data, not the table.
+        ->and(moduleFilesMatching('Crm', '/(?<!case Trainings = )[\'"](trainings|training_funding_modes)[\'"]/'))->toBe([]);
 });

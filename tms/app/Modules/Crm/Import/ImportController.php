@@ -3,6 +3,7 @@
 namespace App\Modules\Crm\Import;
 
 use App\Http\Controllers\Controller;
+use App\Modules\Catalogue\Trainings;
 use App\Modules\Core\Access\Permissions as CorePermissions;
 use App\Modules\Core\References\ReferenceItem;
 use App\Modules\Core\Tenancy\TenantStorage;
@@ -84,10 +85,13 @@ class ImportController extends Controller
 
     // ------------------------------------------------------------ 1. the file
 
-    public function create(): Response
+    public function create(Request $request): Response
     {
+        $user = $this->user($request);
+
         return Inertia::render('crm/import/upload', [
-            'targets' => array_map(fn (ImportTarget $t) => ['value' => $t->value, 'label' => $t->label()], ImportTarget::cases()),
+            'targets' => array_values(array_map(fn (ImportTarget $t) => ['value' => $t->value, 'label' => $t->label()],
+                array_filter(ImportTarget::cases(), fn (ImportTarget $t) => $this->mayImport($user, $t)))),
             'profiles' => ImportProfile::query()->orderBy('name')->get(['id', 'name', 'target'])
                 ->map(fn (ImportProfile $p) => ['id' => $p->id, 'name' => $p->name, 'target' => $p->target->value])->all(),
             'maxMegabytes' => self::MAX_MEGABYTES,
@@ -119,6 +123,9 @@ class ImportController extends Controller
         }
 
         $target = ImportTarget::from($input['target']);
+        if (! $this->mayImport($this->user($request), $target)) {
+            throw ValidationException::withMessages(['target' => 'Seuls les gestionnaires du catalogue peuvent importer des formations.']);
+        }
         $profile = null;
         if (! empty($input['profile_id'])) {
             $profile = ImportProfile::query()->find($input['profile_id']);
@@ -450,7 +457,7 @@ class ImportController extends Controller
             'hasValues' => $batch->target->mappableFields() !== [],
             'strategy' => [
                 'value' => $batch->strategy()->value,
-                'options' => array_map(fn (DuplicateStrategy $s) => ['value' => $s->value, 'label' => $s->label(), 'description' => self::strategyHelp($s)], DuplicateStrategy::cases()),
+                'options' => array_map(fn (DuplicateStrategy $s) => ['value' => $s->value, 'label' => $s->labelFor($batch->target), 'description' => self::strategyHelp($s, $batch->target)], DuplicateStrategy::cases()),
             ],
             'canRun' => $batch->canRun() && ($simulation['blocking'] ?? []) === [],
             'sourceSystem' => $batch->sourceSystem(),
@@ -539,7 +546,7 @@ class ImportController extends Controller
             'created_at' => $batch->created_at->toIso8601String(),
             'failure' => $batch->options['failure'] ?? null,
             'undo' => isset($batch->options['undo']) ? ['removed' => (int) $batch->options['undo']['removed'], 'kept' => (int) $batch->options['undo']['kept']] : null,
-            'strategy' => $batch->strategy()->label(),
+            'strategy' => $batch->strategy()->labelFor($batch->target),
             'source_system' => $batch->sourceSystem(),
         ];
     }
@@ -566,13 +573,30 @@ class ImportController extends Controller
         return sprintf('Fichier lu en %s, séparateur « %s ».', $reader->encoding(), $reader->delimiter() === "\t" ? 'tabulation' : $reader->delimiter());
     }
 
-    private static function strategyHelp(DuplicateStrategy $strategy): string
+    private static function strategyHelp(DuplicateStrategy $strategy, ImportTarget $target): string
     {
+        if ($target === ImportTarget::Trainings) {
+            return match ($strategy) {
+                DuplicateStrategy::Skip => 'Si une formation du catalogue a le même code, la ligne est ignorée : la formation n\'est pas touchée.',
+                DuplicateStrategy::Merge => 'Si une formation du catalogue a le même code, elle est mise à jour avec les valeurs non vides du fichier.',
+                DuplicateStrategy::Create => 'Une nouvelle formation est créée ; une ligne dont le code est déjà utilisé est refusée.',
+            };
+        }
+
         return match ($strategy) {
             DuplicateStrategy::Skip => 'Si la fiche existe déjà (même SIRET, e-mail, téléphone ou nom au même endroit), la ligne est ignorée : la fiche existante n\'est pas touchée.',
             DuplicateStrategy::Merge => 'Si la fiche existe déjà de façon certaine, seules ses informations vides sont complétées avec celles du fichier. Les ressemblances moins sûres sont ignorées.',
             DuplicateStrategy::Create => 'Une nouvelle fiche est créée même si une fiche semblable existe (impossible quand le SIRET est déjà utilisé).',
         };
+    }
+
+    /**
+     * The catalogue is imported by the users who manage it (crm.import is
+     * checked by the routes).
+     */
+    private function mayImport(User $user, ImportTarget $target): bool
+    {
+        return $target !== ImportTarget::Trainings || $user->can(Trainings::MANAGE_PERMISSION);
     }
 
     private function kind(ImportTarget $target, string $field): string

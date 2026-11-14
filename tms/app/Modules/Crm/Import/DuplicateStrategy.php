@@ -10,6 +10,10 @@ namespace App\Modules\Crm\Import;
  *   name in the same postal code / city) is completed with the file values
  *   for its empty fields; a possible duplicate (similar name) is ignored.
  * - Create: a new fiche is created anyway (impossible on an existing SIRET).
+ *
+ * For the catalogue (ImportTarget::Trainings) the duplicate is the training
+ * of the same code: Merge updates it with the non-empty values of the file,
+ * Create refuses the row (a code is unique).
  */
 enum DuplicateStrategy: string
 {
@@ -24,5 +28,10 @@ enum DuplicateStrategy: string
             self::Merge => 'Compléter la fiche existante',
             self::Create => 'Créer quand même',
         };
+    }
+
+    public function labelFor(ImportTarget $target): string
+    {
+        return $target === ImportTarget::Trainings && $this === self::Merge ? 'Mettre à jour la formation existante' : $this->label();
     }
 }

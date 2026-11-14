@@ -19,6 +19,8 @@ final readonly class TrainingData
         public ?int $price_company_cents,
         public ?int $price_individual_cents,
         public bool $is_active,
+        /** Last change, to the second (« 2026-11-14 10:30:00 », app timezone): tells whether it changed since. */
+        public ?string $updated_at = null,
     ) {}
 
     public static function fromModel(Training $training): self
@@ -34,6 +36,7 @@ final readonly class TrainingData
             price_company_cents: self::cents($training->price_company),
             price_individual_cents: self::cents($training->price_individual),
             is_active: $training->is_active,
+            updated_at: $training->updated_at?->copy()->setTimezone(config('app.timezone'))->format('Y-m-d H:i:s'),
         );
     }
 

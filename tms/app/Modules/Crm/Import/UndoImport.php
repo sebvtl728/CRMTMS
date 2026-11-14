@@ -2,6 +2,7 @@
 
 namespace App\Modules\Crm\Import;
 
+use App\Modules\Catalogue\Trainings;
 use App\Modules\Core\Audit\AuditRecorder;
 use App\Modules\Core\Tenancy\TenantAwareJob;
 use App\Modules\Core\Tenancy\TenantContext;
@@ -28,7 +29,9 @@ use Illuminate\Support\Facades\DB;
  * - something not created by this import hangs on it (LinkedData: note,
  *   link, attachment, consent, and what later modules register), e.g.
  *   added by a user or by a later import;
- * - it was merged since.
+ * - it was merged since;
+ * - (a training) it is used since (TrainingUsage: opportunity, quote...);
+ *   it is removed through Catalogue\Trainings, never through its model.
  * Fiches the import only updated are left as they are; nothing is restored.
  * The last contact of a fiche whose imported notes were removed is
  * recomputed from what remains (LastContact::recompute).
@@ -43,13 +46,15 @@ class UndoImport implements ShouldQueue
     use Dispatchable, Queueable, TenantAwareJob;
 
     /** Order of removal (morph aliases). */
-    public const PHASES = ['note', 'affiliation', 'person', 'organisation'];
+    public const PHASES = ['note', 'affiliation', 'person', 'organisation', Trainings::MORPH_ALIAS];
 
     public const KEPT_MODIFIED = 'Modifiée depuis l\'import, conservée.';
 
     public const KEPT_MERGED = 'Fusionnée depuis l\'import, conservée.';
 
     public const KEPT_LINKED = 'Liée à des données ajoutées depuis l\'import, conservée.';
+
+    public const KEPT_USED = 'Formation utilisée depuis l\'import (opportunités, devis), conservée.';
 
     public int $tries = 1;
 
@@ -157,6 +162,10 @@ class UndoImport implements ShouldQueue
      */
     private function remove(string $type, string $id, array $known): bool|string
     {
+        if ($type === Trainings::MORPH_ALIAS) {
+            return $this->removeTraining($id, $known);
+        }
+
         $class = Relation::getMorphedModel($type);
         if ($class === null) {
             return false;
@@ -181,6 +190,28 @@ class UndoImport implements ShouldQueue
         $model->delete();
         if ($model instanceof Note) {
             $this->recontacted[$model->notable_type.':'.$model->notable_id] = [$model->notable_type, $model->notable_id];
+        }
+
+        return true;
+    }
+
+    /**
+     * @param  array{created: array<string, true>, stamps: array<string, string>}  $known
+     */
+    private function removeTraining(string $id, array $known): bool|string
+    {
+        $trainings = app(Trainings::class);
+        $training = $trainings->find($id);
+        if ($training === null) {
+            return false; // already deleted
+        }
+        $stamp = $known['stamps'][Trainings::MORPH_ALIAS.':'.$id] ?? null;
+        if ($stamp !== null && $stamp !== $training->updated_at) {
+            return self::KEPT_MODIFIED;
+        }
+        // Refused when used since (TrainingUsage).
+        if (! $trainings->deleteImported($id)) {
+            return self::KEPT_USED;
         }
 
         return true;

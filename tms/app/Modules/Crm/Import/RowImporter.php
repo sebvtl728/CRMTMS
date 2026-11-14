@@ -2,6 +2,7 @@
 
 namespace App\Modules\Crm\Import;
 
+use App\Modules\Catalogue\Trainings;
 use App\Modules\Core\Security\DatabaseErrorLog;
 use App\Modules\Crm\Affiliations\Affiliation;
 use App\Modules\Crm\Affiliations\AffiliationRequest;
@@ -76,6 +77,9 @@ final class RowImporter
 
     private readonly ?string $sourceSystem;
 
+    /** Rows of a catalogue import (target Trainings). */
+    private readonly ?TrainingRows $trainings;
+
     public function __construct(
         private readonly ImportBatch $batch,
         private readonly FieldMap $map,
@@ -87,6 +91,9 @@ final class RowImporter
         $this->strategy = $batch->strategy();
         $this->stamps = new ImportStamps;
         $this->sourceSystem = $batch->sourceSystem();
+        $this->trainings = $batch->target === ImportTarget::Trainings
+            ? new TrainingRows($batch, $values, $dryRun, $this->stamps, app(Trainings::class))
+            : null;
     }
 
     /**
@@ -107,7 +114,7 @@ final class RowImporter
      */
     public function prefetch(array $rows): void
     {
-        if ($this->sourceSystem === null) {
+        if ($this->sourceSystem === null || $this->trainings !== null) {
             return;
         }
 
@@ -182,6 +189,7 @@ final class RowImporter
             ImportTarget::People => $this->personRow($line, $values),
             ImportTarget::Affiliations => $this->affiliationRow($line, $values),
             ImportTarget::Notes => $this->noteRow($values),
+            ImportTarget::Trainings => $this->trainings?->row($line, $values) ?? RowOutcome::error('Ligne non importée.'),
         };
 
         // In a replayable run (no savepoint per row), any failure goes up to RunImport.
@@ -266,6 +274,10 @@ final class RowImporter
      */
     private function read(array $row): array
     {
+        if ($this->trainings !== null) {
+            return $this->trainings->read($this->map->values($row));
+        }
+
         $labels = $this->batch->target->fields();
         $mappable = $this->batch->target->mappableFields();
         $values = [];
@@ -1078,6 +1090,7 @@ final class RowImporter
             str_contains($message, 'organisations_siret_unique') => 'SIRET : '.OrganisationRequest::DUPLICATE_SIRET,
             str_contains($message, 'affiliations_active_unique') => AffiliationRequest::ALREADY_ATTACHED,
             str_contains($message, 'source_unique') => 'Identifiant source déjà utilisé par une autre fiche.',
+            str_contains($message, 'code_unique') => TrainingRows::DUPLICATE_CODE,
             default => 'Ligne non importée : elle entre en conflit avec une fiche existante.',
         };
     }

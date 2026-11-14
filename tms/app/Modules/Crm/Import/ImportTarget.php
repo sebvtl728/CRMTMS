@@ -7,7 +7,9 @@ use App\Modules\Core\References\ReferenceList;
 /**
  * What a file imports. Affiliations: one person and her entreprise on the
  * same row (« interlocuteurs »). Notes: history of exchanges, the subject
- * found by SIRET, e-mail or source identifier.
+ * found by SIRET, e-mail or source identifier. Trainings: the catalogue,
+ * written through Catalogue\Trainings (TrainingRows), for the users who
+ * manage it.
  */
 enum ImportTarget: string
 {
@@ -15,6 +17,7 @@ enum ImportTarget: string
     case People = 'people';
     case Affiliations = 'affiliations';
     case Notes = 'notes';
+    case Trainings = 'trainings';
 
     private const ORGANISATION = [
         'name' => 'Raison sociale', 'siret' => 'SIRET', 'naf_code' => 'Code NAF', 'legal_form' => 'Forme juridique',
@@ -46,6 +49,12 @@ enum ImportTarget: string
     private const NOTE = [
         'subject_siret' => "SIRET de l'entreprise", 'subject_email' => 'E-mail de la fiche',
         'subject_source_id' => 'Identifiant source de la fiche', 'date' => 'Date', 'body' => 'Note',
+    ];
+
+    private const TRAINING = [
+        'code' => 'Code', 'title' => 'Intitulé', 'das' => 'DAS', 'duration_hours' => 'Durée (heures)', 'duration_days' => 'Durée (jours)',
+        'audience' => 'Public', 'prerequisites' => 'Prérequis', 'price_company' => 'Tarif entreprise', 'price_individual' => 'Tarif particulier',
+        'funding_modes' => 'Financements', 'is_active' => 'Active', 'source_id' => 'Identifiant source',
     ];
 
     /**
@@ -98,6 +107,16 @@ enum ImportTarget: string
         'subject_email' => ['email', 'e mail', 'mail', 'courriel'],
         'subject_source_id' => ['id', 'identifiant', 'reference', 'ref', 'code client', 'id fiche'],
         'date' => ['date', 'date de l echange', 'date echange', 'date de contact', 'le'],
+        'code' => ['code', 'code formation', 'reference', 'ref', 'reference formation', 'code produit'],
+        'title' => ['intitule', 'libelle', 'titre', 'formation', 'nom de la formation', 'intitule de la formation', 'designation'],
+        'duration_hours' => ['duree heures', 'duree en heures', 'nombre d heures', 'nb heures', 'heures', 'duree h', 'volume horaire'],
+        'duration_days' => ['duree jours', 'duree en jours', 'nombre de jours', 'nb jours', 'jours', 'duree j'],
+        'audience' => ['public', 'public vise', 'public concerne', 'cible'],
+        'prerequisites' => ['prerequis', 'pre requis'],
+        'price_company' => ['tarif entreprise', 'prix entreprise', 'tarif ht entreprise', 'prix ht entreprise', 'tarif inter', 'tarif'],
+        'price_individual' => ['tarif particulier', 'prix particulier', 'tarif individuel', 'prix individuel', 'tarif ht particulier'],
+        'funding_modes' => ['financements', 'financement', 'modes de financement', 'mode de financement', 'dispositifs'],
+        'is_active' => ['active', 'actif', 'en catalogue', 'disponible'],
         'body' => ['note', 'notes', 'commentaire', 'commentaires', 'texte', 'compte rendu', 'echange', 'contenu', 'description', 'observations'],
     ];
 
@@ -108,6 +127,7 @@ enum ImportTarget: string
             self::People => 'Personnes',
             self::Affiliations => 'Interlocuteurs (personne et entreprise)',
             self::Notes => "Historique d'échanges (notes)",
+            self::Trainings => 'Catalogue de formations',
         };
     }
 
@@ -123,6 +143,7 @@ enum ImportTarget: string
             self::People => self::PERSON,
             self::Affiliations => array_diff_key(self::PERSON, ['is_individual' => true]) + self::AFFILIATION + $this->organisationFields(),
             self::Notes => self::NOTE,
+            self::Trainings => self::TRAINING,
         };
     }
 
@@ -167,6 +188,7 @@ enum ImportTarget: string
                 'origin' => ReferenceList::ContactOrigin, 'das' => ReferenceList::Das, 'decision_role' => ReferenceList::DecisionRole,
                 'organisation.sector' => ReferenceList::Sector],
             self::Notes => [],
+            self::Trainings => ['das' => ReferenceList::Das, 'funding_modes' => ReferenceList::FundingMode],
         };
 
         return $lists;
@@ -183,6 +205,7 @@ enum ImportTarget: string
             self::Organisations => ['name'],
             self::People, self::Affiliations => ['last_name'],
             self::Notes => ['body'],
+            self::Trainings => ['title', 'das'],
         };
     }
 

@@ -14,7 +14,7 @@ use Illuminate\Validation\Rule;
  */
 class TrainingRequest extends FormRequest
 {
-    private const DECIMALS = ['duration_hours', 'duration_days', 'price_company', 'price_individual'];
+    public const DECIMALS = ['duration_hours', 'duration_days', 'price_company', 'price_individual'];
 
     public function authorize(): bool
     {
@@ -45,9 +45,9 @@ class TrainingRequest extends FormRequest
 
     /**
      * « 12 500,00 € » → « 12500.00 »; anything else unchanged for the
-     * validation to refuse.
+     * validation to refuse. Also used by the import (TrainingImport).
      */
-    private static function decimal(mixed $value): mixed
+    public static function decimal(mixed $value): mixed
     {
         if (! is_string($value)) {
             return $value;
@@ -73,7 +73,17 @@ class TrainingRequest extends FormRequest
      */
     public function rules(): array
     {
-        $current = $this->current();
+        return self::fieldRules($this->current());
+    }
+
+    /**
+     * The rules of a training, $current being the training edited (null on
+     * creation). Shared with the import (TrainingImport).
+     *
+     * @return array<string, mixed>
+     */
+    public static function fieldRules(?Training $current): array
+    {
         $tenantId = app(TenantContext::class)->id();
         $currentFunding = $current?->fundingModes()->pluck('reference_items.id')->all() ?? [];
 
@@ -113,6 +123,14 @@ class TrainingRequest extends FormRequest
      * @return array<string, string>
      */
     public function messages(): array
+    {
+        return self::validationMessages();
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    public static function validationMessages(): array
     {
         return [
             'required' => 'Ce champ est obligatoire.',
