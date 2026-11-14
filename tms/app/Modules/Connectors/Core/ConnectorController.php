@@ -40,7 +40,7 @@ class ConnectorController extends Controller
                 'configured' => $configs->has($key),
                 'enabled' => (bool) $configs->get($key)?->contains('enabled', true),
             ])->values(),
-            'runs' => ConnectorRun::query()->with('config')->latest('started_at')->limit(25)->get()->map(fn (ConnectorRun $r) => [
+            'runs' => ConnectorRun::query()->with('config')->latest('started_at')->latest('id')->limit(25)->get()->map(fn (ConnectorRun $r) => [
                 'id' => $r->id,
                 'connector' => ($key = $r->config->connector_key) && isset($connectors[$key]) ? $connectors[$key]::label() : $key,
                 'direction' => $r->direction,

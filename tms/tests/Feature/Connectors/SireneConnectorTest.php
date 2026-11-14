@@ -221,11 +221,11 @@ it('journals failures and not found', function () {
     freshHttp();
     Http::fake(['*' => Http::response('boom', 500)]);
     $this->actingAs(commercial())->getJson('/crm/sirene/'.SIEGE_SIRET)->assertStatus(503);
-    expect(ConnectorRun::query()->latest('started_at')->first()->status)->toBe('failed');
+    expect(ConnectorRun::query()->latest('started_at')->latest('id')->first()->status)->toBe('failed');
 
     fakeSirene('not-found');
     $this->getJson('/crm/sirene/'.UNKNOWN_SIRET)->assertNotFound();
-    $run = ConnectorRun::query()->latest('started_at')->first();
+    $run = ConnectorRun::query()->latest('started_at')->latest('id')->first();
     expect($run->status)->toBe('success')->and($run->summary)->toContain('aucune entreprise');
 });
 
