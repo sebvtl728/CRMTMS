@@ -24,15 +24,15 @@ final class CalendarAnnouncements
     private const CHUNK = 500;
 
     /**
-     * @param  'organisation_id'|'person_id'|'opportunity_id'  $column
-     * @param  string|list<string>  $ids
+     * @param  string  $column  one of COLUMNS
+     * @param  string|list<string|null>  $ids
      */
     public static function announceFor(string $column, string|array $ids): void
     {
         if (! in_array($column, self::COLUMNS, true)) {
             throw new InvalidArgumentException("Colonne inconnue : {$column}.");
         }
-        $ids = array_values(array_unique(array_filter((array) $ids, fn ($id) => is_string($id) && $id !== '')));
+        $ids = array_values(array_unique(array_filter((array) $ids, fn (?string $id) => $id !== null && $id !== '')));
         $types = $ids === [] ? [] : WeekPlanning::types();
         if ($types === []) {
             return;
