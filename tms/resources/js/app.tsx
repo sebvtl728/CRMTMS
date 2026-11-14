@@ -1,6 +1,6 @@
 import '../css/app.css';
 
-import { createInertiaApp } from '@inertiajs/react';
+import { createInertiaApp, router } from '@inertiajs/react';
 import { resolvePageComponent } from 'laravel-vite-plugin/inertia-helpers';
 import { createRoot } from 'react-dom/client';
 import { route as routeFn } from 'ziggy-js';
@@ -12,11 +12,23 @@ declare global {
 
 const appName = import.meta.env.VITE_APP_NAME || 'Laravel';
 
+// Tab title: the organisme's name (default company) once signed in, else the application's.
+let siteName = appName;
+const brandName = (props: Record<string, unknown>): string => {
+    const brand = props.brand as { name?: string } | null | undefined;
+
+    return brand?.name || appName;
+};
+
 createInertiaApp({
-    title: (title) => `${title} - ${appName}`,
+    title: (title) => (title ? `${title} - ${siteName}` : siteName),
     resolve: (name) => resolvePageComponent(`./pages/${name}.tsx`, import.meta.glob('./pages/**/*.tsx')),
     setup({ el, App, props }) {
         const root = createRoot(el);
+        siteName = brandName(props.initialPage.props);
+        router.on('navigate', (event) => {
+            siteName = brandName(event.detail.page.props);
+        });
 
         root.render(<App {...props} />);
     },

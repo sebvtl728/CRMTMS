@@ -3,6 +3,7 @@
 namespace App\Http\Middleware;
 
 use App\Modules\Core\Access\Permissions;
+use App\Modules\Core\Companies\Brand;
 use App\Modules\Core\Users\User;
 use App\Modules\Crm\Activities\TodoQuery;
 use App\Modules\Crm\Permissions as CrmPermissions;
@@ -44,6 +45,8 @@ class HandleInertiaRequests extends Middleware
         return array_merge(parent::share($request), [
             ...parent::share($request),
             'name' => config('app.name'),
+            // Organisme identity (sidebar, tab title): signed-in users only, never before login.
+            'brand' => fn () => $user === null ? null : app(Brand::class)->current(),
             'auth' => [
                 'user' => $user === null ? null : [
                     'id' => $user->id,

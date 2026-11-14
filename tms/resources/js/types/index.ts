@@ -27,6 +27,8 @@ export interface NavItem {
 
 export interface SharedData {
     name: string;
+    /** Organisme identity (default company), null for guests. */
+    brand: { name: string; logoUrl: string | null } | null;
     auth: Auth;
     /** Menu badge of « À faire »: overdue + today. */
     todo_count: number;

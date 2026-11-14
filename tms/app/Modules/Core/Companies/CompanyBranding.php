@@ -120,6 +120,20 @@ class CompanyBranding
      */
     public function logoDataUri(Company $company): ?string
     {
+        $logo = $this->logoFile($company);
+
+        return $logo === null ? null : 'data:'.$logo['mime'].';base64,'.base64_encode($logo['content']);
+    }
+
+    /**
+     * The stored logo (content, MIME type, SHA-256), for the PDF and the
+     * application's brand (BrandLogoController); null without a logo, when
+     * the file is missing or no longer an accepted image.
+     *
+     * @return array{content: string, mime: string, sha256: string}|null
+     */
+    public function logoFile(Company $company): ?array
+    {
         $path = $company->logo_path;
         if ($path === null || ! $this->isOwnPath($company, $path)) {
             return null;
@@ -135,7 +149,7 @@ class CompanyBranding
             return null;
         }
 
-        return 'data:'.$mime.';base64,'.base64_encode($bytes);
+        return ['content' => $bytes, 'mime' => $mime, 'sha256' => hash('sha256', $bytes)];
     }
 
     private function directory(Company $company): string
