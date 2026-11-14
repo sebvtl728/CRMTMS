@@ -33,6 +33,8 @@ class CalendarTokenController extends Controller
             ],
             'url' => $url,
             'status' => $request->session()->get('status'),
+            'outlook' => OutlookController::props($this->user($request)),
+            'outlook_error' => $request->session()->get('outlook_error'),
         ]);
         if ($url !== null) {
             Inertia::clearHistory();

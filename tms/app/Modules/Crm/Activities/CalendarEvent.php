@@ -25,5 +25,6 @@ final readonly class CalendarEvent
         public ?int $durationMinutes,
         public string $url,
         public CarbonImmutable $updatedAt,
+        public ?string $responsibleUserId = null,
     ) {}
 }

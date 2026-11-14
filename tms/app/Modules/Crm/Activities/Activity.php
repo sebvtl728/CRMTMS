@@ -6,6 +6,7 @@ use App\Modules\Core\Audit\Auditable;
 use App\Modules\Core\References\ReferenceItem;
 use App\Modules\Core\Tenancy\BelongsToTenant;
 use App\Modules\Core\Users\User;
+use App\Modules\Crm\Activities\Events\ActivityChanged;
 use App\Modules\Crm\Opportunities\Opportunity;
 use App\Modules\Crm\Organisations\Organisation;
 use App\Modules\Crm\People\Person;
@@ -61,6 +62,12 @@ class Activity extends Model
     /** @var list<string> */
     protected array $auditPersonal = ['subject', 'report', 'location'];
 
+    /** What a calendar shows of an action (CalendarEvents): a change is announced (ActivityChanged). */
+    public const CALENDAR_FIELDS = [
+        'type_id', 'due_at', 'duration_minutes', 'location', 'responsible_user_id',
+        'organisation_id', 'person_id', 'opportunity_id', 'deleted_at',
+    ];
+
     /** @var list<string> */
     protected array $auditIgnore = ['happened_at', 'created_by'];
 
@@ -108,6 +115,18 @@ class Activity extends Model
         static::saved($forgetBadge);
         static::deleted($forgetBadge);
         static::restored($forgetBadge);
+
+        // Calendars (Outlook) follow the action: announced once committed.
+        static::created(fn (Activity $activity) => ActivityChanged::dispatch($activity->id, $activity->responsible_user_id));
+        static::updated(function (Activity $activity): void {
+            if (! $activity->wasChanged(self::CALENDAR_FIELDS)) {
+                return;
+            }
+            $before = $activity->getOriginal('responsible_user_id');
+            ActivityChanged::dispatch($activity->id, $activity->responsible_user_id,
+                is_string($before) && $before !== $activity->responsible_user_id ? $before : null);
+        });
+        static::deleted(fn (Activity $activity) => ActivityChanged::dispatch($activity->id, $activity->responsible_user_id));
     }
 
     protected function casts(): array

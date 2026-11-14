@@ -9,7 +9,8 @@ use Carbon\CarbonImmutable;
 /**
  * Public read service of the CRM for calendars (Connectors\Calendar): the
  * meetings and calls a user is responsible for, with a due date in
- * [$from, $to), within his visibility, on live fiches only.
+ * [$from, $to), within his visibility, on live fiches only; or one
+ * action (find), for the calendars it is pushed to.
  */
 final class CalendarEvents
 {
@@ -38,23 +39,57 @@ final class CalendarEvents
 
         $events = [];
         foreach ($activities as $activity) {
-            $kind = $types[$activity->type_id] === WeekPlanning::CALL ? WeekPlanning::CALL : WeekPlanning::MEETING;
-            $events[] = new CalendarEvent(
-                id: $activity->id,
-                kind: $kind,
-                type: (string) $activity->type?->label,
-                fiche: $activity->ficheName(),
-                opportunity: $activity->opportunity?->title,
-                result: $activity->result?->label,
-                location: $activity->location,
-                start: CarbonImmutable::instance($activity->due_at),
-                durationMinutes: $activity->duration_minutes,
-                url: self::url($activity),
-                updatedAt: CarbonImmutable::instance($activity->updated_at ?? $activity->created_at ?? now()),
-            );
+            $events[] = self::event($activity, $types);
         }
 
         return $events;
+    }
+
+    /**
+     * The calendar event of one action, as its responsible's calendars show
+     * it, or null when it has none: deleted, not a meeting or call, without
+     * due date or responsible, on a fiche in the trash, or out of the
+     * responsible's visibility (or his account is gone).
+     */
+    public static function find(string $activityId): ?CalendarEvent
+    {
+        $types = WeekPlanning::types();
+        $activity = $types === [] ? null : Activity::query()->whereKey($activityId)
+            ->whereIn('type_id', array_keys($types))
+            ->whereNotNull('due_at')->whereNotNull('responsible_user_id')
+            ->first();
+        $responsible = $activity === null ? null : User::query()->find($activity->responsible_user_id);
+        if ($activity === null || $responsible === null) {
+            return null;
+        }
+
+        $visible = TodoQuery::onLiveFiches(CrmVisibility::activities(Activity::query(), $responsible))
+            ->whereKey($activity->id)->with(ActivityRows::WITH)->first();
+
+        return $visible === null ? null : self::event($visible, $types);
+    }
+
+    /**
+     * @param  array<string, string>  $types
+     */
+    private static function event(Activity $activity, array $types): CalendarEvent
+    {
+        $kind = $types[$activity->type_id] === WeekPlanning::CALL ? WeekPlanning::CALL : WeekPlanning::MEETING;
+
+        return new CalendarEvent(
+            id: $activity->id,
+            kind: $kind,
+            type: (string) $activity->type?->label,
+            fiche: $activity->ficheName(),
+            opportunity: $activity->opportunity?->title,
+            result: $activity->result?->label,
+            location: $activity->location,
+            start: CarbonImmutable::instance($activity->due_at),
+            durationMinutes: $activity->duration_minutes,
+            url: self::url($activity),
+            updatedAt: CarbonImmutable::instance($activity->updated_at ?? $activity->created_at ?? now()),
+            responsibleUserId: $activity->responsible_user_id,
+        );
     }
 
     private static function url(Activity $activity): string

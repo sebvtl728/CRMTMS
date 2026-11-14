@@ -4,6 +4,7 @@ namespace App\Modules\Crm\Gdpr;
 
 use App\Modules\Core\Audit\AuditRecorder;
 use App\Modules\Core\Tenancy\TenantStorage;
+use App\Modules\Crm\Activities\Events\ActivityChanged;
 use App\Modules\Crm\Import\ImportBatch;
 use App\Modules\Crm\People\Person;
 use Illuminate\Support\Facades\DB;
@@ -152,9 +153,11 @@ class Anonymiser
         DB::table('gdpr_pending')->where('person_id', $locked->id)->delete();
         DB::table('opportunities')->whereIn('person_id', $subjects)->whereNotNull('loss_comment')->update(['loss_comment' => null, 'updated_at' => now()]);
         DB::table('opportunity_contacts')->whereIn('person_id', $subjects)->delete();
-        DB::table('activities')
+        $activities = DB::table('activities')
             ->where(fn ($q) => $q->whereIn('person_id', $subjects)
                 ->orWhereIn('opportunity_id', DB::table('opportunities')->select('id')->whereIn('person_id', $subjects)))
+            ->pluck('responsible_user_id', 'id');
+        DB::table('activities')->whereIn('id', $activities->keys()->all())
             ->update([
                 'report' => null,
                 'location' => null,
@@ -177,6 +180,11 @@ class Anonymiser
             'notes' => count($notes),
             'attachments' => $attachments->count(),
         ]);
+
+        // Calendars it was pushed to drop the name and place (after commit).
+        foreach ($activities as $activityId => $responsibleId) {
+            ActivityChanged::dispatch((string) $activityId, is_string($responsibleId) ? $responsibleId : null);
+        }
 
         return $files;
     }

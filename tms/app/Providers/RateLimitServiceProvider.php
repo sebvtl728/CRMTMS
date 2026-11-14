@@ -26,6 +26,7 @@ class RateLimitServiceProvider extends ServiceProvider
         'email-verification-send' => 6,
         'activation' => 10,
         'calendar-feed' => 30,
+        'outlook-oauth' => 10,
     ];
 
     /**

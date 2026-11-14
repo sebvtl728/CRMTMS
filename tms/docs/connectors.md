@@ -117,3 +117,58 @@ Appliquée à l'enregistrement (règle `SmtpHost`, qui résout l'hôte en A/AAAA
 | taille | `tranche_effectif_salarie` (code INSEE → « 20 à 49 salariés »), rapprochée du référentiel `company_size` par libellé identique, sinon par la première tranche (« 10-49 », « 250 et plus ») qui contient toute la fourchette ; sinon vide |
 
 L'effectif est celui de l'établissement (non diffusé ou inconnu : vide). Les adresses sont reprises telles que l'API les donne (majuscules).
+
+## Connecteur Microsoft 365 (envoi vers l'agenda Outlook)
+
+`Microsoft365Connector` (clé `microsoft365`, type synchronisation). Chaque utilisateur qui le souhaite connecte **son** compte Microsoft 365. Ses rendez-vous et appels datés du CRM sont alors créés dans son agenda Outlook, mis à jour et supprimés avec eux. C'est un envoi : rien n'est relu depuis Outlook. Ce sont les mêmes actions que le flux iCal : types marqués « rendez-vous » ou « appel » (`meta.planning`), action datée, fiche non supprimée, visible de son responsable.
+
+Paramètres : `tenant` (annuaire Azure : son ID, un de ses domaines `xxx.onmicrosoft.com`, ou vide = `common`), `client_id` (ID d'application). Secret : `client_secret`.
+
+### Déclarer l'application dans Azure (une fois par organisme)
+
+1. Portail Azure › **Microsoft Entra ID** › **Inscriptions d'applications** › **Nouvelle inscription**.
+   - Nom : « TMS – agenda ».
+   - Types de comptes : « Comptes dans cet annuaire organisationnel uniquement » (recommandé ; renseignez alors `tenant` avec l'ID de l'annuaire).
+   - **URI de redirection** : plateforme **Web**, `https://<adresse de l'organisme>/settings/calendar/outlook/callback`. Exemple : `https://tms.capformation.fr/settings/calendar/outlook/callback`. Ajoutez une URI par adresse si l'organisme en a plusieurs.
+2. **Autorisations des API** › Ajouter › Microsoft Graph › **Autorisations déléguées** : `Calendars.ReadWrite` et `offline_access`. Ne choisissez pas d'autorisation « Application ». Facultatif : « Accorder le consentement administrateur » évite à chaque utilisateur de consentir lui-même.
+3. **Certificats et secrets** › Nouveau secret client. Copiez la **Valeur** (et non l'ID du secret) et notez sa date d'expiration.
+4. Dans le TMS : `/admin/connectors` › Microsoft 365. Renseignez :
+   - `tenant` : ID de l'annuaire ;
+   - `client_id` : ID d'application (client) ;
+   - `client_secret` : la valeur copiée.
+
+   Activez puis lancez **Tester**. Avec un annuaire précis, le test vérifie l'identifiant et le secret auprès de Microsoft. Avec `common`, il vérifie seulement que Microsoft est joignable.
+5. Avant l'expiration du secret : créez-en un nouveau dans Azure et remplacez-le dans le TMS.
+
+### Côté utilisateur
+
+« Mon agenda » (`/settings/calendar`) › **Connecter Outlook** : connexion Microsoft, consentement, retour au TMS. Les actions déjà planifiées des 180 prochains jours sont alors envoyées. **Déconnecter Outlook** supprime les jetons et arrête l'envoi ; les évènements déjà créés restent dans l'agenda.
+
+### Fonctionnement et sécurité
+
+- **OAuth 2.0 « code d'autorisation » + PKCE (S256).**
+  - Le `state` est signé (HMAC dérivé d'`APP_KEY`). Il est lié à l'organisme, à l'utilisateur et à sa session, valable 10 minutes et à usage unique.
+  - L'URI de redirection est calculée sur l'adresse de la requête, donc celle de l'organisme.
+- **Jetons.** Jetons d'accès et de rafraîchissement par utilisateur dans `calendar_links`, chiffrés (`APP_KEY`), jamais sérialisés ni journalisés.
+- **Renouvellement.**
+  - Le jeton d'accès est renouvelé avant son expiration, puis une fois de plus si Graph répond 401.
+  - Si Microsoft refuse le renouvellement (`invalid_grant` : consentement retiré, mot de passe changé…), le lien passe « À reconnecter ». L'utilisateur voit un message dans « Mon agenda » et le bouton « Reconnecter Outlook ». Rien n'est envoyé d'ici là.
+- **Déclenchement.**
+  - Le CRM émet `Crm\Activities\Events\ActivityChanged` après validation de la transaction (création, modification du type, de la date, de la durée, du lieu, des fiches ou du responsable, suppression, restauration, anonymisation).
+  - L'écouteur `QueueOutlookPush` met en file `PushActivityToOutlook` (`TenantAwareJob`, après commit). Il le fait seulement si le connecteur est actif et que le responsable (nouveau ou précédent) a un lien actif, ou qu'un évènement Outlook existe déjà pour l'action.
+- **Ce que fait le job.**
+  - Il relit l'état **actuel** de l'action (`CalendarEvents::find`), jamais une photo : les rejeux convergent.
+  - Il s'exécute une fois à la fois par action (`WithoutOverlapping`, clé préfixée par l'organisme).
+  - Il crée (`POST /me/events`), modifie (`PATCH`) ou supprime (`DELETE`).
+  - En cas de réaffectation, il supprime l'évènement de l'agenda de l'ancien responsable et le crée chez le nouveau.
+  - Un 404 en modification recrée l'évènement ; un 404 en suppression vaut « déjà supprimé ».
+  - Doublons : l'identifiant d'évènement est conservé dans `calendar_link_events`. La création porte un `transactionId` enregistré avant l'appel, qu'un rejeu réutilise.
+  - 429 / 5xx / délai dépassé : nouvel essai plus tard. Le job respecte `Retry-After` (au plus 1 h), sinon attend 30 s, 2 min, 10 min, 30 min puis 1 h. Il abandonne après 24 h.
+- **Contenu envoyé.**
+  - Titre : « type – fiche ».
+  - Corps : fiche, opportunité, lieu et lien vers la fiche.
+  - Heures locales avec `timeZone: Europe/Paris` ; la fin = début + durée exacte (60 min pour un rendez-vous, 15 min pour un appel par défaut).
+  - **Jamais** le compte rendu ni l'objet saisi.
+- **Réseau.** Seuls `login.microsoftonline.com` et `graph.microsoft.com` sont appelés, en https, sans suivre de redirection. `HostPolicy` strict est revérifié à chaque appel.
+- **Journal.** `connector_runs` (sens `out`) contient « Action <id> : évènement Outlook créé / mis à jour / supprimé » et des erreurs rédigées par l'application (code HTTP). Il ne contient ni titre, ni fiche, ni adresse e-mail, ni texte de Microsoft. Une exécution en échec peut être relancée (`payload_ref` = `activity:<id>`).
+- **Audit.** `calendar.outlook_connected`, `calendar.outlook_disconnected`, `calendar.outlook_reconnect_required`.

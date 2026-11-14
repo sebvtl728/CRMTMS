@@ -12,13 +12,22 @@ import { type BreadcrumbItem } from '@/types';
 
 const breadcrumbs: BreadcrumbItem[] = [{ title: 'Mon agenda', href: '/settings/calendar' }];
 
+interface OutlookProps {
+    available: boolean;
+    status: 'none' | 'active' | 'reconnect';
+    connected_at: string | null;
+    message: string | null;
+}
+
 interface CalendarProps {
     calendar: { created_at: string | null; last_used_at: string | null } | null;
     url: string | null;
     status?: string | null;
+    outlook: OutlookProps;
+    outlook_error?: string | null;
 }
 
-export default function Calendar({ calendar, url, status }: CalendarProps) {
+export default function Calendar({ calendar, url, status, outlook, outlook_error }: CalendarProps) {
     const [copied, setCopied] = useState(false);
     const [processing, setProcessing] = useState(false);
 
@@ -37,6 +46,21 @@ export default function Calendar({ calendar, url, status }: CalendarProps) {
             return;
         }
         router.delete(route('calendar.destroy'), { preserveScroll: true, onStart: () => setProcessing(true), onFinish: () => setProcessing(false) });
+    };
+
+    const connectOutlook = () => {
+        router.post(route('calendar.outlook.connect'), {}, { onStart: () => setProcessing(true), onFinish: () => setProcessing(false) });
+    };
+
+    const disconnectOutlook = () => {
+        if (!window.confirm("Déconnecter Outlook ? Vos rendez-vous n'y seront plus envoyés ; les évènements déjà créés restent dans votre agenda.")) {
+            return;
+        }
+        router.delete(route('calendar.outlook.disconnect'), {
+            preserveScroll: true,
+            onStart: () => setProcessing(true),
+            onFinish: () => setProcessing(false),
+        });
     };
 
     const copy = async () => {
@@ -137,6 +161,42 @@ export default function Calendar({ calendar, url, status }: CalendarProps) {
                                 Sur Mac : Fichier › Nouvel abonnement à un calendrier, collez le lien puis S'abonner. Sur iPhone : Réglages ›
                                 Calendrier › Comptes › Ajouter un compte › Autre › Ajouter un calendrier avec abonnement.
                             </p>
+                        </div>
+                    </div>
+
+                    <div className="space-y-3 text-sm">
+                        <HeadingSmall
+                            title="Connecter Outlook"
+                            description="Avec un compte Microsoft 365, vos rendez-vous et appels sont créés directement dans votre agenda Outlook, mis à jour et supprimés avec eux, en quelques instants."
+                        />
+                        {outlook_error && <p className="font-medium text-red-700 dark:text-red-400">{outlook_error}</p>}
+                        {outlook.message !== null && (
+                            <p className="rounded-md border border-amber-300 bg-amber-50 p-3 dark:border-amber-700 dark:bg-amber-950">
+                                {outlook.message}
+                            </p>
+                        )}
+                        {outlook.status === 'active' && (
+                            <p>
+                                Outlook connecté{outlook.connected_at !== null ? ` le ${formatDateTime(outlook.connected_at)}` : ''}. Les comptes
+                                rendus n'y sont jamais envoyés.
+                            </p>
+                        )}
+                        {!outlook.available && outlook.status === 'none' && (
+                            <p className="text-muted-foreground">
+                                L'envoi vers Outlook n'est pas activé pour votre organisme : contactez votre administrateur.
+                            </p>
+                        )}
+                        <div className="flex flex-wrap gap-2">
+                            {outlook.available && outlook.status !== 'active' && (
+                                <Button type="button" onClick={connectOutlook} disabled={processing}>
+                                    {outlook.status === 'reconnect' ? 'Reconnecter Outlook' : 'Connecter Outlook'}
+                                </Button>
+                            )}
+                            {outlook.status !== 'none' && (
+                                <Button type="button" variant="outline" onClick={disconnectOutlook} disabled={processing}>
+                                    Déconnecter Outlook
+                                </Button>
+                            )}
                         </div>
                     </div>
                 </div>
