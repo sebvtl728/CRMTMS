@@ -170,7 +170,7 @@ refute() {
 }
 
 @test "update rolls back on failed migration" {
-    psql_owner "insert into companies (id, tenant_id, name) values (gen_random_uuid(), current_setting('app.tenant_id')::uuid, 'bats-avant-maj')" >/dev/null
+    psql_owner "insert into companies (id, tenant_id, name, quote_prefix) values (gen_random_uuid(), current_setting('app.tenant_id')::uuid, 'bats-avant-maj', 'BATS')" >/dev/null
     compose exec -T app sh -c 'echo avant-maj > storage/app/bats-update.txt'
     cp "$TMS_DIR/compose.prod.yaml" "$STACK_DIR/compose.before"
 

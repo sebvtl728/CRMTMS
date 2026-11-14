@@ -5,6 +5,14 @@ Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) ; ve
 
 ## [Non publié]
 
+## [0.4.1] - 2026-11-14
+
+Première publication installable du lot 1d (la 0.4.0 n'a pas pu être publiée).
+
+### Corrigé
+
+- Test d'intégration de la mise à jour adapté aux préfixes de devis uniques par société.
+
 ## [0.4.0] - 2026-11-14
 
 Lot 1d : catalogue de formations et devis.
@@ -186,7 +194,8 @@ Lot 1a : socle de l'application.
   mise à jour avec retour arrière automatique.
 - Publication : image multi-architecture signée (cosign), archive de version, sommes de contrôle.
 
-[Non publié]: https://github.com/sebvtl728/CRMTMS/compare/v0.4.0...HEAD
+[Non publié]: https://github.com/sebvtl728/CRMTMS/compare/v0.4.1...HEAD
+[0.4.1]: https://github.com/sebvtl728/CRMTMS/compare/v0.4.0...v0.4.1
 [0.4.0]: https://github.com/sebvtl728/CRMTMS/compare/v0.3.1...v0.4.0
 [0.3.1]: https://github.com/sebvtl728/CRMTMS/compare/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/sebvtl728/CRMTMS/compare/v0.2.0...v0.3.0
