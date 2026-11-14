@@ -11,6 +11,7 @@ use App\Modules\Crm\Activities\ActivityRows;
 use App\Modules\Crm\Permissions;
 use App\Modules\Crm\Quotes\Quote;
 use App\Modules\Crm\Quotes\QuoteRows;
+use App\Modules\Crm\Quotes\QuoteStatus;
 use App\Modules\Crm\Support\FilterInput;
 use App\Modules\Crm\Support\FormOptions;
 use App\Modules\Crm\Visibility\CrmVisibility;
@@ -20,6 +21,7 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -254,7 +256,23 @@ class OpportunityController extends Controller
         $to = ReferenceItem::query()->where('list', ReferenceList::PipelineStage)->findOrFail($validated['stage_id']);
         $wonOn = isset($validated['won_on']) ? CarbonImmutable::parse($validated['won_on'], config('app.timezone')) : null;
 
-        $this->stages->move($opportunity, $to, $validated['loss_reason_id'] ?? null, $validated['loss_comment'] ?? null, $wonOn);
+        $quote = null;
+        if (isset($validated['quote_id'])) {
+            if (OpportunityStage::outcome($to) !== 'won') {
+                throw ValidationException::withMessages(['quote_id' => OpportunityStage::QUOTE_ONLY_WHEN_WON]);
+            }
+            $quote = Quote::query()->whereKey($validated['quote_id'])->where('opportunity_id', $opportunity->id)
+                ->where('status', QuoteStatus::Accepted)->first()
+                ?? throw ValidationException::withMessages(['quote_id' => OpportunityStage::QUOTE_NOT_ACCEPTED]);
+        }
+
+        DB::transaction(function () use ($opportunity, $to, $validated, $wonOn, $quote): void {
+            $this->stages->move($opportunity, $to, $validated['loss_reason_id'] ?? null, $validated['loss_comment'] ?? null, $wonOn);
+            // The amount of the opportunity becomes the accepted quote's total HT.
+            if ($quote !== null) {
+                $opportunity->forceFill(['amount' => $quote->total_ht])->save();
+            }
+        });
 
         return back()->with('status', 'Étape mise à jour : '.$to->label.'.');
     }

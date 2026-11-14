@@ -26,6 +26,10 @@ final class OpportunityStage
 {
     public const LOSS_REASON_REQUIRED = 'Le motif de perte est obligatoire.';
 
+    public const QUOTE_NOT_ACCEPTED = 'Ce devis n\'est pas un devis accepté de cette opportunité.';
+
+    public const QUOTE_ONLY_WHEN_WON = 'Le montant d\'un devis ne s\'applique qu\'en passant l\'opportunité en gagnée.';
+
     /**
      * @param  array<string, mixed>  $attributes  validated fields (probability null = stage default)
      * @param  list<string>  $contactIds
@@ -113,6 +117,43 @@ final class OpportunityStage
             $this->record($locked, $from, $to);
             $opportunity->setRawAttributes($locked->getAttributes(), true);
         });
+    }
+
+    /**
+     * Moves the opportunity forward to $to (a sent quote: « Proposition »),
+     * only when its stage is open and comes before $to in the pipeline
+     * order. Returns whether it moved.
+     */
+    public function advanceTo(Opportunity $opportunity, ReferenceItem $to): bool
+    {
+        $current = ReferenceItem::withTrashed()->find($opportunity->stage_id);
+        if ($current === null || self::outcome($current) !== null || self::outcome($to) !== null || $current->position >= $to->position) {
+            return false;
+        }
+
+        $this->move($opportunity, $to, null, null, null);
+
+        return true;
+    }
+
+    /**
+     * The active open stage flagged meta.quote_stage by the organisme, if any.
+     */
+    public static function quoteStage(): ?ReferenceItem
+    {
+        return ReferenceItem::query()->where('list', ReferenceList::PipelineStage)->where('is_active', true)
+            ->orderBy('position')->get()
+            ->first(fn (ReferenceItem $i) => ($i->meta['quote_stage'] ?? false) === true && self::outcome($i) === null);
+    }
+
+    /**
+     * The first active stage closing with $outcome (« won » / « lost »), in pipeline order.
+     */
+    public static function closingStage(string $outcome): ?ReferenceItem
+    {
+        return ReferenceItem::query()->where('list', ReferenceList::PipelineStage)->where('is_active', true)
+            ->orderBy('position')->orderBy('label')->get()
+            ->first(fn (ReferenceItem $i) => self::outcome($i) === $outcome);
     }
 
     /**

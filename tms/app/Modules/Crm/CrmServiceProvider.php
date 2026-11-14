@@ -414,6 +414,23 @@ class CrmServiceProvider extends ServiceProvider
 
             return is_string($latest) ? CarbonImmutable::parse($latest) : null;
         });
+
+        // A quote sent or reminded: a contact of its account and its recipient.
+        LastContact::registerSource(function (string $subjectType, array $ids): ?CarbonInterface {
+            $query = match ($subjectType) {
+                (new Organisation)->getMorphClass() => Quote::query()->whereIn('organisation_id', $ids),
+                (new Person)->getMorphClass() => Quote::query()->where(fn (Builder $q) => $q->whereIn('person_id', $ids)->orWhereIn('contact_person_id', $ids)),
+                default => null,
+            };
+            if ($query === null) {
+                return null;
+            }
+
+            $latest = $query->whereNotNull('sent_at')->toBase()
+                ->selectRaw('max(greatest(sent_at, coalesce(reminded_at, sent_at))) as latest')->value('latest');
+
+            return is_string($latest) ? CarbonImmutable::parse($latest) : null;
+        });
     }
 
     /**

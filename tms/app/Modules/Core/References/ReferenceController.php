@@ -31,6 +31,7 @@ class ReferenceController extends Controller
                 'label' => $list->label(),
                 'has_probability' => $list->hasProbability(),
                 'has_planning' => $list->hasPlanning(),
+                'has_quote_stage' => $list->hasQuoteStage(),
                 'items' => ($items[$list->value] ?? collect())->map(fn (ReferenceItem $i) => [
                     'id' => $i->id,
                     'code' => $i->code,
@@ -55,13 +56,14 @@ class ReferenceController extends Controller
         $data = $this->validated($request, $list);
 
         DB::transaction(function () use ($list, $data): void {
-            ReferenceItem::create([
+            $item = ReferenceItem::create([
                 'list' => $list,
                 'code' => ReferenceItem::uniqueCode($list, $data['label']),
                 'label' => $data['label'],
                 'position' => (int) ReferenceItem::withTrashed()->where('list', $list)->max('position') + 1,
                 'meta' => $this->metaFrom($list, $data, null),
             ]);
+            $this->keepOneQuoteStage($item);
         });
 
         return $this->back('Valeur ajoutée.');
@@ -77,12 +79,17 @@ class ReferenceController extends Controller
             $this->refuse(self::SYSTEM_MESSAGE);
         }
 
-        // The code is never editable: it is not read from the request at all.
-        $item->update([
-            'label' => $data['label'],
-            'is_active' => $active,
-            'meta' => $this->metaFrom($list, $data, $item),
-        ]);
+        $meta = $this->metaFrom($list, $data, $item);
+
+        DB::transaction(function () use ($item, $data, $active, $meta): void {
+            // The code is never editable: it is not read from the request at all.
+            $item->update([
+                'label' => $data['label'],
+                'is_active' => $active,
+                'meta' => $meta,
+            ]);
+            $this->keepOneQuoteStage($item);
+        });
 
         return $this->back('Valeur enregistrée.');
     }
@@ -148,6 +155,7 @@ class ReferenceController extends Controller
             'meta.probability' => [Rule::requiredIf(fn () => $list->hasProbability() && ! ($item !== null && ($item->meta['outcome'] ?? null) !== null)), 'nullable', 'integer', 'between:0,100'],
             'meta.color' => ['nullable', 'string', 'regex:/^#[0-9a-fA-F]{6}$/'],
             'meta.planning' => ['nullable', Rule::in(array_keys(ReferenceItem::PLANNING_KINDS))],
+            'meta.quote_stage' => ['nullable', 'boolean'],
         ], [
             'label.required' => 'Le libellé est obligatoire.',
             'label.unique' => 'Une valeur portant ce libellé existe déjà dans cette liste.',
@@ -156,6 +164,7 @@ class ReferenceController extends Controller
             'meta.probability.integer' => 'La probabilité doit être un nombre entier.',
             'meta.color.regex' => 'La couleur doit être au format #RRGGBB.',
             'meta.planning.in' => 'Choisissez Rendez-vous, Appel ou rien pour le planning.',
+            'meta.quote_stage.boolean' => 'Cochez ou décochez la case.',
         ]);
     }
 
@@ -184,6 +193,17 @@ class ReferenceController extends Controller
                 unset($meta['planning']);
             }
         }
+        // Stage of a sent quote: kept unless the form sends it; never a closing stage.
+        if ($list->hasQuoteStage() && array_key_exists('quote_stage', $input)) {
+            if ((bool) $input['quote_stage']) {
+                if (($meta['outcome'] ?? null) !== null) {
+                    throw ValidationException::withMessages(['meta.quote_stage' => 'Une étape gagnée ou perdue ne peut pas être l\'étape d\'un devis envoyé.']);
+                }
+                $meta['quote_stage'] = true;
+            } else {
+                unset($meta['quote_stage']);
+            }
+        }
         if (array_key_exists('color', $input)) {
             $meta['color'] = $input['color'];
         }
@@ -192,6 +212,24 @@ class ReferenceController extends Controller
         }
 
         return $meta === [] ? null : $meta;
+    }
+
+    /**
+     * At most one stage of a sent quote: flagging one clears the others.
+     */
+    private function keepOneQuoteStage(ReferenceItem $item): void
+    {
+        if (! $item->list->hasQuoteStage() || ($item->meta['quote_stage'] ?? false) !== true) {
+            return;
+        }
+
+        ReferenceItem::withTrashed()->where('list', $item->list)->whereKeyNot($item->getKey())->get()
+            ->filter(fn (ReferenceItem $other) => array_key_exists('quote_stage', $other->meta ?? []))
+            ->each(function (ReferenceItem $other): void {
+                $meta = $other->meta ?? [];
+                unset($meta['quote_stage']);
+                $other->update(['meta' => $meta === [] ? null : $meta]);
+            });
     }
 
     private function assertBelongs(ReferenceList $list, ReferenceItem $item): void

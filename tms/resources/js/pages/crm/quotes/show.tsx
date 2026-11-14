@@ -1,4 +1,6 @@
 import { decimalInput, rateLabel } from '@/components/crm/quote-lines';
+import { QuoteAnswerDialog, QuoteOutcomeDialog, type ProposeWon, type QuotePipeline } from '@/components/crm/quote-outcome-dialog';
+import { QuoteSendDialog, type QuoteMessageDefaults } from '@/components/crm/quote-send-dialog';
 import { QuoteStatusBadge, type QuoteRow } from '@/components/crm/quote-list';
 import InputError from '@/components/input-error';
 import { Badge } from '@/components/ui/badge';
@@ -8,8 +10,8 @@ import AppLayout from '@/layouts/app-layout';
 import { formatAmount, formatDateTime, formatDay } from '@/lib/crm';
 import { type BreadcrumbItem } from '@/types';
 import { Head, Link, router, usePage } from '@inertiajs/react';
-import { Copy, FileText, Pencil, Trash2 } from 'lucide-react';
-import { useState } from 'react';
+import { BellRing, Check, Copy, FileText, Pencil, RotateCw, Send, Trash2, TriangleAlert, X } from 'lucide-react';
+import { useEffect, useState } from 'react';
 
 interface QuoteLineRow {
     id: string;
@@ -32,6 +34,12 @@ interface QuoteData extends QuoteRow {
     vat_exempt: boolean;
     vat_notice: string | null;
     sent_at: string | null;
+    reminded_at: string | null;
+    accepted_on: string | null;
+    refused_on: string | null;
+    refusal_reason: string | null;
+    replaced_by: { id: string; number: string } | null;
+    email: { status: 'pending' | 'sent' | 'failed'; error: string | null; sent_at: string | null } | null;
     created_at: string | null;
     lines: QuoteLineRow[];
     totals: { ht: string; vat: string; ttc: string; vat_by_rate: { rate: string; base: string; vat: string }[] };
@@ -39,7 +47,11 @@ interface QuoteData extends QuoteRow {
 
 interface ShowProps {
     quote: QuoteData;
-    can: { update: boolean; delete: boolean; duplicate: boolean };
+    can: { update: boolean; delete: boolean; duplicate: boolean; send: boolean; remind: boolean; resend: boolean; answer: boolean };
+    send: QuoteMessageDefaults | null;
+    remind: QuoteMessageDefaults | null;
+    pipeline: QuotePipeline;
+    propose: { won: ProposeWon | null; lost: boolean };
     status?: string;
 }
 
@@ -52,8 +64,13 @@ function Item({ label, children }: { label: string; children: React.ReactNode })
     );
 }
 
-export default function QuoteShow({ quote: q, can, status }: ShowProps) {
+export default function QuoteShow({ quote: q, can, send, remind, pipeline, propose, status }: ShowProps) {
     const [confirming, setConfirming] = useState(false);
+    const [mailing, setMailing] = useState<'send' | 'remind' | null>(null);
+    const [answer, setAnswer] = useState<'accept' | 'refuse' | null>(null);
+    const [proposal, setProposal] = useState(propose);
+    // A new answer (flashed by the server) opens the pipeline proposal again.
+    useEffect(() => setProposal(propose), [propose]);
     const errors = usePage().props.errors as Record<string, string | undefined>;
 
     const breadcrumbs: BreadcrumbItem[] = [
@@ -102,6 +119,30 @@ export default function QuoteShow({ quote: q, can, status }: ShowProps) {
                                 {q.status.value === 'draft' ? 'Aperçu PDF' : 'PDF'}
                             </a>
                         </Button>
+                        {can.send && send && (
+                            <Button onClick={() => setMailing('send')}>
+                                <Send className="h-4 w-4" />
+                                Envoyer
+                            </Button>
+                        )}
+                        {can.remind && remind && (
+                            <Button variant="outline" onClick={() => setMailing('remind')}>
+                                <BellRing className="h-4 w-4" />
+                                Relancer
+                            </Button>
+                        )}
+                        {can.answer && (
+                            <>
+                                <Button variant="outline" onClick={() => setAnswer('accept')}>
+                                    <Check className="h-4 w-4" />
+                                    Accepté
+                                </Button>
+                                <Button variant="outline" onClick={() => setAnswer('refuse')}>
+                                    <X className="h-4 w-4" />
+                                    Refusé
+                                </Button>
+                            </>
+                        )}
                         {can.update && (
                             <Button asChild variant="outline">
                                 <Link href={route('crm.quotes.edit', q.id)}>
@@ -126,6 +167,26 @@ export default function QuoteShow({ quote: q, can, status }: ShowProps) {
                 </div>
 
                 {status && <div className="text-sm font-medium text-green-600">{status}</div>}
+                {q.email?.status === 'failed' && (
+                    <div
+                        role="alert"
+                        className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-red-300 bg-red-50 p-3 text-sm text-red-900 dark:border-red-800 dark:bg-red-950 dark:text-red-100"
+                    >
+                        <p className="flex gap-2">
+                            <TriangleAlert className="mt-0.5 h-4 w-4 shrink-0" />
+                            <span>
+                                L'e-mail n'est pas parti. {q.email.error}
+                            </span>
+                        </p>
+                        {can.resend && (
+                            <Button size="sm" variant="outline" onClick={() => router.post(route('crm.quotes.resend', q.id), {}, { preserveScroll: true })}>
+                                <RotateCw className="h-4 w-4" />
+                                Renvoyer
+                            </Button>
+                        )}
+                    </div>
+                )}
+                {q.email?.status === 'pending' && <p className="text-muted-foreground text-sm">E-mail en cours d'envoi…</p>}
                 {/* A new version refused (numbering): the reason, in French. */}
                 <InputError message={errors.company_id ?? errors.lines} />
 
@@ -145,6 +206,17 @@ export default function QuoteShow({ quote: q, can, status }: ShowProps) {
                         <Item label="Responsable de l'opportunité">{q.responsible}</Item>
                         <Item label="Créé le">{formatDateTime(q.created_at)}</Item>
                         {q.sent_at && <Item label="Envoyé le">{formatDateTime(q.sent_at)}</Item>}
+                        {q.reminded_at && <Item label="Relancé le">{formatDateTime(q.reminded_at)}</Item>}
+                        {q.accepted_on && <Item label="Accepté le">{formatDay(q.accepted_on)}</Item>}
+                        {q.refused_on && <Item label="Refusé le">{formatDay(q.refused_on)}</Item>}
+                        {q.refusal_reason && <Item label="Motif du refus">{q.refusal_reason}</Item>}
+                        {q.replaced_by && (
+                            <Item label="Remplacé par">
+                                <Link href={route('crm.quotes.show', q.replaced_by.id)} className="underline">
+                                    {q.replaced_by.number}
+                                </Link>
+                            </Item>
+                        )}
                     </dl>
                     {q.notes && <p className="mt-3 text-sm whitespace-pre-line">{q.notes}</p>}
                 </section>
@@ -221,6 +293,19 @@ export default function QuoteShow({ quote: q, can, status }: ShowProps) {
                     </dl>
                 </section>
             </div>
+
+            {send && <QuoteSendDialog quoteId={q.id} number={q.number} kind="send" defaults={send} open={mailing === 'send'} onClose={() => setMailing(null)} />}
+            {remind && (
+                <QuoteSendDialog quoteId={q.id} number={q.number} kind="remind" defaults={remind} open={mailing === 'remind'} onClose={() => setMailing(null)} />
+            )}
+            <QuoteAnswerDialog quoteId={q.id} number={q.number} issuedOn={q.issued_on} answer={answer} onClose={() => setAnswer(null)} />
+            <QuoteOutcomeDialog
+                quoteId={q.id}
+                pipeline={pipeline}
+                proposeWon={proposal.won}
+                proposeLost={proposal.lost}
+                onClose={() => setProposal({ won: null, lost: false })}
+            />
 
             <Dialog open={confirming} onOpenChange={setConfirming}>
                 <DialogContent>

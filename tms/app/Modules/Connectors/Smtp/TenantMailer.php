@@ -68,7 +68,10 @@ final class TenantMailer
             : collect($members)->contains(fn (string $m) => self::mailerDeliversNowhere($m, $depth + 1));
     }
 
-    private static function activeConfig(?Company $company): ?ConnectorConfig
+    /**
+     * The SMTP configuration used for $company (its own, else the organisme-wide one), or null.
+     */
+    public static function activeConfig(?Company $company): ?ConnectorConfig
     {
         $candidates = ConnectorConfig::query()
             ->where('connector_key', SmtpConnector::key())

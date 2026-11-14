@@ -18,3 +18,6 @@ Schedule::command('tms:crm:gdpr-retention')->dailyAt('03:30')->timezone('Europe/
 
 // Daily summary of the actions to do, for the users who opted in (queued per user).
 Schedule::command('tms:crm:daily-digest')->dailyAt('07:30')->timezone('Europe/Paris')->withoutOverlapping()->onOneServer();
+
+// Sent quotes past their validity (Paris date) become « Expiré ».
+Schedule::command('tms:crm:expire-quotes')->dailyAt('00:05')->timezone('Europe/Paris')->withoutOverlapping()->onOneServer();

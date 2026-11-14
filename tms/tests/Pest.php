@@ -25,6 +25,7 @@ use App\Modules\Crm\Quotes\Quote;
 use App\Modules\Crm\Quotes\QuoteWriter;
 use Illuminate\Filesystem\Filesystem;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Storage;
 use PragmaRX\Google2FA\Google2FA;
 use Tests\RefreshDatabaseAsOwner;
@@ -370,4 +371,55 @@ function makeQuote(Opportunity $opportunity, ?Company $company = null, ?array $l
             'unit' => 'stagiaire', 'unit_price' => '1000.00', 'discount_percent' => '0.00', 'vat_rate' => '20.00',
         ]],
     ]);
+}
+
+/**
+ * Gotenberg answers a recognisable PDF (« %PDF-1.7 devis N », N = call).
+ */
+function fakeQuoteGotenberg(): void
+{
+    config(['documents.gotenberg_url' => 'http://gotenberg:3000']);
+    $calls = 0;
+    Http::fake(['gotenberg:3000/*' => function () use (&$calls) {
+        $calls++;
+
+        return Http::response("%PDF-1.7 devis {$calls}", 200, ['Content-Type' => 'application/pdf']);
+    }]);
+}
+
+/**
+ * A draft quote ready to send: company « CAP FORMATION » (prefix CF), the
+ * entreprise « Le Bistrot » and its interlocutrice Léa Durand (e-mail) as
+ * recipient, the opportunity at $stage.
+ */
+function sendableQuote(string $stage = 'Nouveau', ?string $email = 'lea.durand@example.test'): Quote
+{
+    $company = Company::query()->where('is_default', true)->first()
+        ?? Company::factory()->default()->create(['name' => 'CAP FORMATION', 'quote_prefix' => 'CF']);
+    $organisation = Organisation::query()->create(['name' => 'Le Bistrot', 'city' => 'Annecy']);
+    $contact = makePerson('Durand', ['first_name' => 'Léa', 'email' => $email]);
+    affiliate($contact, $organisation);
+    $opportunity = makeOpportunity($organisation, ['stage_id' => pipelineStage($stage)->id]);
+
+    $quote = makeQuote($opportunity, $company);
+    $quote->forceFill(['contact_person_id' => $contact->id])->save();
+
+    return $quote->refresh();
+}
+
+/**
+ * The fields of the « Envoyer le devis » window.
+ *
+ * @param  array<string, mixed>  $overrides
+ * @return array<string, mixed>
+ */
+function quoteMessage(array $overrides = []): array
+{
+    return [
+        'to' => 'lea.durand@example.test',
+        'cc' => [],
+        'subject' => 'Votre devis',
+        'body' => "Bonjour,\n\nVoici notre devis.",
+        ...$overrides,
+    ];
 }

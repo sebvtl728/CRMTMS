@@ -4,10 +4,14 @@ namespace App\Modules\Crm\Quotes;
 
 use App\Exceptions\UserFacingHttpException;
 use App\Http\Controllers\Controller;
+use App\Modules\Connectors\Smtp\TenantMailer;
 use App\Modules\Core\Companies\LegalMentions;
+use App\Modules\Core\References\ReferenceList;
 use App\Modules\Core\Tenancy\TenantStorage;
 use App\Modules\Core\Users\User;
 use App\Modules\Crm\Opportunities\Opportunity;
+use App\Modules\Crm\Opportunities\OpportunityStage;
+use App\Modules\Crm\Support\FormOptions;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -19,8 +23,8 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
 
 /**
  * « Devis » screens: list, fiche, draft form (created from an opportunity),
- * deletion of a draft, new version, PDF. Sending and outcomes come later
- * (QuoteTransitions); only a draft is changed (409 otherwise).
+ * deletion of a draft, new version, PDF. Sending and outcomes:
+ * QuoteTransitionController; only a draft is changed (409 otherwise).
  */
 class QuoteController extends Controller
 {
@@ -69,6 +73,12 @@ class QuoteController extends Controller
         Gate::authorize('view', $quote);
         $quote->load([...QuoteRows::WITH, 'opportunity.organisation', 'opportunity.person', 'contact:id,first_name,last_name,deleted_at', 'lines.das']);
 
+        $canUpdate = $user->can('update', $quote);
+        // The windows read the whole recipient (the lists above load a few columns).
+        $mailQuote = Quote::query()->with('company')->findOrFail($quote->id);
+        $nowhere = TenantMailer::deliversNowhere($quote->company);
+        $replacedBy = $quote->replaced_by_id === null ? null : Quote::query()->find($quote->replaced_by_id, ['id', 'number']);
+
         $totals = QuoteTotals::compute($quote->lines->map(fn (QuoteLine $l) => new LineInput($l->quantity, $l->unit_price, $l->discount_percent, $l->vat_rate))->all(), $quote->vat_exempt);
 
         return Inertia::render('crm/quotes/show', [
@@ -79,6 +89,16 @@ class QuoteController extends Controller
                 'vat_exempt' => $quote->vat_exempt,
                 'vat_notice' => $quote->vat_exempt ? LegalMentions::vatExemptionNotice() : null,
                 'sent_at' => $quote->sent_at?->toIso8601String(),
+                'reminded_at' => $quote->reminded_at?->toIso8601String(),
+                'accepted_on' => $quote->accepted_on?->toDateString(),
+                'refused_on' => $quote->refused_on?->toDateString(),
+                'refusal_reason' => $quote->refusal_reason,
+                'replaced_by' => $replacedBy === null ? null : ['id' => $replacedBy->id, 'number' => $replacedBy->number],
+                'email' => $quote->email_status === null ? null : [
+                    'status' => $quote->email_status,
+                    'error' => $quote->email_error,
+                    'sent_at' => $quote->email_sent_at?->toIso8601String(),
+                ],
                 'created_at' => $quote->created_at?->toIso8601String(),
                 'lines' => $quote->lines->map(fn (QuoteLine $l) => [
                     'id' => $l->id,
@@ -107,9 +127,28 @@ class QuoteController extends Controller
                 ],
             ],
             'can' => [
-                'update' => $quote->isDraft() && $user->can('update', $quote),
+                'update' => $quote->isDraft() && $canUpdate,
                 'delete' => $quote->isDraft() && $user->can('delete', $quote),
                 'duplicate' => $user->can('duplicate', $quote),
+                'send' => $quote->isDraft() && $canUpdate,
+                'remind' => $quote->isAwaitingAnswer() && $quote->email_status !== 'pending' && $canUpdate,
+                'resend' => $quote->email_status === 'failed' && $canUpdate,
+                'answer' => $quote->isAwaitingAnswer() && $canUpdate,
+            ],
+            // Prefilled windows; a warning when nothing would really leave.
+            'send' => $quote->isDraft() ? [...QuoteMail::defaults($mailQuote, QuoteMail::KIND_SEND), 'delivers_nowhere' => $nowhere] : null,
+            'remind' => $quote->isAwaitingAnswer() ? [...QuoteMail::defaults($mailQuote, QuoteMail::KIND_REMIND), 'delivers_nowhere' => $nowhere] : null,
+            // The outcome windows move the opportunity through the stage endpoint.
+            'pipeline' => [
+                'opportunity_id' => $quote->opportunity_id,
+                'open' => $quote->opportunity !== null && $quote->opportunity->won_on === null && $quote->opportunity->lost_on === null,
+                'won_stage_id' => OpportunityStage::closingStage('won')?->id,
+                'lost_stage_id' => OpportunityStage::closingStage('lost')?->id,
+                'loss_reasons' => FormOptions::reference(ReferenceList::LossReason),
+            ],
+            'propose' => [
+                'won' => $request->session()->get('proposeWon'),
+                'lost' => (bool) $request->session()->get('proposeLost', false),
             ],
             'status' => $request->session()->get('status'),
         ]);
@@ -148,15 +187,16 @@ class QuoteController extends Controller
     }
 
     /**
-     * A new version: a draft copy with a new number.
+     * A new version: a draft copy with a new number; a sent quote is then
+     * refused as replaced by it (QuoteTransitions::newVersion).
      */
-    public function duplicate(Quote $quote): RedirectResponse
+    public function duplicate(Quote $quote, QuoteTransitions $transitions): RedirectResponse
     {
         Gate::authorize('duplicate', $quote);
         $opportunity = $quote->opportunity;
         assert($opportunity !== null);
 
-        $copy = $this->writer->duplicate($quote, $opportunity);
+        $copy = $transitions->newVersion($quote, $this->writer, $opportunity);
 
         return to_route('crm.quotes.show', $copy)->with('status', "Nouvelle version créée : devis {$copy->number}.");
     }

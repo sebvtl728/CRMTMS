@@ -45,6 +45,10 @@ use Illuminate\Support\Facades\Auth;
  * @property array<string, mixed>|null $recipient_snapshot name, address, e-mail frozen when sent
  * @property string|null $pdf_path
  * @property string|null $notes mentions particulières
+ * @property array{kind?: string, to?: string, cc?: list<string>, subject?: string, body?: string}|null $email_message last e-mail (sending or reminder), kept to send it again
+ * @property string|null $email_status pending|sent|failed (SendQuote)
+ * @property Carbon|null $email_sent_at
+ * @property string|null $email_error fixed French message, never the server's text
  * @property string|null $created_by
  * @property string|null $updated_by
  * @property Carbon|null $created_at
@@ -62,7 +66,7 @@ class Quote extends Model
     protected array $auditPersonal = ['notes', 'refusal_reason', 'recipient_snapshot'];
 
     /** @var list<string> */
-    protected array $auditIgnore = ['created_by', 'updated_by'];
+    protected array $auditIgnore = ['created_by', 'updated_by', 'email_message', 'email_status', 'email_sent_at', 'email_error'];
 
     /** @var list<string> */
     protected $fillable = [
@@ -107,12 +111,20 @@ class Quote extends Model
             'total_vat' => 'decimal:2',
             'total_ttc' => 'decimal:2',
             'recipient_snapshot' => 'array',
+            'email_message' => 'array',
+            'email_sent_at' => 'datetime',
         ];
     }
 
     public function isDraft(): bool
     {
         return $this->status === QuoteStatus::Draft;
+    }
+
+    /** Sent or reminded: awaiting the customer's answer. */
+    public function isAwaitingAnswer(): bool
+    {
+        return in_array($this->status, [QuoteStatus::Sent, QuoteStatus::Reminded], true);
     }
 
     /**
