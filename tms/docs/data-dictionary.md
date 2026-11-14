@@ -240,6 +240,9 @@ Index : (`tenant_id`, `stage_id`), (`tenant_id`, `das_id`), (`tenant_id`, `respo
 ### `opportunity_contacts` — interlocuteurs d'une opportunité
 `tenant_id` · `opportunity_id` (FK, cascade) · `person_id` (FK, cascade) ; PK (`opportunity_id`, `person_id`). Un particulier est automatiquement son propre contact.
 
+### `opportunity_trainings` — formations d'une opportunité
+`id`, `tenant_id` · `opportunity_id` (FK, cascade) · `training_id` (FK `trainings`, restrict ; lue par `Catalogue\Trainings` uniquement) · `quantity` numeric(8,2), défaut 1 (CHECK > 0 ; saisie ≤ 9 999,99) · `position` smallint (ordre) · `created_at`, `updated_at`. Unique (`opportunity_id`, `training_id`), index `training_id`. Journalisée (`opportunity_training`). Une formation présente ici (opportunité supprimée comprise) ne peut pas être supprimée du catalogue (`TrainingUsage` « opportunities »). Montant proposé = Σ tarif (entreprise ou particulier selon le compte) × quantité, jamais enregistré.
+
 ### `opportunity_stage_changes` — historique des étapes
 `id`, `tenant_id` · `opportunity_id` (FK, cascade) · `from_stage_id` (null à la création), `to_stage_id` (FK `reference_items`) · `loss_reason_id` (null ; motif donné lors de ce passage à perdu, gardé même si l'affaire est rouverte) · `changed_by` · `changed_at` (timestamptz, µs). Index (`opportunity_id`, `changed_at`). Alimente l'**Historique** des fiches.
 

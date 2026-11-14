@@ -63,6 +63,8 @@ Une **opportunité** est une affaire en cours avec une entreprise ou un **partic
 
 Depuis la fiche, onglet **Opportunités**, **Nouvelle opportunité** (ou depuis l'écran **Opportunités**, qui demande d'abord l'entreprise ou le particulier). Renseignez l'**objet**, le **DAS**, l'**étape**, le **montant estimé**, la **clôture prévue**, la priorité, le **mode de financement** (prérempli depuis la fiche d'un particulier) et le responsable. Pour une entreprise, cochez ses interlocuteurs concernés.
 
+**Formations** : ajoutez les formations du catalogue concernées (formations actives uniquement) et leur **quantité** (par défaut 1 ; « 2,5 » accepté). Sans DAS choisi, celui de la première formation est repris. Sur une opportunité enregistrée, **Calculer le montant proposé** fait la somme tarif × quantité (tarif entreprise ou particulier selon le compte) ; une formation sans tarif compte 0 et est signalée. Le montant proposé n'est jamais enregistré seul : **Reporter dans le montant estimé** le recopie dans le champ, puis **Enregistrer**. Une formation désactivée depuis reste sur les opportunités qui l'ont (« (inactive) ») mais ne peut plus être ajoutée ; une formation utilisée par une opportunité ne peut pas être supprimée du catalogue.
+
 > Pour un particulier, ne mettez pas son nom dans l'**objet** (« Formation HACCP 3 jours », pas « Formation de M. Dupont ») : l'objet est conservé pour les statistiques même après l'anonymisation de la personne (voir RGPD).
 
 ### Étapes et probabilité
@@ -87,7 +89,7 @@ Sur la page d'une opportunité, **Changer d'étape** ouvre la même fenêtre.
 
 ### Liste, filtres et export
 
-**Opportunités** liste les affaires avec les totaux (montant et pondéré). Filtres : recherche (objet ou nom de la fiche), DAS, entreprises ou particuliers, responsable, priorité, étape, clôture prévue du / au, **Mes opportunités** ; tri par clôture prévue, montant, montant pondéré ou création. **Vue pipeline** / **Vue liste** passent de l'une à l'autre en gardant les filtres. **Exporter (.xlsx)** exporte la liste filtrée (mêmes règles que les autres exports).
+**Opportunités** liste les affaires avec les totaux (montant et pondéré). Filtres : recherche (objet ou nom de la fiche), DAS, **formation**, entreprises ou particuliers, responsable, priorité, étape, clôture prévue du / au, **Mes opportunités** ; tri par clôture prévue, montant, montant pondéré ou création. **Vue pipeline** / **Vue liste** passent de l'une à l'autre en gardant les filtres. **Exporter (.xlsx)** exporte la liste filtrée (mêmes règles que les autres exports ; la colonne **Formations** donne leurs intitulés séparés par « ; »).
 
 ## 4. Actions, relances et « À faire »
 

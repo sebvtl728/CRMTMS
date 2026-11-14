@@ -13,6 +13,7 @@ use App\Modules\Crm\Support\FilterInput;
 use App\Modules\Crm\Support\FormOptions;
 use App\Modules\Crm\Visibility\CrmVisibility;
 use Carbon\CarbonImmutable;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -46,7 +47,7 @@ class OpportunityController extends Controller
                 'weighted_amount' => number_format((float) ($totals->weighted ?? 0), 2, '.', ''),
             ],
             'filters' => $filters,
-            'options' => OpportunityListQuery::options(),
+            'options' => OpportunityListQuery::options($filters['training']),
             'can' => ['create' => $user->can(Permissions::CREATE), 'export' => $user->can(Permissions::EXPORT)],
             'status' => $request->session()->get('status'),
         ]);
@@ -82,7 +83,7 @@ class OpportunityController extends Controller
                 'contact_ids' => $person !== null ? [$person->id] : [],
             ],
             'contactOptions' => OpportunityAccounts::contactOptions($organisation?->id, $person?->id),
-            'options' => $this->formOptions(null),
+            'options' => [...$this->formOptions(null), 'trainings' => OpportunityTrainings::options(null, $person !== null)],
         ]);
     }
 
@@ -92,10 +93,16 @@ class OpportunityController extends Controller
 
         $validated = $request->validated();
         $contactIds = array_values($validated['contact_ids'] ?? []);
-        unset($validated['contact_ids']);
+        $trainings = array_values($validated['training_lines'] ?? []);
+        unset($validated['contact_ids'], $validated['training_lines']);
         $validated['responsible_user_id'] = array_key_exists('responsible_user_id', $validated) ? $validated['responsible_user_id'] : $this->user($request)->id;
 
-        $opportunity = $this->stages->create($validated, $contactIds);
+        $opportunity = DB::transaction(function () use ($validated, $contactIds, $trainings): Opportunity {
+            $opportunity = $this->stages->create($validated, $contactIds);
+            OpportunityTrainings::sync($opportunity, $trainings);
+
+            return $opportunity;
+        });
 
         return to_route('crm.opportunities.show', $opportunity)->with('status', 'Opportunité créée.');
     }
@@ -135,6 +142,10 @@ class OpportunityController extends Controller
                 ->where('opportunity_id', $opportunity->id)
                 ->orderByDesc('happened_at')->orderByDesc('id')->limit(100)->get()
                 ->map(fn (Activity $a) => ActivityRows::row($a))->all(),
+            'trainings' => [
+                'lines' => OpportunityTrainings::lines($opportunity),
+                'estimate' => OpportunityTrainings::proposal($opportunity),
+            ],
             'stages' => OpportunityStage::options($opportunity->stage_id),
             'lossReasons' => FormOptions::reference(ReferenceList::LossReason),
             'can' => [
@@ -163,13 +174,14 @@ class OpportunityController extends Controller
                 'funding_mode_id' => $opportunity->funding_mode_id,
                 'responsible_user_id' => $opportunity->responsible_user_id,
                 'contact_ids' => $opportunity->contacts()->pluck('people.id')->all(),
+                'training_lines' => OpportunityTrainings::stored($opportunity),
             ],
             'account' => $opportunity->isIndividual()
                 ? ['type' => 'person', 'id' => $opportunity->person_id, 'name' => $opportunity->person?->fullName(), 'individual' => (bool) $opportunity->person?->is_individual]
                 : ['type' => 'organisation', 'id' => $opportunity->organisation_id, 'name' => $opportunity->organisation?->name, 'individual' => false],
             'defaults' => null,
             'contactOptions' => OpportunityAccounts::contactOptions($opportunity->organisation_id, $opportunity->person_id),
-            'options' => $this->formOptions($opportunity),
+            'options' => [...$this->formOptions($opportunity), 'trainings' => OpportunityTrainings::options($opportunity, $opportunity->isIndividual())],
         ]);
     }
 
@@ -182,7 +194,8 @@ class OpportunityController extends Controller
         DB::transaction(function () use ($opportunity, $validated): void {
             $probability = $validated['probability'] ?? null;
             $contactIds = array_key_exists('contact_ids', $validated) ? array_values($validated['contact_ids'] ?? []) : null;
-            unset($validated['probability'], $validated['contact_ids']);
+            $trainings = array_key_exists('training_lines', $validated) ? array_values($validated['training_lines'] ?? []) : null;
+            unset($validated['probability'], $validated['contact_ids'], $validated['training_lines']);
 
             $opportunity->fill($validated);
             if ($probability !== null) {
@@ -192,6 +205,9 @@ class OpportunityController extends Controller
 
             if ($contactIds !== null) {
                 $this->stages->syncContacts($opportunity, $contactIds);
+            }
+            if ($trainings !== null) {
+                OpportunityTrainings::sync($opportunity, $trainings);
             }
         });
 
@@ -205,6 +221,25 @@ class OpportunityController extends Controller
         DB::transaction(fn () => $opportunity->delete());
 
         return to_route('crm.opportunities.index')->with('status', 'Opportunité supprimée.');
+    }
+
+    /**
+     * Amount the trainings propose (saved lines, or the lines given, typed
+     * on the form): computed, never written.
+     */
+    public function estimate(Request $request, Opportunity $opportunity): JsonResponse
+    {
+        Gate::authorize('view', $opportunity);
+
+        $lines = null;
+        if ($request->has('training_lines')) {
+            $request->merge(['training_lines' => OpportunityTrainings::normalise($request->input('training_lines'))]);
+            /** @var array{training_lines?: list<array{training_id: string, quantity: string}>} $validated */
+            $validated = $request->validate(OpportunityTrainings::rules($opportunity), OpportunityTrainings::messages());
+            $lines = $validated['training_lines'] ?? [];
+        }
+
+        return response()->json(OpportunityTrainings::proposal($opportunity, $lines));
     }
 
     public function stage(StageRequest $request, Opportunity $opportunity): RedirectResponse

@@ -1,3 +1,4 @@
+import { OpportunityTrainingsField, quantityInput, type TrainingLineInput, type TrainingOption } from '@/components/crm/opportunity-trainings';
 import Heading from '@/components/heading';
 import InputError from '@/components/input-error';
 import { Button } from '@/components/ui/button';
@@ -36,6 +37,7 @@ interface FormProps {
         funding_mode_id: string | null;
         responsible_user_id: string | null;
         contact_ids: string[];
+        training_lines: TrainingLineInput[];
     } | null;
     account: Account | null;
     defaults: {
@@ -46,7 +48,14 @@ interface FormProps {
         contact_ids: string[];
     } | null;
     contactOptions: Option[];
-    options: { das: Option[]; stage: StageOption[]; priority: Option[]; funding_mode: Option[]; responsible: Option[] };
+    options: {
+        das: Option[];
+        stage: StageOption[];
+        priority: Option[];
+        funding_mode: Option[];
+        responsible: Option[];
+        trainings: TrainingOption[];
+    };
 }
 
 type OpportunityForm = {
@@ -62,6 +71,7 @@ type OpportunityForm = {
     funding_mode_id: string;
     responsible_user_id: string;
     contact_ids: string[];
+    training_lines: TrainingLineInput[];
 };
 
 const NONE = 'none';
@@ -163,6 +173,7 @@ export default function OpportunityFormPage({ opportunity, account, defaults, co
         funding_mode_id: opportunity?.funding_mode_id ?? defaults?.funding_mode_id ?? '',
         responsible_user_id: opportunity?.responsible_user_id ?? defaults?.responsible_user_id ?? '',
         contact_ids: opportunity?.contact_ids ?? defaults?.contact_ids ?? [],
+        training_lines: (opportunity?.training_lines ?? []).map((l) => ({ training_id: l.training_id, quantity: quantityInput(l.quantity) })),
     });
 
     const breadcrumbs: BreadcrumbItem[] = [
@@ -297,6 +308,17 @@ export default function OpportunityFormPage({ opportunity, account, defaults, co
                             )}
                             {pick('responsible_user_id', 'Responsable', options.responsible, 'Sans responsable')}
                         </fieldset>
+
+                        <OpportunityTrainingsField
+                            lines={data.training_lines}
+                            options={options.trainings}
+                            errors={errors as Record<string, string | undefined>}
+                            opportunityId={opportunity?.id ?? null}
+                            onChange={(lines) => setData('training_lines', lines)}
+                            // No DAS chosen yet: the DAS of the first training (the server does the same).
+                            onAdded={(option) => setData((d) => (d.das_id ? d : { ...d, das_id: option.das_id }))}
+                            onApplyAmount={(amount) => setData('amount', amount)}
+                        />
 
                         {contactOptions.length > 0 && (
                             <fieldset className="grid gap-2 rounded-xl border p-4">

@@ -2,15 +2,20 @@
 
 namespace App\Modules\Crm\Export;
 
+use App\Modules\Catalogue\Trainings;
 use App\Modules\Core\Exports\ExportCell;
 use App\Modules\Core\Exports\ExportResource;
 use App\Modules\Core\Users\User;
 use App\Modules\Crm\Opportunities\Opportunity;
 use App\Modules\Crm\Opportunities\OpportunityRows;
+use App\Modules\Crm\Opportunities\OpportunityTraining;
 use Illuminate\Database\Eloquent\Model;
 
 final class OpportunityExport implements ExportResource
 {
+    /** @var array<string, string> titles of the trainings met, by id (one lookup per training) */
+    private array $trainingTitles = [];
+
     public function fileName(): string
     {
         return 'opportunites';
@@ -28,6 +33,7 @@ final class OpportunityExport implements ExportResource
             'account' => 'Compte',
             'target' => 'Type de compte',
             'das' => 'DAS',
+            'trainings' => 'Formations',
             'stage' => 'Étape',
             'probability' => 'Probabilité (%)',
             'amount' => 'Montant (€)',
@@ -50,7 +56,7 @@ final class OpportunityExport implements ExportResource
 
     public function with(User $user): array
     {
-        return [...OpportunityRows::WITH, 'fundingMode', 'lossReason'];
+        return [...OpportunityRows::WITH, 'fundingMode', 'lossReason', 'trainingLines'];
     }
 
     public function value(Model $model, string $column): string|ExportCell|null
@@ -62,6 +68,7 @@ final class OpportunityExport implements ExportResource
             'account' => $model->isIndividual() ? $model->person?->fullName() : $model->organisation?->name,
             'target' => $model->isIndividual() ? 'Particulier' : 'Entreprise',
             'das' => $model->das?->label,
+            'trainings' => $this->trainings($model),
             'stage' => $model->stage?->label,
             'probability' => ExportCell::integer($model->probability),
             'amount' => ExportCell::amount($model->amount),
@@ -76,5 +83,17 @@ final class OpportunityExport implements ExportResource
             'created_at' => ExportCell::date($model->created_at),
             default => null,
         };
+    }
+
+    /**
+     * Titles of its trainings, in order, joined by « ; ».
+     */
+    private function trainings(Opportunity $opportunity): ?string
+    {
+        $titles = $opportunity->trainingLines
+            ->map(fn (OpportunityTraining $line): string => $this->trainingTitles[$line->training_id] ??= app(Trainings::class)->find($line->training_id)->title ?? '')
+            ->filter(fn (string $t) => $t !== '')->values()->all();
+
+        return $titles === [] ? null : implode(' ; ', $titles);
     }
 }

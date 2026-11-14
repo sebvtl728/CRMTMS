@@ -291,7 +291,8 @@ class Merger
     }
 
     /**
-     * Opportunities (trashed ones too, with their stage history) follow the
+     * Opportunities (trashed ones too, with their stage history and their
+     * trainings, which hang on the opportunity: nothing to move) follow the
      * fiche. A person's contact rows go to the kept person, once per
      * opportunity.
      */

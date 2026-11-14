@@ -1,5 +1,6 @@
 import { ActivityList, type ActivityRow } from '@/components/crm/activity-list';
 import { StageBadge, type OpportunityRow } from '@/components/crm/opportunity-list';
+import { OpportunityTrainingsSummary, type TrainingEstimate, type TrainingLine } from '@/components/crm/opportunity-trainings';
 import { QuickActionFicheButton } from '@/components/crm/quick-action';
 import { StageDialog, type StageOption } from '@/components/crm/stage-dialog';
 import { Badge } from '@/components/ui/badge';
@@ -28,6 +29,7 @@ interface ShowProps {
     opportunity: OpportunityData;
     history: { id: string; from: string | null; to: string | null; by: string | null; at: string }[];
     activities: ActivityRow[];
+    trainings: { lines: TrainingLine[]; estimate: TrainingEstimate };
     stages: StageOption[];
     lossReasons: Option[];
     can: { update: boolean; delete: boolean };
@@ -43,7 +45,7 @@ function Item({ label, children }: { label: string; children: React.ReactNode })
     );
 }
 
-export default function OpportunityShow({ opportunity: o, history, activities, stages, lossReasons, can, status }: ShowProps) {
+export default function OpportunityShow({ opportunity: o, history, activities, trainings, stages, lossReasons, can, status }: ShowProps) {
     const [moving, setMoving] = useState(false);
     const [confirming, setConfirming] = useState(false);
 
@@ -141,6 +143,10 @@ export default function OpportunityShow({ opportunity: o, history, activities, s
                                 ))}
                             </ul>
                         )}
+                    </section>
+                    <section className="rounded-xl border p-4 lg:col-span-2">
+                        <h2 className="mb-3 text-sm font-semibold">Formations</h2>
+                        <OpportunityTrainingsSummary lines={trainings.lines} estimate={trainings.estimate} />
                     </section>
                     <section className="rounded-xl border p-4 lg:col-span-2">
                         <h2 className="mb-3 text-sm font-semibold">Actions</h2>

@@ -24,13 +24,14 @@ final class OpportunityListQuery
 
     /**
      * @param  array<array-key, mixed>  $input
-     * @return array{q: string, das: ?string, target: ?string, responsible: ?string, priority: ?string, stage: ?string, close_from: ?string, close_to: ?string, mine: bool, sort: string, dir: string}
+     * @return array{q: string, das: ?string, training: ?string, target: ?string, responsible: ?string, priority: ?string, stage: ?string, close_from: ?string, close_to: ?string, mine: bool, sort: string, dir: string}
      */
     public static function filters(array $input): array
     {
         return [
             'q' => FilterInput::text($input['q'] ?? null),
             'das' => FilterInput::id($input['das'] ?? null),
+            'training' => FilterInput::id($input['training'] ?? null),
             'target' => FilterInput::oneOf($input['target'] ?? null, self::TARGETS),
             'responsible' => FilterInput::id($input['responsible'] ?? null),
             'priority' => FilterInput::id($input['priority'] ?? null),
@@ -44,15 +45,17 @@ final class OpportunityListQuery
     }
 
     /**
-     * Choices of the filter bar (list and kanban).
+     * Choices of the filter bar (list and kanban); $training: the training
+     * filtered on, kept among the choices when it is no longer active.
      *
      * @return array<string, list<array<string, mixed>>>
      */
-    public static function options(): array
+    public static function options(?string $training = null): array
     {
         return [
             'target' => [['value' => 'organisation', 'label' => 'Entreprises'], ['value' => 'individual', 'label' => 'Particuliers']],
             'das' => FormOptions::reference(ReferenceList::Das),
+            'training' => OpportunityTrainings::filterOptions($training),
             'stage' => FormOptions::reference(ReferenceList::PipelineStage),
             'priority' => FormOptions::reference(ReferenceList::Priority),
             'responsible' => FormOptions::responsible(),
@@ -66,7 +69,7 @@ final class OpportunityListQuery
     }
 
     /**
-     * @param  array{q: string, das: ?string, target: ?string, responsible: ?string, priority: ?string, stage: ?string, close_from: ?string, close_to: ?string, mine: bool, sort: string, dir: string}  $filters
+     * @param  array{q: string, das: ?string, training: ?string, target: ?string, responsible: ?string, priority: ?string, stage: ?string, close_from: ?string, close_to: ?string, mine: bool, sort: string, dir: string}  $filters
      * @return Builder<Opportunity>
      */
     public static function build(array $filters, User $user): Builder
@@ -77,6 +80,8 @@ final class OpportunityListQuery
                 ->orWhereIn('opportunities.person_id', Person::query()->select('people.id')))
             ->when($filters['q'] !== '', fn (Builder $q) => self::search($q, $filters['q']))
             ->when($filters['das'], fn (Builder $q, string $v) => $q->where('opportunities.das_id', $v))
+            ->when($filters['training'], fn (Builder $q, string $v) => $q->whereIn('opportunities.id', OpportunityTraining::query()->select('opportunity_trainings.opportunity_id')
+                ->where('opportunity_trainings.training_id', $v)))
             ->when($filters['target'] === 'organisation', fn (Builder $q) => $q->whereNotNull('opportunities.organisation_id'))
             ->when($filters['target'] === 'individual', fn (Builder $q) => $q->whereNotNull('opportunities.person_id'))
             ->when($filters['responsible'], fn (Builder $q, string $v) => $q->where('opportunities.responsible_user_id', $v))

@@ -2,6 +2,7 @@
 
 namespace App\Modules\Crm;
 
+use App\Modules\Catalogue\TrainingUsage;
 use App\Modules\Core\Access\Permissions as CorePermissions;
 use App\Modules\Core\Access\PrimaryRoleChanged;
 use App\Modules\Core\Audit\MorphAliases;
@@ -20,6 +21,7 @@ use App\Modules\Crm\Import\ImportStamp;
 use App\Modules\Crm\Opportunities\OpportunitiesProvider;
 use App\Modules\Crm\Opportunities\Opportunity;
 use App\Modules\Crm\Opportunities\OpportunityPolicy;
+use App\Modules\Crm\Opportunities\OpportunityTraining;
 use App\Modules\Crm\Opportunities\StageChange;
 use App\Modules\Crm\Organisations\Organisation;
 use App\Modules\Crm\Organisations\OrganisationPolicy;
@@ -73,6 +75,7 @@ class CrmServiceProvider extends ServiceProvider
             'consent' => Consent::class,
             'opportunity' => Opportunity::class,
             'opportunity_stage_change' => StageChange::class,
+            'opportunity_training' => OpportunityTraining::class,
             'activity' => Activity::class,
         ]);
 
@@ -84,6 +87,7 @@ class CrmServiceProvider extends ServiceProvider
     {
         self::registerReferenceUsage();
         self::registerLinkedData();
+        self::registerTrainingUsage();
         self::registerContactSources();
         FollowedDas::registerOnUsersPage();
         Event::listen(PrimaryRoleChanged::class, FollowedDas::onRoleChanged(...));
@@ -335,6 +339,15 @@ class CrmServiceProvider extends ServiceProvider
             Activity::withTrashed()->where($fiche instanceof Organisation ? 'organisation_id' : 'person_id', $fiche->getKey()), $ids)->exists());
         LinkedData::register('crm.consents', fn (Organisation|Person $fiche, array $ids): bool => $fiche instanceof Person
             && $except(Consent::query()->where('person_id', $fiche->getKey()), $ids)->exists());
+    }
+
+    /**
+     * A training on an opportunity (a trashed one too: its lines stay) is in
+     * use: the catalogue refuses to delete it.
+     */
+    public static function registerTrainingUsage(): void
+    {
+        TrainingUsage::register('opportunities', fn (string $trainingId): bool => OpportunityTraining::query()->where('training_id', $trainingId)->exists());
     }
 
     /**

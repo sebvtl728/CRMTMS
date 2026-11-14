@@ -21,6 +21,7 @@ Route::middleware(['auth'])->prefix('crm/opportunities')->name('crm.opportunitie
     Route::get('{opportunity}/edit', [OpportunityController::class, 'edit'])->middleware('can:crm.update')->name('edit');
     Route::put('{opportunity}', [OpportunityController::class, 'update'])->middleware('can:crm.update')->name('update');
     Route::delete('{opportunity}', [OpportunityController::class, 'destroy'])->middleware('can:crm.delete')->name('destroy');
+    Route::post('{opportunity}/estimate', [OpportunityController::class, 'estimate'])->middleware('can:crm.view')->name('estimate');
     Route::post('{opportunity}/stage', [OpportunityController::class, 'stage'])->middleware('can:crm.update')->name('stage');
 });
 
