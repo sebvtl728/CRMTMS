@@ -3,6 +3,7 @@
 namespace App\Modules\Core\Companies;
 
 use App\Http\Controllers\Controller;
+use App\Modules\Core\Tenancy\TenantContext;
 use App\Rules\Siret;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
@@ -232,7 +233,11 @@ class CompanyController extends Controller
             'phone' => ['nullable', 'string', 'max:30'],
             'is_default' => ['boolean'],
             // Quotes (absent from a request: unchanged, or the defaults on creation).
-            'quote_prefix' => ['sometimes', 'required', 'string', 'regex:/^[A-Z0-9]{1,10}$/'],
+            // One company per prefix (they share its numbering otherwise).
+            'quote_prefix' => ['sometimes', 'required', 'string', 'regex:/^[A-Z0-9]{1,10}$/', Rule::unique('companies', 'quote_prefix')
+                ->where('tenant_id', app(TenantContext::class)->id())
+                ->whereNull('deleted_at')
+                ->ignore($request->route('company') instanceof Company ? $request->route('company')->getKey() : null)],
             'quote_validity_days' => ['sometimes', 'required', 'integer', 'between:1,365'],
             'quote_terms' => ['nullable', 'string', 'max:5000'],
             'quote_footer' => ['nullable', 'string', 'max:5000'],
@@ -245,6 +250,7 @@ class CompanyController extends Controller
             'quote_prefix.required' => 'Le préfixe de numérotation est obligatoire.',
             'quote_prefix.string' => 'Le préfixe ne peut contenir que des lettres majuscules et des chiffres (10 caractères au plus).',
             'quote_prefix.regex' => 'Le préfixe ne peut contenir que des lettres majuscules et des chiffres (10 caractères au plus).',
+            'quote_prefix.unique' => 'Ce préfixe est déjà celui d\'une autre société : choisissez-en un autre.',
             'quote_validity_days.required' => 'La durée de validité doit être comprise entre 1 et 365 jours.',
             'quote_validity_days.integer' => 'La durée de validité doit être comprise entre 1 et 365 jours.',
             'quote_validity_days.between' => 'La durée de validité doit être comprise entre 1 et 365 jours.',

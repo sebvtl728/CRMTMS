@@ -10,7 +10,7 @@ import { type Option } from '@/lib/crm';
 import { type BreadcrumbItem } from '@/types';
 import { Head, Link, useForm } from '@inertiajs/react';
 import { LoaderCircle } from 'lucide-react';
-import { FormEventHandler } from 'react';
+import { FormEventHandler, useState } from 'react';
 
 interface StoredLine {
     training_id: string | null;
@@ -103,14 +103,25 @@ export default function QuoteFormPage({ quote, missing_prices: missing, vat_exem
         }
     };
 
+    const [rateHint, setRateHint] = useState<string | null>(null);
+
+    // The rates follow the regime of the company: 0 % when exempt, 20 % back when subject.
     const changeCompany = (id: string) => {
         const next = options.companies.find((c) => c.value === id);
+        const regimeChanged = next !== undefined && next.vat_exempt !== (company?.vat_exempt ?? false);
         setData((d) => ({
             ...d,
             company_id: id,
             valid_until: next ? addDays(d.issued_on, next.validity_days) : d.valid_until,
-            lines: next?.vat_exempt ? d.lines.map((l) => ({ ...l, vat_rate: '0.00' })) : d.lines,
+            lines: regimeChanged ? d.lines.map((l) => ({ ...l, vat_rate: next.vat_exempt ? '0.00' : '20.00' })) : d.lines,
         }));
+        if (regimeChanged) {
+            setRateHint(
+                next.vat_exempt
+                    ? 'Société exonérée : les lignes passent à 0 %.'
+                    : 'Société assujettie : les lignes passent à 20 %, modifiez le taux si besoin.',
+            );
+        }
     };
 
     const cancelHref = editing && quote.id ? route('crm.quotes.show', quote.id) : route('crm.opportunities.show', opportunity.id);
@@ -196,6 +207,11 @@ export default function QuoteFormPage({ quote, missing_prices: missing, vat_exem
                             />
                             <InputError message={errors.notes} />
                         </div>
+                        {rateHint && (
+                            <p role="status" className="text-sm text-amber-700 md:col-span-2 dark:text-amber-300">
+                                {rateHint}
+                            </p>
+                        )}
                         {vatExempt && (
                             <p className="text-muted-foreground text-sm md:col-span-2">Société exonérée de TVA : toutes les lignes sont à 0 %.</p>
                         )}

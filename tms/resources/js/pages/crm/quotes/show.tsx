@@ -1,12 +1,13 @@
 import { decimalInput, rateLabel } from '@/components/crm/quote-lines';
 import { QuoteStatusBadge, type QuoteRow } from '@/components/crm/quote-list';
+import InputError from '@/components/input-error';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import AppLayout from '@/layouts/app-layout';
 import { formatAmount, formatDateTime, formatDay } from '@/lib/crm';
 import { type BreadcrumbItem } from '@/types';
-import { Head, Link, router } from '@inertiajs/react';
+import { Head, Link, router, usePage } from '@inertiajs/react';
 import { Copy, FileText, Pencil, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 
@@ -53,6 +54,7 @@ function Item({ label, children }: { label: string; children: React.ReactNode })
 
 export default function QuoteShow({ quote: q, can, status }: ShowProps) {
     const [confirming, setConfirming] = useState(false);
+    const errors = usePage().props.errors as Record<string, string | undefined>;
 
     const breadcrumbs: BreadcrumbItem[] = [
         { title: 'Devis', href: route('crm.quotes.index') },
@@ -122,6 +124,8 @@ export default function QuoteShow({ quote: q, can, status }: ShowProps) {
                 </div>
 
                 {status && <div className="text-sm font-medium text-green-600">{status}</div>}
+                {/* A new version refused (numbering): the reason, in French. */}
+                <InputError message={errors.company_id ?? errors.lines} />
 
                 <section className="rounded-xl border p-4">
                     <h2 className="mb-3 text-sm font-semibold">Devis</h2>

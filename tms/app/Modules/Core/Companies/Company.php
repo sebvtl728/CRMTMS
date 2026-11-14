@@ -84,6 +84,21 @@ class Company extends Model
 
     protected static function booted(): void
     {
+        // A prefix belongs to one company: a new company left with the default
+        // prefix (placeholder, factory, form without it) takes the first free
+        // suffix (« DEV2 »…). A prefix typed in the form is validated instead.
+        static::creating(function (Company $company): void {
+            if ($company->isDirty('quote_prefix')) {
+                return;
+            }
+            $taken = static::query()->pluck('quote_prefix')->all();
+            $prefix = $company->quote_prefix;
+            for ($n = 2; in_array($prefix, $taken, true); $n++) {
+                $prefix = substr($company->quote_prefix, 0, 10 - strlen((string) $n)).$n;
+            }
+            $company->quote_prefix = $prefix;
+        });
+
         // Becoming the default unsets the previous one. Runs inside save()'s
         // transaction, before the write, so the partial unique index holds.
         static::saving(function (Company $company): void {

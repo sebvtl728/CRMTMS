@@ -6,10 +6,12 @@ use App\Modules\Catalogue\Trainings;
 use App\Modules\Core\Companies\Company;
 use App\Modules\Core\Companies\VatRegime;
 use App\Modules\Crm\Opportunities\Opportunity;
+use App\Modules\Crm\Opportunities\OpportunityAccounts;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
+use LogicException;
 
 /**
  * Writes a draft quote: its number (at creation, in the same transaction),
@@ -21,7 +23,7 @@ use Illuminate\Validation\ValidationException;
  * two decimals at most, a unit of QuoteLine::UNITS, a rate of
  * QuoteTotals::VAT_RATES.
  *
- * @phpstan-type LineData array{training_id: ?string, label: string, description: ?string, quantity: string, unit: string, unit_price: string, discount_percent: string, vat_rate: string}
+ * @phpstan-type LineData array{training_id: ?string, das_id?: ?string, label: string, description: ?string, quantity: string, unit: string, unit_price: string, discount_percent: string, vat_rate: string}
  * @phpstan-type QuoteData array{contact_person_id: ?string, issued_on: string, valid_until: string, notes: ?string, lines: list<LineData>}
  */
 final class QuoteWriter
@@ -55,7 +57,9 @@ final class QuoteWriter
                 throw $e;
             }
 
-            throw ValidationException::withMessages(['company_id' => 'Ce numéro de devis est déjà pris par une autre société de même préfixe : donnez à chaque société un préfixe différent (Administration › Sociétés).']);
+            // Defensive: the sequence is per prefix, so only numbers given
+            // outside it (data fixed by hand…) can collide.
+            throw ValidationException::withMessages(['company_id' => 'Le numéro de devis attribué existe déjà. Vérifiez la numérotation de la société (Administration › Sociétés) puis réessayez.']);
         }
     }
 
@@ -69,7 +73,11 @@ final class QuoteWriter
 
     /**
      * A new draft with the content of $source: new number, issued today,
-     * valid for the company's usual duration.
+     * valid for the company's usual duration. What is no longer allowed is
+     * not carried over silently: a recipient who is no longer an active
+     * interlocuteur is dropped, and a line whose training is now inactive
+     * stays as a free line (label, price and DAS kept, link to the training
+     * removed: it cannot be added to a new quote).
      */
     public function duplicate(Quote $source, Opportunity $opportunity): Quote
     {
@@ -78,22 +86,28 @@ final class QuoteWriter
             $company = Company::query()->where('is_default', true)->firstOrFail();
         }
         $today = CarbonImmutable::now(QuoteNumbering::TIMEZONE)->startOfDay();
+        $contacts = array_column(OpportunityAccounts::contactOptions($opportunity->organisation_id, $opportunity->person_id), 'value');
 
         return $this->create($opportunity, $company, [
-            'contact_person_id' => $source->contact_person_id,
+            'contact_person_id' => in_array($source->contact_person_id, $contacts, true) ? $source->contact_person_id : null,
             'issued_on' => $today->toDateString(),
             'valid_until' => $today->addDays($company->quote_validity_days)->toDateString(),
             'notes' => $source->notes,
-            'lines' => $source->lines()->get()->map(fn (QuoteLine $l) => [
-                'training_id' => $l->training_id,
-                'label' => $l->label,
-                'description' => $l->description,
-                'quantity' => $l->quantity,
-                'unit' => $l->unit,
-                'unit_price' => $l->unit_price,
-                'discount_percent' => $l->discount_percent,
-                'vat_rate' => $l->vat_rate,
-            ])->values()->all(),
+            'lines' => $source->lines()->get()->map(function (QuoteLine $l): array {
+                $active = $l->training_id !== null && $this->trainings->find($l->training_id)?->is_active === true;
+
+                return [
+                    'training_id' => $active ? $l->training_id : null,
+                    'das_id' => $l->das_id,
+                    'label' => $l->label,
+                    'description' => $l->description,
+                    'quantity' => $l->quantity,
+                    'unit' => $l->unit,
+                    'unit_price' => $l->unit_price,
+                    'discount_percent' => $l->discount_percent,
+                    'vat_rate' => $l->vat_rate,
+                ];
+            })->values()->all(),
         ]);
     }
 
@@ -102,6 +116,9 @@ final class QuoteWriter
      */
     private function write(Quote $quote, array $data): Quote
     {
+        if (! $quote->isDraft()) {
+            throw new LogicException('Seul un brouillon de devis se modifie.');
+        }
         $company = $quote->company;
         $exempt = $company !== null && $company->vat_regime === VatRegime::Exempt;
         $lines = array_map(fn (array $l) => [...$l, 'vat_rate' => $exempt ? '0.00' : $l['vat_rate']], $data['lines']);
@@ -133,7 +150,8 @@ final class QuoteWriter
             $line->fill([
                 'position' => $position,
                 'training_id' => $data['training_id'],
-                'das_id' => $data['training_id'] === null ? null : $this->trainings->find($data['training_id'])?->das_id,
+                // The training's DAS; a free line keeps the DAS it is given (duplicate).
+                'das_id' => $data['training_id'] === null ? ($data['das_id'] ?? null) : $this->trainings->find($data['training_id'])?->das_id,
                 'label' => $data['label'],
                 'description' => $data['description'],
                 'quantity' => $data['quantity'],

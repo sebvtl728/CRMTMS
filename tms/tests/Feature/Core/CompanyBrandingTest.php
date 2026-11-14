@@ -5,6 +5,7 @@ use App\Modules\Core\Companies\Company;
 use App\Modules\Core\Companies\CompanyBranding;
 use App\Modules\Core\Tenancy\Tenant;
 use App\Modules\Core\Tenancy\TenantContext;
+use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
 use Inertia\Testing\AssertableInertia as Assert;
@@ -94,6 +95,31 @@ it('validates the quote settings in french', function (array $input, string $fie
     'terms too long' => [['quote_terms' => str_repeat('a', 5001)], 'quote_terms', 'Les conditions ne peuvent pas dépasser 5 000 caractères.'],
     'footer too long' => [['quote_footer' => str_repeat('a', 5001)], 'quote_footer', 'Le pied de page ne peut pas dépasser 5 000 caractères.'],
 ]);
+
+it('keeps one company per quote prefix in the organisme', function () {
+    $this->actingAs(admin(twoFactor: true));
+    $first = Company::factory()->default()->create();
+    $second = Company::factory()->create();
+
+    // Left with the default prefix, a new company takes the first free suffix.
+    expect($first->quote_prefix)->toBe('DEV')->and($second->quote_prefix)->toBe('DEV2')
+        ->and(Company::factory()->create()->quote_prefix)->toBe('DEV3');
+
+    // A prefix typed in the form must be free (the company's own is fine).
+    $this->put("/admin/companies/{$second->id}", brandingPayload($second, ['quote_prefix' => 'dev']))
+        ->assertSessionHasErrors(['quote_prefix' => 'Ce préfixe est déjà celui d\'une autre société : choisissez-en un autre.']);
+    $this->put("/admin/companies/{$first->id}", brandingPayload($first, ['quote_prefix' => 'DEV']))->assertSessionDoesntHaveErrors();
+
+    // The database refuses it too; a deleted company frees its prefix.
+    Company::factory()->create(['quote_prefix' => 'ABC']);
+    expect(fn () => Company::factory()->create(['quote_prefix' => 'ABC']))->toThrow(UniqueConstraintViolationException::class);
+    $second->delete();
+    $this->put("/admin/companies/{$first->id}", brandingPayload($first, ['quote_prefix' => 'DEV2']))->assertSessionDoesntHaveErrors();
+
+    // Another organisme may use the same prefix.
+    $other = app(TenantContext::class)->run(Tenant::factory()->create(), fn () => Company::factory()->create(['quote_prefix' => 'DEV2']));
+    expect($other->quote_prefix)->toBe('DEV2');
+});
 
 it('stores the logo under the tenant directory and serves it as a data uri', function () {
     $tenant = tenant();

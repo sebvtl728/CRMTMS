@@ -86,7 +86,7 @@ it('numbering is gapless under concurrency and resets per paris year', function 
             ->and($numbering->next(companyOn('numbering_a', $companyId, $tenantId), CarbonImmutable::parse('2027-01-01 00:00', 'Europe/Paris')))->toBe('DEV-2027-0002');
         $a->commit();
 
-        expect($setup->table('quote_sequences')->where('company_id', $companyId)->orderBy('year')->pluck('last_number', 'year')->all())
+        expect($setup->table('quote_sequences')->where('tenant_id', $tenantId)->where('prefix', 'DEV')->orderBy('year')->pluck('last_number', 'year')->all())
             ->toBe([2026 => 4, 2027 => 2]);
     } finally {
         foreach ([$a, $b] as $connection) {
@@ -123,7 +123,7 @@ it('takes the year in paris time and pads the number', function () {
         ->and($numbering->next($company, CarbonImmutable::parse('2027-03-01 12:00', 'Europe/Paris')))->toBe('DEV-2027-0002');
 });
 
-it('numbers each company with its own prefix and sequence', function () {
+it('numbers each prefix with its own sequence', function () {
     inTenant();
     $cap = Company::factory()->create(['quote_prefix' => 'CAP']);
     $other = Company::factory()->create(['quote_prefix' => 'F2']);
@@ -134,9 +134,13 @@ it('numbers each company with its own prefix and sequence', function () {
         ->and($numbering->next($cap, $at))->toBe('CAP-2026-0002')
         ->and($numbering->next($other, $at))->toBe('F2-2026-0001');
 
-    // A new prefix applies to the next numbers; the sequence carries on.
+    // The sequence belongs to the prefix: a new prefix starts its own, and a
+    // prefix given up then taken by another company carries on (no duplicate).
     $cap->update(['quote_prefix' => 'CF']);
-    expect($numbering->next($cap->fresh(), $at))->toBe('CF-2026-0003');
+    $other->update(['quote_prefix' => 'CAP']);
+    expect($numbering->next($cap->fresh(), $at))->toBe('CF-2026-0001')
+        ->and($numbering->next($other->fresh(), $at))->toBe('CAP-2026-0003')
+        ->and(DB::table('quote_sequences')->orderBy('prefix')->pluck('last_number', 'prefix')->all())->toBe(['CAP' => 3, 'CF' => 1, 'F2' => 1]);
 });
 
 it('keeps the numbering of another organisme independent', function () {
@@ -152,7 +156,7 @@ it('keeps the numbering of another organisme independent', function () {
     $theirs = Company::factory()->create();
 
     expect($numbering->next($theirs, $at))->toBe('DEV-2026-0001')
-        ->and(DB::table('quote_sequences')->pluck('company_id')->all())->toBe([$theirs->id]); // RLS: only its own rows
+        ->and(DB::table('quote_sequences')->pluck('tenant_id')->all())->toBe([$other->id]); // RLS: only its own rows
 
     // A company of another organisme cannot be numbered from here (RLS check).
     expect(fn () => DB::transaction(fn () => $numbering->next($mine, $at)))->toThrow(QueryException::class);

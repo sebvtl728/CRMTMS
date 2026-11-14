@@ -14,9 +14,11 @@ use App\Modules\Crm\Organisations\Organisation;
 use App\Modules\Crm\Quotes\Quote;
 use App\Modules\Crm\Quotes\QuoteLine;
 use App\Modules\Crm\Quotes\QuoteStatus;
+use App\Modules\Crm\Quotes\QuoteWriter;
 use App\Modules\Crm\Support\LinkedData;
 use App\Modules\Crm\Timeline\Timeline;
 use Carbon\CarbonImmutable;
+use Illuminate\Support\Facades\DB;
 use Inertia\Testing\AssertableInertia as Assert;
 
 beforeEach(function () {
@@ -352,4 +354,55 @@ it('refuses a quote for an opportunity on a trashed fiche or without a company',
     $this->get("/crm/opportunities/{$opportunity->id}/quotes/create")->assertForbidden();
     $this->post('/crm/quotes', quotePayload($opportunity, $company))->assertForbidden();
     expect(Quote::query()->count())->toBe(0);
+});
+
+it('carries a new version over without what is no longer allowed', function () {
+    $this->actingAs(commercial());
+    $organisation = Organisation::query()->create(['name' => 'Le Bistrot']);
+    $contact = makePerson('Durand');
+    $affiliation = affiliate($contact, $organisation);
+    $training = qsTraining('HACCP', ['price_company' => '100.00']);
+    $opportunity = makeOpportunity($organisation);
+    $company = Company::factory()->default()->create();
+    $this->post('/crm/quotes', quotePayload($opportunity, $company, [quoteLine(['training_id' => $training->id, 'label' => 'HACCP'])], ['contact_person_id' => $contact->id]))
+        ->assertSessionHasNoErrors();
+    $quote = Quote::query()->sole();
+
+    // The recipient left the entreprise, the training was deactivated.
+    $affiliation->update(['ended_on' => '2026-11-01']);
+    $training->update(['is_active' => false]);
+    $this->post("/crm/quotes/{$quote->id}/duplicate")->assertSessionHasNoErrors();
+
+    $copy = Quote::query()->whereKeyNot($quote->id)->sole();
+    $line = $copy->lines()->sole();
+    expect($copy->contact_person_id)->toBeNull()
+        ->and($line->training_id)->toBeNull()
+        ->and($line->das_id)->toBe($training->das_id)
+        ->and([$line->label, $line->unit_price])->toBe(['HACCP', '1000.00']);
+});
+
+it('shows a numbering collision as a French error, on creation and on a new version', function () {
+    $this->actingAs(commercial());
+    $opportunity = makeOpportunity(Organisation::query()->create(['name' => 'Le Bistrot']));
+    $quote = makeQuote($opportunity);
+    // A sequence reset by hand: the next number already exists.
+    DB::table('quote_sequences')->delete();
+
+    $this->postJson('/crm/quotes', quotePayload($opportunity, $quote->company))
+        ->assertJsonValidationErrors(['company_id' => 'Le numéro de devis attribué existe déjà. Vérifiez la numérotation de la société (Administration › Sociétés) puis réessayez.']);
+    $this->from("/crm/quotes/{$quote->id}")->post("/crm/quotes/{$quote->id}/duplicate")
+        ->assertRedirect("/crm/quotes/{$quote->id}")->assertSessionHasErrors('company_id');
+    expect(Quote::query()->count())->toBe(1);
+});
+
+it('never rewrites a quote that is no longer a draft', function () {
+    $this->actingAs(commercial());
+    $quote = makeQuote(makeOpportunity(Organisation::query()->create(['name' => 'Le Bistrot'])));
+    $quote->forceFill(['status' => QuoteStatus::Sent])->save();
+
+    expect(fn () => app(QuoteWriter::class)->update($quote, [
+        'contact_person_id' => null, 'issued_on' => '2026-11-14', 'valid_until' => '2026-12-14', 'notes' => null,
+        'lines' => [['training_id' => null, 'label' => 'X', 'description' => null, 'quantity' => '1.00', 'unit' => 'jour', 'unit_price' => '1.00', 'discount_percent' => '0.00', 'vat_rate' => '20.00']],
+    ]))->toThrow(LogicException::class, 'Seul un brouillon de devis se modifie.');
+    expect($quote->refresh()->total_ht)->toBe('1000.00');
 });

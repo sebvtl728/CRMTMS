@@ -7,8 +7,11 @@ use Carbon\CarbonImmutable;
 use LogicException;
 
 /**
- * Quote numbers: <préfixe>-<AAAA>-<NNNN>, one sequence per company and per
- * Paris calendar year, whatever the prefix (changing it never renumbers).
+ * Quote numbers: <préfixe>-<AAAA>-<NNNN>, one sequence per organisme, prefix
+ * and Paris calendar year. A prefix belongs to one company (unique among the
+ * companies not deleted); companies that held the same prefix one after the
+ * other share its sequence, so a number is never given twice, even after a
+ * prefix change.
  *
  * The number comes from an atomic upsert on quote_sequences run in the
  * caller's transaction (the one creating the quote): the row lock it takes
@@ -33,12 +36,12 @@ class QuoteNumbering
         $year = (int) $at->setTimezone(self::TIMEZONE)->format('Y');
 
         $row = $db->selectOne(
-            'insert into quote_sequences (tenant_id, company_id, year, last_number, created_at, updated_at)
+            'insert into quote_sequences (tenant_id, prefix, year, last_number, created_at, updated_at)
              values (?, ?, ?, 1, now(), now())
-             on conflict (company_id, year) do update
+             on conflict (tenant_id, prefix, year) do update
                 set last_number = quote_sequences.last_number + 1, updated_at = now()
              returning last_number',
-            [$company->tenant_id, $company->getKey(), $year],
+            [$company->tenant_id, $company->quote_prefix, $year],
         );
 
         return sprintf('%s-%d-%04d', $company->quote_prefix, $year, (int) $row->last_number);
