@@ -3,6 +3,7 @@
 use App\Modules\Connectors\Core\ConnectorConfig;
 use App\Modules\Connectors\Core\ConnectorRun;
 use App\Modules\Connectors\Smtp\SmtpTransportFactory;
+use App\Modules\Core\Companies\VatRegime;
 use App\Modules\Core\References\CapFormationReferenceSeeder;
 use App\Modules\Core\References\ReferenceItem;
 use App\Modules\Core\References\ReferenceList;
@@ -12,6 +13,7 @@ use App\Modules\Crm\Opportunities\StageChange;
 use App\Modules\Crm\Quotes\QuoteMail;
 use App\Modules\Crm\Quotes\QuoteMailFailed;
 use App\Modules\Crm\Quotes\QuoteStatus;
+use App\Modules\Crm\Quotes\QuoteTransitions;
 use App\Modules\Crm\Quotes\SendQuote;
 use App\Modules\Crm\Timeline\LastContact;
 use App\Modules\Crm\Timeline\Timeline;
@@ -362,4 +364,77 @@ it('a replayed sending job sends nothing again', function () {
     app()->call([new SendQuote($quote->id), 'handle']);
     expect($sent)->toHaveCount(1)
         ->and(ConnectorRun::query()->count())->toBe(1);
+});
+
+it('refuses to send a draft whose company changed its vat regime, and warns on the fiche and the form', function (VatRegime $before, VatRegime $after) {
+    Mail::fake();
+    $this->actingAs(commercial());
+    $quote = sendableQuote();
+    $quote->company->update(['vat_regime' => $before]);
+    // Saved under the former regime (the writer applies the company's).
+    $quote->forceFill(['vat_exempt' => $before === VatRegime::Exempt])->save();
+    $this->get("/crm/quotes/{$quote->id}")->assertInertia(fn (Assert $page) => $page->where('send_blocked', null)->where('vat_regime_changed', false));
+
+    $quote->company->update(['vat_regime' => $after]);
+
+    $this->get("/crm/quotes/{$quote->id}")->assertInertia(fn (Assert $page) => $page
+        ->where('vat_regime_changed', true)
+        ->where('send_blocked', QuoteTransitions::VAT_REGIME_CHANGED));
+    $this->get("/crm/quotes/{$quote->id}/edit")->assertInertia(fn (Assert $page) => $page->where('vat_regime_changed', true));
+
+    $this->post("/crm/quotes/{$quote->id}/send", quoteMessage())->assertStatus(409)
+        ->assertSee('Le régime de TVA de la société a changé : ouvrez le brouillon, vérifiez les taux et enregistrez-le.', false);
+
+    $quote->refresh();
+    expect($quote->status)->toBe(QuoteStatus::Draft)->and($quote->pdf_path)->toBeNull();
+    Mail::assertNothingSent();
+})->with([
+    'exempt then liable' => [VatRegime::Exempt, VatRegime::Subject],
+    'liable then exempt' => [VatRegime::Subject, VatRegime::Exempt],
+]);
+
+it('refuses to send a draft past its validity date', function () {
+    Mail::fake();
+    $this->actingAs(commercial());
+    $quote = sendableQuote();
+    $quote->forceFill(['issued_on' => '2026-10-01', 'valid_until' => '2026-11-14'])->save();
+    // Valid until today included.
+    $this->get("/crm/quotes/{$quote->id}")->assertInertia(fn (Assert $page) => $page->where('send_blocked', null));
+
+    $quote->forceFill(['valid_until' => '2026-11-13'])->save();
+    $this->get("/crm/quotes/{$quote->id}")->assertInertia(fn (Assert $page) => $page->where('send_blocked', QuoteTransitions::VALIDITY_PASSED));
+
+    $this->post("/crm/quotes/{$quote->id}/send", quoteMessage())->assertStatus(409)
+        ->assertSee('La date de validité est dépassée : modifiez les dates du devis avant de l&#039;envoyer.', false);
+    expect($quote->refresh()->status)->toBe(QuoteStatus::Draft);
+    Mail::assertNothingSent();
+});
+
+it('refuses a reminder or a resend of a quote whose archived pdf is gone, and hides them', function () {
+    Mail::fake();
+    $this->actingAs(commercial());
+    $quote = sendableQuote();
+    $this->post("/crm/quotes/{$quote->id}/send", quoteMessage())->assertSessionHasNoErrors();
+    $quote->refresh();
+    $this->get("/crm/quotes/{$quote->id}")->assertInertia(fn (Assert $page) => $page->where('pdf_available', true)->where('can.remind', true));
+
+    Storage::disk(TenantStorage::DISK)->delete((string) $quote->pdf_path);
+    $quote->forceFill(['email_status' => 'failed', 'email_error' => 'Le serveur d\'envoi a refusé le message (code 550).'])->save();
+    DB::table('organisations')->update(['last_contact_at' => null]);
+
+    $this->get("/crm/quotes/{$quote->id}")->assertInertia(fn (Assert $page) => $page
+        ->where('pdf_available', false)
+        ->where('can.remind', false)
+        ->where('can.resend', false));
+
+    $this->post("/crm/quotes/{$quote->id}/resend")->assertStatus(409)->assertSee('Le PDF archivé de ce devis est introuvable', false);
+    $quote->forceFill(['email_status' => 'sent', 'email_error' => null])->save();
+    $this->post("/crm/quotes/{$quote->id}/remind", quoteMessage())->assertStatus(409)->assertSee('Le PDF archivé de ce devis est introuvable', false);
+
+    $quote->refresh();
+    expect($quote->status)->toBe(QuoteStatus::Sent)
+        ->and($quote->reminded_at)->toBeNull()
+        ->and($quote->email_status)->toBe('sent')
+        ->and(DB::table('organisations')->where('id', $quote->organisation_id)->value('last_contact_at'))->toBeNull();
+    expect(Mail::sent(QuoteMail::class))->toHaveCount(1);
 });

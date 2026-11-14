@@ -18,6 +18,7 @@ use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Storage;
+use Inertia\Testing\AssertableInertia as Assert;
 
 beforeEach(function () {
     CrmServiceProvider::registerReferenceUsage();
@@ -153,10 +154,20 @@ it('anonymisation of an interlocuteur removes her from the quotes of the entrepr
 
     $this->get("/crm/quotes/{$quote->id}/pdf")->assertStatus(410)->assertSee('Document supprimé (données anonymisées).');
 
-    // A reminder sends nothing without the archived document (no new rendering).
+    // No reminder without the archived document (no new rendering): refused, hidden.
     $calls = count(Http::recorded());
-    $this->post("/crm/quotes/{$quote->id}/remind", quoteMessage(['to' => 'accueil@bistrot.test']))->assertSessionHasNoErrors();
+    $this->get("/crm/quotes/{$quote->id}")->assertInertia(fn (Assert $page) => $page->where('pdf_available', false)->where('can.remind', false));
+    $this->post("/crm/quotes/{$quote->id}/remind", quoteMessage(['to' => 'accueil@bistrot.test']))
+        ->assertStatus(409)->assertSee('Le PDF archivé de ce devis est introuvable', false);
     expect(Mail::sent(QuoteMail::class))->toHaveCount(2) // the two sendings above
+        ->and($quote->refresh()->status)->toBe(QuoteStatus::Sent)
+        ->and($quote->reminded_at)->toBeNull()
+        ->and(count(Http::recorded()))->toBe($calls);
+
+    // A message queued before the purge sends nothing either.
+    $quote->forceFill(['email_status' => 'pending', 'email_message' => ['kind' => QuoteMail::KIND_REMIND, ...quoteMessage(['to' => 'accueil@bistrot.test'])]])->save();
+    SendQuote::dispatchSync($quote->id);
+    expect(Mail::sent(QuoteMail::class))->toHaveCount(2)
         ->and($quote->refresh()->email_status)->toBe('failed')
         ->and($quote->email_error)->toBe(SendQuote::NO_DOCUMENT)
         ->and(count(Http::recorded()))->toBe($calls);

@@ -68,6 +68,7 @@ final class QuoteForm
             ],
             'missing_prices' => $missing,
             'vat_exempt' => $company->vat_regime === VatRegime::Exempt,
+            'vat_regime_changed' => false,
             ...$this->shared($opportunity, []),
         ];
     }
@@ -102,6 +103,8 @@ final class QuoteForm
             'missing_prices' => [],
             // A draft follows its company: the rates apply as it is now.
             'vat_exempt' => $quote->company?->vat_regime === VatRegime::Exempt,
+            // Saved under the other regime: the user checks the rates (exempt → liable: lines at 0 %).
+            'vat_regime_changed' => QuoteTransitions::vatRegimeChanged($quote),
             ...$this->shared($opportunity, $lines->pluck('training_id')->filter()->values()->all(), $quote),
         ];
     }

@@ -41,6 +41,8 @@ interface FormProps {
     };
     missing_prices: string[];
     vat_exempt: boolean;
+    /** A draft saved under the other VAT regime of its company. */
+    vat_regime_changed: boolean;
     opportunity: { id: string; title: string; account: { type: 'organisation' | 'person'; id: string | null; name: string | null } };
     options: {
         companies: CompanyOption[];
@@ -71,7 +73,14 @@ function addDays(iso: string, days: number): string {
     return date.toISOString().slice(0, 10);
 }
 
-export default function QuoteFormPage({ quote, missing_prices: missing, vat_exempt: storedExempt, opportunity, options }: FormProps) {
+export default function QuoteFormPage({
+    quote,
+    missing_prices: missing,
+    vat_exempt: storedExempt,
+    vat_regime_changed: regimeChanged,
+    opportunity,
+    options,
+}: FormProps) {
     const editing = quote.id !== null;
 
     const { data, setData, post, put, processing, errors } = useForm<QuoteForm>({
@@ -133,6 +142,17 @@ export default function QuoteFormPage({ quote, missing_prices: missing, vat_exem
 
             <div className="flex max-w-5xl flex-col gap-6 p-4">
                 <Heading title={title} description={`Opportunité « ${opportunity.title} » · ${opportunity.account.name ?? '—'}`} />
+
+                {regimeChanged && (
+                    <div
+                        role="alert"
+                        className="rounded-xl border border-amber-300 bg-amber-50 p-3 text-sm text-amber-950 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-50"
+                    >
+                        Le régime de TVA de la société a changé depuis l'enregistrement de ce brouillon
+                        {storedExempt ? ' (exonérée) : les lignes passent à 0 %.' : ' (assujettie) : choisissez le taux de TVA de chaque ligne.'}{' '}
+                        Vérifiez les taux puis enregistrez le devis avant de l'envoyer.
+                    </div>
+                )}
 
                 {missing.length > 0 && (
                     <div className="rounded-xl border border-amber-300 bg-amber-50 p-3 text-sm text-amber-950 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-50">

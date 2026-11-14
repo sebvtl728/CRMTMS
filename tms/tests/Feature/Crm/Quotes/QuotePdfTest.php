@@ -266,7 +266,8 @@ it('never renders again a sent quote whose archive is lost: 410 and a warning', 
 
     $this->actingAs(commercial());
     $this->get("/crm/quotes/{$quote->id}/pdf")->assertStatus(410)
-        ->assertSee('Document supprimé (données anonymisées).')
+        ->assertSee('Le PDF archivé est introuvable : contactez l&#039;administrateur.', false)
+        ->assertDontSee('données anonymisées')
         ->assertDontSee('Nouveau nom');
     Http::assertSentCount(1); // the freeze only
 

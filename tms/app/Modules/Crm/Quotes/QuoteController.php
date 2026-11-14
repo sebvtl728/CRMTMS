@@ -33,6 +33,8 @@ class QuoteController extends Controller
 {
     public const DOCUMENT_GONE = 'Document supprimé (données anonymisées).';
 
+    public const ARCHIVE_LOST = 'Le PDF archivé est introuvable : contactez l\'administrateur.';
+
     public function __construct(
         private readonly QuoteWriter $writer,
         private readonly QuoteForm $form,
@@ -74,17 +76,19 @@ class QuoteController extends Controller
         return to_route('crm.quotes.show', $quote)->with('status', "Devis {$quote->number} créé.");
     }
 
-    public function show(Request $request, Quote $quote): Response
+    public function show(Request $request, Quote $quote, QuotePdf $pdf): Response
     {
         $user = $this->user($request);
         Gate::authorize('view', $quote);
         $quote->load([...QuoteRows::WITH, 'opportunity.organisation', 'opportunity.person', 'contact:id,first_name,last_name,deleted_at', 'lines.das']);
 
         $canUpdate = $user->can('update', $quote);
-        // The windows read the whole recipient (the lists above load a few columns).
+        // The windows and the send checks read the whole company (the lists above load a few columns).
         $mailQuote = Quote::query()->with('company')->findOrFail($quote->id);
         $nowhere = TenantMailer::deliversNowhere($quote->company);
         $replacedBy = $quote->replaced_by_id === null ? null : Quote::query()->find($quote->replaced_by_id, ['id', 'number']);
+
+        $pdfAvailable = $quote->isDraft() || $pdf->archived($quote) !== null;
 
         $totals = QuoteTotals::compute($quote->lines->map(fn (QuoteLine $l) => new LineInput($l->quantity, $l->unit_price, $l->discount_percent, $l->vat_rate))->all(), $quote->vat_exempt);
 
@@ -138,10 +142,16 @@ class QuoteController extends Controller
                 'delete' => $quote->isDraft() && $user->can('delete', $quote),
                 'duplicate' => $user->can('duplicate', $quote),
                 'send' => $quote->isDraft() && $canUpdate,
-                'remind' => $quote->isAwaitingAnswer() && ! in_array($quote->email_status, ['pending', 'failed'], true) && $canUpdate,
-                'resend' => $quote->email_status === 'failed' && $canUpdate,
+                // A reminder or « Renvoyer » attaches the archived PDF.
+                'remind' => $quote->isAwaitingAnswer() && ! in_array($quote->email_status, ['pending', 'failed'], true) && $pdfAvailable && $canUpdate,
+                'resend' => $quote->email_status === 'failed' && $pdfAvailable && $canUpdate,
                 'answer' => $quote->isAwaitingAnswer() && $canUpdate,
             ],
+            // A sent quote without its archive: no PDF link, no reminder.
+            'pdf_available' => $pdfAvailable,
+            // A draft that cannot be sent as it is (button disabled, reason shown).
+            'send_blocked' => $quote->isDraft() ? QuoteTransitions::sendBlocker($mailQuote) : null,
+            'vat_regime_changed' => QuoteTransitions::vatRegimeChanged($mailQuote),
             // Prefilled windows; a warning when nothing would really leave.
             'send' => $quote->isDraft() ? [...QuoteMail::defaults($mailQuote, QuoteMail::KIND_SEND), 'delivers_nowhere' => $nowhere] : null,
             'remind' => $quote->isAwaitingAnswer() ? [...QuoteMail::defaults($mailQuote, QuoteMail::KIND_REMIND), 'delivers_nowhere' => $nowhere] : null,
@@ -248,6 +258,8 @@ class QuoteController extends Controller
         if (! $quote->isDraft()) {
             if ($quote->pdf_path !== null) {
                 Log::warning('Archive PDF du devis introuvable', ['quote_id' => $quote->id]);
+
+                throw new UserFacingHttpException(410, self::ARCHIVE_LOST);
             }
 
             throw new UserFacingHttpException(410, self::DOCUMENT_GONE);

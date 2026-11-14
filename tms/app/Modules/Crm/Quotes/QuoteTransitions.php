@@ -3,6 +3,7 @@
 namespace App\Modules\Crm\Quotes;
 
 use App\Exceptions\UserFacingHttpException;
+use App\Modules\Core\Companies\VatRegime;
 use App\Modules\Crm\Opportunities\Opportunity;
 use App\Modules\Crm\Opportunities\OpportunityStage;
 use App\Modules\Crm\Organisations\Organisation;
@@ -37,10 +38,43 @@ final class QuoteTransitions
 
     public const NOTHING_TO_RESEND = 'Aucun e-mail en échec à renvoyer pour ce devis.';
 
+    public const VAT_REGIME_CHANGED = 'Le régime de TVA de la société a changé : ouvrez le brouillon, vérifiez les taux et enregistrez-le.';
+
+    public const VALIDITY_PASSED = 'La date de validité est dépassée : modifiez les dates du devis avant de l\'envoyer.';
+
+    public const NO_ARCHIVE = 'Le PDF archivé de ce devis est introuvable : il ne peut pas être joint au message. Contactez l\'administrateur.';
+
     public function __construct(
         private readonly QuoteFreezer $freezer,
         private readonly OpportunityStage $stages,
+        private readonly QuotePdf $pdf,
     ) {}
+
+    /**
+     * Why this draft cannot be sent as it is, null when it can: its
+     * company changed its VAT regime since it was saved (the rates and the
+     * exemption notice would be wrong), or its validity date is past
+     * (Paris). Shown on the fiche, checked again on the locked row.
+     */
+    public static function sendBlocker(Quote $draft): ?string
+    {
+        if (self::vatRegimeChanged($draft)) {
+            return self::VAT_REGIME_CHANGED;
+        }
+        if ($draft->valid_until->toDateString() < CarbonImmutable::now(QuoteNumbering::TIMEZONE)->toDateString()) {
+            return self::VALIDITY_PASSED;
+        }
+
+        return null;
+    }
+
+    /** A draft saved under the other VAT regime of its company. */
+    public static function vatRegimeChanged(Quote $draft): bool
+    {
+        $company = $draft->company;
+
+        return $draft->isDraft() && $company !== null && $draft->vat_exempt !== ($company->vat_regime === VatRegime::Exempt);
+    }
 
     /**
      * @param  Message  $message
@@ -50,6 +84,10 @@ final class QuoteTransitions
         $this->transition($quote, function (Quote $locked) use ($message): void {
             if (! $locked->isDraft()) {
                 throw new UserFacingHttpException(409, self::NOT_DRAFT);
+            }
+            $blocker = self::sendBlocker($locked);
+            if ($blocker !== null) {
+                throw new UserFacingHttpException(409, $blocker);
             }
             $this->freezer->freeze($locked);
 
@@ -78,6 +116,7 @@ final class QuoteTransitions
             if ($locked->email_status === 'failed') {
                 throw new UserFacingHttpException(409, self::LAST_MAIL_FAILED);
             }
+            $this->requireArchive($locked);
 
             $now = CarbonImmutable::now();
             $locked->status = QuoteStatus::Reminded;
@@ -96,6 +135,7 @@ final class QuoteTransitions
             if ($locked->email_status !== 'failed' || ! is_array($locked->email_message)) {
                 throw new UserFacingHttpException(409, self::NOTHING_TO_RESEND);
             }
+            $this->requireArchive($locked);
             $locked->email_status = 'pending';
             $locked->email_error = null;
             $locked->save();
@@ -180,6 +220,17 @@ final class QuoteTransitions
             });
 
         return $count;
+    }
+
+    /**
+     * A reminder or « Renvoyer » attaches the archived PDF: without it
+     * (purged by the anonymisation, or lost) nothing is queued.
+     */
+    private function requireArchive(Quote $quote): void
+    {
+        if ($this->pdf->archived($quote) === null) {
+            throw new UserFacingHttpException(409, self::NO_ARCHIVE);
+        }
     }
 
     /**

@@ -1,7 +1,7 @@
 import { decimalInput, rateLabel } from '@/components/crm/quote-lines';
+import { QuoteStatusBadge, type QuoteRow } from '@/components/crm/quote-list';
 import { QuoteAnswerDialog, QuoteOutcomeDialog, type ProposeWon, type QuotePipeline } from '@/components/crm/quote-outcome-dialog';
 import { QuoteSendDialog, type QuoteMessageDefaults } from '@/components/crm/quote-send-dialog';
-import { QuoteStatusBadge, type QuoteRow } from '@/components/crm/quote-list';
 import InputError from '@/components/input-error';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -52,6 +52,11 @@ interface ShowProps {
     remind: QuoteMessageDefaults | null;
     pipeline: QuotePipeline;
     propose: { won: ProposeWon | null; lost: boolean };
+    /** False for a sent quote whose archived PDF is gone: no link, no reminder. */
+    pdf_available: boolean;
+    /** Why this draft cannot be sent as it is (VAT regime changed, validity past). */
+    send_blocked: string | null;
+    vat_regime_changed: boolean;
     status?: string;
 }
 
@@ -64,7 +69,18 @@ function Item({ label, children }: { label: string; children: React.ReactNode })
     );
 }
 
-export default function QuoteShow({ quote: q, can, send, remind, pipeline, propose, status }: ShowProps) {
+export default function QuoteShow({
+    quote: q,
+    can,
+    send,
+    remind,
+    pipeline,
+    propose,
+    pdf_available: pdfAvailable,
+    send_blocked: sendBlocked,
+    vat_regime_changed: regimeChanged,
+    status,
+}: ShowProps) {
     const [confirming, setConfirming] = useState(false);
     const [mailing, setMailing] = useState<'send' | 'remind' | null>(null);
     const [answer, setAnswer] = useState<'accept' | 'refuse' | null>(null);
@@ -113,14 +129,21 @@ export default function QuoteShow({ quote: q, can, send, remind, pipeline, propo
                     </div>
                     <div className="flex flex-wrap gap-2">
                         {/* A draft is previewed (watermark); a sent quote opens its archived PDF. */}
-                        <Button asChild variant="outline">
-                            <a href={route('crm.quotes.pdf', q.id)} target="_blank" rel="noopener noreferrer">
+                        {pdfAvailable ? (
+                            <Button asChild variant="outline">
+                                <a href={route('crm.quotes.pdf', q.id)} target="_blank" rel="noopener noreferrer">
+                                    <FileText className="h-4 w-4" />
+                                    {q.status.value === 'draft' ? 'Aperçu PDF' : 'PDF'}
+                                </a>
+                            </Button>
+                        ) : (
+                            <Button variant="outline" disabled title="Le PDF archivé de ce devis n’est plus disponible.">
                                 <FileText className="h-4 w-4" />
-                                {q.status.value === 'draft' ? 'Aperçu PDF' : 'PDF'}
-                            </a>
-                        </Button>
+                                PDF indisponible
+                            </Button>
+                        )}
                         {can.send && send && (
-                            <Button onClick={() => setMailing('send')}>
+                            <Button onClick={() => setMailing('send')} disabled={sendBlocked !== null} title={sendBlocked ?? undefined}>
                                 <Send className="h-4 w-4" />
                                 Envoyer
                             </Button>
@@ -167,6 +190,21 @@ export default function QuoteShow({ quote: q, can, send, remind, pipeline, propo
                 </div>
 
                 {status && <div className="text-sm font-medium text-green-600">{status}</div>}
+                {can.send && sendBlocked && (
+                    <p
+                        role="alert"
+                        className="flex gap-2 rounded-md border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900 dark:border-amber-700 dark:bg-amber-950 dark:text-amber-100"
+                    >
+                        <TriangleAlert className="mt-0.5 h-4 w-4 shrink-0" />
+                        {sendBlocked}
+                    </p>
+                )}
+                {!can.send && regimeChanged && (
+                    <p className="text-muted-foreground text-sm">Le régime de TVA de la société a changé depuis l'enregistrement de ce brouillon.</p>
+                )}
+                {!pdfAvailable && (
+                    <p className="text-muted-foreground text-sm">Le PDF archivé de ce devis n’est plus disponible : ni relance ni renvoi possible.</p>
+                )}
                 {q.email?.status === 'failed' && (
                     <div
                         role="alert"
@@ -174,12 +212,14 @@ export default function QuoteShow({ quote: q, can, send, remind, pipeline, propo
                     >
                         <p className="flex gap-2">
                             <TriangleAlert className="mt-0.5 h-4 w-4 shrink-0" />
-                            <span>
-                                L'e-mail n'est pas parti. {q.email.error}
-                            </span>
+                            <span>L'e-mail n'est pas parti. {q.email.error}</span>
                         </p>
                         {can.resend && (
-                            <Button size="sm" variant="outline" onClick={() => router.post(route('crm.quotes.resend', q.id), {}, { preserveScroll: true })}>
+                            <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => router.post(route('crm.quotes.resend', q.id), {}, { preserveScroll: true })}
+                            >
                                 <RotateCw className="h-4 w-4" />
                                 Renvoyer
                             </Button>
@@ -294,9 +334,25 @@ export default function QuoteShow({ quote: q, can, send, remind, pipeline, propo
                 </section>
             </div>
 
-            {send && <QuoteSendDialog quoteId={q.id} number={q.number} kind="send" defaults={send} open={mailing === 'send'} onClose={() => setMailing(null)} />}
+            {send && (
+                <QuoteSendDialog
+                    quoteId={q.id}
+                    number={q.number}
+                    kind="send"
+                    defaults={send}
+                    open={mailing === 'send'}
+                    onClose={() => setMailing(null)}
+                />
+            )}
             {remind && (
-                <QuoteSendDialog quoteId={q.id} number={q.number} kind="remind" defaults={remind} open={mailing === 'remind'} onClose={() => setMailing(null)} />
+                <QuoteSendDialog
+                    quoteId={q.id}
+                    number={q.number}
+                    kind="remind"
+                    defaults={remind}
+                    open={mailing === 'remind'}
+                    onClose={() => setMailing(null)}
+                />
             )}
             <QuoteAnswerDialog quoteId={q.id} number={q.number} issuedOn={q.issued_on} answer={answer} onClose={() => setAnswer(null)} />
             <QuoteOutcomeDialog
