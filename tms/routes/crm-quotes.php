@@ -17,9 +17,9 @@ Route::middleware(['auth'])->group(function () {
         Route::delete('{quote}', [QuoteController::class, 'destroy'])->middleware('can:crm.delete')->name('destroy');
         Route::post('{quote}/duplicate', [QuoteController::class, 'duplicate'])->middleware('can:crm.create')->name('duplicate');
         // Sending (renders and archives the PDF: limited), reminder, outcome.
-        Route::post('{quote}/send', [QuoteTransitionController::class, 'send'])->middleware(['can:crm.update', 'throttle:quote-pdf'])->name('send');
-        Route::post('{quote}/remind', [QuoteTransitionController::class, 'remind'])->middleware('can:crm.update')->name('remind');
-        Route::post('{quote}/resend', [QuoteTransitionController::class, 'resend'])->middleware('can:crm.update')->name('resend');
+        Route::post('{quote}/send', [QuoteTransitionController::class, 'send'])->middleware(['can:crm.update', 'throttle:quote-pdf', 'throttle:quote-mail'])->name('send');
+        Route::post('{quote}/remind', [QuoteTransitionController::class, 'remind'])->middleware(['can:crm.update', 'throttle:quote-mail'])->name('remind');
+        Route::post('{quote}/resend', [QuoteTransitionController::class, 'resend'])->middleware(['can:crm.update', 'throttle:quote-mail'])->name('resend');
         Route::post('{quote}/accept', [QuoteTransitionController::class, 'accept'])->middleware('can:crm.update')->name('accept');
         Route::post('{quote}/refuse', [QuoteTransitionController::class, 'refuse'])->middleware('can:crm.update')->name('refuse');
         // Archived PDF of a sent quote, or preview of a draft (rendered on the fly: limited).

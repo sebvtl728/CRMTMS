@@ -10,13 +10,16 @@ use App\Modules\Core\Tenancy\TenantStorage;
 use App\Modules\Crm\CrmServiceProvider;
 use App\Modules\Crm\Opportunities\StageChange;
 use App\Modules\Crm\Quotes\QuoteMail;
+use App\Modules\Crm\Quotes\QuoteMailFailed;
 use App\Modules\Crm\Quotes\QuoteStatus;
 use App\Modules\Crm\Quotes\SendQuote;
 use App\Modules\Crm\Timeline\LastContact;
 use App\Modules\Crm\Timeline\Timeline;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\Client\Factory;
+use Illuminate\Log\Events\MessageLogged;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Queue;
@@ -227,8 +230,20 @@ it('keeps the quote sent when the smtp server fails, shows the banner and sends 
 
     // Three tries with a backoff, then failed.
     expect($job->tries)->toBe(3)->and($job->backoff())->toBe([60, 300, 900]);
-    expect(fn () => app()->call([$job, 'handle']))->toThrow(TransportException::class);
-    $job->failed(new TransportException('550'));
+    // Rethrown without the server's text (logged by the worker, kept in failed_jobs).
+    $thrown = null;
+    try {
+        app()->call([$job, 'handle']);
+    } catch (Throwable $e) {
+        $thrown = $e;
+    }
+    expect($thrown)->toBeInstanceOf(QuoteMailFailed::class)
+        ->and($thrown->getMessage())->toBe('Le serveur d\'envoi a refusé le message (code 550).')
+        ->and($thrown->getCode())->toBe(550)
+        ->and((string) $thrown)->not->toContain('lea.durand')->not->toContain('cap-user')
+        ->and($thrown->getPrevious())->toBeNull();
+    expect($quote->refresh()->email_status)->toBe('pending'); // retried until the last try
+    $job->failed($thrown);
 
     $quote->refresh();
     expect($quote->status)->toBe(QuoteStatus::Sent)
@@ -311,4 +326,40 @@ it('does not send when the pdf cannot be rendered', function () {
         ->and($quote->opportunity->refresh()->stage_id)->toBe(pipelineStage('Étude')->id);
     Mail::assertNothingSent();
     expect(ReferenceItem::query()->where('list', ReferenceList::PipelineStage)->count())->toBe(7);
+});
+
+it('on a sync queue, a failed e-mail shows the banner, never the server text', function () {
+    quoteSmtp(fn () => throw new TransportException('550 5.1.1 <lea.durand@example.test>: rejected for user cap-user'));
+    $logged = [];
+    Event::listen(MessageLogged::class, function ($e) use (&$logged) {
+        $logged[] = $e->message.json_encode($e->context);
+    });
+    $this->actingAs(commercial());
+    $quote = sendableQuote();
+
+    $this->post("/crm/quotes/{$quote->id}/send", quoteMessage())->assertSessionHasNoErrors()->assertRedirect(route('crm.quotes.show', $quote));
+
+    $quote->refresh();
+    expect($quote->status)->toBe(QuoteStatus::Sent)
+        ->and($quote->email_status)->toBe('failed')
+        ->and($quote->email_error)->toBe('Le serveur d\'envoi a refusé le message (code 550).');
+    expect(implode("\n", $logged))->not->toContain('lea.durand')->not->toContain('cap-user');
+    expect(DB::table('failed_jobs')->count())->toBe(0);
+    $this->get("/crm/quotes/{$quote->id}")->assertInertia(fn (Assert $page) => $page->where('quote.email.status', 'failed')->where('can.resend', true)->where('can.remind', false));
+});
+
+it('a replayed sending job sends nothing again', function () {
+    $sent = [];
+    quoteSmtp(function (RawMessage $m) use (&$sent) {
+        $sent[] = $m;
+    });
+    $this->actingAs(commercial());
+    $quote = sendableQuote();
+
+    $this->post("/crm/quotes/{$quote->id}/send", quoteMessage())->assertSessionHasNoErrors();
+    expect($sent)->toHaveCount(1)->and($quote->refresh()->email_status)->toBe('sent');
+
+    app()->call([new SendQuote($quote->id), 'handle']);
+    expect($sent)->toHaveCount(1)
+        ->and(ConnectorRun::query()->count())->toBe(1);
 });

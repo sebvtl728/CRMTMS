@@ -131,7 +131,7 @@ class QuoteController extends Controller
                 'delete' => $quote->isDraft() && $user->can('delete', $quote),
                 'duplicate' => $user->can('duplicate', $quote),
                 'send' => $quote->isDraft() && $canUpdate,
-                'remind' => $quote->isAwaitingAnswer() && $quote->email_status !== 'pending' && $canUpdate,
+                'remind' => $quote->isAwaitingAnswer() && ! in_array($quote->email_status, ['pending', 'failed'], true) && $canUpdate,
                 'resend' => $quote->email_status === 'failed' && $canUpdate,
                 'answer' => $quote->isAwaitingAnswer() && $canUpdate,
             ],
@@ -193,6 +193,10 @@ class QuoteController extends Controller
     public function duplicate(Quote $quote, QuoteTransitions $transitions): RedirectResponse
     {
         Gate::authorize('duplicate', $quote);
+        // The source is then refused as replaced: that is a change of it.
+        if ($quote->isAwaitingAnswer() || $quote->status === QuoteStatus::Expired) {
+            Gate::authorize('update', $quote);
+        }
         $opportunity = $quote->opportunity;
         assert($opportunity !== null);
 

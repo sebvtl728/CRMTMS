@@ -10,6 +10,7 @@ use App\Modules\Crm\Quotes\QuoteStatus;
 use App\Modules\Crm\Timeline\Timeline;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Storage;
 use Inertia\Testing\AssertableInertia as Assert;
@@ -196,4 +197,30 @@ it('a new version of a sent quote replaces it; a draft copy leaves the draft alo
     $this->post("/crm/quotes/{$accepted->id}/accept", [])->assertSessionHasNoErrors();
     $this->post("/crm/quotes/{$accepted->id}/duplicate")->assertRedirect();
     expect($accepted->refresh()->status)->toBe(QuoteStatus::Accepted)->and($accepted->replaced_by_id)->toBeNull();
+});
+
+it('refuses a reminder while the last e-mail is pending or failed', function () {
+    $quote = outcomeQuote();
+
+    $quote->forceFill(['email_status' => 'pending'])->save();
+    $this->post("/crm/quotes/{$quote->id}/remind", quoteMessage())->assertStatus(409)
+        ->assertSee('encore en cours d&#039;envoi', false);
+
+    $quote->forceFill(['email_status' => 'failed'])->save();
+    $this->post("/crm/quotes/{$quote->id}/remind", quoteMessage())->assertStatus(409)->assertSee('Renvoyer');
+    $this->get("/crm/quotes/{$quote->id}")->assertInertia(fn (Assert $page) => $page->where('can.remind', false)->where('can.resend', true));
+
+    expect($quote->refresh()->status)->toBe(QuoteStatus::Sent);
+    expect(Mail::sent(QuoteMail::class))->toHaveCount(1);
+});
+
+it('a new version of a sent quote needs the right to change it', function () {
+    $quote = outcomeQuote();
+
+    // Direction may not create; a user able to create but not update does not exist by
+    // default: check the policy is asked for the source.
+    Gate::before(fn ($user, string $ability, array $args) => $ability === 'update' && ($args[0] ?? null) instanceof Quote ? false : null);
+    $this->post("/crm/quotes/{$quote->id}/duplicate")->assertForbidden();
+    expect(Quote::query()->count())->toBe(1)
+        ->and($quote->refresh()->status)->toBe(QuoteStatus::Sent);
 });

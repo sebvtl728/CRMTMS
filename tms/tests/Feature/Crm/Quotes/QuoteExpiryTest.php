@@ -11,6 +11,7 @@ use App\Modules\Crm\Timeline\Timeline;
 use Carbon\CarbonImmutable;
 use Illuminate\Console\Scheduling\Event;
 use Illuminate\Console\Scheduling\Schedule;
+use Illuminate\Support\Facades\DB;
 
 beforeEach(function () {
     CrmServiceProvider::registerReferenceUsage();
@@ -75,4 +76,21 @@ it('is scheduled daily at 00:05 paris time', function () {
     expect($event)->not->toBeNull()
         ->and($event->expression)->toBe('5 0 * * *')
         ->and($event->timezone)->toBe('Europe/Paris');
+});
+
+it('never expires a quote answered meanwhile', function () {
+    $quote = quoteIn(QuoteStatus::Sent);
+    $this->travelTo(CarbonImmutable::parse('2026-12-15 00:05', 'Europe/Paris'));
+
+    // The candidate list is read first; the answer arrives before its row is locked.
+    $answered = false;
+    Quote::retrieved(function (Quote $q) use ($quote, &$answered) {
+        if (! $answered && $q->id === $quote->id) {
+            $answered = true;
+            DB::table('quotes')->where('id', $quote->id)->update(['status' => 'accepted', 'accepted_on' => '2026-12-14']);
+        }
+    });
+
+    $this->artisan('tms:crm:expire-quotes')->expectsOutput('Devis expirés : 0.')->assertSuccessful();
+    expect($quote->refresh()->status)->toBe(QuoteStatus::Accepted);
 });

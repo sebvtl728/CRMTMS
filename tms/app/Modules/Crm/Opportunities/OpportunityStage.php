@@ -126,14 +126,22 @@ final class OpportunityStage
      */
     public function advanceTo(Opportunity $opportunity, ReferenceItem $to): bool
     {
-        $current = ReferenceItem::withTrashed()->find($opportunity->stage_id);
-        if ($current === null || self::outcome($current) !== null || self::outcome($to) !== null || $current->position >= $to->position) {
+        if (self::outcome($to) !== null) {
             return false;
         }
 
-        $this->move($opportunity, $to, null, null, null);
+        return DB::transaction(function () use ($opportunity, $to): bool {
+            // Checked on the locked row: a manual move made meanwhile is never pulled back.
+            $locked = Opportunity::query()->lockForUpdate()->findOrFail($opportunity->getKey());
+            $current = ReferenceItem::withTrashed()->find($locked->stage_id);
+            if ($current === null || self::outcome($current) !== null || $current->position >= $to->position) {
+                return false;
+            }
 
-        return true;
+            $this->move($opportunity, $to, null, null, null);
+
+            return true;
+        });
     }
 
     /**

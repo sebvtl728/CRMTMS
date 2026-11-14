@@ -33,6 +33,8 @@ final class QuoteTransitions
 
     public const STILL_SENDING = 'L\'e-mail précédent de ce devis est encore en cours d\'envoi : réessayez dans un instant.';
 
+    public const LAST_MAIL_FAILED = 'Le dernier e-mail de ce devis n\'est pas parti : utilisez « Renvoyer » avant de relancer.';
+
     public const NOTHING_TO_RESEND = 'Aucun e-mail en échec à renvoyer pour ce devis.';
 
     public function __construct(
@@ -72,6 +74,9 @@ final class QuoteTransitions
             }
             if ($locked->email_status === 'pending') {
                 throw new UserFacingHttpException(409, self::STILL_SENDING);
+            }
+            if ($locked->email_status === 'failed') {
+                throw new UserFacingHttpException(409, self::LAST_MAIL_FAILED);
             }
 
             $now = CarbonImmutable::now();
@@ -135,6 +140,7 @@ final class QuoteTransitions
             $locked = Quote::query()->lockForUpdate()->findOrFail($quote->getKey());
             $copy = $writer->duplicate($locked, $opportunity);
 
+            // An accepted or refused quote keeps its answer: the copy is only a new draft.
             if ($locked->isAwaitingAnswer() || $locked->status === QuoteStatus::Expired) {
                 $locked->status = QuoteStatus::Refused;
                 $locked->forceFill(['refused_on' => CarbonImmutable::now(QuoteNumbering::TIMEZONE)->toDateString()]);
@@ -160,10 +166,17 @@ final class QuoteTransitions
         Quote::query()->whereIn('status', [QuoteStatus::Sent, QuoteStatus::Reminded])
             ->where('valid_until', '<', $today)
             ->lazyById()
-            ->each(function (Quote $quote) use (&$count): void {
-                $quote->status = QuoteStatus::Expired;
-                $quote->save();
-                $count++;
+            ->each(function (Quote $candidate) use ($today, &$count): void {
+                // Re-read under lock: an answer given meanwhile is never overwritten.
+                DB::transaction(function () use ($candidate, $today, &$count): void {
+                    $quote = Quote::query()->lockForUpdate()->find($candidate->getKey());
+                    if ($quote === null || ! $quote->isAwaitingAnswer() || $quote->valid_until->toDateString() >= $today) {
+                        return;
+                    }
+                    $quote->status = QuoteStatus::Expired;
+                    $quote->save();
+                    $count++;
+                });
             });
 
         return $count;

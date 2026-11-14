@@ -15,6 +15,7 @@ use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Queue\InteractsWithQueue;
+use Illuminate\Queue\Jobs\SyncJob;
 use Illuminate\Support\Facades\Storage;
 use RuntimeException;
 use Symfony\Component\Mailer\Exception\TransportExceptionInterface;
@@ -26,6 +27,7 @@ use Throwable;
  * company's SMTP first). Reads the CURRENT quote: a replay after success, or
  * a message already sent, does nothing (email_status is no longer pending).
  *
+ * Failures are rethrown as QuoteMailFailed (reason and SMTP code only).
  * Three tries with a backoff, then email_status « failed » and a fixed
  * French reason (the SMTP code at most): the quote stays « Envoyé » and its
  * page offers « Renvoyer ». With an SMTP connector, each try is journaled in
@@ -93,7 +95,16 @@ class SendQuote implements ShouldQueue
 
         /** @var Throwable|null $error set by the closure */
         if ($error !== null) {
-            throw $error; // retried (backoff), then failed()
+            // Never the transport's own text: it may quote the address or the account.
+            $failure = new QuoteMailFailed(self::reason($error), self::smtpCode($error));
+            if ($this->job instanceof SyncJob) {
+                // No worker (sync queue): no retry, the page shows the banner.
+                $this->failed($failure);
+
+                return;
+            }
+
+            throw $failure; // retried (backoff), then failed()
         }
 
         Quote::query()->whereKey($quote->id)->toBase()
@@ -120,23 +131,36 @@ class SendQuote implements ShouldQueue
      */
     public static function reason(Throwable $e): string
     {
+        if ($e instanceof QuoteMailFailed) {
+            return $e->getMessage();
+        }
         if ($e instanceof SmtpHostRefused) {
             return 'L\'adresse du serveur d\'envoi est refusée (adresse interne).';
         }
         if ($e instanceof PdfRenderingFailed) {
             return 'Le PDF du devis n\'a pas pu être produit.';
         }
-        if ($e instanceof TransportExceptionInterface || $e instanceof RuntimeException) {
-            $code = (int) $e->getCode();
-            if ($code < 400 || $code > 599) {
-                $code = preg_match('/got code "([45]\d\d)"/', $e->getMessage(), $m) === 1 || preg_match('/^\s*([45]\d\d)\b/', $e->getMessage(), $m) === 1
-                    ? (int) $m[1] : 0;
-            }
-            if ($code !== 0) {
-                return "Le serveur d'envoi a refusé le message (code {$code}).";
-            }
+        $code = self::smtpCode($e);
+
+        return $code !== 0
+            ? "Le serveur d'envoi a refusé le message (code {$code})."
+            : 'Le serveur d\'envoi est injoignable ou a refusé le message.';
+    }
+
+    /**
+     * The SMTP reply code (4xx / 5xx) of a transport failure, else 0.
+     */
+    private static function smtpCode(Throwable $e): int
+    {
+        if (! $e instanceof TransportExceptionInterface && ! $e instanceof RuntimeException) {
+            return 0;
+        }
+        $code = (int) $e->getCode();
+        if ($code >= 400 && $code <= 599) {
+            return $code;
         }
 
-        return 'Le serveur d\'envoi est injoignable ou a refusé le message.';
+        return preg_match('/got code "([45]\d\d)"/', $e->getMessage(), $m) === 1 || preg_match('/^\s*([45]\d\d)\b/', $e->getMessage(), $m) === 1
+            ? (int) $m[1] : 0;
     }
 }
