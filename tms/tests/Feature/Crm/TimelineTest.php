@@ -358,3 +358,27 @@ it('stores last_contact_at at the exact instant of the note, in the application 
         ->toBe('2026-11-12 10:30:00')
         ->and(DB::selectOne("select current_setting('TimeZone') as v")->v)->toBe('Europe/Paris');
 });
+
+it('pages across the autumn dst fold without skipping nor repeating an entry', function () {
+    $this->actingAs(commercial());
+    $this->travelTo(CarbonImmutable::parse('2026-10-24 09:00:00'));
+    $org = tlOrg();
+    // 02:30 twice in Paris on 25/10/2026: CEST (00:30 UTC) then CET (01:30 UTC).
+    $cet = tlNote($org, 'CET');
+    $cest = tlNote($org, 'CEST');
+    DB::table('notes')->where('id', $cest->id)->update(['created_at' => DB::raw("'2026-10-25 00:30:00+00'::timestamptz")]);
+    DB::table('notes')->where('id', $cet->id)->update(['created_at' => DB::raw("'2026-10-25 01:30:00+00'::timestamptz")]);
+
+    $seen = [];
+    $cursor = null;
+    for ($i = 0; $i < 5; $i++) {
+        $page = Timeline::for($org->fresh(), $cursor, 1);
+        if ($page->isEmpty()) {
+            break;
+        }
+        $seen[] = $page->first()->body ?? $page->first()->type;
+        $cursor = $page->last()->cursor();
+    }
+
+    expect(array_slice($seen, 0, 2))->toBe(['CET', 'CEST'])->and($seen)->toHaveCount(3);
+});

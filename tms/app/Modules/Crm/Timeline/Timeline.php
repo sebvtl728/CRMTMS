@@ -17,12 +17,13 @@ final class Timeline
     public const TAG = 'crm.timeline';
 
     /**
-     * An instant as the SQL literal to compare a timestamp with: stored values
-     * are in the application timezone and keep their microseconds.
+     * An instant as the SQL literal to compare a timestamp with: in the
+     * application timezone, with its microseconds and its offset (02:30 comes
+     * twice on the autumn DST fold).
      */
     public static function bound(CarbonImmutable $instant): string
     {
-        return $instant->setTimezone((string) config('app.timezone'))->format('Y-m-d H:i:s.u');
+        return $instant->setTimezone((string) config('app.timezone'))->format('Y-m-d H:i:s.uP');
     }
 
     /**
