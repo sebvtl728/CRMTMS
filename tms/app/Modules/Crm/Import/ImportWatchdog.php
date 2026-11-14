@@ -77,7 +77,7 @@ class ImportWatchdog
                 }
                 $batch->refresh();
                 $this->audit->record('crm.import_failed_marked', $batch, [], [
-                    'file' => $batch->original_name, 'target' => $batch->target->value, 'total' => $batch->total,
+                    'target' => $batch->target->value, 'total' => $batch->total,
                     'created' => $batch->created, 'watchdog' => true,
                 ]);
 
@@ -90,7 +90,7 @@ class ImportWatchdog
                 return null;
             }
             $this->audit->record('crm.import_resumed', $batch, [], [
-                'file' => $batch->original_name, 'cursor_line' => $batch->cursor_line, 'resumes' => $resumes + 1,
+                'cursor_line' => $batch->cursor_line, 'resumes' => $resumes + 1,
             ]);
         } finally {
             $lock->release();

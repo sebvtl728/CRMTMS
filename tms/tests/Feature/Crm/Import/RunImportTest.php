@@ -22,6 +22,7 @@ use App\Modules\Crm\Organisations\Organisation;
 use App\Modules\Crm\People\Person;
 use App\Modules\Crm\Timeline\Note;
 use App\Rules\Siret;
+use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
@@ -76,7 +77,7 @@ it('imports entreprises through the domain code paths', function () {
     // Journal: one « created » per fiche, by the importing user.
     expect(AuditLog::query()->where('event', 'created')->where('auditable_type', 'organisation')->where('user_id', $this->user->id)->count())->toBe(3);
     $run = AuditLog::query()->where('event', 'crm.import_run')->sole();
-    expect($run->new_values)->toEqualCanonicalizing(['file' => 'utf8_semicolon.csv', 'target' => 'organisations', 'strategy' => 'skip', 'total' => 3, 'created' => 3, 'updated' => 0, 'skipped' => 0, 'errors' => 0])
+    expect($run->new_values)->toEqualCanonicalizing(['target' => 'organisations', 'strategy' => 'skip', 'total' => 3, 'created' => 3, 'updated' => 0, 'skipped' => 0, 'errors' => 0])
         ->and($run->user_id)->toBe($this->user->id);
 
     $rows = ImportRow::query()->orderBy('line')->get();
@@ -149,6 +150,27 @@ it('replays a chunk row by row when one row fails, keeping the others and the cr
         ->and(Organisation::query()->whereIn('name', ['A', 'C'])->pluck('origin_id')->unique()->all())->toBe([$item->id])
         ->and(ImportRow::query()->count())->toBe(3);
 });
+
+it('stops, resumable, on a database out of resources or shutting down instead of failing every row', function (string $state) {
+    Organisation::creating(function (Organisation $organisation) use ($state): void {
+        if ($organisation->name === 'Boum') {
+            DB::select("do $$ begin raise exception 'arrêt' using errcode = '{$state}'; end $$");
+        }
+    });
+
+    $batch = uploadImport("Raison sociale\nA\nBoum\nC\n", ImportTarget::Organisations);
+    simulateImport($batch);
+
+    // The job fails (the worker reports it); the chunk is rolled back, the batch stays running
+    // at its last cursor, for the watchdog to resume once the database is back.
+    expect(fn () => RunImport::dispatch($batch->id))->toThrow(QueryException::class);
+
+    $batch->refresh();
+    expect($batch->status)->toBe(ImportBatch::RUNNING)
+        ->and([$batch->cursor_line, $batch->errors])->toBe([0, 0])
+        ->and(ImportRow::query()->count())->toBe(0)
+        ->and(Organisation::query()->count())->toBe(0);
+})->with(['out of memory (53200)' => '53200', 'admin shutdown (57P01)' => '57P01']);
 
 it('turns a row failing on any database error into an error row and goes on', function () {
     // A database error that is not a uniqueness conflict, on one row only.

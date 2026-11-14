@@ -22,8 +22,9 @@ use Throwable;
  * (counters and resume point saved with each chunk). A job works for at most
  * SLICE_SECONDS, then queues its continuation: no import outlives the worker
  * timeout, and a crash loses at most one chunk (rolled back). At the end:
- * report .xlsx, status « done », journal crm.import_run (counters and file
- * name, never the content).
+ * report .xlsx, status « done », journal crm.import_run (counters, never the
+ * file name nor the content). A database unavailable midway leaves the batch
+ * running at its cursor (ImportWatchdog resumes it).
  */
 class RunImport implements ShouldQueue
 {
@@ -118,6 +119,11 @@ class RunImport implements ShouldQueue
             return false;
         } catch (Throwable $e) {
             self::log($e, $batch);
+            if (RowImporter::transient($e)) {
+                // Database unavailable (connection, resources, shutdown): the chunk was rolled
+                // back, the batch stays « running » at its cursor; ImportWatchdog resumes it.
+                throw $e;
+            }
             $batch->refresh();
             $options = $batch->options;
             $options['failure'] = $e instanceof ImportFileException ? $e->getMessage() : 'L\'import s\'est arrêté sur une erreur inattendue. Les lignes déjà traitées sont conservées (annulables).';
@@ -232,7 +238,6 @@ class RunImport implements ShouldQueue
     private function summary(ImportBatch $batch): array
     {
         return [
-            'file' => $batch->original_name,
             'target' => $batch->target->value,
             'strategy' => $batch->strategy()->value,
             'total' => $batch->total,

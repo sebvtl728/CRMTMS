@@ -41,11 +41,14 @@ final class AttachmentPurge
                 ->where('notable_type', $fiche->getMorphClass())
                 ->whereIn('notable_id', $trashed)
                 ->chunkById(500, function ($attachments) use (&$count): void {
-                    foreach ($attachments as $attachment) {
-                        Storage::disk(TenantStorage::DISK)->delete($attachment->path);
+                    $disk = Storage::disk(TenantStorage::DISK);
+                    // Only the files really gone are flagged; a failed deletion is retried next run.
+                    $deleted = $attachments->filter(fn (Attachment $a): bool => $disk->delete($a->path) || ! $disk->exists($a->path));
+                    if ($deleted->isEmpty()) {
+                        return;
                     }
                     // Not a user change: no journal line (the file name is personal data anyway).
-                    $count += DB::table('attachments')->whereIn('id', $attachments->modelKeys())->whereNull('file_deleted_at')
+                    $count += DB::table('attachments')->whereIn('id', $deleted->modelKeys())->whereNull('file_deleted_at')
                         ->update(['file_deleted_at' => now()]);
                 });
         }

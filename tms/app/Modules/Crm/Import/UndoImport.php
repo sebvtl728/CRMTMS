@@ -144,7 +144,6 @@ class UndoImport implements ShouldQueue
         ImportStamps::markUndone($batch);
         $batch->forceFill(['status' => ImportBatch::UNDONE, 'undone_at' => now()])->save();
         $audit->record('crm.import_undone', $batch, [], [
-            'file' => $batch->original_name,
             'removed' => $batch->options['undo']['removed'] ?? 0,
             'kept' => $batch->options['undo']['kept'] ?? 0,
         ]);

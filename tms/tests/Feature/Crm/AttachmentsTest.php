@@ -253,6 +253,27 @@ it('shows « Fichier supprimé » in the history and answers 410 to its download
         ->assertSee('Fichier supprimé : la fiche était dans la corbeille depuis plus de 12 mois.');
 });
 
+it('keeps the file flagged present when its deletion fails, retrying on the next run', function () {
+    $stuck = attachedTo(attOrg(), 13);
+    $gone = attachedTo(Organisation::query()->create(['name' => 'Garage Martin']), 13);
+    Storage::disk('local')->delete($gone->path); // already absent: nothing left to delete
+    $disk = Storage::disk('local');
+    $failing = Mockery::mock($disk)->makePartial();
+    $failing->shouldReceive('delete')->andReturn(false);
+    Storage::set('local', $failing);
+
+    Artisan::call('tms:crm:purge-attachments');
+
+    expect($stuck->refresh()->file_deleted_at)->toBeNull()
+        ->and($gone->refresh()->file_deleted_at)->not->toBeNull();
+
+    Storage::set('local', $disk);
+    Artisan::call('tms:crm:purge-attachments');
+
+    expect($stuck->refresh()->file_deleted_at)->not->toBeNull();
+    Storage::disk('local')->assertMissing($stuck->path);
+});
+
 it('purges every night, for every organisme', function () {
     $events = collect(app(Schedule::class)->events())->filter(fn ($e) => str_contains((string) $e->command, 'tms:crm:purge-attachments'));
 

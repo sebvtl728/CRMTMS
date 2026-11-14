@@ -269,7 +269,7 @@ class ImportBatch extends Model
 
         $this->refresh();
         app(AuditRecorder::class)->record('crm.import_failed_marked', $this, [], [
-            'file' => $this->original_name, 'target' => $this->target->value, 'total' => $this->total, 'created' => $this->created,
+            'target' => $this->target->value, 'total' => $this->total, 'created' => $this->created,
         ], $by);
 
         return true;

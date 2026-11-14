@@ -9,6 +9,8 @@ use App\Modules\Crm\Gdpr\Consent;
 use App\Modules\Crm\Import\ImportBatch;
 use App\Modules\Crm\Import\ImportRow;
 use App\Modules\Crm\Import\ImportTarget;
+use App\Modules\Crm\Import\ImportWatchdog;
+use App\Modules\Crm\Import\RunImport;
 use App\Modules\Crm\Import\UndoImport;
 use App\Modules\Crm\Organisations\Organisation;
 use App\Modules\Crm\People\Person;
@@ -43,7 +45,7 @@ it('undoes an import: created fiches go to the trash, updated ones stay', functi
         ->and($existing->refresh()->city)->toBe('Annecy');
 
     $audit = AuditLog::query()->where('event', 'crm.import_undone')->sole();
-    expect($audit->new_values)->toEqualCanonicalizing(['file' => 'fichier.csv', 'removed' => 2, 'kept' => 0])
+    expect($audit->new_values)->toEqualCanonicalizing(['removed' => 2, 'kept' => 0])
         ->and($audit->user_id)->toBe($this->user->id)
         ->and(AuditLog::query()->where('event', 'deleted')->where('auditable_type', 'organisation')->count())->toBe(2);
 });
@@ -193,6 +195,26 @@ it('purges uploaded files and raw values after 30 days', function () {
         ->and($recent->stored_path)->toStartWith(TenantStorage::path('imports'));
 });
 
+it('never writes the uploaded file name in any import journal line', function () {
+    $batch = uploadImport("Raison sociale\nGarage Martin\n", ImportTarget::Organisations, name: 'Export Jean Dupont.csv');
+    simulateImport($batch);
+    RunImport::dispatch($batch->id);
+    UndoImport::dispatch($batch->id, $this->user->id);
+    // A stuck run marked failed by a user, then one resumed and failed by the watchdog.
+    foreach ([[], ['resumes' => 1], []] as $i => $options) {
+        $stuck = uploadImport("Raison sociale\nCafé\n", ImportTarget::Organisations, name: "Liste Jean Dupont {$i}.csv");
+        DB::table('import_batches')->where('id', $stuck->id)->update(['status' => ImportBatch::RUNNING, 'updated_at' => now()->subMinutes(20), 'options' => json_encode($options)]);
+        if ($i === 0) {
+            $stuck->refresh()->markFailed($this->user);
+        }
+    }
+    app(ImportWatchdog::class)->run();
+
+    $events = AuditLog::query()->where('event', 'like', 'crm.import%')->pluck('event')->unique()->sort()->values()->all();
+    expect($events)->toBe(['crm.import_failed_marked', 'crm.import_resumed', 'crm.import_run', 'crm.import_undone'])
+        ->and(AuditLog::query()->get()->toJson())->not->toContain('Dupont');
+});
+
 it('replaces the name of the uploaded file at the 30-day purge, which may name a person', function () {
     $old = uploadImport("Raison sociale\nGarage Martin\n", ImportTarget::Organisations, name: 'Export Jean Dupont.CSV');
     $old->forceFill(['created_at' => now()->subDays(31)])->save();
@@ -200,12 +222,19 @@ it('replaces the name of the uploaded file at the 30-day purge, which may name a
     $xlsx->forceFill(['created_at' => now()->subDays(31)])->save();
     $recent = uploadImport("Raison sociale\nCafé des Arts\n", ImportTarget::Organisations, name: 'Liste Marie Curie.csv');
 
+    $lookalike = uploadImport("Raison sociale\nCafé\n", ImportTarget::Organisations, name: 'fichier-import Jean Dupont.csv');
+    // Its file already purged: only its name still names a person.
+    $lookalike->forceFill(['created_at' => now()->subDays(31)])->save();
+    Storage::disk('local')->delete((string) $lookalike->stored_path);
+    DB::table('import_batches')->where('id', $lookalike->id)->update(['stored_path' => null]);
+
     Artisan::call('tms:crm:purge-imports');
     Artisan::call('tms:crm:purge-imports'); // idempotent
 
     expect($old->refresh()->original_name)->toBe('fichier-import.csv')
         ->and($xlsx->refresh()->original_name)->toBe('fichier-import.xlsx')
         ->and($recent->refresh()->original_name)->toBe('Liste Marie Curie.csv')
+        ->and($lookalike->refresh()->original_name)->toBe('fichier-import.csv')
         // The change is journaled without the former name.
         ->and(AuditLog::query()->where('auditable_id', $old->id)->get()->toJson())->not->toContain('Dupont');
 });

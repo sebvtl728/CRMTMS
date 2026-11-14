@@ -224,12 +224,24 @@ final class RowImporter
 
     /**
      * A database error the row's own savepoint absorbed. Not in a simulation
-     * (no savepoint), nor a lost connection (SQL state class 08: no row can
-     * succeed, the run stops).
+     * (no savepoint), nor when the database itself is unavailable (transient()).
      */
     private function absorbable(QueryException $e): bool
     {
-        return ! $this->dryRun && ! str_starts_with((string) ($e->errorInfo[0] ?? ''), '08');
+        return ! $this->dryRun && ! self::transient($e);
+    }
+
+    /**
+     * The database is unavailable, not the row at fault (SQL state class 08
+     * connection, 53 insufficient resources, 57 operator intervention or
+     * shutdown): no further row can succeed, the run stops and stays
+     * resumable instead of turning every remaining row into an error.
+     */
+    public static function transient(\Throwable $e): bool
+    {
+        $sql = DatabaseErrorLog::queryException($e);
+
+        return $sql !== null && in_array(substr((string) ($sql->errorInfo[0] ?? ''), 0, 2), ['08', '53', '57'], true);
     }
 
     /**
