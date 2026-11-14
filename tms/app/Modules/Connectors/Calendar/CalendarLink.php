@@ -15,7 +15,10 @@ use Illuminate\Support\Carbon;
  * The Outlook (Microsoft 365) link of a user: his OAuth tokens, encrypted
  * with APP_KEY and never serialised. One per user. « À reconnecter »
  * (RECONNECT) once Microsoft refused to refresh them: tokens are dropped
- * and nothing is pushed until the user connects again.
+ * and nothing is pushed until the user connects again. « Déconnecté »
+ * (DISCONNECTED) once the user disconnected: the row and the copies Outlook
+ * could not delete are kept (a reconnection updates them, never
+ * duplicates); the tokens serve RemoveOutlookEvents only, then are dropped.
  *
  * @property string $id
  * @property string $tenant_id
@@ -34,6 +37,8 @@ class CalendarLink extends Model
     public const ACTIVE = 'active';
 
     public const RECONNECT = 'reconnect';
+
+    public const DISCONNECTED = 'disconnected';
 
     /** An access token is renewed when it expires within this many seconds. */
     public const EXPIRY_MARGIN_SECONDS = 120;
@@ -81,6 +86,15 @@ class CalendarLink extends Model
         return $this->status === self::ACTIVE && $this->refresh_token !== null;
     }
 
+    /**
+     * Whether Graph may be called with this link: active, or disconnected
+     * while its events are being removed (tokens not dropped yet).
+     */
+    public function canCall(): bool
+    {
+        return in_array($this->status, [self::ACTIVE, self::DISCONNECTED], true) && $this->refresh_token !== null;
+    }
+
     public function accessTokenFresh(): bool
     {
         return $this->access_token !== null && $this->expires_at !== null
@@ -103,9 +117,15 @@ class CalendarLink extends Model
         ])->save();
     }
 
+    /** Microsoft refused the refresh; a disconnected link stays so. */
     public function markReconnect(): void
     {
-        $this->forceFill(['status' => self::RECONNECT, 'access_token' => null, 'refresh_token' => null, 'expires_at' => null])->save();
+        $this->forceFill(['status' => $this->status === self::DISCONNECTED ? self::DISCONNECTED : self::RECONNECT])->dropTokens();
+    }
+
+    public function dropTokens(): void
+    {
+        $this->forceFill(['access_token' => null, 'refresh_token' => null, 'expires_at' => null])->save();
     }
 
     /**

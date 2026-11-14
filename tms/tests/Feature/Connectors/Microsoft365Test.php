@@ -19,6 +19,7 @@ use App\Modules\Crm\CrmServiceProvider;
 use App\Modules\Crm\Gdpr\Anonymiser;
 use App\Modules\Crm\Organisations\Organisation;
 use Carbon\CarbonImmutable;
+use Illuminate\Foundation\Testing\TestCase;
 use Illuminate\Http\Client\Factory;
 use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\DB;
@@ -511,17 +512,69 @@ it('connects to the addresses it checked, never resolving the names again (dns r
     ]);
 });
 
-it('disconnects outlook: tokens deleted, pushes stopped', function () {
+it('disconnects outlook: events removed from the calendar, tokens deleted, pushes stopped', function () {
+    $this->travelTo(m365At('2026-11-18 10:00:00'));
     m365Config();
     $user = commercial();
     $link = m365Link($user);
-
-    $this->actingAs($user)->delete('/settings/calendar/outlook')->assertRedirect('/settings/calendar');
-
-    expect(CalendarLink::query()->whereKey($link->id)->exists())->toBeFalse()
-        ->and(AuditLog::query()->where('event', 'calendar.outlook_disconnected')->count())->toBe(1);
+    m365Http(graphCreated());
     m365Meeting($user);
+
+    m365Http([GRAPH_EVENTS.'/AAMkEvent1' => Http::response(null, 204)]);
+    $this->actingAs($user)->delete('/settings/calendar/outlook')->assertRedirect('/settings/calendar')->assertSessionHas('status');
+
+    [$delete] = graphRequests();
+    expect($delete->method())->toBe('DELETE')->and($delete->url())->toBe(GRAPH_EVENTS.'/AAMkEvent1')
+        ->and(CalendarLinkEvent::query()->count())->toBe(0);
+    $link->refresh();
+    expect($link->status)->toBe(CalendarLink::DISCONNECTED)
+        ->and($link->access_token)->toBeNull()->and($link->refresh_token)->toBeNull()
+        ->and(AuditLog::query()->where('event', 'calendar.outlook_disconnected')->count())->toBe(1);
+    $this->actingAs($user)->get('/settings/calendar')->assertInertia(fn ($page) => $page->where('outlook.status', 'none'));
+
+    m365Http();
+    m365Meeting($user, ['due_at' => m365At('2026-11-21 09:00:00')]);
     expect(graphRequests())->toBe([]);
+});
+
+/** Connects $user through the OAuth flow (authorization code + PKCE). */
+function m365Reconnect(TestCase $test, User $user, array $graph = []): void
+{
+    $location = (string) $test->actingAs($user)->post('/settings/calendar/outlook/connect')->headers->get('Location');
+    parse_str((string) parse_url($location, PHP_URL_QUERY), $query);
+    m365Http([M365_TOKEN_URL => Http::response([
+        'token_type' => 'Bearer', 'scope' => 'https://graph.microsoft.com/Calendars.ReadWrite', 'expires_in' => 3599,
+        'access_token' => 'access-'.Str::random(20), 'refresh_token' => 'refresh-'.Str::random(20),
+    ]), ...$graph]);
+    $test->actingAs($user)->get('/settings/calendar/outlook/callback?code=code-123&state='.urlencode($query['state']))
+        ->assertRedirect('/settings/calendar')->assertSessionHas('status');
+}
+
+it('never duplicates an event when outlook is disconnected then connected again', function () {
+    $this->travelTo(m365At('2026-11-18 10:00:00'));
+    m365Config();
+    $user = commercial();
+    $link = m365Link($user);
+    m365Http([GRAPH_EVENTS => Http::sequence()->push(['id' => 'AAMkEvent1'], 201)->push(['id' => 'AAMkEvent2'], 201)]);
+    $kept = m365Meeting($user);
+    m365Meeting($user, ['due_at' => m365At('2026-11-20 09:00:00')]);
+
+    // Microsoft refuses one deletion: its copy is remembered, the other one is gone.
+    m365Http([GRAPH_EVENTS.'/AAMkEvent1' => Http::response(null, 403), GRAPH_EVENTS.'/AAMkEvent2' => Http::response(null, 204)]);
+    $this->actingAs($user)->delete('/settings/calendar/outlook');
+    expect(CalendarLinkEvent::query()->sole()->activity_id)->toBe($kept->id)
+        ->and($link->refresh()->refresh_token)->toBeNull();
+
+    m365Reconnect($this, $user, [
+        GRAPH_EVENTS.'/AAMkEvent1' => Http::response(['id' => 'AAMkEvent1']),
+        GRAPH_EVENTS => Http::response(['id' => 'AAMkEvent3'], 201),
+    ]);
+
+    $requests = collect(graphRequests());
+    expect($requests->filter(fn (Request $r) => $r->method() === 'PATCH')->map(fn (Request $r) => $r->url())->values()->all())->toBe([GRAPH_EVENTS.'/AAMkEvent1'])
+        ->and($requests->filter(fn (Request $r) => $r->method() === 'POST')->count())->toBe(1)
+        ->and(CalendarLink::query()->where('user_id', $user->id)->sole()->status)->toBe(CalendarLink::ACTIVE)
+        ->and(CalendarLinkEvent::query()->orderBy('outlook_event_id')->pluck('outlook_event_id')->all())->toBe(['AAMkEvent1', 'AAMkEvent3']);
 });
 
 it('updates the outlook event when the person is anonymised', function () {

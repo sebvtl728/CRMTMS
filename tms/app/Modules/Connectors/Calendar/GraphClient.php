@@ -99,7 +99,7 @@ class GraphClient
     {
         Cache::lock("tenant:{$link->tenant_id}:outlook:refresh:{$link->id}", 30)->block(15, function () use ($config, $link, $staleToken): void {
             $link->refresh();
-            if (! $link->isActive()) {
+            if (! $link->canCall()) {
                 throw new OutlookReconnectRequired;
             }
             if ($link->access_token !== $staleToken && $link->accessTokenFresh()) {
@@ -202,7 +202,7 @@ class GraphClient
      */
     private function graph(ConnectorConfig $config, CalendarLink $link, string $method, string $path, ?array $body = null): Response
     {
-        if (! $link->isActive()) {
+        if (! $link->canCall()) {
             throw new OutlookReconnectRequired;
         }
         if (! $link->accessTokenFresh()) {

@@ -142,7 +142,7 @@ Paramètres : `tenant` (annuaire Azure : son ID, un de ses domaines `xxx.onmicro
 
 ### Côté utilisateur
 
-« Mon agenda » (`/settings/calendar`) › **Connecter Outlook** : connexion Microsoft, consentement, retour au TMS. Les actions déjà planifiées des 180 prochains jours sont alors envoyées. **Déconnecter Outlook** supprime les jetons et arrête l'envoi ; les évènements déjà créés restent dans l'agenda.
+« Mon agenda » (`/settings/calendar`) › **Connecter Outlook** : connexion Microsoft, consentement, retour au TMS. Les actions déjà planifiées des 180 prochains jours sont alors envoyées. **Déconnecter Outlook** arrête l'envoi, retire de l'agenda Outlook les rendez-vous et appels que le TMS y avait créés (job `RemoveOutlookEvents`, par lots de 200, tant que les jetons sont encore valides), puis supprime les jetons. Le retrait est « au mieux » : un évènement que Microsoft refuse de supprimer reste dans l'agenda, mais le TMS garde sa trace. Une reconnexion le met alors à jour au lieu d'en créer un second : déconnecter puis reconnecter ne crée jamais de doublon.
 
 ### Fonctionnement et sécurité
 
@@ -154,7 +154,7 @@ Paramètres : `tenant` (annuaire Azure : son ID, un de ses domaines `xxx.onmicro
   - Le jeton d'accès est renouvelé avant son expiration, puis une fois de plus si Graph répond 401.
   - Si Microsoft refuse le renouvellement (`invalid_grant` : consentement retiré, mot de passe changé…), le lien passe « À reconnecter ». L'utilisateur voit un message dans « Mon agenda » et le bouton « Reconnecter Outlook ». Rien n'est envoyé d'ici là.
 - **Déclenchement.**
-  - Le CRM émet `Crm\Activities\Events\ActivityChanged` après validation de la transaction (création, modification du type, de la date, de la durée, du lieu, des fiches ou du responsable, suppression, restauration, anonymisation).
+  - Le CRM émet `Crm\Activities\Events\ActivityChanged` après validation de la transaction (création, modification du type, de la date, de la durée, du lieu, des fiches ou du responsable, suppression, restauration, anonymisation). Il l'émet aussi pour les rendez-vous et appels concernés (à faire, ou prévus depuis la veille) quand leur fiche ou leur opportunité part à la corbeille ou en revient, quand deux fiches sont fusionnées, ou quand l'opportunité change de DAS ou de compte (`Crm\Activities\CalendarAnnouncements`). Un simple renommage de fiche n'est repris qu'à la prochaine modification de l'action.
   - L'écouteur `QueueOutlookPush` met en file `PushActivityToOutlook` (`TenantAwareJob`, après commit). Il le fait seulement si le connecteur est actif et que le responsable (nouveau ou précédent) a un lien actif, ou qu'un évènement Outlook existe déjà pour l'action.
 - **Ce que fait le job.**
   - Il relit l'état **actuel** de l'action (`CalendarEvents::find`), jamais une photo : les rejeux convergent.

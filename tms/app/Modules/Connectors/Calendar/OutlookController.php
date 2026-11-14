@@ -17,7 +17,9 @@ use Throwable;
  * « Connecter Outlook » in « Mon agenda »: OAuth 2.0 authorization code +
  * PKCE with Microsoft (the redirect URI is this organisme's address), the
  * tokens stored encrypted on the user's link; and « Déconnecter », which
- * deletes them (nothing more is pushed).
+ * stops the pushes, removes the events already sent (RemoveOutlookEvents)
+ * then drops the tokens. The link row stays: copies Outlook could not
+ * delete are updated, not duplicated, on the next connection.
  */
 class OutlookController extends Controller
 {
@@ -33,6 +35,7 @@ class OutlookController extends Controller
     public static function props(User $user): array
     {
         $link = CalendarLink::for($user->id);
+        $link = $link?->status === CalendarLink::DISCONNECTED ? null : $link;
 
         return [
             'available' => Microsoft365Connector::activeConfig() !== null,
@@ -93,12 +96,14 @@ class OutlookController extends Controller
     {
         $user = $this->user($request);
         $link = CalendarLink::for($user->id);
-        if ($link !== null) {
-            $link->delete();
+        if ($link !== null && $link->status !== CalendarLink::DISCONNECTED) {
+            $link->forceFill(['status' => CalendarLink::DISCONNECTED])->save();
             $this->audit->record('calendar.outlook_disconnected', $user);
+            // With the tokens still valid: the events sent are removed, then the tokens dropped.
+            RemoveOutlookEvents::dispatch($link->id);
         }
 
-        return to_route('calendar.settings')->with('status', 'Outlook déconnecté : plus rien n\'y sera envoyé. Les évènements déjà créés restent dans votre agenda.');
+        return to_route('calendar.settings')->with('status', 'Outlook déconnecté : plus rien n\'y sera envoyé, et les rendez-vous déjà envoyés sont retirés de votre agenda Outlook.');
     }
 
     /** On this organisme's address (declared in the Azure application). */

@@ -31,6 +31,8 @@ Lot 1c : pipeline commercial, actions et relances, planning, agenda.
   prochaine relance enregistrés ensemble.
 - **Mon agenda** : lien d'abonnement **iCal** privé (Outlook, Google Agenda, Apple Calendrier) et, avec Microsoft
   365, **envoi direct des rendez-vous dans Outlook** (connecteur à déclarer dans Azure, voir `docs/connectors.md`).
+  Outlook suit aussi la fiche et l'opportunité (corbeille, restauration, fusion) ; « Déconnecter Outlook » retire
+  de l'agenda les rendez-vous envoyés, et une reconnexion ne crée pas de doublon.
 - **Accueil** : « Mes relances » (en retard / aujourd'hui), **pipeline pondéré du mois**, **prochains
   rendez-vous**, dans le périmètre de chacun.
 - Menu **Commercial** réorganisé : Pipeline, Opportunités, À faire, Planning, Compte rendu de RDV, Entreprises,
