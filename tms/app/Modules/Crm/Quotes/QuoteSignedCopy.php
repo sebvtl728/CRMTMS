@@ -4,6 +4,7 @@ namespace App\Modules\Crm\Quotes;
 
 use App\Exceptions\UserFacingHttpException;
 use App\Modules\Core\Audit\AuditRecorder;
+use App\Modules\Core\Tenancy\StagedFile;
 use App\Modules\Core\Tenancy\TenantStorage;
 use Closure;
 use Illuminate\Http\UploadedFile;
@@ -101,8 +102,9 @@ final class QuoteSignedCopy
 
     /**
      * Stores (or replaces) the signed copy of an accepted quote: new file
-     * first, then the columns and the journal, then (after the commit) the
-     * previous file if it had another name.
+     * under a temporary name, then the columns and the journal; once
+     * committed, the file takes its name and a previous one of another name
+     * goes (StagedFile). A failed save leaves the previous copy intact.
      *
      * @throws UserFacingHttpException 409 when the quote is not accepted
      * @throws ValidationException when the file is not accepted or cannot be written
@@ -115,18 +117,18 @@ final class QuoteSignedCopy
         }
 
         $directory = TenantStorage::path('quotes', $quote->id);
-        $name = 'signe.'.$extension;
-        $path = $directory.'/'.$name;
-        $disk = Storage::disk(TenantStorage::DISK);
+        $path = $directory.'/signe.'.$extension;
 
-        if ($disk->putFileAs($directory, $file, $name) === false) {
+        // Temporary name first: a previous copy stays intact until the save is committed.
+        $staged = StagedFile::stage($directory, $file, $extension);
+        if ($staged === null) {
             report(new RuntimeException('Signed quote could not be written to the private disk.'));
 
             throw ValidationException::withMessages([self::FIELD => "Le devis signé n'a pas pu être enregistré. Réessayez ou contactez l'administrateur."]);
         }
 
         try {
-            $previous = DB::transaction(function () use ($quote, $file, $path, $extension): ?string {
+            DB::transaction(function () use ($quote, $file, $path, $extension, $staged): void {
                 $locked = Quote::query()->lockForUpdate()->findOrFail($quote->getKey());
                 if ($locked->status !== QuoteStatus::Accepted) {
                     throw new UserFacingHttpException(409, self::NOT_ACCEPTED);
@@ -143,20 +145,12 @@ final class QuoteSignedCopy
                     'sha256' => hash_file('sha256', (string) $file->getRealPath()),
                 ]);
                 $quote->setRawAttributes($locked->getAttributes(), true);
-
-                return $previous;
+                StagedFile::promote($staged, $path, $previous !== null && self::isOwnPath($quote, $previous) ? $previous : null);
             });
         } catch (\Throwable $e) {
-            // Same name as the previous one: the old file is already overwritten, keep it.
-            if (Quote::query()->whereKey($quote->getKey())->value('signed_path') !== $path) {
-                $disk->delete($path);
-            }
+            StagedFile::discard($staged);
 
             throw $e;
-        }
-
-        if ($previous !== null && $previous !== $path && self::isOwnPath($quote, $previous)) {
-            DB::afterCommit(fn () => Storage::disk(TenantStorage::DISK)->delete($previous));
         }
     }
 

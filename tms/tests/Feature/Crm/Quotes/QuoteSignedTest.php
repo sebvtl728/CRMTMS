@@ -8,6 +8,7 @@ use App\Modules\Crm\CrmServiceProvider;
 use App\Modules\Crm\Gdpr\Anonymiser;
 use App\Modules\Crm\Gdpr\PersonDataExport;
 use App\Modules\Crm\Quotes\Quote;
+use App\Modules\Crm\Quotes\QuoteSignedCopy;
 use App\Modules\Crm\Quotes\QuoteStatus;
 use App\Modules\Crm\Timeline\Timeline;
 use Carbon\CarbonImmutable;
@@ -158,4 +159,21 @@ it('deletes the signed copy when the contact is anonymised, and lists it in her 
     $quote->refresh();
     expect($quote->signed_path)->toBeNull()->and($quote->signed_name)->toBeNull()->and($quote->signed_at)->toBeNull();
     Storage::disk(TenantStorage::DISK)->assertMissing($path);
+});
+
+it('keeps the previous signed copy intact when saving the replacement fails', function () {
+    $quote = signedSentQuote();
+    $this->post("/crm/quotes/{$quote->id}/accept", ['signed' => signedUpload('scan.pdf', signedPdf())])->assertSessionHasNoErrors();
+    $path = $quote->refresh()->signed_path;
+
+    Quote::saving(function (): void {
+        throw new RuntimeException('database down');
+    });
+    $other = "%PDF-1.7\nautre contenu\n%%EOF\n";
+    expect(fn () => app(QuoteSignedCopy::class)->store($quote->refresh(), signedUpload('autre.pdf', $other)))
+        ->toThrow(RuntimeException::class);
+
+    $disk = Storage::disk(TenantStorage::DISK);
+    expect($disk->get($path))->toBe(signedPdf())
+        ->and(collect($disk->files(dirname($path)))->filter(fn (string $f) => str_starts_with(basename($f), '.tmp-'))->all())->toBe([]);
 });
