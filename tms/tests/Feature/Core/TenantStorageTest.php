@@ -11,6 +11,7 @@ it('storage path is prefixed by tenant and refuses without context', function ()
         ->and(TenantStorage::path('attachments', 'a/b.pdf'))->toBe("tenants/{$tenant->id}/attachments/a/b.pdf")
         ->and(TenantStorage::path('exports', '/x.csv'))->toBe("tenants/{$tenant->id}/exports/x.csv")
         ->and(TenantStorage::path('gdpr', 'r.zip'))->toBe("tenants/{$tenant->id}/gdpr/r.zip")
+        ->and(TenantStorage::path('quotes', 'q/CF-2026-0001.pdf'))->toBe("tenants/{$tenant->id}/quotes/q/CF-2026-0001.pdf")
         ->and(TenantStorage::DISK)->toBe('local');
 
     app(TenantContext::class)->clear();

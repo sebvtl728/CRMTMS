@@ -15,5 +15,7 @@ Route::middleware(['auth'])->group(function () {
         Route::put('{quote}/edit', [QuoteController::class, 'update'])->middleware('can:crm.update')->name('update');
         Route::delete('{quote}', [QuoteController::class, 'destroy'])->middleware('can:crm.delete')->name('destroy');
         Route::post('{quote}/duplicate', [QuoteController::class, 'duplicate'])->middleware('can:crm.create')->name('duplicate');
+        // Archived PDF of a sent quote, or preview of a draft (rendered on the fly: limited).
+        Route::get('{quote}/pdf', [QuoteController::class, 'pdf'])->middleware(['can:crm.view', 'throttle:quote-pdf'])->name('pdf');
     });
 });

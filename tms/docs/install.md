@@ -56,8 +56,9 @@ Les tests s'exécutent en tant que `tms_app` sur la base `tms_test` ; le schéma
 compilés (`npm run build`).
 
 Les tests de volume (groupe `slow` : import de 10 000 lignes en moins de 60 s, recherche sur
-50 000 fiches en moins d'une seconde sous RLS) sont exclus de la commande ci-dessus
-(`phpunit.xml`) ; la CI les lance à part :
+50 000 fiches en moins d'une seconde sous RLS) et la conversion réelle d'un devis en PDF (service
+`gotenberg`, démarré avec l'application ; adresse `GOTENBERG_URL`, par défaut `http://gotenberg:3000`)
+sont exclus de la commande ci-dessus (`phpunit.xml`) ; la CI les lance à part (service `gotenberg` du job) :
 
 ```bash
 docker compose exec app php artisan test --group=slow
@@ -340,7 +341,14 @@ docker compose -f compose.prod.yaml --env-file .env up -d --wait
 ops/migrate.sh   # rôle propriétaire dans un conteneur éphémère uniquement
 ```
 
-Seul Caddy publie des ports (80/443) ; PostgreSQL et Redis ne sont pas exposés. Caddy est la seule
+Seul Caddy publie des ports (80/443) ; PostgreSQL, Redis et Gotenberg ne sont pas exposés.
+
+**Gotenberg** (conversion HTML → PDF des devis) fait partie de la pile : `docker compose up -d --wait`
+(installateur, mise à jour, restauration) le démarre et attend son contrôle de santé, sans action de
+l'installateur. Il tourne sans JavaScript ni accès réseau sortant (options de `compose.prod.yaml`) : les
+documents sont autonomes (logo intégré). S'il est arrêté, l'aperçu ou l'envoi d'un devis affiche « Le PDF n'a pas
+pu être généré, réessayez dans un instant. » ; les PDF des devis envoyés, archivés dans
+`storage/app/private/tenants/<organisme>/quotes/` (volume `storage`, inclus dans la sauvegarde), restent consultables. Caddy est la seule
 adresse de confiance pour `X-Forwarded-*` (`TRUSTED_PROXIES`), ce qui active HTTPS/HSTS et l'IP cliente
 correcte. `compose.prod.yaml` la renseigne avec l'adresse fixe de Caddy (`TMS_CADDY_IP`, `172.29.250.10` par
 défaut) ; **toute installation derrière Caddy ou un autre proxy doit la renseigner**. Sans elle, l'application voit

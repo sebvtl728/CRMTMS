@@ -95,10 +95,12 @@ export default function QuoteShow({ quote: q, can, status }: ShowProps) {
                         </p>
                     </div>
                     <div className="flex flex-wrap gap-2">
-                        {/* The PDF comes with the next increment. */}
-                        <Button variant="outline" disabled title="Bientôt disponible">
-                            <FileText className="h-4 w-4" />
-                            Aperçu PDF
+                        {/* A draft is previewed (watermark); a sent quote opens its archived PDF. */}
+                        <Button asChild variant="outline">
+                            <a href={route('crm.quotes.pdf', q.id)} target="_blank" rel="noopener noreferrer">
+                                <FileText className="h-4 w-4" />
+                                {q.status.value === 'draft' ? 'Aperçu PDF' : 'PDF'}
+                            </a>
                         </Button>
                         {can.update && (
                             <Button asChild variant="outline">

@@ -170,9 +170,25 @@ services:
     networks:
       - tms
 
+  # HTML -> PDF (quotes). Internal only: no published port. Chromium without
+  # JavaScript nor outbound access (documents are self-contained); unused routes off.
   gotenberg:
     image: gotenberg/gotenberg:8.40
     restart: unless-stopped
+    command: ["gotenberg",
+      "--chromium-disable-javascript=true",
+      "--chromium-deny-public-ips=true",
+      "--chromium-deny-private-ips=true",
+      "--api-disable-download-from=true",
+      "--webhook-disable=true",
+      "--libreoffice-disable-routes=true",
+      "--pdfengines-disable-routes=true"]
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "-o", "/dev/null", "http://127.0.0.1:3000/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 6
+      start_period: 20s
     networks:
       - tms
 

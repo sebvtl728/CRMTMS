@@ -5,18 +5,21 @@ namespace App\Modules\Crm\Quotes;
 use App\Exceptions\UserFacingHttpException;
 use App\Http\Controllers\Controller;
 use App\Modules\Core\Companies\LegalMentions;
+use App\Modules\Core\Tenancy\TenantStorage;
 use App\Modules\Core\Users\User;
 use App\Modules\Crm\Opportunities\Opportunity;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Facades\Storage;
 use Inertia\Inertia;
 use Inertia\Response;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 /**
  * « Devis » screens: list, fiche, draft form (created from an opportunity),
- * deletion of a draft, new version. Sending and outcomes come later
+ * deletion of a draft, new version, PDF. Sending and outcomes come later
  * (QuoteTransitions); only a draft is changed (409 otherwise).
  */
 class QuoteController extends Controller
@@ -156,6 +159,41 @@ class QuoteController extends Controller
         $copy = $this->writer->duplicate($quote, $opportunity);
 
         return to_route('crm.quotes.show', $copy)->with('status', "Nouvelle version créée : devis {$copy->number}.");
+    }
+
+    /**
+     * The archived PDF of a sent quote, else (a draft) a preview rendered on
+     * the fly with a watermark. Shown in the browser, never cached.
+     */
+    public function pdf(Quote $quote, QuotePdf $pdf): StreamedResponse
+    {
+        Gate::authorize('view', $quote);
+
+        $headers = [
+            'Content-Type' => 'application/pdf',
+            'Content-Disposition' => 'inline; filename="'.QuotePdf::fileName($quote).'"',
+            'Cache-Control' => 'private, no-store',
+            'X-Content-Type-Options' => 'nosniff',
+        ];
+
+        $archived = $pdf->archived($quote);
+        if ($archived !== null) {
+            $disk = Storage::disk(TenantStorage::DISK);
+
+            return response()->stream(function () use ($disk, $archived): void {
+                $stream = $disk->readStream($archived);
+                if (is_resource($stream)) {
+                    fpassthru($stream);
+                    fclose($stream);
+                }
+            }, 200, [...$headers, 'Content-Length' => (string) $disk->size($archived)]);
+        }
+
+        $bytes = $pdf->render($quote);
+
+        return response()->stream(function () use ($bytes): void {
+            echo $bytes;
+        }, 200, [...$headers, 'Content-Length' => (string) strlen($bytes)]);
     }
 
     private static function draftOnly(Quote $quote): void
