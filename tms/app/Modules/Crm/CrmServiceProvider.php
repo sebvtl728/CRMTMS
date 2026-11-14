@@ -102,9 +102,9 @@ class CrmServiceProvider extends ServiceProvider
         RateLimiter::for('crm-export', fn (Request $request) => Limit::perMinute(20)->by('crm-export:'.($request->user()?->getAuthIdentifier() ?? $request->ip()))
             ->response(fn (Request $request, array $headers) => response()->json(['message' => 'Trop d\'exports en peu de temps. Réessayez dans une minute.'], 429, $headers)));
 
-        // A draft's PDF is rendered on each request (Gotenberg): 30 a minute per user.
         // Quote e-mails (send, reminder, « Renvoyer »): 20 a minute per user.
         RateLimiter::for('quote-mail', fn (Request $request) => Limit::perMinute(20)->by('quote-mail:'.($request->user()?->getAuthIdentifier() ?? $request->ip())));
+        // A draft's PDF is rendered on each request (Gotenberg): 30 a minute per user.
         RateLimiter::for('quote-pdf', fn (Request $request) => Limit::perMinute(30)->by('quote-pdf:'.($request->user()?->getAuthIdentifier() ?? $request->ip())));
 
         Gate::policy(Organisation::class, OrganisationPolicy::class);

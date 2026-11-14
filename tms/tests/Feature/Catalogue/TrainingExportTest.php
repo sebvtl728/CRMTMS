@@ -24,7 +24,9 @@ beforeEach(function () {
 function trainingXlsxCells(TestResponse $response): array
 {
     $response->assertOk();
-    $path = tempnam(sys_get_temp_dir(), 'xlsx').'.xlsx';
+    // tempnam() creates its file: removed with the .xlsx copy.
+    $temp = (string) tempnam(sys_get_temp_dir(), 'xlsx');
+    $path = $temp.'.xlsx';
     file_put_contents($path, $response->streamedContent());
     $reader = new Reader;
     $reader->open($path);
@@ -37,6 +39,7 @@ function trainingXlsxCells(TestResponse $response): array
     }
     $reader->close();
     unlink($path);
+    unlink($temp);
 
     return $rows;
 }
