@@ -9,6 +9,8 @@ use App\Modules\Core\Users\User;
 use App\Modules\Crm\Activities\Activity;
 use App\Modules\Crm\Activities\ActivityRows;
 use App\Modules\Crm\Permissions;
+use App\Modules\Crm\Quotes\Quote;
+use App\Modules\Crm\Quotes\QuoteRows;
 use App\Modules\Crm\Support\FilterInput;
 use App\Modules\Crm\Support\FormOptions;
 use App\Modules\Crm\Visibility\CrmVisibility;
@@ -146,11 +148,13 @@ class OpportunityController extends Controller
                 'lines' => OpportunityTrainings::lines($opportunity),
                 'estimate' => OpportunityTrainings::proposal($opportunity),
             ],
+            'quotes' => QuoteRows::forOpportunity($opportunity, $user),
             'stages' => OpportunityStage::options($opportunity->stage_id),
             'lossReasons' => FormOptions::reference(ReferenceList::LossReason),
             'can' => [
                 'update' => $user->can('update', $opportunity),
                 'delete' => $user->can('delete', $opportunity),
+                'createQuote' => $user->can('create', [Quote::class, $opportunity]),
             ],
             'status' => $request->session()->get('status'),
         ]);

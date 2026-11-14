@@ -2,6 +2,7 @@ import { SimilarFiches, type DuplicateCandidate } from '@/components/crm/duplica
 import { FicheOpportunities, type OpportunityRow } from '@/components/crm/opportunity-list';
 import { OrganisationContacts, type AffiliationRow } from '@/components/crm/organisation-contacts';
 import { QuickActionFicheButton } from '@/components/crm/quick-action';
+import { FicheQuotes, type QuoteRow } from '@/components/crm/quote-list';
 import { Timeline } from '@/components/crm/timeline';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -53,6 +54,7 @@ interface ShowProps {
     formerAffiliations: AffiliationRow[];
     decisionRoles: Option[];
     opportunities: OpportunityRow[];
+    quotes: QuoteRow[];
     can: {
         affiliate: boolean;
         createPerson: boolean;
@@ -65,7 +67,7 @@ interface ShowProps {
     status?: string;
 }
 
-const TABS = ['Informations', 'Interlocuteurs', 'Opportunités', 'Historique'] as const;
+const TABS = ['Informations', 'Interlocuteurs', 'Opportunités', 'Devis', 'Historique'] as const;
 
 function Item({ label, children }: { label: string; children: React.ReactNode }) {
     return (
@@ -94,6 +96,7 @@ export default function OrganisationShow({
     formerAffiliations,
     decisionRoles,
     opportunities,
+    quotes,
     similar,
     can,
     status,
@@ -254,6 +257,7 @@ export default function OrganisationShow({
                         createHref={can.createOpportunity ? `${route('crm.opportunities.create')}?organisation=${o.id}` : null}
                     />
                 )}
+                {tab === 'Devis' && <FicheQuotes rows={quotes} />}
                 {tab === 'Historique' && <Timeline kind="organisation" subjectId={o.id} canEdit={can.update} />}
             </div>
 

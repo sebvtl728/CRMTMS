@@ -2,6 +2,7 @@ import { ActivityList, type ActivityRow } from '@/components/crm/activity-list';
 import { StageBadge, type OpportunityRow } from '@/components/crm/opportunity-list';
 import { OpportunityTrainingsSummary, type TrainingEstimate, type TrainingLine } from '@/components/crm/opportunity-trainings';
 import { QuickActionFicheButton } from '@/components/crm/quick-action';
+import { QuoteCards, type QuoteRow } from '@/components/crm/quote-list';
 import { StageDialog, type StageOption } from '@/components/crm/stage-dialog';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -10,7 +11,7 @@ import AppLayout from '@/layouts/app-layout';
 import { formatAmount, formatDateTime, formatDay, type Option } from '@/lib/crm';
 import { type BreadcrumbItem } from '@/types';
 import { Head, Link, router } from '@inertiajs/react';
-import { ArrowRightLeft, Pencil, Trash2 } from 'lucide-react';
+import { ArrowRightLeft, FilePlus, Pencil, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 
 interface OpportunityData extends OpportunityRow {
@@ -29,10 +30,11 @@ interface ShowProps {
     opportunity: OpportunityData;
     history: { id: string; from: string | null; to: string | null; by: string | null; at: string }[];
     activities: ActivityRow[];
+    quotes: QuoteRow[];
     training_summary: { lines: TrainingLine[]; estimate: TrainingEstimate };
     stages: StageOption[];
     lossReasons: Option[];
-    can: { update: boolean; delete: boolean };
+    can: { update: boolean; delete: boolean; createQuote: boolean };
     status?: string;
 }
 
@@ -49,6 +51,7 @@ export default function OpportunityShow({
     opportunity: o,
     history,
     activities,
+    quotes,
     training_summary: trainings,
     stages,
     lossReasons,
@@ -156,6 +159,26 @@ export default function OpportunityShow({
                     <section className="rounded-xl border p-4 lg:col-span-2">
                         <h2 className="mb-3 text-sm font-semibold">Formations</h2>
                         <OpportunityTrainingsSummary lines={trainings.lines} estimate={trainings.estimate} />
+                    </section>
+                    <section className="rounded-xl border p-4 lg:col-span-2" aria-labelledby="opportunity-quotes">
+                        <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+                            <h2 id="opportunity-quotes" className="text-sm font-semibold">
+                                Devis
+                            </h2>
+                            {can.createQuote && (
+                                <Button asChild size="sm" variant="outline">
+                                    <Link href={route('crm.quotes.create', o.id)}>
+                                        <FilePlus className="h-4 w-4" />
+                                        Nouveau devis
+                                    </Link>
+                                </Button>
+                            )}
+                        </div>
+                        {quotes.length === 0 ? (
+                            <p className="text-muted-foreground text-sm">Aucun devis pour cette opportunité.</p>
+                        ) : (
+                            <QuoteCards rows={quotes} showAccount={false} />
+                        )}
                     </section>
                     <section className="rounded-xl border p-4 lg:col-span-2">
                         <h2 className="mb-3 text-sm font-semibold">Actions</h2>

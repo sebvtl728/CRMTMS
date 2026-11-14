@@ -1,6 +1,7 @@
 <?php
 
 use App\Modules\Core\Access\Role;
+use App\Modules\Core\Companies\Company;
 use App\Modules\Core\References\ReferenceItem;
 use App\Modules\Core\References\ReferenceList;
 use App\Modules\Core\Tenancy\Tenant;
@@ -20,6 +21,8 @@ use App\Modules\Crm\Opportunities\Opportunity;
 use App\Modules\Crm\Opportunities\OpportunityStage;
 use App\Modules\Crm\Organisations\Organisation;
 use App\Modules\Crm\People\Person;
+use App\Modules\Crm\Quotes\Quote;
+use App\Modules\Crm\Quotes\QuoteWriter;
 use Illuminate\Filesystem\Filesystem;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
@@ -298,5 +301,73 @@ function makeOpportunity(Organisation|Person $account, array $attributes = []): 
         'das_id' => crmItem(ReferenceList::Das, 'Hôtellerie-restauration')->id,
         'stage_id' => pipelineStage('Nouveau')->id,
         ...$attributes,
+    ]);
+}
+
+/*
+|--------------------------------------------------------------------------
+| CRM quote helpers
+|--------------------------------------------------------------------------
+*/
+
+/**
+ * A line of a quote as the form posts it (French typing).
+ *
+ * @param  array<string, mixed>  $overrides
+ * @return array<string, mixed>
+ */
+function quoteLine(array $overrides = []): array
+{
+    return [
+        'training_id' => null,
+        'label' => 'Formation HACCP',
+        'description' => null,
+        'quantity' => '1',
+        'unit' => 'stagiaire',
+        'unit_price' => '1 000,00',
+        'discount_percent' => '0',
+        'vat_rate' => '20',
+        ...$overrides,
+    ];
+}
+
+/**
+ * @param  list<array<string, mixed>>|null  $lines
+ * @param  array<string, mixed>  $overrides
+ * @return array<string, mixed>
+ */
+function quotePayload(Opportunity $opportunity, Company $company, ?array $lines = null, array $overrides = []): array
+{
+    return [
+        'opportunity_id' => $opportunity->id,
+        'company_id' => $company->id,
+        'contact_person_id' => null,
+        'issued_on' => now('Europe/Paris')->toDateString(),
+        'valid_until' => now('Europe/Paris')->addDays(30)->toDateString(),
+        'notes' => null,
+        'lines' => $lines ?? [quoteLine()],
+        ...$overrides,
+    ];
+}
+
+/**
+ * A draft quote written through QuoteWriter (number, totals), one line of
+ * 1 000,00 € HT by default.
+ *
+ * @param  list<array<string, mixed>>|null  $lines  normalised lines (« 1000.00 »)
+ */
+function makeQuote(Opportunity $opportunity, ?Company $company = null, ?array $lines = null): Quote
+{
+    $company ??= Company::query()->where('is_default', true)->first() ?? Company::factory()->default()->create();
+
+    return app(QuoteWriter::class)->create($opportunity, $company, [
+        'contact_person_id' => null,
+        'issued_on' => now('Europe/Paris')->toDateString(),
+        'valid_until' => now('Europe/Paris')->addDays(30)->toDateString(),
+        'notes' => null,
+        'lines' => $lines ?? [[
+            'training_id' => null, 'label' => 'Formation HACCP', 'description' => null, 'quantity' => '1.00',
+            'unit' => 'stagiaire', 'unit_price' => '1000.00', 'discount_percent' => '0.00', 'vat_rate' => '20.00',
+        ]],
     ]);
 }

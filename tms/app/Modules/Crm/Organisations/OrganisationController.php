@@ -11,6 +11,7 @@ use App\Modules\Crm\Affiliations\Affiliation;
 use App\Modules\Crm\Duplicates\DuplicateGuard;
 use App\Modules\Crm\Opportunities\OpportunityRows;
 use App\Modules\Crm\Permissions;
+use App\Modules\Crm\Quotes\QuoteRows;
 use App\Modules\Crm\Search\CrmResource;
 use App\Modules\Crm\Search\ListExtras;
 use App\Modules\Crm\Search\RecentViews;
@@ -156,6 +157,7 @@ class OrganisationController extends Controller
             'formerAffiliations' => $affiliations->whereNotNull('ended_on')->sortByDesc(fn (Affiliation $a) => $a->ended_on)->map($affiliationRow)->values()->all(),
             'decisionRoles' => FormOptions::reference(ReferenceList::DecisionRole),
             'opportunities' => OpportunityRows::forFiche($organisation, $user),
+            'quotes' => QuoteRows::forFiche($organisation, $user),
             'similar' => $user->can(Permissions::MERGE) ? $this->duplicates->similarTo($organisation, $user) : [],
             'can' => [
                 'merge' => ! $organisation->trashed() && $user->can(Permissions::MERGE),

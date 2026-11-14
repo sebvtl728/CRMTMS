@@ -12,6 +12,7 @@ import {
     Columns3,
     Contact,
     Factory,
+    FileText,
     Handshake,
     History,
     LayoutGrid,
@@ -30,6 +31,7 @@ const homeNavItems: NavItem[] = [{ title: 'Accueil', url: '/dashboard', icon: La
 const commercialNavItems: (NavItem & { permission: string })[] = [
     { title: 'Pipeline', url: '/crm/opportunities/kanban', icon: Columns3, permission: 'crm.view' },
     { title: 'Opportunités', url: '/crm/opportunities', icon: Handshake, permission: 'crm.view' },
+    { title: 'Devis', url: '/crm/quotes', icon: FileText, permission: 'crm.view' },
     { title: 'À faire', url: '/crm/todo', icon: CalendarCheck, permission: 'crm.view' },
     { title: 'Planning', url: '/crm/planning', icon: CalendarRange, permission: 'crm.view' },
     { title: 'Catalogue', url: '/catalogue', icon: BookOpen, permission: 'catalogue.view' },

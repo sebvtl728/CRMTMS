@@ -3,6 +3,7 @@ import { FicheOpportunities, type OpportunityRow } from '@/components/crm/opport
 import { PersonGdpr, type GdprData } from '@/components/crm/person-gdpr';
 import { PersonTypeBadges } from '@/components/crm/person-type-badges';
 import { QuickActionFicheButton } from '@/components/crm/quick-action';
+import { FicheQuotes, type QuoteRow } from '@/components/crm/quote-list';
 import { Timeline } from '@/components/crm/timeline';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -71,6 +72,7 @@ interface ShowProps {
     person: PersonData;
     gdpr: GdprData;
     opportunities: OpportunityRow[];
+    quotes: QuoteRow[];
     can: {
         update: boolean;
         delete: boolean;
@@ -93,7 +95,7 @@ function Item({ label, children }: { label: string; children: React.ReactNode })
     );
 }
 
-const TABS = ['Informations', 'Opportunités', 'Historique'] as const;
+const TABS = ['Informations', 'Opportunités', 'Devis', 'Historique'] as const;
 
 const mail = (email: string | null) =>
     email && (
@@ -109,7 +111,7 @@ const tel = (phone: string | null) =>
         </a>
     );
 
-export default function PersonShow({ person: p, similar, gdpr, opportunities, can, status }: ShowProps) {
+export default function PersonShow({ person: p, similar, gdpr, opportunities, quotes, can, status }: ShowProps) {
     const [confirming, setConfirming] = useState(false);
     const [tab, setTab] = useState<(typeof TABS)[number]>('Informations');
 
@@ -224,6 +226,7 @@ export default function PersonShow({ person: p, similar, gdpr, opportunities, ca
                         createHref={can.createOpportunity ? `${route('crm.opportunities.create')}?person=${p.id}` : null}
                     />
                 )}
+                {tab === 'Devis' && <FicheQuotes rows={quotes} />}
                 {tab === 'Historique' && <Timeline kind="person" subjectId={p.id} canEdit={can.update} />}
 
                 <div

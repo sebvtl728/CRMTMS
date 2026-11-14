@@ -27,6 +27,10 @@ use App\Modules\Crm\Organisations\Organisation;
 use App\Modules\Crm\Organisations\OrganisationPolicy;
 use App\Modules\Crm\People\Person;
 use App\Modules\Crm\People\PersonPolicy;
+use App\Modules\Crm\Quotes\Quote;
+use App\Modules\Crm\Quotes\QuoteLine;
+use App\Modules\Crm\Quotes\QuotePolicy;
+use App\Modules\Crm\Quotes\QuotesProvider;
 use App\Modules\Crm\Search\SavedFilter;
 use App\Modules\Crm\Support\LinkedData;
 use App\Modules\Crm\Timeline\Attachment;
@@ -77,10 +81,12 @@ class CrmServiceProvider extends ServiceProvider
             'opportunity_stage_change' => StageChange::class,
             'opportunity_training' => OpportunityTraining::class,
             'activity' => Activity::class,
+            'quote' => Quote::class,
+            'quote_line' => QuoteLine::class,
         ]);
 
         // Sources of the « Historique »; later increments tag their own.
-        $this->app->tag([NotesProvider::class, AttachmentsProvider::class, AuditProvider::class, OpportunitiesProvider::class, ActivitiesProvider::class], Timeline::TAG);
+        $this->app->tag([NotesProvider::class, AttachmentsProvider::class, AuditProvider::class, OpportunitiesProvider::class, ActivitiesProvider::class, QuotesProvider::class], Timeline::TAG);
     }
 
     public function boot(): void
@@ -100,6 +106,7 @@ class CrmServiceProvider extends ServiceProvider
         Gate::policy(Person::class, PersonPolicy::class);
         Gate::policy(Opportunity::class, OpportunityPolicy::class);
         Gate::policy(Activity::class, ActivityPolicy::class);
+        Gate::policy(Quote::class, QuotePolicy::class);
 
         // A fiche the user may not see is a 404, whatever the action. Trashed
         // fiches resolve too (show, restore): the controller decides.
@@ -192,6 +199,30 @@ class CrmServiceProvider extends ServiceProvider
             }
 
             return $opportunity;
+        });
+
+        // A quote: visible with its opportunity (its DAS), which must not be
+        // trashed; on a trashed fiche only with crm.delete, like the opportunity.
+        Route::bind('quote', function (string $value): Quote {
+            if (! Str::isUuid($value)) {
+                throw (new ModelNotFoundException)->setModel(Quote::class, [$value]);
+            }
+
+            $user = request()->user();
+            $query = Quote::query();
+            if ($user instanceof User) {
+                $query = CrmVisibility::quotes($query, $user);
+            }
+            $quote = $query->with(['company', 'opportunity.organisation', 'opportunity.person'])->findOrFail($value);
+
+            $opportunity = $quote->opportunity;
+            $fiche = $opportunity->organisation ?? $opportunity->person;
+            if ($opportunity->trashed()
+                || ($user instanceof User && ($fiche === null || $fiche->trashed()) && ! $user->can(Permissions::DELETE))) {
+                throw (new ModelNotFoundException)->setModel(Quote::class, [$value]);
+            }
+
+            return $quote;
         });
 
         // An action: visible with its opportunity when it has one (its DAS),
@@ -337,17 +368,24 @@ class CrmServiceProvider extends ServiceProvider
             || ($fiche instanceof Person && DB::table('opportunity_contacts')->where('person_id', $fiche->getKey())->exists()));
         LinkedData::register('crm.activities', fn (Organisation|Person $fiche, array $ids): bool => $except(
             Activity::withTrashed()->where($fiche instanceof Organisation ? 'organisation_id' : 'person_id', $fiche->getKey()), $ids)->exists());
+        // A quote names its account and its recipient (an interlocuteur too).
+        LinkedData::register('crm.quotes', fn (Organisation|Person $fiche, array $ids): bool => $except(
+            Quote::withTrashed()->where(fn (Builder $q) => $fiche instanceof Organisation
+                ? $q->where('organisation_id', $fiche->getKey())
+                : $q->where('person_id', $fiche->getKey())->orWhere('contact_person_id', $fiche->getKey())), $ids)->exists());
         LinkedData::register('crm.consents', fn (Organisation|Person $fiche, array $ids): bool => $fiche instanceof Person
             && $except(Consent::query()->where('person_id', $fiche->getKey()), $ids)->exists());
     }
 
     /**
-     * A training on an opportunity (a trashed one too: its lines stay) is in
-     * use: the catalogue refuses to delete it.
+     * A training on an opportunity or a quote (a trashed one too: its lines
+     * stay) is in use: the catalogue refuses to delete it.
      */
     public static function registerTrainingUsage(): void
     {
         TrainingUsage::register('opportunities', fn (string $trainingId): bool => OpportunityTraining::query()->where('training_id', $trainingId)->exists());
+        // Lines of a trashed quote stay too.
+        TrainingUsage::register('quotes', fn (string $trainingId): bool => QuoteLine::query()->where('training_id', $trainingId)->exists());
     }
 
     /**
@@ -403,5 +441,6 @@ class CrmServiceProvider extends ServiceProvider
         ReferenceUsage::register(ReferenceList::LossReason, 'opportunities', 'loss_reason_id');
         ReferenceUsage::register(ReferenceList::ActionType, 'activities', 'type_id');
         ReferenceUsage::register(ReferenceList::ActionResult, 'activities', 'result_id');
+        ReferenceUsage::register(ReferenceList::Das, 'quote_lines', 'das_id');
     }
 }
