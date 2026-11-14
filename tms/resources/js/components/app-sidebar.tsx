@@ -15,6 +15,7 @@ import {
     FileText,
     Handshake,
     History,
+    KeyRound,
     LayoutGrid,
     ListChecks,
     Plug,
@@ -46,6 +47,7 @@ const commercialNavItems: (NavItem & { permission: string })[] = [
 const adminNavItems: (NavItem & { permission: string })[] = [
     { title: 'Sociétés', url: '/admin/companies', icon: Building2, permission: 'companies.manage' },
     { title: 'Utilisateurs', url: '/admin/users', icon: Users, permission: 'users.manage' },
+    { title: 'Rôles et droits', url: '/admin/roles', icon: KeyRound, permission: 'roles.manage' },
     { title: 'Référentiels', url: '/admin/references', icon: ListChecks, permission: 'references.manage' },
     { title: 'Connecteurs', url: '/admin/connectors', icon: Plug, permission: 'connectors.manage' },
     { title: "Journal d'audit", url: '/admin/audit', icon: History, permission: 'audit.view' },

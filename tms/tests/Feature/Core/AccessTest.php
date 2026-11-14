@@ -27,11 +27,11 @@ it('defines the six roles with French labels and the 2FA requirement', function 
 });
 
 it('lists the core permission catalogue, then the modules\' permissions', function () {
-    expect(array_slice(Permissions::all(), 0, 7))->toBe([
-        'users.manage', 'companies.manage', 'references.manage', 'connectors.manage',
+    expect(array_slice(Permissions::all(), 0, 8))->toBe([
+        'users.manage', 'roles.manage', 'companies.manage', 'references.manage', 'connectors.manage',
         'audit.view', 'settings.manage', 'exports.run',
     ])
-        ->and(array_slice(Permissions::all(), 7))->toBe([...App\Modules\Crm\Permissions::all(), ...App\Modules\Catalogue\Permissions::all()]);
+        ->and(array_slice(Permissions::all(), 8))->toBe([...App\Modules\Crm\Permissions::all(), ...App\Modules\Catalogue\Permissions::all()]);
 });
 
 it('seeds the roles and the default matrix for a tenant', function () {

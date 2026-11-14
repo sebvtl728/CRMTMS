@@ -4,8 +4,11 @@ namespace App\Modules\Core\Access;
 
 use App\Modules\Core\Users\InvitationAccepted;
 use App\Modules\Core\Users\User;
+use Illuminate\Cache\RateLimiting\Limit;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\ServiceProvider;
 use Spatie\Permission\PermissionRegistrar;
 
@@ -26,6 +29,9 @@ class AccessServiceProvider extends ServiceProvider
         foreach (Permissions::all() as $permission) {
             Gate::define($permission, fn (User $user): bool => $user->checkPermissionTo($permission));
         }
+
+        // « Rôles et droits »: 60 changes a minute per administrator.
+        RateLimiter::for('roles-write', fn (Request $request) => Limit::perMinute(60)->by('roles-write:'.($request->user()?->getAuthIdentifier() ?? $request->ip())));
 
         // The invited role becomes the primary role once the account is activated.
         Event::listen(InvitationAccepted::class, function (InvitationAccepted $event): void {

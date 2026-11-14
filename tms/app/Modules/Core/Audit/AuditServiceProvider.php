@@ -3,6 +3,7 @@
 namespace App\Modules\Core\Audit;
 
 use App\Modules\Core\Access\PrimaryRoleChanged;
+use App\Modules\Core\Access\RoleModel;
 use App\Modules\Core\Companies\Company;
 use App\Modules\Core\References\ReferenceItem;
 use App\Modules\Core\Tenancy\Tenant;
@@ -21,6 +22,7 @@ class AuditServiceProvider extends ServiceProvider
             'invitation' => Invitation::class,
             'company' => Company::class,
             'reference_item' => ReferenceItem::class,
+            'role' => RoleModel::class,
         ]);
     }
 

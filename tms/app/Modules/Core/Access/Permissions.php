@@ -23,11 +23,36 @@ final class Permissions
 
     public const EXPORTS_RUN = 'exports.run';
 
+    /** « Rôles et droits » screen: the administrator only, never editable. */
+    public const ROLES_MANAGE = 'roles.manage';
+
+    /**
+     * Never granted to another role from the « Rôles et droits » screen
+     * (the administrator always holds them): whoever manages users or rights
+     * could otherwise give himself everything.
+     */
+    public const LOCKED = [self::USERS_MANAGE, self::ROLES_MANAGE];
+
+    /** Theme of the Core permissions on the « Rôles et droits » screen. */
+    public const CORE_GROUP = 'Administration';
+
+    /** @var array<string, array{0: string, 1: string}> permission => [French label, one-sentence explanation] */
+    private const CORE_LABELS = [
+        self::USERS_MANAGE => ['Gérer les utilisateurs', 'Inviter, modifier, désactiver les comptes et changer leur rôle.'],
+        self::ROLES_MANAGE => ['Gérer les rôles et droits', 'Modifier les droits de chaque rôle sur cet écran.'],
+        self::COMPANIES_MANAGE => ['Gérer les sociétés', 'Créer et modifier les sociétés émettrices des devis (mentions légales, logo, numérotation).'],
+        self::REFERENCES_MANAGE => ['Gérer les référentiels', 'Modifier les listes paramétrables (DAS, étapes, origines…).'],
+        self::CONNECTORS_MANAGE => ['Gérer les connecteurs', 'Configurer les logiciels externes (messagerie, annuaire des entreprises, agenda…).'],
+        self::AUDIT_VIEW => ["Consulter le journal d'audit", "Voir qui a fait quoi et quand dans l'organisme."],
+        self::SETTINGS_MANAGE => ['Gérer les paramètres', "Régler la sécurité de l'organisme (déconnexion après inactivité…)."],
+        self::EXPORTS_RUN => ['Lancer les exports système', "Exports techniques de l'organisme (hors exports Excel des listes)."],
+    ];
+
     /**
      * Permissions of the modules (crm.*, ...), registered by their service
      * provider so that Core never depends on a module.
      *
-     * @var array<string, array{permissions: list<string>, defaults: callable(Role): list<string>}>
+     * @var array<string, array{permissions: list<string>, defaults: callable(Role): list<string>, labels: array<string, array{0: string, 1: string}>, group: string}>
      */
     private static array $modules = [];
 
@@ -36,12 +61,36 @@ final class Permissions
      * Call from the module's ServiceProvider::register() (gates are defined in
      * AccessServiceProvider::boot()). Registering a module again replaces it.
      *
+     * Every permission comes with its French label and explanation (the
+     * « Rôles et droits » screen; a test fails for one without), under $group.
+     *
      * @param  list<string>  $permissions
      * @param  callable(Role): list<string>  $defaultsFor
+     * @param  array<string, array{0: string, 1: string}>  $labels  permission => [label, explanation]
      */
-    public static function registerModule(string $module, array $permissions, callable $defaultsFor): void
+    public static function registerModule(string $module, array $permissions, callable $defaultsFor, array $labels = [], string $group = ''): void
     {
-        self::$modules[$module] = ['permissions' => $permissions, 'defaults' => $defaultsFor];
+        self::$modules[$module] = ['permissions' => $permissions, 'defaults' => $defaultsFor, 'labels' => $labels, 'group' => $group];
+    }
+
+    /**
+     * French label, explanation and theme of a permission; null when its
+     * module gave none.
+     *
+     * @return array{label: string, description: string, group: string}|null
+     */
+    public static function label(string $permission): ?array
+    {
+        if (isset(self::CORE_LABELS[$permission])) {
+            return ['label' => self::CORE_LABELS[$permission][0], 'description' => self::CORE_LABELS[$permission][1], 'group' => self::CORE_GROUP];
+        }
+        foreach (self::$modules as $module) {
+            if (in_array($permission, $module['permissions'], true) && isset($module['labels'][$permission])) {
+                return ['label' => $module['labels'][$permission][0], 'description' => $module['labels'][$permission][1], 'group' => $module['group']];
+            }
+        }
+
+        return null;
     }
 
     /**
@@ -88,6 +137,7 @@ final class Permissions
     {
         return [
             self::USERS_MANAGE,
+            self::ROLES_MANAGE,
             self::COMPANIES_MANAGE,
             self::REFERENCES_MANAGE,
             self::CONNECTORS_MANAGE,

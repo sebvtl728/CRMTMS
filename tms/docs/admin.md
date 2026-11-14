@@ -5,6 +5,7 @@ Ce guide s'adresse à l'**administrateur de l'organisme** (rôle « Administrate
 | Écran | Chemin | Permission |
 |---|---|---|
 | Sociétés | `/admin/companies` | `companies.manage` |
+| Rôles et droits | `/admin/roles` | `roles.manage` |
 | Utilisateurs | `/admin/users` | `users.manage` |
 | Référentiels | `/admin/references` | `references.manage` |
 | Connecteurs | `/admin/connectors` | `connectors.manage` |
@@ -162,6 +163,14 @@ Le **catalogue de formations** a deux permissions à part :
 Le rôle *Responsable DAS* garde la lecture seule et l'export, limités à ses DAS suivis (devis compris : ceux des opportunités de ses DAS) : il voit les opportunités de ses DAS (et leurs actions), et les actions sans opportunité des fiches qu'il voit. La **direction** et l'**administrateur** voient en plus les actions de toute l'équipe (**À faire › Équipe**) et le planning d'un **collègue**.
 
 **Mises à jour et personnalisation.** À chaque installation ou mise à jour (`ops/migrate.sh` lance `php artisan tms:permissions:sync`), la synchronisation des permissions accorde à chaque organisme les droits par défaut **nouveaux** de chaque rôle, une seule fois : un droit que vous avez retiré à un rôle n'est pas rétabli par une mise à jour. La matrice rôle → permission est propre à chaque organisme.
+
+**Écran « Rôles et droits »** (Administration › **Rôles et droits**, droit `roles.manage`, accordé par défaut au seul administrateur de l'organisme). Un tableau croise les rôles (en colonnes) et les droits (en lignes, regroupés par thème, chacun avec une phrase d'explication). Cochez ou décochez une case : elle est enregistrée aussitôt (message de confirmation), et les utilisateurs du rôle ont leurs nouveaux droits dès leur page suivante, sans être déconnectés. Une case surlignée diffère des droits par défaut du rôle ; **Rétablir les droits par défaut** (avec confirmation) remet exactement le tableau ci-dessus pour ce rôle.
+
+- Le rôle **Administrateur de l'organisme** n'est pas modifiable : il garde tous les droits.
+- **Gérer les utilisateurs** (`users.manage`) et **Gérer les rôles et droits** (`roles.manage`) ne s'accordent qu'à l'administrateur : sinon, qui les détiendrait pourrait se donner tous les droits.
+- La **double authentification** reste liée au rôle (administrateur, direction), pas aux droits.
+- Le **Responsable DAS** ne voit que les fiches de ses DAS suivis : c'est une règle de données, pas un droit ; l'écran ne la change pas.
+- Chaque changement est journalisé (`roles.permission_granted`, `roles.permission_revoked`, `roles.reset` : rôle et droit). Les modifications n'ont aucun effet sur un autre organisme, et une mise à jour ne rétablit jamais un droit retiré.
 
 ## 11. RGPD : durée de conservation et anonymisation
 

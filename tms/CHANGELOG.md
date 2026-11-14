@@ -29,6 +29,11 @@ Ajustements après les premiers retours.
   ouverture depuis le devis, mention « Devis signé ajouté » dans l'historique. Supprimé par l'anonymisation du
   destinataire ; signalé dans l'export de ses données.
 
+- **Rôles et droits** (Administration) : tableau des droits de chaque rôle, regroupés par thème avec une explication,
+  case par case, droits différents du défaut surlignés, **Rétablir les droits par défaut** par rôle ; journalisé.
+  Nouveau droit `roles.manage` (administrateur seulement). Le rôle administrateur, « Gérer les utilisateurs » et
+  « Gérer les rôles et droits » ne sont pas modifiables.
+
 ### Modifié
 
 - Une formation d'intérêt d'une fiche empêche sa suppression du catalogue (désactivation possible).
