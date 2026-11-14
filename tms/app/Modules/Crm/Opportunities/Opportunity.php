@@ -6,6 +6,7 @@ use App\Modules\Core\Audit\Auditable;
 use App\Modules\Core\References\ReferenceItem;
 use App\Modules\Core\Tenancy\BelongsToTenant;
 use App\Modules\Core\Users\User;
+use App\Modules\Crm\Activities\CalendarAnnouncements;
 use App\Modules\Crm\Organisations\Organisation;
 use App\Modules\Crm\People\Person;
 use Carbon\CarbonImmutable;
@@ -85,6 +86,12 @@ class Opportunity extends Model
                 $opportunity->updated_by = Auth::id();
             }
         });
+
+        // Calendars (Outlook) follow the opportunity of an action.
+        $announce = fn (Opportunity $opportunity) => CalendarAnnouncements::announceFor('opportunity_id', $opportunity->id);
+        static::deleted($announce);
+        static::restored($announce);
+        static::updated(fn (Opportunity $opportunity) => $opportunity->wasChanged(['das_id', 'organisation_id', 'person_id']) ? $announce($opportunity) : null);
     }
 
     protected function casts(): array

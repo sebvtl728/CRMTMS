@@ -5,6 +5,7 @@ namespace App\Modules\Crm\Duplicates;
 use App\Modules\Core\Audit\AuditRecorder;
 use App\Modules\Core\Tenancy\TenantContext;
 use App\Modules\Crm\Activities\Activity;
+use App\Modules\Crm\Activities\CalendarAnnouncements;
 use App\Modules\Crm\Affiliations\Affiliation;
 use App\Modules\Crm\Opportunities\Opportunity;
 use App\Modules\Crm\Organisations\Organisation;
@@ -167,6 +168,8 @@ class Merger
             $this->moveOpportunities($k, $d);
             $this->moveActivities($k, $d);
             $this->uniteDas($k, $d, $isPerson);
+            // Calendars (Outlook) now show the kept fiche (moves above are raw SQL).
+            CalendarAnnouncements::announceFor($isPerson ? 'person_id' : 'organisation_id', [$k->id, $d->id]);
 
             // Values retained on $keep, read before the absorbed fiche is scrubbed.
             foreach ($fields as $field => $label) {

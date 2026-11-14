@@ -6,6 +6,7 @@ use App\Modules\Core\Audit\Auditable;
 use App\Modules\Core\References\ReferenceItem;
 use App\Modules\Core\Tenancy\BelongsToTenant;
 use App\Modules\Core\Users\User;
+use App\Modules\Crm\Activities\CalendarAnnouncements;
 use App\Modules\Crm\Affiliations\Affiliation;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
@@ -101,7 +102,9 @@ class Organisation extends Model
             if (! $organisation->isForceDeleting()) {
                 Affiliation::cascadeDelete('organisation_id', $organisation);
             }
+            CalendarAnnouncements::announceFor('organisation_id', $organisation->id);
         });
+        static::restored(fn (Organisation $organisation) => CalendarAnnouncements::announceFor('organisation_id', $organisation->id));
         // A merged fiche stays in the trash: its content now lives in the kept one.
         static::restoring(fn (Organisation $organisation) => $organisation->merged_into_id === null ? null : false);
         static::restoring(fn (Organisation $organisation) => Affiliation::cascadeRestore('organisation_id', $organisation));

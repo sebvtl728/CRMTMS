@@ -542,3 +542,82 @@ it('updates the outlook event when the person is anonymised', function () {
         ->and(json_encode($patch->data()))->not->toContain('Dupont')->not->toContain('Annecy')
         ->and($patch->data()['location'])->toBe(['displayName' => '']);
 });
+
+it('deletes the outlook event when the fiche goes to the trash and recreates it on restore', function () {
+    $this->travelTo(m365At('2026-11-18 10:00:00'));
+    m365Config();
+    $user = commercial();
+    m365Link($user);
+    m365Http(graphCreated());
+    $meeting = m365Meeting($user);
+    $organisation = Organisation::query()->findOrFail($meeting->organisation_id);
+
+    m365Http([GRAPH_EVENTS.'/AAMkEvent1' => Http::response(null, 204)]);
+    DB::transaction(fn () => $organisation->delete());
+    [$delete] = graphRequests();
+    expect($delete->method())->toBe('DELETE')->and($delete->url())->toBe(GRAPH_EVENTS.'/AAMkEvent1')
+        ->and(CalendarLinkEvent::query()->count())->toBe(0);
+
+    m365Http(graphCreated('AAMkEvent2'));
+    DB::transaction(fn () => $organisation->restore());
+    [$post] = graphRequests();
+    expect($post->method())->toBe('POST')->and($post->data()['subject'])->toBe('Rendez-vous physique – Hôtel du Lac')
+        ->and(CalendarLinkEvent::query()->sole()->outlook_event_id)->toBe('AAMkEvent2');
+});
+
+it('deletes the outlook event of a person fiche sent to the trash', function () {
+    $this->travelTo(m365At('2026-11-18 10:00:00'));
+    m365Config();
+    $user = commercial();
+    m365Link($user);
+    $person = makePerson('Dupont', ['first_name' => 'Jean']);
+    m365Http(graphCreated());
+    m365Meeting($user, ['person_id' => $person->id, 'organisation_id' => null]);
+
+    m365Http([GRAPH_EVENTS.'/AAMkEvent1' => Http::response(null, 204)]);
+    DB::transaction(fn () => $person->delete());
+    [$delete] = graphRequests();
+    expect($delete->method())->toBe('DELETE');
+});
+
+it('points the outlook event to the kept fiche after a merge', function () {
+    $this->travelTo(m365At('2026-11-18 10:00:00'));
+    m365Config();
+    $user = commercial();
+    m365Link($user);
+    $keep = Organisation::query()->create(['name' => 'Hôtel du Lac SAS']);
+    $drop = Organisation::query()->create(['name' => 'Hotel du lac']);
+    m365Http(graphCreated());
+    m365Meeting($user, ['organisation_id' => $drop->id]);
+
+    m365Http([GRAPH_EVENTS.'/AAMkEvent1' => Http::response(['id' => 'AAMkEvent1'])]);
+    $this->actingAs($user)->post('/crm/merge/organisation', ['keep' => $keep->id, 'drop' => $drop->id, 'fields' => []])
+        ->assertRedirect(route('crm.organisations.show', $keep));
+
+    $patches = collect(graphRequests())->filter(fn (Request $r) => $r->method() === 'PATCH')->values();
+    expect($patches)->not->toBeEmpty();
+    $last = $patches->last();
+    expect($last->data()['subject'])->toBe('Rendez-vous physique – Hôtel du Lac SAS')
+        ->and($last->data()['body']['content'])->toContain(url('/crm/organisations/'.$keep->id))
+        ->and(collect(graphRequests())->contains(fn (Request $r) => $r->method() === 'POST'))->toBeFalse();
+});
+
+it('deletes the outlook event when its opportunity goes to the trash', function () {
+    $this->travelTo(m365At('2026-11-18 10:00:00'));
+    m365Config();
+    $user = commercial();
+    m365Link($user);
+    $opportunity = makeOpportunity(Organisation::query()->firstOrCreate(['name' => 'Hôtel du Lac']), ['title' => 'Formation HACCP']);
+    m365Http(graphCreated());
+    m365Meeting($user, ['opportunity_id' => $opportunity->id, 'organisation_id' => null]);
+
+    m365Http([GRAPH_EVENTS.'/AAMkEvent1' => Http::response(null, 204)]);
+    DB::transaction(fn () => $opportunity->delete());
+    [$delete] = graphRequests();
+    expect($delete->method())->toBe('DELETE')->and(CalendarLinkEvent::query()->count())->toBe(0);
+
+    m365Http(graphCreated('AAMkEvent2'));
+    DB::transaction(fn () => $opportunity->restore());
+    [$post] = graphRequests();
+    expect($post->method())->toBe('POST');
+});
