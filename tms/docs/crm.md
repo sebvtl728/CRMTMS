@@ -44,7 +44,7 @@ L'onglet **Historique** d'une fiche liste, du plus récent au plus ancien, les *
 
 ### Suppression et restauration
 
-**Supprimer** une fiche la place dans la corbeille : elle disparaît des listes mais peut être restaurée (case **Corbeille** de la liste, puis **Restaurer** sur la fiche). Les rattachements, notes et pièces jointes suivent la fiche.
+**Supprimer** une fiche la place dans la corbeille : elle disparaît des listes mais peut être restaurée (case **Corbeille** de la liste, puis **Restaurer** sur la fiche). Les rattachements, notes et pièces jointes suivent la fiche. Au-delà de **12 mois** en corbeille, les fichiers joints sont effacés : l'historique indique alors « Fichier supprimé ».
 
 ### Mobile
 
@@ -142,7 +142,7 @@ L'historique des imports est conservé ; le fichier d'origine (et les valeurs br
 
 ## 6. Exporter
 
-Dans les listes **Entreprises** et **Personnes** (sur ordinateur), **Exporter (.xlsx)** télécharge un fichier Excel de **la liste telle qu'elle est filtrée**, avec les colonnes choisies dans **Colonnes**. Un contrôle préalable refuse l'export, avec un message, s'il dépasse la limite de lignes (50 000 par défaut) ou si vous exportez trop souvent. Chaque export est tracé dans le journal d'audit. Les valeurs commençant par `=`, `+`, `-` ou `@` sont neutralisées pour ne pas être exécutées par Excel. Les dates et montants sont au format français.
+Dans les listes **Entreprises** et **Personnes** (sur ordinateur), **Exporter (.xlsx)** télécharge un fichier Excel de **la liste telle qu'elle est filtrée**, avec les colonnes choisies dans **Colonnes**. Un contrôle préalable refuse l'export, avec un message, s'il dépasse la limite de lignes (50 000 par défaut) ou si vous exportez trop souvent. Chaque export est tracé dans le journal d'audit. Les valeurs commençant par `=`, `+`, `-` ou `@` sont neutralisées pour ne pas être exécutées par Excel. Les dates et montants sont au format français. L'export des personnes propose aussi les colonnes **Système source**, **Identifiant source** (fiches importées) et **Base légale** (RGPD).
 
 ## 7. RGPD
 

@@ -18,9 +18,9 @@ final class AttachmentsProvider implements TimelineProvider
                 'attachment',
                 CarbonImmutable::instance($a->created_at),
                 $a->original_name,
-                null,
+                $a->file_deleted_at === null ? null : AttachmentPurge::DELETED_LABEL,
                 $a->uploader?->name,
-                ['id' => $a->id, 'size' => $a->size, 'mime' => $a->mime],
+                ['id' => $a->id, 'size' => $a->size, 'mime' => $a->mime, 'file_deleted' => $a->file_deleted_at !== null],
             ));
     }
 }

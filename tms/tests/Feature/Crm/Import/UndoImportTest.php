@@ -193,6 +193,23 @@ it('purges uploaded files and raw values after 30 days', function () {
         ->and($recent->stored_path)->toStartWith(TenantStorage::path('imports'));
 });
 
+it('replaces the name of the uploaded file at the 30-day purge, which may name a person', function () {
+    $old = uploadImport("Raison sociale\nGarage Martin\n", ImportTarget::Organisations, name: 'Export Jean Dupont.CSV');
+    $old->forceFill(['created_at' => now()->subDays(31)])->save();
+    $xlsx = uploadImport('contacts.xlsx', ImportTarget::People);
+    $xlsx->forceFill(['created_at' => now()->subDays(31)])->save();
+    $recent = uploadImport("Raison sociale\nCafé des Arts\n", ImportTarget::Organisations, name: 'Liste Marie Curie.csv');
+
+    Artisan::call('tms:crm:purge-imports');
+    Artisan::call('tms:crm:purge-imports'); // idempotent
+
+    expect($old->refresh()->original_name)->toBe('fichier-import.csv')
+        ->and($xlsx->refresh()->original_name)->toBe('fichier-import.xlsx')
+        ->and($recent->refresh()->original_name)->toBe('Liste Marie Curie.csv')
+        // The change is journaled without the former name.
+        ->and(AuditLog::query()->where('auditable_id', $old->id)->get()->toJson())->not->toContain('Dupont');
+});
+
 // --- Fix round 1: undo never removes what users built on -------------------
 
 it('keeps an imported fiche that received a note after the import', function () {

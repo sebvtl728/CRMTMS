@@ -12,8 +12,8 @@ use Illuminate\Support\Str;
 use Throwable;
 
 /**
- * Receives a file to import: checked readable first (format, encoding,
- * header row), then copied to tenants/<id>/imports/<batch>/original.<ext>
+ * Receives a file to import: checked readable first (real type, format,
+ * encoding, header row), then copied to tenants/<id>/imports/<batch>/original.<ext>
  * on the private disk and recorded as an « uploaded » batch.
  */
 final class ImportUploads
@@ -34,6 +34,7 @@ final class ImportUploads
         ], fn ($v) => $v !== null);
 
         // Refused before anything is stored.
+        Readers::assertContent($localPath, $originalName);
         Readers::open($localPath, $originalName, $options);
 
         $extension = mb_strtolower(pathinfo($originalName, PATHINFO_EXTENSION));

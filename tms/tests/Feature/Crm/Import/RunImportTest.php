@@ -23,6 +23,7 @@ use App\Modules\Crm\People\Person;
 use App\Modules\Crm\Timeline\Note;
 use App\Rules\Siret;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use OpenSpout\Reader\XLSX\Reader;
 
@@ -147,6 +148,27 @@ it('replays a chunk row by row when one row fails, keeping the others and the cr
         ->and(rowMessages($batch, 3))->toBe(['SIRET : Une entreprise avec ce SIRET existe déjà.'])
         ->and(Organisation::query()->whereIn('name', ['A', 'C'])->pluck('origin_id')->unique()->all())->toBe([$item->id])
         ->and(ImportRow::query()->count())->toBe(3);
+});
+
+it('turns a row failing on any database error into an error row and goes on', function () {
+    // A database error that is not a uniqueness conflict, on one row only.
+    Organisation::creating(function (Organisation $organisation): void {
+        if ($organisation->name === 'Boum Durand') {
+            DB::select('select 1 / 0');
+        }
+    });
+    Log::spy();
+
+    $batch = runImport("Raison sociale;Ville\nA;Lyon\nBoum Durand;Pau\nC;Paris\n", ImportTarget::Organisations);
+
+    expect($batch->status)->toBe(ImportBatch::DONE)
+        ->and([$batch->total, $batch->created, $batch->errors])->toBe([3, 2, 1])
+        ->and(rowMessages($batch, 3))->toBe(['Ligne non importée : la base de données l\'a refusée (code 22012).'])
+        ->and(Organisation::query()->orderBy('name')->pluck('name')->all())->toBe(['A', 'C']);
+
+    // Logged for the administrator without any value of the row.
+    Log::shouldHaveReceived('warning')->withArgs(fn (string $message, array $context) => $context['sqlstate'] === '22012'
+        && $context['line_number'] === 3 && ! str_contains(json_encode($context, JSON_THROW_ON_ERROR), 'Durand'))->once();
 });
 
 it('re-imports the same file by source id: updates, no duplicates', function () {

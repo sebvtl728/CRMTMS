@@ -11,6 +11,7 @@ use OpenSpout\Common\Entity\Cell\FormulaCell;
 use OpenSpout\Reader\XLSX\Options;
 use OpenSpout\Reader\XLSX\Reader;
 use Throwable;
+use ZipArchive;
 
 /**
  * First sheet of an .xlsx workbook, every cell read as text: a number typed
@@ -20,6 +21,8 @@ use Throwable;
  */
 final class XlsxReader implements TabularReader
 {
+    public const UNREADABLE = 'Le fichier .xlsx est illisible (fichier endommagé ou d\'un autre format).';
+
     private Headers $headers;
 
     private int $headerLine = 1;
@@ -48,11 +51,29 @@ final class XlsxReader implements TabularReader
         if ($handle !== false) {
             fclose($handle);
         }
-        if ($magic !== "PK\x03\x04") {
-            throw new ImportFileException('Le fichier .xlsx est illisible (fichier endommagé ou d\'un autre format).');
+        if ($magic !== "PK\x03\x04" || ! self::hasContentTypes($path)) {
+            throw new ImportFileException(self::UNREADABLE);
         }
 
         return new self($path);
+    }
+
+    /**
+     * An Office Open XML package always lists its parts in
+     * [Content_Types].xml: a plain zip renamed .xlsx does not.
+     */
+    private static function hasContentTypes(string $path): bool
+    {
+        $zip = new ZipArchive;
+        if ($zip->open($path, ZipArchive::RDONLY) !== true) {
+            return false;
+        }
+
+        try {
+            return $zip->locateName('[Content_Types].xml') !== false;
+        } finally {
+            $zip->close();
+        }
     }
 
     public function headers(): array
@@ -94,7 +115,7 @@ final class XlsxReader implements TabularReader
         try {
             $reader->open($this->path);
         } catch (Throwable) {
-            throw new ImportFileException('Le fichier .xlsx est illisible (fichier endommagé ou d\'un autre format).');
+            throw new ImportFileException(self::UNREADABLE);
         }
 
         try {

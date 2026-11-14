@@ -45,6 +45,9 @@ final class PersonExport implements ExportResource
             'responsible' => 'Responsable',
             'last_contact_at' => 'Dernier contact',
             'created_at' => 'Création',
+            'source_system' => 'Système source',
+            'source_id' => 'Identifiant source',
+            'legal_basis' => 'Base légale',
         ];
     }
 
@@ -86,6 +89,9 @@ final class PersonExport implements ExportResource
             'responsible' => $model->responsible?->name,
             'last_contact_at' => $model->last_contact_at?->format('d/m/Y'),
             'created_at' => $model->created_at?->format('d/m/Y'),
+            'source_system' => $model->source_system,
+            'source_id' => $model->source_id,
+            'legal_basis' => $model->legal_basis->label(),
             default => null,
         };
     }

@@ -16,7 +16,8 @@ use Illuminate\Support\Facades\Auth;
 /**
  * File attached to an entreprise or a person. The bytes live on the private
  * disk under tenants/<tenant_id>/attachments/<uuid>; deleting the row keeps
- * the file until the GDPR purge. The file name may carry a person's name:
+ * the file until the GDPR purge; the file of a fiche trashed for 12 months
+ * is deleted, the row kept (AttachmentPurge). The file name may carry a person's name:
  * the journal masks it.
  *
  * @property string $id
@@ -30,6 +31,7 @@ use Illuminate\Support\Facades\Auth;
  * @property string|null $uploaded_by
  * @property Carbon $created_at
  * @property Carbon|null $deleted_at
+ * @property Carbon|null $file_deleted_at file deleted by the retention purge (AttachmentPurge), row kept
  */
 class Attachment extends Model
 {
@@ -60,7 +62,7 @@ class Attachment extends Model
     protected array $auditPersonal = ['original_name'];
 
     /** @var list<string> */
-    protected array $auditIgnore = ['path'];
+    protected array $auditIgnore = ['path', 'file_deleted_at'];
 
     /** @var list<string> */
     protected $fillable = ['original_name', 'mime', 'size', 'path'];
@@ -92,6 +94,6 @@ class Attachment extends Model
 
     protected function casts(): array
     {
-        return ['size' => 'integer'];
+        return ['size' => 'integer', 'file_deleted_at' => 'datetime'];
     }
 }

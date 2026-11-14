@@ -149,6 +149,20 @@ it('exports people with french headers, phones as shown on screen, organisations
         ->and($rows[1])->toBe(['Mme', 'Durand', 'Léa', 'Hôtel du Lac', '06 12 34 56 78', 'lea@x.fr', '02/01/2026']);
 });
 
+it('exports the source system, source identifier and legal basis of people', function () {
+    $this->actingAs(commercial());
+    makePerson('Durand', ['source_system' => 'Formevol', 'source_id' => 'F-0042']);
+    makePerson('Martin', ['is_individual' => true]);
+
+    $rows = exRows($this->get('/crm/people/export?columns[]=last_name&columns[]=source_system&columns[]=source_id&columns[]=legal_basis&sort=last_name'));
+
+    expect($rows)->toBe([
+        ['Nom', 'Système source', 'Identifiant source', 'Base légale'],
+        ['Durand', 'Formevol', 'F-0042', 'Intérêt légitime'],
+        ['Martin', '', '', 'Consentement'],
+    ]);
+});
+
 it('audits the export with filters and row count but no row content', function () {
     $this->actingAs(commercial());
     Organisation::query()->create(['name' => 'Alpha', 'status' => 'client', 'email' => 'secret@alpha.fr']);

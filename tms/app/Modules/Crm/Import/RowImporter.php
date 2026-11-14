@@ -2,6 +2,7 @@
 
 namespace App\Modules\Crm\Import;
 
+use App\Modules\Core\Security\DatabaseErrorLog;
 use App\Modules\Crm\Affiliations\Affiliation;
 use App\Modules\Crm\Affiliations\AffiliationRequest;
 use App\Modules\Crm\Duplicates\DuplicateCandidate;
@@ -19,6 +20,7 @@ use Illuminate\Database\QueryException;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Validator;
 
 /**
@@ -194,6 +196,7 @@ final class RowImporter
                 $e instanceof SkipRow => (new RowOutcome(ImportRow::SKIPPED))->add('info', $e->getMessage()),
                 $e instanceof ImportRowException => RowOutcome::error($e->getMessage()),
                 $e instanceof UniqueConstraintViolationException => RowOutcome::error(self::conflict($e)),
+                $this->absorbable($e) => $this->databaseError($line, $e),
                 default => throw $e,
             };
         }
@@ -203,6 +206,30 @@ final class RowImporter
         }
 
         return $outcome;
+    }
+
+    /**
+     * Any other database error on a row run in its own savepoint (rolled
+     * back alone): the row becomes an error, the import goes on. Logged with
+     * the SQL state and statement only (no value of the row).
+     */
+    private function databaseError(int $line, QueryException $e): RowOutcome
+    {
+        $context = DatabaseErrorLog::context($e);
+        Log::warning('Ligne d\'import CRM refusée par la base de données', ['batch_id' => $this->batch->id, 'line_number' => $line, ...$context]);
+        $state = is_string($context['sqlstate'] ?? null) && preg_match('/^[0-9A-Z]{5}$/', $context['sqlstate']) === 1 ? $context['sqlstate'] : null;
+
+        return RowOutcome::error('Ligne non importée : la base de données l\'a refusée'.($state === null ? '' : " (code {$state})").'.');
+    }
+
+    /**
+     * A database error the row's own savepoint absorbed. Not in a simulation
+     * (no savepoint), nor a lost connection (SQL state class 08: no row can
+     * succeed, the run stops).
+     */
+    private function absorbable(QueryException $e): bool
+    {
+        return ! $this->dryRun && ! str_starts_with((string) ($e->errorInfo[0] ?? ''), '08');
     }
 
     /**

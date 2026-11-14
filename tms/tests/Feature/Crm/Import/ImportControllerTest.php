@@ -15,6 +15,7 @@ use App\Modules\Crm\Import\ImportTarget;
 use App\Modules\Crm\Organisations\Organisation;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 use Inertia\Testing\AssertableInertia as Assert;
 
 beforeEach(function () {
@@ -102,6 +103,43 @@ it('refuses a bad upload with a french message', function (array $input, string 
     'unreadable xlsx' => [['file' => csvUpload('pas un classeur', 'faux.xlsx'), 'target' => 'organisations'], 'file'],
     'empty csv' => [['file' => csvUpload('', 'vide.csv'), 'target' => 'organisations'], 'file'],
 ]);
+
+/** A zip archive holding $entries (name => content), as an upload named $name. */
+function zipUpload(array $entries, string $name): UploadedFile
+{
+    $path = tempnam(sys_get_temp_dir(), 'zip');
+    $zip = new ZipArchive;
+    $zip->open($path, ZipArchive::OVERWRITE);
+    foreach ($entries as $entry => $content) {
+        $zip->addFromString($entry, $content);
+    }
+    $zip->close();
+
+    return UploadedFile::fake()->createWithContent($name, (string) file_get_contents($path));
+}
+
+it('checks the real type of the file, not only its extension', function (Closure $file, string $message) {
+    $this->actingAs($this->user);
+
+    $this->post('/crm/import', ['file' => $file(), 'target' => 'organisations'])->assertSessionHasErrors(['file' => $message]);
+    expect(ImportBatch::query()->count())->toBe(0)
+        ->and(Storage::disk('local')->allFiles())->toBe([]);
+})->with([
+    'zip renamed .csv' => [fn () => zipUpload(['a.txt' => 'Nom;Ville'], 'clients.csv'), 'Le contenu du fichier n\'est pas du texte CSV : enregistrez-le au format .csv (UTF-8 ou Windows-1252) depuis votre tableur, ou importez le .xlsx.'],
+    'pdf renamed .csv' => [fn () => csvUpload("%PDF-1.7\nNom;Ville\nA;Lyon\n"), 'Le contenu du fichier n\'est pas du texte CSV : enregistrez-le au format .csv (UTF-8 ou Windows-1252) depuis votre tableur, ou importez le .xlsx.'],
+    'binary .csv (nul byte)' => [fn () => csvUpload("Nom;Ville\nA\0B;Lyon\n"), 'Le contenu du fichier n\'est pas du texte CSV : enregistrez-le au format .csv (UTF-8 ou Windows-1252) depuis votre tableur, ou importez le .xlsx.'],
+    'neither utf-8 nor windows-1252' => [fn () => csvUpload("Nom;Ville\nA\x81\x8D;Lyon\n"), 'Le contenu du fichier n\'est pas du texte CSV : enregistrez-le au format .csv (UTF-8 ou Windows-1252) depuis votre tableur, ou importez le .xlsx.'],
+    'zip without [Content_Types].xml as .xlsx' => [fn () => zipUpload(['xl/workbook.xml' => '<workbook/>'], 'clients.xlsx'), 'Le fichier .xlsx est illisible (fichier endommagé ou d\'un autre format).'],
+]);
+
+it('still accepts windows-1252 text and a real xlsx', function () {
+    $this->actingAs($this->user);
+
+    $this->post('/crm/import', ['file' => csvUpload("Raison sociale;Ville\nH\xF4tel du Lac;Annecy\n"), 'target' => 'organisations'])->assertSessionHasNoErrors();
+    $this->post('/crm/import', ['file' => UploadedFile::fake()->createWithContent('contacts.xlsx', (string) file_get_contents(base_path('tests/Fixtures/imports/contacts.xlsx'))), 'target' => 'people'])->assertSessionHasNoErrors();
+
+    expect(ImportBatch::query()->count())->toBe(2);
+});
 
 it('takes the settings of a profile and refuses one of another target', function () {
     $this->actingAs($this->user);

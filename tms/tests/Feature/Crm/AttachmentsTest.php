@@ -4,11 +4,17 @@ use App\Modules\Core\Access\Role;
 use App\Modules\Core\Access\RoleModel;
 use App\Modules\Core\Tenancy\Tenant;
 use App\Modules\Core\Tenancy\TenantContext;
+use App\Modules\Core\Tenancy\TenantStorage;
 use App\Modules\Crm\Organisations\Organisation;
+use App\Modules\Crm\People\Person;
 use App\Modules\Crm\Timeline\Attachment;
+use App\Modules\Crm\Timeline\AttachmentsProvider;
+use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 
 beforeEach(function () {
     tenant();
@@ -196,4 +202,59 @@ it('stores nothing outside the private disk', function () {
 
     expect(glob(public_path('*.pdf')))->toBe([])
         ->and(config('filesystems.disks.local.root'))->not->toContain('public');
+});
+
+// --- Retention: files of fiches trashed for more than 12 months -----------
+
+/** An attachment of $fiche, stored as the upload does, the fiche trashed $monthsAgo months ago (null: not trashed). */
+function attachedTo(Organisation|Person $fiche, ?int $monthsAgo): Attachment
+{
+    $path = TenantStorage::path('attachments', (string) Str::uuid());
+    Storage::disk('local')->put($path, PDF);
+    $attachment = new Attachment(['original_name' => 'Devis.pdf', 'mime' => 'application/pdf', 'size' => strlen(PDF), 'path' => $path]);
+    $attachment->notable()->associate($fiche);
+    $attachment->save();
+    if ($monthsAgo !== null) {
+        DB::table($fiche->getTable())->where('id', $fiche->id)->update(['deleted_at' => now()->subMonths($monthsAgo)->subDay()]);
+    }
+
+    return $attachment;
+}
+
+it('deletes the files of fiches trashed for more than 12 months, keeping the rows', function () {
+    $oldOrg = attachedTo(attOrg(), 12);
+    $oldPerson = attachedTo(makePerson('Roux'), 13);
+    $recent = attachedTo(Organisation::query()->create(['name' => 'Garage Martin']), 11);
+    $active = attachedTo(Organisation::query()->create(['name' => 'Café des Arts']), null);
+
+    expect(Artisan::call('tms:crm:purge-attachments'))->toBe(0)
+        ->and(Artisan::output())->toContain('Fichiers supprimés : 2.');
+    Artisan::call('tms:crm:purge-attachments'); // idempotent
+    expect(Artisan::output())->toContain('Fichiers supprimés : 0.');
+
+    Storage::disk('local')->assertMissing([$oldOrg->path, $oldPerson->path]);
+    Storage::disk('local')->assertExists([$recent->path, $active->path]);
+    expect(Attachment::query()->whereNotNull('file_deleted_at')->pluck('id')->sort()->values()->all())->toBe(collect([$oldOrg->id, $oldPerson->id])->sort()->values()->all())
+        ->and(Attachment::query()->count())->toBe(4);
+});
+
+it('shows « Fichier supprimé » in the history and answers 410 to its download', function () {
+    $org = attOrg();
+    $attachment = attachedTo($org, 13);
+    Artisan::call('tms:crm:purge-attachments');
+    $org->restore();
+
+    $entry = app(AttachmentsProvider::class)->entriesFor($org->refresh(), null, 10)->sole();
+    expect($entry->meta['file_deleted'])->toBeTrue()
+        ->and($entry->body)->toBe('Fichier supprimé');
+
+    $this->actingAs(commercial())->get("/crm/attachments/{$attachment->id}")
+        ->assertStatus(410)
+        ->assertSee('Fichier supprimé : la fiche était dans la corbeille depuis plus de 12 mois.');
+});
+
+it('purges every night, for every organisme', function () {
+    $events = collect(app(Schedule::class)->events())->filter(fn ($e) => str_contains((string) $e->command, 'tms:crm:purge-attachments'));
+
+    expect($events)->toHaveCount(1)->and($events->first()->expression)->toBe('45 3 * * *');
 });

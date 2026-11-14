@@ -17,6 +17,14 @@ final class CsvReader implements TabularReader
 {
     public const DELIMITERS = [';', "\t", ','];
 
+    public const NOT_TEXT = 'Le contenu du fichier n\'est pas du texte CSV : enregistrez-le au format .csv (UTF-8 ou Windows-1252) depuis votre tableur, ou importez le .xlsx.';
+
+    /** Signatures of binary formats often renamed .csv (zip / Office, PDF, old Excel, images). */
+    private const BINARY_SIGNATURES = ["PK\x03\x04", '%PDF-', "\xD0\xCF\x11\xE0", "\x89PNG", "\xFF\xD8\xFF", 'GIF8'];
+
+    /** Bytes Windows-1252 leaves undefined: a file holding them is neither UTF-8 nor Windows-1252 text. */
+    private const UNDEFINED_1252 = "\x81\x8D\x8F\x90\x9D";
+
     private Headers $headers;
 
     /** Row number of the header (empty lines before it are skipped). */
@@ -62,6 +70,71 @@ final class CsvReader implements TabularReader
         }
 
         return new self($path, $delimiter ?? self::detectDelimiter($path), $encoding);
+    }
+
+    /**
+     * The real content is text: no binary signature, no NUL byte, and valid
+     * UTF-8 or Windows-1252 (whole file, read in 1 Mo chunks).
+     *
+     * @throws ImportFileException with a French message otherwise
+     */
+    public static function assertText(string $path): void
+    {
+        $handle = @fopen($path, 'rb');
+        if ($handle === false) {
+            throw new ImportFileException('Le fichier est illisible.');
+        }
+
+        try {
+            $first = true;
+            while (! feof($handle)) {
+                $chunk = fread($handle, 1048576);
+                if ($chunk === false) {
+                    break;
+                }
+                if ($first) {
+                    foreach (self::BINARY_SIGNATURES as $signature) {
+                        if (str_starts_with($chunk, $signature)) {
+                            throw new ImportFileException(self::NOT_TEXT);
+                        }
+                    }
+                    $first = false;
+                }
+                if (str_contains($chunk, "\0")) {
+                    throw new ImportFileException(self::NOT_TEXT);
+                }
+            }
+        } finally {
+            fclose($handle);
+        }
+
+        if (EncodingDetector::detectFile($path) === EncodingDetector::WINDOWS_1252 && self::hasUndefined1252($path)) {
+            throw new ImportFileException(self::NOT_TEXT);
+        }
+    }
+
+    private static function hasUndefined1252(string $path): bool
+    {
+        $handle = fopen($path, 'rb');
+        if ($handle === false) {
+            return true;
+        }
+
+        try {
+            while (! feof($handle)) {
+                $chunk = fread($handle, 1048576);
+                if ($chunk === false) {
+                    break;
+                }
+                if (strpbrk($chunk, self::UNDEFINED_1252) !== false) {
+                    return true;
+                }
+            }
+
+            return false;
+        } finally {
+            fclose($handle);
+        }
     }
 
     public function delimiter(): string

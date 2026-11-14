@@ -18,7 +18,7 @@ export interface TimelineEntryData {
     title: string;
     body: string | null;
     author: string | null;
-    meta: { id?: string; size?: number; mime?: string } & Record<string, unknown>;
+    meta: { id?: string; size?: number; mime?: string; file_deleted?: boolean } & Record<string, unknown>;
 }
 
 interface Props {
@@ -254,7 +254,7 @@ export function Timeline({ kind, subjectId, canEdit }: Props) {
                             <EntryIcon type={entry.type} />
                             <div className="min-w-0 flex-1">
                                 <div className="flex flex-wrap items-baseline justify-between gap-x-3">
-                                    {entry.type === 'attachment' && entry.meta.id ? (
+                                    {entry.type === 'attachment' && entry.meta.id && !entry.meta.file_deleted ? (
                                         <a
                                             href={route('crm.attachments.download', entry.meta.id)}
                                             className="inline-flex items-center gap-1 text-sm font-medium break-all underline"

@@ -194,7 +194,7 @@ Conventions communes : UUID v7, `tenant_id`, suppression logique (`deleted_at`) 
 `id`, `tenant_id` · `notable_type`, `notable_id` (fiche concernée : alias `organisation` ou `person`) · `body` (text) · `author_id` (FK `users`) · `created_at`, `updated_at` (timestamptz, µs), `deleted_at`.
 
 ### `attachments` — pièces jointes
-`id`, `tenant_id` · `notable_type`, `notable_id` · `original_name`, `mime`, `size` (octets), `path` (chemin dans le stockage de l'organisme, hors dossier public) · `uploaded_by` · horodatages, `deleted_at`. Le fichier est lu uniquement via l'application (contrôle des droits).
+`id`, `tenant_id` · `notable_type`, `notable_id` · `original_name`, `mime`, `size` (octets), `path` (chemin dans le stockage de l'organisme, hors dossier public) · `uploaded_by` · horodatages, `deleted_at` · `file_deleted_at` (fichier effacé du stockage par la purge de conservation : fiche en corbeille depuis plus de 12 mois ; la ligne reste, affichée « Fichier supprimé »). Le fichier est lu uniquement via l'application (contrôle des droits).
 
 ### `saved_filters` — filtres enregistrés
 `id`, `tenant_id` · `user_id` (auteur, cascade) · `resource` (`organisations` ou `people`, CHECK) · `name` (100) · `filters` (jsonb, clés validées) · `columns` (jsonb, null : colonnes de liste et d'export) · `is_shared` (visible de tout l'organisme) · horodatages. Le journal ne garde pas les termes de recherche.
@@ -212,9 +212,9 @@ Conventions communes : UUID v7, `tenant_id`, suppression logique (`deleted_at`) 
 |---|---|
 | `id`, `tenant_id`, `user_id` | Import et auteur |
 | `target`, `profile_id` | Type de données et profil utilisé |
-| `original_name`, `stored_path` | Nom du fichier et chemin de stockage (purgés au bout de 30 jours) |
+| `original_name`, `stored_path` | Nom du fichier et chemin de stockage (purgés au bout de 30 jours : le nom devient `fichier-import.<ext>`, il peut nommer une personne ; masqué dans le journal) |
 | `status` | `uploaded`, `simulated`, `running`, `done`, `failed`, `undoing`, `undone` (CHECK ; l'état transitoire de simulation figure aussi) |
-| `options`, `field_map`, `value_map` | Réglages choisis dans l'assistant |
+| `options`, `field_map`, `value_map` | Réglages choisis dans l'assistant ; `options.resumes` : reprises automatiques par la surveillance, `options.failure` : raison d'un échec |
 | `simulation` | Résultat de la simulation (jsonb) |
 | `total`, `created`, `updated`, `skipped`, `errors` | Compteurs |
 | `cursor_line` | Reprise de l'import après interruption |

@@ -44,7 +44,7 @@ class RunImport implements ShouldQueue
 
     public function handle(DuplicateFinder $finder, DasLinks $das, AuditRecorder $audit, TenantContext $tenants): void
     {
-        $lock = Cache::lock('crm-import:'.$tenants->id().':'.$this->batchId, $this->timeout + 30);
+        $lock = Cache::lock(self::lockKey($tenants->id(), $this->batchId), $this->timeout + 30);
         if (! $lock->get()) {
             return; // another worker is on it
         }
@@ -64,6 +64,12 @@ class RunImport implements ShouldQueue
         if ($continue) {
             static::dispatch($this->batchId);
         }
+    }
+
+    /** Held by the job working on a batch (ImportWatchdog checks it too). */
+    public static function lockKey(string $tenantId, string $batchId): string
+    {
+        return 'crm-import:'.$tenantId.':'.$batchId;
     }
 
     /**
