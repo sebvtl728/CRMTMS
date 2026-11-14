@@ -32,6 +32,8 @@ import { useMemo, useState } from 'react';
 
 interface Column {
     stage: StageOption;
+    /** Deactivated stage still holding opportunities: shown, never a drop target. */
+    inactive: boolean;
     count: number;
     amount: string;
     weighted_amount: string;
@@ -117,6 +119,7 @@ function ColumnHeader({ column, closedDays }: { column: Column; closedDays: numb
                 {formatAmount(column.amount)} · pondéré {formatAmount(column.weighted_amount)}
             </p>
             {column.stage.outcome !== null && <p className="text-muted-foreground text-xs">{closedDays} derniers jours</p>}
+            {column.inactive && <p className="text-muted-foreground text-xs">Étape désactivée : déplacez ces opportunités vers une étape active.</p>}
         </header>
     );
 }
@@ -134,13 +137,13 @@ function KanbanColumn({
     cardsLimit: number;
     canUpdate: boolean;
 }) {
-    const { setNodeRef, isOver } = useDroppable({ id: column.stage.value });
+    const { setNodeRef, isOver } = useDroppable({ id: column.stage.value, disabled: column.inactive });
 
     return (
         <section
             ref={setNodeRef}
             aria-label={column.stage.label}
-            className={`bg-muted/40 flex w-64 shrink-0 flex-col rounded-xl border ${isOver ? 'ring-primary ring-2' : ''}`}
+            className={`flex w-64 shrink-0 flex-col rounded-xl border ${column.inactive ? 'border-dashed' : 'bg-muted/40'} ${isOver ? 'ring-primary ring-2' : ''}`}
         >
             <ColumnHeader column={column} closedDays={closedDays} />
             <ul className="grid min-h-24 content-start gap-2 p-2">
@@ -223,7 +226,9 @@ export default function OpportunitiesKanban({ columns, filters, options, stages,
         if (!card || !target || target === (pending[card.id] ?? card.stage.id)) return;
 
         const stage = stages.find((s) => s.value === target);
-        if (stage?.outcome) {
+        // Only active stages are destinations.
+        if (!stage) return;
+        if (stage.outcome) {
             // Gagné: date of the win; Perdu: loss reason. Cancelling leaves the card where it was.
             setDialog({ card, target });
 

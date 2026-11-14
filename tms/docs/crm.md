@@ -79,7 +79,7 @@ Sur la page d'une opportunité, **Changer d'étape** ouvre la même fenêtre.
 
 ### Pipeline (kanban)
 
-**Pipeline** affiche une colonne par étape avec, en tête, le nombre d'opportunités, le montant et le montant pondéré. **Glissez** une carte par sa poignée vers une autre colonne (souris, ou clavier : Espace pour saisir, flèches, Espace pour déposer). Vers **Gagné** ou **Perdu**, la fenêtre demande la date ou le motif ; **Annuler** remet la carte en place. Si le serveur refuse le déplacement, la carte revient et le message s'affiche.
+**Pipeline** affiche une colonne par étape avec, en tête, le nombre d'opportunités, le montant et le montant pondéré. **Glissez** une carte par sa poignée vers une autre colonne (souris, ou clavier : Espace pour saisir, flèches, Espace pour déposer). Vers **Gagné** ou **Perdu**, la fenêtre demande la date ou le motif ; **Annuler** remet la carte en place. Si le serveur refuse le déplacement, la carte revient et le message s'affiche. Une étape désactivée par l'administrateur qui contient encore des opportunités reste affichée, sous le nom « <étape> (inactif) » : on peut en sortir ses cartes, pas y en déposer.
 
 - Les colonnes **Gagné** et **Perdu** ne montrent que les affaires closes depuis **90 jours**.
 - Une colonne affiche au plus 100 cartes (les totaux comptent tout) : affinez les filtres.

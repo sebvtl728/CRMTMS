@@ -116,15 +116,19 @@ final class OpportunityStage
     }
 
     /**
-     * Stages offered when moving: active ones (the current one kept), in
-     * pipeline order, with their outcome and default probability.
+     * Stages offered when moving: active ones (the current one(s) kept,
+     * labelled « (inactif) » when deactivated), in pipeline order, with
+     * their outcome and default probability.
      *
+     * @param  string|list<string>|null  $currentId
      * @return list<array{value: string, label: string, outcome: ?string, probability: int}>
      */
-    public static function options(?string $currentId = null): array
+    public static function options(string|array|null $currentId = null): array
     {
+        $keep = array_values(array_filter((array) $currentId));
+
         return ReferenceItem::query()->where('list', ReferenceList::PipelineStage)
-            ->where(fn ($q) => $q->where('is_active', true)->when($currentId, fn ($q2, $id) => $q2->orWhere('id', $id)))
+            ->where(fn ($q) => $q->where('is_active', true)->when($keep !== [], fn ($q2) => $q2->orWhereIn('id', $keep)))
             ->orderBy('position')->orderBy('label')->get()
             ->map(fn (ReferenceItem $i) => [
                 'value' => $i->id,

@@ -15,7 +15,9 @@ use Inertia\Response;
 
 /**
  * « Pipeline »: one column per active stage, in pipeline order, with its
- * count, amount and weighted amount. Same filters, visibility and sort as
+ * count, amount and weighted amount; a deactivated stage still holding
+ * opportunities keeps a column « <nom> (inactif) » (inactive: not a drop
+ * target, its opportunities wait to be moved). Same filters, visibility and sort as
  * the list (OpportunityListQuery). Won and lost columns only hold the
  * opportunities closed in the last CLOSED_DAYS days; each column shows at
  * most CARDS cards (its totals count them all). Moves go through the
@@ -48,11 +50,14 @@ class KanbanController extends Controller
             ->get()->keyBy('stage_id');
 
         $stages = OpportunityStage::options();
-        $columns = array_map(function (array $stage) use ($query, $totals): array {
+        $active = array_column($stages, 'value');
+        $held = array_values(array_diff(array_map('strval', $totals->keys()->all()), $active));
+        $columns = array_map(function (array $stage) use ($query, $totals, $active): array {
             $total = $totals->get($stage['value']);
 
             return [
                 'stage' => $stage,
+                'inactive' => ! in_array($stage['value'], $active, true),
                 'count' => (int) ($total->count ?? 0),
                 'amount' => number_format((float) ($total->amount ?? 0), 2, '.', ''),
                 'weighted_amount' => number_format((float) ($total->weighted ?? 0), 2, '.', ''),
@@ -60,7 +65,7 @@ class KanbanController extends Controller
                     ->with(OpportunityRows::WITH)->limit(self::CARDS)->get()
                     ->map(fn (Opportunity $o) => OpportunityRows::row($o))->values()->all(),
             ];
-        }, $stages);
+        }, $held === [] ? $stages : OpportunityStage::options($held));
 
         return Inertia::render('crm/opportunities/kanban', [
             'columns' => $columns,

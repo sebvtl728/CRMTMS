@@ -64,11 +64,29 @@ it('shows the active stages as columns with exact count, amount and weighted tot
         ->has('lossReasons')->has('stages', 7)->where('can.update', true)->where('closedDays', 90));
 });
 
-it('leaves out inactive stages', function () {
+it('leaves out empty inactive stages', function () {
     $this->actingAs(commercial());
     pipelineStage('Étude')->forceFill(['is_active' => false])->save();
 
-    expect(array_keys(kanbanColumns($this->get('/crm/opportunities/kanban'))))->not->toContain('Étude');
+    expect(array_keys(kanbanColumns($this->get('/crm/opportunities/kanban'))))->not->toContain('Étude')->not->toContain('Étude (inactif)');
+});
+
+it('keeps the opportunities of a deactivated stage in a column of their own, not a drop target', function () {
+    $this->actingAs(commercial());
+    $org = Organisation::query()->create(['name' => 'Le Bistrot']);
+    $study = makeOpportunity($org, ['title' => 'En étude', 'amount' => 1000]);
+    app(OpportunityStage::class)->move($study, pipelineStage('Étude'), null, null, null);
+    pipelineStage('Étude')->forceFill(['is_active' => false])->save();
+
+    $response = $this->get('/crm/opportunities/kanban');
+    $columns = kanbanColumns($response);
+
+    expect(array_keys($columns))->toBe(['Nouveau', 'Contacté', 'Étude (inactif)', 'Proposition', 'Négociation', 'Gagné', 'Perdu'])
+        ->and($columns['Étude (inactif)'])->toMatchArray(['count' => 1, 'amount' => '1000.00', 'inactive' => true])
+        ->and(collect($columns['Étude (inactif)']['cards'])->pluck('title')->all())->toBe(['En étude'])
+        ->and($columns['Nouveau']['inactive'])->toBeFalse();
+    // Not offered as a destination.
+    $response->assertInertia(fn ($page) => $page->has('stages', 6));
 });
 
 it('applies the same filters and visibility as the list', function () {
