@@ -41,6 +41,11 @@ use Illuminate\Support\Facades\DB;
  * @property string|null $email
  * @property string|null $phone
  * @property bool $is_default
+ * @property string|null $logo_path private disk, set by CompanyBranding only
+ * @property string $quote_prefix ^[A-Z0-9]{1,10}$
+ * @property int $quote_validity_days 1 to 365
+ * @property string|null $quote_terms
+ * @property string|null $quote_footer
  * @property Carbon|null $deleted_at
  */
 #[UseFactory(CompanyFactory::class)]
@@ -55,7 +60,16 @@ class Company extends Model
         'siret', 'rcs_city', 'vat_number', 'vat_regime', 'nda_number',
         'address_line1', 'address_line2', 'address_postal_code', 'address_city', 'address_country',
         'email', 'phone', 'is_default',
+        'quote_prefix', 'quote_validity_days', 'quote_terms', 'quote_footer',
     ];
+
+    /**
+     * The logo has its own journal events (CompanyBranding: company.logo_changed /
+     * company.logo_deleted), which also cover a replacement under the same name.
+     *
+     * @var list<string>
+     */
+    protected array $auditIgnore = ['logo_path'];
 
     /** @var array<string, mixed> */
     protected $attributes = [
@@ -64,10 +78,22 @@ class Company extends Model
         'capital_variable' => false,
         'address_country' => 'FR',
         'is_default' => false,
+        'quote_prefix' => 'DEV',
+        'quote_validity_days' => 30,
     ];
 
     protected static function booted(): void
     {
+        // A prefix belongs to one company: a new company left with the default
+        // prefix (placeholder, factory, form without it) takes the first free
+        // suffix (« DEV2 »…). A prefix typed in the form is validated instead.
+        static::creating(function (Company $company): void {
+            if ($company->isDirty('quote_prefix')) {
+                return;
+            }
+            $company->quote_prefix = static::freePrefix($company->quote_prefix);
+        });
+
         // Becoming the default unsets the previous one. Runs inside save()'s
         // transaction, before the write, so the partial unique index holds.
         static::saving(function (Company $company): void {
@@ -81,6 +107,22 @@ class Company extends Model
                 ->get()
                 ->each(fn (Company $other) => $other->update(['is_default' => false]));
         });
+    }
+
+    /**
+     * $base when no company of the organisme uses it, else the first free
+     * suffix (« DEV2 », « DEV3 »…; 10 characters at most). A deleted
+     * company frees its prefix.
+     */
+    public static function freePrefix(string $base = 'DEV'): string
+    {
+        $taken = static::query()->pluck('quote_prefix')->all();
+        $prefix = $base;
+        for ($n = 2; in_array($prefix, $taken, true); $n++) {
+            $prefix = substr($base, 0, 10 - strlen((string) $n)).$n;
+        }
+
+        return $prefix;
     }
 
     /**
@@ -100,6 +142,7 @@ class Company extends Model
             'vat_regime' => VatRegime::class,
             'capital_variable' => 'boolean',
             'is_default' => 'boolean',
+            'quote_validity_days' => 'integer',
         ];
     }
 }

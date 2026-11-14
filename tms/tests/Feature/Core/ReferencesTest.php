@@ -367,3 +367,55 @@ it('flags the meeting and call types of existing organismes by migration', funct
         'appel' => ['color' => '#ff8800', 'planning' => 'call'],
     ]);
 });
+
+it('flags the CAP FORMATION « Proposition » stage as the stage of a sent quote', function () {
+    seedCap();
+    $flagged = ReferenceItem::query()->where('list', ReferenceList::PipelineStage)->get()
+        ->filter(fn (ReferenceItem $i) => ($i->meta['quote_stage'] ?? false) === true)->pluck('code')->all();
+
+    expect(array_values($flagged))->toBe(['proposition']);
+});
+
+it('lets the admin choose one quote stage, never a closing one', function () {
+    seedCap();
+    $this->actingAs(admin(twoFactor: true));
+    $stage = fn (string $code) => ReferenceItem::query()->where('list', ReferenceList::PipelineStage)->where('code', $code)->sole();
+
+    $this->putJson("/admin/references/pipeline_stage/{$stage('negociation')->id}", ['label' => 'Négociation', 'meta' => ['probability' => 80, 'quote_stage' => true]])->assertRedirect();
+    expect($stage('negociation')->meta['quote_stage'])->toBeTrue()
+        // Only one: the previous one is cleared.
+        ->and($stage('proposition')->meta)->not->toHaveKey('quote_stage')
+        ->and($stage('proposition')->meta['probability'])->toBe(60);
+
+    $this->putJson("/admin/references/pipeline_stage/{$stage('gagne')->id}", ['label' => 'Gagné', 'meta' => ['quote_stage' => true]])
+        ->assertStatus(422)->assertJsonValidationErrors(['meta.quote_stage' => 'Une étape gagnée ou perdue ne peut pas être l\'étape d\'un devis envoyé.']);
+
+    // A label-only update keeps the flag; false removes it.
+    $this->putJson("/admin/references/pipeline_stage/{$stage('negociation')->id}", ['label' => 'Négociation', 'is_active' => true, 'meta' => ['probability' => 80]])->assertRedirect();
+    expect($stage('negociation')->meta['quote_stage'])->toBeTrue();
+    $this->putJson("/admin/references/pipeline_stage/{$stage('negociation')->id}", ['label' => 'Négociation', 'meta' => ['probability' => 80, 'quote_stage' => false]])->assertRedirect();
+    expect($stage('negociation')->meta)->not->toHaveKey('quote_stage');
+
+    // Other lists ignore it.
+    $this->postJson('/admin/references/contact_origin', ['label' => 'Salon pro', 'meta' => ['quote_stage' => true]])->assertRedirect();
+    expect(ReferenceItem::query()->where('code', 'salon-pro')->sole()->meta)->toBeNull();
+
+    $this->get('/admin/references')->assertInertia(fn (Assert $p) => $p->where('lists.pipeline_stage.has_quote_stage', true)->where('lists.das.has_quote_stage', false));
+});
+
+it('flags the « Proposition » stage of existing organismes by migration, unless one is chosen', function () {
+    seedCap();
+    $proposition = ReferenceItem::query()->where('list', ReferenceList::PipelineStage)->where('code', 'proposition')->sole();
+    $proposition->update(['meta' => ['probability' => 60, 'outcome' => null]]);
+
+    (require database_path('migrations/2026_12_04_000002_flag_quote_pipeline_stage.php'))->up();
+    expect($proposition->fresh()->meta['quote_stage'])->toBeTrue();
+
+    // The organisme chose another stage (or none, false): kept.
+    $proposition = $proposition->fresh();
+    $proposition->update(['meta' => ['probability' => 60, 'outcome' => null]]);
+    $other = ReferenceItem::query()->where('list', ReferenceList::PipelineStage)->where('code', 'etude')->sole();
+    $other->update(['meta' => ['probability' => 40, 'outcome' => null, 'quote_stage' => false]]);
+    (require database_path('migrations/2026_12_04_000002_flag_quote_pipeline_stage.php'))->up();
+    expect($proposition->fresh()->meta)->not->toHaveKey('quote_stage');
+});

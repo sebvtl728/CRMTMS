@@ -40,6 +40,14 @@ class OpportunityRequest extends FormRequest
         if ($this->has('amount')) {
             $clean['amount'] = Amount::parse($this->input('amount'));
         }
+        if ($this->has('training_lines')) {
+            $clean['training_lines'] = OpportunityTrainings::normalise($this->input('training_lines'));
+            // No DAS chosen yet: the DAS of the first training (still required).
+            $das = $this->input('das_id');
+            if ($das === null || (is_string($das) && trim($das) === '')) {
+                $clean['das_id'] = OpportunityTrainings::firstDas($clean['training_lines']);
+            }
+        }
 
         $this->merge($clean);
     }
@@ -71,6 +79,7 @@ class OpportunityRequest extends FormRequest
             'responsible_user_id' => ['nullable', ...ReferenceRules::responsible($current?->responsible_user_id)],
             'contact_ids' => ['sometimes', 'array'],
             'contact_ids.*' => ['distinct', Rule::in($this->allowedContacts($user))],
+            ...OpportunityTrainings::rules($current),
         ];
 
         if ($current === null) {
@@ -185,6 +194,7 @@ class OpportunityRequest extends FormRequest
             'expected_close_on.date_format' => 'La date doit être au format AAAA-MM-JJ.',
             'array' => 'Cette valeur n\'est pas valide.',
             'contact_ids.*.in' => 'Cette personne n\'est pas un interlocuteur de ce compte.',
+            ...OpportunityTrainings::messages(),
         ];
     }
 }

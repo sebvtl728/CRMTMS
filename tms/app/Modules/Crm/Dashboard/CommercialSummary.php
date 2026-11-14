@@ -10,6 +10,7 @@ use App\Modules\Crm\Activities\TodoQuery;
 use App\Modules\Crm\Activities\WeekPlanning;
 use App\Modules\Crm\Opportunities\OpportunityListQuery;
 use App\Modules\Crm\Opportunities\OpportunityStage;
+use App\Modules\Crm\Quotes\QuoteSuccessRate;
 use App\Modules\Crm\Visibility\CrmVisibility;
 use Carbon\CarbonImmutable;
 
@@ -19,6 +20,7 @@ use Carbon\CarbonImmutable;
  * - « Mes relances »: his own actions overdue and due today (as « À faire »);
  * - « Pipeline pondéré du mois »: weighted amount of the open opportunities
  *   expected to close in the current Paris month (as the list filtered so);
+ * - « Devis »: quotes sent this Paris month, accepted among them, the rate;
  * - « Prochains rendez-vous »: his next meetings to do (types flagged
  *   meta.planning « meeting »), without report.
  */
@@ -28,15 +30,28 @@ final class CommercialSummary
     public const MEETINGS = 5;
 
     /**
-     * @return array{follow_ups: array{overdue: int, today: int}, pipeline: array{weighted_amount: string, count: int, month: string, close_from: string, close_to: string}, meetings: list<array<string, mixed>>}
+     * @return array{follow_ups: array{overdue: int, today: int}, pipeline: array{weighted_amount: string, count: int, month: string, close_from: string, close_to: string}, quotes: array{sent: int, accepted: int, rate: float|null, month: string}, meetings: list<array<string, mixed>>}
      */
     public static function for(User $user, CarbonImmutable $now): array
     {
         return [
             'follow_ups' => TodoQuery::counts($user, $now),
             'pipeline' => self::pipeline($user, $now),
+            'quotes' => self::quotes($user, $now),
             'meetings' => self::meetings($user, $now),
         ];
+    }
+
+    /**
+     * Quotes sent this Paris month, accepted among them, and the rate.
+     *
+     * @return array{sent: int, accepted: int, rate: float|null, month: string}
+     */
+    private static function quotes(User $user, CarbonImmutable $now): array
+    {
+        $month = QuoteSuccessRate::period('month', $now);
+
+        return [...QuoteSuccessRate::for($user, $month['from'], $month['to']), 'month' => $month['label']];
     }
 
     /**

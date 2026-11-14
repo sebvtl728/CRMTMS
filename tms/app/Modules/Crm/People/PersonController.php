@@ -3,11 +3,11 @@
 namespace App\Modules\Crm\People;
 
 use App\Http\Controllers\Controller;
+use App\Modules\Core\Exports\ExportCell;
 use App\Modules\Core\References\ReferenceItem;
 use App\Modules\Core\References\ReferenceList;
 use App\Modules\Core\Users\User;
 use App\Modules\Crm\Duplicates\DuplicateGuard;
-use App\Modules\Crm\Export\ExportCell;
 use App\Modules\Crm\Gdpr\Consent;
 use App\Modules\Crm\Gdpr\ConsentChannel;
 use App\Modules\Crm\Gdpr\GdprPending;
@@ -16,6 +16,7 @@ use App\Modules\Crm\Opportunities\OpportunityRows;
 use App\Modules\Crm\Organisations\Organisation;
 use App\Modules\Crm\Organisations\OrganisationStatus;
 use App\Modules\Crm\Permissions;
+use App\Modules\Crm\Quotes\QuoteRows;
 use App\Modules\Crm\Search\CrmResource;
 use App\Modules\Crm\Search\ListExtras;
 use App\Modules\Crm\Search\RecentViews;
@@ -214,6 +215,7 @@ class PersonController extends Controller
             ],
             'gdpr' => $this->gdpr($person, $user),
             'opportunities' => OpportunityRows::forFiche($person, $user),
+            'quotes' => QuoteRows::forFiche($person, $user),
             'similar' => $user->can(Permissions::MERGE) ? $this->duplicates->similarTo($person, $user) : [],
             'can' => [
                 'merge' => ! $person->trashed() && $person->anonymised_at === null && $user->can(Permissions::MERGE),

@@ -1,8 +1,8 @@
-# Guide utilisateur : fiches, pipeline, relances, import et RGPD
+# Guide utilisateur : fiches, pipeline, relances, catalogue, devis, import et RGPD
 
 Ce guide s'adresse aux personnes qui utilisent le TMS au quotidien (commerciaux, chargés de relations, assistants, direction, responsables de DAS). Les écrans sont désignés par leur libellé à l'écran. Ce que vous voyez dépend de votre rôle : les boutons auxquels vous n'avez pas droit n'apparaissent pas (voir `admin.md` pour la liste des droits par rôle).
 
-Le menu de gauche, section **Commercial**, donne accès, dans cet ordre, à **Pipeline**, **Opportunités**, **À faire** (avec le nombre d'actions en retard ou du jour), **Planning**, **Compte rendu de RDV**, **Entreprises**, **Personnes**, **Imports** et **RGPD**. Le mot « entreprise » désigne ici toute organisation cliente ou prospect : entreprise, association, collectivité.
+Le menu de gauche, section **Commercial**, donne accès, dans cet ordre, à **Pipeline**, **Opportunités**, **Devis**, **À faire** (avec le nombre d'actions en retard ou du jour), **Planning**, **Compte rendu de RDV**, **Catalogue**, **Entreprises**, **Personnes**, **Imports** et **RGPD**. Le mot « entreprise » désigne ici toute organisation cliente ou prospect : entreprise, association, collectivité.
 
 ## 1. L'écran d'accueil
 
@@ -13,6 +13,7 @@ Le menu de gauche, section **Commercial**, donne accès, dans cet ordre, à **Pi
 - le nombre d'entreprises et de personnes que vous pouvez voir ;
 - **Mes relances** : le nombre de vos actions **en retard** et à faire **aujourd'hui** (les mêmes que l'écran **À faire**) ; un clic ouvre **À faire** ;
 - **Pipeline pondéré** du mois : la somme des montants pondérés de vos opportunités **en cours** (ni gagnées, ni perdues) dont la **clôture prévue** tombe dans le mois en cours ; un clic ouvre la liste **Opportunités** filtrée sur ce mois ;
+- **Devis** du mois : le **taux de réussite** des devis envoyés dans le mois en cours (heure de Paris), avec le nombre d'envoyés et d'acceptés (« — » si aucun devis n'est parti) ; un clic ouvre la liste **Devis** ;
 - **Prochains rendez-vous** : vos 5 prochains rendez-vous à faire, avec le jour, l'heure et le lieu ; un clic ouvre la fiche ;
 - **Dernières fiches consultées** : les 5 dernières fiches que vous avez ouvertes, les plus récentes en premier. Cette liste est personnelle ; elle ne garde que le fait que vous avez ouvert la fiche, pas son contenu. Une fiche supprimée, fusionnée ou hors de votre périmètre n'y figure plus.
 
@@ -27,7 +28,7 @@ Tous ces chiffres respectent votre périmètre : un Responsable de DAS n'y compt
 - **Saisie rapide** : seule la **raison sociale** est obligatoire. Complétez le reste quand vous l'avez.
 - **Compléter depuis le SIRET** : saisissez les 14 chiffres, puis ce bouton va chercher l'annuaire officiel des entreprises et remplit **uniquement les champs encore vides**. Rien n'est enregistré tant que vous n'avez pas cliqué sur **Enregistrer**. Si l'annuaire ne répond pas, saisissez les informations à la main.
 - Un même SIRET ne peut pas servir à deux fiches : le formulaire vous propose d'ouvrir la fiche existante.
-- Sur une fiche, les onglets sont **Informations**, **Interlocuteurs**, **Opportunités** et **Historique**.
+- Sur une fiche, les onglets sont **Informations**, **Interlocuteurs**, **Opportunités**, **Devis** et **Historique**.
 
 ### Personnes
 
@@ -41,7 +42,7 @@ Seul le **nom** est obligatoire. Pour rattacher quelqu'un à une entreprise, ouv
 
 ### Historique, notes et pièces jointes
 
-L'onglet **Historique** d'une fiche liste, du plus récent au plus ancien, les **notes**, les **pièces jointes**, les **actions** (appels, rendez-vous… voir plus bas), les **étapes de ses opportunités** et les **modifications** de la fiche (qui a changé quoi et quand ; les données personnelles modifiées sont signalées sans afficher leur valeur).
+L'onglet **Historique** d'une fiche liste, du plus récent au plus ancien, les **notes**, les **pièces jointes**, les **actions** (appels, rendez-vous… voir plus bas), les **étapes de ses opportunités**, les **devis** (« Devis CF-2026-0001 créé / envoyé / relancé / accepté / refusé / expiré ») et les **modifications** de la fiche (qui a changé quoi et quand ; les données personnelles modifiées sont signalées sans afficher leur valeur).
 
 - **Ajouter une note** : écrivez dans la zone « Ajouter une note » (appel, rendez-vous, information utile), puis **Ajouter la note**. Une note met à jour la date de **dernier contact** de la fiche.
 - **Joindre un fichier** : PDF, images, Word, Excel, OpenDocument, texte, CSV, 20 Mo maximum.
@@ -62,6 +63,8 @@ Une **opportunité** est une affaire en cours avec une entreprise ou un **partic
 ### Créer une opportunité
 
 Depuis la fiche, onglet **Opportunités**, **Nouvelle opportunité** (ou depuis l'écran **Opportunités**, qui demande d'abord l'entreprise ou le particulier). Renseignez l'**objet**, le **DAS**, l'**étape**, le **montant estimé**, la **clôture prévue**, la priorité, le **mode de financement** (prérempli depuis la fiche d'un particulier) et le responsable. Pour une entreprise, cochez ses interlocuteurs concernés.
+
+**Formations** : ajoutez les formations du catalogue concernées (formations actives uniquement) et leur **quantité** (par défaut 1 ; « 2,5 » accepté). Sans DAS choisi, celui de la première formation est repris. Sur une opportunité enregistrée, **Calculer le montant proposé** fait la somme tarif × quantité (tarif entreprise ou particulier selon le compte) ; une formation sans tarif compte 0 et est signalée. Le montant proposé n'est jamais enregistré seul : **Reporter dans le montant estimé** le recopie dans le champ, puis **Enregistrer**. Une formation désactivée depuis reste sur les opportunités qui l'ont (« (inactive) ») mais ne peut plus être ajoutée ; une formation utilisée par une opportunité ne peut pas être supprimée du catalogue.
 
 > Pour un particulier, ne mettez pas son nom dans l'**objet** (« Formation HACCP 3 jours », pas « Formation de M. Dupont ») : l'objet est conservé pour les statistiques même après l'anonymisation de la personne (voir RGPD).
 
@@ -87,9 +90,75 @@ Sur la page d'une opportunité, **Changer d'étape** ouvre la même fenêtre.
 
 ### Liste, filtres et export
 
-**Opportunités** liste les affaires avec les totaux (montant et pondéré). Filtres : recherche (objet ou nom de la fiche), DAS, entreprises ou particuliers, responsable, priorité, étape, clôture prévue du / au, **Mes opportunités** ; tri par clôture prévue, montant, montant pondéré ou création. **Vue pipeline** / **Vue liste** passent de l'une à l'autre en gardant les filtres. **Exporter (.xlsx)** exporte la liste filtrée (mêmes règles que les autres exports).
+**Opportunités** liste les affaires avec les totaux (montant et pondéré). Filtres : recherche (objet ou nom de la fiche), DAS, **formation**, entreprises ou particuliers, responsable, priorité, étape, clôture prévue du / au, **Mes opportunités** ; tri par clôture prévue, montant, montant pondéré ou création. **Vue pipeline** / **Vue liste** passent de l'une à l'autre en gardant les filtres. **Exporter (.xlsx)** exporte la liste filtrée (mêmes règles que les autres exports ; la colonne **Formations** donne leurs intitulés séparés par « ; »).
 
-## 4. Actions, relances et « À faire »
+## 4. Catalogue de formations
+
+**Catalogue** liste les formations proposées par l'organisme : intitulé, code (facultatif, unique), **DAS**, durées en heures et en jours, public visé, prérequis, **tarif entreprise** et **tarif particulier** HT par stagiaire, modes de financement possibles (CPF, OPCO…), état (active ou désactivée).
+
+- Tout le monde voit le catalogue ; seuls l'administrateur et la direction le modifient (droit `catalogue.manage`, voir `admin.md`) : **Nouvelle formation**, **Modifier**, **Désactiver** / **Activer**, **Supprimer**.
+- Montants et durées se saisissent à la française (« 1 250,50 », « 7,5 »).
+- Filtres : recherche (intitulé ou code, sans souci d'accents), **DAS**, **Financement**, **État** ; tri par intitulé, code ou tarif entreprise.
+- Une formation **désactivée** n'est plus proposée sur les nouvelles opportunités ni les nouveaux devis, mais reste sur ceux qui l'ont déjà. Une formation **utilisée** (par une opportunité ou un devis, même supprimés) ne peut pas être supprimée : désactivez-la.
+- **Exporter (.xlsx)** (avec le droit d'export) : la liste filtrée, tarifs et durées en vrais nombres.
+- **Importer un catalogue** : menu **Imports**, type **Catalogue de formations** (gestionnaires du catalogue ayant aussi le droit d'import), voir § 11.
+
+## 5. Devis
+
+Un **devis** se crée depuis une **opportunité** : il en reprend le compte (entreprise ou particulier), les formations et le DAS. Écran **Devis** pour la liste, section **Devis** de la page d'une opportunité, onglet **Devis** des fiches.
+
+### Créer et modifier un brouillon
+
+Sur la page de l'opportunité, **Nouveau devis** ouvre un formulaire prérempli :
+
+- **Société émettrice** (la société par défaut ; elle donne le **numéro** et ne change plus ensuite), **Destinataire** (le particulier, ou le premier interlocuteur de l'opportunité), **Date du devis** (aujourd'hui), **Valable jusqu'au** (date + durée de validité de la société, 30 jours par défaut), **Mentions particulières** ;
+- une **ligne par formation** de l'opportunité : intitulé, quantité, unité « stagiaire », tarif entreprise ou particulier selon le compte, TVA 20 %. Une formation sans tarif est signalée : indiquez le prix de la ligne.
+
+Chaque ligne porte un libellé, une description, une **quantité** (« 2,5 » accepté), une **unité** (stagiaire, jour, heure, forfait, session), un **prix unitaire HT**, une **remise** en % et un **taux de TVA** (20 %, 10 %, 5,5 %, 2,1 % ou 0 %). On peut ajouter une ligne libre ou une formation du catalogue, déplacer et retirer des lignes (1 à 100 lignes). Les totaux s'affichent pendant la saisie et sont recalculés au centime près à l'enregistrement : total HT de chaque ligne, TVA **par taux** (sur la somme des lignes du même taux), total TTC.
+
+Si la société est **exonérée de TVA** (régime choisi par l'administrateur), toutes les lignes sont à 0 % et le devis porte la mention « TVA non applicable, art. 261-4-4° a du CGI » ; un brouillon suit le régime actuel de sa société, un devis envoyé garde celui du jour de l'envoi.
+
+**Enregistrer le brouillon** attribue le numéro `<préfixe>-<année>-<numéro>` (par exemple `CF-2026-0001`) : un compteur par préfixe et par année civile (heure de Paris, l'année du jour de création), sans trou ; le numéro d'un brouillon supprimé n'est pas réattribué. Tant qu'il est **brouillon**, le devis se **modifie** et se **supprime** ; une fois envoyé, il ne se modifie plus.
+
+### PDF
+
+**Aperçu PDF** ouvre le devis dans un nouvel onglet, marqué **BROUILLON** en filigrane. Le document porte le logo, l'adresse et les mentions légales de la société, le destinataire, l'objet (celui de l'opportunité), les lignes, la TVA par taux, les totaux, les mentions particulières, les conditions générales et le pied de page de la société, et une case « Bon pour accord ». À l'**envoi**, le PDF est **figé et archivé** (sans filigrane) : le bouton **PDF** d'un devis envoyé rouvre toujours ce même document, même si la société ou le client changent ensuite.
+
+### Envoyer, relancer
+
+- **Envoyer** : destinataire (prérempli avec l'e-mail du destinataire, ou à défaut de l'entreprise), jusqu'à 5 adresses en copie, objet et message préremplis, modifiables. Le message part en texte simple avec le PDF joint, par la messagerie de l'organisme (connecteur SMTP de la société, sinon de l'organisme) ; sans serveur d'envoi configuré, la fenêtre prévient que le message ne partira pas réellement. Le devis passe **Envoyé** ; l'opportunité avance d'elle-même à l'étape du devis envoyé (« Proposition » chez CAP FORMATION, réglage de l'administrateur) si elle était à une étape antérieure ; la date de **dernier contact** des fiches est mise à jour.
+- L'envoi se fait en arrière-plan : « E-mail en cours d'envoi… » s'affiche quelques instants. S'il échoue (serveur refusé…), le bandeau **L'e-mail n'est pas parti** donne la raison et **Renvoyer** réessaie le même message. Le devis reste envoyé.
+- **Relancer** (devis envoyé ou déjà relancé) : nouveau message, même PDF ; le devis passe **Relancé**. Impossible tant qu'un envoi est en cours ou en échec (utilisez **Renvoyer**).
+- **Envoyer** est indisponible (la raison s'affiche) quand la **date de validité est dépassée** (modifiez les dates) ou quand le **régime de TVA de la société a changé** depuis l'enregistrement du brouillon : ouvrez-le, vérifiez les taux (une société devenue assujettie laisse les lignes à 0 % : choisissez le taux de chaque ligne) et enregistrez-le.
+- Si le PDF archivé d'un devis envoyé est introuvable, **PDF**, **Relancer** et **Renvoyer** sont indisponibles (« Le PDF archivé est introuvable : contactez l'administrateur. ») : le devis n'est jamais régénéré avec les données du jour.
+
+### Réponse du client
+
+Les boutons **Accepté** et **Refusé** apparaissent sur un devis envoyé ou relancé (pour un devis expiré, faites une nouvelle version).
+
+- **Accepté** (date d'acceptation : aujourd'hui par défaut, jamais dans le futur ni avant la date du devis) : le TMS propose ensuite de **passer l'opportunité en « Gagné »**, à la date d'acceptation, avec la case **Mettre le montant de l'opportunité à jour** (total HT du devis) cochée par défaut. **Ne pas changer** laisse l'opportunité telle quelle.
+- **Refusé** (date et motif facultatif) : le TMS propose de **passer l'opportunité en « Perdu »**, motif de perte obligatoire.
+- Rien n'est proposé si l'opportunité est déjà gagnée ou perdue.
+
+### Expiration
+
+Chaque nuit à **0 h 05** (heure de Paris), un devis **envoyé** ou **relancé** dont la date de validité est dépassée passe **Expiré** : un devis valable jusqu'au 14 l'est encore toute la journée du 14. Les brouillons et les devis acceptés ou refusés ne changent pas.
+
+### Nouvelle version
+
+**Nouvelle version** crée un nouveau brouillon (nouveau numéro, daté du jour, mêmes lignes sauf les formations désactivées depuis ; le destinataire est repris s'il est toujours interlocuteur) à modifier puis envoyer. Le devis d'origine, s'il était envoyé, relancé ou expiré, passe **Refusé** avec la mention **Remplacé par** le nouveau numéro ; un devis déjà accepté ou refusé garde sa réponse.
+
+### Liste, taux de réussite et export
+
+**Devis** liste les devis visibles (un Responsable DAS ne voit que ceux des opportunités de ses DAS). Filtres : recherche (numéro, objet de l'opportunité, nom du compte), **Statut**, **Société**, **DAS**, **Responsable**, date du devis du / au ; tri par date, numéro ou total.
+
+Le bandeau **Taux de réussite** donne, pour la période choisie (**Mois**, **Trimestre**, **Année**, heure de Paris), le nombre de devis **envoyés** dans la période et la part de ceux qui ont été **acceptés** (quelle que soit la date d'acceptation), dans les filtres de la liste. Un devis remplacé par une **nouvelle version** n'est pas compté : seule la nouvelle version compte, une fois envoyée. **Exporter (.xlsx)** exporte la liste filtrée : numéro, dates, statut, société, compte, opportunité, DAS, responsable, totaux HT / TVA / TTC, dates d'envoi et de réponse (ni texte libre, ni coordonnées).
+
+### Fusion et RGPD
+
+Les devis suivent la fiche conservée lors d'une fusion. L'anonymisation d'une personne efface de ses devis le destinataire figé, les mentions, le motif de refus, le message envoyé et **supprime le PDF archivé** (il n'est plus jamais régénéré : le bouton **PDF** affiche « Document supprimé (données anonymisées) ») ; numéro, lignes, montants, statut et dates restent pour les statistiques. Pour un interlocuteur d'une entreprise, seule sa part est effacée (son nom et son e-mail dans le destinataire figé, le message envoyé, le PDF archivé ; ses adresses en copie d'autres devis) ; le nom et l'adresse de l'entreprise, les mentions et le motif de refus du devis sont conservés. L'export des données d'une personne contient ses devis.
+
+## 6. Actions, relances et « À faire »
 
 Une **action** est un échange ou une tâche commerciale : appel, rendez-vous, e-mail, rappel… (types et résultats paramétrables). Elle concerne une entreprise, une personne et/ou une opportunité, et figure dans l'**Historique** de la fiche.
 
@@ -119,7 +188,7 @@ Le nombre affiché à côté de **À faire** dans le menu (en retard + aujourd'h
 
 Dans **Paramètres › Profil**, cochez **Recevoir le récapitulatif quotidien** : chaque matin à **7 h 30**, un e-mail liste vos actions en retard et du jour (titres, fiches, heures ; jamais de compte rendu ni de lieu). Pas d'e-mail les jours où il n'y a rien. L'option est désactivée par défaut.
 
-## 5. Planning et compte rendu de rendez-vous
+## 7. Planning et compte rendu de rendez-vous
 
 ### Planning de la semaine
 
@@ -139,14 +208,14 @@ Les types d'action qui comptent comme rendez-vous ou comme appels sont réglés 
 
 Tout est enregistré ensemble ou rien ne l'est (par exemple si le motif de perte manque).
 
-## 6. Votre agenda : abonnement iCal et Outlook
+## 8. Votre agenda : abonnement iCal et Outlook
 
 **Paramètres › Mon agenda** envoie vos rendez-vous et appels planifiés vers votre agenda habituel.
 
 - **Lien d'abonnement (iCal)** : **Créer mon lien d'abonnement** donne une adresse privée, **affichée une seule fois** (copiez-la). Abonnez-y Outlook (web ou nouvel Outlook : Calendrier › Ajouter un calendrier › S'abonner à partir du web ; Outlook classique : Accueil › Ajouter un calendrier › À partir d'Internet), Google Agenda ou Apple Calendrier (instructions sur la page). L'agenda montre les 30 derniers jours et les 6 prochains mois, sans compte rendu, et se met à jour selon le rythme de votre agenda (souvent plusieurs heures chez Google et Outlook). **Ce lien donne accès à votre agenda sans mot de passe** : ne le partagez pas ; **Créer un nouveau lien** annule l'ancien, **Révoquer le lien** coupe l'accès.
 - **Connecter Outlook** (Microsoft 365, si l'administrateur l'a activé) : vos rendez-vous et appels sont créés, modifiés et supprimés directement dans votre agenda Outlook, en quelques instants. Si Microsoft demande de vous reconnecter, un message l'indique : **Reconnecter Outlook**. **Déconnecter Outlook** arrête l'envoi (les évènements déjà créés restent). Mise en place par l'administrateur : voir `connectors.md` (section Microsoft 365).
 
-## 7. Rechercher
+## 9. Rechercher
 
 - **Recherche globale** : **Ctrl K** (ou **Cmd K** sur Mac, ou la touche **/** hors d'un champ) ouvre une fenêtre de recherche. Tapez au moins 2 caractères : nom, SIRET, e-mail ou téléphone, sans souci d'accents ni de majuscules ni d'espaces dans le SIRET ou le téléphone. Les résultats sont groupés **Entreprises** et **Personnes** ; **flèches** pour choisir, **Entrée** pour ouvrir.
 - **Recherche dans une liste** : le champ en haut de **Entreprises** ou **Personnes** filtre la liste en tapant. Les filtres (statut, DAS, secteur, responsable, origine…) se combinent.
@@ -156,7 +225,7 @@ Tout est enregistré ensemble ou rien ne l'est (par exemple si le motif de perte
 
 > Les **Responsables de DAS** ne voient que les fiches rattachées aux DAS qui leur sont attribués (par l'administrateur). Les autres rôles voient toutes les fiches de l'organisme.
 
-## 8. Doublons et fusion
+## 10. Doublons et fusion
 
 ### Avertissement à la saisie
 
@@ -177,7 +246,7 @@ L'écran **Fusionner deux fiches** montre la **fiche conservée** et la **fiche 
 - l'adresse de la fiche absorbée renvoie vers la fiche conservée ;
 - la fiche absorbée ne peut pas être restaurée et ses données personnelles sont effacées.
 
-## 9. Importer un fichier
+## 11. Importer un fichier
 
 L'import (menu **Imports**) charge des fiches depuis un fichier **Excel (.xlsx)** ou **CSV**. Il se fait depuis un ordinateur. Vous pouvez aussi y accéder par le bouton **Importer** de la liste **Entreprises**.
 
@@ -188,7 +257,8 @@ Choisissez ce que contient votre fichier :
 - **Entreprises** : une ligne par entreprise ;
 - **Personnes** : une ligne par personne (particuliers ou contacts sans entreprise) ;
 - **Interlocuteurs (personne et entreprise)** : une ligne par interlocuteur, la personne et son entreprise sont créées ensemble et reliées ;
-- **Historique d'échanges (notes)** : échanges passés (appels, rendez-vous…) rattachés à une fiche déjà présente, retrouvée par SIRET, e-mail ou identifiant source.
+- **Historique d'échanges (notes)** : échanges passés (appels, rendez-vous…) rattachés à une fiche déjà présente, retrouvée par SIRET, e-mail ou identifiant source ;
+- **Catalogue de formations** (gestionnaires du catalogue) : une ligne par formation (intitulé et DAS obligatoires ; code, durées, public, prérequis, tarifs, financements séparés par `,` ou `;`, active, identifiant source). Une formation est retrouvée par son identifiant source, puis par son code ; **Mettre à jour la formation existante** remplace ses valeurs par celles du fichier (cellules vides exceptées) et ses financements par ceux du fichier.
 
 Déposez le fichier (CSV avec séparateur `;`, `,` ou tabulation, en UTF-8 ou en Windows-1252 comme l'export Excel français : l'encodage et le séparateur sont reconnus tout seuls ; si le fichier est mal lu, ouvrez « Le fichier est mal lu ? Options avancées »). Si vous avez déjà enregistré un **profil** pour ce type de fichier, choisissez-le : les colonnes seront associées d'avance. Puis **Continuer : associer les colonnes**.
 
@@ -230,17 +300,18 @@ Dans **Imports**, **Annuler l'import** ouvre une confirmation qui annonce combie
 
 - **supprime** (met à la corbeille) les fiches **créées** par cet import ;
 - **conserve** une fiche créée par l'import si quelqu'un l'a **modifiée depuis**, si une note, un rattachement ou une pièce jointe y a été ajouté par ailleurs, ou si elle a été fusionnée. Ces fiches sont signalées dans le rapport ;
-- **ne défait pas** les mises à jour : les fiches existantes que l'import avait complétées restent telles quelles.
+- **ne défait pas** les mises à jour : les fiches existantes que l'import avait complétées restent telles quelles ;
+- pour un catalogue : supprime les formations créées, sauf celles modifiées depuis ou **utilisées** depuis par une opportunité ou un devis (signalées dans le rapport ; l'aperçu de la confirmation peut encore les compter). Réimporter ensuite le fichier crée de nouvelles formations.
 
 Réimporter plus tard le même fichier peut restaurer les fiches mises à la corbeille par l'annulation, mais jamais celles que quelqu'un a supprimées volontairement.
 
 L'historique des imports est conservé ; le fichier d'origine (et les valeurs brutes de ses lignes) est supprimé automatiquement au bout de 30 jours.
 
-## 10. Exporter
+## 12. Exporter
 
-Dans les listes **Entreprises**, **Personnes** et **Opportunités** (sur ordinateur), **Exporter (.xlsx)** télécharge un fichier Excel de **la liste telle qu'elle est filtrée**, avec les colonnes choisies dans **Colonnes**. Un contrôle préalable refuse l'export, avec un message, s'il dépasse la limite de lignes (50 000 par défaut) ou si vous exportez trop souvent. Chaque export est tracé dans le journal d'audit. Les valeurs commençant par `=`, `+`, `-` ou `@` sont neutralisées pour ne pas être exécutées par Excel. Les montants, probabilités et dates sont de vrais nombres et de vraies dates (affichés « 1 234,50 € » et « 20/12/2026 ») : Excel peut les additionner, les trier et les filtrer. Les autres colonnes (SIRET, téléphones…) restent du texte. L'export des personnes propose aussi les colonnes **Système source**, **Identifiant source** (fiches importées) et **Base légale** (RGPD).
+Dans les listes **Entreprises**, **Personnes**, **Opportunités**, **Devis** et **Catalogue** (sur ordinateur), **Exporter (.xlsx)** télécharge un fichier Excel de **la liste telle qu'elle est filtrée**, avec les colonnes choisies dans **Colonnes**. Un contrôle préalable refuse l'export, avec un message, s'il dépasse la limite de lignes (50 000 par défaut) ou si vous exportez trop souvent. Chaque export est tracé dans le journal d'audit. Les valeurs commençant par `=`, `+`, `-` ou `@` sont neutralisées pour ne pas être exécutées par Excel. Les montants, probabilités et dates sont de vrais nombres et de vraies dates (affichés « 1 234,50 € » et « 20/12/2026 ») : Excel peut les additionner, les trier et les filtrer. Les autres colonnes (SIRET, téléphones…) restent du texte. L'export des personnes propose aussi les colonnes **Système source**, **Identifiant source** (fiches importées) et **Base légale** (RGPD).
 
-## 11. RGPD
+## 13. RGPD
 
 Les données de personnes sont des données personnelles. Le TMS aide à respecter la durée de conservation, le droit d'opposition et le droit d'accès.
 
@@ -251,8 +322,8 @@ La section **RGPD** de la fiche affiche :
 - la **Base légale** du traitement (intérêt légitime par défaut ; consentement, contrat ou obligation légale) ;
 - les **Consentements** par canal (e-mail, SMS, téléphone, prospection) : **Enregistrer un consentement** ajoute un choix daté (**Accordé** ou **Refusé ou retiré**) avec sa source. L'historique est conservé : un nouveau choix s'ajoute sans effacer les précédents ;
 - **Opposition à la prospection** : enregistre que la personne ne veut plus être sollicitée ; une mention **Opposé à la prospection** apparaît sur la fiche, dans les listes et la recherche ;
-- **Exporter ses données** : fichier contenant toutes les données que le TMS détient sur la personne, y compris ses opportunités et ses actions (droit d'accès) ;
-- **Anonymiser maintenant** : efface définitivement les données personnelles de la fiche (nom, coordonnées, notes, pièces jointes, comptes rendus et lieux des actions, commentaire de perte des opportunités…). Pour confirmer, tapez le nom de la personne. Seules des données statistiques (statut, DAS, rattachements, montants et étapes des opportunités, types et dates des actions) restent. **Cette opération est irréversible.**
+- **Exporter ses données** : fichier contenant toutes les données que le TMS détient sur la personne, y compris ses opportunités, ses actions et ses devis (droit d'accès) ;
+- **Anonymiser maintenant** : efface définitivement les données personnelles de la fiche (nom, coordonnées, notes, pièces jointes, comptes rendus et lieux des actions, commentaire de perte des opportunités, destinataire et PDF archivé des devis…). Pour confirmer, tapez le nom de la personne. Seules des données statistiques (statut, DAS, rattachements, montants et étapes des opportunités, types et dates des actions) restent. **Cette opération est irréversible.**
 
 > **Objet des opportunités d'un particulier** : il est **conservé** après l'anonymisation, pour les statistiques. S'il contient le nom de la personne, ce nom reste : ne mettez jamais de nom dans l'objet d'une opportunité.
 
@@ -270,6 +341,6 @@ L'écran **RGPD** (menu Commercial, réservé aux personnes ayant ce droit) pré
 
 Chaque nuit où des personnes sont nouvellement listées, les responsables RGPD reçoivent un e-mail avec le nombre de personnes concernées (sans leurs noms).
 
-## 12. Utilisateurs et droits (administrateur)
+## 14. Utilisateurs et droits (administrateur)
 
 Le menu **Administration › Utilisateurs** permet à l'administrateur de l'organisme d'**inviter** des collègues, de **changer leur rôle**, de **désactiver** / **réactiver** un compte, de **renvoyer** ou **révoquer** une invitation et d'attribuer les **DAS suivis** à un Responsable de DAS. Un organisme garde toujours au moins un administrateur actif. Les droits CRM par rôle sont détaillés dans `admin.md`.

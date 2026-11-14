@@ -2,6 +2,8 @@
 
 namespace App\Modules\Crm\Import;
 
+use App\Modules\Catalogue\Trainings;
+use App\Modules\Catalogue\TrainingUsage;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\Relation;
 
@@ -31,6 +33,11 @@ final class UndoPreview
         }
 
         foreach ($ids as $type => $list) {
+            if ($type === Trainings::MORPH_ALIAS) {
+                self::trainings($list, $known['stamps'], $result);
+
+                continue;
+            }
             $class = Relation::getMorphedModel($type);
             if ($class === null) {
                 continue;
@@ -55,5 +62,33 @@ final class UndoPreview
         }
 
         return $result;
+    }
+
+    /**
+     * Trainings, read through the catalogue's public services: one modified
+     * or used since the import is counted as kept (keptModified), as the
+     * undo keeps it.
+     *
+     * @param  list<string>  $ids
+     * @param  array<string, string>  $stamps
+     * @param  array{canUndo: bool, removable: int, keptModified: int, keptMerged: int, byType: array<string, int>}  $result
+     */
+    private static function trainings(array $ids, array $stamps, array &$result): void
+    {
+        $trainings = app(Trainings::class);
+        foreach ($ids as $id) {
+            $training = $trainings->find($id);
+            if ($training === null) {
+                continue;
+            }
+            $stamp = $stamps[Trainings::MORPH_ALIAS.':'.$id] ?? null;
+            // Kept like the undo does: modified, or used since (TrainingUsage).
+            if (($stamp !== null && $stamp !== $training->updated_at) || TrainingUsage::isUsed($id)) {
+                $result['keptModified']++;
+            } else {
+                $result['removable']++;
+                $result['byType'][Trainings::MORPH_ALIAS] = ($result['byType'][Trainings::MORPH_ALIAS] ?? 0) + 1;
+            }
+        }
     }
 }

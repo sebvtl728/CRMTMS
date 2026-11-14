@@ -39,6 +39,7 @@ interface SimulationProps {
 const number = new Intl.NumberFormat('fr-FR');
 
 export default function ImportSimulation({ batch, simulation, unknownCount, hasValues, strategy, canRun, sourceSystem }: SimulationProps) {
+    const catalogue = batch.target.value === 'trainings';
     const [confirming, setConfirming] = useState(false);
     const [busy, setBusy] = useState(false);
     const errors = (usePage().props.errors ?? {}) as Record<string, string>;
@@ -119,10 +120,13 @@ export default function ImportSimulation({ batch, simulation, unknownCount, hasV
                 )}
 
                 <fieldset className="grid gap-2" disabled={busy}>
-                    <legend className="mb-1 text-sm font-medium">Que faire quand la fiche existe déjà ?</legend>
+                    <legend className="mb-1 text-sm font-medium">
+                        {catalogue ? 'Que faire quand la formation existe déjà ?' : 'Que faire quand la fiche existe déjà ?'}
+                    </legend>
                     <p className="text-muted-foreground text-xs">
-                        Une fiche est considérée comme existante si le SIRET, l&apos;e-mail ou le téléphone est identique, ou si le nom est le même au
-                        même endroit. Le choix relance la simulation.
+                        {catalogue
+                            ? 'Une formation est considérée comme existante si une formation du catalogue a le même code. Une formation de même identifiant source est toujours mise à jour. Le choix relance la simulation.'
+                            : "Une fiche est considérée comme existante si le SIRET, l'e-mail ou le téléphone est identique, ou si le nom est le même au même endroit. Le choix relance la simulation."}
                     </p>
                     {strategy.options.map((o) => (
                         <label

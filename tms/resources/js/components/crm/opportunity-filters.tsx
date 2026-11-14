@@ -11,6 +11,7 @@ import { useEffect, useRef, useState } from 'react';
 export interface OpportunityFilterValues {
     q: string;
     das: string | null;
+    training: string | null;
     target: string | null;
     responsible: string | null;
     priority: string | null;
@@ -25,6 +26,7 @@ export interface OpportunityFilterValues {
 export interface OpportunityFilterOptions {
     target: Option[];
     das: Option[];
+    training: Option[];
     stage: Option[];
     priority: Option[];
     responsible: Option[];
@@ -35,7 +37,7 @@ export interface OpportunityFilterOptions {
 export function opportunityQuery(filters: OpportunityFilterValues): Record<string, string> {
     const query: Record<string, string> = {};
     if (filters.q) query.q = filters.q;
-    (['das', 'target', 'responsible', 'priority', 'stage', 'close_from', 'close_to'] as const).forEach((k) => {
+    (['das', 'training', 'target', 'responsible', 'priority', 'stage', 'close_from', 'close_to'] as const).forEach((k) => {
         if (filters[k]) query[k] = String(filters[k]);
     });
     if (filters.mine) query.mine = '1';
@@ -51,6 +53,7 @@ export function isFiltered(filters: OpportunityFilterValues): boolean {
     return Boolean(
         filters.q ||
             filters.das ||
+            filters.training ||
             filters.target ||
             filters.responsible ||
             filters.priority ||
@@ -102,6 +105,9 @@ export function OpportunityFilters({
             </div>
             <FilterSelect label="Cible" value={filters.target} options={options.target} onChange={(v) => visit({ target: v })} />
             <FilterSelect label="DAS" value={filters.das} options={options.das} onChange={(v) => visit({ das: v })} />
+            {options.training.length > 0 && (
+                <FilterSelect label="Formation" value={filters.training} options={options.training} onChange={(v) => visit({ training: v })} />
+            )}
             {showStage && <FilterSelect label="Étape" value={filters.stage} options={options.stage} onChange={(v) => visit({ stage: v })} />}
             <FilterSelect label="Priorité" value={filters.priority} options={options.priority} onChange={(v) => visit({ priority: v })} />
             <FilterSelect label="Responsable" value={filters.responsible} options={options.responsible} onChange={(v) => visit({ responsible: v })} />

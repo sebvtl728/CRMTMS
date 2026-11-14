@@ -16,6 +16,8 @@ x-app: &app
       condition: service_healthy
     redis:
       condition: service_started
+    gotenberg:
+      condition: service_started
 
 services:
   app:
@@ -51,8 +53,18 @@ services:
   redis:
     image: redis:7
 
+  # HTML -> PDF (quotes). Internal only: no published port. Chromium without
+  # JavaScript nor outbound access (documents are self-contained); unused routes off.
   gotenberg:
-    image: gotenberg/gotenberg:8
+    image: gotenberg/gotenberg:8.40
+    command: ["gotenberg",
+      "--chromium-disable-javascript=true",
+      "--chromium-deny-public-ips=true",
+      "--chromium-deny-private-ips=true",
+      "--api-disable-download-from=true",
+      "--webhook-disable=true",
+      "--libreoffice-disable-routes=true",
+      "--pdfengines-disable-routes=true"]
 
   worker:
     <<: *app

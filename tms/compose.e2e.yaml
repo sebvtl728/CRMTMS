@@ -12,6 +12,8 @@ services:
         condition: service_healthy
       redis:
         condition: service_started
+      gotenberg: # quote PDF (compose.yaml service, same network)
+        condition: service_started
     environment:
       DB_DATABASE: tms_e2e
       TMS_MODE: single

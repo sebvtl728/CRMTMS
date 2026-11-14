@@ -20,7 +20,7 @@ class StageRequest extends FormRequest
     protected function prepareForValidation(): void
     {
         $clean = [];
-        foreach (['loss_reason_id', 'loss_comment', 'won_on'] as $key) {
+        foreach (['loss_reason_id', 'loss_comment', 'won_on', 'quote_id'] as $key) {
             if ($this->has($key)) {
                 $value = $this->input($key);
                 $value = is_string($value) ? trim($value) : $value;
@@ -42,6 +42,8 @@ class StageRequest extends FormRequest
             'loss_reason_id' => ['nullable', ...ReferenceRules::item(ReferenceList::LossReason)],
             'loss_comment' => ['nullable', 'string', 'max:2000'],
             'won_on' => ['nullable', 'date_format:Y-m-d', 'before_or_equal:today', 'after:2000-01-01'],
+            // « Gagné » after an accepted quote: the amount becomes its total HT.
+            'quote_id' => ['nullable', 'uuid'],
         ];
     }
 
@@ -53,6 +55,7 @@ class StageRequest extends FormRequest
         return [
             'required' => 'Choisissez une étape.',
             'uuid' => 'Cette valeur n\'existe pas ou n\'est plus disponible.',
+            'quote_id.uuid' => OpportunityStage::QUOTE_NOT_ACCEPTED,
             'exists' => 'Cette valeur n\'existe pas ou n\'est plus disponible.',
             'loss_comment.max' => 'Le commentaire est trop long.',
             'won_on.date_format' => 'La date doit être au format AAAA-MM-JJ.',

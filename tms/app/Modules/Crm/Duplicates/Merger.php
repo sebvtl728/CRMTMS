@@ -10,6 +10,7 @@ use App\Modules\Crm\Affiliations\Affiliation;
 use App\Modules\Crm\Opportunities\Opportunity;
 use App\Modules\Crm\Organisations\Organisation;
 use App\Modules\Crm\People\Person;
+use App\Modules\Crm\Quotes\Quote;
 use App\Modules\Crm\Timeline\Attachment;
 use App\Modules\Crm\Timeline\Note;
 use Illuminate\Database\QueryException;
@@ -27,7 +28,8 @@ use InvalidArgumentException;
  * keeps $keep's value unless it is empty), affiliations moved (one active
  * link per pair: the oldest survives, completed by the other), notes and
  * attachments moved, opportunities and opportunity contacts moved (a
- * person holding opportunities stays a particulier), actions moved, DAS
+ * person holding opportunities stays a particulier), quotes moved (account
+ * and recipient; the frozen recipient copy is kept), actions moved, DAS
  * united, source identifiers kept in merged_sources, $drop trashed for
  * good with merged_into_id, journal crm.merged (ids only).
  */
@@ -166,6 +168,7 @@ class Merger
             $this->moveAffiliations($isPerson ? 'person_id' : 'organisation_id', $isPerson ? 'organisation_id' : 'person_id', $k->id, $d->id);
             $this->moveTimeline($k, $d);
             $this->moveOpportunities($k, $d);
+            $this->moveQuotes($k, $d);
             $this->moveActivities($k, $d);
             $this->uniteDas($k, $d, $isPerson);
             // Calendars (Outlook) now show the kept fiche (moves above are raw SQL).
@@ -291,7 +294,8 @@ class Merger
     }
 
     /**
-     * Opportunities (trashed ones too, with their stage history) follow the
+     * Opportunities (trashed ones too, with their stage history and their
+     * trainings, which hang on the opportunity: nothing to move) follow the
      * fiche. A person's contact rows go to the kept person, once per
      * opportunity.
      */
@@ -305,6 +309,19 @@ class Merger
                 ->whereIn('opportunity_id', DB::table('opportunity_contacts')->select('opportunity_id')->where('person_id', $keep->id))
                 ->delete();
             DB::table('opportunity_contacts')->where('person_id', $drop->id)->update(['person_id' => $keep->id]);
+        }
+    }
+
+    /**
+     * Quotes (trashed ones too) follow the fiche: as account, and for a
+     * person as recipient. The copy of the recipient of a sent quote
+     * (recipient_snapshot) is a frozen document: left as it is.
+     */
+    private function moveQuotes(Organisation|Person $keep, Organisation|Person $drop): void
+    {
+        $columns = $keep instanceof Person ? ['person_id', 'contact_person_id'] : ['organisation_id'];
+        foreach ($columns as $column) {
+            Quote::withTrashed()->where($column, $drop->id)->toBase()->update([$column => $keep->id, 'updated_at' => now()]);
         }
     }
 

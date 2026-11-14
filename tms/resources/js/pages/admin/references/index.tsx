@@ -17,6 +17,7 @@ type ReferenceMeta = {
     outcome?: 'won' | 'lost' | null;
     color?: string | null;
     planning?: 'meeting' | 'call' | null;
+    quote_stage?: boolean;
 };
 
 /** Place of an action type in the CRM planning (meta.planning). */
@@ -38,6 +39,7 @@ interface ReferenceListData {
     label: string;
     has_probability: boolean;
     has_planning: boolean;
+    has_quote_stage: boolean;
     items: ReferenceItem[];
 }
 
@@ -52,6 +54,7 @@ interface EditorState {
     probability: string;
     color: string; // '' = none
     planning: string; // '' = not in the planning
+    quoteStage: boolean;
 }
 
 const breadcrumbs: BreadcrumbItem[] = [{ title: 'Référentiels', href: '/admin/references' }];
@@ -89,7 +92,10 @@ export default function ReferencesIndex({ lists, status }: ReferencesIndexProps)
             probability: item?.meta.probability !== undefined ? String(item.meta.probability) : '',
             color: item?.meta.color ?? '',
             planning: item?.meta.planning ?? '',
+            quoteStage: item?.meta.quote_stage === true,
         });
+
+    const closing = editor?.item?.meta.outcome != null; // won / lost: fixed probability
 
     const submit: FormEventHandler = (e) => {
         e.preventDefault();
@@ -98,6 +104,7 @@ export default function ReferencesIndex({ lists, status }: ReferencesIndexProps)
         const meta: ReferenceMeta = { color: editor.color || null };
         if (list.has_probability && editor.probability !== '') meta.probability = Number(editor.probability);
         if (list.has_planning) meta.planning = editor.planning === '' ? null : (editor.planning as 'meeting' | 'call');
+        if (list.has_quote_stage && !closing) meta.quote_stage = editor.quoteStage;
         const payload = { label: editor.label, meta };
         const options = {
             preserveScroll: true,
@@ -124,8 +131,6 @@ export default function ReferencesIndex({ lists, status }: ReferencesIndexProps)
         if (!window.confirm(`Supprimer la valeur « ${item.label} » ?`)) return;
         router.delete(route('admin.references.destroy', [current, item.id]), { preserveScroll: true });
     };
-
-    const closing = editor?.item?.meta.outcome != null; // won / lost: fixed probability
 
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
@@ -208,6 +213,7 @@ export default function ReferencesIndex({ lists, status }: ReferencesIndexProps)
                                 {list.has_probability && item.meta.probability !== undefined && (
                                     <Badge variant="outline">{item.meta.probability} %</Badge>
                                 )}
+                                {list.has_quote_stage && item.meta.quote_stage && <Badge variant="outline">Étape du devis envoyé</Badge>}
                                 {list.has_planning && item.meta.planning && (
                                     <Badge variant="outline">Planning : {PLANNING_KINDS[item.meta.planning]}</Badge>
                                 )}
@@ -328,6 +334,23 @@ export default function ReferencesIndex({ lists, status }: ReferencesIndexProps)
                                     <option value="call">Appel (planning, s'il a une échéance)</option>
                                 </select>
                                 <InputError message={errors['meta.planning']} />
+                            </div>
+                        )}
+
+                        {list.has_quote_stage && !closing && (
+                            <div className="grid gap-1">
+                                <label className="flex items-center gap-2 text-sm">
+                                    <input
+                                        type="checkbox"
+                                        checked={editor?.quoteStage ?? false}
+                                        onChange={(e) => setEditor((s) => s && { ...s, quoteStage: e.target.checked })}
+                                    />
+                                    Étape d'un devis envoyé
+                                </label>
+                                <p className="text-muted-foreground text-xs">
+                                    À l'envoi d'un devis, l'opportunité passe à cette étape si elle n'y est pas encore. Une seule étape : la cocher la retire des autres.
+                                </p>
+                                <InputError message={errors['meta.quote_stage']} />
                             </div>
                         )}
 

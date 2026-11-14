@@ -30,6 +30,9 @@ final class CapFormationReferenceSeeder
         'Perdu' => [0, 'lost'],
     ];
 
+    /** The stage a sent quote brings its opportunity to (meta.quote_stage). */
+    private const QUOTE_STAGE = 'Proposition';
+
     /**
      * Action types shown in the CRM planning (meta.planning), by code.
      *
@@ -71,7 +74,7 @@ final class CapFormationReferenceSeeder
                     Str::slug($label),
                     $label,
                     $position++,
-                    ['probability' => $probability, 'outcome' => $outcome],
+                    ['probability' => $probability, 'outcome' => $outcome, ...($label === self::QUOTE_STAGE ? ['quote_stage' => true] : [])],
                     $outcome !== null,
                 );
             }

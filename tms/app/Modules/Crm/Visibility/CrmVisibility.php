@@ -115,6 +115,24 @@ final class CrmVisibility
     }
 
     /**
+     * A quote is seen when its opportunity is (its DAS), whatever its lines.
+     * Trashed opportunities and fiches are left to the caller.
+     *
+     * @template TModel of \Illuminate\Database\Eloquent\Model
+     *
+     * @param  Builder<TModel>  $query
+     * @return Builder<TModel>
+     */
+    public static function quotes(Builder $query, User $user): Builder
+    {
+        if (! self::restricts($user)) {
+            return $query;
+        }
+
+        return $query->whereIn($query->getModel()->qualifyColumn('opportunity_id'), self::opportunities(Opportunity::withTrashed(), $user)->select('opportunities.id'));
+    }
+
+    /**
      * A Responsable DAS sees an action of an opportunity only when he sees
      * that opportunity (its DAS), whatever its fiches: the fiche of the
      * opportunity is stamped on every such action. An action without

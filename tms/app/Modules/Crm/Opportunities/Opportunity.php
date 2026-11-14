@@ -163,6 +163,16 @@ class Opportunity extends Model
     }
 
     /**
+     * Trainings of the catalogue (OpportunityTrainings), in order.
+     *
+     * @return HasMany<OpportunityTraining, $this>
+     */
+    public function trainingLines(): HasMany
+    {
+        return $this->hasMany(OpportunityTraining::class)->orderBy('position')->orderBy('id');
+    }
+
+    /**
      * @return BelongsTo<ReferenceItem, $this>
      */
     public function stage(): BelongsTo

@@ -7,7 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
-import { Head, Link, useForm } from '@inertiajs/react';
+import { Head, Link, router, useForm } from '@inertiajs/react';
 import { LoaderCircle } from 'lucide-react';
 import { FormEventHandler, useEffect, useState } from 'react';
 
@@ -35,13 +35,27 @@ type CompanyForm = {
     email: string;
     phone: string;
     is_default: boolean;
+    quote_prefix: string;
+    quote_validity_days: string;
+    quote_terms: string;
+    quote_footer: string;
 };
 
-interface CompanyData extends Omit<CompanyForm, 'scop_underlying_form' | 'capital_amount'> {
+interface CompanyData extends Omit<CompanyForm, 'scop_underlying_form' | 'capital_amount' | 'quote_validity_days' | 'quote_terms' | 'quote_footer'> {
     id: string;
     scop_underlying_form: string | null;
     capital_amount: string | null;
+    quote_validity_days: number;
+    quote_terms: string | null;
+    quote_footer: string | null;
+    /** data URI of the current logo, null without one */
+    logo: string | null;
 }
+
+const MAX_LOGO_BYTES = 1024 * 1024;
+const MAX_TEXT = 5000;
+const textareaClass =
+    'border-input bg-background ring-offset-background placeholder:text-muted-foreground focus-visible:ring-ring w-full rounded-md border px-3 py-2 text-base focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-hidden md:text-sm';
 
 interface EditProps {
     company: CompanyData | null;
@@ -50,6 +64,8 @@ interface EditProps {
     underlyingForms: Option[];
     vatRegimes: Option[];
     vatExemptionNotice: string;
+    /** The first free quote prefix (a new company), or the company's own. */
+    nextPrefix: string;
 }
 
 function xsrfToken(): string {
@@ -68,7 +84,7 @@ function Field({ id, label, error, children }: { id: string; label: string; erro
     );
 }
 
-export default function EditCompany({ company, mentions, legalForms, underlyingForms, vatRegimes, vatExemptionNotice }: EditProps) {
+export default function EditCompany({ company, mentions, legalForms, underlyingForms, vatRegimes, vatExemptionNotice, nextPrefix }: EditProps) {
     const { data, setData, post, put, processing, errors } = useForm<CompanyForm>({
         name: company?.name ?? '',
         legal_form: company?.legal_form ?? 'autre',
@@ -88,7 +104,42 @@ export default function EditCompany({ company, mentions, legalForms, underlyingF
         email: company?.email ?? '',
         phone: company?.phone ?? '',
         is_default: company?.is_default ?? false,
+        quote_prefix: company?.quote_prefix ?? nextPrefix,
+        quote_validity_days: String(company?.quote_validity_days ?? 30),
+        quote_terms: company?.quote_terms ?? '',
+        quote_footer: company?.quote_footer ?? '',
     });
+
+    const [logoError, setLogoError] = useState<string | undefined>();
+    const [logoSaving, setLogoSaving] = useState(false);
+
+    const uploadLogo = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        e.target.value = '';
+        if (!file || !company) return;
+        setLogoError(undefined);
+        if (file.size > MAX_LOGO_BYTES) {
+            setLogoError('Le logo ne doit pas dépasser 1 Mo.');
+            return;
+        }
+        setLogoSaving(true);
+        router.post(
+            route('admin.companies.logo.store', company.id),
+            { logo: file },
+            {
+                forceFormData: true,
+                preserveScroll: true,
+                preserveState: true,
+                onError: (errs) => setLogoError(errs.logo ?? 'Le logo n’a pas pu être enregistré.'),
+                onFinish: () => setLogoSaving(false),
+            },
+        );
+    };
+
+    const removeLogo = () => {
+        if (!company || !window.confirm('Supprimer le logo ? Il n’apparaîtra plus sur les devis.')) return;
+        router.delete(route('admin.companies.logo.destroy', company.id), { preserveScroll: true, preserveState: true });
+    };
 
     const [preview, setPreview] = useState(mentions);
     const isCooperative = data.legal_form === 'scop' || data.legal_form === 'scic';
@@ -268,6 +319,83 @@ export default function EditCompany({ company, mentions, legalForms, underlyingF
                             <Input {...text('phone')} type="tel" />
                         </Field>
                     </div>
+
+                    <fieldset className="space-y-6 rounded-xl border p-4">
+                        <legend className="px-1 text-sm font-semibold">Devis</legend>
+
+                        <div className="grid gap-2">
+                            <Label htmlFor="logo">Logo</Label>
+                            {company ? (
+                                <div className="flex flex-wrap items-center gap-4">
+                                    {company.logo ? (
+                                        <img src={company.logo} alt="Logo actuel" className="h-16 max-w-48 rounded border object-contain p-1" />
+                                    ) : (
+                                        <span className="text-muted-foreground text-sm">Aucun logo</span>
+                                    )}
+                                    <Input
+                                        id="logo"
+                                        type="file"
+                                        accept="image/png,image/jpeg"
+                                        onChange={uploadLogo}
+                                        disabled={logoSaving}
+                                        className="max-w-xs"
+                                        aria-describedby="logo-help"
+                                    />
+                                    {company.logo && (
+                                        <Button type="button" variant="outline" onClick={removeLogo}>
+                                            Supprimer le logo
+                                        </Button>
+                                    )}
+                                </div>
+                            ) : (
+                                <p className="text-muted-foreground text-sm">Enregistrez d’abord la société pour ajouter un logo.</p>
+                            )}
+                            <p id="logo-help" className="text-muted-foreground text-xs">
+                                PNG ou JPEG, 1 Mo au maximum.
+                            </p>
+                            <InputError message={logoError} />
+                        </div>
+
+                        <div className="grid gap-6 sm:grid-cols-2">
+                            <Field id="quote_prefix" label="Préfixe de numérotation" error={errors.quote_prefix}>
+                                <Input
+                                    {...text('quote_prefix')}
+                                    onChange={(e) => setData('quote_prefix', e.target.value.toUpperCase())}
+                                    maxLength={10}
+                                    required
+                                    aria-describedby="quote_prefix-help"
+                                />
+                                <p id="quote_prefix-help" className="text-muted-foreground text-xs">
+                                    Lettres majuscules et chiffres. Exemple de numéro : {(data.quote_prefix || 'DEV') + '-' + new Date().getFullYear() + '-0001'}
+                                </p>
+                            </Field>
+                            <Field id="quote_validity_days" label="Durée de validité (jours)" error={errors.quote_validity_days}>
+                                <Input {...text('quote_validity_days')} type="number" min={1} max={365} required />
+                            </Field>
+                        </div>
+
+                        <Field id="quote_terms" label="Conditions générales" error={errors.quote_terms}>
+                            <textarea
+                                id="quote_terms"
+                                value={data.quote_terms}
+                                onChange={(e) => setData('quote_terms', e.target.value)}
+                                maxLength={MAX_TEXT}
+                                rows={6}
+                                className={textareaClass}
+                            />
+                        </Field>
+
+                        <Field id="quote_footer" label="Pied de page" error={errors.quote_footer}>
+                            <textarea
+                                id="quote_footer"
+                                value={data.quote_footer}
+                                onChange={(e) => setData('quote_footer', e.target.value)}
+                                maxLength={MAX_TEXT}
+                                rows={3}
+                                className={textareaClass}
+                            />
+                        </Field>
+                    </fieldset>
 
                     <div className="flex items-center gap-2">
                         <Checkbox

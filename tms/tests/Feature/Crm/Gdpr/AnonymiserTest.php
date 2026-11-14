@@ -91,7 +91,7 @@ it('scrubs the person, her links, notes, attachments and consents, and keeps the
     $audit = AuditLog::query()->where('event', 'gdpr.anonymised')->sole();
     expect($audit->auditable_id)->toBe($person->id)
         ->and($audit->old_values)->toBeEmpty()
-        ->and($audit->new_values)->toEqualCanonicalizing(['reason' => 'manual', 'notes' => 1, 'attachments' => 1]);
+        ->and($audit->new_values)->toEqualCanonicalizing(['reason' => 'manual', 'notes' => 1, 'attachments' => 1, 'quotes' => 0]);
 
     // Irreversible and idempotent.
     anonymise($person->refresh());

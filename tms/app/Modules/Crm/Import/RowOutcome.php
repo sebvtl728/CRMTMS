@@ -58,6 +58,33 @@ final class RowOutcome
         return $this;
     }
 
+    /**
+     * The subject given by its morph alias and id (a record of another
+     * module, known through its public service only).
+     */
+    public function subjectRef(string $type, string $id, bool $created = false): self
+    {
+        $this->subjectType = $type;
+        $this->subjectId = $id;
+        $this->createdSubject = $created;
+
+        return $this;
+    }
+
+    /**
+     * Created / updated record of another module, with the stamp (updated_at
+     * to the second) the import left it with.
+     */
+    public function createdRef(string $type, string $id, ?string $at): void
+    {
+        $this->createdRefs[] = ['type' => $type, 'id' => $id, 'at' => $at];
+    }
+
+    public function touchedRef(string $type, string $id, ?string $at): void
+    {
+        $this->touchedRefs[] = ['type' => $type, 'id' => $id, 'at' => $at];
+    }
+
     public function created(Model $model): void
     {
         if ($model->exists) {

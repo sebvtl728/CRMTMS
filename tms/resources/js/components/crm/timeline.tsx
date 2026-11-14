@@ -42,6 +42,7 @@ function EntryIcon({ type }: { type: string }) {
     if (type === 'attachment') return <Paperclip className={cls} aria-hidden />;
     if (type === 'opportunity') return <Handshake className={cls} aria-hidden />;
     if (type === 'activity') return <ClipboardCheck className={cls} aria-hidden />;
+    if (type === 'quote') return <FileText className={cls} aria-hidden />;
 
     return <History className={cls} aria-hidden />;
 }
@@ -268,6 +269,10 @@ export function Timeline({ kind, subjectId, canEdit }: Props) {
                                             href={route('crm.opportunities.show', entry.meta.opportunity_id)}
                                             className="text-sm font-medium hover:underline"
                                         >
+                                            {entry.title}
+                                        </Link>
+                                    ) : entry.type === 'quote' && typeof entry.meta.quote_id === 'string' ? (
+                                        <Link href={route('crm.quotes.show', entry.meta.quote_id)} className="text-sm font-medium hover:underline">
                                             {entry.title}
                                         </Link>
                                     ) : (

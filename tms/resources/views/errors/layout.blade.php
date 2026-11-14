@@ -5,7 +5,8 @@
     $status = isset($exception) && $exception instanceof \Symfony\Component\HttpKernel\Exception\HttpExceptionInterface
         ? $exception->getStatusCode() : ($status ?? 500);
     $detail = null;
-    if (isset($exception) && $status < 500
+    // A server-side failure keeps its fixed text, except a known, retryable one (PDF converter).
+    if (isset($exception) && ($status < 500 || $exception instanceof \App\Modules\Core\Documents\PdfRenderingFailed)
         && $exception instanceof \App\Exceptions\UserFacingHttpException
         && $exception->getMessage() !== '') {
         $detail = $exception->getMessage();

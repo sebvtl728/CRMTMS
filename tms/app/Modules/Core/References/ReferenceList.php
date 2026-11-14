@@ -59,4 +59,13 @@ enum ReferenceList: string
     {
         return $this === self::ActionType;
     }
+
+    /**
+     * One open pipeline stage per organisme may be flagged meta.quote_stage:
+     * sending a quote moves an opportunity that is not past it there.
+     */
+    public function hasQuoteStage(): bool
+    {
+        return $this === self::PipelineStage;
+    }
 }

@@ -58,9 +58,9 @@ it('gives a new tenant the full matrix, CRM included', function () {
     $matrix = matrixOf($tenant);
 
     expect($matrix['admin_organisme'])->toBe(collect(Permissions::all())->sort()->values()->all())
-        ->and($matrix['direction'])->toBe(['audit.view', 'crm.export', 'crm.gdpr', 'crm.view', 'exports.run'])
-        ->and($matrix['assistant'])->toBe(['crm.create', 'crm.update', 'crm.view'])
-        ->and($matrix['responsable_das'])->toBe(['crm.export', 'crm.view']);
+        ->and($matrix['direction'])->toBe(['audit.view', 'catalogue.manage', 'catalogue.view', 'crm.export', 'crm.gdpr', 'crm.view', 'exports.run'])
+        ->and($matrix['assistant'])->toBe(['catalogue.view', 'crm.create', 'crm.update', 'crm.view'])
+        ->and($matrix['responsable_das'])->toBe(['catalogue.view', 'crm.export', 'crm.view']);
 });
 
 it('sync adds new default permissions to existing tenants once', function () {
@@ -68,13 +68,13 @@ it('sync adds new default permissions to existing tenants once', function () {
     forgetCrmOffers($tenant);
     PermissionModel::query()->where('name', 'like', 'crm.%')->delete();
 
-    expect(matrixOf($tenant)['commercial'])->toBe([]);
+    expect(matrixOf($tenant)['commercial'])->toBe(['catalogue.view']);
 
     $this->artisan('tms:permissions:sync')->assertSuccessful();
 
     expect(PermissionModel::query()->where('name', 'like', 'crm.%')->count())->toBe(8)
-        ->and(matrixOf($tenant)['commercial'])->toBe(['crm.create', 'crm.delete', 'crm.export', 'crm.import', 'crm.merge', 'crm.update', 'crm.view'])
-        ->and(matrixOf($tenant)['direction'])->toBe(['audit.view', 'crm.export', 'crm.gdpr', 'crm.view', 'exports.run']);
+        ->and(matrixOf($tenant)['commercial'])->toBe(['catalogue.view', 'crm.create', 'crm.delete', 'crm.export', 'crm.import', 'crm.merge', 'crm.update', 'crm.view'])
+        ->and(matrixOf($tenant)['direction'])->toBe(['audit.view', 'catalogue.manage', 'catalogue.view', 'crm.export', 'crm.gdpr', 'crm.view', 'exports.run']);
 
     // Idempotent.
     $before = matrixOf($tenant);
@@ -83,6 +83,29 @@ it('sync adds new default permissions to existing tenants once', function () {
 
     expect(matrixOf($tenant))->toBe($before)
         ->and(app(TenantContext::class)->run($tenant, fn () => DB::table('role_permission_defaults_applied')->count()))->toBe($rows);
+});
+
+it('sync offers the catalogue permissions once to existing tenants', function () {
+    $tenant = Tenant::factory()->create();
+    app(TenantContext::class)->run($tenant, function () {
+        foreach (RoleModel::all() as $role) {
+            $role->revokePermissionTo(array_values(array_intersect(['catalogue.view', 'catalogue.manage'], $role->permissions->pluck('name')->all())));
+        }
+        DB::table('role_permission_defaults_applied')->where('permission', 'like', 'catalogue.%')->delete();
+        RoleModel::findByName('assistant')->revokePermissionTo('crm.update');
+    });
+
+    PermissionSync::run();
+
+    expect(matrixOf($tenant)['commercial'])->toContain('catalogue.view')->not->toContain('catalogue.manage')
+        ->and(matrixOf($tenant)['direction'])->toContain('catalogue.view', 'catalogue.manage')
+        ->and(matrixOf($tenant)['admin_organisme'])->toContain('catalogue.view', 'catalogue.manage')
+        // Offered once: what an administrator removed earlier stays removed.
+        ->and(matrixOf($tenant)['assistant'])->toBe(['catalogue.view', 'crm.create', 'crm.view']);
+
+    app(TenantContext::class)->run($tenant, fn () => RoleModel::findByName('commercial')->revokePermissionTo('catalogue.view'));
+    PermissionSync::run();
+    expect(matrixOf($tenant)['commercial'])->not->toContain('catalogue.view');
 });
 
 it('sync never re-adds a permission an admin removed', function () {
@@ -105,7 +128,7 @@ it('sync reaches suspended tenants and leaves no context behind', function () {
 
     PermissionSync::run();
 
-    expect(matrixOf($tenant)['assistant'])->toBe(['crm.create', 'crm.update', 'crm.view'])
+    expect(matrixOf($tenant)['assistant'])->toBe(['catalogue.view', 'crm.create', 'crm.update', 'crm.view'])
         ->and(app(TenantContext::class)->current())->toBeNull();
 });
 
@@ -144,7 +167,7 @@ it('reports the failing tenant and exits with an error', function () {
         ->assertExitCode(1);
 
     // The other organisme is still brought up to date.
-    expect(matrixOf($fine)['assistant'])->toBe(['crm.create', 'crm.update', 'crm.view']);
+    expect(matrixOf($fine)['assistant'])->toBe(['catalogue.view', 'crm.create', 'crm.update', 'crm.view']);
 });
 
 it('exposes the tenants that failed in ForEachTenant', function () {

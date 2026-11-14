@@ -38,6 +38,8 @@ interface Meeting {
 interface Commercial {
     follow_ups: { overdue: number; today: number };
     pipeline: { weighted_amount: string; count: number; month: string; close_from: string; close_to: string };
+    /** Quotes sent this month, accepted among them; rate in %, null when none was sent. */
+    quotes: { sent: number; accepted: number; rate: number | null; month: string };
     meetings: Meeting[];
 }
 
@@ -98,6 +100,7 @@ function NextMeetings({ meetings }: { meetings: Meeting[] }) {
 }
 
 const numberFormat = new Intl.NumberFormat('fr-FR');
+const percentFormat = new Intl.NumberFormat('fr-FR', { maximumFractionDigits: 1 });
 
 export default function Dashboard({ recent_views, counters, commercial }: Props) {
     const { auth } = usePage<SharedData>().props;
@@ -133,7 +136,7 @@ export default function Dashboard({ recent_views, counters, commercial }: Props)
                 )}
 
                 {counters !== null && (
-                    <section aria-label="Chiffres" className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+                    <section aria-label="Chiffres" className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
                         <Link
                             href="/crm/organisations"
                             className="focus-visible:ring-ring rounded-xl focus-visible:ring-2 focus-visible:outline-none"
@@ -190,6 +193,27 @@ export default function Dashboard({ recent_views, counters, commercial }: Props)
                                             <CardDescription>
                                                 {numberFormat.format(commercial.pipeline.count)} opportunité{commercial.pipeline.count > 1 ? 's' : ''}{' '}
                                                 en cours, clôture prévue ce mois-ci
+                                            </CardDescription>
+                                        </CardHeader>
+                                    </Card>
+                                </Link>
+                            </section>
+                        )}
+                        {commercial !== null && (
+                            <section aria-label="Devis du mois">
+                                <Link
+                                    href={route('crm.quotes.index')}
+                                    className="focus-visible:ring-ring block h-full rounded-xl focus-visible:ring-2 focus-visible:outline-none"
+                                >
+                                    <Card className="hover:bg-muted/50 h-full transition-colors">
+                                        <CardHeader>
+                                            <CardDescription>Devis · {commercial.quotes.month}</CardDescription>
+                                            <CardTitle className="text-3xl">
+                                                {commercial.quotes.rate === null ? '—' : `${percentFormat.format(commercial.quotes.rate)} %`}
+                                            </CardTitle>
+                                            <CardDescription>
+                                                {numberFormat.format(commercial.quotes.sent)} envoyé{commercial.quotes.sent > 1 ? 's' : ''},{' '}
+                                                {numberFormat.format(commercial.quotes.accepted)} accepté{commercial.quotes.accepted > 1 ? 's' : ''}
                                             </CardDescription>
                                         </CardHeader>
                                     </Card>

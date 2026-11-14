@@ -2,6 +2,8 @@
 
 namespace App\Modules\Crm\Export;
 
+use App\Modules\Core\Exports\ExportCell;
+use App\Modules\Core\Exports\ExportResource;
 use App\Modules\Core\Users\User;
 use App\Modules\Crm\Organisations\Organisation;
 use Illuminate\Database\Eloquent\Model;

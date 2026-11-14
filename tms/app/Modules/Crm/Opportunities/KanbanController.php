@@ -70,7 +70,7 @@ class KanbanController extends Controller
         return Inertia::render('crm/opportunities/kanban', [
             'columns' => $columns,
             'filters' => $filters,
-            'options' => OpportunityListQuery::options(),
+            'options' => OpportunityListQuery::options($filters['training']),
             'stages' => $stages,
             'lossReasons' => FormOptions::reference(ReferenceList::LossReason),
             'closedDays' => self::CLOSED_DAYS,

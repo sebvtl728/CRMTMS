@@ -25,6 +25,8 @@ jobs:
       DB_OWNER_USERNAME: tms_owner
       REDIS_CLIENT: phpredis
       REDIS_HOST: 127.0.0.1
+      # Quote PDF: the real converter for the slow group (QuotePdfTest).
+      GOTENBERG_URL: http://127.0.0.1:3000
       # Throwaway credentials of the ephemeral CI database service only.
       POSTGRES_USER: postgres
       PGHOST: 127.0.0.1
@@ -46,6 +48,15 @@ jobs:
           - 6379:6379
         options: >-
           --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+      gotenberg:
+        image: gotenberg/gotenberg:8.40
+        ports:
+          - 3000:3000
+        options: >-
+          --health-cmd "curl -fsS -o /dev/null http://127.0.0.1:3000/health"
           --health-interval 5s
           --health-timeout 5s
           --health-retries 20
@@ -86,7 +97,7 @@ jobs:
       - run: vendor/bin/phpstan analyse --memory-limit=1G
       # No --parallel: tms_app cannot create the per-process databases.
       - run: php artisan test
-      # Volume tests (excluded from the default run, phpunit.xml).
+      # Volume tests and the real PDF conversion (excluded from the default run, phpunit.xml).
       - run: php artisan test --group=slow
 
   js:

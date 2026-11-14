@@ -2,8 +2,8 @@
 
 namespace App\Modules\Crm\Search;
 
+use App\Modules\Core\Exports\ExportResource;
 use App\Modules\Core\Users\User;
-use App\Modules\Crm\Export\ExportResource;
 use App\Modules\Crm\Export\OrganisationExport;
 use App\Modules\Crm\Export\PersonExport;
 use App\Modules\Crm\Organisations\OrganisationListQuery;

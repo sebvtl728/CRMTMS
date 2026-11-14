@@ -56,8 +56,9 @@ Les tests s'exécutent en tant que `tms_app` sur la base `tms_test` ; le schéma
 compilés (`npm run build`).
 
 Les tests de volume (groupe `slow` : import de 10 000 lignes en moins de 60 s, recherche sur
-50 000 fiches en moins d'une seconde sous RLS) sont exclus de la commande ci-dessus
-(`phpunit.xml`) ; la CI les lance à part :
+50 000 fiches en moins d'une seconde sous RLS) et la conversion réelle d'un devis en PDF (service
+`gotenberg`, démarré avec l'application ; adresse `GOTENBERG_URL`, par défaut `http://gotenberg:3000`)
+sont exclus de la commande ci-dessus (`phpunit.xml`) ; la CI les lance à part (service `gotenberg` du job) :
 
 ```bash
 docker compose exec app php artisan test --group=slow
@@ -76,11 +77,18 @@ et son affichage sur téléphone (375 px). Le service Sirene n'est pas appelé :
 « Proposition » dans le kanban, refus de « Perdu » sans motif puis acceptation avec motif, saisie rapide d'un appel
 avec relance le lendemain, relance visible dans « À faire » et dans le planning, menu « Commercial », accueil
 (pipeline pondéré du mois), puis un compte rendu de rendez-vous au téléphone (375 × 812). `tests/e2e/report.spec.ts`
-rejoue le compte rendu d'un rendez-vous du jour en moins de 6 gestes. Tous réutilisent la session de
+rejoue le compte rendu d'un rendez-vous du jour en moins de 6 gestes. `tests/e2e/quotes.spec.ts` couvre le devis :
+formation créée dans le catalogue, ajoutée à une opportunité « Étude », « Calculer le montant proposé », devis créé
+depuis l'opportunité, aperçu PDF (vrai rendu par le service `gotenberg` de la pile, réponse `application/pdf`),
+envoi (mailer `log` de la pile e2e : le résultat est vérifié à l'écran, statut « Envoyé », sans boîte aux lettres),
+opportunité passée en « Proposition », « Accepté » puis « Gagné », devis listé avec un taux de réussite du mois de
+100 %. La société créée par `admin.spec.ts` y prend le préfixe `CF` (celui de la société d'installation est `DEV`).
+Tous réutilisent la session de
 l'administrateur : les fichiers se lancent ensemble, dans l'ordre alphabétique (un seul processus).
 
 Il s'exécute sur une pile dédiée (`compose.e2e.yaml` : application `app-e2e`, base `tms_e2e`, organisme `e2e`,
-port **8081**, assets compilés) : la base et les données de développement ne sont jamais touchées. Prérequis :
+port **8081**, assets compilés, file `sync`, e-mails écrits dans le journal ; elle utilise le `gotenberg` de la pile de
+développement) : la base et les données de développement ne sont jamais touchées. Prérequis :
 la pile de développement démarrée (`docker compose up -d`, Colima inclus) et Node.js 20+ sur la machine hôte.
 
 ```bash
@@ -187,6 +195,32 @@ Pour une installation accessible seulement sur le réseau local, utiliser `TMS_T
 certificat avec sa propre autorité ; les navigateurs affichent un avertissement tant que cette autorité n'est
 pas approuvée (certificat racine : `docker compose -f /opt/tms/compose.prod.yaml exec caddy cat
 /data/caddy/pki/authorities/local/root.crt`). Le nom doit tout de même être résolu par le DNS local.
+
+#### Derrière Nginx Proxy Manager ou un autre proxy qui termine le TLS
+
+Cas rencontré sur le terrain : le serveur n'est pas joignable directement depuis Internet, un proxy existant
+(Nginx Proxy Manager, Traefik, HAProxy…) reçoit le trafic et le relaie au TMS.
+
+1. Sur le serveur du TMS, mettre `TMS_TLS=internal` dans `/opt/tms/.env`, puis recréer Caddy pour qu'il relise la
+   variable : `docker compose --project-directory /opt/tms -f /opt/tms/compose.prod.yaml --env-file /opt/tms/.env up -d caddy`. Caddy ne demande plus de certificat
+   Let's Encrypt (le proxy s'en charge) et sert le domaine avec son autorité locale.
+2. Dans le proxy, pour le domaine du TMS : schéma **https**, port **443**, adresse IP du serveur TMS, **WebSockets
+   activés**. Le proxy doit présenter le nom du domaine à Caddy (SNI), sinon Caddy ne sait pas quel certificat
+   servir et la connexion échoue ; dans Nginx Proxy Manager, onglet *Advanced* de l'hôte :
+   ```nginx
+   proxy_ssl_server_name on;
+   proxy_ssl_name <domaine>;
+   ```
+   Le certificat public (Let's Encrypt) est obtenu par le proxy, comme pour ses autres sites.
+3. Si la box ou le routeur ne fait pas de *NAT loopback* (le domaine public ne répond pas depuis le réseau local),
+   ajouter une réécriture DNS locale du domaine vers l'**adresse IP du proxy sur le réseau local** (par exemple
+   *DNS rewrites* d'AdGuard Home, ou l'équivalent de Pi-hole / du routeur).
+
+**Limite actuelle** : le TMS ne fait confiance qu'à Caddy pour `X-Forwarded-For` ; derrière un second proxy, il voit
+l'adresse du proxy pour tous les visiteurs. Les limites par adresse IP (connexion, lien d'activation, flux iCal,
+visiteurs non connectés…) sont alors **partagées par tous les utilisateurs**, et le journal d'audit note l'adresse
+du proxy. Un mode « proxy dédié » (adresse du proxy de confiance configurable) est à prévoir ; d'ici là, ne pas
+mettre `TRUSTED_PROXIES=*`.
 
 ### Où sont les secrets
 
@@ -340,7 +374,14 @@ docker compose -f compose.prod.yaml --env-file .env up -d --wait
 ops/migrate.sh   # rôle propriétaire dans un conteneur éphémère uniquement
 ```
 
-Seul Caddy publie des ports (80/443) ; PostgreSQL et Redis ne sont pas exposés. Caddy est la seule
+Seul Caddy publie des ports (80/443) ; PostgreSQL, Redis et Gotenberg ne sont pas exposés.
+
+**Gotenberg** (conversion HTML → PDF des devis) fait partie de la pile : `docker compose up -d --wait`
+(installateur, mise à jour, restauration) le démarre et attend son contrôle de santé, sans action de
+l'installateur. Il tourne sans JavaScript ni accès réseau sortant (options de `compose.prod.yaml`) : les
+documents sont autonomes (logo intégré). S'il est arrêté, l'aperçu ou l'envoi d'un devis affiche « Le PDF n'a pas
+pu être généré, réessayez dans un instant. » ; les PDF des devis envoyés, archivés dans
+`storage/app/private/tenants/<organisme>/quotes/` (volume `storage`, inclus dans la sauvegarde), restent consultables. Caddy est la seule
 adresse de confiance pour `X-Forwarded-*` (`TRUSTED_PROXIES`), ce qui active HTTPS/HSTS et l'IP cliente
 correcte. `compose.prod.yaml` la renseigne avec l'adresse fixe de Caddy (`TMS_CADDY_IP`, `172.29.250.10` par
 défaut) ; **toute installation derrière Caddy ou un autre proxy doit la renseigner**. Sans elle, l'application voit

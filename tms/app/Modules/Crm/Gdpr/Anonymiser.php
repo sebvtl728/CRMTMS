@@ -7,6 +7,7 @@ use App\Modules\Core\Tenancy\TenantStorage;
 use App\Modules\Crm\Activities\Events\ActivityChanged;
 use App\Modules\Crm\Import\ImportBatch;
 use App\Modules\Crm\People\Person;
+use App\Modules\Crm\Quotes\QuoteAnonymisation;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
@@ -25,6 +26,10 @@ use Throwable;
  * - her opportunities as particulier (trashed too): kept with amounts,
  *   stages and history (statistics), the loss comment cleared; her rows as
  *   contact of an opportunity deleted;
+ * - her quotes (as particulier or interlocuteur; QuoteAnonymisation): kept
+ *   with numbers, lines, totals and statuses; recipient copy, mentions,
+ *   refusal reason and last e-mail cleared, archived PDFs deleted (files
+ *   after the commit); her address leaves the e-mails of other quotes;
  * - her actions (hers, or on her opportunities as particulier; trashed
  *   too): kept with type, dates and result, the report and place cleared,
  *   the subject (« Appel – <her name> ») reset to the type;
@@ -153,6 +158,8 @@ class Anonymiser
         DB::table('gdpr_pending')->where('person_id', $locked->id)->delete();
         DB::table('opportunities')->whereIn('person_id', $subjects)->whereNotNull('loss_comment')->update(['loss_comment' => null, 'updated_at' => now()]);
         DB::table('opportunity_contacts')->whereIn('person_id', $subjects)->delete();
+        $quotes = QuoteAnonymisation::scrub($subjects, $traces->emails);
+        $files = [...$files, ...$quotes['files']];
         $activities = DB::table('activities')
             ->where(fn ($q) => $q->whereIn('person_id', $subjects)
                 ->orWhereIn('opportunity_id', DB::table('opportunities')->select('id')->whereIn('person_id', $subjects)))
@@ -179,6 +186,7 @@ class Anonymiser
             'reason' => $reason,
             'notes' => count($notes),
             'attachments' => $attachments->count(),
+            'quotes' => $quotes['quotes'],
         ]);
 
         // Calendars it was pushed to drop the name and place (after commit).

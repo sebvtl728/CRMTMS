@@ -67,6 +67,18 @@ Code dans `tms/app/Modules/Crm/` (Organisations, People, Affiliations, Opportuni
 - **Données personnelles** : aucune valeur de champ personnel en clair dans `audit_logs` (`Auditable::$auditPersonal`, valeur `[donnée personnelle]`) ni dans les logs ; l'anonymisation (`Gdpr/Anonymiser`) purge aussi les lignes d'import et les pièces jointes.
 - **Visibilité** : toute requête sur une fiche passe par `CrmVisibility` (le Responsable DAS ne voit que ses DAS suivis) ; les `Route::bind` du `CrmServiceProvider` renvoient 404 pour une fiche hors périmètre.
 
+## Modules Catalogue et Devis (lot 1d) : points d'architecture à connaître
+
+Guide utilisateur : `tms/docs/crm.md` (§ 4 catalogue, § 5 devis) ; réglages : `tms/docs/admin.md` (§ 3 sociétés, § 14 devis).
+
+- **Catalogue** (`tms/app/Modules/Catalogue/`, tables `trainings`, `training_funding_modes`, permissions `catalogue.view` / `catalogue.manage`) : module à part. Le Crm n'en utilise que `Trainings` (service public : `find`, `options`, `search`, import), `TrainingData` (tarifs en centimes entiers) et `TrainingUsage`, et ne nomme jamais ses tables (`ModuleBoundariesArchTest`, motif `CATALOGUE_TABLES` : pas de clé `'trainings'` nue dans le Crm, d'où `training_lines`, `options.training`, `training_titles`). Catalogue ne dépend pas du Crm (exports partagés dans `Core\Exports`).
+- **TrainingUsage** : registre de garde-fous de suppression. Tout module qui référence une formation s'y déclare (`TrainingUsage::register('nom', fn ($id) => bool)`, comme `opportunities` et `quotes` dans `CrmServiceProvider`) ; la suppression d'une formation et l'annulation d'un import le consultent.
+- **Devis** (`tms/app/Modules/Crm/Quotes/`) : `QuoteTotals` calcule tout en centimes entiers avec `brick/math` (jamais de float ; TVA par taux sur la somme des lignes, arrondi demi supérieur) ; `QuoteWriter` crée et modifie un brouillon dans une transaction ; `QuoteNumbering::next()` exige une transaction et incrémente `quote_sequences` clé (`tenant_id`, `prefix`, année de Paris) ; `quote_prefix` unique par organisme. Un devis non brouillon ne se modifie plus (409).
+- **Transitions** : `QuoteTransitions` (verrou `lockForUpdate` sur chaque transition) : envoi = `QuoteFreezer::freeze` (destinataire figé, PDF archivé, régime de TVA figé) puis `SendQuote` (`TenantAwareJob`, `afterCommit`, `TenantMailer`, `email_status`) ; l'opportunité avance vers l'étape `meta.quote_stage` (`OpportunityStage::quoteStage()` / `advanceTo()`, jamais un code d'étape en dur) ; « Gagné » reprend le montant du devis accepté lu côté serveur (`quote_id` sur l'endpoint d'étape). Expiration : `tms:crm:expire-quotes` (0 h 05 Paris, `ForEachTenant`).
+- **PDF** : `Core\Documents\PdfRenderer` (Gotenberg, `config/documents.php`, `GOTENBERG_URL`) est le seul moteur ; `QuotePdf` + `resources/views/documents/quote*.blade.php` (CSP sans ressource externe, logo en data URI, `{{ }}` seulement). Un devis envoyé sert toujours son archive (`TenantStorage` zone `quotes`) ; sans archive : 410, jamais de nouveau rendu. Échec Gotenberg = `PdfRenderingFailed` (503, message français).
+- **Données personnelles** : `recipient_snapshot`, `notes`, `refusal_reason` dans `$auditPersonal` ; `email_*` hors audit ; échecs SMTP sans texte du serveur (`QuoteMailFailed`) ; `QuoteAnonymisation` (appelé par l'Anonymiser) efface aussi les PDF archivés.
+- **Taux de réussite** : `QuoteSuccessRate` passe par `QuoteListQuery` (même source que la liste et l'export : filtres et visibilité DAS).
+
 ## Conventions
 
 - Identifiants UUID v7 ; suppression logique sur les fiches métier.

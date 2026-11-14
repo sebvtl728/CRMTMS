@@ -3,10 +3,12 @@
 namespace App\Modules\Core\Companies;
 
 use App\Http\Controllers\Controller;
+use App\Modules\Core\Tenancy\TenantContext;
 use App\Rules\Siret;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -16,6 +18,8 @@ use Inertia\Response;
  */
 class CompanyController extends Controller
 {
+    public function __construct(private readonly CompanyBranding $branding) {}
+
     public function index(Request $request): Response
     {
         return Inertia::render('admin/companies/index', [
@@ -65,6 +69,41 @@ class CompanyController extends Controller
     }
 
     /**
+     * Uploads (or replaces) the logo printed on the company's quotes.
+     */
+    public function storeLogo(Request $request, Company $company): RedirectResponse
+    {
+        $request->validate([
+            'logo' => [
+                'required', 'file', 'max:'.CompanyBranding::MAX_KILOBYTES,
+                function (string $attribute, mixed $value, \Closure $fail): void {
+                    if ($value instanceof UploadedFile && CompanyBranding::detectedType($value) === null) {
+                        $fail(CompanyBranding::TYPE_MESSAGE);
+                    }
+                },
+            ],
+        ], [
+            'logo.required' => 'Choisissez une image.',
+            'logo.file' => 'Le fichier envoyé est invalide.',
+            'logo.uploaded' => 'Le logo n\'a pas pu être envoyé (taille maximale : 1 Mo).',
+            'logo.max' => 'Le logo ne doit pas dépasser 1 Mo.',
+        ]);
+
+        $file = $request->file('logo');
+        assert($file instanceof UploadedFile);
+        $this->branding->storeLogo($company, $file);
+
+        return back()->with('status', 'Logo enregistré.');
+    }
+
+    public function destroyLogo(Company $company): RedirectResponse
+    {
+        $this->branding->deleteLogo($company);
+
+        return back()->with('status', 'Logo supprimé.');
+    }
+
+    /**
      * Legal mentions of unsaved input, for the live preview of the form.
      */
     public function preview(Request $request): JsonResponse
@@ -106,7 +145,14 @@ class CompanyController extends Controller
                 'email' => $company->email,
                 'phone' => $company->phone,
                 'is_default' => $company->is_default,
+                'quote_prefix' => $company->quote_prefix,
+                'quote_validity_days' => $company->quote_validity_days,
+                'quote_terms' => $company->quote_terms,
+                'quote_footer' => $company->quote_footer,
+                'logo' => $this->branding->logoDataUri($company),
             ],
+            // A new company: the first free prefix (one company per prefix).
+            'nextPrefix' => $company === null ? Company::freePrefix() : $company->quote_prefix,
             'mentions' => $company === null ? '' : LegalMentions::for($company),
             'legalForms' => LegalForm::options(),
             'underlyingForms' => array_map(fn (string $f) => ['value' => $f, 'label' => mb_strtoupper($f)], LegalForm::underlyingForms()),
@@ -138,6 +184,9 @@ class CompanyController extends Controller
         }
         if (is_string($input['vat_number'] ?? null)) {
             $input['vat_number'] = mb_strtoupper($input['vat_number']);
+        }
+        if (is_string($input['quote_prefix'] ?? null)) {
+            $input['quote_prefix'] = mb_strtoupper(trim($input['quote_prefix']));
         }
         if (is_string($input['capital_amount'] ?? null)) {
             $input['capital_amount'] = str_replace([' ', "\u{00A0}", ','], ['', '', '.'], $input['capital_amount']);
@@ -185,12 +234,32 @@ class CompanyController extends Controller
             'email' => ['nullable', 'email', 'max:255'],
             'phone' => ['nullable', 'string', 'max:30'],
             'is_default' => ['boolean'],
+            // Quotes (absent from a request: unchanged, or the defaults on creation).
+            // One company per prefix (they share its numbering otherwise).
+            'quote_prefix' => ['sometimes', 'required', 'string', 'regex:/^[A-Z0-9]{1,10}$/', Rule::unique('companies', 'quote_prefix')
+                ->where('tenant_id', app(TenantContext::class)->id())
+                ->whereNull('deleted_at')
+                ->ignore($request->route('company') instanceof Company ? $request->route('company')->getKey() : null)],
+            'quote_validity_days' => ['sometimes', 'required', 'integer', 'between:1,365'],
+            'quote_terms' => ['nullable', 'string', 'max:5000'],
+            'quote_footer' => ['nullable', 'string', 'max:5000'],
         ], [
             'capital_amount.required' => 'Le capital social est obligatoire pour cette forme juridique (sauf capital variable).',
             'capital_amount.gt' => 'Le capital doit être strictement supérieur à 0.',
             'siret.required' => 'Le numéro SIRET est obligatoire.',
             'scop_underlying_form.required' => 'Indiquez la forme sous-jacente de la coopérative (SARL, SA ou SAS).',
             'vat_number.regex' => 'Le numéro de TVA intracommunautaire est invalide (ex. FR12345678901).',
+            'quote_prefix.required' => 'Le préfixe de numérotation est obligatoire.',
+            'quote_prefix.string' => 'Le préfixe ne peut contenir que des lettres majuscules et des chiffres (10 caractères au plus).',
+            'quote_prefix.regex' => 'Le préfixe ne peut contenir que des lettres majuscules et des chiffres (10 caractères au plus).',
+            'quote_prefix.unique' => 'Ce préfixe est déjà celui d\'une autre société : choisissez-en un autre.',
+            'quote_validity_days.required' => 'La durée de validité doit être comprise entre 1 et 365 jours.',
+            'quote_validity_days.integer' => 'La durée de validité doit être comprise entre 1 et 365 jours.',
+            'quote_validity_days.between' => 'La durée de validité doit être comprise entre 1 et 365 jours.',
+            'quote_terms.string' => 'Les conditions doivent être un texte.',
+            'quote_terms.max' => 'Les conditions ne peuvent pas dépasser 5 000 caractères.',
+            'quote_footer.string' => 'Le pied de page doit être un texte.',
+            'quote_footer.max' => 'Le pied de page ne peut pas dépasser 5 000 caractères.',
         ]);
 
         if (! (LegalForm::from($data['legal_form'])->isCooperative())) {
