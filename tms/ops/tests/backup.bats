@@ -79,14 +79,18 @@ teardown_file() {
 }
 
 @test "only caddy publishes ports; postgres and redis are not exposed" {
-    run compose ps --format '{{.Service}} {{.Publishers}}'
+    # JSON, not the text of {{.Publishers}}: its rendering changes between Compose versions.
+    # One "service url:published->target/proto" line per published port (array or NDJSON).
+    local ps
+    ps=$(compose ps --format json)
+    # shellcheck disable=SC2016  # jq variables, not shell ones
+    run jq -r 'if type == "array" then .[] else . end
+        | .Service as $s | (.Publishers // [])[] | select(.PublishedPort > 0)
+        | "\($s) \(.URL):\(.PublishedPort)->\(.TargetPort)/\(.Protocol)"' <<<"$ps"
     [ "$status" -eq 0 ]
-    [ -n "$output" ]
+    [[ "$output" == *"caddy 0.0.0.0:18443->443/tcp"* ]] || false
     while IFS= read -r line; do
-        case "$line" in
-            caddy*) [[ "$line" == *"0.0.0.0:18443->443/tcp"* ]] ;;
-            *) [[ "$line" != *"0.0.0.0"* && "$line" != *"[::]"* ]] ;;
-        esac
+        [[ "$line" == "caddy "* ]] || false
     done <<<"$output"
 }
 
