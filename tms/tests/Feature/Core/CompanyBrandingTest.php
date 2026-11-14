@@ -121,6 +121,19 @@ it('keeps one company per quote prefix in the organisme', function () {
     expect($other->quote_prefix)->toBe('DEV2');
 });
 
+it('prefills the new company form with the first free quote prefix', function () {
+    $this->actingAs(admin(twoFactor: true));
+    $this->get('/admin/companies/create')->assertInertia(fn (Assert $page) => $page->where('nextPrefix', 'DEV'));
+
+    Company::factory()->default()->create();
+    Company::factory()->create();
+    $this->get('/admin/companies/create')->assertInertia(fn (Assert $page) => $page->where('nextPrefix', 'DEV3'));
+
+    // The edit form shows the company's own prefix.
+    $company = Company::factory()->create(['quote_prefix' => 'CAP']);
+    $this->get("/admin/companies/{$company->id}/edit")->assertInertia(fn (Assert $page) => $page->where('company.quote_prefix', 'CAP'));
+});
+
 it('stores the logo under the tenant directory and serves it as a data uri', function () {
     $tenant = tenant();
     $this->actingAs(admin(twoFactor: true));

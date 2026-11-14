@@ -91,12 +91,7 @@ class Company extends Model
             if ($company->isDirty('quote_prefix')) {
                 return;
             }
-            $taken = static::query()->pluck('quote_prefix')->all();
-            $prefix = $company->quote_prefix;
-            for ($n = 2; in_array($prefix, $taken, true); $n++) {
-                $prefix = substr($company->quote_prefix, 0, 10 - strlen((string) $n)).$n;
-            }
-            $company->quote_prefix = $prefix;
+            $company->quote_prefix = static::freePrefix($company->quote_prefix);
         });
 
         // Becoming the default unsets the previous one. Runs inside save()'s
@@ -112,6 +107,22 @@ class Company extends Model
                 ->get()
                 ->each(fn (Company $other) => $other->update(['is_default' => false]));
         });
+    }
+
+    /**
+     * $base when no company of the organisme uses it, else the first free
+     * suffix (« DEV2 », « DEV3 »…; 10 characters at most). A deleted
+     * company frees its prefix.
+     */
+    public static function freePrefix(string $base = 'DEV'): string
+    {
+        $taken = static::query()->pluck('quote_prefix')->all();
+        $prefix = $base;
+        for ($n = 2; in_array($prefix, $taken, true); $n++) {
+            $prefix = substr($base, 0, 10 - strlen((string) $n)).$n;
+        }
+
+        return $prefix;
     }
 
     /**

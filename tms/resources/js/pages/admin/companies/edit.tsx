@@ -64,6 +64,8 @@ interface EditProps {
     underlyingForms: Option[];
     vatRegimes: Option[];
     vatExemptionNotice: string;
+    /** The first free quote prefix (a new company), or the company's own. */
+    nextPrefix: string;
 }
 
 function xsrfToken(): string {
@@ -82,7 +84,7 @@ function Field({ id, label, error, children }: { id: string; label: string; erro
     );
 }
 
-export default function EditCompany({ company, mentions, legalForms, underlyingForms, vatRegimes, vatExemptionNotice }: EditProps) {
+export default function EditCompany({ company, mentions, legalForms, underlyingForms, vatRegimes, vatExemptionNotice, nextPrefix }: EditProps) {
     const { data, setData, post, put, processing, errors } = useForm<CompanyForm>({
         name: company?.name ?? '',
         legal_form: company?.legal_form ?? 'autre',
@@ -102,7 +104,7 @@ export default function EditCompany({ company, mentions, legalForms, underlyingF
         email: company?.email ?? '',
         phone: company?.phone ?? '',
         is_default: company?.is_default ?? false,
-        quote_prefix: company?.quote_prefix ?? 'DEV',
+        quote_prefix: company?.quote_prefix ?? nextPrefix,
         quote_validity_days: String(company?.quote_validity_days ?? 30),
         quote_terms: company?.quote_terms ?? '',
         quote_footer: company?.quote_footer ?? '',

@@ -151,6 +151,8 @@ class CompanyController extends Controller
                 'quote_footer' => $company->quote_footer,
                 'logo' => $this->branding->logoDataUri($company),
             ],
+            // A new company: the first free prefix (one company per prefix).
+            'nextPrefix' => $company === null ? Company::freePrefix() : $company->quote_prefix,
             'mentions' => $company === null ? '' : LegalMentions::for($company),
             'legalForms' => LegalForm::options(),
             'underlyingForms' => array_map(fn (string $f) => ['value' => $f, 'label' => mb_strtoupper($f)], LegalForm::underlyingForms()),
