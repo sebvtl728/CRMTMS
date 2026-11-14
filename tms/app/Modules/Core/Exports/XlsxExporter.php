@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Modules\Crm\Export;
+namespace App\Modules\Core\Exports;
 
 use App\Modules\Core\Users\User;
 use DateTimeInterface;

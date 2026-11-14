@@ -2,6 +2,8 @@
 
 namespace App\Modules\Crm\Export;
 
+use App\Modules\Core\Exports\ExportCell;
+use App\Modules\Core\Exports\ExportResource;
 use App\Modules\Core\Users\User;
 use App\Modules\Crm\People\Person;
 use App\Modules\Crm\People\PhoneNumber;

@@ -1,5 +1,6 @@
 <?php
 
+use App\Modules\Catalogue\Training;
 use App\Modules\Core\Audit\Auditable;
 use App\Modules\Core\Tenancy\BelongsToTenant;
 use App\Modules\Core\Tenancy\Tenant;
@@ -96,6 +97,11 @@ function unauditedModels(array $models, string $namespace): array
 
 it('every CRM model is audited', function () {
     expect(unauditedModels(moduleModels(), 'App\\Modules\\Crm\\'))->toBe([]);
+});
+
+it('every Catalogue model is audited', function () {
+    expect(unauditedModels(moduleModels(), 'App\\Modules\\Catalogue\\'))->toBe([])
+        ->and(moduleModels())->toContain(Training::class);
 });
 
 it('flags a model without Auditable in an audited namespace', function () {

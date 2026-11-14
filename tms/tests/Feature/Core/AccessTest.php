@@ -31,7 +31,7 @@ it('lists the core permission catalogue, then the modules\' permissions', functi
         'users.manage', 'companies.manage', 'references.manage', 'connectors.manage',
         'audit.view', 'settings.manage', 'exports.run',
     ])
-        ->and(array_slice(Permissions::all(), 7))->toBe(App\Modules\Crm\Permissions::all());
+        ->and(array_slice(Permissions::all(), 7))->toBe([...App\Modules\Crm\Permissions::all(), ...App\Modules\Catalogue\Permissions::all()]);
 });
 
 it('seeds the roles and the default matrix for a tenant', function () {
@@ -45,9 +45,9 @@ it('seeds the roles and the default matrix for a tenant', function () {
 
         // Core permissions only (the modules' defaults are tested with PermissionSync).
         $matrix = RoleModel::query()->with('permissions')->get()
-            ->mapWithKeys(fn (RoleModel $r) => [$r->name => $r->permissions->pluck('name')->reject(fn ($p) => str_starts_with($p, 'crm.'))->sort()->values()->all()]);
+            ->mapWithKeys(fn (RoleModel $r) => [$r->name => $r->permissions->pluck('name')->reject(fn ($p) => str_starts_with($p, 'crm.') || str_starts_with($p, 'catalogue.'))->sort()->values()->all()]);
 
-        expect($matrix['admin_organisme'])->toBe(collect(Permissions::all())->reject(fn ($p) => str_starts_with($p, 'crm.'))->sort()->values()->all())
+        expect($matrix['admin_organisme'])->toBe(collect(Permissions::all())->reject(fn ($p) => str_starts_with($p, 'crm.') || str_starts_with($p, 'catalogue.'))->sort()->values()->all())
             ->and($matrix['direction'])->toBe(['audit.view', 'exports.run'])
             ->and($matrix['commercial'])->toBe([])
             ->and($matrix['charge_relations'])->toBe([])
@@ -63,7 +63,7 @@ it('does not overwrite the matrix of an existing role when seeding again', funct
     RoleSeeder::seedFor($tenant);
 
     expect(RoleModel::findByName('direction')->permissions->pluck('name')->all())
-        ->toEqualCanonicalizing(['audit.view', 'crm.view', 'crm.export', 'crm.gdpr']);
+        ->toEqualCanonicalizing(['audit.view', 'crm.view', 'crm.export', 'crm.gdpr', 'catalogue.view', 'catalogue.manage']);
 });
 
 // ---------------------------------------------------------------- authorization

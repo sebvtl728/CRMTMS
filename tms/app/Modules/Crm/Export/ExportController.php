@@ -4,6 +4,8 @@ namespace App\Modules\Crm\Export;
 
 use App\Http\Controllers\Controller;
 use App\Modules\Core\Audit\AuditRecorder;
+use App\Modules\Core\Exports\ExportResource;
+use App\Modules\Core\Exports\XlsxExporter;
 use App\Modules\Core\Users\User;
 use App\Modules\Crm\Opportunities\OpportunityListQuery;
 use App\Modules\Crm\People\Person;

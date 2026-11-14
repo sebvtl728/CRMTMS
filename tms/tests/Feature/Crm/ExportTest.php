@@ -2,10 +2,10 @@
 
 use App\Modules\Core\Access\Role;
 use App\Modules\Core\Audit\AuditLog;
+use App\Modules\Core\Exports\XlsxExporter;
 use App\Modules\Core\References\CapFormationReferenceSeeder;
 use App\Modules\Core\References\ReferenceList;
 use App\Modules\Crm\CrmServiceProvider;
-use App\Modules\Crm\Export\XlsxExporter;
 use App\Modules\Crm\Organisations\Organisation;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;

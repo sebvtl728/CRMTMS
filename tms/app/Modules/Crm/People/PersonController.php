@@ -3,11 +3,11 @@
 namespace App\Modules\Crm\People;
 
 use App\Http\Controllers\Controller;
+use App\Modules\Core\Exports\ExportCell;
 use App\Modules\Core\References\ReferenceItem;
 use App\Modules\Core\References\ReferenceList;
 use App\Modules\Core\Users\User;
 use App\Modules\Crm\Duplicates\DuplicateGuard;
-use App\Modules\Crm\Export\ExportCell;
 use App\Modules\Crm\Gdpr\Consent;
 use App\Modules\Crm\Gdpr\ConsentChannel;
 use App\Modules\Crm\Gdpr\GdprPending;

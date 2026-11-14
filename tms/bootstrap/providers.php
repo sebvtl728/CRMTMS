@@ -1,5 +1,6 @@
 <?php
 
+use App\Modules\Catalogue\CatalogueServiceProvider;
 use App\Modules\Connectors\ConnectorsServiceProvider;
 use App\Modules\Core\Access\AccessServiceProvider;
 use App\Modules\Core\Audit\AuditServiceProvider;
@@ -20,4 +21,5 @@ return [
     AuditServiceProvider::class,
     ConnectorsServiceProvider::class,
     CrmServiceProvider::class,
+    CatalogueServiceProvider::class,
 ];

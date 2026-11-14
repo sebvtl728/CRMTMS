@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Modules\Crm\Export;
+namespace App\Modules\Core\Exports;
 
 use Carbon\CarbonImmutable;
 use DateTimeInterface;
@@ -16,6 +16,9 @@ final class ExportCell
     public const AMOUNT_FORMAT = '#,##0.00\ "€"';
 
     public const INTEGER_FORMAT = '0';
+
+    /** A decimal shown as is (« 14,5 », « 2 ») in a French Excel. */
+    public const DECIMAL_FORMAT = 'General';
 
     /** « 20/12/2026 ». */
     public const DATE_FORMAT = 'dd/mm/yyyy';
@@ -33,6 +36,7 @@ final class ExportCell
         return match (true) {
             $cell->value instanceof DateTimeInterface => $cell->value->format('d/m/Y'),
             $cell->format === self::AMOUNT_FORMAT => number_format((float) $cell->value, 2, ',', ' '),
+            $cell->format === self::DECIMAL_FORMAT => str_replace('.', ',', (string) $cell->value),
             default => (string) $cell->value,
         };
     }
@@ -43,6 +47,12 @@ final class ExportCell
     public static function amount(?string $value): ?self
     {
         return $value === null || $value === '' ? null : new self((float) $value, self::AMOUNT_FORMAT);
+    }
+
+    /** A decimal quantity (« 14.50 » as stored: hours, days), null when empty. */
+    public static function decimal(?string $value): ?self
+    {
+        return $value === null || $value === '' ? null : new self((float) $value, self::DECIMAL_FORMAT);
     }
 
     public static function integer(?int $value): ?self
