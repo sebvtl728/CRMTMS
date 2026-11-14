@@ -11,7 +11,8 @@ use Carbon\CarbonImmutable;
  * The iCalendar (RFC 5545) feed of a user: his meetings and calls from 30
  * days back to 180 days ahead, in local Paris time (TZID with its
  * VTIMEZONE, so an event keeps its wall-clock time across DST changes).
- * The report of an action never leaves the tool.
+ * Lengths are DURATION values (exact time). The report of an action never
+ * leaves the tool.
  */
 final class IcalFeed
 {
@@ -98,7 +99,9 @@ final class IcalFeed
     private static function event(CalendarEvent $event, CarbonImmutable $now): array
     {
         $start = $event->start->setTimezone(self::TZID);
-        $end = $start->addMinutes($event->durationMinutes ?? self::DEFAULT_MINUTES[$event->kind]);
+        // DURATION, not DTEND: an exact length stays right across a DST
+        // change (02:30 CEST + 1 h is 02:30 CET, which a local DTEND loses).
+        $minutes = $event->durationMinutes ?? self::DEFAULT_MINUTES[$event->kind];
         $local = fn (CarbonImmutable $at): string => $at->format('Ymd\THis');
         $utc = fn (CarbonImmutable $at): string => $at->utc()->format('Ymd\THis\Z');
 
@@ -114,7 +117,7 @@ final class IcalFeed
             'DTSTAMP:'.$utc($now),
             'LAST-MODIFIED:'.$utc($event->updatedAt),
             'DTSTART;TZID='.self::TZID.':'.$local($start),
-            'DTEND;TZID='.self::TZID.':'.$local($end),
+            'DURATION:PT'.$minutes.'M',
             'SUMMARY:'.self::text(trim($event->type.($event->fiche !== '' ? ' – '.$event->fiche : ''))),
         ];
         if ($event->location !== null && trim($event->location) !== '') {

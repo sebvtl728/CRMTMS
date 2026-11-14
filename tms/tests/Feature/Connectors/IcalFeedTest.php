@@ -11,6 +11,7 @@ use App\Modules\Core\Users\User;
 use App\Modules\Crm\Activities\Activity;
 use App\Modules\Crm\CrmServiceProvider;
 use App\Modules\Crm\Organisations\Organisation;
+use App\Providers\RateLimitServiceProvider;
 use Carbon\CarbonImmutable;
 
 beforeEach(function () {
@@ -108,7 +109,7 @@ it('serves the meetings and calls of its owner as an RFC 5545 calendar', functio
         'UID' => $meeting->id,
         'SUMMARY' => 'Rendez-vous physique – Hôtel du Lac',
         'DTSTART;TZID=Europe/Paris' => '20261119T090000',
-        'DTEND;TZID=Europe/Paris' => '20261119T100000',
+        'DURATION' => 'PT60M',
         'LOCATION' => 'Annecy',
         'URL' => url('/crm/opportunities/'.$opportunity->id),
     ])->and($first['DESCRIPTION'])->toContain('Fiche : Hôtel du Lac')->toContain('Opportunité : Formation HACCP')
@@ -120,7 +121,7 @@ it('serves the meetings and calls of its owner as an RFC 5545 calendar', functio
         'UID' => $call->id,
         'SUMMARY' => 'Appel – Hôtel du Lac',
         'DTSTART;TZID=Europe/Paris' => '20261120T110000',
-        'DTEND;TZID=Europe/Paris' => '20261120T111500',
+        'DURATION' => 'PT15M',
         'URL' => url('/crm/organisations/'.$organisation->id),
     ])->and($second['DESCRIPTION'])->toContain('Résultat : Réussi')
         ->and($second)->not->toHaveKey('LOCATION');
@@ -134,15 +135,22 @@ it('ical event across dst keeps local time', function () {
     icalAction($user, 'Rendez-vous physique', '2026-10-26 09:00:00', ['subject' => 'Hiver', 'duration_minutes' => null]);
     icalAction($user, 'Prise de rendez-vous', '2027-03-29 09:00:00', ['subject' => 'Été suivant', 'duration_minutes' => 90]);
     icalAction($user, 'Appel', '2026-10-25 23:30:00', ['subject' => 'Tard', 'duration_minutes' => 45]);
+    // Across the changes themselves: 01:30 + 2 h of exact time.
+    icalAction($user, 'Rendez-vous physique', '2026-10-25 01:30:00', ['subject' => 'Recul', 'duration_minutes' => 120]);
+    icalAction($user, 'Rendez-vous physique', '2027-03-28 01:30:00', ['subject' => 'Avance', 'duration_minutes' => 120]);
 
-    $events = icalEvents($this->get(feedPath(CalendarToken::issue($user)))->assertOk()->getContent());
+    $ics = $this->get(feedPath(CalendarToken::issue($user)))->assertOk()->getContent();
+    $events = icalEvents($ics);
 
-    expect(array_map(fn (array $e) => [$e['DTSTART;TZID=Europe/Paris'], $e['DTEND;TZID=Europe/Paris']], $events))->toBe([
-        ['20261024T090000', '20261024T100000'],
-        ['20261025T233000', '20261026T001500'],
-        ['20261026T090000', '20261026T100000'], // meeting without duration: 1 hour
-        ['20270329T090000', '20270329T103000'],
-    ]);
+    expect($ics)->not->toContain('DTEND')
+        ->and(array_map(fn (array $e) => [$e['DTSTART;TZID=Europe/Paris'], $e['DURATION']], $events))->toBe([
+            ['20261024T090000', 'PT60M'],
+            ['20261025T013000', 'PT120M'], // ends at 02:30 CET (3:30 on a summer clock)
+            ['20261025T233000', 'PT45M'],
+            ['20261026T090000', 'PT60M'], // meeting without duration: 1 hour
+            ['20270328T013000', 'PT120M'], // ends at 04:30 CEST
+            ['20270329T090000', 'PT90M'],
+        ]);
 });
 
 it('only lists the dated meetings and calls of its owner from 30 days back to 180 days ahead', function () {
@@ -283,6 +291,26 @@ it('limits the feed to 30 requests a minute', function () {
     $this->get(feedPath($token))->assertStatus(429);
 });
 
+it('limits the feed per address too, without starving a shared calendar server', function () {
+    $token = CalendarToken::issue(commercial());
+
+    // Links rotated by one client: each one is new, the address is not.
+    for ($i = 0; $i < 40; $i++) {
+        $this->get(feedPath(bin2hex(random_bytes(32))))->assertNotFound();
+    }
+    // A server fetching many links from the same address still gets the valid one.
+    $this->get(feedPath($token))->assertOk();
+
+    for ($i = 41; $i < RateLimitServiceProvider::FEED_PER_IP; $i++) {
+        $this->get(feedPath(bin2hex(random_bytes(32))))->assertNotFound();
+    }
+    $this->get(feedPath(bin2hex(random_bytes(32))))->assertStatus(429);
+    $this->get(feedPath($token))->assertStatus(429);
+
+    // Another address is not affected.
+    $this->withServerVariables(['REMOTE_ADDR' => '203.0.113.9'])->get(feedPath($token))->assertOk();
+});
+
 it('lets a user generate, regenerate and revoke his link from « Mon agenda »', function () {
     $user = commercial();
     $this->actingAs($user);
@@ -291,14 +319,18 @@ it('lets a user generate, regenerate and revoke his link from « Mon agenda »',
         ->assertInertia(fn ($p) => $p->component('settings/calendar')->where('calendar', null)->where('url', null));
 
     $this->post('/settings/calendar')->assertRedirect('/settings/calendar');
-    $page = $this->get('/settings/calendar')->assertOk()->viewData('page')['props'];
+    $shown = $this->get('/settings/calendar')->assertOk()->viewData('page');
+    $page = $shown['props'];
+    // Encrypted history state, its key rotated on the next visit.
+    expect($shown['encryptHistory'])->toBeTrue();
     expect($page['url'])->toMatch('#^'.preg_quote(url('/calendar'), '#').'/[0-9a-f]{64}\.ics$#')
         ->and($page['calendar']['created_at'])->not->toBeNull();
     $first = $page['url'];
     $this->get(parse_url($first, PHP_URL_PATH))->assertOk();
 
     // Shown once only.
-    $this->get('/settings/calendar')->assertInertia(fn ($p) => $p->where('url', null)->whereNot('calendar', null));
+    $next = $this->get('/settings/calendar')->assertInertia(fn ($p) => $p->where('url', null)->whereNot('calendar', null))->viewData('page');
+    expect($next['clearHistory'])->toBeTrue();
 
     $this->post('/settings/calendar')->assertRedirect('/settings/calendar');
     $second = $this->get('/settings/calendar')->viewData('page')['props']['url'];

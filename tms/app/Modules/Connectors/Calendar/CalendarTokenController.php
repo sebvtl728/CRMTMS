@@ -18,15 +18,27 @@ class CalendarTokenController extends Controller
     public function edit(Request $request): Response
     {
         $token = CalendarToken::activeFor($this->user($request));
+        $url = $request->session()->get('calendar_url');
 
-        return Inertia::render('settings/calendar', [
+        // The link is a page prop, kept in the browser history state: that
+        // state is encrypted, and its key is rotated by the next page
+        // rendered (flag set after this response is built), so « back »
+        // can never show the link again.
+        Inertia::encryptHistory();
+
+        $response = Inertia::render('settings/calendar', [
             'calendar' => $token === null ? null : [
                 'created_at' => $token->created_at?->toIso8601String(),
                 'last_used_at' => $token->last_used_at?->toIso8601String(),
             ],
-            'url' => $request->session()->get('calendar_url'),
+            'url' => $url,
             'status' => $request->session()->get('status'),
         ]);
+        if ($url !== null) {
+            Inertia::clearHistory();
+        }
+
+        return $response;
     }
 
     public function store(Request $request): RedirectResponse

@@ -23,7 +23,6 @@ final readonly class CalendarEvent
         public ?string $location,
         public CarbonImmutable $start,
         public ?int $durationMinutes,
-        public bool $done,
         public string $url,
         public CarbonImmutable $updatedAt,
     ) {}

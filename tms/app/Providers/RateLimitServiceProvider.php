@@ -28,11 +28,22 @@ class RateLimitServiceProvider extends ServiceProvider
         'calendar-feed' => 30,
     ];
 
+    /**
+     * The iCal feed also counts per address, more widely: links rotated by
+     * one client are limited, a calendar server fetching many links is not.
+     */
+    public const FEED_PER_IP = 300;
+
     public function boot(): void
     {
         foreach (self::LIMITS as $name => $perMinute) {
             RateLimiter::for($name, fn (Request $request) => Limit::perMinute($perMinute)->by(self::key($name, $request)));
         }
+
+        RateLimiter::for('calendar-feed', fn (Request $request) => [
+            Limit::perMinute(self::LIMITS['calendar-feed'])->by(self::key('calendar-feed', $request)),
+            Limit::perMinute(self::FEED_PER_IP)->by(self::key('calendar-feed-ip', $request)),
+        ]);
     }
 
     public static function key(string $name, Request $request): string
@@ -44,9 +55,9 @@ class RateLimitServiceProvider extends ServiceProvider
     }
 
     /**
-     * The iCal feed counts per link, not per address: the calendar servers
-     * (Google, Microsoft) and an office behind one NAT share a few IPs. The
-     * hash of the token, never the token itself, goes into the cache key.
+     * The iCal feed counts per link (plus FEED_PER_IP per address): the
+     * calendar servers (Google, Microsoft) and an office behind one NAT share
+     * a few IPs. The hash of the token, never the token, is in the key.
      */
     private static function feed(string $name, Request $request): ?string
     {

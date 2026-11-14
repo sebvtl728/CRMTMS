@@ -49,7 +49,6 @@ final class CalendarEvents
                 location: $activity->location,
                 start: CarbonImmutable::instance($activity->due_at),
                 durationMinutes: $activity->duration_minutes,
-                done: $activity->done_at !== null,
                 url: self::url($activity),
                 updatedAt: CarbonImmutable::instance($activity->updated_at ?? $activity->created_at ?? now()),
             );
