@@ -20,6 +20,23 @@ final class ExportCell
     /** « 20/12/2026 ». */
     public const DATE_FORMAT = 'dd/mm/yyyy';
 
+    /**
+     * A cell as text for the screen (list tables): « 1 234,50 », « 10 »,
+     * « 20/12/2026 »; text as is.
+     */
+    public static function display(string|self|null $cell): ?string
+    {
+        if (! $cell instanceof self) {
+            return $cell;
+        }
+
+        return match (true) {
+            $cell->value instanceof DateTimeInterface => $cell->value->format('d/m/Y'),
+            $cell->format === self::AMOUNT_FORMAT => number_format((float) $cell->value, 2, ',', ' '),
+            default => (string) $cell->value,
+        };
+    }
+
     private function __construct(public readonly int|float|DateTimeInterface $value, public readonly string $format) {}
 
     /** A decimal amount (« 1234.50 » as stored), null when empty. */

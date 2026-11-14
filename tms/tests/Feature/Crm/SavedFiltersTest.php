@@ -6,7 +6,9 @@ use App\Modules\Core\References\CapFormationReferenceSeeder;
 use App\Modules\Core\Tenancy\TenantContext;
 use App\Modules\Crm\CrmServiceProvider;
 use App\Modules\Crm\Organisations\Organisation;
+use App\Modules\Crm\People\Person;
 use App\Modules\Crm\Search\SavedFilter;
+use Carbon\CarbonImmutable;
 use Inertia\Testing\AssertableInertia as Assert;
 
 beforeEach(function () {
@@ -193,4 +195,15 @@ it('does not fail on an array resource and caps long search terms', function () 
 
     $this->getJson('/crm/saved-filters?resource[]=x')->assertOk();
     $this->get('/crm/organisations?q='.str_repeat('a', 300))->assertInertia(fn (Assert $page) => $page->where('filters.q', str_repeat('a', 100)));
+});
+
+it('shows the date cells of the lists as french text, not as export objects', function () {
+    $this->actingAs(commercial());
+    $this->travelTo(CarbonImmutable::parse('2026-11-14 00:30', 'Europe/Paris'));
+    Organisation::query()->create(['name' => 'Alpha']);
+    Person::query()->create(['last_name' => 'Dupont']);
+
+    $this->get('/crm/organisations')->assertInertia(fn (Assert $page) => $page->where('organisations.data.0.cells.created_at', '14/11/2026')
+        ->where('organisations.data.0.cells.last_contact_at', null));
+    $this->get('/crm/people')->assertInertia(fn (Assert $page) => $page->where('people.data.0.cells.created_at', '14/11/2026'));
 });

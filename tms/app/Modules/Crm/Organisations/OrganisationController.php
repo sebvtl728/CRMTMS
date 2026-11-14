@@ -8,6 +8,7 @@ use App\Modules\Core\References\ReferenceList;
 use App\Modules\Core\Users\User;
 use App\Modules\Crm\Affiliations\Affiliation;
 use App\Modules\Crm\Duplicates\DuplicateGuard;
+use App\Modules\Crm\Export\ExportCell;
 use App\Modules\Crm\Opportunities\OpportunityRows;
 use App\Modules\Crm\Permissions;
 use App\Modules\Crm\Search\CrmResource;
@@ -327,7 +328,7 @@ class OrganisationController extends Controller
     {
         $export = $resource->export();
 
-        return collect(array_keys($export->columns()))->mapWithKeys(fn (string $c) => [$c => $export->value($organisation, $c)])->all();
+        return collect(array_keys($export->columns()))->mapWithKeys(fn (string $c) => [$c => ExportCell::display($export->value($organisation, $c))])->all();
     }
 
     /**
