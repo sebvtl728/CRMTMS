@@ -60,6 +60,17 @@ it('rate: 4 sent in november, 1 accepted in december gives 25 % for november', f
     expect($quarter)->toBe(['sent' => 5, 'accepted' => 1, 'rate' => 20.0]);
 });
 
+it('a quote replaced by a new version leaves the rate: only the new version counts', function () {
+    $this->travelTo(CarbonImmutable::parse('2026-11-25 10:00', 'Europe/Paris'));
+    $v1 = srQuote('2026-11-05 09:00');
+    $v2 = srQuote('2026-11-12 09:00', '2026-11-20');
+    // v1 refused as « Remplacé par » v2 (QuoteTransitions::newVersion).
+    $v1->forceFill(['status' => QuoteStatus::Refused, 'refused_on' => '2026-11-12', 'refusal_reason' => "Remplacé par {$v2->number}", 'replaced_by_id' => $v2->id])->save();
+
+    expect(QuoteSuccessRate::for(commercial(), CarbonImmutable::parse('2026-11-01', 'Europe/Paris'), CarbonImmutable::parse('2026-11-30', 'Europe/Paris'), []))
+        ->toBe(['sent' => 1, 'accepted' => 1, 'rate' => 100.0]);
+});
+
 it('shows the rate above the list, by month, quarter or year (Paris)', function () {
     $this->travelTo(CarbonImmutable::parse('2026-11-30 23:45', 'Europe/Paris')); // still November in Paris
     srNovember();

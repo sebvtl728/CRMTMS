@@ -8,8 +8,8 @@ use Carbon\CarbonImmutable;
 /**
  * Success rate of the quotes: among the quotes SENT in a period (sent_at,
  * Paris calendar days), how many were accepted (at any time since). A
- * quote replaced by a new version counts as sent and not accepted; the new
- * version counts when it is sent. Within what the user sees (Responsable
+ * quote replaced by a new version (replaced_by_id) is left out: only the
+ * new version counts, when it is sent. Within what the user sees (Responsable
  * DAS: his DAS only) and the filters of the « Devis » list, except the
  * status and the issue dates (the period replaces them).
  */
@@ -35,6 +35,7 @@ final class QuoteSuccessRate
             ->reorder()
             ->where('quotes.sent_at', '>=', $start->format('Y-m-d H:i:sP'))
             ->where('quotes.sent_at', '<', $end->format('Y-m-d H:i:sP'))
+            ->whereNull('quotes.replaced_by_id')
             ->toBase()
             ->selectRaw('count(*) as sent, count(*) filter (where quotes.status = ?) as accepted', [QuoteStatus::Accepted->value])
             ->first();
