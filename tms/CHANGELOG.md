@@ -31,18 +31,24 @@ Ajustements après les premiers retours.
 
 - **Rôles et droits** (Administration) : tableau des droits de chaque rôle, regroupés par thème avec une explication,
   case par case, droits différents du défaut surlignés, **Rétablir les droits par défaut** par rôle ; journalisé.
-  Nouveau droit `roles.manage` (administrateur seulement). Le rôle administrateur, « Gérer les utilisateurs » et
-  « Gérer les rôles et droits » ne sont pas modifiables.
+  Nouveau droit `roles.manage` (administrateur seulement). Le rôle administrateur, « Gérer les utilisateurs »,
+  « Gérer les rôles et droits » et « Gérer les connecteurs » ne sont pas modifiables ; « Lancer les exports système »
+  et « Gérer les paramètres » sont signalés comme droits de niveau administrateur.
 
 - **Modèles d'e-mails** (Administration) : objet et texte de l'envoi et de la relance d'un devis, de l'invitation d'un
   utilisateur et du récapitulatif quotidien, avec variables à insérer, aperçu, e-mail de test et retour au modèle par
-  défaut ; variables inconnues refusées, aucun code interprété. Les e-mails de sécurité restent des modèles système.
+  défaut ; variables inconnues, caractères de contrôle dans l'objet et Markdown dans l'invitation neutralisés, aucun
+  code interprété. Les e-mails de sécurité restent des modèles système.
 
 ### Modifié
 
 - Une formation d'intérêt d'une fiche empêche sa suppression du catalogue (désactivation possible).
 - Remplacer le logo d'une société ou le devis signé ne fait plus perdre l'ancien fichier si l'enregistrement échoue.
 - Récapitulatif quotidien : « 0 action » au singulier.
+- Devis signé ouvert dans un bac à sable (`Content-Security-Policy: sandbox`) ; objet proposé pour l'envoi d'un devis
+  limité à 200 caractères.
+- Workers : les droits sont relus à chaque tâche (plus de droits périmés pour un même organisme).
+- Formations d'intérêt : une seule entrée de journal par modification.
 - Fusion de fiches : les formations d'intérêt sont réunies (sans doublon). Anonymisation d'une personne : ses
   formations d'intérêt sont supprimées. Export RGPD : section « Formations d'intérêt ».
 

@@ -40,11 +40,15 @@ class InvitationNotification extends Notification
             'organisme' => $this->organisation,
             'application' => (string) config('app.name'),
         ]);
-        $paragraphs = array_values(array_filter(array_map('trim', preg_split('/\R\s*\R/', $text['body']) ?: []), fn (string $p) => $p !== ''));
+        // Plain text: Markdown is escaped (the mail layout renders Markdown), the
+        // greeting is the first line only, the rest plain paragraphs.
+        $lines = preg_split('/\R/', trim($text['body'])) ?: [];
+        $greeting = trim((string) array_shift($lines));
+        $paragraphs = array_values(array_filter(array_map('trim', preg_split('/\R\s*\R/', implode("\n", $lines)) ?: []), fn (string $p) => $p !== ''));
 
-        $message = (new MailMessage)->subject($text['subject'])->greeting(array_shift($paragraphs) ?? 'Bonjour,');
+        $message = (new MailMessage)->subject($text['subject'])->greeting(self::plain($greeting !== '' ? $greeting : 'Bonjour,'));
         foreach ($paragraphs as $paragraph) {
-            $message->line($paragraph);
+            $message->line(self::plain($paragraph));
         }
 
         return $message
@@ -52,5 +56,14 @@ class InvitationNotification extends Notification
             ->line('Ce lien est valable '.Invitation::VALIDITY_HOURS.' heures et ne peut être utilisé qu\'une seule fois.')
             ->line('Si vous n\'attendiez pas cette invitation, ignorez ce message.')
             ->salutation('Cordialement,');
+    }
+
+    /**
+     * Text shown as typed by the mail layout's Markdown: every Markdown
+     * punctuation is backslash-escaped (HTML is escaped by the layout).
+     */
+    private static function plain(string $text): string
+    {
+        return (string) preg_replace('/([\\\\`*_{}\[\]()#+\-.!|<>~])/', '\\\\$1', $text);
     }
 }

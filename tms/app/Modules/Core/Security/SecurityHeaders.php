@@ -16,7 +16,9 @@ class SecurityHeaders
 
         $response = $next($request);
 
-        $response->headers->set('Content-Security-Policy', $this->contentSecurityPolicy($nonce));
+        // A response may add its own directives (e.g. « sandbox » for an uploaded file).
+        $own = $response->headers->get('Content-Security-Policy');
+        $response->headers->set('Content-Security-Policy', $this->contentSecurityPolicy($nonce).($own ? '; '.$own : ''));
         $response->headers->set('X-Content-Type-Options', 'nosniff');
         $response->headers->set('X-Frame-Options', 'DENY');
         $response->headers->set('Referrer-Policy', 'strict-origin-when-cross-origin');

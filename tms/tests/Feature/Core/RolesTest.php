@@ -54,7 +54,7 @@ it('shows the matrix with the default of each cell', function () {
         ->where('roles.1.granted', fn ($granted) => collect($granted)->sort()->values()->all() === collect(Permissions::defaultsFor(Role::Direction))->sort()->values()->all())
         ->where('roles.1.defaults', fn ($d) => collect($d)->sort()->values()->all() === collect(Permissions::defaultsFor(Role::Direction))->sort()->values()->all())
         ->where('groups', fn ($groups) => collect($groups)->flatMap(fn ($g) => collect($g['permissions'])->pluck('name'))->sort()->values()->all() === collect(Permissions::all())->sort()->values()->all())
-        ->where('locked', [Permissions::USERS_MANAGE, Permissions::ROLES_MANAGE]));
+        ->where('locked', Permissions::LOCKED));
 });
 
 it('grants and revokes a permission of a role, journaled, effective at the next request', function () {
@@ -113,4 +113,20 @@ it('changes only the current organisme, and a later sync never grants a removed 
     expect(rolePermissions(Role::Commercial))->not->toContain('crm.delete');
     $theirs = app(TenantContext::class)->run($other, fn () => rolePermissions(Role::Commercial));
     expect($theirs)->toContain('crm.delete');
+});
+
+it('never grants the connectors to another role (an SMTP relay would capture invitation links)', function () {
+    $this->actingAs(admin(twoFactor: true));
+
+    expect(Permissions::LOCKED)->toContain(Permissions::CONNECTORS_MANAGE);
+    $this->post('/admin/roles/direction', ['permission' => Permissions::CONNECTORS_MANAGE, 'granted' => true])->assertForbidden();
+    expect(rolePermissions(Role::Direction))->not->toContain(Permissions::CONNECTORS_MANAGE);
+});
+
+it('warns about the administration-level rights on the screen', function () {
+    $this->actingAs(admin(twoFactor: true));
+
+    $this->get('/admin/roles')->assertInertia(fn (Assert $page) => $page
+        ->where('groups.0.permissions', fn ($rows) => collect($rows)->whereNotNull('warning')->pluck('name')->sort()->values()->all() === ['exports.run', 'settings.manage'])
+        ->where('groups.0.permissions', fn ($rows) => str_contains((string) collect($rows)->firstWhere('name', 'settings.manage')['description'], "modèles d'e-mails")));
 });

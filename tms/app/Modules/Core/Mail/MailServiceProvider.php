@@ -49,6 +49,8 @@ class MailServiceProvider extends ServiceProvider
 
     public function boot(): void
     {
+        // Saves, resets and previews: 60 a minute per administrator.
+        RateLimiter::for('mail-templates-write', fn (Request $request) => Limit::perMinute(60)->by('mail-templates-write:'.($request->user()?->getAuthIdentifier() ?? $request->ip())));
         // « Envoyer un e-mail de test »: 10 a minute per administrator.
         RateLimiter::for('mail-template-test', fn (Request $request) => Limit::perMinute(10)->by('mail-template-test:'.($request->user()?->getAuthIdentifier() ?? $request->ip())));
     }

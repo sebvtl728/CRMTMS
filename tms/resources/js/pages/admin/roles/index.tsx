@@ -19,6 +19,8 @@ interface PermissionRow {
     name: string;
     label: string;
     description: string;
+    /** Administration-level power, worth a second thought before granting it. */
+    warning: string | null;
 }
 
 interface RolesProps {
@@ -68,7 +70,9 @@ export default function Roles({ roles, groups, locked, status }: RolesProps) {
 
                 <ul className="text-muted-foreground list-disc space-y-1 pl-5 text-sm">
                     <li>Le rôle Administrateur de l'organisme a toujours tous les droits : il ne se modifie pas.</li>
-                    <li>« Gérer les utilisateurs » et « Gérer les rôles et droits » restent réservés à l'administrateur.</li>
+                    <li>
+                        « Gérer les utilisateurs », « Gérer les rôles et droits » et « Gérer les connecteurs » restent réservés à l'administrateur.
+                    </li>
                     <li>
                         Une case <span className="rounded bg-amber-100 px-1 text-amber-900 dark:bg-amber-900 dark:text-amber-100">surlignée</span>{' '}
                         diffère des droits par défaut du rôle.
@@ -117,6 +121,7 @@ export default function Roles({ roles, groups, locked, status }: RolesProps) {
                                         <th scope="row" className="px-3 py-2 text-left font-normal">
                                             <div className="font-medium">{p.label}</div>
                                             <div className="text-muted-foreground text-xs">{p.description}</div>
+                                            {p.warning && <div className="mt-1 text-xs text-amber-700 dark:text-amber-300">⚠ {p.warning}</div>}
                                         </th>
                                         {roles.map((role) => {
                                             const granted = role.granted.includes(p.name);

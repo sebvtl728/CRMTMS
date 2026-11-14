@@ -11,6 +11,7 @@ use App\Modules\Core\Users\InvitationMail;
 use App\Modules\Crm\Activities\DailyDigestMail;
 use App\Modules\Crm\CrmServiceProvider;
 use App\Modules\Crm\Quotes\QuoteMail;
+use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Facades\Mail;
 use Inertia\Testing\AssertableInertia as Assert;
 
@@ -132,4 +133,58 @@ it('keeps templates per organisme, cached under the tenant id', function () {
     expect(app(MailTemplates::class)->get('quote.send')['subject'])->toBe('Mien')
         ->and(app(TenantContext::class)->run($other, fn () => app(MailTemplates::class)->get('quote.send')['subject']))->toBe('Devis {numero_devis} — {societe}')
         ->and(MailTemplates::cacheKey(tenant()->id, 'quote.send'))->toStartWith(tenant()->id.':');
+});
+
+it('refuses control characters in a subject and caps the prefilled quote subject', function () {
+    $this->actingAs(admin(twoFactor: true));
+
+    $this->put('/admin/mail-templates/quote.send', ['subject' => "Devis\r\nBcc: x@example.test", 'body' => 'x'])
+        ->assertSessionHasErrors(['subject' => "L'objet doit tenir sur une ligne, sans caractère de contrôle."]);
+    $this->put('/admin/mail-templates/quote.send', ['subject' => "Devis\t{numero_devis}", 'body' => 'x'])->assertSessionHasErrors('subject');
+
+    $this->put('/admin/mail-templates/quote.send', ['subject' => str_repeat('{societe} ', 20), 'body' => 'x'])->assertSessionHasNoErrors();
+    $quote = sendableQuote();
+    $quote->company?->update(['name' => str_repeat('Très longue raison sociale ', 4)]);
+    $subject = QuoteMail::defaults($quote->refresh(), QuoteMail::KIND_SEND)['subject'];
+    expect(mb_strlen($subject))->toBeLessThanOrEqual(200);
+});
+
+it('limits the writes of the templates screen', function () {
+    foreach (['admin.mail-templates.update', 'admin.mail-templates.destroy', 'admin.mail-templates.preview'] as $name) {
+        expect(app('router')->getRoutes()->getByName($name)?->gatherMiddleware())->toContain('throttle:mail-templates-write');
+    }
+});
+
+it('renders the invitation text literally, without Markdown', function () {
+    inTenant();
+    MailTemplate::query()->create(['key' => 'users.invitation', 'subject' => 'Bienvenue', 'body' => "Bonjour {nom_utilisateur},\nsuite de la formule\n\n[lien](http://x.example.test)\n\n# titre"]);
+    app(MailTemplates::class)->forget('users.invitation');
+
+    $html = (new InvitationMail('https://cap.example.test/activation/abc', '*Léa* [Durand](http://evil.test)', 'CAP FORMATION'))->build()->render();
+
+    expect($html)->not->toContain('href="http://x.example.test"')
+        ->and($html)->not->toContain('href="http://evil.test"')
+        ->and($html)->not->toContain('<h1>titre')
+        ->and($html)->not->toContain('<em>Léa</em>')
+        ->and($html)->toContain('[lien](http://x.example.test)')
+        ->and($html)->toContain('# titre')
+        ->and($html)->toContain('suite de la formule')
+        ->and($html)->toContain('https://cap.example.test/activation/abc');
+});
+
+it('saves a template even when a concurrent first save collides', function () {
+    $this->actingAs(admin(twoFactor: true));
+    $collided = false;
+    MailTemplate::creating(function () use (&$collided): void {
+        if (! $collided) {
+            $collided = true;
+
+            throw new UniqueConstraintViolationException('pgsql', 'insert into mail_templates', [], new RuntimeException('duplicate key'));
+        }
+    });
+
+    $this->put('/admin/mail-templates/quote.remind', ['subject' => 'Relance {numero_devis}', 'body' => 'x'])->assertSessionHasNoErrors();
+
+    expect($collided)->toBeTrue()
+        ->and(MailTemplate::query()->where('key', 'quote.remind')->sole()->subject)->toBe('Relance {numero_devis}');
 });

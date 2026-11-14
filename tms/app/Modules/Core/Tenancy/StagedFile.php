@@ -14,11 +14,15 @@ use RuntimeException;
  * and only once that is committed is the temporary file moved to its final
  * name (and a previous file of another name deleted). A failed save deletes
  * the temporary file only. Leftover temporary files (a crash between commit
- * and move) are removed at the next replacement in the directory.
+ * and move) older than ten minutes are removed at the next replacement in
+ * the directory (a recent one may be a concurrent upload).
  */
 final class StagedFile
 {
     private const PREFIX = '.tmp-';
+
+    /** A temporary file older than this is a leftover, never an upload in flight. */
+    private const STALE_SECONDS = 600;
 
     /**
      * Writes $file as a temporary file of $directory; returns its path, or null when the disk refused it.
@@ -27,7 +31,7 @@ final class StagedFile
     {
         $disk = Storage::disk(TenantStorage::DISK);
         foreach ($disk->files($directory) as $leftover) {
-            if (str_starts_with(basename($leftover), self::PREFIX)) {
+            if (str_starts_with(basename($leftover), self::PREFIX) && $disk->lastModified($leftover) < time() - self::STALE_SECONDS) {
                 $disk->delete($leftover);
             }
         }
@@ -39,20 +43,26 @@ final class StagedFile
 
     /**
      * After the current transaction commits (at once outside one): the
-     * temporary file becomes $final, and $previous (another name) goes.
+     * temporary file is renamed over $final (one atomic rename: the old file
+     * is never deleted first), $previous (another name) goes, then $after
+     * runs (caches that depend on the file).
+     *
+     * @param  (callable(): mixed)|null  $after
      */
-    public static function promote(string $temporary, string $final, ?string $previous): void
+    public static function promote(string $temporary, string $final, ?string $previous, ?callable $after = null): void
     {
-        DB::afterCommit(function () use ($temporary, $final, $previous): void {
+        DB::afterCommit(function () use ($temporary, $final, $previous, $after): void {
             $disk = Storage::disk(TenantStorage::DISK);
-            if ($disk->exists($final)) {
-                $disk->delete($final);
-            }
             if (! $disk->move($temporary, $final)) {
                 report(new RuntimeException('A staged file could not be moved to its final name.'));
+
+                return;
             }
             if ($previous !== null && $previous !== $final) {
                 $disk->delete($previous);
+            }
+            if ($after !== null) {
+                $after();
             }
         });
     }

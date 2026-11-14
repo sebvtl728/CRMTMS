@@ -23,7 +23,12 @@ class RoleController extends Controller
         foreach (Permissions::all() as $permission) {
             $label = Permissions::label($permission) ?? ['label' => $permission, 'description' => '', 'group' => 'Autres'];
             $groups[$label['group']] ??= ['label' => $label['group'], 'permissions' => []];
-            $groups[$label['group']]['permissions'][] = ['name' => $permission, 'label' => $label['label'], 'description' => $label['description']];
+            $groups[$label['group']]['permissions'][] = [
+                'name' => $permission,
+                'label' => $label['label'],
+                'description' => $label['description'],
+                'warning' => Permissions::WARNINGS[$permission] ?? null,
+            ];
         }
 
         return Inertia::render('admin/roles/index', [

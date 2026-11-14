@@ -84,7 +84,8 @@ class CompanyBranding
                     'size' => $file->getSize(),
                     'sha256' => hash_file('sha256', (string) $file->getRealPath()),
                 ]);
-                StagedFile::promote($staged, $path, $previous !== null && $this->isOwnPath($company, $previous) ? $previous : null);
+                // The brand (sidebar) is recomputed once the new file is in place.
+                StagedFile::promote($staged, $path, $previous !== null && $this->isOwnPath($company, $previous) ? $previous : null, fn () => Brand::forget($company->tenant_id));
             });
         } catch (\Throwable $e) {
             StagedFile::discard($staged);

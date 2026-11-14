@@ -109,7 +109,7 @@ class MailTemplateController extends Controller
     private function validated(Request $request, string $key): array
     {
         $data = $request->validate([
-            'subject' => ['required', 'string', 'max:200'],
+            'subject' => ['required', 'string', 'max:'.MailTemplates::SUBJECT_MAX],
             'body' => ['required', 'string', 'max:10000'],
         ], [
             'subject.required' => "Indiquez l'objet.",
@@ -117,7 +117,7 @@ class MailTemplateController extends Controller
             'body.required' => 'Indiquez le texte.',
             'body.max' => 'Le texte ne doit pas dépasser 10 000 caractères.',
         ]);
-        $subject = trim((string) $data['subject']);
+        $subject = (string) $data['subject'];
         $body = str_replace("\r\n", "\n", (string) $data['body']);
         $errors = MailTemplates::errors($key, $subject, $body);
         if ($errors !== []) {

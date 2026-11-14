@@ -29,9 +29,17 @@ final class Permissions
     /**
      * Never granted to another role from the « Rôles et droits » screen
      * (the administrator always holds them): whoever manages users or rights
-     * could otherwise give himself everything.
+     * could otherwise give himself everything, and whoever manages the
+     * connectors could point the organisme's SMTP at his own relay and
+     * capture the next invitation link.
      */
-    public const LOCKED = [self::USERS_MANAGE, self::ROLES_MANAGE];
+    public const LOCKED = [self::USERS_MANAGE, self::ROLES_MANAGE, self::CONNECTORS_MANAGE];
+
+    /** @var array<string, string> permission => warning shown on the « Rôles et droits » screen */
+    public const WARNINGS = [
+        self::EXPORTS_RUN => "Droit de niveau administrateur : les exports système portent sur tout l'organisme, sans tenir compte des DAS suivis.",
+        self::SETTINGS_MANAGE => "Droit de niveau administrateur : sécurité des sessions, textes des e-mails envoyés au nom de l'organisme et durée de conservation RGPD.",
+    ];
 
     /** Theme of the Core permissions on the « Rôles et droits » screen. */
     public const CORE_GROUP = 'Administration';
@@ -44,7 +52,7 @@ final class Permissions
         self::REFERENCES_MANAGE => ['Gérer les référentiels', 'Modifier les listes paramétrables (DAS, étapes, origines…).'],
         self::CONNECTORS_MANAGE => ['Gérer les connecteurs', 'Configurer les logiciels externes (messagerie, annuaire des entreprises, agenda…).'],
         self::AUDIT_VIEW => ["Consulter le journal d'audit", "Voir qui a fait quoi et quand dans l'organisme."],
-        self::SETTINGS_MANAGE => ['Gérer les paramètres', "Régler la sécurité de l'organisme (déconnexion après inactivité…)."],
+        self::SETTINGS_MANAGE => ['Gérer les paramètres', "Régler la sécurité de l'organisme (déconnexion après inactivité…), les modèles d'e-mails (dont le texte de l'invitation) et la durée de conservation RGPD."],
         self::EXPORTS_RUN => ['Lancer les exports système', "Exports techniques de l'organisme (hors exports Excel des listes)."],
     ];
 
