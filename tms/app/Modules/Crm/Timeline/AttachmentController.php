@@ -42,6 +42,9 @@ class AttachmentController extends Controller
         $subject = $attachment->notable;
         abort_unless($subject instanceof Model, 404);
         Gate::authorize('view', $subject);
+        if ($attachment->file_deleted_at !== null) {
+            throw new UserFacingHttpException(410, AttachmentPurge::DELETED_MESSAGE);
+        }
 
         $disk = Storage::disk(TenantStorage::DISK);
         abort_unless($disk->exists($attachment->path), 404);

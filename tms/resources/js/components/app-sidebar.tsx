@@ -3,12 +3,35 @@ import { NavUser } from '@/components/nav-user';
 import { Sidebar, SidebarContent, SidebarFooter, SidebarHeader, SidebarMenu, SidebarMenuButton, SidebarMenuItem } from '@/components/ui/sidebar';
 import { type NavItem, type SharedData } from '@/types';
 import { Link, usePage } from '@inertiajs/react';
-import { Building2, Contact, Factory, History, LayoutGrid, ListChecks, Plug, ShieldAlert, ShieldCheck, Upload, Users } from 'lucide-react';
+import {
+    Building2,
+    CalendarCheck,
+    CalendarRange,
+    ClipboardPen,
+    Columns3,
+    Contact,
+    Factory,
+    Handshake,
+    History,
+    LayoutGrid,
+    ListChecks,
+    Plug,
+    ShieldAlert,
+    ShieldCheck,
+    Upload,
+    Users,
+} from 'lucide-react';
 import AppLogo from './app-logo';
 
 const homeNavItems: NavItem[] = [{ title: 'Accueil', url: '/dashboard', icon: LayoutGrid }];
 
+// « Commercial », in the order of a working day: the pipeline, the actions to do, then the fiches.
 const commercialNavItems: (NavItem & { permission: string })[] = [
+    { title: 'Pipeline', url: '/crm/opportunities/kanban', icon: Columns3, permission: 'crm.view' },
+    { title: 'Opportunités', url: '/crm/opportunities', icon: Handshake, permission: 'crm.view' },
+    { title: 'À faire', url: '/crm/todo', icon: CalendarCheck, permission: 'crm.view' },
+    { title: 'Planning', url: '/crm/planning', icon: CalendarRange, permission: 'crm.view' },
+    { title: 'Compte rendu de RDV', url: '/crm/report', icon: ClipboardPen, permission: 'crm.update' },
     { title: 'Entreprises', url: '/crm/organisations', icon: Factory, permission: 'crm.view' },
     { title: 'Personnes', url: '/crm/people', icon: Contact, permission: 'crm.view' },
     { title: 'Imports', url: '/crm/import', icon: Upload, permission: 'crm.import' },
@@ -26,8 +49,10 @@ const adminNavItems: (NavItem & { permission: string })[] = [
 ];
 
 export function AppSidebar() {
-    const { auth } = usePage<SharedData>().props;
-    const commercialItems = commercialNavItems.filter((item) => auth.permissions.includes(item.permission));
+    const { auth, todo_count } = usePage<SharedData>().props;
+    const commercialItems = commercialNavItems
+        .filter((item) => auth.permissions.includes(item.permission))
+        .map((item) => (item.url === '/crm/todo' ? { ...item, badge: todo_count } : item));
     const adminItems = adminNavItems.filter((item) => auth.permissions.includes(item.permission));
 
     return (

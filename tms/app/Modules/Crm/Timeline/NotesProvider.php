@@ -8,11 +8,11 @@ use Illuminate\Support\Collection;
 
 final class NotesProvider implements TimelineProvider
 {
-    public function entriesFor(Model $subject, ?CarbonImmutable $before, int $limit): Collection
+    public function entriesFor(Model $subject, ?TimelineCursor $before, int $limit): Collection
     {
         return Note::query()->with('author')
             ->where('notable_type', $subject->getMorphClass())->where('notable_id', $subject->getKey())
-            ->when($before, fn ($q) => $q->where('created_at', '<', Timeline::bound($before)))
+            ->tap(fn ($q) => Timeline::after($q, $before, 'note'))
             ->orderByDesc('created_at')->orderByDesc('id')->limit($limit)->get()
             ->map(fn (Note $n) => new TimelineEntry(
                 'note',

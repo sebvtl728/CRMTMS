@@ -54,7 +54,7 @@ final class OrganisationExport implements ExportResource
         return ['legalForm', 'sector', 'establishmentType', 'companySize', 'origin', 'responsible', 'das'];
     }
 
-    public function value(Model $model, string $column): ?string
+    public function value(Model $model, string $column): string|ExportCell|null
     {
         assert($model instanceof Organisation);
 
@@ -77,8 +77,8 @@ final class OrganisationExport implements ExportResource
             'postal_code' => $model->postal_code,
             'city' => $model->city,
             'country' => $model->country,
-            'last_contact_at' => $model->last_contact_at?->format('d/m/Y'),
-            'created_at' => $model->created_at?->format('d/m/Y'),
+            'last_contact_at' => ExportCell::date($model->last_contact_at),
+            'created_at' => ExportCell::date($model->created_at),
             default => null,
         };
     }

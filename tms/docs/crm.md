@@ -1,8 +1,8 @@
-# Guide utilisateur : fiches, recherche, import et RGPD
+# Guide utilisateur : fiches, pipeline, relances, import et RGPD
 
 Ce guide s'adresse aux personnes qui utilisent le TMS au quotidien (commerciaux, chargés de relations, assistants, direction, responsables de DAS). Les écrans sont désignés par leur libellé à l'écran. Ce que vous voyez dépend de votre rôle : les boutons auxquels vous n'avez pas droit n'apparaissent pas (voir `admin.md` pour la liste des droits par rôle).
 
-Le menu de gauche, section **Commercial**, donne accès à **Entreprises**, **Personnes**, **Imports** et **RGPD**. Le mot « entreprise » désigne ici toute organisation cliente ou prospect : entreprise, association, collectivité.
+Le menu de gauche, section **Commercial**, donne accès, dans cet ordre, à **Pipeline**, **Opportunités**, **À faire** (avec le nombre d'actions en retard ou du jour), **Planning**, **Compte rendu de RDV**, **Entreprises**, **Personnes**, **Imports** et **RGPD**. Le mot « entreprise » désigne ici toute organisation cliente ou prospect : entreprise, association, collectivité.
 
 ## 1. L'écran d'accueil
 
@@ -11,7 +11,12 @@ Le menu de gauche, section **Commercial**, donne accès à **Entreprises**, **Pe
 - **Nouvelle entreprise** et **Nouveau particulier** ouvrent directement le formulaire de saisie ;
 - **Rechercher** (ou les touches **Ctrl K**) ouvre la recherche (voir plus bas) ;
 - le nombre d'entreprises et de personnes que vous pouvez voir ;
+- **Mes relances** : le nombre de vos actions **en retard** et à faire **aujourd'hui** (les mêmes que l'écran **À faire**) ; un clic ouvre **À faire** ;
+- **Pipeline pondéré** du mois : la somme des montants pondérés de vos opportunités **en cours** (ni gagnées, ni perdues) dont la **clôture prévue** tombe dans le mois en cours ; un clic ouvre la liste **Opportunités** filtrée sur ce mois ;
+- **Prochains rendez-vous** : vos 5 prochains rendez-vous à faire, avec le jour, l'heure et le lieu ; un clic ouvre la fiche ;
 - **Dernières fiches consultées** : les 5 dernières fiches que vous avez ouvertes, les plus récentes en premier. Cette liste est personnelle ; elle ne garde que le fait que vous avez ouvert la fiche, pas son contenu. Une fiche supprimée, fusionnée ou hors de votre périmètre n'y figure plus.
+
+Tous ces chiffres respectent votre périmètre : un Responsable de DAS n'y compte que ses DAS.
 
 ## 2. Les fiches
 
@@ -22,7 +27,7 @@ Le menu de gauche, section **Commercial**, donne accès à **Entreprises**, **Pe
 - **Saisie rapide** : seule la **raison sociale** est obligatoire. Complétez le reste quand vous l'avez.
 - **Compléter depuis le SIRET** : saisissez les 14 chiffres, puis ce bouton va chercher l'annuaire officiel des entreprises et remplit **uniquement les champs encore vides**. Rien n'est enregistré tant que vous n'avez pas cliqué sur **Enregistrer**. Si l'annuaire ne répond pas, saisissez les informations à la main.
 - Un même SIRET ne peut pas servir à deux fiches : le formulaire vous propose d'ouvrir la fiche existante.
-- Sur une fiche, les onglets sont **Informations**, **Interlocuteurs** et **Historique**.
+- Sur une fiche, les onglets sont **Informations**, **Interlocuteurs**, **Opportunités** et **Historique**.
 
 ### Personnes
 
@@ -36,7 +41,7 @@ Seul le **nom** est obligatoire. Pour rattacher quelqu'un à une entreprise, ouv
 
 ### Historique, notes et pièces jointes
 
-L'onglet **Historique** d'une fiche liste, du plus récent au plus ancien, les **notes**, les **pièces jointes** et les **modifications** de la fiche (qui a changé quoi et quand ; les données personnelles modifiées sont signalées sans afficher leur valeur).
+L'onglet **Historique** d'une fiche liste, du plus récent au plus ancien, les **notes**, les **pièces jointes**, les **actions** (appels, rendez-vous… voir plus bas), les **étapes de ses opportunités** et les **modifications** de la fiche (qui a changé quoi et quand ; les données personnelles modifiées sont signalées sans afficher leur valeur).
 
 - **Ajouter une note** : écrivez dans la zone « Ajouter une note » (appel, rendez-vous, information utile), puis **Ajouter la note**. Une note met à jour la date de **dernier contact** de la fiche.
 - **Joindre un fichier** : PDF, images, Word, Excel, OpenDocument, texte, CSV, 20 Mo maximum.
@@ -44,13 +49,104 @@ L'onglet **Historique** d'une fiche liste, du plus récent au plus ancien, les *
 
 ### Suppression et restauration
 
-**Supprimer** une fiche la place dans la corbeille : elle disparaît des listes mais peut être restaurée (case **Corbeille** de la liste, puis **Restaurer** sur la fiche). Les rattachements, notes et pièces jointes suivent la fiche.
+**Supprimer** une fiche la place dans la corbeille : elle disparaît des listes mais peut être restaurée (case **Corbeille** de la liste, puis **Restaurer** sur la fiche). Les rattachements, notes et pièces jointes suivent la fiche. Au-delà de **12 mois** en corbeille, les fichiers joints sont effacés : l'historique indique alors « Fichier supprimé ».
 
 ### Mobile
 
-Les écrans fonctionnent sur téléphone (listes en cartes, fiche en une colonne, saisie d'une note sur place). L'export et l'import sont réservés à l'ordinateur.
+Les écrans fonctionnent sur téléphone (listes en cartes, fiche en une colonne, saisie d'une note sur place, pipeline en liste par étape, planning jour par jour, **Compte rendu de RDV** en un seul formulaire). L'export et l'import sont réservés à l'ordinateur.
 
-## 3. Rechercher
+## 3. Pipeline et opportunités
+
+Une **opportunité** est une affaire en cours avec une entreprise ou un **particulier**. Une personne qui n'est pas particulier (simple interlocuteur) ne peut pas porter d'opportunité : on la crée sur son entreprise et on la coche comme **interlocuteur** de l'affaire.
+
+### Créer une opportunité
+
+Depuis la fiche, onglet **Opportunités**, **Nouvelle opportunité** (ou depuis l'écran **Opportunités**, qui demande d'abord l'entreprise ou le particulier). Renseignez l'**objet**, le **DAS**, l'**étape**, le **montant estimé**, la **clôture prévue**, la priorité, le **mode de financement** (prérempli depuis la fiche d'un particulier) et le responsable. Pour une entreprise, cochez ses interlocuteurs concernés.
+
+> Pour un particulier, ne mettez pas son nom dans l'**objet** (« Formation HACCP 3 jours », pas « Formation de M. Dupont ») : l'objet est conservé pour les statistiques même après l'anonymisation de la personne (voir RGPD).
+
+### Étapes et probabilité
+
+Les étapes (Nouveau, Contacté, Étude, Proposition, Négociation, Gagné, Perdu chez CAP FORMATION) sont paramétrées par l'administrateur, chacune avec une **probabilité** par défaut. Le **montant pondéré** = montant × probabilité.
+
+- À chaque changement d'étape, la probabilité reprend celle de la nouvelle étape. Une probabilité saisie à la main est conservée au prochain changement d'étape, puis l'étape reprend la main (Gagné et Perdu imposent toujours la leur).
+- **Gagné** fixe la probabilité à 100 % et demande la **date de gain** (aujourd'hui par défaut, jamais dans le futur).
+- **Perdu** fixe la probabilité à 0 % et **exige un motif de perte** (liste paramétrable : Prix, Financement refusé, Concurrent…), avec un commentaire facultatif. Sans motif, le changement est refusé.
+- Rouvrir une affaire gagnée ou perdue efface la date, le motif et le commentaire ; l'historique garde le motif donné à l'époque.
+- Chaque changement d'étape est tracé dans l'**Historique** de la fiche (« Opportunité « X » : Étude → Proposition », « Opportunité perdue », avec le motif ; le commentaire n'y est pas affiché).
+
+Sur la page d'une opportunité, **Changer d'étape** ouvre la même fenêtre.
+
+### Pipeline (kanban)
+
+**Pipeline** affiche une colonne par étape avec, en tête, le nombre d'opportunités, le montant et le montant pondéré. **Glissez** une carte par sa poignée vers une autre colonne (souris, ou clavier : Espace pour saisir, flèches, Espace pour déposer). Vers **Gagné** ou **Perdu**, la fenêtre demande la date ou le motif ; **Annuler** remet la carte en place. Si le serveur refuse le déplacement, la carte revient et le message s'affiche. Une étape désactivée par l'administrateur qui contient encore des opportunités reste affichée, sous le nom « <étape> (inactif) » : on peut en sortir ses cartes, pas y en déposer.
+
+- Les colonnes **Gagné** et **Perdu** ne montrent que les affaires closes depuis **90 jours**.
+- Une colonne affiche au plus 100 cartes (les totaux comptent tout) : affinez les filtres.
+- Sur téléphone, le pipeline devient une liste groupée par étape, avec **Changer d'étape** sur chaque carte.
+
+### Liste, filtres et export
+
+**Opportunités** liste les affaires avec les totaux (montant et pondéré). Filtres : recherche (objet ou nom de la fiche), DAS, entreprises ou particuliers, responsable, priorité, étape, clôture prévue du / au, **Mes opportunités** ; tri par clôture prévue, montant, montant pondéré ou création. **Vue pipeline** / **Vue liste** passent de l'une à l'autre en gardant les filtres. **Exporter (.xlsx)** exporte la liste filtrée (mêmes règles que les autres exports).
+
+## 4. Actions, relances et « À faire »
+
+Une **action** est un échange ou une tâche commerciale : appel, rendez-vous, e-mail, rappel… (types et résultats paramétrables). Elle concerne une entreprise, une personne et/ou une opportunité, et figure dans l'**Historique** de la fiche.
+
+### Saisie rapide : « + Action »
+
+Le bouton **+ Action** (en haut de chaque écran du CRM, et sur les fiches et opportunités) ouvre une fenêtre préremplie avec la fiche ouverte :
+
+- choisissez le type en un clic (**Appel**, **RDV**, **E-mail**, **Rappel**, ou **Autre type…**) ;
+- l'**objet** est facultatif (par défaut « Type – fiche ») ;
+- **Fait maintenant** (coché par défaut) enregistre un échange qui vient d'avoir lieu, avec son **résultat** et son **compte rendu** ; décoché, l'action est **à faire** le jour et à l'heure choisis (une date sans heure = 9 h) ;
+- **Prochaine relance** : **Demain**, **Dans 1 semaine**, **Dans 1 mois** ou une date, et un type (Rappel par défaut) : une action à faire est créée sur les mêmes fiches, pour le même responsable.
+
+Une action faite met à jour la date de **dernier contact** de la fiche. Une action ne peut pas être datée « faite » dans le futur.
+
+### L'écran « À faire »
+
+**À faire** liste vos actions à faire, triées par échéance, en trois parties : **En retard** (en rouge : échéance avant aujourd'hui), **Aujourd'hui**, **Cette semaine** (jusqu'à dimanche soir). Les jours sont ceux de l'heure de Paris : une relance prévue aujourd'hui n'est pas en retard avant minuit.
+
+- **Fait** ouvre la fenêtre de compte rendu (résultat, compte rendu, prochaine relance) ;
+- **Reporter** : **Demain**, **Dans 1 semaine** ou une date (une date seule = 9 h) ;
+- **Ouvrir la fiche** ;
+- **Équipe** (direction et administrateur) affiche les actions de toute l'équipe.
+
+Le nombre affiché à côté de **À faire** dans le menu (en retard + aujourd'hui) se met à jour dans la minute.
+
+### Récapitulatif quotidien par e-mail
+
+Dans **Paramètres › Profil**, cochez **Recevoir le récapitulatif quotidien** : chaque matin à **7 h 30**, un e-mail liste vos actions en retard et du jour (titres, fiches, heures ; jamais de compte rendu ni de lieu). Pas d'e-mail les jours où il n'y a rien. L'option est désactivée par défaut.
+
+## 5. Planning et compte rendu de rendez-vous
+
+### Planning de la semaine
+
+**Planning** montre vos **rendez-vous** (à faire et faits) et vos **appels planifiés** de la semaine, du lundi au dimanche, à leur heure. **Semaine précédente** / **Semaine suivante** / **Cette semaine** ; sur téléphone, un jour à la fois. La direction et l'administrateur peuvent choisir un **Collègue**.
+
+Les types d'action qui comptent comme rendez-vous ou comme appels sont réglés par l'administrateur (**Administration › Référentiels**, types d'action, champ **Planning commercial**). Chez CAP FORMATION : « Prise de rendez-vous » et « Rendez-vous physique » (rendez-vous), « Appel » (appel, s'il a une échéance).
+
+### Compte rendu de RDV (téléphone)
+
+**Compte rendu de RDV** (menu, ou bouton **Compte rendu** sur un rendez-vous du jour dans le planning) est un formulaire unique pensé pour le téléphone :
+
+1. choisissez le rendez-vous du jour (présélectionné s'il n'y en a qu'un), ou **Sans rendez-vous prévu : choisir une fiche** ;
+2. le **résultat** et le **compte rendu** ;
+3. si besoin, l'**étape** de l'opportunité concernée (motif obligatoire pour **Perdu**) ;
+4. la **prochaine relance** ;
+5. **Enregistrer le compte rendu**.
+
+Tout est enregistré ensemble ou rien ne l'est (par exemple si le motif de perte manque).
+
+## 6. Votre agenda : abonnement iCal et Outlook
+
+**Paramètres › Mon agenda** envoie vos rendez-vous et appels planifiés vers votre agenda habituel.
+
+- **Lien d'abonnement (iCal)** : **Créer mon lien d'abonnement** donne une adresse privée, **affichée une seule fois** (copiez-la). Abonnez-y Outlook (web ou nouvel Outlook : Calendrier › Ajouter un calendrier › S'abonner à partir du web ; Outlook classique : Accueil › Ajouter un calendrier › À partir d'Internet), Google Agenda ou Apple Calendrier (instructions sur la page). L'agenda montre les 30 derniers jours et les 6 prochains mois, sans compte rendu, et se met à jour selon le rythme de votre agenda (souvent plusieurs heures chez Google et Outlook). **Ce lien donne accès à votre agenda sans mot de passe** : ne le partagez pas ; **Créer un nouveau lien** annule l'ancien, **Révoquer le lien** coupe l'accès.
+- **Connecter Outlook** (Microsoft 365, si l'administrateur l'a activé) : vos rendez-vous et appels sont créés, modifiés et supprimés directement dans votre agenda Outlook, en quelques instants. Si Microsoft demande de vous reconnecter, un message l'indique : **Reconnecter Outlook**. **Déconnecter Outlook** arrête l'envoi (les évènements déjà créés restent). Mise en place par l'administrateur : voir `connectors.md` (section Microsoft 365).
+
+## 7. Rechercher
 
 - **Recherche globale** : **Ctrl K** (ou **Cmd K** sur Mac, ou la touche **/** hors d'un champ) ouvre une fenêtre de recherche. Tapez au moins 2 caractères : nom, SIRET, e-mail ou téléphone, sans souci d'accents ni de majuscules ni d'espaces dans le SIRET ou le téléphone. Les résultats sont groupés **Entreprises** et **Personnes** ; **flèches** pour choisir, **Entrée** pour ouvrir.
 - **Recherche dans une liste** : le champ en haut de **Entreprises** ou **Personnes** filtre la liste en tapant. Les filtres (statut, DAS, secteur, responsable, origine…) se combinent.
@@ -60,7 +156,7 @@ Les écrans fonctionnent sur téléphone (listes en cartes, fiche en une colonne
 
 > Les **Responsables de DAS** ne voient que les fiches rattachées aux DAS qui leur sont attribués (par l'administrateur). Les autres rôles voient toutes les fiches de l'organisme.
 
-## 4. Doublons et fusion
+## 8. Doublons et fusion
 
 ### Avertissement à la saisie
 
@@ -76,12 +172,12 @@ Les doublons ne sont jamais cherchés dans les données d'un autre organisme.
 
 L'écran **Fusionner deux fiches** montre la **fiche conservée** et la **fiche absorbée**. Pour chaque champ qui diffère, choisissez la valeur à garder. Les champs identiques sont regroupés. Au clic sur **Fusionner**, une confirmation rappelle que **la fusion est définitive** :
 
-- l'historique, les notes, les pièces jointes et les rattachements de la fiche absorbée passent sur la fiche conservée ; si les deux fiches avaient le même rattachement, il n'en reste qu'un ;
+- l'historique, les notes, les pièces jointes, les rattachements, les **opportunités** et les **actions** de la fiche absorbée passent sur la fiche conservée ; si les deux fiches avaient le même rattachement, il n'en reste qu'un ;
 - les DAS sont réunis ;
 - l'adresse de la fiche absorbée renvoie vers la fiche conservée ;
 - la fiche absorbée ne peut pas être restaurée et ses données personnelles sont effacées.
 
-## 5. Importer un fichier
+## 9. Importer un fichier
 
 L'import (menu **Imports**) charge des fiches depuis un fichier **Excel (.xlsx)** ou **CSV**. Il se fait depuis un ordinateur. Vous pouvez aussi y accéder par le bouton **Importer** de la liste **Entreprises**.
 
@@ -140,11 +236,11 @@ Réimporter plus tard le même fichier peut restaurer les fiches mises à la cor
 
 L'historique des imports est conservé ; le fichier d'origine (et les valeurs brutes de ses lignes) est supprimé automatiquement au bout de 30 jours.
 
-## 6. Exporter
+## 10. Exporter
 
-Dans les listes **Entreprises** et **Personnes** (sur ordinateur), **Exporter (.xlsx)** télécharge un fichier Excel de **la liste telle qu'elle est filtrée**, avec les colonnes choisies dans **Colonnes**. Un contrôle préalable refuse l'export, avec un message, s'il dépasse la limite de lignes (50 000 par défaut) ou si vous exportez trop souvent. Chaque export est tracé dans le journal d'audit. Les valeurs commençant par `=`, `+`, `-` ou `@` sont neutralisées pour ne pas être exécutées par Excel. Les dates et montants sont au format français.
+Dans les listes **Entreprises**, **Personnes** et **Opportunités** (sur ordinateur), **Exporter (.xlsx)** télécharge un fichier Excel de **la liste telle qu'elle est filtrée**, avec les colonnes choisies dans **Colonnes**. Un contrôle préalable refuse l'export, avec un message, s'il dépasse la limite de lignes (50 000 par défaut) ou si vous exportez trop souvent. Chaque export est tracé dans le journal d'audit. Les valeurs commençant par `=`, `+`, `-` ou `@` sont neutralisées pour ne pas être exécutées par Excel. Les montants, probabilités et dates sont de vrais nombres et de vraies dates (affichés « 1 234,50 € » et « 20/12/2026 ») : Excel peut les additionner, les trier et les filtrer. Les autres colonnes (SIRET, téléphones…) restent du texte. L'export des personnes propose aussi les colonnes **Système source**, **Identifiant source** (fiches importées) et **Base légale** (RGPD).
 
-## 7. RGPD
+## 11. RGPD
 
 Les données de personnes sont des données personnelles. Le TMS aide à respecter la durée de conservation, le droit d'opposition et le droit d'accès.
 
@@ -155,12 +251,14 @@ La section **RGPD** de la fiche affiche :
 - la **Base légale** du traitement (intérêt légitime par défaut ; consentement, contrat ou obligation légale) ;
 - les **Consentements** par canal (e-mail, SMS, téléphone, prospection) : **Enregistrer un consentement** ajoute un choix daté (**Accordé** ou **Refusé ou retiré**) avec sa source. L'historique est conservé : un nouveau choix s'ajoute sans effacer les précédents ;
 - **Opposition à la prospection** : enregistre que la personne ne veut plus être sollicitée ; une mention **Opposé à la prospection** apparaît sur la fiche, dans les listes et la recherche ;
-- **Exporter ses données** : fichier contenant toutes les données que le TMS détient sur la personne (droit d'accès) ;
-- **Anonymiser maintenant** : efface définitivement les données personnelles de la fiche (nom, coordonnées, notes, pièces jointes…). Pour confirmer, tapez le nom de la personne. Seules des données statistiques (statut, DAS, rattachements) restent. **Cette opération est irréversible.**
+- **Exporter ses données** : fichier contenant toutes les données que le TMS détient sur la personne, y compris ses opportunités et ses actions (droit d'accès) ;
+- **Anonymiser maintenant** : efface définitivement les données personnelles de la fiche (nom, coordonnées, notes, pièces jointes, comptes rendus et lieux des actions, commentaire de perte des opportunités…). Pour confirmer, tapez le nom de la personne. Seules des données statistiques (statut, DAS, rattachements, montants et étapes des opportunités, types et dates des actions) restent. **Cette opération est irréversible.**
+
+> **Objet des opportunités d'un particulier** : il est **conservé** après l'anonymisation, pour les statistiques. S'il contient le nom de la personne, ce nom reste : ne mettez jamais de nom dans l'objet d'une opportunité.
 
 ### Durée de conservation
 
-Une personne **sans relation contractuelle** (ni client, ni rattachée à une entreprise cliente) dont le **dernier contact** date de plus de **3 ans** (réglable de 1 à 10 ans, voir ci-dessous) est inscrite chaque nuit sur la liste **À anonymiser**. Elle y reste **30 jours**, puis est anonymisée automatiquement. Un nouveau contact (une note, par exemple) la retire de la liste.
+Une personne **sans relation contractuelle** (ni client, ni rattachée à une entreprise cliente) dont le **dernier contact** date de plus de **3 ans** (réglable de 1 à 10 ans, voir ci-dessous) est inscrite chaque nuit sur la liste **À anonymiser**. Elle y reste **30 jours**, puis est anonymisée automatiquement. Un nouveau contact (une note ou une action faite, par exemple) la retire de la liste.
 
 ### L'écran RGPD
 
@@ -172,6 +270,6 @@ L'écran **RGPD** (menu Commercial, réservé aux personnes ayant ce droit) pré
 
 Chaque nuit où des personnes sont nouvellement listées, les responsables RGPD reçoivent un e-mail avec le nombre de personnes concernées (sans leurs noms).
 
-## 8. Utilisateurs et droits (administrateur)
+## 12. Utilisateurs et droits (administrateur)
 
 Le menu **Administration › Utilisateurs** permet à l'administrateur de l'organisme d'**inviter** des collègues, de **changer leur rôle**, de **désactiver** / **réactiver** un compte, de **renvoyer** ou **révoquer** une invitation et d'attribuer les **DAS suivis** à un Responsable de DAS. Un organisme garde toujours au moins un administrateur actif. Les droits CRM par rôle sont détaillés dans `admin.md`.

@@ -67,6 +67,20 @@ it('prefills an entreprise from a known siret', function () {
         && $r['q'] === SIEGE_SIRET);
 });
 
+it('connects to the address it checked, never resolving the name again (dns rebinding)', function () {
+    freshHttp();
+    $pinned = null;
+    Http::fake(function (Request $request, array $options) use (&$pinned) {
+        $pinned = $options['curl'][CURLOPT_RESOLVE] ?? null;
+
+        return Http::response(sireneFixture('dassault-systemes'));
+    });
+
+    $this->actingAs(commercial())->getJson('/crm/sirene/'.SIEGE_SIRET)->assertOk();
+
+    expect($pinned)->toBe(['recherche-entreprises.api.gouv.fr:443:203.0.113.10']);
+});
+
 it('uses the establishment that carries the siret, not the head office', function () {
     fakeSirene();
 

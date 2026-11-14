@@ -9,10 +9,14 @@ use App\Modules\Crm\Gdpr\Consent;
 use App\Modules\Crm\Import\ImportBatch;
 use App\Modules\Crm\Import\ImportRow;
 use App\Modules\Crm\Import\ImportTarget;
+use App\Modules\Crm\Import\ImportWatchdog;
+use App\Modules\Crm\Import\RunImport;
 use App\Modules\Crm\Import\UndoImport;
 use App\Modules\Crm\Organisations\Organisation;
 use App\Modules\Crm\People\Person;
 use App\Modules\Crm\Timeline\Note;
+use Carbon\CarbonImmutable;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
@@ -41,7 +45,7 @@ it('undoes an import: created fiches go to the trash, updated ones stay', functi
         ->and($existing->refresh()->city)->toBe('Annecy');
 
     $audit = AuditLog::query()->where('event', 'crm.import_undone')->sole();
-    expect($audit->new_values)->toEqualCanonicalizing(['file' => 'fichier.csv', 'removed' => 2, 'kept' => 0])
+    expect($audit->new_values)->toEqualCanonicalizing(['removed' => 2, 'kept' => 0])
         ->and($audit->user_id)->toBe($this->user->id)
         ->and(AuditLog::query()->where('event', 'deleted')->where('auditable_type', 'organisation')->count())->toBe(2);
 });
@@ -85,6 +89,63 @@ it('undoes imported notes', function () {
 
     expect(Note::query()->count())->toBe(0)
         ->and(Note::onlyTrashed()->count())->toBe(1);
+});
+
+it('recomputes the last contact when imported notes are undone', function () {
+    $this->travelTo(CarbonImmutable::parse('2026-11-13 09:00:00'));
+    $org = Organisation::query()->create(['name' => 'Hôtel du Lac', 'siret' => '73282932000074']);
+    $person = makePerson('Roux');
+    affiliate($person, $org);
+    $earlier = new Note(['body' => 'Appel manuel']);
+    $earlier->notable()->associate($org);
+    $earlier->created_at = Carbon::parse('2026-10-01 10:00:00');
+    $earlier->save();
+    $personNote = new Note(['body' => 'Rendez-vous']);
+    $personNote->notable()->associate($person);
+    $personNote->created_at = Carbon::parse('2026-10-05 15:00:00');
+    $personNote->save();
+    DB::table('people')->where('id', $person->id)->update(['last_contact_at' => null]);
+    DB::table('organisations')->where('id', $org->id)->update(['last_contact_at' => '2026-10-01 10:00:00']);
+
+    $batch = runImport("SIRET;Date;Note\n73282932000074;12/11/2026 16:30;Échange importé\n", ImportTarget::Notes);
+    expect($org->refresh()->last_contact_at?->toDateTimeString())->toBe('2026-11-12 16:30:00');
+
+    $this->travel(1)->minutes();
+    UndoImport::dispatch($batch->id);
+
+    // Back to the latest remaining contact: the note of its active contact.
+    expect(Note::query()->count())->toBe(2)
+        ->and($org->refresh()->last_contact_at?->toDateTimeString())->toBe('2026-10-05 15:00:00')
+        ->and($person->refresh()->last_contact_at)->toBeNull();
+});
+
+it('empties the last contact when the only notes were imported then undone', function () {
+    Organisation::query()->create(['name' => 'Hôtel du Lac', 'siret' => '73282932000074']);
+    $batch = runImport("SIRET;Date;Note\n73282932000074;12/11/2026;Premier échange\n", ImportTarget::Notes);
+    $org = Organisation::query()->sole();
+    expect($org->last_contact_at)->not->toBeNull();
+
+    UndoImport::dispatch($batch->id);
+
+    expect($org->refresh()->last_contact_at)->toBeNull();
+});
+
+it('brings an imported note dated in the future back to today, with a warning', function () {
+    $this->travelTo(CarbonImmutable::parse('2026-11-13 11:00:00'));
+    $org = Organisation::query()->create(['name' => 'Hôtel du Lac', 'siret' => '73282932000074']);
+
+    $batch = runImport("SIRET;Date;Note\n73282932000074;15/03/2027;Rendez-vous prévu\n", ImportTarget::Notes);
+
+    $note = Note::query()->sole();
+    expect([$batch->created, $batch->errors])->toBe([1, 0])
+        ->and($note->created_at->toDateTimeString())->toBe('2026-11-13 11:00:00')
+        ->and($org->refresh()->last_contact_at?->toDateTimeString())->toBe('2026-11-13 11:00:00')
+        ->and(rowMessages($batch, 2))->toContain("Date future ramenée à aujourd'hui");
+
+    // Importing the same file again does not duplicate the note.
+    $this->travel(1)->hours();
+    $again = runImport("SIRET;Date;Note\n73282932000074;15/03/2027;Rendez-vous prévu\n", ImportTarget::Notes);
+    expect(Note::query()->count())->toBe(1)->and($again->created)->toBe(0);
 });
 
 it('undoes only a finished import, and only once', function () {
@@ -132,6 +193,50 @@ it('purges uploaded files and raw values after 30 days', function () {
         ->and($old->canUndo())->toBeTrue()
         ->and(Storage::disk('local')->exists((string) $recent->stored_path))->toBeTrue()
         ->and($recent->stored_path)->toStartWith(TenantStorage::path('imports'));
+});
+
+it('never writes the uploaded file name in any import journal line', function () {
+    $batch = uploadImport("Raison sociale\nGarage Martin\n", ImportTarget::Organisations, name: 'Export Jean Dupont.csv');
+    simulateImport($batch);
+    RunImport::dispatch($batch->id);
+    UndoImport::dispatch($batch->id, $this->user->id);
+    // A stuck run marked failed by a user, then one resumed and failed by the watchdog.
+    foreach ([[], ['resumes' => 1], []] as $i => $options) {
+        $stuck = uploadImport("Raison sociale\nCafé\n", ImportTarget::Organisations, name: "Liste Jean Dupont {$i}.csv");
+        DB::table('import_batches')->where('id', $stuck->id)->update(['status' => ImportBatch::RUNNING, 'updated_at' => now()->subMinutes(20), 'options' => json_encode($options)]);
+        if ($i === 0) {
+            $stuck->refresh()->markFailed($this->user);
+        }
+    }
+    app(ImportWatchdog::class)->run();
+
+    $events = AuditLog::query()->where('event', 'like', 'crm.import%')->pluck('event')->unique()->sort()->values()->all();
+    expect($events)->toBe(['crm.import_failed_marked', 'crm.import_resumed', 'crm.import_run', 'crm.import_undone'])
+        ->and(AuditLog::query()->get()->toJson())->not->toContain('Dupont');
+});
+
+it('replaces the name of the uploaded file at the 30-day purge, which may name a person', function () {
+    $old = uploadImport("Raison sociale\nGarage Martin\n", ImportTarget::Organisations, name: 'Export Jean Dupont.CSV');
+    $old->forceFill(['created_at' => now()->subDays(31)])->save();
+    $xlsx = uploadImport('contacts.xlsx', ImportTarget::People);
+    $xlsx->forceFill(['created_at' => now()->subDays(31)])->save();
+    $recent = uploadImport("Raison sociale\nCafé des Arts\n", ImportTarget::Organisations, name: 'Liste Marie Curie.csv');
+
+    $lookalike = uploadImport("Raison sociale\nCafé\n", ImportTarget::Organisations, name: 'fichier-import Jean Dupont.csv');
+    // Its file already purged: only its name still names a person.
+    $lookalike->forceFill(['created_at' => now()->subDays(31)])->save();
+    Storage::disk('local')->delete((string) $lookalike->stored_path);
+    DB::table('import_batches')->where('id', $lookalike->id)->update(['stored_path' => null]);
+
+    Artisan::call('tms:crm:purge-imports');
+    Artisan::call('tms:crm:purge-imports'); // idempotent
+
+    expect($old->refresh()->original_name)->toBe('fichier-import.csv')
+        ->and($xlsx->refresh()->original_name)->toBe('fichier-import.xlsx')
+        ->and($recent->refresh()->original_name)->toBe('Liste Marie Curie.csv')
+        ->and($lookalike->refresh()->original_name)->toBe('fichier-import.csv')
+        // The change is journaled without the former name.
+        ->and(AuditLog::query()->where('auditable_id', $old->id)->get()->toJson())->not->toContain('Dupont');
 });
 
 // --- Fix round 1: undo never removes what users built on -------------------

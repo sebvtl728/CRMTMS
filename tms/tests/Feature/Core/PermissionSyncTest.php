@@ -5,6 +5,7 @@ use App\Modules\Core\Access\Permissions;
 use App\Modules\Core\Access\PermissionSync;
 use App\Modules\Core\Access\Role;
 use App\Modules\Core\Access\RoleModel;
+use App\Modules\Core\Tenancy\ForEachTenant;
 use App\Modules\Core\Tenancy\Tenant;
 use App\Modules\Core\Tenancy\TenantContext;
 use App\Modules\Crm\Permissions as CrmPermissions;
@@ -121,4 +122,40 @@ it('keeps the offers of each tenant under row level security', function () {
 it('shares the CRM permissions of the user with the frontend', function () {
     $this->actingAs(commercial())->get('/dashboard')
         ->assertInertia(fn ($page) => $page->where('auth.permissions', fn ($p) => collect($p)->contains('crm.view') && ! collect($p)->contains('crm.gdpr')));
+});
+
+it('reports the failing tenant and exits with an error', function () {
+    $bad = Tenant::factory()->create(['slug' => 'broken-org']);
+    Tenant::factory()->create(['slug' => 'fine-org']);
+
+    $fine = Tenant::query()->where('slug', 'fine-org')->firstOrFail();
+    forgetCrmOffers($bad);
+    forgetCrmOffers($fine);
+
+    DB::listen(function ($query) {
+        if (str_contains($query->sql, 'role_permission_defaults_applied') && str_starts_with(strtolower($query->sql), 'insert')
+            && app(TenantContext::class)->current()?->slug === 'broken-org') {
+            throw new RuntimeException('boom');
+        }
+    });
+
+    $this->artisan('tms:permissions:sync')
+        ->expectsOutputToContain('Échec pour l\'organisme broken-org')
+        ->assertExitCode(1);
+
+    // The other organisme is still brought up to date.
+    expect(matrixOf($fine)['assistant'])->toBe(['crm.create', 'crm.update', 'crm.view']);
+});
+
+it('exposes the tenants that failed in ForEachTenant', function () {
+    $a = Tenant::factory()->create(['slug' => 'aaa-org']);
+    Tenant::factory()->create(['slug' => 'bbb-org']);
+
+    $failed = ForEachTenant::run(function (Tenant $tenant) use ($a) {
+        if ($tenant->is($a)) {
+            throw new RuntimeException('boom');
+        }
+    });
+
+    expect(array_map(fn (Tenant $t) => $t->slug, $failed))->toContain('aaa-org')->not->toContain('bbb-org');
 });

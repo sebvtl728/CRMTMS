@@ -24,6 +24,7 @@ beforeEach(function () {
         'rebind.example.test' => ['127.0.0.1'],
         'lan.example.test' => ['10.0.0.5'],
         'dual.example.test' => ['203.0.113.7', '::ffff:169.254.169.254'],
+        'v6.example.test' => ['2001:db8::25'],
         default => ['203.0.113.10'],
     });
 });
@@ -69,7 +70,10 @@ function fakeSmtpTransport(): RecordingTransport
     {
         public function __construct(private readonly TransportInterface $fake) {}
 
-        public function check(array $settings): void {}
+        public function check(array $settings): array
+        {
+            return ['203.0.113.10'];
+        }
 
         public function make(array $settings, array $secrets): TransportInterface
         {
@@ -229,6 +233,16 @@ it('builds the transport from the configuration with a bounded timeout', functio
         ->and($transport->getStream()->getTimeout())->toBeLessThanOrEqual(10);
 });
 
+it('connects to the address it checked, the certificate still verified against the name (dns rebinding)', function () {
+    $tls = (new SmtpTransportFactory)->make(['host' => 'smtp.example.test', 'port' => 587, 'encryption' => 'tls'], []);
+    $v6 = (new SmtpTransportFactory)->make(['host' => 'v6.example.test', 'port' => 465, 'encryption' => 'ssl'], []);
+
+    expect($tls->getStream()->getHost())->toBe('203.0.113.10')
+        ->and($tls->getStream()->getStreamOptions()['ssl'])->toMatchArray(['peer_name' => 'smtp.example.test', 'SNI_server_name' => 'smtp.example.test'])
+        ->and($v6->getStream()->getHost())->toBe('[2001:db8::25]')
+        ->and($v6->getStream()->getStreamOptions()['ssl']['peer_name'])->toBe('v6.example.test');
+});
+
 it('requires STARTTLS when the encryption is tls', function () {
     $transport = (new SmtpTransportFactory)->make(['host' => '203.0.113.9', 'port' => 587, 'encryption' => 'tls'], []);
 
@@ -251,7 +265,8 @@ describe('TenantMailer', function () {
     {
         $transport = TenantMailer::for($company)->getSymfonyTransport();
 
-        return $transport instanceof EsmtpTransport ? $transport->getStream()->getHost() : 'default';
+        // The stream connects to the pinned address; the name is the TLS peer name.
+        return $transport instanceof EsmtpTransport ? ($transport->getStream()->getStreamOptions()['ssl']['peer_name'] ?? $transport->getStream()->getHost()) : 'default';
     }
 
     it('falls back to the instance mailer without configuration', function () {

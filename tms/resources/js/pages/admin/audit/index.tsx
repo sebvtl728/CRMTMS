@@ -59,6 +59,7 @@ const EVENT_LABELS: Record<string, string> = {
     'crm.import_run': 'Import lancé',
     'crm.import_undone': 'Import annulé',
     'crm.import_failed_marked': 'Import marqué comme échoué',
+    'crm.import_resumed': 'Import relancé automatiquement',
     'users.invitation_sent': 'Invitation envoyée',
     'users.invitation_send_failed': "Échec d'envoi de l'invitation",
     'users.activation_reissued': "Lien d'activation réémis",

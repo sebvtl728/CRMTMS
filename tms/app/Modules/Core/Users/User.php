@@ -41,6 +41,7 @@ use Spatie\Permission\Traits\HasRoles;
  * @property list<string>|null $two_factor_recovery_codes sha256 hashes, encrypted at rest
  * @property Carbon|null $two_factor_confirmed_at
  * @property int|null $two_factor_last_used_step
+ * @property bool $daily_digest opt-in to the daily summary of the actions to do
  */
 #[UseFactory(UserFactory::class)]
 class User extends Authenticatable
@@ -100,6 +101,7 @@ class User extends Authenticatable
             'two_factor_recovery_codes' => 'encrypted:array',
             'two_factor_confirmed_at' => 'datetime',
             'two_factor_last_used_step' => 'integer',
+            'daily_digest' => 'boolean',
         ];
     }
 

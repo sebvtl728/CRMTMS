@@ -6,6 +6,7 @@ use App\Modules\Core\Audit\Auditable;
 use App\Modules\Core\References\ReferenceItem;
 use App\Modules\Core\Tenancy\BelongsToTenant;
 use App\Modules\Core\Users\User;
+use App\Modules\Crm\Activities\CalendarAnnouncements;
 use App\Modules\Crm\Affiliations\Affiliation;
 use App\Modules\Crm\Gdpr\LegalBasis;
 use App\Modules\Crm\Organisations\OrganisationStatus;
@@ -139,7 +140,9 @@ class Person extends Model
             if (! $person->isForceDeleting()) {
                 Affiliation::cascadeDelete('person_id', $person);
             }
+            CalendarAnnouncements::announceFor('person_id', $person->id);
         });
+        static::restored(fn (Person $person) => CalendarAnnouncements::announceFor('person_id', $person->id));
         // A merged fiche stays in the trash: its content now lives in the kept one.
         static::restoring(fn (Person $person) => $person->merged_into_id === null ? null : false);
         static::restoring(fn (Person $person) => Affiliation::cascadeRestore('person_id', $person));

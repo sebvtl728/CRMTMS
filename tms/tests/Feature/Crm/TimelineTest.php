@@ -12,6 +12,7 @@ use App\Modules\Crm\People\Person;
 use App\Modules\Crm\Timeline\Attachment;
 use App\Modules\Crm\Timeline\Note;
 use App\Modules\Crm\Timeline\Timeline;
+use App\Modules\Crm\Timeline\TimelineCursor;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\DB;
 
@@ -76,7 +77,10 @@ it('translates audit entries: field names and status label, never values', funct
 });
 
 it('shows no personal value of a person in the feed', function () {
-    $this->actingAs(commercial());
+    // Fixed author name: a random (fr_FR) one could be « … Dupont » or « … Martin ».
+    $user = commercial();
+    $user->forceFill(['name' => 'Agent Commercial'])->save();
+    $this->actingAs($user);
     $person = makePerson('Dupont', ['first_name' => 'Marie', 'email' => 'marie@example.org', 'city' => 'Lyon']);
     $this->travel(1)->seconds();
     $person->update(['last_name' => 'Martin-Secret', 'email' => 'autre@example.org']);
@@ -175,14 +179,83 @@ it('does not skip entries created within the same second at a page boundary', fu
     tlNote($org, 'B');
 
     $entries = Timeline::for($org->fresh(), null, 1);
-    $next = Timeline::for($org->fresh(), $entries->last()->at, 1);
+    $next = Timeline::for($org->fresh(), $entries->last()->cursor(), 1);
 
     expect($entries->first()->body)->toBe('B')->and($next->first()->body)->toBe('A');
 });
 
-it('rejects a malformed cursor', function () {
+it('falls back to the first page on a malformed cursor', function (string $cursor) {
     $org = tlOrg();
-    $this->actingAs(commercial())->getJson("/crm/organisations/{$org->id}/timeline?before=pas-une-date")->assertStatus(422);
+    $this->actingAs(commercial())->getJson("/crm/organisations/{$org->id}/timeline?before=".urlencode($cursor))
+        ->assertOk()->assertJsonCount(1, 'entries')->assertJsonPath('entries.0.title', 'Fiche créée')->assertJsonPath('next', null);
+})->with([
+    'not base64' => 'pas-une-date!',
+    'old time cursor' => '2026-11-12T10:00:00.000000Z',
+    'not json' => rtrim(strtr(base64_encode('{oops'), '+/', '-_'), '='),
+    'json list' => rtrim(strtr(base64_encode('[1,2,3]'), '+/', '-_'), '='),
+    'bad date' => rtrim(strtr(base64_encode('{"at":"hier","type":"note","id":"0195b2c4-0000-7000-8000-000000000000"}'), '+/', '-_'), '='),
+    'bad id' => rtrim(strtr(base64_encode('{"at":"2026-11-12T10:00:00Z","type":"note","id":"1 or 1=1"}'), '+/', '-_'), '='),
+    'bad type' => rtrim(strtr(base64_encode('{"at":"2026-11-12T10:00:00Z","type":["x"],"id":"0195b2c4-0000-7000-8000-000000000000"}'), '+/', '-_'), '='),
+]);
+
+it('encodes the cursor as an opaque base64url string that round-trips', function () {
+    $cursor = new TimelineCursor(CarbonImmutable::parse('2026-11-12 10:00:00.123456', 'Europe/Paris'), 'note', '0195b2c4-0000-7000-8000-000000000000');
+    $encoded = $cursor->encode();
+    $decoded = TimelineCursor::decode($encoded);
+
+    expect($encoded)->toMatch('/^[A-Za-z0-9_-]+$/')
+        ->and($decoded?->at->equalTo($cursor->at))->toBeTrue()
+        ->and($decoded?->at->format('u'))->toBe('123456')
+        ->and($decoded?->type)->toBe('note')
+        ->and($decoded?->id)->toBe($cursor->id);
+});
+
+it('loses and repeats no entry of two providers at the same instant across a page boundary', function () {
+    $this->actingAs(commercial());
+    $this->travelTo(CarbonImmutable::parse('2026-11-12 09:00:00'));
+    $org = tlOrg();
+    $this->travelTo(CarbonImmutable::parse('2026-11-12 09:30:00.250000'));
+    tlNote($org, 'Même instant');
+    tlAttachment($org, 'meme-instant.pdf');
+    tlNote($org, 'Même instant bis');
+
+    $seen = [];
+    $cursor = null;
+    do {
+        $page = Timeline::for($org->fresh(), $cursor, 1);
+        foreach ($page as $entry) {
+            $seen[] = $entry->type.':'.($entry->meta['id'] ?? '');
+        }
+        $cursor = $page->last()?->cursor();
+    } while ($page->isNotEmpty() && count($seen) < 10);
+
+    $all = Timeline::for($org->fresh());
+    expect($seen)->toHaveCount(4)->toBe(array_values(array_unique($seen)))
+        ->and($seen)->toBe($all->map(fn ($e) => $e->type.':'.$e->meta['id'])->all())
+        // Stable order: at desc, type desc, id desc.
+        ->and($all->pluck('type')->all())->toBe(['note', 'note', 'attachment', 'audit']);
+});
+
+it('keeps over HTTP an entry of another provider at the instant of the last entry of a page', function () {
+    $this->actingAs(commercial());
+    $this->travelTo(CarbonImmutable::parse('2026-11-12 09:00:00'));
+    $org = tlOrg();
+    $this->travelTo(CarbonImmutable::parse('2026-11-12 09:30:00'));
+    tlNote($org, 'Note limite');
+    tlAttachment($org, 'limite.pdf');
+    foreach (range(1, 29) as $i) {
+        $this->travelTo(CarbonImmutable::parse('2026-11-12 10:00:00')->addMinutes($i));
+        tlNote($org, "Note {$i}");
+    }
+
+    $first = $this->getJson("/crm/organisations/{$org->id}/timeline")->assertOk();
+    expect($first->json('entries'))->toHaveCount(30)
+        ->and($first->json('entries.29.body'))->toBe('Note limite')
+        ->and($first->json('next'))->toBeString()->not->toContain('2026');
+
+    $second = $this->getJson("/crm/organisations/{$org->id}/timeline?before=".urlencode($first->json('next')))->assertOk();
+    expect(array_column($second->json('entries'), 'title'))->toBe(['limite.pdf', 'Fiche créée'])
+        ->and($second->json('next'))->toBeNull();
 });
 
 it('adds a note to an entreprise and to a person, authored by the user', function () {
@@ -268,7 +341,7 @@ it('does not bring back, on the next page, audit entries newer than the cursor (
     $first = Timeline::for($org->fresh(), null, 3);
     expect($first->pluck('title')->all())->toBe(['Note', 'Fiche modifiée (champs : Ville)', 'Note']);
 
-    $second = Timeline::for($org->fresh(), $first->last()->at, 3);
+    $second = Timeline::for($org->fresh(), $first->last()->cursor(), 3);
     expect($second->pluck('title')->all())->toBe(['Fiche créée']);
 });
 
@@ -284,4 +357,28 @@ it('stores last_contact_at at the exact instant of the note, in the application 
         ->and(DB::selectOne("select to_char(last_contact_at at time zone 'Europe/Paris', 'YYYY-MM-DD HH24:MI:SS') as v from organisations where id = ?", [$org->id])->v)
         ->toBe('2026-11-12 10:30:00')
         ->and(DB::selectOne("select current_setting('TimeZone') as v")->v)->toBe('Europe/Paris');
+});
+
+it('pages across the autumn dst fold without skipping nor repeating an entry', function () {
+    $this->actingAs(commercial());
+    $this->travelTo(CarbonImmutable::parse('2026-10-24 09:00:00'));
+    $org = tlOrg();
+    // 02:30 twice in Paris on 25/10/2026: CEST (00:30 UTC) then CET (01:30 UTC).
+    $cet = tlNote($org, 'CET');
+    $cest = tlNote($org, 'CEST');
+    DB::table('notes')->where('id', $cest->id)->update(['created_at' => DB::raw("'2026-10-25 00:30:00+00'::timestamptz")]);
+    DB::table('notes')->where('id', $cet->id)->update(['created_at' => DB::raw("'2026-10-25 01:30:00+00'::timestamptz")]);
+
+    $seen = [];
+    $cursor = null;
+    for ($i = 0; $i < 5; $i++) {
+        $page = Timeline::for($org->fresh(), $cursor, 1);
+        if ($page->isEmpty()) {
+            break;
+        }
+        $seen[] = $page->first()->body ?? $page->first()->type;
+        $cursor = $page->last()->cursor();
+    }
+
+    expect(array_slice($seen, 0, 2))->toBe(['CET', 'CEST'])->and($seen)->toHaveCount(3);
 });

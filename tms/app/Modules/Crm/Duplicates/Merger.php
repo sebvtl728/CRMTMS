@@ -4,7 +4,10 @@ namespace App\Modules\Crm\Duplicates;
 
 use App\Modules\Core\Audit\AuditRecorder;
 use App\Modules\Core\Tenancy\TenantContext;
+use App\Modules\Crm\Activities\Activity;
+use App\Modules\Crm\Activities\CalendarAnnouncements;
 use App\Modules\Crm\Affiliations\Affiliation;
+use App\Modules\Crm\Opportunities\Opportunity;
 use App\Modules\Crm\Organisations\Organisation;
 use App\Modules\Crm\People\Person;
 use App\Modules\Crm\Timeline\Attachment;
@@ -23,8 +26,10 @@ use InvalidArgumentException;
  * chosen fields copied onto $keep (field => 'keep'|'drop'; a missing choice
  * keeps $keep's value unless it is empty), affiliations moved (one active
  * link per pair: the oldest survives, completed by the other), notes and
- * attachments moved, DAS united, source identifiers kept in merged_sources,
- * $drop trashed for good with merged_into_id, journal crm.merged (ids only).
+ * attachments moved, opportunities and opportunity contacts moved (a
+ * person holding opportunities stays a particulier), actions moved, DAS
+ * united, source identifiers kept in merged_sources, $drop trashed for
+ * good with merged_into_id, journal crm.merged (ids only).
  */
 class Merger
 {
@@ -160,7 +165,11 @@ class Merger
             $isPerson = $k instanceof Person;
             $this->moveAffiliations($isPerson ? 'person_id' : 'organisation_id', $isPerson ? 'organisation_id' : 'person_id', $k->id, $d->id);
             $this->moveTimeline($k, $d);
+            $this->moveOpportunities($k, $d);
+            $this->moveActivities($k, $d);
             $this->uniteDas($k, $d, $isPerson);
+            // Calendars (Outlook) now show the kept fiche (moves above are raw SQL).
+            CalendarAnnouncements::announceFor($isPerson ? 'person_id' : 'organisation_id', [$k->id, $d->id]);
 
             // Values retained on $keep, read before the absorbed fiche is scrubbed.
             foreach ($fields as $field => $label) {
@@ -168,6 +177,12 @@ class Merger
                 if ($choice === 'drop') {
                     $k->setAttribute($field, $d->getAttribute($field));
                 }
+            }
+
+            // The account of an opportunity is a particulier: a person holding
+            // opportunities stays one, whatever the choice for the flag.
+            if ($k instanceof Person && Opportunity::withTrashed()->where('person_id', $k->id)->exists()) {
+                $k->is_individual = true;
             }
 
             // Absorbed fiche first: frees its unique values (SIRET) for $keep.
@@ -273,6 +288,34 @@ class Merger
                 ->where('notable_type', $drop->getMorphClass())->where('notable_id', $drop->id)
                 ->update(['notable_id' => $keep->id]);
         }
+    }
+
+    /**
+     * Opportunities (trashed ones too, with their stage history) follow the
+     * fiche. A person's contact rows go to the kept person, once per
+     * opportunity.
+     */
+    private function moveOpportunities(Organisation|Person $keep, Organisation|Person $drop): void
+    {
+        $column = $keep instanceof Person ? 'person_id' : 'organisation_id';
+        Opportunity::withTrashed()->where($column, $drop->id)->update([$column => $keep->id]);
+
+        if ($keep instanceof Person) {
+            DB::table('opportunity_contacts')->where('person_id', $drop->id)
+                ->whereIn('opportunity_id', DB::table('opportunity_contacts')->select('opportunity_id')->where('person_id', $keep->id))
+                ->delete();
+            DB::table('opportunity_contacts')->where('person_id', $drop->id)->update(['person_id' => $keep->id]);
+        }
+    }
+
+    /**
+     * Actions (trashed ones too) follow the fiche. Written in SQL: neither
+     * the journal nor the contact date need them (merged at the end).
+     */
+    private function moveActivities(Organisation|Person $keep, Organisation|Person $drop): void
+    {
+        $column = $keep instanceof Person ? 'person_id' : 'organisation_id';
+        Activity::withTrashed()->where($column, $drop->id)->toBase()->update([$column => $keep->id, 'updated_at' => now()]);
     }
 
     private function uniteDas(Organisation|Person $keep, Organisation|Person $drop, bool $isPerson): void

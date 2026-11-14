@@ -7,10 +7,12 @@ use App\Modules\Core\References\ReferenceItem;
 use App\Modules\Core\References\ReferenceList;
 use App\Modules\Core\Users\User;
 use App\Modules\Crm\Duplicates\DuplicateGuard;
+use App\Modules\Crm\Export\ExportCell;
 use App\Modules\Crm\Gdpr\Consent;
 use App\Modules\Crm\Gdpr\ConsentChannel;
 use App\Modules\Crm\Gdpr\GdprPending;
 use App\Modules\Crm\Gdpr\LegalBasis;
+use App\Modules\Crm\Opportunities\OpportunityRows;
 use App\Modules\Crm\Organisations\Organisation;
 use App\Modules\Crm\Organisations\OrganisationStatus;
 use App\Modules\Crm\Permissions;
@@ -18,6 +20,7 @@ use App\Modules\Crm\Search\CrmResource;
 use App\Modules\Crm\Search\ListExtras;
 use App\Modules\Crm\Search\RecentViews;
 use App\Modules\Crm\Support\DasLinks;
+use App\Modules\Crm\Support\FilterInput;
 use App\Modules\Crm\Support\FormOptions;
 use App\Modules\Crm\Visibility\CrmVisibility;
 use Illuminate\Database\Eloquent\Builder;
@@ -92,17 +95,18 @@ class PersonController extends Controller
     {
         $export = CrmResource::People->export();
 
-        return collect(array_keys($export->columns()))->mapWithKeys(fn (string $c) => [$c => $export->value($person, $c)])->all();
+        return collect(array_keys($export->columns()))->mapWithKeys(fn (string $c) => [$c => ExportCell::display($export->value($person, $c))])->all();
     }
 
     /**
      * People to attach to an entreprise (autocomplete of the interlocuteurs
      * tab): visible people matching the text, minus those already attached.
+     * `individual=1` keeps the particuliers only (account of an opportunity).
      */
     public function search(Request $request): JsonResponse
     {
         $user = $this->user($request);
-        $term = is_string($request->query('q')) ? trim($request->query('q')) : '';
+        $term = FilterInput::text($request->query('q'));
         $organisationId = $this->idOrNull($request->query('organisation'));
 
         if (mb_strlen($term) < 2) {
@@ -112,6 +116,7 @@ class PersonController extends Controller
         $people = CrmVisibility::people(Person::query(), $user)
             ->with(CrmVisibility::activeAffiliationsWith($user))
             ->search($term)
+            ->when(FilterInput::bool($request->query('individual')), fn (Builder $q) => $q->where('is_individual', true))
             ->when($organisationId, fn (Builder $q, string $id) => $q->whereNotExists(fn ($sub) => $sub->select(DB::raw(1))->from('affiliations')
                 ->whereColumn('affiliations.person_id', 'people.id')->where('affiliations.organisation_id', $id)
                 ->whereNull('affiliations.ended_on')->whereNull('affiliations.deleted_at')))
@@ -208,9 +213,11 @@ class PersonController extends Controller
                 'anonymised_at' => $person->anonymised_at?->toIso8601String(),
             ],
             'gdpr' => $this->gdpr($person, $user),
+            'opportunities' => OpportunityRows::forFiche($person, $user),
             'similar' => $user->can(Permissions::MERGE) ? $this->duplicates->similarTo($person, $user) : [],
             'can' => [
                 'merge' => ! $person->trashed() && $person->anonymised_at === null && $user->can(Permissions::MERGE),
+                'createOpportunity' => $person->is_individual && ! $person->trashed() && $person->anonymised_at === null && $user->can(Permissions::CREATE),
                 'update' => ! $person->trashed() && $user->can('update', $person),
                 'delete' => ! $person->trashed() && $user->can('delete', $person),
                 'restore' => $person->trashed() && $user->can('restore', $person),

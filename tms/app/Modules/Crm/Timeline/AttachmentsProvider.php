@@ -8,19 +8,19 @@ use Illuminate\Support\Collection;
 
 final class AttachmentsProvider implements TimelineProvider
 {
-    public function entriesFor(Model $subject, ?CarbonImmutable $before, int $limit): Collection
+    public function entriesFor(Model $subject, ?TimelineCursor $before, int $limit): Collection
     {
         return Attachment::query()->with('uploader')
             ->where('notable_type', $subject->getMorphClass())->where('notable_id', $subject->getKey())
-            ->when($before, fn ($q) => $q->where('created_at', '<', Timeline::bound($before)))
+            ->tap(fn ($q) => Timeline::after($q, $before, 'attachment'))
             ->orderByDesc('created_at')->orderByDesc('id')->limit($limit)->get()
             ->map(fn (Attachment $a) => new TimelineEntry(
                 'attachment',
                 CarbonImmutable::instance($a->created_at),
                 $a->original_name,
-                null,
+                $a->file_deleted_at === null ? null : AttachmentPurge::DELETED_LABEL,
                 $a->uploader?->name,
-                ['id' => $a->id, 'size' => $a->size, 'mime' => $a->mime],
+                ['id' => $a->id, 'size' => $a->size, 'mime' => $a->mime, 'file_deleted' => $a->file_deleted_at !== null],
             ));
     }
 }

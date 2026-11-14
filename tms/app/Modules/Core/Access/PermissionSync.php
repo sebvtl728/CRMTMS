@@ -19,17 +19,21 @@ use Spatie\Permission\PermissionRegistrar;
  *    administrator removed is never granted again.
  *
  * Idempotent. Runs under RLS, in each tenant's context (runtime connection).
+ * One tenant failing never blocks the others; run() returns the failed ones.
  */
 final class PermissionSync
 {
     public const TABLE = 'role_permission_defaults_applied';
 
-    public static function run(): void
+    /**
+     * @return list<Tenant> the tenants that could not be synchronised
+     */
+    public static function run(): array
     {
         self::ensurePermissions();
 
         // Suspended tenants too: their matrix must be complete if reactivated.
-        ForEachTenant::run(fn () => self::syncCurrentTenant(), includeSuspended: true);
+        return ForEachTenant::run(fn () => self::syncCurrentTenant(), includeSuspended: true);
     }
 
     public static function forTenant(Tenant $tenant): void

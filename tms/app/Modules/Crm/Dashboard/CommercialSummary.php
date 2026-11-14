@@ -1,0 +1,116 @@
+<?php
+
+namespace App\Modules\Crm\Dashboard;
+
+use App\Modules\Core\References\ReferenceItem;
+use App\Modules\Core\References\ReferenceList;
+use App\Modules\Core\Users\User;
+use App\Modules\Crm\Activities\Activity;
+use App\Modules\Crm\Activities\TodoQuery;
+use App\Modules\Crm\Activities\WeekPlanning;
+use App\Modules\Crm\Opportunities\OpportunityListQuery;
+use App\Modules\Crm\Opportunities\OpportunityStage;
+use App\Modules\Crm\Visibility\CrmVisibility;
+use Carbon\CarbonImmutable;
+
+/**
+ * The commercial blocks of « Accueil », always within what the user may
+ * see (Responsable DAS: his DAS only):
+ * - « Mes relances »: his own actions overdue and due today (as « À faire »);
+ * - « Pipeline pondéré du mois »: weighted amount of the open opportunities
+ *   expected to close in the current Paris month (as the list filtered so);
+ * - « Prochains rendez-vous »: his next meetings to do (types flagged
+ *   meta.planning « meeting »), without report.
+ */
+final class CommercialSummary
+{
+    /** Meetings listed, at most. */
+    public const MEETINGS = 5;
+
+    /**
+     * @return array{follow_ups: array{overdue: int, today: int}, pipeline: array{weighted_amount: string, count: int, month: string, close_from: string, close_to: string}, meetings: list<array<string, mixed>>}
+     */
+    public static function for(User $user, CarbonImmutable $now): array
+    {
+        return [
+            'follow_ups' => TodoQuery::counts($user, $now),
+            'pipeline' => self::pipeline($user, $now),
+            'meetings' => self::meetings($user, $now),
+        ];
+    }
+
+    /**
+     * @return array{weighted_amount: string, count: int, month: string, close_from: string, close_to: string}
+     */
+    private static function pipeline(User $user, CarbonImmutable $now): array
+    {
+        $local = $now->setTimezone((string) config('app.timezone'));
+        $from = $local->startOfMonth()->toDateString();
+        $to = $local->endOfMonth()->toDateString();
+
+        $filters = OpportunityListQuery::filters(['close_from' => $from, 'close_to' => $to]);
+        $row = OpportunityListQuery::build($filters, $user)
+            ->whereNotIn('opportunities.stage_id', self::closedStages())
+            ->reorder()->toBase()
+            ->selectRaw('count(*) as count, coalesce(sum(opportunities.weighted_amount), 0) as weighted')
+            ->first();
+
+        return [
+            'weighted_amount' => number_format((float) ($row->weighted ?? 0), 2, '.', ''),
+            'count' => (int) ($row->count ?? 0),
+            'month' => ucfirst($local->locale('fr')->isoFormat('MMMM YYYY')),
+            'close_from' => $from,
+            'close_to' => $to,
+        ];
+    }
+
+    /**
+     * Won and lost stages (inactive ones too: old opportunities keep them).
+     *
+     * @return list<string>
+     */
+    private static function closedStages(): array
+    {
+        return ReferenceItem::withTrashed()->where('list', ReferenceList::PipelineStage)->get(['id', 'meta'])
+            ->filter(fn (ReferenceItem $stage) => OpportunityStage::outcome($stage) !== null)
+            ->pluck('id')->values()->all();
+    }
+
+    /**
+     * @return list<array<string, mixed>>
+     */
+    private static function meetings(User $user, CarbonImmutable $now): array
+    {
+        $types = WeekPlanning::meetingTypes();
+        if ($types === []) {
+            return [];
+        }
+
+        $tz = (string) config('app.timezone');
+
+        return TodoQuery::onLiveFiches(CrmVisibility::activities(Activity::query(), $user))
+            ->where('responsible_user_id', $user->id)
+            ->whereIn('type_id', $types)
+            ->whereNull('done_at')
+            ->where('due_at', '>=', $now->format('Y-m-d H:i:sP'))
+            ->with(['type', 'organisation:id,name', 'person:id,first_name,last_name', 'opportunity:id,title'])
+            ->orderBy('due_at')->orderBy('id')
+            ->limit(self::MEETINGS)
+            ->get()
+            ->map(function (Activity $activity) use ($now, $tz): array {
+                $at = CarbonImmutable::instance($activity->due_at ?? $now)->setTimezone($tz);
+
+                return [
+                    'id' => $activity->id,
+                    'type' => $activity->type?->label,
+                    'at' => $at->toIso8601String(),
+                    'day' => ucfirst($at->locale('fr')->isoFormat('dddd D MMMM')),
+                    'time' => $at->format('H:i'),
+                    'location' => $activity->location,
+                    'organisation' => $activity->organisation === null ? null : ['id' => $activity->organisation->id, 'name' => $activity->organisation->name],
+                    'person' => $activity->person === null ? null : ['id' => $activity->person->id, 'name' => $activity->person->fullName()],
+                    'opportunity' => $activity->opportunity === null ? null : ['id' => $activity->opportunity->id, 'name' => $activity->opportunity->title],
+                ];
+            })->values()->all();
+    }
+}

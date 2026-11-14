@@ -1,5 +1,7 @@
 import { SimilarFiches, type DuplicateCandidate } from '@/components/crm/duplicate-warning';
+import { FicheOpportunities, type OpportunityRow } from '@/components/crm/opportunity-list';
 import { OrganisationContacts, type AffiliationRow } from '@/components/crm/organisation-contacts';
+import { QuickActionFicheButton } from '@/components/crm/quick-action';
 import { Timeline } from '@/components/crm/timeline';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -50,11 +52,20 @@ interface ShowProps {
     affiliations: AffiliationRow[];
     formerAffiliations: AffiliationRow[];
     decisionRoles: Option[];
-    can: { affiliate: boolean; createPerson: boolean; update: boolean; delete: boolean; restore: boolean; merge: boolean };
+    opportunities: OpportunityRow[];
+    can: {
+        affiliate: boolean;
+        createPerson: boolean;
+        createOpportunity: boolean;
+        update: boolean;
+        delete: boolean;
+        restore: boolean;
+        merge: boolean;
+    };
     status?: string;
 }
 
-const TABS = ['Informations', 'Interlocuteurs', 'Historique'] as const;
+const TABS = ['Informations', 'Interlocuteurs', 'Opportunités', 'Historique'] as const;
 
 function Item({ label, children }: { label: string; children: React.ReactNode }) {
     return (
@@ -77,7 +88,16 @@ function safeLink(url: string | null): React.ReactNode {
     );
 }
 
-export default function OrganisationShow({ organisation: o, affiliations, formerAffiliations, decisionRoles, similar, can, status }: ShowProps) {
+export default function OrganisationShow({
+    organisation: o,
+    affiliations,
+    formerAffiliations,
+    decisionRoles,
+    opportunities,
+    similar,
+    can,
+    status,
+}: ShowProps) {
     const [tab, setTab] = useState<(typeof TABS)[number]>('Informations');
     const [confirming, setConfirming] = useState(false);
     const errors = usePage().props.errors as Record<string, string | undefined>;
@@ -113,6 +133,7 @@ export default function OrganisationShow({ organisation: o, affiliations, former
                         </div>
                     </div>
                     <div className="flex flex-wrap gap-2">
+                        <QuickActionFicheButton context={{ organisation_id: o.id }} available={!o.deleted} />
                         {can.update && (
                             <Button asChild variant="outline">
                                 <Link href={route('crm.organisations.edit', o.id)}>
@@ -225,6 +246,12 @@ export default function OrganisationShow({ organisation: o, affiliations, former
                         former={formerAffiliations}
                         decisionRoles={decisionRoles}
                         can={{ affiliate: can.affiliate, createPerson: can.createPerson }}
+                    />
+                )}
+                {tab === 'Opportunités' && (
+                    <FicheOpportunities
+                        rows={opportunities}
+                        createHref={can.createOpportunity ? `${route('crm.opportunities.create')}?organisation=${o.id}` : null}
                     />
                 )}
                 {tab === 'Historique' && <Timeline kind="organisation" subjectId={o.id} canEdit={can.update} />}

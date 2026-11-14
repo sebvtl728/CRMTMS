@@ -121,3 +121,26 @@ it('shows nothing to a Responsable DAS who follows no DAS', function () {
 
     expect(CrmVisibility::people(Person::query(), userWithRole(Role::ResponsableDas))->count())->toBe(0);
 });
+
+it('does not open a person through a trashed entreprise, keeps the followed DAS on the person', function () {
+    $mine = das('Hôtellerie-restauration');
+    $stamp = ['tenant_id' => tenant()->id];
+    $gone = Organisation::query()->create(['name' => 'Fermée']);
+    $gone->das()->sync([$mine->id => $stamp]);
+    $alive = Organisation::query()->create(['name' => 'Ouverte']);
+    $alive->das()->sync([$mine->id => $stamp]);
+
+    affiliate(makePerson('Chez la fermée'), $gone);
+    affiliate(makePerson('Chez ouverte'), $alive);
+    $followed = makePerson('Fermée mais DAS suivi');
+    $followed->das()->sync([$mine->id => $stamp]);
+    affiliate($followed, $gone);
+    affiliate(makePerson('Ancien chez ouverte'), $alive, ['ended_on' => '2026-01-01']);
+    $gone->delete();
+
+    $user = userWithRole(Role::ResponsableDas);
+    followDas($user, $mine);
+
+    expect(CrmVisibility::people(Person::query(), $user)->orderBy('last_name')->pluck('last_name')->all())
+        ->toBe(['Chez ouverte', 'Fermée mais DAS suivi']);
+});

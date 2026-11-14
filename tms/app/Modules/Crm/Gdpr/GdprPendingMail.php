@@ -2,6 +2,7 @@
 
 namespace App\Modules\Crm\Gdpr;
 
+use App\Modules\Core\Tenancy\TenantUrl;
 use Illuminate\Mail\Mailable;
 use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Support\Carbon;
@@ -12,7 +13,13 @@ use Illuminate\Support\Carbon;
  */
 class GdprPendingMail extends Mailable
 {
-    public function __construct(public readonly int $count, public readonly Carbon $plannedAt, public readonly int $postponed = 0) {}
+    /** On the organisme's address (sent from the nightly job, not a request). */
+    private readonly string $url;
+
+    public function __construct(public readonly int $count, public readonly Carbon $plannedAt, public readonly int $postponed = 0)
+    {
+        $this->url = TenantUrl::route('crm.gdpr.index');
+    }
 
     public function build(): self
     {
@@ -29,7 +36,7 @@ class GdprPendingMail extends Mailable
             $message->line(($this->postponed === 1 ? '1 anonymisation prévue a été reportée' : "{$this->postponed} anonymisations prévues ont été reportées")
                 .' car un import était en cours : elles seront faites à la prochaine exécution, la nuit prochaine.');
         }
-        $message->action('Voir la liste', route('crm.gdpr.index'))
+        $message->action('Voir la liste', $this->url)
             ->salutation('Cordialement,');
 
         return $this->subject((string) $message->subject)->html((string) $message->render());

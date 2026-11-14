@@ -2,11 +2,9 @@
 
 namespace App\Modules\Crm\Timeline;
 
-use App\Exceptions\UserFacingHttpException;
 use App\Http\Controllers\Controller;
 use App\Modules\Crm\Organisations\Organisation;
 use App\Modules\Crm\People\Person;
-use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -14,7 +12,7 @@ use Illuminate\Support\Facades\Gate;
 
 /**
  * The « Historique » feed of a fiche, loaded by the page in pages of 30
- * (cursor = instant of the oldest entry shown).
+ * (opaque cursor = position of the last entry shown, see TimelineCursor).
  */
 class TimelineController extends Controller
 {
@@ -34,15 +32,9 @@ class TimelineController extends Controller
     {
         Gate::authorize('view', $subject);
 
-        $before = null;
+        // Opaque cursor; anything that does not decode is the first page.
         $cursor = $request->query('before');
-        if (is_string($cursor) && $cursor !== '') {
-            try {
-                $before = CarbonImmutable::parse($cursor);
-            } catch (\Throwable) {
-                throw new UserFacingHttpException(422, 'Curseur invalide.');
-            }
-        }
+        $before = is_string($cursor) ? TimelineCursor::decode($cursor) : null;
 
         $entries = Timeline::for($subject, $before, self::PAGE + 1);
         $more = $entries->count() > self::PAGE;
@@ -50,7 +42,7 @@ class TimelineController extends Controller
 
         return response()->json([
             'entries' => $page->map->toArray()->all(),
-            'next' => $more ? $page->last()?->at->toIso8601ZuluString('microsecond') : null,
+            'next' => $more ? $page->last()?->cursor()->encode() : null,
         ]);
     }
 }

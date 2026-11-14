@@ -4,6 +4,8 @@ namespace App\Http\Middleware;
 
 use App\Modules\Core\Access\Permissions;
 use App\Modules\Core\Users\User;
+use App\Modules\Crm\Activities\TodoQuery;
+use App\Modules\Crm\Permissions as CrmPermissions;
 use Illuminate\Http\Request;
 use Inertia\Middleware;
 
@@ -54,6 +56,8 @@ class HandleInertiaRequests extends Middleware
                 // Names only: the menu and pages adapt, the server stays the authority.
                 'permissions' => $user === null ? [] : array_values(array_filter(Permissions::all(), fn (string $p) => $user->can($p))),
             ],
+            // Menu badge of « À faire »: overdue + today, cached 60 s (lazy: skipped by partial reloads).
+            'todo_count' => fn () => $user !== null && $user->can(CrmPermissions::VIEW) ? TodoQuery::badge($user) : 0,
         ]);
     }
 }

@@ -36,7 +36,7 @@ class UserDasController extends Controller
         }
 
         $after = array_values($data['das_ids']);
-        $before = CrmVisibility::followedDas($user);
+        $before = FollowedDas::ids($user);
 
         DB::transaction(function () use ($user, $after): void {
             DB::table('user_das')->where('user_id', $user->getKey())->delete();

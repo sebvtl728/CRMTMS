@@ -3,33 +3,48 @@
 namespace App\Modules\Crm;
 
 use App\Modules\Core\Access\Permissions as CorePermissions;
+use App\Modules\Core\Access\PrimaryRoleChanged;
 use App\Modules\Core\Audit\MorphAliases;
 use App\Modules\Core\References\ReferenceList;
 use App\Modules\Core\References\ReferenceUsage;
 use App\Modules\Core\Users\User;
+use App\Modules\Crm\Activities\ActivitiesProvider;
+use App\Modules\Crm\Activities\Activity;
+use App\Modules\Crm\Activities\ActivityPolicy;
 use App\Modules\Crm\Affiliations\Affiliation;
 use App\Modules\Crm\Gdpr\Consent;
 use App\Modules\Crm\Import\ImportBatch;
 use App\Modules\Crm\Import\ImportProfile;
 use App\Modules\Crm\Import\ImportRow;
 use App\Modules\Crm\Import\ImportStamp;
+use App\Modules\Crm\Opportunities\OpportunitiesProvider;
+use App\Modules\Crm\Opportunities\Opportunity;
+use App\Modules\Crm\Opportunities\OpportunityPolicy;
+use App\Modules\Crm\Opportunities\StageChange;
 use App\Modules\Crm\Organisations\Organisation;
 use App\Modules\Crm\Organisations\OrganisationPolicy;
 use App\Modules\Crm\People\Person;
 use App\Modules\Crm\People\PersonPolicy;
 use App\Modules\Crm\Search\SavedFilter;
+use App\Modules\Crm\Support\LinkedData;
 use App\Modules\Crm\Timeline\Attachment;
 use App\Modules\Crm\Timeline\AttachmentsProvider;
 use App\Modules\Crm\Timeline\AuditProvider;
+use App\Modules\Crm\Timeline\LastContact;
 use App\Modules\Crm\Timeline\Note;
 use App\Modules\Crm\Timeline\NotesProvider;
 use App\Modules\Crm\Timeline\Timeline;
 use App\Modules\Crm\Visibility\CrmVisibility;
+use App\Modules\Crm\Visibility\FollowedDas;
+use Carbon\CarbonImmutable;
+use Carbon\CarbonInterface;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Http\Exceptions\HttpResponseException;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\Route;
@@ -56,15 +71,22 @@ class CrmServiceProvider extends ServiceProvider
             'import_row' => ImportRow::class,
             'import_stamp' => ImportStamp::class,
             'consent' => Consent::class,
+            'opportunity' => Opportunity::class,
+            'opportunity_stage_change' => StageChange::class,
+            'activity' => Activity::class,
         ]);
 
         // Sources of the « Historique »; later increments tag their own.
-        $this->app->tag([NotesProvider::class, AttachmentsProvider::class, AuditProvider::class], Timeline::TAG);
+        $this->app->tag([NotesProvider::class, AttachmentsProvider::class, AuditProvider::class, OpportunitiesProvider::class, ActivitiesProvider::class], Timeline::TAG);
     }
 
     public function boot(): void
     {
         self::registerReferenceUsage();
+        self::registerLinkedData();
+        self::registerContactSources();
+        FollowedDas::registerOnUsersPage();
+        Event::listen(PrimaryRoleChanged::class, FollowedDas::onRoleChanged(...));
 
         // Check + download count together: 10 exports a minute per user.
         RateLimiter::for('crm-export', fn (Request $request) => Limit::perMinute(20)->by('crm-export:'.($request->user()?->getAuthIdentifier() ?? $request->ip()))
@@ -72,6 +94,8 @@ class CrmServiceProvider extends ServiceProvider
 
         Gate::policy(Organisation::class, OrganisationPolicy::class);
         Gate::policy(Person::class, PersonPolicy::class);
+        Gate::policy(Opportunity::class, OpportunityPolicy::class);
+        Gate::policy(Activity::class, ActivityPolicy::class);
 
         // A fiche the user may not see is a 404, whatever the action. Trashed
         // fiches resolve too (show, restore): the controller decides.
@@ -93,7 +117,7 @@ class CrmServiceProvider extends ServiceProvider
                 $query = CrmVisibility::organisations($query, $user);
             }
 
-            return $query->findOrFail($value);
+            return self::unlessTrashedForbidden($query->findOrFail($value), $user);
         });
 
         Route::bind('person', function (string $value): Person {
@@ -113,7 +137,7 @@ class CrmServiceProvider extends ServiceProvider
                 $query = CrmVisibility::people($query, $user);
             }
 
-            return $query->findOrFail($value);
+            return self::unlessTrashedForbidden($query->findOrFail($value), $user);
         });
 
         // An affiliation is reachable through the entreprise it belongs to.
@@ -126,7 +150,8 @@ class CrmServiceProvider extends ServiceProvider
             $user = request()->user();
 
             if ($user instanceof User) {
-                $query->whereIn('organisation_id', CrmVisibility::organisations(Organisation::withTrashed(), $user)->select('organisations.id'));
+                // Trashed entreprises: only with crm.delete, like the fiche itself.
+                $query->whereIn('organisation_id', CrmVisibility::organisations(self::organisationsFor($user), $user)->select('organisations.id'));
             }
 
             return $query->findOrFail($value);
@@ -144,9 +169,85 @@ class CrmServiceProvider extends ServiceProvider
             return ($user instanceof User ? $query->visibleTo($user) : $query)->findOrFail($value);
         });
 
+        // An opportunity: DAS visibility; on a trashed fiche only with crm.delete.
+        Route::bind('opportunity', function (string $value): Opportunity {
+            if (! Str::isUuid($value)) {
+                throw (new ModelNotFoundException)->setModel(Opportunity::class, [$value]);
+            }
+
+            $user = request()->user();
+            $query = Opportunity::query();
+            if ($user instanceof User) {
+                $query = CrmVisibility::opportunities($query, $user);
+            }
+            $opportunity = $query->with(['organisation', 'person'])->findOrFail($value);
+
+            $fiche = $opportunity->organisation ?? $opportunity->person;
+            if ($user instanceof User && ($fiche === null || $fiche->trashed()) && ! $user->can(Permissions::DELETE)) {
+                throw (new ModelNotFoundException)->setModel(Opportunity::class, [$value]);
+            }
+
+            return $opportunity;
+        });
+
+        // An action: visible with its opportunity when it has one (its DAS),
+        // otherwise with one of its fiches; on a trashed fiche only with crm.delete.
+        Route::bind('activity', function (string $value): Activity {
+            if (! Str::isUuid($value)) {
+                throw (new ModelNotFoundException)->setModel(Activity::class, [$value]);
+            }
+
+            $user = request()->user();
+            $query = Activity::query();
+            if ($user instanceof User) {
+                $query = CrmVisibility::activities($query, $user);
+            }
+            $activity = $query->with(['organisation', 'person', 'opportunity.organisation', 'opportunity.person'])->findOrFail($value);
+
+            if ($user instanceof User && $activity->ficheTrashed() && ! $user->can(Permissions::DELETE)) {
+                throw (new ModelNotFoundException)->setModel(Activity::class, [$value]);
+            }
+
+            return $activity;
+        });
+
         // A note / attachment is reachable through the fiche it belongs to.
         Route::bind('note', fn (string $value): Note => self::bindOnSubject(Note::query(), $value, Note::class));
         Route::bind('attachment', fn (string $value): Attachment => self::bindOnSubject(Attachment::query(), $value, Attachment::class));
+    }
+
+    /**
+     * @return Builder<Organisation>
+     */
+    private static function organisationsFor(User $user): Builder
+    {
+        return $user->can(Permissions::DELETE) ? Organisation::withTrashed() : Organisation::query();
+    }
+
+    /**
+     * @return Builder<Person>
+     */
+    private static function peopleFor(User $user): Builder
+    {
+        return $user->can(Permissions::DELETE) ? Person::withTrashed() : Person::query();
+    }
+
+    /**
+     * A trashed fiche is readable by URL only with crm.delete, like the
+     * « corbeille » filter of the lists: anybody else gets a 404.
+     *
+     * @template TModel of Organisation|Person
+     *
+     * @param  TModel  $fiche
+     * @return TModel
+     */
+    private static function unlessTrashedForbidden(Organisation|Person $fiche, mixed $user): Organisation|Person
+    {
+        if ($fiche->trashed() && $user instanceof User && ! $user->can(Permissions::DELETE)) {
+            throw (new ModelNotFoundException)->setModel($fiche::class, [$fiche->getKey()]);
+        }
+
+        return $fiche;
     }
 
     /**
@@ -200,15 +301,65 @@ class CrmServiceProvider extends ServiceProvider
 
         $user = request()->user();
 
-        if ($user instanceof User && CrmVisibility::restricts($user)) {
+        // Subjects: the fiches the user sees, trashed ones only with crm.delete.
+        if ($user instanceof User && (CrmVisibility::restricts($user) || ! $user->can(Permissions::DELETE))) {
             $query->where(fn (Builder $q) => $q
                 ->where(fn (Builder $o) => $o->where('notable_type', (new Organisation)->getMorphClass())
-                    ->whereIn('notable_id', CrmVisibility::organisations(Organisation::withTrashed(), $user)->select('organisations.id')))
+                    ->whereIn('notable_id', CrmVisibility::organisations(self::organisationsFor($user), $user)->select('organisations.id')))
                 ->orWhere(fn (Builder $p) => $p->where('notable_type', (new Person)->getMorphClass())
-                    ->whereIn('notable_id', CrmVisibility::people(Person::withTrashed(), $user)->select('people.id'))));
+                    ->whereIn('notable_id', CrmVisibility::people(self::peopleFor($user), $user)->select('people.id'))));
         }
 
         return $query->findOrFail($value);
+    }
+
+    /**
+     * Data hanging on a fiche (LinkedData): an import undo keeps the fiche.
+     * Consents are never created by an import: any consent of the person was
+     * recorded since, and must stay with her fiche (proof, RGPD).
+     */
+    public static function registerLinkedData(): void
+    {
+        $except = fn (Builder $query, array $ids): Builder => $ids === [] ? $query : $query->whereKeyNot($ids);
+
+        LinkedData::register('crm.affiliations', fn (Organisation|Person $fiche, array $ids): bool => $except(
+            Affiliation::query()->where($fiche instanceof Organisation ? 'organisation_id' : 'person_id', $fiche->getKey()), $ids)->exists());
+        LinkedData::register('crm.notes', fn (Organisation|Person $fiche, array $ids): bool => $except(
+            Note::query()->where('notable_type', $fiche->getMorphClass())->where('notable_id', $fiche->getKey()), $ids)->exists());
+        LinkedData::register('crm.attachments', fn (Organisation|Person $fiche, array $ids): bool => $except(
+            Attachment::query()->where('notable_type', $fiche->getMorphClass())->where('notable_id', $fiche->getKey()), $ids)->exists());
+        LinkedData::register('crm.opportunities', fn (Organisation|Person $fiche, array $ids): bool => $except(
+            Opportunity::withTrashed()->where($fiche instanceof Organisation ? 'organisation_id' : 'person_id', $fiche->getKey()), $ids)->exists()
+            || ($fiche instanceof Person && DB::table('opportunity_contacts')->where('person_id', $fiche->getKey())->exists()));
+        LinkedData::register('crm.activities', fn (Organisation|Person $fiche, array $ids): bool => $except(
+            Activity::withTrashed()->where($fiche instanceof Organisation ? 'organisation_id' : 'person_id', $fiche->getKey()), $ids)->exists());
+        LinkedData::register('crm.consents', fn (Organisation|Person $fiche, array $ids): bool => $fiche instanceof Person
+            && $except(Consent::query()->where('person_id', $fiche->getKey()), $ids)->exists());
+    }
+
+    /**
+     * Done actions are contacts (LastContact::recompute): those on the fiches
+     * and on their opportunities. Trashed actions no longer count.
+     */
+    public static function registerContactSources(): void
+    {
+        LastContact::registerSource(function (string $subjectType, array $ids): ?CarbonInterface {
+            $column = match ($subjectType) {
+                (new Organisation)->getMorphClass() => 'organisation_id',
+                (new Person)->getMorphClass() => 'person_id',
+                default => null,
+            };
+            if ($column === null) {
+                return null;
+            }
+
+            $latest = Activity::query()->whereNotNull('done_at')
+                ->where(fn (Builder $q) => $q->whereIn($column, $ids)
+                    ->orWhereIn('opportunity_id', DB::table('opportunities')->select('id')->whereIn($column, $ids)))
+                ->max('done_at');
+
+            return is_string($latest) ? CarbonImmutable::parse($latest) : null;
+        });
     }
 
     /**
@@ -229,5 +380,15 @@ class CrmServiceProvider extends ServiceProvider
         ReferenceUsage::register(ReferenceList::ContactOrigin, 'people', 'origin_id');
         ReferenceUsage::register(ReferenceList::Das, 'person_das', 'das_id');
         ReferenceUsage::register(ReferenceList::DecisionRole, 'affiliations', 'decision_role_id');
+        ReferenceUsage::register(ReferenceList::PipelineStage, 'opportunities', 'stage_id');
+        ReferenceUsage::register(ReferenceList::PipelineStage, 'opportunity_stage_changes', 'from_stage_id');
+        ReferenceUsage::register(ReferenceList::PipelineStage, 'opportunity_stage_changes', 'to_stage_id');
+        ReferenceUsage::register(ReferenceList::LossReason, 'opportunity_stage_changes', 'loss_reason_id');
+        ReferenceUsage::register(ReferenceList::Das, 'opportunities', 'das_id');
+        ReferenceUsage::register(ReferenceList::Priority, 'opportunities', 'priority_id');
+        ReferenceUsage::register(ReferenceList::FundingMode, 'opportunities', 'funding_mode_id');
+        ReferenceUsage::register(ReferenceList::LossReason, 'opportunities', 'loss_reason_id');
+        ReferenceUsage::register(ReferenceList::ActionType, 'activities', 'type_id');
+        ReferenceUsage::register(ReferenceList::ActionResult, 'activities', 'result_id');
     }
 }

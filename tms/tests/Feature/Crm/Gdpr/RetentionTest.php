@@ -2,6 +2,7 @@
 
 use App\Modules\Core\Audit\AuditLog;
 use App\Modules\Core\Tenancy\Tenant;
+use App\Modules\Core\Tenancy\TenantDomain;
 use App\Modules\Crm\Gdpr\AnonymiseExpired;
 use App\Modules\Crm\Gdpr\Anonymiser;
 use App\Modules\Crm\Gdpr\GdprPending;
@@ -330,4 +331,17 @@ it('never touches another organisme', function () {
 
     inTenant($other);
     expect(Person::query()->find($foreign->id)?->anonymised_at)->toBeNull();
+});
+
+it('links the gdpr managers to the organisme address, not APP_URL', function () {
+    config(['tms.mode' => 'multi', 'app.url' => 'http://worker.invalid']);
+    TenantDomain::factory()->for(tenant())->create(['host' => 'cap.example.test']);
+    admin(twoFactor: true);
+    agedPerson('Ancien', 5);
+
+    AnonymiseExpired::dispatch();
+
+    // « Voir la liste » (the layout's logo still links to APP_URL).
+    Mail::assertSent(GdprPendingMail::class, fn (GdprPendingMail $m) => str_contains($m->render(), 'href="https://cap.example.test'.route('crm.gdpr.index', [], false).'"')
+        && ! str_contains($m->render(), 'worker.invalid'.route('crm.gdpr.index', [], false)));
 });

@@ -20,7 +20,8 @@ use Illuminate\Support\Facades\Storage;
  * One uploaded file and its import: uploaded -> simulating -> simulated ->
  * running -> done | failed, then undoing -> undone. A batch running,
  * simulating or undoing without progress for STUCK_MINUTES is « stuck » and
- * may be marked failed (what it created can then be undone).
+ * may be marked failed (what it created can then be undone); a stuck run is
+ * also resumed once, then failed, by ImportWatchdog.
  *
  * @property string $id
  * @property string $tenant_id
@@ -71,6 +72,13 @@ class ImportBatch extends Model
 
     /** Original files (and raw row values) are kept this many days. */
     public const RETENTION_DAYS = 30;
+
+    /**
+     * A file name may name a person: masked in the journal.
+     *
+     * @var list<string>
+     */
+    protected array $auditPersonal = ['original_name'];
 
     /**
      * The upload is journaled (who, which file, which target); its progress
@@ -261,7 +269,7 @@ class ImportBatch extends Model
 
         $this->refresh();
         app(AuditRecorder::class)->record('crm.import_failed_marked', $this, [], [
-            'file' => $this->original_name, 'target' => $this->target->value, 'total' => $this->total, 'created' => $this->created,
+            'target' => $this->target->value, 'total' => $this->total, 'created' => $this->created,
         ], $by);
 
         return true;

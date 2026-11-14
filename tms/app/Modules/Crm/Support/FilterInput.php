@@ -8,9 +8,9 @@ namespace App\Modules\Crm\Support;
  */
 final class FilterInput
 {
-    public static function text(mixed $value): string
+    public static function text(mixed $value, int $max = 100): string
     {
-        return is_string($value) ? mb_substr(trim($value), 0, 100) : '';
+        return is_string($value) ? mb_substr(trim($value), 0, $max) : '';
     }
 
     public static function id(mixed $value): ?string

@@ -25,7 +25,7 @@ class SmtpTransportFactory
      */
     public function make(array $settings, array $secrets): TransportInterface
     {
-        $this->check($settings);
+        $ips = $this->check($settings);
         $host = (string) ($settings['host'] ?? '');
         $encryption = (string) ($settings['encryption'] ?? 'tls');
         $transport = (new EsmtpTransportFactory)->create(new Dsn(
@@ -46,9 +46,27 @@ class SmtpTransportFactory
 
         if ($transport instanceof EsmtpTransport && ($stream = $transport->getStream()) instanceof SocketStream) {
             $stream->setTimeout(self::TIMEOUT);
+            self::pin($stream, $host, $ips[0]);
         }
 
         return $transport;
+    }
+
+    /**
+     * The socket connects to the checked address, never resolving the name
+     * again (DNS rebinding); TLS (implicit or STARTTLS) still verifies the
+     * certificate against the name, sent as SNI.
+     */
+    private static function pin(SocketStream $stream, string $host, string $ip): void
+    {
+        if (filter_var($host, FILTER_VALIDATE_IP) !== false) {
+            return; // a literal address: nothing to resolve
+        }
+
+        $options = $stream->getStreamOptions();
+        $options['ssl'] = [...($options['ssl'] ?? []), 'peer_name' => $host, 'SNI_server_name' => $host];
+        $stream->setStreamOptions($options);
+        $stream->setHost(str_contains($ip, ':') ? "[{$ip}]" : $ip);
     }
 
     /**
@@ -56,10 +74,11 @@ class SmtpTransportFactory
      * the connection test AND every real send (TenantMailer) are covered.
      *
      * @param  array<string, mixed>  $settings
+     * @return non-empty-list<string> the checked addresses
      *
      * @throws SmtpHostRefused with a French message
      */
-    public function check(array $settings): void
+    public function check(array $settings): array
     {
         $host = (string) ($settings['host'] ?? '');
         $ips = SmtpHostPolicy::resolve($host);
@@ -71,5 +90,7 @@ class SmtpTransportFactory
         if (($reason = SmtpHostPolicy::violation($ips)) !== null) {
             throw new SmtpHostRefused("Le serveur « {$host} » pointe vers {$reason} : envoi refusé.");
         }
+
+        return $ips;
     }
 }

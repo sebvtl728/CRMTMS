@@ -1,9 +1,11 @@
+import { ACTIVITY_SAVED_EVENT, completeActivity } from '@/components/crm/quick-action';
 import InputError from '@/components/input-error';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { formatDateTime } from '@/lib/crm';
-import { router } from '@inertiajs/react';
-import { FileText, History, LoaderCircle, Paperclip, StickyNote, Trash2 } from 'lucide-react';
+import { Link, router } from '@inertiajs/react';
+import { Check, ClipboardCheck, FileText, Handshake, History, LoaderCircle, Paperclip, StickyNote, Trash2 } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 const MAX_NOTE = 10000;
@@ -16,7 +18,7 @@ export interface TimelineEntryData {
     title: string;
     body: string | null;
     author: string | null;
-    meta: { id?: string; size?: number; mime?: string } & Record<string, unknown>;
+    meta: { id?: string; size?: number; mime?: string; file_deleted?: boolean } & Record<string, unknown>;
 }
 
 interface Props {
@@ -38,9 +40,36 @@ function EntryIcon({ type }: { type: string }) {
     const cls = 'text-muted-foreground mt-0.5 h-4 w-4 shrink-0';
     if (type === 'note') return <StickyNote className={cls} aria-hidden />;
     if (type === 'attachment') return <Paperclip className={cls} aria-hidden />;
+    if (type === 'opportunity') return <Handshake className={cls} aria-hidden />;
+    if (type === 'activity') return <ClipboardCheck className={cls} aria-hidden />;
 
     return <History className={cls} aria-hidden />;
 }
+
+/** Status, type and result of an action, overdue in red. */
+function ActivityBadges({ meta }: { meta: TimelineEntryData['meta'] }) {
+    const status = typeof meta.status === 'string' ? meta.status : null;
+    const label = typeof meta.status_label === 'string' ? meta.status_label : null;
+
+    return (
+        <span className="flex flex-wrap items-center gap-1">
+            {typeof meta.type === 'string' && <Badge variant="outline">{meta.type}</Badge>}
+            {label && <Badge variant={status === 'overdue' ? 'destructive' : status === 'done' ? 'secondary' : 'default'}>{label}</Badge>}
+            {typeof meta.result === 'string' && <Badge variant="outline">{meta.result}</Badge>}
+        </span>
+    );
+}
+
+/** Route that removes an entry of the history (notes, files, actions). */
+function removeRoute(entry: TimelineEntryData): string {
+    const id = String(entry.meta.id);
+    if (entry.type === 'note') return route('crm.notes.destroy', id);
+    if (entry.type === 'activity') return route('crm.activities.destroy', id);
+
+    return route('crm.attachments.destroy', id);
+}
+
+const REMOVABLE = ['note', 'attachment', 'activity'];
 
 /**
  * « Historique » of a fiche: notes, attached files and changes, most recent
@@ -52,6 +81,7 @@ export function Timeline({ kind, subjectId, canEdit }: Props) {
     const timelineUrl = route(`${base}.timeline`, subjectId);
 
     const [entries, setEntries] = useState<TimelineEntryData[]>([]);
+    /** Opaque cursor from the server (position of the last entry shown), sent back as is. */
     const [next, setNext] = useState<string | null>(null);
     const [loading, setLoading] = useState(true);
     const [failed, setFailed] = useState(false);
@@ -64,6 +94,7 @@ export function Timeline({ kind, subjectId, canEdit }: Props) {
 
     const load = useCallback(
         async (before: string | null) => {
+            // A failed « Voir plus » keeps the entries already shown; a first load replaces them.
             setLoading(true);
             setFailed(false);
             try {
@@ -86,6 +117,14 @@ export function Timeline({ kind, subjectId, canEdit }: Props) {
 
     useEffect(() => {
         void load(null);
+    }, [load]);
+
+    // An action saved from the « + Action » dialog shows up at once.
+    useEffect(() => {
+        const reload = () => void load(null);
+        window.addEventListener(ACTIVITY_SAVED_EVENT, reload);
+
+        return () => window.removeEventListener(ACTIVITY_SAVED_EVENT, reload);
     }, [load]);
 
     const options = {
@@ -140,9 +179,7 @@ export function Timeline({ kind, subjectId, canEdit }: Props) {
 
     const remove = () => {
         if (!removing?.meta.id) return;
-        const target = removing;
-        const url = target.type === 'note' ? route('crm.notes.destroy', target.meta.id) : route('crm.attachments.destroy', target.meta.id);
-        router.delete(url, {
+        router.delete(removeRoute(removing), {
             preserveScroll: true,
             preserveState: true,
             onSuccess: () => {
@@ -217,7 +254,7 @@ export function Timeline({ kind, subjectId, canEdit }: Props) {
                             <EntryIcon type={entry.type} />
                             <div className="min-w-0 flex-1">
                                 <div className="flex flex-wrap items-baseline justify-between gap-x-3">
-                                    {entry.type === 'attachment' && entry.meta.id ? (
+                                    {entry.type === 'attachment' && entry.meta.id && !entry.meta.file_deleted ? (
                                         <a
                                             href={route('crm.attachments.download', entry.meta.id)}
                                             className="inline-flex items-center gap-1 text-sm font-medium break-all underline"
@@ -226,23 +263,58 @@ export function Timeline({ kind, subjectId, canEdit }: Props) {
                                             {entry.title}
                                             <span className="text-muted-foreground ml-1 font-normal no-underline">{formatSize(entry.meta.size)}</span>
                                         </a>
+                                    ) : entry.type === 'opportunity' && typeof entry.meta.opportunity_id === 'string' ? (
+                                        <Link
+                                            href={route('crm.opportunities.show', entry.meta.opportunity_id)}
+                                            className="text-sm font-medium hover:underline"
+                                        >
+                                            {entry.title}
+                                        </Link>
                                     ) : (
                                         <span className="text-sm font-medium">{entry.title}</span>
                                     )}
+                                    {entry.type === 'activity' && <ActivityBadges meta={entry.meta} />}
                                     <span className="text-muted-foreground text-xs">
+                                        {entry.type === 'activity' && entry.meta.status !== 'done' ? 'Échéance : ' : ''}
                                         {formatDateTime(entry.at)}
                                         {entry.author && ` · ${entry.author}`}
                                     </span>
                                 </div>
                                 {entry.body && <p className="mt-1 text-sm break-words whitespace-pre-line">{entry.body}</p>}
+                                {entry.type === 'activity' && typeof entry.meta.opportunity_id === 'string' && (
+                                    <p className="text-muted-foreground mt-1 text-xs">
+                                        Opportunité :{' '}
+                                        <Link href={route('crm.opportunities.show', entry.meta.opportunity_id)} className="underline">
+                                            {typeof entry.meta.opportunity === 'string' ? entry.meta.opportunity : 'voir'}
+                                        </Link>
+                                    </p>
+                                )}
                             </div>
-                            {canEdit && entry.type !== 'audit' && entry.meta.id && (
+                            {canEdit && entry.type === 'activity' && entry.meta.status !== 'done' && entry.meta.id && (
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="sm"
+                                    className="shrink-0"
+                                    onClick={() => completeActivity(String(entry.meta.id))}
+                                >
+                                    <Check className="h-4 w-4" />
+                                    Fait
+                                </Button>
+                            )}
+                            {canEdit && REMOVABLE.includes(entry.type) && entry.meta.id && (
                                 <Button
                                     type="button"
                                     variant="ghost"
                                     size="icon"
                                     className="h-8 w-8 shrink-0"
-                                    aria-label={entry.type === 'note' ? 'Supprimer cette note' : `Retirer ${entry.title}`}
+                                    aria-label={
+                                        entry.type === 'note'
+                                            ? 'Supprimer cette note'
+                                            : entry.type === 'activity'
+                                              ? `Supprimer l’action ${entry.title}`
+                                              : `Retirer ${entry.title}`
+                                    }
                                     onClick={() => setRemoving(entry)}
                                 >
                                     <Trash2 className="h-4 w-4" />
@@ -271,11 +343,19 @@ export function Timeline({ kind, subjectId, canEdit }: Props) {
             <Dialog open={removing !== null} onOpenChange={(open) => !open && setRemoving(null)}>
                 <DialogContent>
                     <DialogHeader>
-                        <DialogTitle>{removing?.type === 'note' ? 'Supprimer cette note ?' : 'Retirer ce fichier ?'}</DialogTitle>
+                        <DialogTitle>
+                            {removing?.type === 'note'
+                                ? 'Supprimer cette note ?'
+                                : removing?.type === 'activity'
+                                  ? 'Supprimer cette action ?'
+                                  : 'Retirer ce fichier ?'}
+                        </DialogTitle>
                         <DialogDescription>
                             {removing?.type === 'note'
                                 ? 'La note disparaît de l’historique.'
-                                : `« ${removing?.title} » disparaît de l’historique et ne peut plus être téléchargé.`}
+                                : removing?.type === 'activity'
+                                  ? `« ${removing?.title} » disparaît de l’historique ; la date du dernier contact est recalculée.`
+                                  : `« ${removing?.title} » disparaît de l’historique et ne peut plus être téléchargé.`}
                         </DialogDescription>
                     </DialogHeader>
                     <DialogFooter>
@@ -283,7 +363,7 @@ export function Timeline({ kind, subjectId, canEdit }: Props) {
                             Annuler
                         </Button>
                         <Button variant="destructive" onClick={remove}>
-                            {removing?.type === 'note' ? 'Supprimer' : 'Retirer'}
+                            {removing?.type === 'attachment' ? 'Retirer' : 'Supprimer'}
                         </Button>
                     </DialogFooter>
                 </DialogContent>

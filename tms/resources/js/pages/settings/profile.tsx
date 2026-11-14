@@ -6,6 +6,7 @@ import { FormEventHandler } from 'react';
 import HeadingSmall from '@/components/heading-small';
 import InputError from '@/components/input-error';
 import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import AppLayout from '@/layouts/app-layout';
@@ -18,13 +19,14 @@ const breadcrumbs: BreadcrumbItem[] = [
     },
 ];
 
-export default function Profile({ mustVerifyEmail, status }: { mustVerifyEmail: boolean; status?: string }) {
+export default function Profile({ mustVerifyEmail, status, daily_digest }: { mustVerifyEmail: boolean; status?: string; daily_digest: boolean }) {
     const { auth } = usePage<SharedData>().props;
 
     const { data, setData, patch, errors, processing, recentlySuccessful, reset } = useForm({
         name: auth.user.name,
         email: auth.user.email,
         current_password: '',
+        daily_digest,
     });
 
     // The e-mail is the login identity: changing it needs the current password.
@@ -80,6 +82,23 @@ export default function Profile({ mustVerifyEmail, status }: { mustVerifyEmail: 
 
                             <InputError className="mt-2" message={errors.email} />
                         </div>
+
+                        {auth.permissions.includes('crm.view') && (
+                            <div className="grid gap-2">
+                                <div className="flex items-center gap-2">
+                                    <Checkbox
+                                        id="daily_digest"
+                                        checked={data.daily_digest}
+                                        onCheckedChange={(checked) => setData('daily_digest', checked === true)}
+                                    />
+                                    <Label htmlFor="daily_digest">Recevoir le récapitulatif quotidien</Label>
+                                </div>
+                                <p className="text-muted-foreground text-sm">
+                                    Chaque matin à 7 h 30, un e-mail liste vos actions en retard et du jour (aucun e-mail s'il n'y en a pas).
+                                </p>
+                                <InputError message={errors.daily_digest} />
+                            </div>
+                        )}
 
                         {emailChanged && (
                             <div className="grid gap-2">

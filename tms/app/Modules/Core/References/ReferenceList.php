@@ -50,4 +50,13 @@ enum ReferenceList: string
     {
         return $this === self::PipelineStage;
     }
+
+    /**
+     * Action types carry their place in the CRM planning (meta.planning:
+     * « meeting », « call » or none), set by the organisme.
+     */
+    public function hasPlanning(): bool
+    {
+        return $this === self::ActionType;
+    }
 }

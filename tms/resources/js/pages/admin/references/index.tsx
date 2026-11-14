@@ -16,7 +16,11 @@ type ReferenceMeta = {
     probability?: number;
     outcome?: 'won' | 'lost' | null;
     color?: string | null;
+    planning?: 'meeting' | 'call' | null;
 };
+
+/** Place of an action type in the CRM planning (meta.planning). */
+const PLANNING_KINDS = { meeting: 'Rendez-vous', call: 'Appel' } as const;
 
 interface ReferenceItem {
     id: string;
@@ -33,6 +37,7 @@ interface ReferenceListData {
     key: string;
     label: string;
     has_probability: boolean;
+    has_planning: boolean;
     items: ReferenceItem[];
 }
 
@@ -46,6 +51,7 @@ interface EditorState {
     label: string;
     probability: string;
     color: string; // '' = none
+    planning: string; // '' = not in the planning
 }
 
 const breadcrumbs: BreadcrumbItem[] = [{ title: 'Référentiels', href: '/admin/references' }];
@@ -82,6 +88,7 @@ export default function ReferencesIndex({ lists, status }: ReferencesIndexProps)
             label: item?.label ?? '',
             probability: item?.meta.probability !== undefined ? String(item.meta.probability) : '',
             color: item?.meta.color ?? '',
+            planning: item?.meta.planning ?? '',
         });
 
     const submit: FormEventHandler = (e) => {
@@ -90,8 +97,14 @@ export default function ReferencesIndex({ lists, status }: ReferencesIndexProps)
 
         const meta: ReferenceMeta = { color: editor.color || null };
         if (list.has_probability && editor.probability !== '') meta.probability = Number(editor.probability);
+        if (list.has_planning) meta.planning = editor.planning === '' ? null : (editor.planning as 'meeting' | 'call');
         const payload = { label: editor.label, meta };
-        const options = { preserveScroll: true, onStart: () => setProcessing(true), onFinish: () => setProcessing(false), onSuccess: () => setEditor(null) };
+        const options = {
+            preserveScroll: true,
+            onStart: () => setProcessing(true),
+            onFinish: () => setProcessing(false),
+            onSuccess: () => setEditor(null),
+        };
 
         if (editor.item) {
             router.put(route('admin.references.update', [current, editor.item.id]), payload, options);
@@ -119,11 +132,17 @@ export default function ReferencesIndex({ lists, status }: ReferencesIndexProps)
             <Head title="Référentiels" />
 
             <div className="flex flex-col gap-6 p-4">
-                <Heading title="Référentiels" description="Listes de valeurs de votre organisme, utilisées dans les fiches, le pipeline et les actions" />
+                <Heading
+                    title="Référentiels"
+                    description="Listes de valeurs de votre organisme, utilisées dans les fiches, le pipeline et les actions"
+                />
 
                 {status && <div className="text-sm font-medium text-green-600">{status}</div>}
                 {errors.item && (
-                    <div role="alert" className="text-destructive rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm dark:border-red-900 dark:bg-red-950">
+                    <div
+                        role="alert"
+                        className="text-destructive rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm dark:border-red-900 dark:bg-red-950"
+                    >
                         {errors.item}
                     </div>
                 )}
@@ -149,7 +168,9 @@ export default function ReferencesIndex({ lists, status }: ReferencesIndexProps)
 
                 <section role="tabpanel" className="flex flex-col gap-3">
                     <div className="flex items-center justify-between gap-4">
-                        <p className="text-muted-foreground text-sm">Glissez-déposez les lignes (ou utilisez les flèches) pour changer l'ordre d'affichage.</p>
+                        <p className="text-muted-foreground text-sm">
+                            Glissez-déposez les lignes (ou utilisez les flèches) pour changer l'ordre d'affichage.
+                        </p>
                         <Button onClick={() => openEditor(null)}>
                             <Plus className="h-4 w-4" />
                             Ajouter une valeur
@@ -170,15 +191,26 @@ export default function ReferencesIndex({ lists, status }: ReferencesIndexProps)
                                     setDragId(null);
                                     if (from >= 0) move(from, index);
                                 }}
-                                className={cn('flex items-center gap-3 px-3 py-2', dragId === item.id && 'opacity-40', !item.is_active && 'bg-muted/40')}
+                                className={cn(
+                                    'flex items-center gap-3 px-3 py-2',
+                                    dragId === item.id && 'opacity-40',
+                                    !item.is_active && 'bg-muted/40',
+                                )}
                             >
                                 <GripVertical className="text-muted-foreground h-4 w-4 shrink-0 cursor-grab" aria-hidden />
-                                {item.meta.color && <span className="h-3 w-3 shrink-0 rounded-full border" style={{ backgroundColor: item.meta.color }} aria-hidden />}
+                                {item.meta.color && (
+                                    <span className="h-3 w-3 shrink-0 rounded-full border" style={{ backgroundColor: item.meta.color }} aria-hidden />
+                                )}
                                 <div className="min-w-0 flex-1">
                                     <span className={cn('font-medium', !item.is_active && 'text-muted-foreground line-through')}>{item.label}</span>
                                     <span className="text-muted-foreground ml-2 text-xs">{item.code}</span>
                                 </div>
-                                {list.has_probability && item.meta.probability !== undefined && <Badge variant="outline">{item.meta.probability} %</Badge>}
+                                {list.has_probability && item.meta.probability !== undefined && (
+                                    <Badge variant="outline">{item.meta.probability} %</Badge>
+                                )}
+                                {list.has_planning && item.meta.planning && (
+                                    <Badge variant="outline">Planning : {PLANNING_KINDS[item.meta.planning]}</Badge>
+                                )}
                                 {item.is_system && <Badge variant="secondary">Système</Badge>}
                                 {item.in_use && <Badge variant="secondary">Utilisée</Badge>}
                                 {!item.is_active && (
@@ -188,7 +220,13 @@ export default function ReferencesIndex({ lists, status }: ReferencesIndexProps)
                                     </Badge>
                                 )}
                                 <div className="flex shrink-0 items-center">
-                                    <Button variant="ghost" size="icon" onClick={() => move(index, index - 1)} disabled={index === 0} aria-label={`Monter ${item.label}`}>
+                                    <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        onClick={() => move(index, index - 1)}
+                                        disabled={index === 0}
+                                        aria-label={`Monter ${item.label}`}
+                                    >
                                         <ArrowUp className="h-4 w-4" />
                                     </Button>
                                     <Button
@@ -218,7 +256,13 @@ export default function ReferencesIndex({ lists, status }: ReferencesIndexProps)
                                         size="icon"
                                         onClick={() => remove(item)}
                                         disabled={item.is_system || item.in_use}
-                                        title={item.is_system ? 'Valeur système : suppression impossible' : item.in_use ? 'Valeur utilisée : désactivez-la plutôt' : undefined}
+                                        title={
+                                            item.is_system
+                                                ? 'Valeur système : suppression impossible'
+                                                : item.in_use
+                                                  ? 'Valeur utilisée : désactivez-la plutôt'
+                                                  : undefined
+                                        }
                                         aria-label={`Supprimer ${item.label}`}
                                     >
                                         <Trash2 className="h-4 w-4" />
@@ -241,7 +285,13 @@ export default function ReferencesIndex({ lists, status }: ReferencesIndexProps)
 
                         <div className="grid gap-2">
                             <Label htmlFor="ref-label">Libellé</Label>
-                            <Input id="ref-label" value={editor?.label ?? ''} onChange={(e) => setEditor((s) => s && { ...s, label: e.target.value })} required autoFocus />
+                            <Input
+                                id="ref-label"
+                                value={editor?.label ?? ''}
+                                onChange={(e) => setEditor((s) => s && { ...s, label: e.target.value })}
+                                required
+                                autoFocus
+                            />
                             <InputError message={errors.label} />
                         </div>
 
@@ -261,6 +311,23 @@ export default function ReferencesIndex({ lists, status }: ReferencesIndexProps)
                                 />
                                 {closing && <p className="text-muted-foreground text-xs">Étape de clôture : probabilité fixe.</p>}
                                 <InputError message={errors['meta.probability']} />
+                            </div>
+                        )}
+
+                        {list.has_planning && (
+                            <div className="grid gap-2">
+                                <Label htmlFor="ref-planning">Planning commercial</Label>
+                                <select
+                                    id="ref-planning"
+                                    className="border-input bg-background focus:ring-ring h-9 w-full rounded-md border px-3 text-sm focus:ring-2 focus:outline-hidden"
+                                    value={editor?.planning ?? ''}
+                                    onChange={(e) => setEditor((s) => s && { ...s, planning: e.target.value })}
+                                >
+                                    <option value="">Non affiché</option>
+                                    <option value="meeting">Rendez-vous (planning et compte rendu de RDV)</option>
+                                    <option value="call">Appel (planning, s'il a une échéance)</option>
+                                </select>
+                                <InputError message={errors['meta.planning']} />
                             </div>
                         )}
 

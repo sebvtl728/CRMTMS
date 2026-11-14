@@ -30,6 +30,13 @@ final class CapFormationReferenceSeeder
         'Perdu' => [0, 'lost'],
     ];
 
+    /**
+     * Action types shown in the CRM planning (meta.planning), by code.
+     *
+     * @var array<string, string>
+     */
+    private const PLANNING = ['prise-de-rendez-vous' => 'meeting', 'rendez-vous-physique' => 'meeting', 'appel' => 'call'];
+
     /** @var array<string, list<string>> */
     private const VALUES = [
         'das' => ['Métiers supports', 'Compétences transversales', 'Hôtellerie-restauration', 'Mobilités professionnelles'],
@@ -51,7 +58,9 @@ final class CapFormationReferenceSeeder
         app(TenantContext::class)->run($tenant, function (): void {
             foreach (self::VALUES as $list => $labels) {
                 foreach ($labels as $i => $label) {
-                    self::ensure(ReferenceList::from($list), Str::slug($label), $label, $i + 1);
+                    $code = Str::slug($label);
+                    $planning = $list === ReferenceList::ActionType->value ? (self::PLANNING[$code] ?? null) : null;
+                    self::ensure(ReferenceList::from($list), $code, $label, $i + 1, $planning === null ? null : ['planning' => $planning]);
                 }
             }
 

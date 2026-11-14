@@ -2,6 +2,7 @@
 
 namespace App\Modules\Crm\Import;
 
+use App\Modules\Core\Security\DatabaseErrorLog;
 use App\Modules\Crm\Affiliations\Affiliation;
 use App\Modules\Crm\Affiliations\AffiliationRequest;
 use App\Modules\Crm\Duplicates\DuplicateCandidate;
@@ -19,6 +20,7 @@ use Illuminate\Database\QueryException;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Validator;
 
 /**
@@ -35,6 +37,8 @@ use Illuminate\Support\Facades\Validator;
  */
 final class RowImporter
 {
+    public const FUTURE_DATE = 'Date future ramenée à aujourd\'hui';
+
     /** Fields whose stored column differs from the field code. */
     private const COLUMNS = [
         'legal_form' => 'legal_form_id', 'sector' => 'sector_id', 'establishment_type' => 'establishment_type_id',
@@ -192,6 +196,7 @@ final class RowImporter
                 $e instanceof SkipRow => (new RowOutcome(ImportRow::SKIPPED))->add('info', $e->getMessage()),
                 $e instanceof ImportRowException => RowOutcome::error($e->getMessage()),
                 $e instanceof UniqueConstraintViolationException => RowOutcome::error(self::conflict($e)),
+                $this->absorbable($e) => $this->databaseError($line, $e),
                 default => throw $e,
             };
         }
@@ -201,6 +206,44 @@ final class RowImporter
         }
 
         return $outcome;
+    }
+
+    /**
+     * Any other database error on a row run in its own savepoint (rolled
+     * back alone): the row becomes an error, the import goes on. Logged with
+     * the SQL state and statement only (no value of the row).
+     */
+    private function databaseError(int $line, QueryException $e): RowOutcome
+    {
+        $context = DatabaseErrorLog::context($e);
+        Log::warning('Ligne d\'import CRM refusée par la base de données', ['batch_id' => $this->batch->id, 'line_number' => $line, ...$context]);
+        $state = is_string($context['sqlstate'] ?? null) && preg_match('/^[0-9A-Z]{5}$/', $context['sqlstate']) === 1 ? $context['sqlstate'] : null;
+
+        return RowOutcome::error('Ligne non importée : la base de données l\'a refusée'.($state === null ? '' : " (code {$state})").'.');
+    }
+
+    /**
+     * A database error the row's own savepoint absorbed. Not in a simulation
+     * (no savepoint), nor when the database itself is unavailable (transient()).
+     */
+    private function absorbable(QueryException $e): bool
+    {
+        return ! $this->dryRun && ! self::transient($e);
+    }
+
+    /**
+     * The database is unavailable, not the row at fault (SQL state class 08
+     * connection, 53 insufficient resources, 57P01-57P03 server shutting
+     * down or not accepting connections): no further row can succeed, the
+     * run stops and stays resumable instead of turning every remaining row
+     * into an error. A cancelled statement (57014, timeout) is the row's.
+     */
+    public static function transient(\Throwable $e): bool
+    {
+        $sql = DatabaseErrorLog::queryException($e);
+        $state = $sql === null ? '' : (string) ($sql->errorInfo[0] ?? '');
+
+        return in_array(substr($state, 0, 2), ['08', '53'], true) || in_array($state, ['57P01', '57P02', '57P03'], true);
     }
 
     /**
@@ -252,7 +295,16 @@ final class RowImporter
                 $date === null ? $errors[] = "{$label} : date invalide (format attendu JJ/MM/AAAA)." : $values[$field] = $date->toDateString();
             } elseif ($base === 'date') {
                 $date = Values::date($raw, true);
-                $date === null ? $errors[] = "{$label} : date invalide (format attendu JJ/MM/AAAA)." : $values[$field] = $date;
+                if ($date === null) {
+                    $errors[] = "{$label} : date invalide (format attendu JJ/MM/AAAA).";
+                } elseif ($date->isFuture()) {
+                    // A contact cannot be in the future (last contact, GDPR clock): today, with a warning.
+                    $values[$field] = CarbonImmutable::now();
+                    $values['date_clamped'] = true;
+                    $warnings[] = self::FUTURE_DATE;
+                } else {
+                    $values[$field] = $date;
+                }
             } elseif (in_array($base, ['is_individual', 'is_referent'], true)) {
                 $bool = Values::bool($raw);
                 $bool === null ? $errors[] = "{$label} : répondez par Oui ou Non." : $values[$field] = $bool;
@@ -335,10 +387,6 @@ final class RowImporter
                 $errors[] = 'Note : ce champ est obligatoire.';
             } elseif (mb_strlen($body) > Note::MAX_LENGTH) {
                 $errors[] = 'Note : le texte dépasse '.Note::MAX_LENGTH.' caractères.';
-            }
-            $date = $values['date'] ?? null;
-            if ($date instanceof CarbonImmutable && $date->isAfter(now()->addMinute())) {
-                $errors[] = 'Date : la date est dans le futur.';
             }
         }
 
@@ -558,8 +606,9 @@ final class RowImporter
 
     /**
      * A note on the fiche found by source identifier, SIRET or e-mail. Its
-     * date (if any) becomes the note's date; the last contact only moves
-     * forward. A note already present (same fiche, text and date) is skipped.
+     * date (if any) becomes the note's date (a future date is brought back
+     * to now, with a warning); the last contact only moves forward. A note
+     * already present (same fiche, text and date) is skipped.
      *
      * @param  array<string, mixed>  $values
      */
@@ -574,7 +623,8 @@ final class RowImporter
 
         $existing = Note::query()->where('notable_type', $subject->getMorphClass())->where('notable_id', $subject->getKey())
             ->where('body', $body)
-            ->when($date instanceof CarbonImmutable, fn ($q) => $q->where('created_at', $date))
+            // A date brought back to today changes at each run: the text alone identifies the note.
+            ->when($date instanceof CarbonImmutable && ! ($values['date_clamped'] ?? false), fn ($q) => $q->where('created_at', $date))
             ->exists();
         if ($existing) {
             return (new RowOutcome(ImportRow::SKIPPED))->add('info', 'Note déjà importée : ligne ignorée.')->subject($subject);

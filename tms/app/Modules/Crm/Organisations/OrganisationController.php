@@ -8,6 +8,8 @@ use App\Modules\Core\References\ReferenceList;
 use App\Modules\Core\Users\User;
 use App\Modules\Crm\Affiliations\Affiliation;
 use App\Modules\Crm\Duplicates\DuplicateGuard;
+use App\Modules\Crm\Export\ExportCell;
+use App\Modules\Crm\Opportunities\OpportunityRows;
 use App\Modules\Crm\Permissions;
 use App\Modules\Crm\Search\CrmResource;
 use App\Modules\Crm\Search\ListExtras;
@@ -153,11 +155,13 @@ class OrganisationController extends Controller
             'affiliations' => $affiliations->whereNull('ended_on')->map($affiliationRow)->values()->all(),
             'formerAffiliations' => $affiliations->whereNotNull('ended_on')->sortByDesc(fn (Affiliation $a) => $a->ended_on)->map($affiliationRow)->values()->all(),
             'decisionRoles' => FormOptions::reference(ReferenceList::DecisionRole),
+            'opportunities' => OpportunityRows::forFiche($organisation, $user),
             'similar' => $user->can(Permissions::MERGE) ? $this->duplicates->similarTo($organisation, $user) : [],
             'can' => [
                 'merge' => ! $organisation->trashed() && $user->can(Permissions::MERGE),
                 'affiliate' => ! $organisation->trashed() && $user->can('update', $organisation),
                 'createPerson' => $user->can(Permissions::CREATE),
+                'createOpportunity' => ! $organisation->trashed() && $user->can(Permissions::CREATE),
                 'update' => ! $organisation->trashed() && $user->can('update', $organisation),
                 'delete' => ! $organisation->trashed() && $user->can('delete', $organisation),
                 'restore' => $organisation->trashed() && $user->can('restore', $organisation),
@@ -324,7 +328,7 @@ class OrganisationController extends Controller
     {
         $export = $resource->export();
 
-        return collect(array_keys($export->columns()))->mapWithKeys(fn (string $c) => [$c => $export->value($organisation, $c)])->all();
+        return collect(array_keys($export->columns()))->mapWithKeys(fn (string $c) => [$c => ExportCell::display($export->value($organisation, $c))])->all();
     }
 
     /**

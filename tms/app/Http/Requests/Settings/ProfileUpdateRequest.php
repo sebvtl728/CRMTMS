@@ -29,6 +29,8 @@ class ProfileUpdateRequest extends FormRequest
                 Rule::unique(User::class)->where('tenant_id', $this->user()->tenant_id)->ignore($this->user()->id),
             ],
 
+            'daily_digest' => ['sometimes', 'boolean'],
+
             // The e-mail is the login identity: changing it needs the current password.
             'current_password' => [
                 Rule::requiredIf(fn () => $this->string('email')->value() !== $this->user()->email),

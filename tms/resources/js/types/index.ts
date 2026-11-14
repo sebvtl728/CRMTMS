@@ -21,11 +21,15 @@ export interface NavItem {
     url: string;
     icon?: LucideIcon | null;
     isActive?: boolean;
+    /** Count shown beside the entry (hidden at 0). */
+    badge?: number;
 }
 
 export interface SharedData {
     name: string;
     auth: Auth;
+    /** Menu badge of « À faire »: overdue + today. */
+    todo_count: number;
     [key: string]: unknown;
 }
 

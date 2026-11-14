@@ -3,6 +3,7 @@
 namespace App\Modules\Core\Users;
 
 use App\Modules\Core\Tenancy\Tenant;
+use App\Modules\Core\Tenancy\TenantUrl;
 
 /**
  * Absolute activation URL printed by the console commands (no request, so no
@@ -13,14 +14,8 @@ final class ActivationLink
 {
     public static function url(string $plainToken, ?Tenant $tenant = null, ?string $domain = null): string
     {
-        $domain = $domain !== null && $domain !== '' ? $domain : null;
-
-        if ($domain === null && $tenant !== null && config('tms.mode') === 'multi') {
-            $domain = $tenant->domains()->orderBy('host')->value('host');
-        }
-
-        $base = $domain !== null ? 'https://'.mb_strtolower(trim($domain)) : rtrim((string) config('app.url'), '/');
-
-        return $base.route('activation.show', $plainToken, false);
+        // Explicit organisme only (a console command has no current one).
+        return ($tenant === null && ($domain === null || $domain === '') ? rtrim((string) config('app.url'), '/') : TenantUrl::root($tenant, $domain))
+            .route('activation.show', $plainToken, false);
     }
 }

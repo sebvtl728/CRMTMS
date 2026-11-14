@@ -4,18 +4,23 @@ namespace App\Modules\Crm\Gdpr;
 
 use App\Modules\Core\References\ReferenceItem;
 use App\Modules\Core\Users\User;
+use App\Modules\Crm\Activities\Activity;
 use App\Modules\Crm\Affiliations\Affiliation;
+use App\Modules\Crm\Opportunities\Opportunity;
 use App\Modules\Crm\Organisations\Organisation;
 use App\Modules\Crm\People\Person;
 use App\Modules\Crm\Timeline\Attachment;
 use App\Modules\Crm\Timeline\Note;
 use App\Modules\Crm\Visibility\CrmVisibility;
 use DateTimeInterface;
+use Illuminate\Support\Facades\DB;
 
 /**
  * Everything the organisme holds about a person (right of access and
  * portability, GDPR art. 15 and 20): identity, contact details, links with
- * the entreprise names, notes, consents, attachments (listed, not their
+ * the entreprise names, opportunities (as particulier or contact: title,
+ * stage, amount), actions (hers or on her opportunities as particulier:
+ * type, subject, status, result, report, place), notes, consents, attachments (listed, not their
  * content), DAS and dates. Trashed items are included (still held), flagged.
  * Fiches merged into her are listed by id (their data now lives here).
  * Visibility rules apply: for a restricted viewer (Responsable DAS), only
@@ -38,6 +43,16 @@ final class PersonDataExport
             ->orderBy('created_at')->get();
         $notes = Note::withTrashed()->where('notable_type', $person->getMorphClass())->where('notable_id', $person->id)->orderBy('created_at')->get();
         $files = Attachment::withTrashed()->where('notable_type', $person->getMorphClass())->where('notable_id', $person->id)->orderBy('created_at')->get();
+        $opportunities = Opportunity::withTrashed()->with('stage')
+            ->where(fn ($q) => $q->where('person_id', $person->id)
+                ->orWhereIn('id', DB::table('opportunity_contacts')->select('opportunity_id')->where('person_id', $person->id)))
+            ->when($viewer !== null, fn ($q) => CrmVisibility::opportunities($q, $viewer))
+            ->orderByRaw('person_id is null')->orderBy('created_at')->orderBy('id')->get();
+        $actions = Activity::withTrashed()->with(['type', 'result'])
+            ->where(fn ($q) => $q->where('person_id', $person->id)
+                ->orWhereIn('opportunity_id', DB::table('opportunities')->select('id')->where('person_id', $person->id)))
+            ->when($viewer !== null, fn ($q) => CrmVisibility::activities($q, $viewer))
+            ->orderBy('happened_at')->orderBy('id')->get();
         $consents = Consent::query()->where('person_id', $person->id)->orderBy('recorded_at')->get();
 
         return [
@@ -80,6 +95,23 @@ final class PersonDataExport
                 'debut' => $a->started_on?->toDateString(),
                 'fin' => $a->ended_on?->toDateString(),
                 'supprime' => $a->trashed(),
+            ])->all(),
+            'opportunites' => $opportunities->map(fn (Opportunity $o) => [
+                'titre' => $o->title,
+                'role' => $o->person_id === $person->id ? 'Compte (particulier)' : 'Contact',
+                'etape' => $label($o->stage),
+                'montant' => $o->amount,
+                'supprimee' => $o->trashed(),
+            ])->all(),
+            'actions' => $actions->map(fn (Activity $a) => [
+                'date' => $date($a->done_at ?? $a->due_at),
+                'type' => $label($a->type),
+                'objet' => $a->subject,
+                'statut' => Activity::STATUS_LABELS[$a->status()],
+                'resultat' => $label($a->result),
+                'compte_rendu' => $a->report,
+                'lieu' => $a->location,
+                'supprimee' => $a->trashed(),
             ])->all(),
             'notes' => $notes->map(fn (Note $n) => [
                 'date' => $date($n->created_at),

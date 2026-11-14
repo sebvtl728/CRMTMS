@@ -3,18 +3,22 @@
 namespace App\Http\Controllers;
 
 use App\Modules\Core\Users\User;
+use App\Modules\Crm\Dashboard\CommercialSummary;
 use App\Modules\Crm\Organisations\Organisation;
 use App\Modules\Crm\People\Person;
 use App\Modules\Crm\Permissions;
 use App\Modules\Crm\Search\RecentViews;
 use App\Modules\Crm\Visibility\CrmVisibility;
+use Carbon\CarbonImmutable;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
 
 /**
- * « Accueil »: shortcuts, counters and the last fiches the user opened.
- * Counters follow what the user may see (Responsable DAS: his DAS only).
+ * « Accueil »: shortcuts, counters, the commercial summary (« Mes relances »,
+ * weighted pipeline of the month, next meetings) and the last fiches the
+ * user opened. Everything follows what the user may see (Responsable DAS:
+ * his DAS only); nothing CRM without crm.view.
  */
 class DashboardController extends Controller
 {
@@ -30,6 +34,7 @@ class DashboardController extends Controller
                 'organisations' => CrmVisibility::organisations(Organisation::query(), $user)->count(),
                 'people' => CrmVisibility::people(Person::query(), $user)->count(),
             ] : null,
+            'commercial' => $crm ? CommercialSummary::for($user, CarbonImmutable::now()) : null,
         ]);
     }
 }

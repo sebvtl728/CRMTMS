@@ -55,6 +55,14 @@ Les tests s'exécutent en tant que `tms_app` sur la base `tms_test` ; le schéma
 `pgsql_owner` (voir `tests/RefreshDatabaseAsOwner.php`). Les assets doivent avoir été
 compilés (`npm run build`).
 
+Les tests de volume (groupe `slow` : import de 10 000 lignes en moins de 60 s, recherche sur
+50 000 fiches en moins d'une seconde sous RLS) sont exclus de la commande ci-dessus
+(`phpunit.xml`) ; la CI les lance à part :
+
+```bash
+docker compose exec app php artisan test --group=slow
+```
+
 ### Tests de bout en bout (Playwright)
 
 Le test `tests/e2e/admin.spec.ts` rejoue le parcours d'un administrateur dans un vrai navigateur : lien
@@ -63,8 +71,13 @@ invitation d'un utilisateur, journal d'audit. Il enregistre la session de l'admi
 (`tests/e2e/.auth/admin.json`, ignoré par git) que réutilise `tests/e2e/crm.spec.ts` : import d'un CSV de
 3 lignes par l'assistant « Importer », fiches visibles dans la liste, annulation de l'import, puis le parcours
 d'une fiche (création, interlocuteur, note, avertissement de doublon et fusion, recherche globale, export Excel)
-et son affichage sur téléphone (375 px). Le service Sirene n'est pas appelé : son échec est simplement constaté
-(les deux fichiers se lancent donc ensemble, dans cet ordre).
+et son affichage sur téléphone (375 px). Le service Sirene n'est pas appelé : son échec est simplement constaté.
+`tests/e2e/pipeline.spec.ts` couvre le pipeline : opportunité créée depuis une entreprise, glissée jusqu'à
+« Proposition » dans le kanban, refus de « Perdu » sans motif puis acceptation avec motif, saisie rapide d'un appel
+avec relance le lendemain, relance visible dans « À faire » et dans le planning, menu « Commercial », accueil
+(pipeline pondéré du mois), puis un compte rendu de rendez-vous au téléphone (375 × 812). `tests/e2e/report.spec.ts`
+rejoue le compte rendu d'un rendez-vous du jour en moins de 6 gestes. Tous réutilisent la session de
+l'administrateur : les fichiers se lancent ensemble, dans l'ordre alphabétique (un seul processus).
 
 Il s'exécute sur une pile dédiée (`compose.e2e.yaml` : application `app-e2e`, base `tms_e2e`, organisme `e2e`,
 port **8081**, assets compilés) : la base et les données de développement ne sont jamais touchées. Prérequis :
@@ -72,10 +85,14 @@ la pile de développement démarrée (`docker compose up -d`, Colima inclus) et 
 
 ```bash
 cd tms
-npm install
+npm ci                            # sur la machine hôte, à refaire après chaque changement de package-lock.json
 npx playwright install chromium   # une seule fois : télécharge le navigateur (~100 Mo)
-npm run e2e                       # compile les assets, recrée tms_e2e, installe l'organisme, lance le test
+npm run e2e                       # compile les assets, recrée tms_e2e, installe l'organisme, lance les tests
 ```
+
+Le conteneur `vite` a son propre `node_modules` (volume Docker) : une dépendance ajoutée par
+`docker compose run --rm vite npm install …` n'est pas présente sur l'hôte. Si `npm run e2e` échoue à la
+compilation (« Could not resolve "@dnd-kit/core" », par exemple), relancez `npm ci` sur l'hôte.
 
 `tests/e2e/prepare.sh` (appelé par `tests/e2e/global-setup.ts`) démarre la pile e2e, recrée la base `tms_e2e`,
 applique les migrations et exécute `tms:install` ; le lien d'activation obtenu est transmis au test. En cas
@@ -325,7 +342,12 @@ ops/migrate.sh   # rôle propriétaire dans un conteneur éphémère uniquement
 
 Seul Caddy publie des ports (80/443) ; PostgreSQL et Redis ne sont pas exposés. Caddy est la seule
 adresse de confiance pour `X-Forwarded-*` (`TRUSTED_PROXIES`), ce qui active HTTPS/HSTS et l'IP cliente
-correcte. `/health` est aussi servi en HTTP interne (conteneur `caddy`, port 8081, non publié).
+correcte. `compose.prod.yaml` la renseigne avec l'adresse fixe de Caddy (`TMS_CADDY_IP`, `172.29.250.10` par
+défaut) ; **toute installation derrière Caddy ou un autre proxy doit la renseigner**. Sans elle, l'application voit
+l'adresse du proxy pour tous les visiteurs : chaque limite par adresse IP (connexion, lien d'activation,
+vérification d'e-mail, flux iCal « Mon agenda », page de santé, visiteurs non connectés en général) est alors partagée par
+tout le monde et se déclenche pour tous à la fois, et le journal d'audit note l'adresse du proxy. Ne jamais
+mettre `*`. `/health` est aussi servi en HTTP interne (conteneur `caddy`, port 8081, non publié).
 
 #### Sauvegardes et restauration
 

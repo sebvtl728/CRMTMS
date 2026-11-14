@@ -31,7 +31,7 @@ function exRows(TestResponse $response): array
     $rows = [];
     foreach ($reader->getSheetIterator() as $sheet) {
         foreach ($sheet->getRowIterator() as $row) {
-            $rows[] = array_map(fn ($v) => (string) $v, $row->toArray());
+            $rows[] = array_map(fn ($v) => $v instanceof DateTimeInterface ? $v->format('d/m/Y') : (string) $v, $row->toArray());
         }
         break;
     }
@@ -147,6 +147,20 @@ it('exports people with french headers, phones as shown on screen, organisations
 
     expect($rows[0])->toBe(['Civilité', 'Nom', 'Prénom', 'Entreprises', 'Mobile', 'E-mail', 'Création'])
         ->and($rows[1])->toBe(['Mme', 'Durand', 'Léa', 'Hôtel du Lac', '06 12 34 56 78', 'lea@x.fr', '02/01/2026']);
+});
+
+it('exports the source system, source identifier and legal basis of people', function () {
+    $this->actingAs(commercial());
+    makePerson('Durand', ['source_system' => 'Formevol', 'source_id' => 'F-0042']);
+    makePerson('Martin', ['is_individual' => true]);
+
+    $rows = exRows($this->get('/crm/people/export?columns[]=last_name&columns[]=source_system&columns[]=source_id&columns[]=legal_basis&sort=last_name'));
+
+    expect($rows)->toBe([
+        ['Nom', 'Système source', 'Identifiant source', 'Base légale'],
+        ['Durand', 'Formevol', 'F-0042', 'Intérêt légitime'],
+        ['Martin', '', '', 'Consentement'],
+    ]);
 });
 
 it('audits the export with filters and row count but no row content', function () {
