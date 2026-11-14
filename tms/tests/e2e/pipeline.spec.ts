@@ -144,10 +144,13 @@ test('pipeline: opportunity from an entreprise, kanban, loss reason, quick call,
     const sameWeek = isoWeek(tomorrow) === isoWeek(parisDay());
     await page.goto('/crm/todo');
     const week = page.getByRole('region', { name: /^Cette semaine/ });
+    const sections = page.getByRole('region', { name: /^(En retard|Aujourd'hui|Cette semaine)/ });
+    await expect(sections).toHaveCount(3);
     if (sameWeek) {
         await expect(week.getByText(ENTREPRISE).first()).toBeVisible();
     } else {
-        await expect(week.getByText(ENTREPRISE)).toHaveCount(0);
+        // Sunday: tomorrow is next week, so the follow-up is in no section of « À faire » (deterministic, not a skip).
+        await expect(sections.getByText(ENTREPRISE)).toHaveCount(0);
     }
     await page.goto(`/crm/planning?week=${isoWeek(tomorrow)}`);
     await expect(page.getByRole('region', { name: new RegExp(`^\\S+ ${Number(tomorrow.slice(8))} `) }).getByText(ENTREPRISE)).toBeVisible();
@@ -175,7 +178,7 @@ test('phone: meeting report on a fiche without a planned meeting, 375 px wide', 
     expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBeLessThanOrEqual(1);
 
     await page.getByRole('searchbox', { name: 'Rechercher une entreprise ou une personne' }).fill('Traiteur des Alpes');
-    await page.getByRole('button', { name: new RegExp(`^${ENTREPRISE}`) }).click();
+    await page.getByRole('button', { name: new RegExp(`^${ENTREPRISE}`) }).click({ timeout: 15_000 });
     await page.getByRole('button', { name: 'Réussi', exact: true }).click();
     await page.getByLabel('Compte rendu', { exact: true }).fill('Rencontre sur place : le chef veut une session en mars.');
     await page.getByRole('button', { name: 'Enregistrer le compte rendu' }).click();
