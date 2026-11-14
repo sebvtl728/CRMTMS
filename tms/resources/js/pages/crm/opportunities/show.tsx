@@ -29,7 +29,7 @@ interface ShowProps {
     opportunity: OpportunityData;
     history: { id: string; from: string | null; to: string | null; by: string | null; at: string }[];
     activities: ActivityRow[];
-    trainings: { lines: TrainingLine[]; estimate: TrainingEstimate };
+    training_summary: { lines: TrainingLine[]; estimate: TrainingEstimate };
     stages: StageOption[];
     lossReasons: Option[];
     can: { update: boolean; delete: boolean };
@@ -45,7 +45,16 @@ function Item({ label, children }: { label: string; children: React.ReactNode })
     );
 }
 
-export default function OpportunityShow({ opportunity: o, history, activities, trainings, stages, lossReasons, can, status }: ShowProps) {
+export default function OpportunityShow({
+    opportunity: o,
+    history,
+    activities,
+    training_summary: trainings,
+    stages,
+    lossReasons,
+    can,
+    status,
+}: ShowProps) {
     const [moving, setMoving] = useState(false);
     const [confirming, setConfirming] = useState(false);
 

@@ -83,7 +83,7 @@ class OpportunityController extends Controller
                 'contact_ids' => $person !== null ? [$person->id] : [],
             ],
             'contactOptions' => OpportunityAccounts::contactOptions($organisation?->id, $person?->id),
-            'options' => [...$this->formOptions(null), 'trainings' => OpportunityTrainings::options(null, $person !== null)],
+            'options' => [...$this->formOptions(null), 'training' => OpportunityTrainings::options(null, $person !== null)],
         ]);
     }
 
@@ -142,7 +142,7 @@ class OpportunityController extends Controller
                 ->where('opportunity_id', $opportunity->id)
                 ->orderByDesc('happened_at')->orderByDesc('id')->limit(100)->get()
                 ->map(fn (Activity $a) => ActivityRows::row($a))->all(),
-            'trainings' => [
+            'training_summary' => [
                 'lines' => OpportunityTrainings::lines($opportunity),
                 'estimate' => OpportunityTrainings::proposal($opportunity),
             ],
@@ -181,7 +181,7 @@ class OpportunityController extends Controller
                 : ['type' => 'organisation', 'id' => $opportunity->organisation_id, 'name' => $opportunity->organisation?->name, 'individual' => false],
             'defaults' => null,
             'contactOptions' => OpportunityAccounts::contactOptions($opportunity->organisation_id, $opportunity->person_id),
-            'options' => [...$this->formOptions($opportunity), 'trainings' => OpportunityTrainings::options($opportunity, $opportunity->isIndividual())],
+            'options' => [...$this->formOptions($opportunity), 'training' => OpportunityTrainings::options($opportunity, $opportunity->isIndividual())],
         ]);
     }
 

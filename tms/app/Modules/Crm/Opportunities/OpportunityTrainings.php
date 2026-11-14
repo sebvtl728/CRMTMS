@@ -219,7 +219,7 @@ final class OpportunityTrainings
             'training_lines' => ['sometimes', 'array', 'max:'.self::MAX_LINES],
             'training_lines.*' => ['array'],
             'training_lines.*.training_id' => ['bail', 'required', 'string', 'distinct', self::available($kept)],
-            'training_lines.*.quantity' => ['required', 'numeric', 'decimal:0,2', 'min:0.01', 'max:'.self::MAX_QUANTITY],
+            'training_lines.*.quantity' => ['required', 'numeric', 'regex:/^\d+(\.\d{1,2})?$/', 'decimal:0,2', 'min:0.01', 'max:'.self::MAX_QUANTITY],
         ];
     }
 
@@ -237,6 +237,7 @@ final class OpportunityTrainings
             'training_lines.*.training_id.distinct' => 'Cette formation est déjà dans la liste.',
             'training_lines.*.quantity.required' => 'Indiquez une quantité.',
             'training_lines.*.quantity.numeric' => 'Indiquez une quantité, par exemple 1 ou 2,5.',
+            'training_lines.*.quantity.regex' => 'Indiquez une quantité, par exemple 1 ou 2,5.',
             'training_lines.*.quantity.decimal' => 'Indiquez au plus deux décimales.',
             'training_lines.*.quantity.min' => 'La quantité doit être supérieure à 0.',
             'training_lines.*.quantity.max' => 'La quantité ne peut pas dépasser 9 999,99.',

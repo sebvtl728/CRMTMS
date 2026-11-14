@@ -88,12 +88,12 @@ it('stores the trainings of an entreprise opportunity and proposes their amount 
 
     $this->get("/crm/opportunities/{$opportunity->id}")->assertOk()
         ->assertInertia(fn (Assert $page) => $page
-            ->has('trainings.lines', 2)
-            ->where('trainings.lines.0.title', 'HACCP')
-            ->where('trainings.lines.0.quantity', '3.00')
-            ->where('trainings.lines.0.price_cents', 120000)
-            ->where('trainings.estimate.amount_cents', 440000)
-            ->where('trainings.estimate.missing', []));
+            ->has('training_summary.lines', 2)
+            ->where('training_summary.lines.0.title', 'HACCP')
+            ->where('training_summary.lines.0.quantity', '3.00')
+            ->where('training_summary.lines.0.price_cents', 120000)
+            ->where('training_summary.estimate.amount_cents', 440000)
+            ->where('training_summary.estimate.missing', []));
 });
 
 it('uses the particulier price for a particulier and warns of a missing price', function () {
@@ -127,11 +127,11 @@ it('keeps an inactive training on the opportunity that has it but refuses to add
     $old->update(['is_active' => false]);
 
     $this->get("/crm/opportunities/{$opportunity->id}")->assertOk()
-        ->assertInertia(fn (Assert $page) => $page->where('trainings.lines.0.title', 'Ancienne')->where('trainings.lines.0.is_active', false));
+        ->assertInertia(fn (Assert $page) => $page->where('training_summary.lines.0.title', 'Ancienne')->where('training_summary.lines.0.is_active', false));
     $this->get("/crm/opportunities/{$opportunity->id}/edit")->assertOk()
         ->assertInertia(fn (Assert $page) => $page
             ->where('opportunity.training_lines.0.training_id', $old->id)
-            ->where('options.trainings', fn ($options) => collect($options)->pluck('label')->all() === ['Ancienne (inactive)', 'HACCP']));
+            ->where('options.training', fn ($options) => collect($options)->pluck('label')->all() === ['Ancienne (inactive)', 'HACCP']));
 
     // Kept (quantity changed) on the opportunity that already has it.
     $this->put("/crm/opportunities/{$opportunity->id}", otPayload($opportunity, ['training_lines' => otLines([[$old, '2'], [$haccp, '1']])]))->assertSessionHasNoErrors();
@@ -148,7 +148,7 @@ it('keeps an inactive training on the opportunity that has it but refuses to add
     expect(OpportunityTraining::query()->where('opportunity_id', $other->id)->count())->toBe(0);
 
     $this->get('/crm/opportunities/create?organisation='.$organisation->id)
-        ->assertInertia(fn (Assert $page) => $page->where('options.trainings', fn ($options) => collect($options)->pluck('label')->all() === ['HACCP']));
+        ->assertInertia(fn (Assert $page) => $page->where('options.training', fn ($options) => collect($options)->pluck('label')->all() === ['HACCP']));
 });
 
 it('refuses to delete a training an opportunity uses, even a deleted opportunity', function () {
@@ -201,6 +201,9 @@ it('validates the lines in french', function () {
 
     $put([['training_id' => $haccp->id, 'quantity' => '0']])->assertSessionHasErrors(['training_lines.0.quantity' => 'La quantité doit être supérieure à 0.']);
     $put([['training_id' => $haccp->id, 'quantity' => 'trois']])->assertSessionHasErrors(['training_lines.0.quantity' => 'Indiquez une quantité, par exemple 1 ou 2,5.']);
+    $put([['training_id' => $haccp->id, 'quantity' => '+5']])->assertSessionHasErrors(['training_lines.0.quantity' => 'Indiquez une quantité, par exemple 1 ou 2,5.']);
+    $put([['training_id' => $haccp->id, 'quantity' => '.5']])->assertSessionHasErrors(['training_lines.0.quantity' => 'Indiquez une quantité, par exemple 1 ou 2,5.']);
+    $put([['training_id' => $haccp->id, 'quantity' => '1,234']])->assertSessionHasErrors('training_lines.0.quantity');
     $put([['training_id' => $haccp->id, 'quantity' => '10000']])->assertSessionHasErrors(['training_lines.0.quantity' => 'La quantité ne peut pas dépasser 9 999,99.']);
     $put([['training_id' => $haccp->id, 'quantity' => '1'], ['training_id' => $haccp->id, 'quantity' => '2']])
         ->assertSessionHasErrors(['training_lines.1.training_id' => 'Cette formation est déjà dans la liste.']);
@@ -254,9 +257,14 @@ it('filters the list by training and exports the trainings', function () {
     $this->get('/crm/opportunities')->assertInertia(fn (Assert $page) => $page
         ->where('filters.training', null)
         ->where('options.training', fn ($options) => collect($options)->pluck('label')->all() === ['HACCP', 'Hygiène']));
+    $kanban = fn (string $query) => collect($this->get('/crm/opportunities/kanban?'.$query)->original->getData()['page']['props']['columns'])
+        ->flatMap(fn (array $column) => array_column($column['cards'], 'title'))->sort()->values()->all();
+    expect($kanban('training='.$haccp->id))->toBe(['Alpha'])
+        ->and($kanban('training='.$hygiene->id))->toBe(['Alpha', 'Bravo'])
+        ->and($kanban(''))->toBe(['Alpha', 'Bravo', 'Charlie']);
     $this->get('/crm/opportunities/kanban?training='.$haccp->id)->assertOk()->assertInertia(fn (Assert $page) => $page->where('filters.training', $haccp->id));
 
-    $response = $this->get('/crm/opportunities/export?columns[]=title&columns[]=trainings&sort=created_at');
+    $response = $this->get('/crm/opportunities/export?columns[]=title&columns[]=training_titles&sort=created_at');
     $response->assertOk();
     $path = tempnam(sys_get_temp_dir(), 'xlsx');
     file_put_contents($path.'.xlsx', $response->streamedContent());

@@ -14,7 +14,7 @@ use Illuminate\Database\Eloquent\Model;
 final class OpportunityExport implements ExportResource
 {
     /** @var array<string, string> titles of the trainings met, by id (one lookup per training) */
-    private array $trainingTitles = [];
+    private array $titles = [];
 
     public function fileName(): string
     {
@@ -33,7 +33,7 @@ final class OpportunityExport implements ExportResource
             'account' => 'Compte',
             'target' => 'Type de compte',
             'das' => 'DAS',
-            'trainings' => 'Formations',
+            'training_titles' => 'Formations',
             'stage' => 'Étape',
             'probability' => 'Probabilité (%)',
             'amount' => 'Montant (€)',
@@ -68,7 +68,7 @@ final class OpportunityExport implements ExportResource
             'account' => $model->isIndividual() ? $model->person?->fullName() : $model->organisation?->name,
             'target' => $model->isIndividual() ? 'Particulier' : 'Entreprise',
             'das' => $model->das?->label,
-            'trainings' => $this->trainings($model),
+            'training_titles' => $this->trainingTitles($model),
             'stage' => $model->stage?->label,
             'probability' => ExportCell::integer($model->probability),
             'amount' => ExportCell::amount($model->amount),
@@ -88,10 +88,10 @@ final class OpportunityExport implements ExportResource
     /**
      * Titles of its trainings, in order, joined by « ; ».
      */
-    private function trainings(Opportunity $opportunity): ?string
+    private function trainingTitles(Opportunity $opportunity): ?string
     {
         $titles = $opportunity->trainingLines
-            ->map(fn (OpportunityTraining $line): string => $this->trainingTitles[$line->training_id] ??= app(Trainings::class)->find($line->training_id)->title ?? '')
+            ->map(fn (OpportunityTraining $line): string => $this->titles[$line->training_id] ??= app(Trainings::class)->find($line->training_id)->title ?? '')
             ->filter(fn (string $t) => $t !== '')->values()->all();
 
         return $titles === [] ? null : implode(' ; ', $titles);

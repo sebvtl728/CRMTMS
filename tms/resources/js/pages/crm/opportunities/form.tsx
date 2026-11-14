@@ -54,7 +54,7 @@ interface FormProps {
         priority: Option[];
         funding_mode: Option[];
         responsible: Option[];
-        trainings: TrainingOption[];
+        training: TrainingOption[];
     };
 }
 
@@ -311,7 +311,7 @@ export default function OpportunityFormPage({ opportunity, account, defaults, co
 
                         <OpportunityTrainingsField
                             lines={data.training_lines}
-                            options={options.trainings}
+                            options={options.training}
                             errors={errors as Record<string, string | undefined>}
                             opportunityId={opportunity?.id ?? null}
                             onChange={(lines) => setData('training_lines', lines)}
