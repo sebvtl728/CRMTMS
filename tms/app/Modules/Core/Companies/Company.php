@@ -41,6 +41,11 @@ use Illuminate\Support\Facades\DB;
  * @property string|null $email
  * @property string|null $phone
  * @property bool $is_default
+ * @property string|null $logo_path private disk, set by CompanyBranding only
+ * @property string $quote_prefix ^[A-Z0-9]{1,10}$
+ * @property int $quote_validity_days 1 to 365
+ * @property string|null $quote_terms
+ * @property string|null $quote_footer
  * @property Carbon|null $deleted_at
  */
 #[UseFactory(CompanyFactory::class)]
@@ -55,7 +60,16 @@ class Company extends Model
         'siret', 'rcs_city', 'vat_number', 'vat_regime', 'nda_number',
         'address_line1', 'address_line2', 'address_postal_code', 'address_city', 'address_country',
         'email', 'phone', 'is_default',
+        'quote_prefix', 'quote_validity_days', 'quote_terms', 'quote_footer',
     ];
+
+    /**
+     * The logo has its own journal events (CompanyBranding: company.logo_changed /
+     * company.logo_deleted), which also cover a replacement under the same name.
+     *
+     * @var list<string>
+     */
+    protected array $auditIgnore = ['logo_path'];
 
     /** @var array<string, mixed> */
     protected $attributes = [
@@ -64,6 +78,8 @@ class Company extends Model
         'capital_variable' => false,
         'address_country' => 'FR',
         'is_default' => false,
+        'quote_prefix' => 'DEV',
+        'quote_validity_days' => 30,
     ];
 
     protected static function booted(): void
@@ -100,6 +116,7 @@ class Company extends Model
             'vat_regime' => VatRegime::class,
             'capital_variable' => 'boolean',
             'is_default' => 'boolean',
+            'quote_validity_days' => 'integer',
         ];
     }
 }

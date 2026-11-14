@@ -10,4 +10,6 @@ Route::middleware(['auth', 'can:companies.manage'])->prefix('admin/companies')->
     Route::post('/', [CompanyController::class, 'store'])->name('store');
     Route::get('{company}/edit', [CompanyController::class, 'edit'])->name('edit');
     Route::put('{company}', [CompanyController::class, 'update'])->name('update');
+    Route::post('{company}/logo', [CompanyController::class, 'storeLogo'])->name('logo.store');
+    Route::delete('{company}/logo', [CompanyController::class, 'destroyLogo'])->name('logo.destroy');
 });
