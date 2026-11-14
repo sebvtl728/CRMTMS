@@ -40,6 +40,16 @@ Tous ces chiffres respectent votre périmètre : un Responsable de DAS n'y compt
 
 Seul le **nom** est obligatoire. Pour rattacher quelqu'un à une entreprise, ouvrez la fiche de l'entreprise, onglet **Interlocuteurs**, puis **Ajouter un interlocuteur** : **Nouvelle personne** ou **Personne existante** (recherche par nom, e-mail ou téléphone). Vous pouvez désigner un **référent**. **Mettre fin au rattachement** (avec une date) conserve la trace dans **Anciens rattachements** ; **Supprimer le rattachement** l'efface.
 
+### Formations d'intérêt
+
+Sur l'onglet **Informations** d'une entreprise ou d'une personne, le bloc **Formations d'intérêt** liste les formations du catalogue qui l'intéressent, regroupées par DAS. **Modifier** (même droit que pour modifier la fiche) ouvre la liste des formations **actives** du catalogue, regroupées par DAS et filtrées par défaut sur les **DAS de la fiche** : cochez **Afficher toutes les formations** pour élargir, ou tapez quelques lettres dans **Rechercher une formation**. 50 formations au plus par fiche.
+
+- Une formation **désactivée** dans le catalogue reste affichée (grisée, « inactive ») sur les fiches qui l'avaient ; elle ne peut plus être ajoutée ailleurs. Une formation d'intérêt d'une fiche ne peut pas être supprimée du catalogue (seulement désactivée).
+- **Nouvelle opportunité** depuis la fiche : ses formations d'intérêt actives sont proposées dans les **Formations** de l'opportunité (quantité 1), à garder, retirer ou compléter avant d'enregistrer.
+- Les listes **Entreprises** et **Personnes** ont un filtre **Formation d'intérêt** (enregistrable dans un filtre) et une colonne d'export **Formations d'intérêt** (intitulés séparés par « ; »).
+- Chaque changement apparaît dans l'**Historique** de la fiche : « Formations d'intérêt modifiées ».
+- Une fiche dans la corbeille ne se modifie pas : restaurez-la d'abord.
+
 ### Historique, notes et pièces jointes
 
 L'onglet **Historique** d'une fiche liste, du plus récent au plus ancien, les **notes**, les **pièces jointes**, les **actions** (appels, rendez-vous… voir plus bas), les **étapes de ses opportunités**, les **devis** (« Devis CF-2026-0001 créé / envoyé / relancé / accepté / refusé / expiré ») et les **modifications** de la fiche (qui a changé quoi et quand ; les données personnelles modifiées sont signalées sans afficher leur valeur).
@@ -242,7 +252,7 @@ Les doublons ne sont jamais cherchés dans les données d'un autre organisme.
 L'écran **Fusionner deux fiches** montre la **fiche conservée** et la **fiche absorbée**. Pour chaque champ qui diffère, choisissez la valeur à garder. Les champs identiques sont regroupés. Au clic sur **Fusionner**, une confirmation rappelle que **la fusion est définitive** :
 
 - l'historique, les notes, les pièces jointes, les rattachements, les **opportunités** et les **actions** de la fiche absorbée passent sur la fiche conservée ; si les deux fiches avaient le même rattachement, il n'en reste qu'un ;
-- les DAS sont réunis ;
+- les DAS et les **formations d'intérêt** sont réunis (une formation présente sur les deux fiches n'apparaît qu'une fois) ;
 - l'adresse de la fiche absorbée renvoie vers la fiche conservée ;
 - la fiche absorbée ne peut pas être restaurée et ses données personnelles sont effacées.
 
@@ -309,7 +319,7 @@ L'historique des imports est conservé ; le fichier d'origine (et les valeurs br
 
 ## 12. Exporter
 
-Dans les listes **Entreprises**, **Personnes**, **Opportunités**, **Devis** et **Catalogue** (sur ordinateur), **Exporter (.xlsx)** télécharge un fichier Excel de **la liste telle qu'elle est filtrée**, avec les colonnes choisies dans **Colonnes**. Un contrôle préalable refuse l'export, avec un message, s'il dépasse la limite de lignes (50 000 par défaut) ou si vous exportez trop souvent. Chaque export est tracé dans le journal d'audit. Les valeurs commençant par `=`, `+`, `-` ou `@` sont neutralisées pour ne pas être exécutées par Excel. Les montants, probabilités et dates sont de vrais nombres et de vraies dates (affichés « 1 234,50 € » et « 20/12/2026 ») : Excel peut les additionner, les trier et les filtrer. Les autres colonnes (SIRET, téléphones…) restent du texte. L'export des personnes propose aussi les colonnes **Système source**, **Identifiant source** (fiches importées) et **Base légale** (RGPD).
+Dans les listes **Entreprises**, **Personnes**, **Opportunités**, **Devis** et **Catalogue** (sur ordinateur), **Exporter (.xlsx)** télécharge un fichier Excel de **la liste telle qu'elle est filtrée**, avec les colonnes choisies dans **Colonnes**. Un contrôle préalable refuse l'export, avec un message, s'il dépasse la limite de lignes (50 000 par défaut) ou si vous exportez trop souvent. Chaque export est tracé dans le journal d'audit. Les valeurs commençant par `=`, `+`, `-` ou `@` sont neutralisées pour ne pas être exécutées par Excel. Les montants, probabilités et dates sont de vrais nombres et de vraies dates (affichés « 1 234,50 € » et « 20/12/2026 ») : Excel peut les additionner, les trier et les filtrer. Les autres colonnes (SIRET, téléphones…) restent du texte. Les exports des entreprises et des personnes proposent la colonne **Formations d'intérêt**. L'export des personnes propose aussi les colonnes **Système source**, **Identifiant source** (fiches importées) et **Base légale** (RGPD).
 
 ## 13. RGPD
 
@@ -322,8 +332,8 @@ La section **RGPD** de la fiche affiche :
 - la **Base légale** du traitement (intérêt légitime par défaut ; consentement, contrat ou obligation légale) ;
 - les **Consentements** par canal (e-mail, SMS, téléphone, prospection) : **Enregistrer un consentement** ajoute un choix daté (**Accordé** ou **Refusé ou retiré**) avec sa source. L'historique est conservé : un nouveau choix s'ajoute sans effacer les précédents ;
 - **Opposition à la prospection** : enregistre que la personne ne veut plus être sollicitée ; une mention **Opposé à la prospection** apparaît sur la fiche, dans les listes et la recherche ;
-- **Exporter ses données** : fichier contenant toutes les données que le TMS détient sur la personne, y compris ses opportunités, ses actions et ses devis (droit d'accès) ;
-- **Anonymiser maintenant** : efface définitivement les données personnelles de la fiche (nom, coordonnées, notes, pièces jointes, comptes rendus et lieux des actions, commentaire de perte des opportunités, destinataire et PDF archivé des devis…). Pour confirmer, tapez le nom de la personne. Seules des données statistiques (statut, DAS, rattachements, montants et étapes des opportunités, types et dates des actions) restent. **Cette opération est irréversible.**
+- **Exporter ses données** : fichier contenant toutes les données que le TMS détient sur la personne, y compris ses opportunités, ses actions, ses devis et ses **formations d'intérêt** (droit d'accès) ;
+- **Anonymiser maintenant** : efface définitivement les données personnelles de la fiche (nom, coordonnées, notes, pièces jointes, formations d'intérêt, comptes rendus et lieux des actions, commentaire de perte des opportunités, destinataire et PDF archivé des devis…). Pour confirmer, tapez le nom de la personne. Seules des données statistiques (statut, DAS, rattachements, montants et étapes des opportunités, types et dates des actions) restent. **Cette opération est irréversible.**
 
 > **Objet des opportunités d'un particulier** : il est **conservé** après l'anonymisation, pour les statistiques. S'il contient le nom de la personne, ce nom reste : ne mettez jamais de nom dans l'objet d'une opportunité.
 

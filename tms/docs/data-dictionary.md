@@ -203,6 +203,9 @@ Conventions communes : UUID v7, `tenant_id`, suppression logique (`deleted_at`) 
 ### `person_das` — DAS d'une personne
 `tenant_id` · `person_id` (FK, cascade) · `das_id` ; PK (`person_id`, `das_id`).
 
+### `fiche_trainings` — formations d'intérêt d'une entreprise ou d'une personne (0.4.2)
+`id`, `tenant_id` · `organisation_id` (FK, cascade, null) · `person_id` (FK, cascade, null) — CHECK `fiche_trainings_one_fiche_check` : exactement l'un des deux · `training_id` (FK `trainings`, restrict ; lue par `Catalogue\Trainings` uniquement) · `created_by` (FK `users`, null à la suppression) · `created_at`, `updated_at`. Uniques (`organisation_id`, `training_id`) et (`person_id`, `training_id`), index `training_id`. 50 au plus par fiche (validation). Journalisée (`fiche_training`, identifiants seulement) ; chaque changement de la liste est aussi journalisé sur la fiche (`crm.organisation_trainings_changed` / `crm.person_trainings_changed`, `training_ids` avant/après), affiché dans l'historique « Formations d'intérêt modifiées ». Une formation présente ici ne peut pas être supprimée du catalogue (`TrainingUsage` « fiches »). Fusion : lignes déplacées sur la fiche conservée, dédoublonnées ; anonymisation d'une personne : lignes supprimées ; export RGPD : section `formations_d_interet`.
+
 ### `affiliations` — rattachement d'une personne à une entreprise
 `id`, `tenant_id` · `person_id`, `organisation_id` (FK, cascade) · `job_title` · `decision_role_id` (FK `reference_items`, liste `decision_role`) · `work_email`, `work_phone` · `is_referent` (bool) · `started_on`, `ended_on` (dates ; un rattachement terminé est conservé comme ancien) · `created_by`, `updated_by` · horodatages, `deleted_at`. Index unique partiel (`tenant_id`, `person_id`, `organisation_id`) tant que le rattachement est actif et non supprimé : une personne n'a qu'un rattachement actif par entreprise.
 
@@ -285,7 +288,7 @@ Module `Catalogue` : le Crm ne lit jamais ces tables directement (service `Catal
 | `is_active` | bool, défaut `true` | Désactivée : plus proposée, reste sur les opportunités et devis existants |
 | `source_system`, `source_id` | string(50) / string(255), null | Identifiant d'origine (import) ; unique partiel par organisme (`trainings_source_unique`) |
 | `created_by`, `updated_by` | uuid, null (FK `users`) | |
-| `created_at`, `updated_at`, `deleted_at` | timestamp | Suppression logique ; refusée si la formation est utilisée (`Catalogue\TrainingUsage` : opportunités, lignes de devis, supprimées comprises) |
+| `created_at`, `updated_at`, `deleted_at` | timestamp | Suppression logique ; refusée si la formation est utilisée (`Catalogue\TrainingUsage` : opportunités, lignes de devis, supprimées comprises, formations d'intérêt des fiches) |
 
 Index : (`tenant_id`, `das_id`), (`tenant_id`, `title`). Journalisée (`training`). Cible d'import `trainings` (« Catalogue de formations »).
 

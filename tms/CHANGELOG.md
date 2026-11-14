@@ -5,6 +5,32 @@ Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) ; ve
 
 ## [Non publié]
 
+## [0.4.2] - 2026-11-14
+
+Ajustements après les premiers retours.
+
+### Ajouté
+
+- **Identité de l'organisme** : la barre latérale (et l'en-tête sur téléphone) affiche le **logo** et le **nom de la
+  société par défaut** (Administration › Sociétés) à la place de l'icône et du nom génériques ; le titre de l'onglet du
+  navigateur se termine par ce nom. Sans logo : icône générique ; sans société par défaut : nom de l'application.
+  Le logo est servi aux seuls utilisateurs connectés, mis en cache par le navigateur ; les pages de connexion sont
+  inchangées.
+- **Formations d'intérêt** sur les fiches entreprise et personne : choix parmi les formations actives du catalogue,
+  regroupées par DAS et filtrées par défaut sur les DAS de la fiche (« Afficher toutes les formations » pour élargir) ;
+  une formation désactivée reste affichée, grisée. Même droit que la modification de la fiche, 50 formations au plus.
+- Listes **Entreprises** et **Personnes** : filtre **Formation d'intérêt** et colonne d'export **Formations
+  d'intérêt**.
+- **Nouvelle opportunité** depuis une fiche : ses formations d'intérêt actives sont proposées dans les formations de
+  l'opportunité (modifiables).
+- Historique de la fiche : « Formations d'intérêt modifiées ».
+
+### Modifié
+
+- Une formation d'intérêt d'une fiche empêche sa suppression du catalogue (désactivation possible).
+- Fusion de fiches : les formations d'intérêt sont réunies (sans doublon). Anonymisation d'une personne : ses
+  formations d'intérêt sont supprimées. Export RGPD : section « Formations d'intérêt ».
+
 ## [0.4.1] - 2026-11-14
 
 Première publication installable du lot 1d (la 0.4.0 n'a pas pu être publiée).
