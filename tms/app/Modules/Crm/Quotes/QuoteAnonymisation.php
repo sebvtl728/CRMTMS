@@ -13,7 +13,8 @@ use Illuminate\Support\Facades\DB;
  * - Her quotes as interlocuteur of an entreprise: she is no longer the
  *   recipient; the copy keeps the entreprise (name, address) without her
  *   name nor an e-mail; the last e-mail (written to her) is cleared.
- * - Both: the archived PDF names her, it is deleted (the caller deletes the
+ * - Both: the signed copy sent back (a document signed by her or naming
+ *   her) is deleted and its columns cleared; the archived PDF names her, it is deleted (the caller deletes the
  *   files after the commit) and never rendered again (QuoteController::pdf
  *   answers 410).
  * - Any other quote whose last e-mail went to her or copied her: her
@@ -31,18 +32,20 @@ final class QuoteAnonymisation
         $now = now();
         $noMessage = ['email_message' => null, 'email_status' => null, 'email_error' => null];
 
-        $own = DB::table('quotes')->whereIn('person_id', $subjects)->get(['id', 'pdf_path']);
+        $noSigned = ['signed_path' => null, 'signed_name' => null, 'signed_at' => null];
+        $own = DB::table('quotes')->whereIn('person_id', $subjects)->get(['id', 'pdf_path', 'signed_path']);
         DB::table('quotes')->whereIn('id', $own->pluck('id')->all())->update([
             'recipient_snapshot' => null,
             'contact_person_id' => null,
             'notes' => null,
             'refusal_reason' => null,
             'pdf_path' => null,
+            ...$noSigned,
             ...$noMessage,
             'updated_at' => $now,
         ]);
 
-        $asContact = DB::table('quotes')->whereIn('contact_person_id', $subjects)->get(['id', 'pdf_path', 'recipient_snapshot']);
+        $asContact = DB::table('quotes')->whereIn('contact_person_id', $subjects)->get(['id', 'pdf_path', 'signed_path', 'recipient_snapshot']);
         foreach ($asContact as $quote) {
             $snapshot = is_string($quote->recipient_snapshot) ? json_decode($quote->recipient_snapshot, true) : null;
             if (is_array($snapshot)) {
@@ -52,6 +55,7 @@ final class QuoteAnonymisation
                 'contact_person_id' => null,
                 'recipient_snapshot' => is_array($snapshot) ? json_encode($snapshot, JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR) : null,
                 'pdf_path' => null,
+                ...$noSigned,
                 ...$noMessage,
                 'updated_at' => $now,
             ]);
@@ -61,7 +65,10 @@ final class QuoteAnonymisation
 
         return [
             'quotes' => count(array_unique([...$own->pluck('id')->all(), ...$asContact->pluck('id')->all(), ...$messaged])),
-            'files' => array_values(array_filter([...$own->pluck('pdf_path')->all(), ...$asContact->pluck('pdf_path')->all()], 'is_string')),
+            'files' => array_values(array_filter([
+                ...$own->pluck('pdf_path')->all(), ...$asContact->pluck('pdf_path')->all(),
+                ...$own->pluck('signed_path')->all(), ...$asContact->pluck('signed_path')->all(),
+            ], 'is_string')),
         ];
     }
 

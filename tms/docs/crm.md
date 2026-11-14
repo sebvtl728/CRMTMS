@@ -149,6 +149,7 @@ Les boutons **Accepté** et **Refusé** apparaissent sur un devis envoyé ou rel
 - **Accepté** (date d'acceptation : aujourd'hui par défaut, jamais dans le futur ni avant la date du devis) : le TMS propose ensuite de **passer l'opportunité en « Gagné »**, à la date d'acceptation, avec la case **Mettre le montant de l'opportunité à jour** (total HT du devis) cochée par défaut. **Ne pas changer** laisse l'opportunité telle quelle.
 - **Refusé** (date et motif facultatif) : le TMS propose de **passer l'opportunité en « Perdu »**, motif de perte obligatoire.
 - Rien n'est proposé si l'opportunité est déjà gagnée ou perdue.
+- **Devis signé** : la fenêtre **Accepté** permet de joindre, si vous l'avez, l'exemplaire signé renvoyé par le client (PDF, JPEG ou PNG, 10 Mo au maximum ; un fichier renommé ou un SVG est refusé). Sur un devis accepté, **Joindre le devis signé** (ou **Remplacer le devis signé**) l'ajoute plus tard ; le nouveau fichier remplace l'ancien. Il s'ouvre depuis la ligne **Devis signé** du devis. L'historique indique « Devis signé ajouté (CF-2026-0001) », sans le nom du fichier. L'anonymisation du particulier ou de l'interlocuteur destinataire supprime l'exemplaire signé ; son export de données indique pour chaque devis s'il y en a un.
 
 ### Expiration
 

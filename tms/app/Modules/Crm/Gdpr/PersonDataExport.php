@@ -125,6 +125,7 @@ final class PersonDataExport
                 'role' => $q->person_id === $person->id ? 'Compte (particulier)' : 'Destinataire',
                 'statut' => $q->status->label(),
                 'total_ttc' => $q->total_ttc,
+                'devis_signe' => $q->signed_path !== null ? 'oui' : 'non',
                 'supprime' => $q->trashed(),
             ])->all(),
             'actions' => $actions->map(fn (Activity $a) => [

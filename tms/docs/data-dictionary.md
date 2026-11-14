@@ -318,6 +318,9 @@ Index : (`tenant_id`, `das_id`), (`tenant_id`, `title`). Journalisée (`training
 | `vat_exempt` | bool | Régime de la société, recopié à chaque enregistrement du brouillon, figé à l'envoi |
 | `total_ht`, `total_vat`, `total_ttc` | numeric(12,2) | Totaux calculés en centimes entiers (CHECK ≥ 0 et `total_ttc = total_ht + total_vat`) |
 | `recipient_snapshot` | jsonb, null | Destinataire figé à l'envoi (nom, adresse, « à l'attention de », e-mail) ; donnée personnelle (masquée au journal, effacée à l'anonymisation) |
+| `signed_path` | string(500), null | Exemplaire signé renvoyé par le client (devis accepté), `tenants/<id>/quotes/<quote_id>/signe.<pdf\|jpg\|png>` (stockage privé, remplacé à chaque ajout) ; null après anonymisation (fichier supprimé). Ignoré par le journal |
+| `signed_name` | string(255), null | Nom d'origine du fichier signé (donnée personnelle : masqué dans le journal) |
+| `signed_at` | timestamptz, null | Ajout de l'exemplaire signé ; évènement de journal `quote.signed_added` (type, taille, SHA-256) |
 | `pdf_path` | string, null | PDF archivé à l'envoi, `tenants/<id>/quotes/<quote_id>/<numéro>.pdf` (stockage privé) ; null après anonymisation (PDF supprimé, réponse 410) |
 | `notes` | text, null | Mentions particulières (donnée personnelle possible) |
 | `email_message` | jsonb, null | Dernier message : type, `to`, `cc`, objet, corps (pour **Renvoyer**) ; hors journal |

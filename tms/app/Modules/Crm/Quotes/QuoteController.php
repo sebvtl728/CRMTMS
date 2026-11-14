@@ -104,6 +104,11 @@ class QuoteController extends Controller
                 'accepted_on' => $quote->accepted_on?->toDateString(),
                 'refused_on' => $quote->refused_on?->toDateString(),
                 'refusal_reason' => $quote->refusal_reason,
+                'signed' => $quote->signed_path === null ? null : [
+                    'name' => $quote->signed_name,
+                    'at' => $quote->signed_at?->toIso8601String(),
+                    'url' => route('crm.quotes.signed.show', $quote),
+                ],
                 'replaced_by' => $replacedBy === null ? null : ['id' => $replacedBy->id, 'number' => $replacedBy->number],
                 'email' => $quote->email_status === null ? null : [
                     'status' => $quote->email_status,
@@ -146,6 +151,7 @@ class QuoteController extends Controller
                 'remind' => $quote->isAwaitingAnswer() && ! in_array($quote->email_status, ['pending', 'failed'], true) && $pdfAvailable && $canUpdate,
                 'resend' => $quote->email_status === 'failed' && $pdfAvailable && $canUpdate,
                 'answer' => $quote->isAwaitingAnswer() && $canUpdate,
+                'attachSigned' => $quote->status === QuoteStatus::Accepted && $canUpdate,
             ],
             // A sent quote without its archive: no PDF link, no reminder.
             'pdf_available' => $pdfAvailable,

@@ -9,6 +9,7 @@ const TRAINING = 'E2E Hygiène HACCP 2 jours';
 const ENTREPRISE = 'E2E Boulangerie du Lac';
 const OPPORTUNITY = 'E2E HACCP pour l’équipe du fournil';
 const RECIPIENT = 'direction@boulangerie-du-lac.test';
+const SIGNED_PDF = '%PDF-1.4\n1 0 obj\n<< /Type /Catalog >>\nendobj\ntrailer\n<< /Root 1 0 R >>\n%%EOF\n';
 
 /** A form post as the signed-in user (CSRF from the XSRF-TOKEN cookie); returns the final URL. */
 async function send(context: BrowserContext, request: APIRequestContext, url: string, data: Record<string, unknown>): Promise<string> {
@@ -124,6 +125,8 @@ test('quotes: training in the catalogue, amount of the opportunity, quote, pdf, 
     await page.getByRole('button', { name: 'Accepté', exact: true }).click();
     const answer = page.getByRole('dialog');
     await expect(answer.getByRole('heading', { name: `Devis ${number} accepté` })).toBeVisible();
+    // With the signed copy sent back by the customer (optional).
+    await answer.getByLabel('Devis signé (facultatif)').setInputFiles({ name: 'devis-signe.pdf', mimeType: 'application/pdf', buffer: Buffer.from(SIGNED_PDF) });
     await answer.getByRole('button', { name: 'Enregistrer' }).click();
     await expect(page.getByText(`Devis ${number} accepté.`)).toBeVisible();
     const outcome = page.getByRole('dialog');
@@ -131,6 +134,11 @@ test('quotes: training in the catalogue, amount of the opportunity, quote, pdf, 
     await expect(outcome.getByLabel(/Mettre le montant de l'opportunité à jour \(2\s400,00\s€ HT\)/)).toBeChecked();
     await outcome.getByRole('button', { name: 'Passer en « Gagné »' }).click();
     await expect(outcome).toBeHidden();
+    // The signed copy is on the quote, served inline to signed-in users.
+    await expect(page.getByRole('link', { name: 'devis-signe.pdf' })).toBeVisible();
+    const signed = await page.request.get(`${page.url().split('?')[0]}/signe`);
+    expect(signed.status()).toBe(200);
+    expect(signed.headers()['content-type']).toBe('application/pdf');
     await page.goto(opportunityUrl);
     await expect(page.getByText('Gagné', { exact: true }).first()).toBeVisible();
     await expect(page.getByText('Proposition → Gagné')).toBeVisible();

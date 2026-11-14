@@ -21,7 +21,7 @@ use Illuminate\Support\Facades\Auth;
 /**
  * « Historique » of an entreprise, a person (account or recipient) or an
  * opportunity: « Devis DEV-2026-0012 créé / envoyé / relancé / accepté /
- * refusé / expiré ». Read from the journal of the quotes (their creation and
+ * refusé / expiré », « Devis signé ajouté (DEV-2026-0012) ». Read from the journal of the quotes (their creation and
  * their status changes): every transition is there, with its author and its
  * instant, without a table of its own. Deleted quotes and quotes of a
  * deleted opportunity are left out; a Responsable DAS only sees those of
@@ -54,7 +54,7 @@ final class QuotesProvider implements TimelineProvider
         $logs = AuditLog::query()->with('user:id,name')
             ->where('auditable_type', (new Quote)->getMorphClass())
             ->whereIn('auditable_id', $quotes->selectRaw('quotes.id::text'))
-            ->where(fn ($q) => $q->where('event', 'created')
+            ->where(fn ($q) => $q->whereIn('event', ['created', 'quote.signed_added'])
                 ->orWhere(fn ($u) => $u->where('event', 'updated')->whereNotNull('new_values->status')))
             ->tap(fn ($q) => Timeline::after($q, $before, self::TYPE))
             ->orderByDesc('created_at')->orderByDesc('id')->limit($limit)->get();
@@ -62,6 +62,16 @@ final class QuotesProvider implements TimelineProvider
         $numbers = Quote::query()->whereIn('id', $logs->pluck('auditable_id')->unique()->values()->all())->pluck('number', 'id');
 
         return $logs->map(function (AuditLog $log) use ($numbers): TimelineEntry {
+            if ($log->event === 'quote.signed_added') {
+                return new TimelineEntry(
+                    self::TYPE,
+                    CarbonImmutable::instance($log->created_at),
+                    'Devis signé ajouté ('.($numbers[$log->auditable_id] ?? '—').')',
+                    null,
+                    $log->user?->name,
+                    ['id' => $log->id, 'quote_id' => $log->auditable_id, 'event' => 'signed'],
+                );
+            }
             $status = $log->event === 'created' ? QuoteStatus::Draft : (QuoteStatus::tryFrom((string) ($log->new_values['status'] ?? '')) ?? QuoteStatus::Draft);
             $number = $numbers[$log->auditable_id] ?? '—';
 

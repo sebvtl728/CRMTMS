@@ -24,6 +24,10 @@ Ajustements après les premiers retours.
 - **Nouvelle opportunité** depuis une fiche : ses formations d'intérêt actives sont proposées dans les formations de
   l'opportunité (modifiables).
 - Historique de la fiche : « Formations d'intérêt modifiées ».
+- **Devis signé** : l'exemplaire signé renvoyé par le client (PDF, JPEG ou PNG, 10 Mo au maximum, type réel vérifié)
+  se joint dans la fenêtre « Accepté » ou plus tard sur un devis accepté (**Joindre le devis signé**, **Remplacer**) ;
+  ouverture depuis le devis, mention « Devis signé ajouté » dans l'historique. Supprimé par l'anonymisation du
+  destinataire ; signalé dans l'export de ses données.
 
 ### Modifié
 
