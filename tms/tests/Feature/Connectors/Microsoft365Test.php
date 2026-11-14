@@ -488,6 +488,29 @@ it('never calls a host the policy refuses', function () {
         ->and(ConnectorRun::query()->sole()->status)->toBe('failed');
 });
 
+it('connects to the addresses it checked, never resolving the names again (dns rebinding)', function () {
+    $config = m365Config();
+    $user = commercial();
+    m365Link($user, ['expires_at' => now()->subMinute()]);
+    HostPolicy::resolveUsing(fn (string $host): array => $host === 'graph.microsoft.com' ? ['203.0.113.21', '2001:db8::21'] : ['203.0.113.20']);
+    $pinned = [];
+    m365Http();
+    Http::fake(function (Request $request, array $options) use (&$pinned) {
+        $pinned[parse_url($request->url(), PHP_URL_HOST)] = $options['curl'][CURLOPT_RESOLVE] ?? null;
+
+        return str_contains($request->url(), '/token')
+            ? Http::response(['access_token' => 'new-'.Str::random(8), 'refresh_token' => 'r-'.Str::random(8), 'expires_in' => 3599])
+            : Http::response(['id' => 'AAMkEvent1'], 201);
+    });
+
+    m365Meeting($user);
+
+    expect($pinned)->toBe([
+        'login.microsoftonline.com' => ['login.microsoftonline.com:443:203.0.113.20'],
+        'graph.microsoft.com' => ['graph.microsoft.com:443:203.0.113.21,[2001:db8::21]'],
+    ]);
+});
+
 it('disconnects outlook: tokens deleted, pushes stopped', function () {
     m365Config();
     $user = commercial();

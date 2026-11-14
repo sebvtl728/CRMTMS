@@ -92,7 +92,7 @@ Appliquée à l'enregistrement (règle `SmtpHost`, qui résout l'hôte en A/AAAA
 - **Réseaux privés** (RFC 1918, IPv6 ULA) : autorisés en mode `single` (relais sur le réseau local d'un client auto-hébergé), refusés en mode `multi`. Réglable par `TMS_ALLOW_PRIVATE_SMTP_HOSTS`.
 - Un nom qui ne résout pas est accepté à l'enregistrement mais refusé au test et à l'envoi (message français).
 - Les messages d'erreur du test sont toujours rédigés par l'application ; le texte brut du serveur (qui peut contenir l'identifiant) n'est jamais relayé.
-- Risque résiduel connu : le « DNS rebinding » (un nom qui change d'adresse entre la vérification et la connexion).
+- « DNS rebinding » (un nom qui change d'adresse entre la vérification et la connexion) : la connexion se fait sur l'**adresse vérifiée** (le nom n'est pas résolu une seconde fois) ; avec TLS, le certificat reste vérifié par rapport au nom du serveur (`peer_name`, SNI).
 
 ## Connecteur Sirene (préremplissage par SIRET)
 
@@ -100,7 +100,7 @@ Appliquée à l'enregistrement (règle `SmtpHost`, qui résout l'hôte en A/AAAA
 
 - Route : `GET /crm/sirene/{siret}` (droit `crm.create` ou `crm.update`, 30 requêtes/minute/utilisateur). 422 si le SIRET n'a pas 14 chiffres ou échoue au contrôle Luhn ; 404 « Aucune entreprise trouvée pour ce SIRET. » ; 503 « Service de l'annuaire indisponible, saisissez les informations manuellement. » (API en panne, délai de 5 s dépassé, réponse illisible, connecteur désactivé).
 - Le formulaire d'entreprise propose « Compléter depuis le SIRET » (SIRET valide) : seuls les champs **vides** sont remplis, la liste des champs complétés est affichée, l'utilisateur valide en enregistrant.
-- Adresse appelée : `base_url` doit être `https://` + hôte seul (ni identifiant, port, chemin) résolvant **uniquement vers des adresses publiques** (`HostPolicy` strict : aucun réglage ne permet un hôte local ou privé). Revérifié à chaque appel ; redirections non suivies.
+- Adresse appelée : `base_url` doit être `https://` + hôte seul (ni identifiant, port, chemin) résolvant **uniquement vers des adresses publiques** (`HostPolicy` strict : aucun réglage ne permet un hôte local ou privé). Revérifié à chaque appel ; redirections non suivies ; la requête est épinglée sur les adresses vérifiées (`HostPolicy::pinned`, `CURLOPT_RESOLVE` : aucune seconde résolution, protection contre le « DNS rebinding »). Même règle pour le connecteur Microsoft 365 (`login.microsoftonline.com`, `graph.microsoft.com`).
 - Cache (par organisme) : clé `tenant:<tenant_id>:sirene:<siret>`, 24 h pour un résultat, 1 h pour « introuvable » ; les erreurs ne sont jamais mises en cache, ni les entrepreneurs individuels (nom = personne physique).
 - Journal : seul un appel distant réel est journalisé (`connector_runs`, sens `in`), résumé « SIRET … : entreprise trouvée / aucune entreprise trouvée ». Ni raison sociale, ni adresse, ni dirigeants ne sont conservés (les dirigeants de l'API ne sont jamais lus).
 

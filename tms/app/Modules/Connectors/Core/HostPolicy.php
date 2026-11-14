@@ -16,7 +16,10 @@ use Closure;
  *    tms.connectors.allow_private_hosts (default: allowed in single mode,
  *    refused in multi mode).
  *
- * Residual risk (documented): DNS rebinding between the check and the connection.
+ * DNS rebinding (a name answering a public address to the check, then an
+ * internal one to the connection) is closed by connecting to the checked
+ * addresses: pinned() for the HTTP clients (CURLOPT_RESOLVE), the SMTP
+ * transport connects to the address itself (SmtpTransportFactory).
  */
 final class HostPolicy
 {
@@ -53,6 +56,26 @@ final class HostPolicy
         }
 
         return array_values(array_unique($ips));
+    }
+
+    /**
+     * HTTP client options making curl connect to $ips (already checked) for
+     * the host of $url, without resolving the name again. TLS still checks
+     * the certificate against the host name.
+     *
+     * @param  list<string>  $ips
+     * @return array{curl: array<int, list<string>>}
+     */
+    public static function pinned(string $url, array $ips): array
+    {
+        $host = parse_url($url, PHP_URL_HOST);
+        if (! is_string($host) || $host === '' || $ips === []) {
+            throw new \InvalidArgumentException('Nothing to pin.');
+        }
+        $port = parse_url($url, PHP_URL_PORT) ?? (parse_url($url, PHP_URL_SCHEME) === 'http' ? 80 : 443);
+        $addresses = array_map(fn (string $ip): string => str_contains($ip, ':') ? "[{$ip}]" : $ip, $ips);
+
+        return ['curl' => [CURLOPT_RESOLVE => ["{$host}:{$port}:".implode(',', $addresses)]]];
     }
 
     /**

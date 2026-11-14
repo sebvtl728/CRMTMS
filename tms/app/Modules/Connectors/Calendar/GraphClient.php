@@ -18,7 +18,7 @@ use RuntimeException;
  *
  *  - only https://login.microsoftonline.com and https://graph.microsoft.com
  *    are ever called, each time re-checked by HostPolicy (public addresses
- *    only) and without following redirects;
+ *    only, the connection pinned to them) and without following redirects;
  *  - an access token is renewed shortly before it expires, and once more
  *    when Graph answers 401; Microsoft refusing the refresh (invalid_grant)
  *    marks the link « À reconnecter » (OutlookReconnectRequired);
@@ -247,10 +247,11 @@ class GraphClient
      */
     private function send(PendingRequest $request, string $method, string $url, array $options = []): Response
     {
-        $this->guard($url);
+        $ips = $this->guard($url);
 
         try {
-            $response = $request->send($method, $url, $options);
+            // Connects to the checked addresses: no second resolution (DNS rebinding).
+            $response = $request->withOptions(HostPolicy::pinned($url, $ips))->send($method, $url, $options);
         } catch (ConnectionException) {
             throw new GraphRetryLater('Microsoft injoignable (délai dépassé ou connexion refusée).');
         }
@@ -272,8 +273,10 @@ class GraphClient
 
     /**
      * Only Microsoft's two hosts, resolving to public addresses only.
+     *
+     * @return list<string> the checked addresses of the host
      */
-    private function guard(string $url): void
+    private function guard(string $url): array
     {
         $host = parse_url($url, PHP_URL_HOST);
         if (! is_string($host) || ! in_array($host, self::ALLOWED_HOSTS, true) || parse_url($url, PHP_URL_SCHEME) !== 'https') {
@@ -283,6 +286,8 @@ class GraphClient
         if ($ips === [] || HostPolicy::violation($ips, strict: true) !== null) {
             throw new RuntimeException("Hôte {$host} refusé par la politique réseau des connecteurs.");
         }
+
+        return $ips;
     }
 
     private function retryAfter(Response $response): ?int

@@ -67,11 +67,11 @@ class SireneClient
             return ($cached['found'] ?? false) ? CompanyLookupResult::fromArray($cached['data']) : null;
         }
 
-        $baseUrl = $this->baseUrl($config);
+        $base = $this->baseUrl($config);
 
         $result = null;
-        $run = ConnectorRun::track($config, 'in', function () use ($baseUrl, $siret, &$result): string {
-            $result = $this->fetch($baseUrl, $siret);
+        $run = ConnectorRun::track($config, 'in', function () use ($base, $siret, &$result): string {
+            $result = $this->fetch($base, $siret);
 
             return "SIRET {$siret} : ".match (true) {
                 $result === null => 'aucune entreprise trouvée',
@@ -131,9 +131,11 @@ class SireneClient
     }
 
     /**
+     * @return array{0: string, 1: list<string>} the base URL and the checked addresses of its host
+     *
      * @throws SireneUnavailable when the base URL or its host is not acceptable
      */
-    private function baseUrl(ConnectorConfig $config): string
+    private function baseUrl(ConnectorConfig $config): array
     {
         $url = rtrim((string) (($config->settings['base_url'] ?? null) ?: SireneConnector::DEFAULT_BASE_URL), '/');
 
@@ -143,19 +145,22 @@ class SireneClient
             throw SireneUnavailable::generic();
         }
 
-        return $url;
+        return [$url, $ips];
     }
 
     /**
+     * @param  array{0: string, 1: list<string>}  $base  base URL and its checked addresses
      * @return CompanyLookupResult|false|null false when the establishment is
      *                                        not diffusible (statut « P »)
      *
      * @throws RuntimeException on any failure to get a usable answer
      */
-    private function fetch(string $baseUrl, string $siret): CompanyLookupResult|false|null
+    private function fetch(array $base, string $siret): CompanyLookupResult|false|null
     {
+        [$baseUrl, $ips] = $base;
         try {
             $response = Http::acceptJson()
+                ->withOptions(HostPolicy::pinned($baseUrl, $ips))
                 ->timeout(self::TIMEOUT_SECONDS)
                 ->connectTimeout(self::TIMEOUT_SECONDS)
                 ->withoutRedirecting()
