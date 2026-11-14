@@ -95,7 +95,18 @@ final class TodoQuery
             ->whereNotNull('due_at')
             ->when(! $team, fn (Builder $q) => $q->where('responsible_user_id', $user->id));
 
-        // Nothing to do on a fiche in the trash.
+        return self::onLiveFiches($query);
+    }
+
+    /**
+     * Leaves out the actions on a fiche (or opportunity) in the trash:
+     * nothing to do there (also used by the week planning).
+     *
+     * @param  Builder<Activity>  $query
+     * @return Builder<Activity>
+     */
+    public static function onLiveFiches(Builder $query): Builder
+    {
         foreach (['organisation_id' => 'organisations', 'person_id' => 'people', 'opportunity_id' => 'opportunities'] as $column => $table) {
             $query->whereRaw("(activities.{$column} is null or exists (select 1 from {$table} t where t.id = activities.{$column} and t.deleted_at is null))");
         }

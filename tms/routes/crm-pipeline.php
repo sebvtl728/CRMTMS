@@ -1,6 +1,8 @@
 <?php
 
 use App\Modules\Crm\Activities\ActivityController;
+use App\Modules\Crm\Activities\PlanningController;
+use App\Modules\Crm\Activities\QuickReportController;
 use App\Modules\Crm\Activities\TodoController;
 use App\Modules\Crm\Export\ExportController;
 use App\Modules\Crm\Opportunities\KanbanController;
@@ -24,6 +26,15 @@ Route::middleware(['auth'])->prefix('crm/opportunities')->name('crm.opportunitie
 
 // « À faire »: my actions to do (the team's for direction and admin).
 Route::middleware(['auth', 'can:crm.view'])->get('crm/todo', TodoController::class)->name('crm.todo');
+
+// « Planning »: meetings and planned calls of a week (a colleague's for direction and admin).
+Route::middleware(['auth', 'can:crm.view'])->get('crm/planning', PlanningController::class)->name('crm.planning');
+
+// « Compte rendu de RDV »: one form (phone first) — done action, stage, next follow-up.
+Route::middleware(['auth', 'can:crm.update'])->prefix('crm/report')->name('crm.report')->group(function () {
+    Route::get('/', [QuickReportController::class, 'create']);
+    Route::post('/', [QuickReportController::class, 'store'])->name('.store');
+});
 
 // Actions: quick entry from anywhere, « Fait » with the next follow-up, edit, removal.
 Route::middleware(['auth'])->prefix('crm/activities')->name('crm.activities.')->group(function () {

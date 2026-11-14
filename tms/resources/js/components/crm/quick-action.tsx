@@ -35,7 +35,7 @@ export function completeActivity(activityId: string): void {
     window.dispatchEvent(new CustomEvent<QuickActionRequest>(OPEN_EVENT, { detail: { mode: 'complete', activityId } }));
 }
 
-interface TypeOption extends Option {
+export interface TypeOption extends Option {
     code: string;
 }
 
@@ -568,7 +568,7 @@ function ReportField({ value, onChange, error }: { value: string; onChange: (v: 
     );
 }
 
-function NextFollowUp({
+export function NextFollowUp({
     types,
     typeId,
     dueAt,
@@ -649,7 +649,7 @@ function NextFollowUp({
 }
 
 /** Entreprise or person picked through the global search (at least 2 letters). */
-function FicheSearch({ onPick, hasFiche }: { onPick: (kind: 'organisation' | 'person', fiche: Fiche) => void; hasFiche: boolean }) {
+export function FicheSearch({ onPick, hasFiche }: { onPick: (kind: 'organisation' | 'person', fiche: Fiche) => void; hasFiche: boolean }) {
     const [term, setTerm] = useState('');
     const [hits, setHits] = useState<{ organisations: Fiche[]; people: Fiche[] }>({ organisations: [], people: [] });
 

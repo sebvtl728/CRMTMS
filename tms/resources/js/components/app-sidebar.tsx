@@ -6,6 +6,8 @@ import { Link, usePage } from '@inertiajs/react';
 import {
     Building2,
     CalendarCheck,
+    CalendarRange,
+    ClipboardPen,
     Columns3,
     Contact,
     Factory,
@@ -25,6 +27,8 @@ const homeNavItems: NavItem[] = [{ title: 'Accueil', url: '/dashboard', icon: La
 
 const commercialNavItems: (NavItem & { permission: string })[] = [
     { title: 'À faire', url: '/crm/todo', icon: CalendarCheck, permission: 'crm.view' },
+    { title: 'Planning', url: '/crm/planning', icon: CalendarRange, permission: 'crm.view' },
+    { title: 'Compte rendu de RDV', url: '/crm/report', icon: ClipboardPen, permission: 'crm.update' },
     { title: 'Entreprises', url: '/crm/organisations', icon: Factory, permission: 'crm.view' },
     { title: 'Personnes', url: '/crm/people', icon: Contact, permission: 'crm.view' },
     { title: 'Opportunités', url: '/crm/opportunities', icon: Handshake, permission: 'crm.view' },

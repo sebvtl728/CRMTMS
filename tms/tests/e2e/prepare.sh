@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Resets the end-to-end database and prints the administrator's activation URL
+# Resets the end-to-end database (CAP FORMATION reference lists loaded) and prints the administrator's activation URL
 # on the last line of stdout. Run from tms/. Never touches the dev database.
 set -euo pipefail
 
@@ -24,4 +24,4 @@ SQL
 "${COMPOSE[@]}" exec -T app-e2e php artisan migrate --force --database=pgsql_owner >&2
 "${COMPOSE[@]}" exec -T app-e2e php artisan tms:install \
     --tenant-name="Organisme E2E" --slug=e2e \
-    --admin-name="Admin E2E" --admin-email="$ADMIN_EMAIL" | grep -Eo 'https?://[^ ]+/activation/[A-Za-z0-9]+' | tail -n 1
+    --admin-name="Admin E2E" --admin-email="$ADMIN_EMAIL" --seed-cap | grep -Eo 'https?://[^ ]+/activation/[A-Za-z0-9]+' | tail -n 1
