@@ -18,6 +18,7 @@ import {
     KeyRound,
     LayoutGrid,
     ListChecks,
+    Mail,
     Plug,
     ShieldAlert,
     ShieldCheck,
@@ -52,6 +53,7 @@ const adminNavItems: (NavItem & { permission: string })[] = [
     { title: 'Connecteurs', url: '/admin/connectors', icon: Plug, permission: 'connectors.manage' },
     { title: "Journal d'audit", url: '/admin/audit', icon: History, permission: 'audit.view' },
     { title: 'Sécurité', url: '/admin/security', icon: ShieldCheck, permission: 'settings.manage' },
+    { title: "Modèles d'e-mails", url: '/admin/mail-templates', icon: Mail, permission: 'settings.manage' },
 ];
 
 export function AppSidebar() {

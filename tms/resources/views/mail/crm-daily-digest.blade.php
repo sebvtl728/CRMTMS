@@ -1,7 +1,10 @@
 <!DOCTYPE html>
 <html lang="fr">
 <body style="font-family: sans-serif; color: #111827; line-height: 1.5;">
-<p>Bonjour {{ $name }},</p>
+{{-- Introduction and signature: the organisme's plain text, escaped. --}}
+@if ($intro !== '')
+<p>{!! nl2br(e($intro)) !!}</p>
+@endif
 
 @foreach (['overdue' => ['En retard', '#b91c1c'], 'today' => ['Aujourd\'hui', '#111827']] as $key => [$title, $color])
     @if (count($$key) > 0)
@@ -24,9 +27,12 @@
 
 <p><a href="{{ $url }}">Voir mes actions à faire</a></p>
 
+@if ($signature !== '')
+<p>{!! nl2br(e($signature)) !!}</p>
+@endif
+
 <p style="color: #6b7280; font-size: 12px;">
     Vous recevez ce récapitulatif car vous l'avez activé dans votre profil (« Recevoir le récapitulatif quotidien »).
 </p>
-<p>Cordialement,</p>
 </body>
 </html>

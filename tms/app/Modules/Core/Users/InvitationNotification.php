@@ -2,6 +2,8 @@
 
 namespace App\Modules\Core\Users;
 
+use App\Modules\Core\Mail\MailServiceProvider;
+use App\Modules\Core\Mail\MailTemplates;
 use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Notifications\Notification;
 
@@ -25,13 +27,27 @@ class InvitationNotification extends Notification
         return ['mail'];
     }
 
+    /**
+     * The organisme's text (« Modèles d'e-mails »: first paragraph as the
+     * greeting, the others as lines; values escaped by the mail layout),
+     * then what the system always adds: the button, the validity, the warning.
+     */
     public function toMail(object $notifiable): MailMessage
     {
-        return (new MailMessage)
-            ->subject('Activez votre compte '.config('app.name'))
-            ->greeting('Bonjour '.$this->name.',')
-            ->line('Vous êtes invité à rejoindre l\'espace '.$this->organisation.'.')
-            ->line('Choisissez votre mot de passe pour activer votre compte.')
+        $text = app(MailTemplates::class)->render(MailServiceProvider::INVITATION, [
+            'prenom_utilisateur' => explode(' ', trim($this->name))[0],
+            'nom_utilisateur' => $this->name,
+            'organisme' => $this->organisation,
+            'application' => (string) config('app.name'),
+        ]);
+        $paragraphs = array_values(array_filter(array_map('trim', preg_split('/\R\s*\R/', $text['body']) ?: []), fn (string $p) => $p !== ''));
+
+        $message = (new MailMessage)->subject($text['subject'])->greeting(array_shift($paragraphs) ?? 'Bonjour,');
+        foreach ($paragraphs as $paragraph) {
+            $message->line($paragraph);
+        }
+
+        return $message
             ->action('Activer mon compte', $this->url)
             ->line('Ce lien est valable '.Invitation::VALIDITY_HOURS.' heures et ne peut être utilisé qu\'une seule fois.')
             ->line('Si vous n\'attendiez pas cette invitation, ignorez ce message.')

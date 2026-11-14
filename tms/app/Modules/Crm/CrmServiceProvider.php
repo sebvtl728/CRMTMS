@@ -34,6 +34,7 @@ use App\Modules\Crm\Quotes\QuoteLine;
 use App\Modules\Crm\Quotes\QuotePolicy;
 use App\Modules\Crm\Quotes\QuotesProvider;
 use App\Modules\Crm\Search\SavedFilter;
+use App\Modules\Crm\Support\CrmMailTemplates;
 use App\Modules\Crm\Support\LinkedData;
 use App\Modules\Crm\Timeline\Attachment;
 use App\Modules\Crm\Timeline\AttachmentsProvider;
@@ -65,6 +66,7 @@ class CrmServiceProvider extends ServiceProvider
     {
         // In register(): the catalogue must be complete before
         // AccessServiceProvider::boot() defines one gate per permission.
+        CrmMailTemplates::register();
         CorePermissions::registerModule('crm', Permissions::all(), Permissions::defaultsFor(...), Permissions::labels(), Permissions::GROUP);
 
         MorphAliases::register([

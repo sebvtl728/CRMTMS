@@ -6,6 +6,7 @@ Ce guide s'adresse à l'**administrateur de l'organisme** (rôle « Administrate
 |---|---|---|
 | Sociétés | `/admin/companies` | `companies.manage` |
 | Rôles et droits | `/admin/roles` | `roles.manage` |
+| Modèles d'e-mails | `/admin/mail-templates` | `settings.manage` |
 | Utilisateurs | `/admin/users` | `users.manage` |
 | Référentiels | `/admin/references` | `references.manage` |
 | Connecteurs | `/admin/connectors` | `connectors.manage` |
@@ -119,6 +120,16 @@ Filtres : utilisateur, évènement, type d'objet, période (du / au). Chaque lig
 - Chaque modification est consignée dans le journal d'audit (« Paramètres de sécurité modifiés », valeurs avant / après).
 
 Autres garanties (non paramétrables) : mots de passe Argon2id d'au moins 12 caractères, limitation du nombre d'essais de code 2FA, codes de récupération à usage unique, journal d'audit non modifiable, isolation stricte des données entre organismes.
+
+### Modèles d'e-mails
+
+Administration › **Modèles d'e-mails** (droit `settings.manage`, celui de l'écran Sécurité : l'administrateur par défaut). Quatre e-mails sont modifiables (objet de 200 caractères au plus, texte brut de 10 000 caractères au plus) :
+
+- **Envoi d'un devis** et **Relance d'un devis** : proposés dans la fenêtre d'envoi, toujours modifiables au cas par cas avant l'envoi ; le PDF est joint par le système.
+- **Invitation d'un utilisateur** : votre texte (la première ligne sert de formule d'appel) ; le bouton d'activation, la durée de validité du lien et la mention « Si vous n'attendiez pas cette invitation » sont toujours ajoutés.
+- **Récapitulatif quotidien des relances** : le texte avant `{actions}` sert d'introduction, celui après de signature ; la liste des actions et le lien vers « À faire » restent générés. `{actions}` est obligatoire.
+
+Chaque modèle liste ses **variables** (`{numero_devis}`, `{societe}`, `{destinataire}`, `{montant_ttc}`, `{date_validite}`, `{commercial}`, `{organisme}`, `{prenom_utilisateur}`…) : un clic les insère à l'endroit du curseur. Une variable inconnue ou une accolade mal formée est refusée à l'enregistrement. Rien n'est interprété comme du code : chaque `{variable}` est simplement remplacée par sa valeur, en texte (échappée dans les e-mails HTML). **Aperçu** montre le résultat avec des données d'exemple ; **Envoyer un e-mail de test** l'envoie à votre adresse par la messagerie de l'organisme (objet préfixé « [Test] », 10 par minute au plus) ; **Rétablir le modèle par défaut** reprend le texte du TMS. Les e-mails de sécurité (réinitialisation du mot de passe, double authentification, alertes d'exploitation) sont affichés en lecture seule (« modèle système »). Les modèles sont propres à chaque organisme et journalisés.
 
 ## 9. Récupérer l'accès administrateur
 

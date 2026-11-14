@@ -34,9 +34,15 @@ Ajustements après les premiers retours.
   Nouveau droit `roles.manage` (administrateur seulement). Le rôle administrateur, « Gérer les utilisateurs » et
   « Gérer les rôles et droits » ne sont pas modifiables.
 
+- **Modèles d'e-mails** (Administration) : objet et texte de l'envoi et de la relance d'un devis, de l'invitation d'un
+  utilisateur et du récapitulatif quotidien, avec variables à insérer, aperçu, e-mail de test et retour au modèle par
+  défaut ; variables inconnues refusées, aucun code interprété. Les e-mails de sécurité restent des modèles système.
+
 ### Modifié
 
 - Une formation d'intérêt d'une fiche empêche sa suppression du catalogue (désactivation possible).
+- Remplacer le logo d'une société ou le devis signé ne fait plus perdre l'ancien fichier si l'enregistrement échoue.
+- Récapitulatif quotidien : « 0 action » au singulier.
 - Fusion de fiches : les formations d'intérêt sont réunies (sans doublon). Anonymisation d'une personne : ses
   formations d'intérêt sont supprimées. Export RGPD : section « Formations d'intérêt ».
 

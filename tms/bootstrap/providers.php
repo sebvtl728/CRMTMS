@@ -4,6 +4,7 @@ use App\Modules\Catalogue\CatalogueServiceProvider;
 use App\Modules\Connectors\ConnectorsServiceProvider;
 use App\Modules\Core\Access\AccessServiceProvider;
 use App\Modules\Core\Audit\AuditServiceProvider;
+use App\Modules\Core\Mail\MailServiceProvider;
 use App\Modules\Core\Tenancy\TenancyServiceProvider;
 use App\Modules\Core\Users\UsersServiceProvider;
 use App\Modules\Crm\CrmServiceProvider;
@@ -19,6 +20,7 @@ return [
     UsersServiceProvider::class,
     AccessServiceProvider::class,
     AuditServiceProvider::class,
+    MailServiceProvider::class,
     ConnectorsServiceProvider::class,
     CrmServiceProvider::class,
     CatalogueServiceProvider::class,

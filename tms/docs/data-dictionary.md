@@ -103,6 +103,11 @@ Mêmes colonnes que ci-dessus avec `permission_id`. Non utilisée au lot 1a.
 | `quote_terms`, `quote_footer` | text, null | Conditions générales et pied de page imprimés sur les devis (≤ 5 000 caractères) |
 | `created_at`, `updated_at`, `deleted_at` | timestamp | Suppression logique |
 
+## Modèles d'e-mails (0.4.2, RLS)
+
+### `mail_templates` — textes d'e-mails modifiés par l'organisme
+`id`, `tenant_id` · `key` string(100) (`quote.send`, `quote.remind`, `users.invitation`, `crm.daily_digest` ; déclarés par les modules via `Core\Mail\MailTemplateRegistry`) · `subject` string(200) · `body` text (≤ 10 000, texte brut avec `{variables}`) · `updated_by` (FK `users`, null à la suppression) · `created_at`, `updated_at`. Unique (`tenant_id`, `key`). Pas de ligne = modèle par défaut du code. Journalisée (`mail_template`). Cache par organisme (`<tenant_id>:mail-template:<key>`), vidé à l'enregistrement.
+
 ## Référentiels (RLS)
 
 ### `reference_items` — valeurs des listes paramétrables
