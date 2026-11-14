@@ -327,7 +327,7 @@ describe('relancer', function () {
         $this->actingAs(admin(twoFactor: true))->postJson("/admin/connectors/runs/{$run->id}/retry")->assertRedirect();
 
         expect(FakeRetryableConnector::$retries)->toBe(1);
-        $latest = ConnectorRun::query()->latest('started_at')->first();
+        $latest = ConnectorRun::query()->latest('started_at')->latest('id')->first();
         expect(ConnectorRun::query()->count())->toBe(2)->and($latest->status)->toBe('success')->and($latest->payload_ref)->toBe('job:7');
     });
 

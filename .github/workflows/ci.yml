@@ -75,6 +75,10 @@ jobs:
           POSTGRES_APP_PASSWORD: ${{ env.DB_PASSWORD }}
 
       - run: composer install --no-interaction --no-progress --prefer-dist
+      # Empty .env: the configuration comes from the job environment and the
+      # config/ defaults (no secret in the repository). Without the file,
+      # phpdotenv's failed read is reported as a warning by every test.
+      - run: touch .env
       - run: npm ci
       - run: npm run build
 
@@ -94,6 +98,13 @@ jobs:
           node-version: '22'
           cache: npm
           cache-dependency-path: tms/package-lock.json
+      # ziggy-js is resolved from the PHP package (tsconfig paths: vendor/tightenco/ziggy).
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.4'
+          extensions: pdo_pgsql, redis, intl, zip, gd, bcmath, pcntl
+          coverage: none
+      - run: composer install --no-interaction --no-progress --prefer-dist --no-scripts
       - run: npm ci
       - run: npm run lint
       - run: npm run types
@@ -110,7 +121,8 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - run: composer audit --abandoned=report
+      # --locked: audit composer.lock without installing the packages.
+      - run: composer audit --locked --abandoned=report
       # Production dependencies only: the remaining high findings are dev-toolchain transitives (eslint chain).
       - run: npm audit --omit=dev --audit-level=high
 

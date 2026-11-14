@@ -165,12 +165,11 @@ env_value() {
     [ ! -f "$MOCK_LOG/docker.log" ] || refute grep -Eq "compose .*( pull| up )" "$MOCK_LOG/docker.log"
 }
 
-@test "install fails clearly when no download address is known" {
+@test "without TMS_DIST_URL, install downloads from the GitHub release of TMS_GITHUB_REPO" {
     unset TMS_DIST_URL
     run bash "$INSTALL_SH"
-    [ "$status" -ne 0 ]
-    [[ "$output" == *"TMS_DIST_URL"* ]] || false
-    [ ! -f "$MOCK_LOG/curl.log" ]
+    [ "$status" -eq 0 ]
+    grep -q "https://github.com/sebvtl728/CRMTMS/releases/latest/download/SHA256SUMS" "$MOCK_LOG/curl.log"
 }
 
 @test "install requires domain, admin e-mail and organisme name" {

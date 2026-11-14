@@ -455,7 +455,7 @@ it('recreates an event deleted in outlook and forgets one already gone', functio
     m365Http([GRAPH_EVENTS.'/AAMkEvent2' => Http::response(['error' => ['code' => 'ErrorItemNotFound']], 404)]);
     $meeting->delete();
     expect(CalendarLinkEvent::query()->count())->toBe(0)
-        ->and(ConnectorRun::query()->latest('started_at')->first()->status)->toBe('success');
+        ->and(ConnectorRun::query()->latest('started_at')->latest('id')->first()->status)->toBe('success');
 });
 
 it('retries later on throttling, honoring Retry-After', function () {
