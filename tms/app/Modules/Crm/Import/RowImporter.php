@@ -13,8 +13,10 @@ use App\Modules\Crm\Organisations\OrganisationRequest;
 use App\Modules\Crm\Organisations\OrganisationStatus;
 use App\Modules\Crm\People\Person;
 use App\Modules\Crm\People\PersonRequest;
+use App\Modules\Crm\Permissions;
 use App\Modules\Crm\Support\DasLinks;
 use App\Modules\Crm\Timeline\Note;
+use App\Modules\Crm\Visibility\CrmVisibility;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\QueryException;
@@ -38,6 +40,12 @@ use Illuminate\Support\Facades\Validator;
  */
 final class RowImporter
 {
+    /** A fiche found (duplicate, source identifier, note subject) the importing user may not modify. */
+    public const OUT_OF_SCOPE = 'Fiche existante hors de votre périmètre : ligne ignorée.';
+
+    /** @var array<string, bool> morph alias|id => the importing user may modify the fiche */
+    private array $inScope = [];
+
     public const FUTURE_DATE = 'Date future ramenée à aujourd\'hui';
 
     /** Fields whose stored column differs from the field code. */
@@ -630,6 +638,9 @@ final class RowImporter
         if ($subject->getAttribute('anonymised_at') !== null) {
             throw new SkipRow('Fiche anonymisée (RGPD) : non réimportée.');
         }
+        if (($subject instanceof Organisation || $subject instanceof Person) && ! $this->modifiable($subject)) {
+            throw new SkipRow(self::OUT_OF_SCOPE);
+        }
         $body = (string) $values['body'];
         $date = $values['date'] ?? null;
 
@@ -942,6 +953,25 @@ final class RowImporter
         if ($fiche->trashed() && ! $this->stamps->trashedByUndo($fiche)) {
             throw new SkipRow('Fiche supprimée par un utilisateur : non réimportée.');
         }
+        if (! $this->modifiable($fiche)) {
+            throw new SkipRow(self::OUT_OF_SCOPE);
+        }
+    }
+
+    /**
+     * The user who launched the import may modify $fiche (scope of
+     * crm.fiches.update): an existing fiche outside it is never completed,
+     * nor duplicated (the row is skipped). No user (account removed): none.
+     */
+    private function modifiable(Organisation|Person $fiche): bool
+    {
+        $key = $fiche->getMorphClass().'|'.$fiche->getKey();
+        if (! array_key_exists($key, $this->inScope)) {
+            $user = $this->batch->user;
+            $this->inScope[$key] = $user !== null && CrmVisibility::allows($user, Permissions::FICHES_UPDATE, $fiche);
+        }
+
+        return $this->inScope[$key];
     }
 
     /**
