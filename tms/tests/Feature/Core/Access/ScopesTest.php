@@ -183,3 +183,25 @@ it('exposes the scope options in French', function () {
         ->and(Permissions::isScoped(UNSCOPED))->toBeFalse()
         ->and(Permissions::defaultScopesFor(Role::Commercial))->toBe([SCOPED => AccessScope::Own]);
 });
+
+it('keeps the default scope when a right is revoked then granted again', function () {
+    PermissionSync::forTenant(tenant());
+    $matrix = app(RoleMatrix::class);
+    $matrix->setScope(Role::Commercial, SCOPED, AccessScope::Das);
+
+    $matrix->set(Role::Commercial, SCOPED, false);
+    $matrix->set(Role::Commercial, SCOPED, true);
+
+    expect(Scopes::of(commercial(), SCOPED))->toBe(AccessScope::Own)
+        ->and(DB::table('role_permission_scopes')->where('permission', SCOPED)->value('scope'))->toBe('own');
+});
+
+it('forgets the memoised scope when the role of a user changes', function () {
+    PermissionSync::forTenant(tenant());
+    $user = commercial();
+    expect(Scopes::of($user, SCOPED))->toBe(AccessScope::Own);
+
+    $user->assignPrimaryRole(Role::Assistant);
+
+    expect(Scopes::of($user, SCOPED))->toBeNull();
+});

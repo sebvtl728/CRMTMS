@@ -5,6 +5,7 @@ namespace App\Modules\Core\Users;
 use App\Modules\Core\Access\PrimaryRoleChanged;
 use App\Modules\Core\Access\Role;
 use App\Modules\Core\Access\RoleModel;
+use App\Modules\Core\Access\Scopes;
 use App\Modules\Core\Audit\Auditable;
 use App\Modules\Core\Tenancy\BelongsToTenant;
 use App\Modules\Core\Tenancy\TenantContext;
@@ -196,6 +197,7 @@ class User extends Authenticatable
 
         DB::transaction(fn () => $this->syncRoles([$role->value]));
         $this->unsetRelation('roles');
+        Scopes::forget();
 
         PrimaryRoleChanged::dispatch($this, $previous, $role);
     }

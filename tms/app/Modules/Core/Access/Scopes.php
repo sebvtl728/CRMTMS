@@ -67,6 +67,7 @@ final class Scopes
             ->join('role_has_permissions as rp', 'rp.role_id', '=', 'mr.role_id')
             ->join('permissions as p', 'p.id', '=', 'rp.permission_id')
             ->leftJoin(self::TABLE.' as s', fn ($join) => $join->on('s.role_id', '=', 'mr.role_id')->where('s.permission', '=', $permission))
+            ->where('mr.tenant_id', app(TenantContext::class)->id())
             ->where('mr.model_type', $user->getMorphClass())
             ->where('mr.model_id', $user->getKey())
             ->where('p.name', $permission)

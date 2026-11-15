@@ -49,8 +49,10 @@ final class RoleMatrix
                 return;
             }
             $granted ? $model->givePermissionTo($permission) : $model->revokePermissionTo($permission);
-            if (! $granted) {
-                DB::table(Scopes::TABLE)->where('role_id', $model->getKey())->where('permission', $permission)->delete();
+            // Re-granting never widens a role: the default scope comes back (none declared = all).
+            DB::table(Scopes::TABLE)->where('role_id', $model->getKey())->where('permission', $permission)->delete();
+            if ($granted) {
+                PermissionSync::writeDefaultScopes((string) $model->getKey(), $role, [$permission], $this->tenants->id());
             }
             $this->audit->record($granted ? 'roles.permission_granted' : 'roles.permission_revoked', $model, [], ['role' => $role->value, 'permission' => $permission]);
         });
