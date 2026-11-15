@@ -91,6 +91,14 @@ Guide : `tms/docs/admin.md` (§ 10), `tms/docs/crm.md` (§ 13 bis).
 - **Migration des droits** (`2026_12_06_000002_split_crm_permissions`) : organisme par organisme (`set_config('app.tenant_id', …)`), convertit les anciens `crm.view|create|update|delete` ; `tms:permissions:sync` n'accorde ensuite que les droits par défaut **nouveaux** (`role_permission_defaults_applied`).
 - **Chiffre d'affaires** (`tms/app/Modules/Crm/Revenue/`) : `DasRevenue::for($user, Period)` en **centimes entiers** (`brick/math`, jamais de float), jours de Paris ; un devis compte à `accepted_on` par le `das_id` de sa ligne (jamais le Catalogue), une opportunité gagnée à `won_on` **seulement sans devis accepté** (jamais deux fois), corbeille exclue, ligne sans DAS = DAS de l'opportunité. `RevenueSources` applique le périmètre de `crm.revenue.view` ; `RevenueTargets` : un objectif par DAS et par type de période (`revenue_targets`, pas de somme des mois). Le taux « Atteint » du total (`totals.rate`, serveur) compare l'objectif au seul CA des DAS qui en ont un (`targeted_total_cents`).
 
+## Plaquettes (0.5.2) : points d'architecture à connaître
+
+Guide : `tms/docs/crm.md` (§ 4 et § 5) ; tables : `tms/docs/data-dictionary.md`.
+
+- **Bibliothèque** (`Catalogue/Brochures/`, `Catalogue\Brochures` service public) : plaquettes + versions PDF immuables (une version envoyée ne s'efface jamais) ; les autres modules les lisent par ce service (`forTrainings`, `versions`, `offered`, `sent`, `options`), jamais par les tables. `Brochures::registerSentCheck()` : le Crm déclare « version envoyée » (`quote_brochures`, `brochure_sending_versions`) pour que le téléchargement d'une version envoyée d'une plaquette à la corbeille reste possible (sinon 404).
+- **Devis** : `quote_brochures` garde les versions jointes à l'e-mail ; relance et « Renvoyer » rejoignent les mêmes versions. **Envoi depuis une fiche** (`Crm/Brochures/`) : `brochure_sendings` + `brochure_sending_versions`, `SendBrochure` (`TenantAwareJob`), modèle d'e-mail `brochure`, historique par `BrochureSendingsProvider`, effacé par l'anonymisation.
+- `BrochureAttachments` : limite commune de 20 Mo par e-mail et lecture des fichiers ; les deux e-mails partent en texte simple (vue `mail/plain-text`).
+
 ## Conventions
 
 - Identifiants UUID v7 ; suppression logique sur les fiches métier.

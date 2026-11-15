@@ -5,6 +5,16 @@ Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) ; ve
 
 ## [Non publié]
 
+## [0.5.2] - 2026-11-15
+
+Plaquettes (PDF) de l'organisme : bibliothèque, pièces jointes des devis, envoi depuis une fiche.
+
+### Ajouté
+
+- **Bibliothèque de plaquettes** (Catalogue › Plaquettes) : dépôt de PDF (10 Mo au plus, contenu vérifié), rattachement à des formations et/ou des DAS, versions successives conservées, corbeille ; plaquettes listées sur la page d'une formation.
+- **Plaquettes jointes aux devis** : case « Joindre les plaquettes » à l'envoi (plaquettes des formations du devis, 20 Mo au plus avec le PDF) ; la relance et « Renvoyer » rejoignent les mêmes versions.
+- **Envoyer une plaquette** depuis une fiche entreprise, une personne ou une opportunité, avec le modèle d'e-mail « Envoi d'une plaquette » ; envoi consigné dans l'historique (date, auteur, destinataire, état), versions envoyées téléchargeables, effacé par l'anonymisation.
+
 ## [0.5.1] - 2026-11-15
 
 Publication de la 0.5.0 (même contenu) : la vérification automatique de la 0.5.0 avait échoué sur un test de la
@@ -279,7 +289,8 @@ Lot 1a : socle de l'application.
   mise à jour avec retour arrière automatique.
 - Publication : image multi-architecture signée (cosign), archive de version, sommes de contrôle.
 
-[Non publié]: https://github.com/sebvtl728/CRMTMS/compare/v0.5.1...HEAD
+[Non publié]: https://github.com/sebvtl728/CRMTMS/compare/v0.5.2...HEAD
+[0.5.2]: https://github.com/sebvtl728/CRMTMS/compare/v0.5.1...v0.5.2
 [0.5.1]: https://github.com/sebvtl728/CRMTMS/compare/v0.5.0...v0.5.1
 [0.5.0]: https://github.com/sebvtl728/CRMTMS/compare/v0.4.2...v0.5.0
 [0.4.1]: https://github.com/sebvtl728/CRMTMS/compare/v0.4.0...v0.4.1
