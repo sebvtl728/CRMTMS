@@ -26,7 +26,7 @@ final class BrochureSendingRows
             ->orderBy('position')->get(['brochure_sending_id', 'brochure_version_id'])->groupBy('brochure_sending_id');
         $found = app(Brochures::class)->sent($links->flatten(1)->pluck('brochure_version_id')->unique()->values()->all());
 
-        // Downloadable from the library (catalogue.view), unless the brochure is in the trash.
+        // Downloadable from the library (catalogue.view): a sent version stays so, even when its brochure is in the trash.
         $canDownload = Auth::user()?->can('catalogue.view') === true;
 
         return $sendings->map(function (BrochureSending $s) use ($links, $found, $canDownload): array {
@@ -34,7 +34,7 @@ final class BrochureSendingRows
             foreach ($links[$s->id] ?? [] as $link) {
                 $brochure = $found[$link->brochure_version_id] ?? null;
                 if ($brochure !== null) {
-                    $versions[] = ['brochure_id' => $brochure['brochure_id'], 'version_id' => $link->brochure_version_id, 'title' => $brochure['title'], 'downloadable' => $canDownload && ! $brochure['trashed']];
+                    $versions[] = ['brochure_id' => $brochure['brochure_id'], 'version_id' => $link->brochure_version_id, 'title' => $brochure['title'], 'downloadable' => $canDownload];
                 }
             }
 

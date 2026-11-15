@@ -2,6 +2,7 @@
 
 namespace App\Modules\Crm;
 
+use App\Modules\Catalogue\Brochures;
 use App\Modules\Catalogue\TrainingUsage;
 use App\Modules\Core\Access\AccessScope;
 use App\Modules\Core\Access\Permissions as CorePermissions;
@@ -465,6 +466,9 @@ class CrmServiceProvider extends ServiceProvider
         TrainingUsage::register('fiches', fn (string $trainingId): bool => FicheTrainings::uses($trainingId));
         // Lines of a trashed quote stay too.
         TrainingUsage::register('quotes', fn (string $trainingId): bool => QuoteLine::query()->where('training_id', $trainingId)->exists());
+        // A version sent with a quote or from a fiche stays downloadable from the history, its brochure trashed or not.
+        Brochures::registerSentCheck('crm', fn (string $versionId): bool => DB::table('quote_brochures')->where('brochure_version_id', $versionId)->exists()
+            || DB::table('brochure_sending_versions')->where('brochure_version_id', $versionId)->exists());
     }
 
     /**

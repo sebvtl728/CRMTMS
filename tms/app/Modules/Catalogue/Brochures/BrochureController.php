@@ -3,6 +3,7 @@
 namespace App\Modules\Catalogue\Brochures;
 
 use App\Http\Controllers\Controller;
+use App\Modules\Catalogue\Brochures as BrochureLibrary;
 use App\Modules\Catalogue\Permissions;
 use App\Modules\Catalogue\Training;
 use App\Modules\Catalogue\TrainingListQuery;
@@ -144,6 +145,8 @@ class BrochureController extends Controller
         abort_unless(Str::isUuid($version), 404);
         $found = $brochure->versions()->whereKey($version)->first();
         abort_if($found === null, 404);
+        // A brochure in the trash only serves the versions that were sent.
+        abort_if($brochure->trashed() && ! BrochureLibrary::wasSent($found->id), 404);
 
         return self::stream($found);
     }

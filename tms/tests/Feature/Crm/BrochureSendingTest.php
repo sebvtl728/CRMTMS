@@ -463,3 +463,28 @@ it('fails a pending sending whose recipient was anonymised before the job ran', 
     expect(BrochureSending::query()->sole()->email_status)->toBe('failed')
         ->and(BrochureSending::query()->sole()->email_error)->toBe(SendBrochure::ANONYMISED);
 });
+
+it('keeps a sent version of a trashed brochure downloadable from the history, and never an unsent one', function () {
+    Mail::fake();
+    $this->actingAs(commercial());
+    $organisation = Organisation::query()->create(['name' => 'Le Bistrot']);
+    $lea = makePerson('Durand', ['first_name' => 'Léa', 'email' => 'lea@example.test', 'is_individual' => false]);
+    $organisation->affiliations()->create(['person_id' => $lea->id, 'is_active' => true, 'work_email' => 'lea@example.test']);
+    $sent = sendingBrochure('HACCP', "%PDF-1.4 sent\n");
+    $unsentBrochure = $sent->brochure;
+    $unsent = sendingVersion($unsentBrochure, "%PDF-1.4 unsent\n");
+    DB::table('brochures')->where('id', $unsentBrochure->id)->update(['current_version_id' => $sent->id]);
+
+    $this->post("/crm/people/{$lea->id}/brochures/send", sendingPayload($sent, $lea->id))->assertSessionHasNoErrors();
+    $unsentBrochure->delete();
+
+    $entry = brochureEntry($this->getJson("/crm/people/{$lea->id}/timeline"));
+    expect($entry['meta']['versions'][0]['downloadable'])->toBeTrue();
+    $this->get("/catalogue/brochures/{$unsentBrochure->id}/versions/{$sent->id}")->assertOk();
+    $this->get("/catalogue/brochures/{$unsentBrochure->id}/versions/{$unsent->id}")->assertNotFound();
+    $this->get("/catalogue/brochures/{$unsentBrochure->id}/download")->assertNotFound();
+    $this->get("/catalogue/brochures/{$unsentBrochure->id}/edit")->assertNotFound();
+
+    $this->actingAs(userWithPermissions(['crm.fiches.view']));
+    $this->get("/catalogue/brochures/{$unsentBrochure->id}/versions/{$sent->id}")->assertForbidden();
+});

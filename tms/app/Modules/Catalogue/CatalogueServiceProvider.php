@@ -56,13 +56,15 @@ class CatalogueServiceProvider extends ServiceProvider
             return Training::query()->findOrFail($value);
         });
 
-        // A brochure of another organisme (RLS) or in the trash is a 404.
-        Route::bind('brochure', function (string $value): Brochure {
+        // A brochure of another organisme (RLS) or in the trash is a 404, except for the download of a
+        // version (the controller then requires that this version was sent).
+        Route::bind('brochure', function (string $value, \Illuminate\Routing\Route $route): Brochure {
             if (! Str::isUuid($value)) {
                 throw (new ModelNotFoundException)->setModel(Brochure::class, [$value]);
             }
+            $query = $route->getName() === 'catalogue.brochures.versions.download' ? Brochure::withTrashed() : Brochure::query();
 
-            return Brochure::query()->findOrFail($value);
+            return $query->findOrFail($value);
         });
     }
 

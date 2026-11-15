@@ -16,6 +16,34 @@ use Illuminate\Support\Str;
  */
 final class Brochures
 {
+    /** @var array<string, \Closure(string): bool> */
+    private static array $sentChecks = [];
+
+    /**
+     * « This version was sent »: each module that sends brochures (quote
+     * e-mails, sendings from a fiche) registers a check, so that a sent
+     * version of a trashed brochure stays downloadable from the history
+     * (Catalogue never reads their tables).
+     *
+     * @param  string  $name  unique name (module.data), a second registration replaces the first
+     * @param  callable(string): bool  $wasSent  true when the version whose id is given was sent
+     */
+    public static function registerSentCheck(string $name, callable $wasSent): void
+    {
+        self::$sentChecks[$name] = \Closure::fromCallable($wasSent);
+    }
+
+    public static function wasSent(string $versionId): bool
+    {
+        foreach (self::$sentChecks as $check) {
+            if ($check($versionId)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     /**
      * The current version of every brochure (not in the trash) attached to
      * one of these trainings, directly or through the DAS of one of them,
