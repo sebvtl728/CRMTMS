@@ -35,7 +35,9 @@ export default function BrochureFormPage({ brochure, options }: FormProps) {
     const editing = brochure !== null;
     const [filter, setFilter] = useState('');
 
+    // A file travels in a multipart POST: the update is spoofed as a PUT (the method must be in the initial data, post() sends the data of the last render).
     const { data, setData, post, processing, errors } = useForm<BrochureForm & { _method?: string }>({
+        ...(brochure ? { _method: 'put' } : {}),
         title: brochure?.title ?? '',
         file: null,
         training_ids: brochure?.training_ids ?? [],
@@ -51,9 +53,7 @@ export default function BrochureFormPage({ brochure, options }: FormProps) {
 
     const submit: FormEventHandler = (e) => {
         e.preventDefault();
-        // A file travels in a multipart POST: the update is spoofed as a PUT.
         if (editing) {
-            setData('_method', 'put');
             post(route('catalogue.brochures.update', brochure.id), { preserveScroll: true, forceFormData: true });
         } else {
             post(route('catalogue.brochures.store'), { preserveScroll: true, forceFormData: true });

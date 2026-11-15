@@ -425,3 +425,14 @@ it('isolates organismes: no read, download, change or deletion of another one\'s
         ->and(collect($service->options(null))->pluck('title')->all())->toBe(['Mienne']);
     app(TenantContext::class)->run($other, fn () => expect(Brochure::query()->sole()->title)->toBe('Étrangère'));
 });
+
+it('stores an original name that is valid UTF-8 even when the browser sent broken bytes', function () {
+    $this->actingAs(admin(twoFactor: true));
+
+    $brochure = depositBrochure('HACCP', ['file' => brochureFile("Plaquette \xE9t\xE9 \xFF.pdf")]);
+    $name = $brochure->currentVersion->original_name;
+
+    expect(mb_check_encoding($name, 'UTF-8'))->toBeTrue()
+        ->and($name)->toEndWith('.pdf');
+    $this->get("/catalogue/brochures/{$brochure->id}/download")->assertOk();
+});

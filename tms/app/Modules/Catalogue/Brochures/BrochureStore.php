@@ -128,7 +128,7 @@ class BrochureStore
     {
         $version = new BrochureVersion([
             'path' => $path,
-            'original_name' => mb_substr($file->getClientOriginalName(), 0, 255),
+            'original_name' => mb_substr(mb_scrub($file->getClientOriginalName()), 0, 255),
             'size' => (int) $file->getSize(),
             'sha256' => hash_file('sha256', (string) $file->getRealPath()),
         ]);
