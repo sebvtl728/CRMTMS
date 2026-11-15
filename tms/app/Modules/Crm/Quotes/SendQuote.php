@@ -2,6 +2,7 @@
 
 namespace App\Modules\Crm\Quotes;
 
+use App\Modules\Catalogue\Brochures;
 use App\Modules\Connectors\Core\ConnectorRun;
 use App\Modules\Connectors\Smtp\SmtpHostRefused;
 use App\Modules\Connectors\Smtp\TenantMailer;
@@ -42,6 +43,8 @@ class SendQuote implements ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, TenantAwareJob;
 
+    public const NO_BROCHURE = 'Une plaquette jointe est introuvable : l\'e-mail n\'est pas parti.';
+
     public const NO_DOCUMENT = 'Le PDF archivé du devis est introuvable : l\'e-mail n\'est pas parti.';
 
     public int $tries = 3;
@@ -59,7 +62,7 @@ class SendQuote implements ShouldQueue
         return [60, 300, 900];
     }
 
-    public function handle(QuotePdf $pdf): void
+    public function handle(QuotePdf $pdf, Brochures $brochures): void
     {
         $quote = Quote::query()->with('company')->find($this->quoteId);
         $message = $quote?->email_message;
@@ -77,15 +80,29 @@ class SendQuote implements ShouldQueue
             return;
         }
 
+        // The versions recorded at sending, whatever became of their brochure since.
+        $versions = $brochures->versions(QuoteBrochure::query()->where('quote_id', $quote->id)->orderBy('position')->pluck('brochure_version_id')->all());
+        $disk = Storage::disk(TenantStorage::DISK);
+        $joined = [];
+        foreach ($versions as $version) {
+            if (! $disk->exists($version['path'])) {
+                Log::warning('Fichier de plaquette introuvable', ['quote_id' => $quote->id, 'version_id' => $version['version_id']]);
+                $this->failed(new QuoteMailFailed(self::NO_BROCHURE));
+
+                return;
+            }
+            $joined[] = ['bytes' => (string) $disk->get($version['path']), 'name' => $version['original_name']];
+        }
+
         $error = null;
-        $send = function () use ($quote, $message, $archived, &$error): string {
+        $send = function () use ($quote, $message, $archived, $joined, &$error): string {
             try {
                 $bytes = (string) Storage::disk(TenantStorage::DISK)->get($archived);
 
                 TenantMailer::for($quote->company)
                     ->to($message['to'])
                     ->cc($message['cc'] ?? [])
-                    ->send(new QuoteMail($message['subject'], $message['body'], $bytes, QuotePdf::fileName($quote)));
+                    ->send(new QuoteMail($message['subject'], $message['body'], $bytes, QuotePdf::fileName($quote), $joined));
             } catch (Throwable $e) {
                 $error = $e;
 

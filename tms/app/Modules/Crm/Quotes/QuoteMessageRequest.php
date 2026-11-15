@@ -2,6 +2,8 @@
 
 namespace App\Modules\Crm\Quotes;
 
+use App\Modules\Catalogue\Brochures;
+use Illuminate\Contracts\Validation\Validator;
 use Illuminate\Foundation\Http\FormRequest;
 
 /**
@@ -11,6 +13,8 @@ use Illuminate\Foundation\Http\FormRequest;
 class QuoteMessageRequest extends FormRequest
 {
     public const MAX_CC = 5;
+
+    public const MAX_BROCHURES = 20;
 
     public function authorize(): bool
     {
@@ -42,7 +46,39 @@ class QuoteMessageRequest extends FormRequest
             'cc.*' => ['string', 'email:rfc', 'max:254', 'distinct'],
             'subject' => ['required', 'string', 'max:200'],
             'body' => ['required', 'string', 'max:10000'],
+            // Brochure versions joined (sending only: a reminder re-joins the recorded ones).
+            'brochure_version_ids' => ['nullable', 'array', 'max:'.self::MAX_BROCHURES],
+            'brochure_version_ids.*' => ['string', 'uuid'],
         ];
+    }
+
+    /**
+     * Every brochure version chosen exists (Catalogue\Brochures) and the
+     * brochures alone fit in one e-mail; the quote PDF is counted at sending.
+     *
+     * @return list<callable(Validator): void>
+     */
+    public function after(): array
+    {
+        return [function (Validator $validator): void {
+            $ids = $this->input('brochure_version_ids');
+            if (! is_array($ids) || $validator->errors()->has('brochure_version_ids') || $validator->errors()->has('brochure_version_ids.*')) {
+                return;
+            }
+            $ids = array_values(array_filter($ids, 'is_string'));
+            $found = array_column(app(Brochures::class)->versions($ids), 'size', 'version_id');
+            $total = 0;
+            foreach ($ids as $i => $id) {
+                if (! isset($found[$id])) {
+                    $validator->errors()->add("brochure_version_ids.{$i}", QuoteTransitions::BROCHURE_GONE);
+                } elseif ($i === array_search($id, $ids, true)) {
+                    $total += $found[$id];
+                }
+            }
+            if ($total > QuoteTransitions::MAX_ATTACHMENTS_BYTES) {
+                $validator->errors()->add('brochure_version_ids', QuoteTransitions::ATTACHMENTS_TOO_BIG);
+            }
+        }];
     }
 
     /**
@@ -63,6 +99,9 @@ class QuoteMessageRequest extends FormRequest
             'subject.max' => 'L\'objet est trop long (200 caractères au plus).',
             'body.required' => 'Le message est obligatoire.',
             'body.max' => 'Le message est trop long.',
+            'brochure_version_ids.array' => 'Les plaquettes choisies ne sont pas valides.',
+            'brochure_version_ids.max' => 'Vingt plaquettes au plus.',
+            'brochure_version_ids.*.uuid' => QuoteTransitions::BROCHURE_GONE,
             'string' => 'Cette valeur n\'est pas valide.',
         ];
     }
@@ -76,5 +115,18 @@ class QuoteMessageRequest extends FormRequest
         $v = $this->validated();
 
         return ['to' => $v['to'], 'cc' => $v['cc'] ?? [], 'subject' => $v['subject'], 'body' => $v['body']];
+    }
+
+    /**
+     * The brochure versions chosen, each once (empty when the box is unticked).
+     *
+     * @return list<string>
+     */
+    public function brochureVersionIds(): array
+    {
+        /** @var array{brochure_version_ids?: list<string>|null} $v */
+        $v = $this->validated();
+
+        return array_values(array_unique($v['brochure_version_ids'] ?? []));
     }
 }

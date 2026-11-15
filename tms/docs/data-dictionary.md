@@ -357,6 +357,17 @@ Index : `opportunity_id`, `organisation_id`, `person_id`, `contact_person_id`, (
 
 Index : `quote_id`, `training_id`, `das_id`. Journalisée (`quote_line`). La TVA se calcule **par taux** sur la somme des lignes du même taux, pas ligne par ligne.
 
+### `quote_brochures` — plaquettes jointes à l'e-mail d'un devis
+| Colonne | Type | Rôle |
+|---|---|---|
+| `id`, `tenant_id` | uuid | |
+| `quote_id` | uuid (FK, cascade) | |
+| `brochure_version_id` | uuid (FK `brochure_versions`, restrict) | Version jointe à l'envoi (une version envoyée ne s'efface jamais) ; relance et « Renvoyer » rejoignent exactement ces versions |
+| `position` | smallint | Ordre des pièces jointes |
+| `created_at`, `updated_at` | timestamp | |
+
+Unique (`quote_id`, `brochure_version_id`). Journalisée (`quote_brochure`).
+
 ### `revenue_targets` — objectifs de chiffre d'affaires par DAS
 | Colonne | Type | Rôle |
 |---|---|---|

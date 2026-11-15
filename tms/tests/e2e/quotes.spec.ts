@@ -107,6 +107,8 @@ test('quotes: training in the catalogue, amount of the opportunity, quote, pdf, 
     const dialog = page.getByRole('dialog');
     await expect(dialog.getByRole('heading', { name: `Envoyer le devis ${number}` })).toBeVisible();
     await expect(dialog.getByText("Aucun serveur d'envoi n'est configuré", { exact: false })).toBeVisible();
+    // Brochures: the box is ticked by default (nothing attached to this quote's trainings here).
+    await expect(dialog.getByRole('checkbox', { name: 'Joindre les plaquettes' })).toBeChecked();
     await dialog.getByLabel('Destinataire *').fill(RECIPIENT);
     await dialog.getByRole('button', { name: 'Envoyer', exact: true }).click();
     await expect(dialog).toBeHidden();

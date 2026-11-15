@@ -34,6 +34,7 @@ use App\Modules\Crm\Organisations\OrganisationPolicy;
 use App\Modules\Crm\People\Person;
 use App\Modules\Crm\People\PersonPolicy;
 use App\Modules\Crm\Quotes\Quote;
+use App\Modules\Crm\Quotes\QuoteBrochure;
 use App\Modules\Crm\Quotes\QuoteLine;
 use App\Modules\Crm\Quotes\QuotePolicy;
 use App\Modules\Crm\Quotes\QuotesProvider;
@@ -110,6 +111,7 @@ class CrmServiceProvider extends ServiceProvider
             'activity' => Activity::class,
             'quote' => Quote::class,
             'quote_line' => QuoteLine::class,
+            'quote_brochure' => QuoteBrochure::class,
             'revenue_target' => RevenueTarget::class,
         ]);
 
