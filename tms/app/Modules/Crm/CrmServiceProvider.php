@@ -511,6 +511,18 @@ class CrmServiceProvider extends ServiceProvider
 
             return is_string($latest) ? CarbonImmutable::parse($latest) : null;
         });
+
+        // A brochure sent from a fiche (or one of its opportunities): a contact of that fiche and of its recipient.
+        LastContact::registerSource(function (string $subjectType, array $ids): ?CarbonInterface {
+            $query = match ($subjectType) {
+                (new Organisation)->getMorphClass() => BrochureSending::query()->whereIn('organisation_id', $ids),
+                (new Person)->getMorphClass() => BrochureSending::query()->where(fn (Builder $q) => $q->whereIn('person_id', $ids)->orWhereIn('recipient_person_id', $ids)),
+                default => null,
+            };
+            $latest = $query?->max('created_at');
+
+            return is_string($latest) ? CarbonImmutable::parse($latest) : null;
+        });
     }
 
     /**

@@ -18,7 +18,10 @@ use App\Modules\Crm\Brochures\SendBrochure;
 use App\Modules\Crm\CrmServiceProvider;
 use App\Modules\Crm\Duplicates\Merger;
 use App\Modules\Crm\Gdpr\Anonymiser;
+use App\Modules\Crm\Gdpr\PersonDataExport;
 use App\Modules\Crm\Organisations\Organisation;
+use App\Modules\Crm\Timeline\LastContact;
+use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Queue;
@@ -487,4 +490,113 @@ it('keeps a sent version of a trashed brochure downloadable from the history, an
 
     $this->actingAs(userWithPermissions(['crm.fiches.view']));
     $this->get("/catalogue/brochures/{$unsentBrochure->id}/versions/{$sent->id}")->assertForbidden();
+});
+
+it('records the contact on the fiche it was sent from and on the recipient, and keeps it when recomputed', function () {
+    Mail::fake();
+    $this->actingAs(commercial());
+    $organisation = Organisation::query()->create(['name' => 'Le Bistrot']);
+    $lea = makePerson('Durand', ['first_name' => 'Léa', 'email' => 'lea@example.test']);
+    $bystander = makePerson('Autre', ['email' => 'autre@example.test']);
+    affiliate($lea, $organisation);
+    affiliate($bystander, $organisation);
+    $this->travelTo(CarbonImmutable::parse('2026-11-14 10:00', 'Europe/Paris'));
+
+    $this->post("/crm/organisations/{$organisation->id}/brochures/send", sendingPayload(sendingBrochure('HACCP'), $lea->id))->assertSessionHasNoErrors();
+
+    $at = CarbonImmutable::parse('2026-11-14 10:00', 'Europe/Paris');
+    expect(CarbonImmutable::parse($organisation->refresh()->last_contact_at)->equalTo($at))->toBeTrue()
+        ->and(CarbonImmutable::parse($lea->refresh()->last_contact_at)->equalTo($at))->toBeTrue()
+        ->and($bystander->refresh()->last_contact_at)->toBeNull();
+
+    // Recomputed (e.g. after another contact was removed): the sending still counts.
+    LastContact::recompute($lea->getMorphClass(), $lea->id);
+    LastContact::recompute($organisation->getMorphClass(), $organisation->id);
+    expect(CarbonImmutable::parse($lea->refresh()->last_contact_at)->equalTo($at))->toBeTrue()
+        ->and(CarbonImmutable::parse($organisation->refresh()->last_contact_at)->equalTo($at))->toBeTrue();
+
+    $person = makePerson('Martin', ['email' => 'm@example.test', 'is_individual' => true]);
+    $this->travelTo(CarbonImmutable::parse('2026-11-15 09:00', 'Europe/Paris'));
+    $this->post("/crm/people/{$person->id}/brochures/send", sendingPayload(sendingBrochure('Sécu'), $person->id))->assertSessionHasNoErrors();
+    expect(CarbonImmutable::parse($person->refresh()->last_contact_at)->equalTo(CarbonImmutable::parse('2026-11-15 09:00', 'Europe/Paris')))->toBeTrue();
+});
+
+it('also clears subject and message of sendings made from her fiche or her opportunities, not the recipient\'s address', function () {
+    Mail::fake();
+    $this->actingAs(commercial());
+    $person = makePerson('Martin', ['first_name' => 'Claire', 'email' => 'claire@example.test', 'is_individual' => true]);
+    $contact = makePerson('Contact', ['email' => 'contact@example.test']);
+    $opportunity = makeOpportunity($person);
+    DB::table('opportunity_contacts')->insert(['tenant_id' => tenant()->id, 'opportunity_id' => $opportunity->id, 'person_id' => $contact->id]);
+    $version = sendingBrochure('HACCP');
+    $this->post("/crm/opportunities/{$opportunity->id}/brochures/send", sendingPayload($version, $contact->id, ['message' => 'Pour Claire Martin']))->assertSessionHasNoErrors();
+    $sending = BrochureSending::query()->sole();
+    expect($sending->person_id)->toBe($person->id)->and($sending->recipient_email)->toBe('contact@example.test');
+
+    app(Anonymiser::class)->anonymise($person->refresh(), 'manual');
+
+    $sending->refresh();
+    expect($sending->subject)->toBeNull()->and($sending->message)->toBeNull()
+        ->and($sending->recipient_email)->toBe('contact@example.test')
+        ->and($sending->email_status)->toBe('sent');
+});
+
+it('lists in the RGPD export the sendings made to her or from her fiche, in full', function () {
+    Mail::fake();
+    $this->actingAs(commercial());
+    $organisation = Organisation::query()->create(['name' => 'Le Bistrot']);
+    $person = makePerson('Durand', ['first_name' => 'Léa', 'email' => 'lea@example.test']);
+    affiliate($person, $organisation);
+    $other = makePerson('Autre', ['email' => 'autre@example.test', 'is_individual' => true]);
+    $version = sendingBrochure('HACCP');
+    $this->post("/crm/organisations/{$organisation->id}/brochures/send", sendingPayload($version, $person->id, ['message' => 'Bonjour Léa']))->assertSessionHasNoErrors();
+    $this->post("/crm/people/{$other->id}/brochures/send", sendingPayload($version, $other->id))->assertSessionHasNoErrors();
+
+    $rows = PersonDataExport::for($person->refresh())['plaquettes'];
+
+    expect($rows)->toHaveCount(1)
+        ->and($rows[0])->toMatchArray([
+            'role' => 'Destinataire', 'statut' => 'Envoyée', 'adresse_destinataire' => 'lea@example.test',
+            'objet' => 'Nos formations', 'message' => 'Bonjour Léa',
+            'plaquettes' => [['titre' => 'HACCP', 'version' => 'haccp.pdf']],
+        ])
+        ->and($rows[0]['date'])->not->toBeNull();
+
+    $mine = PersonDataExport::for($other->refresh())['plaquettes'];
+    expect($mine)->toHaveCount(1)->and($mine[0]['role'])->toBe('Destinataire');
+});
+
+it('refuses to read a version whose path is outside the brochures area of the organisme', function () {
+    Mail::fake();
+    $disk = Storage::disk(TenantStorage::DISK);
+    $disk->put('tenants/autre/brochures/x.pdf', 'secret');
+    $disk->put(TenantStorage::path('quotes', 'x.pdf'), 'secret');
+    foreach (['tenants/autre/brochures/x.pdf', TenantStorage::path('quotes', 'x.pdf'), TenantStorage::path('brochures').'/../quotes/x.pdf'] as $path) {
+        expect(BrochureAttachments::read([['version_id' => 'v', 'path' => $path, 'original_name' => 'x.pdf', 'size' => 6]]))->toBeNull();
+    }
+    $own = TenantStorage::path('brochures', 'b/ok.pdf');
+    $disk->put($own, 'ok');
+    expect(BrochureAttachments::read([['version_id' => 'v', 'path' => $own, 'original_name' => 'ok.pdf', 'size' => 2]]))->toBe([['bytes' => 'ok', 'name' => 'ok.pdf']]);
+});
+
+it('does not show on the recipient\'s fiche a sending made from a fiche the viewer cannot see', function () {
+    Mail::fake();
+    $mine = crmItem(ReferenceList::Das, 'Hôtellerie-restauration');
+    $this->actingAs(admin(twoFactor: true));
+    $hiddenOrganisation = Organisation::query()->create(['name' => 'Hors DAS']);
+    $lea = makePerson('Durand', ['first_name' => 'Léa', 'email' => 'lea@example.test', 'is_individual' => true]);
+    affiliate($lea, $hiddenOrganisation);
+    $visibleOrganisation = Organisation::query()->create(['name' => 'Dans le DAS']);
+    DB::table('organisation_das')->insert(['tenant_id' => tenant()->id, 'organisation_id' => $visibleOrganisation->id, 'das_id' => $mine->id]);
+    affiliate($lea, $visibleOrganisation);
+    $this->post("/crm/organisations/{$hiddenOrganisation->id}/brochures/send", sendingPayload(sendingBrochure('HACCP'), $lea->id))->assertSessionHasNoErrors();
+
+    $count = fn () => collect($this->getJson("/crm/people/{$lea->id}/timeline")->json('entries'))->where('type', 'brochure_sending')->count();
+    expect($count())->toBe(1);
+
+    $user = userWithRole(Role::ResponsableDas);
+    followDas($user, $mine);
+    $this->actingAs($user);
+    $this->get("/crm/people/{$lea->id}")->assertOk();
+    expect($count())->toBe(0);
 });

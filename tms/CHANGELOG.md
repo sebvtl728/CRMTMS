@@ -13,7 +13,7 @@ Plaquettes (PDF) de l'organisme : bibliothèque, pièces jointes des devis, envo
 
 - **Bibliothèque de plaquettes** (Catalogue › Plaquettes) : dépôt de PDF (10 Mo au plus, contenu vérifié), rattachement à des formations et/ou des DAS, versions successives conservées, corbeille ; plaquettes listées sur la page d'une formation.
 - **Plaquettes jointes aux devis** : case « Joindre les plaquettes » à l'envoi (plaquettes des formations du devis, 20 Mo au plus avec le PDF) ; la relance et « Renvoyer » rejoignent les mêmes versions.
-- **Envoyer une plaquette** depuis une fiche entreprise, une personne ou une opportunité, avec le modèle d'e-mail « Envoi d'une plaquette » ; envoi consigné dans l'historique (date, auteur, destinataire, état), versions envoyées téléchargeables, effacé par l'anonymisation.
+- **Envoyer une plaquette** depuis une fiche entreprise, une personne ou une opportunité, avec le modèle d'e-mail « Envoi d'une plaquette » ; envoi consigné dans l'historique (date, auteur, destinataire, état), versions envoyées téléchargeables, mise à jour du dernier contact de la fiche et du destinataire, effacé par l'anonymisation et repris dans l'export RGPD.
 
 ## [0.5.1] - 2026-11-15
 

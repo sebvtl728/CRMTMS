@@ -6,12 +6,15 @@ use App\Modules\Core\Users\User;
 use App\Modules\Crm\Opportunities\Opportunity;
 use App\Modules\Crm\Organisations\Organisation;
 use App\Modules\Crm\People\Person;
+use App\Modules\Crm\Timeline\LastContact;
+use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
 /**
- * Records a « Envoyer une plaquette » (the row and the exact versions) and
- * queues SendBrochure after the commit. The recipient must be one of
+ * Records a « Envoyer une plaquette » (the row and the exact versions), the
+ * contact on the fiche and on the recipient (LastContact) and queues
+ * SendBrochure after the commit. The recipient must be one of
  * BrochureRecipients for the subject (the fiche, or the opportunity) and
  * have an e-mail address, frozen on the row.
  */
@@ -51,6 +54,16 @@ final class BrochureSender
                     'brochure_version_id' => $versionId,
                     'position' => $position,
                 ]);
+            }
+            // A contact of the fiche it was sent from and of the person it went to.
+            $at = CarbonImmutable::instance($sending->created_at);
+            if ($fiche instanceof Organisation) {
+                LastContact::record($fiche->getMorphClass(), $fiche->id, $at);
+            }
+            foreach (array_unique([$fiche instanceof Person ? $fiche->id : null, $recipient['id']]) as $personId) {
+                if ($personId !== null) {
+                    LastContact::record((new Person)->getMorphClass(), $personId, $at);
+                }
             }
             SendBrochure::dispatch($sending->id)->afterCommit();
 

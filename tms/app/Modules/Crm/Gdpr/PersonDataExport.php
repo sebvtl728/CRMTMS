@@ -2,12 +2,14 @@
 
 namespace App\Modules\Crm\Gdpr;
 
+use App\Modules\Catalogue\Brochures;
 use App\Modules\Core\Access\AccessScope;
 use App\Modules\Core\Access\Scopes;
 use App\Modules\Core\References\ReferenceItem;
 use App\Modules\Core\Users\User;
 use App\Modules\Crm\Activities\Activity;
 use App\Modules\Crm\Affiliations\Affiliation;
+use App\Modules\Crm\Brochures\BrochureSending;
 use App\Modules\Crm\Interests\FicheTraining;
 use App\Modules\Crm\Interests\FicheTrainings;
 use App\Modules\Crm\Opportunities\Opportunity;
@@ -17,6 +19,7 @@ use App\Modules\Crm\Quotes\Quote;
 use App\Modules\Crm\Timeline\Attachment;
 use App\Modules\Crm\Timeline\Note;
 use DateTimeInterface;
+use Illuminate\Database\Eloquent\Collection as EloquentCollection;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -24,7 +27,8 @@ use Illuminate\Support\Facades\DB;
  * portability, GDPR art. 15 and 20): identity, contact details, links with
  * the entreprise names, opportunities (as particulier or contact: title,
  * stage, amount), quotes (as particulier or recipient: number, date, status,
- * total TTC), actions (hers or on her opportunities as particulier:
+ * total TTC), brochure sendings (« plaquettes »: made to her or from her
+ * fiche: date, brochures, status, address, subject, message), actions (hers or on her opportunities as particulier:
  * type, subject, status, result, report, place), notes, consents, attachments (listed, not their
  * content), trainings of interest (« Formations d'intérêt »), DAS and dates. Trashed items are included (still held), flagged.
  * Fiches merged into her are listed by id (their data now lives here).
@@ -75,6 +79,10 @@ final class PersonDataExport
         $quotes = Quote::withTrashed()
             ->where(fn ($q) => $q->where('person_id', $person->id)->orWhere('contact_person_id', $person->id))
             ->orderBy('issued_on')->orderBy('number')->get();
+        $sendings = BrochureSending::query()
+            ->where(fn ($q) => $q->where('recipient_person_id', $person->id)->orWhere('person_id', $person->id))
+            ->orderBy('created_at')->orderBy('id')->get();
+        $sentVersions = self::sentVersions($sendings);
         $trainings = app(FicheTrainings::class)->rows($person);
         $addedOn = FicheTraining::query()->where('person_id', $person->id)->pluck('created_at', 'training_id');
         $consents = Consent::query()->where('person_id', $person->id)->orderBy('recorded_at')->get();
@@ -142,6 +150,16 @@ final class PersonDataExport
                 'devis_signe' => $q->signed_path !== null ? 'oui' : 'non',
                 'supprime' => $q->trashed(),
             ])->all(),
+            'plaquettes' => $sendings->map(fn (BrochureSending $b) => [
+                'date' => $date($b->created_at),
+                'role' => $b->recipient_person_id === $person->id ? 'Destinataire' : 'Envoyée depuis sa fiche',
+                'plaquettes' => $sentVersions[$b->id] ?? [],
+                'statut' => BrochureSending::STATUS_LABELS[$b->email_status] ?? $b->email_status,
+                'envoyee_le' => $date($b->sent_at),
+                'adresse_destinataire' => $b->recipient_email,
+                'objet' => $b->subject,
+                'message' => $b->message,
+            ])->all(),
             'actions' => $actions->map(fn (Activity $a) => [
                 'date' => $date($a->done_at ?? $a->due_at),
                 'type' => $label($a->type),
@@ -177,5 +195,32 @@ final class PersonDataExport
                 'dernier_contact' => $date($person->last_contact_at),
             ],
         ];
+    }
+
+    /**
+     * Brochures of each sending: title and file (name of the version sent).
+     *
+     * @param  EloquentCollection<int, BrochureSending>  $sendings
+     * @return array<string, list<array{titre: string, version: string|null}>> sending id => brochures
+     */
+    private static function sentVersions(EloquentCollection $sendings): array
+    {
+        $links = DB::table('brochure_sending_versions')->whereIn('brochure_sending_id', $sendings->pluck('id')->all())
+            ->orderBy('position')->get(['brochure_sending_id', 'brochure_version_id'])->groupBy('brochure_sending_id');
+        $ids = $links->flatten(1)->pluck('brochure_version_id')->unique()->values()->all();
+        $titles = app(Brochures::class)->sent($ids);
+        $files = collect(app(Brochures::class)->versions($ids))->keyBy('version_id');
+
+        $rows = [];
+        foreach ($links as $sendingId => $versions) {
+            foreach ($versions as $link) {
+                $rows[$sendingId][] = [
+                    'titre' => $titles[$link->brochure_version_id]['title'] ?? '',
+                    'version' => $files[$link->brochure_version_id]['original_name'] ?? null,
+                ];
+            }
+        }
+
+        return $rows;
     }
 }
