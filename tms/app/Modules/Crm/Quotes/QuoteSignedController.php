@@ -52,8 +52,10 @@ class QuoteSignedController extends Controller
             'Content-Disposition' => 'inline; filename="'.$quote->number.'-signe.'.$copy['extension'].'"',
             'Cache-Control' => 'private, no-store',
             'X-Content-Type-Options' => 'nosniff',
-            // Opened inline: no script, no form, no same-origin access, whatever the file holds.
-            'Content-Security-Policy' => 'sandbox',
+            // An image opened inline is sandboxed (no script, form or same-origin
+            // access). Not a PDF: browsers refuse to render a sandboxed PDF; its
+            // type is checked by signature at upload, nosniff and no-store apply.
+            ...($copy['mime'] === 'application/pdf' ? [] : ['Content-Security-Policy' => 'sandbox']),
         ]);
     }
 }

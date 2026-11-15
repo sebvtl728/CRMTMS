@@ -1,6 +1,7 @@
 <?php
 
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Route;
 
 it('sends security headers', function () {
     $this->get('/login')
@@ -68,4 +69,18 @@ it('uses the forwarded client IP for the /health throttle key', function () {
     // Another client behind the same proxy is not throttled.
     $this->withServerVariables(['REMOTE_ADDR' => '172.29.250.10', 'HTTP_X_FORWARDED_FOR' => $other])
         ->getJson('/health')->assertOk();
+});
+
+it('adds the policy of a response as a second header, which can only tighten the global one', function () {
+    Route::middleware('web')->get('/_test/csp', fn () => response('x', 200, ['Content-Security-Policy' => 'script-src *']));
+
+    $policies = $this->get('/_test/csp')->assertOk()->headers->all('Content-Security-Policy');
+
+    expect($policies)->toHaveCount(2)
+        ->and($policies[0])->toContain("script-src 'self'")->not->toContain('script-src *')
+        ->and($policies[1])->toBe('script-src *');
+});
+
+it('sends a single global policy when the response sets none', function () {
+    expect($this->get('/login')->headers->all('Content-Security-Policy'))->toHaveCount(1);
 });

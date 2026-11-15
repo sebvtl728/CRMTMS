@@ -188,3 +188,15 @@ it('saves a template even when a concurrent first save collides', function () {
     expect($collided)->toBeTrue()
         ->and(MailTemplate::query()->where('key', 'quote.remind')->sole()->subject)->toBe('Relance {numero_devis}');
 });
+
+it('shows « < » and « > » of the invitation text as typed', function () {
+    inTenant();
+    MailTemplate::query()->create(['key' => 'users.invitation', 'subject' => 'Bienvenue', 'body' => "Bonjour,\n\nSi a < b et c > d, rejoignez-nous."]);
+    app(MailTemplates::class)->forget('users.invitation');
+
+    $html = (new InvitationMail('https://cap.example.test/activation/abc', 'Léa', 'CAP'))->build()->render();
+
+    expect($html)->toContain('a &lt; b et c &gt; d')
+        ->and($html)->not->toContain('&amp;lt;')
+        ->and($html)->not->toContain('\\&lt;');
+});

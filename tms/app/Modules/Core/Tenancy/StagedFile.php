@@ -31,7 +31,15 @@ final class StagedFile
     {
         $disk = Storage::disk(TenantStorage::DISK);
         foreach ($disk->files($directory) as $leftover) {
-            if (str_starts_with(basename($leftover), self::PREFIX) && $disk->lastModified($leftover) < time() - self::STALE_SECONDS) {
+            if (! str_starts_with(basename($leftover), self::PREFIX)) {
+                continue;
+            }
+            try {
+                $stale = $disk->lastModified($leftover) < time() - self::STALE_SECONDS;
+            } catch (\Throwable) {
+                continue; // gone meanwhile (moved by its own upload): nothing to clean
+            }
+            if ($stale) {
                 $disk->delete($leftover);
             }
         }

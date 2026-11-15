@@ -60,10 +60,11 @@ class InvitationNotification extends Notification
 
     /**
      * Text shown as typed by the mail layout's Markdown: every Markdown
-     * punctuation is backslash-escaped (HTML is escaped by the layout).
+     * punctuation is backslash-escaped; « < », « > » and « & » are left to the
+     * layout, which HTML-encodes them (escaping them twice would show « &lt; »).
      */
     private static function plain(string $text): string
     {
-        return (string) preg_replace('/([\\\\`*_{}\[\]()#+\-.!|<>~])/', '\\\\$1', $text);
+        return (string) preg_replace('/([\\\\`*_{}\[\]()#+\-.!|~])/', '\\\\$1', $text);
     }
 }

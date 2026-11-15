@@ -16,9 +16,14 @@ class SecurityHeaders
 
         $response = $next($request);
 
-        // A response may add its own directives (e.g. « sandbox » for an uploaded file).
-        $own = $response->headers->get('Content-Security-Policy');
-        $response->headers->set('Content-Security-Policy', $this->contentSecurityPolicy($nonce).($own ? '; '.$own : ''));
+        // The global policy always applies. A response's own policy (e.g.
+        // « sandbox » for an uploaded image) is sent as a second header: the
+        // browser enforces both, so it can only tighten, never relax.
+        $own = array_values(array_filter($response->headers->all('Content-Security-Policy'), fn ($v) => is_string($v) && $v !== ''));
+        $response->headers->set('Content-Security-Policy', $this->contentSecurityPolicy($nonce));
+        foreach ($own as $policy) {
+            $response->headers->set('Content-Security-Policy', $policy, false);
+        }
         $response->headers->set('X-Content-Type-Options', 'nosniff');
         $response->headers->set('X-Frame-Options', 'DENY');
         $response->headers->set('Referrer-Policy', 'strict-origin-when-cross-origin');

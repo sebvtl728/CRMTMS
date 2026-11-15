@@ -178,10 +178,16 @@ it('keeps the previous signed copy intact when saving the replacement fails', fu
         ->and(collect($disk->files(dirname($path)))->filter(fn (string $f) => str_starts_with(basename($f), '.tmp-'))->all())->toBe([]);
 });
 
-it('serves the signed copy in a sandbox', function () {
+it('sandboxes a signed image but not a pdf (browsers refuse to render a sandboxed pdf)', function () {
     $quote = signedSentQuote();
     $this->post("/crm/quotes/{$quote->id}/accept", ['signed' => signedUpload('scan.pdf', signedPdf())])->assertSessionHasNoErrors();
+    $url = "/crm/quotes/{$quote->id}/signe";
 
-    $csp = (string) $this->get("/crm/quotes/{$quote->id}/signe")->headers->get('Content-Security-Policy');
-    expect($csp)->toContain('sandbox')->toContain("default-src 'self'");
+    $pdf = $this->get($url)->assertOk()->assertHeader('X-Content-Type-Options', 'nosniff');
+    expect(collect($pdf->headers->all('Content-Security-Policy'))->filter(fn ($v) => str_contains((string) $v, 'sandbox'))->all())->toBe([])
+        ->and($pdf->headers->get('Cache-Control'))->toContain('no-store');
+
+    $this->post($url, ['signed' => signedUpload('photo.png', signedPng())])->assertSessionHasNoErrors();
+    $png = $this->get($url)->assertOk();
+    expect($png->headers->all('Content-Security-Policy'))->toContain('sandbox');
 });

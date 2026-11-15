@@ -4,6 +4,7 @@ use App\Modules\Core\Tenancy\StagedFile;
 use App\Modules\Core\Tenancy\TenantStorage;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
+use League\Flysystem\UnableToRetrieveMetadata;
 
 beforeEach(fn () => fakeImportDisk());
 
@@ -34,4 +35,17 @@ it('moves the staged file over the final one without deleting it first', functio
     expect($disk->get($directory.'/logo.png'))->toBe('after')
         ->and($disk->exists((string) $staged))->toBeFalse()
         ->and($GLOBALS['promoted'] ?? null)->toBe('after');
+});
+
+it('skips a temporary file that vanishes during the cleanup', function () {
+    inTenant();
+    $directory = TenantStorage::path('companies', 'z');
+    $real = Storage::disk(TenantStorage::DISK);
+    $real->put($directory.'/.tmp-gone.png', 'x');
+
+    $disk = Mockery::mock($real)->makePartial();
+    $disk->shouldReceive('lastModified')->andThrow(new UnableToRetrieveMetadata('gone'));
+    Storage::set(TenantStorage::DISK, $disk);
+
+    expect(StagedFile::stage($directory, UploadedFile::fake()->createWithContent('a.png', 'new'), 'png'))->not->toBeNull();
 });

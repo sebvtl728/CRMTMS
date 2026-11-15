@@ -45,8 +45,9 @@ Ajustements après les premiers retours.
 - Une formation d'intérêt d'une fiche empêche sa suppression du catalogue (désactivation possible).
 - Remplacer le logo d'une société ou le devis signé ne fait plus perdre l'ancien fichier si l'enregistrement échoue.
 - Récapitulatif quotidien : « 0 action » au singulier.
-- Devis signé ouvert dans un bac à sable (`Content-Security-Policy: sandbox`) ; objet proposé pour l'envoi d'un devis
-  limité à 200 caractères.
+- Devis signé : une image s'ouvre dans un bac à sable (`Content-Security-Policy: sandbox`, ajouté en second en-tête
+  à la politique globale : il ne peut que la durcir) ; un PDF s'ouvre normalement (type vérifié à l'envoi). Objet
+  proposé pour l'envoi d'un devis limité à 200 caractères.
 - Workers : les droits sont relus à chaque tâche (plus de droits périmés pour un même organisme).
 - Formations d'intérêt : une seule entrée de journal par modification.
 - Fusion de fiches : les formations d'intérêt sont réunies (sans doublon). Anonymisation d'une personne : ses
