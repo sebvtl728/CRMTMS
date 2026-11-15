@@ -1,4 +1,4 @@
-# Dictionnaire de données — lots 1a (socle), 1b (fiches, import, RGPD), 1c (pipeline, actions, agenda) et 1d (catalogue, devis)
+# Dictionnaire de données — lots 1a (socle), 1b (fiches, import, RGPD), 1c (pipeline, actions, agenda), 1d (catalogue, devis) et 0.5.0 (droits, rôles, chiffre d'affaires)
 
 Identifiants : UUID v7 (`uuid`). Dates : `timestamp` (UTC en base ; affichage en heure de Paris). Suppression logique : colonne `deleted_at` (les lignes supprimées restent en base).
 
@@ -60,13 +60,13 @@ tenant_id = nullif(current_setting('app.tenant_id', true), '')::uuid   -- using 
 PK (`tenant_id`, `email`) · `token` (haché) · `created_at`. `tenant_id` est renseigné par défaut depuis `app.tenant_id`.
 
 ### `invitations` — invitations
-`id`, `tenant_id` · `email`, `name` · `role` (rôle proposé) · `token_hash` (char 64, unique : sha256 du jeton, jamais le jeton) · `expires_at` (+24 h) · `accepted_at` (null tant qu'en attente) · `user_id` (FK users, null) compte créé · `invited_by` (FK users, null) · horodatages ; index (`tenant_id`, `email`).
+`id`, `tenant_id` · `email`, `name` · `role` (nom du rôle proposé : un des six rôles système ou un rôle personnalisé `custom_<uuid>`) · `token_hash` (char 64, unique : sha256 du jeton, jamais le jeton) · `expires_at` (+24 h) · `accepted_at` (null tant qu'en attente) · `user_id` (FK users, null) compte créé · `invited_by` (FK users, null) · horodatages ; index (`tenant_id`, `email`).
 
 ### `external_identities` — identités externes (SSO, préparées)
 `id`, `tenant_id` · `user_id` (FK, cascade) · `provider` · `subject` · horodatages ; unique (`provider`, `subject`).
 
 ### `roles` — rôles de l'organisme
-`id`, `tenant_id` · `name` (`admin_organisme`, `direction`, `commercial`, `charge_relations`, `assistant`, `responsable_das`) · `guard_name` · horodatages ; unique (`tenant_id`, `name`, `guard_name`).
+`id`, `tenant_id` · `name` (rôle système : `admin_organisme`, `direction`, `commercial`, `charge_relations`, `assistant`, `responsable_das` ; rôle personnalisé : `custom_<uuid>`, jamais affiché) · `label` (string 80, null : libellé du rôle ; null = libellé par défaut du rôle système) · `guard_name` · `requires_2fa` (bool : double authentification obligatoire ; toujours vraie pour `admin_organisme` et `direction`) · `system` (bool : les six rôles système, jamais supprimés) · horodatages ; unique (`tenant_id`, `name`, `guard_name`) ; libellé unique par organisme (contrôle applicatif sérialisé).
 
 ### `role_has_permissions` — matrice rôle → permission
 `permission_id` · `role_id` · `tenant_id` ; PK (`permission_id`, `role_id`). Clés étrangères composites (`role_id`, `tenant_id`) : un rôle ne peut pas recevoir de permission d'un autre organisme.
@@ -407,4 +407,4 @@ Unique (`tenant_id`, `das_id`, `period_type`, `period_start`) : l'objectif d'un 
 
 ## Permissions CRM (catalogue global `permissions`)
 
-`crm.view`, `crm.create`, `crm.update`, `crm.delete`, `crm.merge`, `crm.import`, `crm.export`, `crm.gdpr` ; catalogue : `catalogue.view`, `catalogue.manage`. La matrice par rôle est dans `admin.md`. `role_permission_defaults_applied` (`tenant_id`, `role`, `permission`) mémorise les droits par défaut déjà accordés à chaque organisme, pour qu'une mise à jour n'ajoute que les nouveaux droits sans rétablir ceux qu'un administrateur a retirés. `role_permission_scopes` (`tenant_id`, `role_id`, `permission`, `scope` = `own`/`das`/`all`) : périmètre d'un rôle pour un droit à périmètre ; sans ligne, le périmètre vaut `all`.
+CRM : `crm.fiches.view|update|delete`, `crm.opportunities.view|update|delete`, `crm.quotes.view|update|delete`, `crm.activities.view|update|delete`, `crm.activities.team`, `crm.revenue.view`, `crm.revenue.manage`, `crm.merge`, `crm.import`, `crm.export`, `crm.gdpr` ; catalogue : `catalogue.view`, `catalogue.manage`, `catalogue.delete`. Les anciens `crm.view|create|update|delete` sont supprimés par la migration 0.5.0 (convertis organisme par organisme). La matrice par rôle est dans `admin.md`. `role_permission_defaults_applied` (`tenant_id`, `role`, `permission`) mémorise les droits par défaut déjà accordés à chaque organisme, pour qu'une mise à jour n'ajoute que les nouveaux droits sans rétablir ceux qu'un administrateur a retirés. `role_permission_scopes` (`tenant_id`, `role_id`, `permission`, `scope` = `own`/`das`/`all`) : périmètre d'un rôle pour un droit à périmètre ; sans ligne, le périmètre vaut `all`.

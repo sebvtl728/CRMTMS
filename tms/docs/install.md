@@ -253,6 +253,10 @@ En root, dans le conteneur ou sur la machine :
 Tant que le dépôt de publication n'est pas renseigné dans les scripts (`TMS_GITHUB_REPO`), préfixer la commande par
 `TMS_DIST_URL=<dossier des fichiers de la version>`.
 
+Mise à jour vers la 0.5.0 : la migration convertit automatiquement les droits existants (`crm.view`, `crm.create`,
+`crm.update`, `crm.delete` deviennent des droits par domaine, sans changer l'accès de personne) et crée de nouveaux
+index sur les tables des fiches ; le verrou est bref. Détail : `admin.md` (§ 10).
+
 Déroulement :
 
 1. Téléchargement de `SHA256SUMS` et de `tms-<version>.tar.gz`, vérification de la somme de contrôle (la version

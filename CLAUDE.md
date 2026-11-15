@@ -63,9 +63,9 @@ Code dans `tms/app/Modules/Crm/` (Organisations, People, Affiliations, Opportuni
 - **Fuseau** : le fuseau PostgreSQL de session suit `APP_TIMEZONE` (`Europe/Paris`, `config/database.php`) : dates, `now()` SQL et PHP concordent. Ne jamais comparer des horodatages sans fuseau.
 - **Connecteurs sortants** : toute adresse appelée (SMTP, Sirene…) passe par `Connectors\Core\HostPolicy` (adresses internes/privées refusées, vérifié à l'enregistrement et à l'appel).
 - **Import** : `Import/` lit CSV/XLSX en continu, simule puis exécute par tranches reprenables (files `imports` et `default`, `TenantAwareJob`). `ImportStamps` (table `import_stamps`) enregistre ce que chaque import a fait à chaque fiche : c'est ce qui permet d'annuler sans écraser le travail des utilisateurs. Un import Formevol = un enregistrement `import_profiles`, pas de code.
-- **Erreurs** : `abort()` avec un message affiché à l'utilisateur lève `App\Exceptions\UserFacingHttpException` (message en français) ; toute autre `HttpException` n'affiche que le texte fixe de son code.
+- **Erreurs** : un message affiché à l'utilisateur doit lever `App\Exceptions\UserFacingHttpException` (message en français) ou passer par une erreur de validation ; un `abort()` simple n'affiche que le texte fixe de son code.
 - **Données personnelles** : aucune valeur de champ personnel en clair dans `audit_logs` (`Auditable::$auditPersonal`, valeur `[donnée personnelle]`) ni dans les logs ; l'anonymisation (`Gdpr/Anonymiser`) purge aussi les lignes d'import et les pièces jointes.
-- **Visibilité** : toute requête sur une fiche passe par `CrmVisibility` (le Responsable DAS ne voit que ses DAS suivis) ; les `Route::bind` du `CrmServiceProvider` renvoient 404 pour une fiche hors périmètre.
+- **Visibilité** : toute requête sur une fiche passe par `CrmVisibility`, piloté par le **périmètre** du droit (voir « 0.5.0 : droits et rôles ») et non par le nom du rôle ; les `Route::bind` du `CrmServiceProvider` renvoient 404 pour une fiche hors périmètre de consultation.
 
 ## Modules Catalogue et Devis (lot 1d) : points d'architecture à connaître
 
@@ -78,6 +78,17 @@ Guide utilisateur : `tms/docs/crm.md` (§ 4 catalogue, § 5 devis) ; réglages :
 - **PDF** : `Core\Documents\PdfRenderer` (Gotenberg, `config/documents.php`, `GOTENBERG_URL`) est le seul moteur ; `QuotePdf` + `resources/views/documents/quote*.blade.php` (CSP sans ressource externe, logo en data URI, `{{ }}` seulement). Un devis envoyé sert toujours son archive (`TenantStorage` zone `quotes`) ; sans archive : 410, jamais de nouveau rendu. Échec Gotenberg = `PdfRenderingFailed` (503, message français).
 - **Données personnelles** : `recipient_snapshot`, `notes`, `refusal_reason` dans `$auditPersonal` ; `email_*` hors audit ; échecs SMTP sans texte du serveur (`QuoteMailFailed`) ; `QuoteAnonymisation` (appelé par l'Anonymiser) efface aussi les PDF archivés.
 - **Taux de réussite** : `QuoteSuccessRate` passe par `QuoteListQuery` (même source que la liste et l'export : filtres et visibilité DAS).
+
+## 0.5.0 : droits et rôles : points d'architecture à connaître
+
+Guide : `tms/docs/admin.md` (§ 10), `tms/docs/crm.md` (§ 13 bis).
+
+- **Périmètres** (`Core\Access\AccessScope` : `own`, `das`, `all` ; table `role_permission_scopes`, sans ligne = `all`) : un module déclare ses droits avec `Permissions::registerModule(..., $scoped, $defaultScopesFor)` (`scoped` = droits à périmètre, `defaultScopesFor` = périmètre par défaut par rôle système). « Ses fiches » = `responsible_user_id` **ou** `created_by` ; un devis suit son opportunité ou son créateur.
+- **`CrmVisibility`** : chaque méthode prend le **droit** (`Permissions::FICHES_VIEW`, `…_UPDATE`, `…_DELETE`…) et en lit le périmètre de l'utilisateur ; `allows($user, $permission, $record)` répond pour un enregistrement. Le périmètre de modification peut être plus large que celui de consultation : la fiche hors périmètre de consultation reste en 404. **Aucun test sur un nom de rôle** dans le code métier (ni `hasRole`, ni `Role::…` hors des droits par défaut) : tout passe par un droit et son périmètre.
+- **Rôles personnalisés** : `RoleCatalogue` (création, renommage, 2FA, suppression ; libellé unique sérialisé par verrou) ; un rôle personnalisé est nommé `custom_<uuid>` (`roles.name`, jamais affiché), son libellé est `roles.label`, `roles.system` distingue les six rôles système (jamais supprimés), `roles.requires_2fa` règle la 2FA (toujours vraie pour `admin_organisme` et `direction`, dans `RoleModel::requires_2fa()` aussi). `Permissions::LOCKED` n'est jamais accordé à un autre rôle. Un rôle ne se supprime pas tant qu'un utilisateur (actif ou désactivé) ou une invitation non expirée le porte.
+- **`RoleScopesChanged`** : évènement émis (après commit) quand les périmètres d'un rôle changent ; le Crm l'écoute (`FollowedDas`) pour la page Utilisateurs (DAS suivis). `PrimaryRoleChanged` couvre le changement de rôle d'un utilisateur.
+- **Migration des droits** (`2026_12_06_000002_split_crm_permissions`) : organisme par organisme (`set_config('app.tenant_id', …)`), convertit les anciens `crm.view|create|update|delete` ; `tms:permissions:sync` n'accorde ensuite que les droits par défaut **nouveaux** (`role_permission_defaults_applied`).
+- **Chiffre d'affaires** (`tms/app/Modules/Crm/Revenue/`) : `DasRevenue::for($user, Period)` en **centimes entiers** (`brick/math`, jamais de float), jours de Paris ; un devis compte à `accepted_on` par le `das_id` de sa ligne (jamais le Catalogue), une opportunité gagnée à `won_on` **seulement sans devis accepté** (jamais deux fois), corbeille exclue, ligne sans DAS = DAS de l'opportunité. `RevenueSources` applique le périmètre de `crm.revenue.view` ; `RevenueTargets` : un objectif par DAS et par type de période (`revenue_targets`, pas de somme des mois).
 
 ## Conventions
 
