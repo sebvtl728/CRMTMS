@@ -71,7 +71,7 @@ it('stores a scope and journals the change with the previous value', function ()
     grantFakeDefaults();
     $user = commercial();
 
-    app(RoleMatrix::class)->setScope(Role::Commercial, SCOPED, AccessScope::Das);
+    app(RoleMatrix::class)->setScope(RoleModel::forSystem(Role::Commercial), SCOPED, AccessScope::Das);
 
     expect(Scopes::of($user, SCOPED))->toBe(AccessScope::Das);
     $log = AuditLog::query()->where('event', 'roles.scope_changed')->sole();
@@ -82,20 +82,20 @@ it('stores a scope and journals the change with the previous value', function ()
 it('never changes the scope of the administrator role', function () {
     grantFakeDefaults();
 
-    app(RoleMatrix::class)->setScope(Role::AdminOrganisme, SCOPED, AccessScope::Own);
+    app(RoleMatrix::class)->setScope(RoleModel::forSystem(Role::AdminOrganisme), SCOPED, AccessScope::Own);
 })->throws(AccessDeniedHttpException::class);
 
 it('refuses a scope on a non scoped permission', function () {
     grantFakeDefaults();
 
-    app(RoleMatrix::class)->setScope(Role::Commercial, UNSCOPED, AccessScope::Own);
+    app(RoleMatrix::class)->setScope(RoleModel::forSystem(Role::Commercial), UNSCOPED, AccessScope::Own);
 })->throws(AccessDeniedHttpException::class);
 
 it('asks to grant the right first when the permission is not granted', function () {
     grantFakeDefaults();
 
     try {
-        app(RoleMatrix::class)->setScope(Role::Assistant, SCOPED, AccessScope::Own);
+        app(RoleMatrix::class)->setScope(RoleModel::forSystem(Role::Assistant), SCOPED, AccessScope::Own);
         $this->fail('422 attendu');
     } catch (HttpException $e) {
         expect($e->getStatusCode())->toBe(422)->and($e->getMessage())->toBe("Accordez d'abord ce droit.");
@@ -105,10 +105,10 @@ it('asks to grant the right first when the permission is not granted', function 
 it('drops the scope row when the permission is revoked', function () {
     grantFakeDefaults();
     $matrix = app(RoleMatrix::class);
-    $matrix->setScope(Role::Commercial, SCOPED, AccessScope::Own);
+    $matrix->setScope(RoleModel::forSystem(Role::Commercial), SCOPED, AccessScope::Own);
     expect(DB::table('role_permission_scopes')->where('permission', SCOPED)->count())->toBe(1);
 
-    $matrix->set(Role::Commercial, SCOPED, false);
+    $matrix->set(RoleModel::forSystem(Role::Commercial), SCOPED, false);
 
     expect(DB::table('role_permission_scopes')->count())->toBe(0)
         ->and(Scopes::of(commercial(), SCOPED))->toBeNull();
@@ -123,8 +123,8 @@ it('keeps scopes isolated between organismes', function () {
     $theirs = userIn($other, []);
     app(TenantContext::class)->run($other, fn () => $theirs->assignPrimaryRole(Role::Commercial));
 
-    app(RoleMatrix::class)->setScope(Role::Commercial, SCOPED, AccessScope::Das);
-    app(TenantContext::class)->run($other, fn () => app(RoleMatrix::class)->setScope(Role::Commercial, SCOPED, AccessScope::Own));
+    app(RoleMatrix::class)->setScope(RoleModel::forSystem(Role::Commercial), SCOPED, AccessScope::Das);
+    app(TenantContext::class)->run($other, fn () => app(RoleMatrix::class)->setScope(RoleModel::forSystem(Role::Commercial), SCOPED, AccessScope::Own));
 
     expect(Scopes::of($mine, SCOPED))->toBe(AccessScope::Das);
     app(TenantContext::class)->run($other, function () use ($theirs) {
@@ -153,7 +153,7 @@ it('grants the default scope once with the default right', function () {
     $row = fn () => DB::table('role_permission_scopes')->where('permission', SCOPED)->value('scope');
     expect($row())->toBe('own');
 
-    app(RoleMatrix::class)->setScope(Role::Commercial, SCOPED, AccessScope::Das);
+    app(RoleMatrix::class)->setScope(RoleModel::forSystem(Role::Commercial), SCOPED, AccessScope::Das);
     PermissionSync::forTenant(tenant());
     RoleSeeder::seedFor(tenant());
 
@@ -163,11 +163,11 @@ it('grants the default scope once with the default right', function () {
 it('writes the default scopes again on reset and tells which scopes a role uses', function () {
     PermissionSync::forTenant(tenant());
     $matrix = app(RoleMatrix::class);
-    $matrix->setScope(Role::Commercial, SCOPED, AccessScope::Das);
+    $matrix->setScope(RoleModel::forSystem(Role::Commercial), SCOPED, AccessScope::Das);
     expect(Scopes::roleUses(commercialRole(), AccessScope::Das))->toBeTrue()
         ->and(DB::table('role_permission_scopes')->where('role_id', commercialRole()->id)->where('permission', SCOPED)->value('scope'))->toBe('das');
 
-    $matrix->reset(Role::Commercial);
+    $matrix->reset(RoleModel::forSystem(Role::Commercial));
 
     expect(DB::table('role_permission_scopes')->where('permission', SCOPED)->value('scope'))->toBe('own')
         ->and(Scopes::roleUses(commercialRole(), AccessScope::Own))->toBeTrue()
@@ -189,10 +189,10 @@ it('exposes the scope options in French', function () {
 it('keeps the default scope when a right is revoked then granted again', function () {
     PermissionSync::forTenant(tenant());
     $matrix = app(RoleMatrix::class);
-    $matrix->setScope(Role::Commercial, SCOPED, AccessScope::Das);
+    $matrix->setScope(RoleModel::forSystem(Role::Commercial), SCOPED, AccessScope::Das);
 
-    $matrix->set(Role::Commercial, SCOPED, false);
-    $matrix->set(Role::Commercial, SCOPED, true);
+    $matrix->set(RoleModel::forSystem(Role::Commercial), SCOPED, false);
+    $matrix->set(RoleModel::forSystem(Role::Commercial), SCOPED, true);
 
     expect(Scopes::of(commercial(), SCOPED))->toBe(AccessScope::Own)
         ->and(DB::table('role_permission_scopes')->where('permission', SCOPED)->value('scope'))->toBe('own');

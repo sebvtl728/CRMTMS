@@ -7,6 +7,7 @@ use App\Modules\Core\Access\AccessScope;
 use App\Modules\Core\Access\Permissions as CorePermissions;
 use App\Modules\Core\Access\PrimaryRoleChanged;
 use App\Modules\Core\Access\Role;
+use App\Modules\Core\Access\RoleScopesChanged;
 use App\Modules\Core\Access\Scopes;
 use App\Modules\Core\Audit\MorphAliases;
 use App\Modules\Core\References\ReferenceList;
@@ -122,6 +123,7 @@ class CrmServiceProvider extends ServiceProvider
         self::registerContactSources();
         FollowedDas::registerOnUsersPage();
         Event::listen(PrimaryRoleChanged::class, FollowedDas::onRoleChanged(...));
+        Event::listen(RoleScopesChanged::class, FollowedDas::onRoleScopesChanged(...));
 
         // Check + download count together: 10 exports a minute per user.
         RateLimiter::for('crm-export', fn (Request $request) => Limit::perMinute(20)->by('crm-export:'.($request->user()?->getAuthIdentifier() ?? $request->ip()))

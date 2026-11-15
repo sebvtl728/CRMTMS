@@ -4,6 +4,7 @@ namespace App\Console\Commands;
 
 use App\Console\Commands\Concerns\ResolvesTenantOption;
 use App\Modules\Core\Access\Role;
+use App\Modules\Core\Access\RoleModel;
 use App\Modules\Core\Audit\AuditRecorder;
 use App\Modules\Core\Tenancy\Tenant;
 use App\Modules\Core\Tenancy\TenantContext;
@@ -25,7 +26,7 @@ class UserActivationLink extends Command
     protected $signature = 'tms:user:activation-link
         {email : Adresse e-mail du compte}
         {--tenant= : Identifiant (slug) de l\'organisme (défaut : TMS_DEFAULT_TENANT)}
-        {--role= : Rôle, obligatoire pour une nouvelle adresse (admin_organisme, direction, commercial…)}
+        {--role= : Rôle, obligatoire pour une nouvelle adresse (admin_organisme, direction, commercial… ou libellé d\'un rôle personnalisé)}
         {--name= : Nom affiché, pour une nouvelle adresse (défaut : partie locale de l\'e-mail)}';
 
     protected $description = 'Émet un nouveau lien d\'activation pour un compte non activé ou une nouvelle adresse';
@@ -39,26 +40,41 @@ class UserActivationLink extends Command
             return self::FAILURE;
         }
 
-        $role = null;
-        if (($roleOption = (string) $this->option('role')) !== '') {
-            $role = Role::tryFrom($roleOption);
-            if ($role === null) {
-                $this->error("Rôle inconnu : « {$roleOption} ». Rôles possibles : ".implode(', ', array_column(Role::cases(), 'value')).'.');
-
-                return self::FAILURE;
-            }
-        }
-
         $tenant = $this->tenantFromOption();
         if ($tenant === null) {
             return self::FAILURE;
         }
 
-        return $tenants->run($tenant, fn () => $this->issue($tenant, $email, $role, $audit));
+        return $tenants->run($tenant, fn () => $this->issue($tenant, $email, (string) $this->option('role'), $audit));
     }
 
-    private function issue(Tenant $tenant, string $email, ?Role $role, AuditRecorder $audit): int
+    /**
+     * A role of the organisme by its name (admin_organisme…) or its label
+     * (case and accents ignored, for a custom role).
+     */
+    private function findRole(string $option): ?RoleModel
     {
+        $wanted = RoleModel::normaliseLabel($option);
+
+        return RoleModel::named($option)
+            ?? RoleModel::query()->ordered()->get()->first(fn (RoleModel $role) => RoleModel::normaliseLabel($role->label()) === $wanted);
+    }
+
+    private function issue(Tenant $tenant, string $email, string $roleOption, AuditRecorder $audit): int
+    {
+        $role = null;
+        if ($roleOption !== '') {
+            $role = $this->findRole($roleOption);
+            if ($role === null) {
+                $this->error("Rôle inconnu : « {$roleOption} ». Rôles possibles : ".implode(', ', array_merge(
+                    array_column(Role::cases(), 'value'),
+                    RoleModel::query()->ordered()->where('system', false)->get()->map(fn (RoleModel $r) => '« '.$r->label().' »')->all(),
+                )).'.');
+
+                return self::FAILURE;
+            }
+        }
+
         $user = User::query()->where('email', $email)->first();
 
         if ($user !== null && ! $user->isActive()) {
@@ -87,7 +103,7 @@ class UserActivationLink extends Command
             $invitation = Invitation::issue($email, (string) $name, $role);
             $audit->record('users.activation_reissued', $invitation, [], [
                 'email' => $email,
-                'role' => $role->value,
+                'role' => $role->name,
                 'by' => 'console',
             ]);
 

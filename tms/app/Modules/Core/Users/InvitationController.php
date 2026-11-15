@@ -5,15 +5,18 @@ namespace App\Modules\Core\Users;
 use App\Http\Controllers\Controller;
 use App\Modules\Connectors\Smtp\SmtpHostRefused;
 use App\Modules\Connectors\Smtp\TenantMailer;
-use App\Modules\Core\Access\Role;
+use App\Modules\Core\Access\RoleCatalogue;
+use App\Modules\Core\Access\RoleModel;
 use App\Modules\Core\Audit\AuditRecorder;
 use App\Modules\Core\Companies\Company;
 use App\Modules\Core\Tenancy\TenantContext;
+use Closure;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use Inertia\Response;
 use Symfony\Component\Mailer\Exception\TransportExceptionInterface;
@@ -32,12 +35,12 @@ class InvitationController extends Controller
             'status' => $request->session()->get('status'),
             'warning' => $request->session()->get('warning'),
             'activationLink' => $request->session()->get('activation_link'),
-            'roleOptions' => Role::options(),
+            'roleOptions' => RoleCatalogue::options(),
             // Modules add their own props/columns (« DAS suivis » of the CRM).
             ...UserPageExtensions::pageProps($request),
             'users' => User::query()->with('roles')->orderBy('name')->get()->map(fn (User $user) => [
                 'id' => $user->id,
-                'role' => $user->role()?->value,
+                'role' => $user->role()?->name,
                 'name' => $user->name,
                 'email' => $user->email,
                 'active' => $user->isActive(),
@@ -51,7 +54,7 @@ class InvitationController extends Controller
                 'id' => $invitation->id,
                 'email' => $invitation->email,
                 'name' => $invitation->name,
-                'role' => $invitation->role->label(),
+                'role' => $invitation->roleLabel(),
                 'expires_at' => $invitation->expires_at->toIso8601String(),
                 'expired' => $invitation->isExpired(),
             ]),
@@ -61,7 +64,7 @@ class InvitationController extends Controller
     public function create(): Response
     {
         return Inertia::render('admin/users/invite', [
-            'roles' => Role::options(),
+            'roles' => RoleCatalogue::options(),
         ]);
     }
 
@@ -78,14 +81,19 @@ class InvitationController extends Controller
                     ->whereNotNull('password'),
             ],
             'name' => ['required', 'string', 'max:255'],
-            'role' => ['required', Rule::enum(Role::class)],
+            'role' => ['required', 'string', 'max:100', function (string $attribute, mixed $value, Closure $fail): void {
+                if (! is_string($value) || RoleModel::named($value) === null) {
+                    $fail('Ce rôle n\'existe pas.');
+                }
+            }],
         ], [
             'email.unique' => 'Un compte existe déjà avec cette adresse e-mail.',
         ]);
 
         /** @var User $inviter */
         $inviter = $request->user();
-        $invitation = Invitation::issue($validated['email'], $validated['name'], Role::from($validated['role']), $inviter);
+        $role = RoleModel::named($validated['role']) ?? throw ValidationException::withMessages(['role' => 'Ce rôle n\'existe pas.']);
+        $invitation = Invitation::issue($validated['email'], $validated['name'], $role, $inviter);
 
         return $this->deliver($invitation, 'sent');
     }
@@ -100,7 +108,9 @@ class InvitationController extends Controller
 
         /** @var User $inviter */
         $inviter = $request->user();
-        $fresh = DB::transaction(fn () => Invitation::issue($invitation->email, $invitation->name, $invitation->role, $inviter));
+        $role = $invitation->roleModel()
+            ?? throw ValidationException::withMessages(['invitation' => 'Le rôle de cette invitation n\'existe plus : révoquez-la puis invitez de nouveau.']);
+        $fresh = DB::transaction(fn () => Invitation::issue($invitation->email, $invitation->name, $role, $inviter));
 
         return $this->deliver($fresh, 'resent');
     }
@@ -110,7 +120,7 @@ class InvitationController extends Controller
         abort_if($invitation->accepted_at !== null, 404);
 
         DB::transaction(function () use ($invitation) {
-            $this->audit->record('users.invitation_revoked', $invitation, [], ['email' => $invitation->email, 'role' => $invitation->role->value]);
+            $this->audit->record('users.invitation_revoked', $invitation, [], ['email' => $invitation->email, 'role' => $invitation->role]);
             $invitation->delete();
         });
 
@@ -127,7 +137,7 @@ class InvitationController extends Controller
     {
         $url = route('activation.show', $invitation->plainToken);
         $company = Company::query()->where('is_default', true)->first();
-        $audited = ['email' => $invitation->email, 'role' => $invitation->role->value];
+        $audited = ['email' => $invitation->email, 'role' => $invitation->role];
         $verb = $kind === 'resent' ? 'renvoyée' : 'envoyée';
 
         if (TenantMailer::deliversNowhere($company)) {

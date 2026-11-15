@@ -3,9 +3,11 @@
 namespace App\Modules\Core\Access;
 
 /**
- * Roles of an account inside its organisme (one primary role per user in
- * lot 1a). Each tenant has its own spatie role records (RoleSeeder), named
- * after these values; the default permissions are in Permissions::defaultsFor().
+ * The six system roles of every organisme (one primary role per user). Each
+ * tenant has its own spatie role records (RoleSeeder, RoleModel with
+ * system = true), named after these values; the default permissions are in
+ * Permissions::defaultsFor(). An organisme adds its own roles with
+ * RoleCatalogue (RoleModel, never an enum case).
  */
 enum Role: string
 {
@@ -31,13 +33,5 @@ enum Role: string
     public function requires2fa(): bool
     {
         return in_array($this, [self::AdminOrganisme, self::Direction], true);
-    }
-
-    /**
-     * @return list<array{value: string, label: string}>
-     */
-    public static function options(): array
-    {
-        return array_map(fn (self $role) => ['value' => $role->value, 'label' => $role->label()], self::cases());
     }
 }

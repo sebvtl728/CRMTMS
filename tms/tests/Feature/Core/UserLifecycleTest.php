@@ -1,6 +1,7 @@
 <?php
 
 use App\Modules\Core\Access\Role;
+use App\Modules\Core\Access\RoleModel;
 use App\Modules\Core\Audit\AuditLog;
 use App\Modules\Core\References\CapFormationReferenceSeeder;
 use App\Modules\Core\References\ReferenceList;
@@ -61,7 +62,7 @@ it('cannot deactivate or demote the last active admin', function () {
     $this->actingAs($actor)->patchJson("/admin/users/{$this->admin->id}/role", ['role' => 'direction'])
         ->assertStatus(422)->assertJsonValidationErrors(['user' => $message]);
 
-    expect($this->admin->fresh()->isActive())->toBeTrue()->and($this->admin->fresh()->role())->toBe(Role::AdminOrganisme);
+    expect($this->admin->fresh()->isActive())->toBeTrue()->and($this->admin->fresh()->role()?->systemRole())->toBe(Role::AdminOrganisme);
 
     // With a second active admin both operations pass.
     $second = admin();
@@ -87,7 +88,7 @@ it('changes a user role and records old and new', function () {
     $this->actingAs($this->admin)->patchJson("/admin/users/{$user->id}/role", ['role' => 'direction'])->assertRedirect();
 
     $log = AuditLog::query()->where('event', 'access.role_changed')->where('auditable_id', $user->id)->orderByDesc('id')->firstOrFail();
-    expect($user->fresh()->role())->toBe(Role::Direction)
+    expect($user->fresh()->role()?->systemRole())->toBe(Role::Direction)
         ->and($log->old_values)->toMatchArray(['role' => 'commercial'])
         ->and($log->new_values)->toMatchArray(['role' => 'direction'])
         ->and(DB::table('sessions')->where('user_id', $user->id)->count())->toBe(0);
@@ -107,10 +108,10 @@ it('keeps the acting admin session when they change their own role', function ()
     $request->setUserResolver(fn () => $this->admin);
     app(UserController::class)->updateRole($request, $this->admin);
 
-    expect($this->admin->fresh()->role())->toBe(Role::Direction)
+    expect($this->admin->fresh()->role()?->systemRole())->toBe(Role::Direction)
         ->and(DB::table('sessions')->where('id', 'drop-me')->exists())->toBeFalse()
         ->and(DB::table('sessions')->where('id', $current)->exists())->toBeTrue()
-        ->and($second->fresh()->role())->toBe(Role::AdminOrganisme);
+        ->and($second->fresh()->role()?->systemRole())->toBe(Role::AdminOrganisme);
 });
 
 it('rejects an unknown role', function () {
@@ -121,7 +122,7 @@ it('rejects an unknown role', function () {
 it('resends an invitation with a new token and expires the old one', function () {
     config(['mail.default' => 'smtp']);
     Mail::fake();
-    $invitation = Invitation::issue('nouveau@cap.test', 'Nouveau', Role::Commercial, $this->admin);
+    $invitation = Invitation::issue('nouveau@cap.test', 'Nouveau', RoleModel::forSystem(Role::Commercial), $this->admin);
     $old = $invitation->plainToken;
     $invitation->forceFill(['expires_at' => now()->addHour()])->save();
 
@@ -136,7 +137,7 @@ it('resends an invitation with a new token and expires the old one', function ()
 });
 
 it('revokes a pending invitation', function () {
-    $invitation = Invitation::issue('nouveau@cap.test', 'Nouveau', Role::Commercial, $this->admin);
+    $invitation = Invitation::issue('nouveau@cap.test', 'Nouveau', RoleModel::forSystem(Role::Commercial), $this->admin);
     $token = $invitation->plainToken;
 
     $this->actingAs($this->admin)->deleteJson("/admin/invitations/{$invitation->id}")->assertRedirect();
@@ -148,7 +149,7 @@ it('revokes a pending invitation', function () {
 
 it('assistant cannot manage users', function () {
     $user = commercial();
-    $invitation = Invitation::issue('nouveau@cap.test', 'Nouveau', Role::Commercial);
+    $invitation = Invitation::issue('nouveau@cap.test', 'Nouveau', RoleModel::forSystem(Role::Commercial));
     $this->actingAs(assistant(twoFactor: true));
 
     $this->patchJson("/admin/users/{$user->id}/role", ['role' => 'direction'])->assertForbidden();
@@ -189,7 +190,7 @@ it('counts the active admins after taking the per-organisme advisory lock', func
 
     $this->actingAs($actor)->patchJson("/admin/users/{$a->id}/role", ['role' => 'direction'])
         ->assertStatus(422)->assertJsonValidationErrors(['user' => 'Il doit rester au moins un administrateur actif.']);
-    expect($fired)->toBeTrue()->and($a->fresh()->role())->toBe(Role::AdminOrganisme);
+    expect($fired)->toBeTrue()->and($a->fresh()->role()?->systemRole())->toBe(Role::AdminOrganisme);
 });
 
 it('empties the followed DAS when a user leaves the Responsable DAS role, with an audit trail', function () {
@@ -235,7 +236,7 @@ it('keeps the last-admin guard reusable for every path that removes an admin', f
 it('lets tms:user:reset-2fa leave the administrators untouched', function () {
     $this->artisan('tms:user:reset-2fa', ['email' => $this->admin->email, '--tenant' => tenant()->slug])->assertSuccessful();
 
-    expect($this->admin->fresh()->isActive())->toBeTrue()->and($this->admin->fresh()->role())->toBe(Role::AdminOrganisme);
+    expect($this->admin->fresh()->isActive())->toBeTrue()->and($this->admin->fresh()->role()?->systemRole())->toBe(Role::AdminOrganisme);
 });
 
 it('refuses to run the last-admin guard outside a transaction', function () {

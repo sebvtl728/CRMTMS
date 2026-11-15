@@ -2,6 +2,8 @@
 
 namespace App\Modules\Core\Access;
 
+use App\Exceptions\UserFacingHttpException;
+use App\Modules\Core\Users\Invitation;
 use App\Modules\Core\Users\InvitationAccepted;
 use App\Modules\Core\Users\User;
 use Illuminate\Cache\RateLimiting\Limit;
@@ -42,8 +44,9 @@ class AccessServiceProvider extends ServiceProvider
         });
 
         // The invited role becomes the primary role once the account is activated.
+        // (ActivationController checked, under lock, that the role still exists.)
         Event::listen(InvitationAccepted::class, function (InvitationAccepted $event): void {
-            $event->user->assignPrimaryRole($event->invitation->role);
+            $event->user->assignPrimaryRole($event->invitation->roleModel() ?? throw new UserFacingHttpException(410, Invitation::ROLE_GONE));
         });
     }
 }

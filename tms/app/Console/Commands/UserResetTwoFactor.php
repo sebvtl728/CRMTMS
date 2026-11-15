@@ -59,7 +59,7 @@ class UserResetTwoFactor extends Command
         });
 
         $this->info("Double authentification réinitialisée pour {$email} ; ses sessions ont été fermées.");
-        $this->line($user->role()?->requires2fa()
+        $this->line($twoFactor->isRequiredFor($user)
             ? 'À la prochaine connexion, le compte devra enrôler un nouvel appareil.'
             : 'Le compte pourra réactiver la double authentification depuis ses paramètres.');
 

@@ -20,6 +20,11 @@ function rolePermissions(Role $role): array
     return RoleModel::query()->where('name', $role->value)->sole()->permissions()->pluck('name')->sort()->values()->all();
 }
 
+function roleId(Role $role): string
+{
+    return RoleModel::forSystem($role)->id;
+}
+
 it('gives every permission a French label and a theme', function () {
     foreach (Permissions::all() as $permission) {
         $label = Permissions::label($permission);
@@ -62,7 +67,7 @@ it('grants and revokes a permission of a role, journaled, effective at the next 
     $assistant = assistant();
     expect($assistant->can('crm.export'))->toBeFalse();
 
-    $this->from('/admin/roles')->post('/admin/roles/assistant', ['permission' => 'crm.export', 'granted' => true])
+    $this->from('/admin/roles')->post('/admin/roles/'.roleId(Role::Assistant), ['permission' => 'crm.export', 'granted' => true])
         ->assertRedirect('/admin/roles')->assertSessionHas('status', 'Droit « Exporter vers Excel » accordé au rôle Assistant.');
     expect(rolePermissions(Role::Assistant))->toContain('crm.export');
     $log = AuditLog::query()->where('event', 'roles.permission_granted')->sole();
@@ -71,7 +76,7 @@ it('grants and revokes a permission of a role, journaled, effective at the next 
     $this->actingAs($assistant->fresh())->get('/crm/organisations/export/check')->assertOk();
 
     $this->actingAs(admin(twoFactor: true));
-    $this->post('/admin/roles/assistant', ['permission' => 'crm.quotes.update', 'granted' => false])->assertSessionHasNoErrors();
+    $this->post('/admin/roles/'.roleId(Role::Assistant), ['permission' => 'crm.quotes.update', 'granted' => false])->assertSessionHasNoErrors();
     expect(rolePermissions(Role::Assistant))->not->toContain('crm.quotes.update')
         ->and(AuditLog::query()->where('event', 'roles.permission_revoked')->sole()->new_values)->toBe(['role' => 'assistant', 'permission' => 'crm.quotes.update']);
 });
@@ -79,11 +84,11 @@ it('grants and revokes a permission of a role, journaled, effective at the next 
 it('refuses to change the administrator, the locked permissions or an unknown one', function () {
     $this->actingAs(admin(twoFactor: true));
 
-    $this->post('/admin/roles/admin_organisme', ['permission' => 'crm.export', 'granted' => false])->assertForbidden();
-    $this->post('/admin/roles/admin_organisme/reset')->assertForbidden();
-    $this->post('/admin/roles/direction', ['permission' => Permissions::USERS_MANAGE, 'granted' => true])->assertForbidden();
-    $this->post('/admin/roles/direction', ['permission' => Permissions::ROLES_MANAGE, 'granted' => true])->assertForbidden();
-    $this->post('/admin/roles/direction', ['permission' => 'nope.manage', 'granted' => true])->assertSessionHasErrors('permission');
+    $this->post('/admin/roles/'.roleId(Role::AdminOrganisme), ['permission' => 'crm.export', 'granted' => false])->assertForbidden();
+    $this->post('/admin/roles/'.roleId(Role::AdminOrganisme).'/reset')->assertForbidden();
+    $this->post('/admin/roles/'.roleId(Role::Direction), ['permission' => Permissions::USERS_MANAGE, 'granted' => true])->assertForbidden();
+    $this->post('/admin/roles/'.roleId(Role::Direction), ['permission' => Permissions::ROLES_MANAGE, 'granted' => true])->assertForbidden();
+    $this->post('/admin/roles/'.roleId(Role::Direction), ['permission' => 'nope.manage', 'granted' => true])->assertSessionHasErrors('permission');
     $this->post('/admin/roles/inconnu', ['permission' => 'crm.export', 'granted' => true])->assertNotFound();
 
     expect(rolePermissions(Role::AdminOrganisme))->toContain('crm.export')
@@ -92,10 +97,10 @@ it('refuses to change the administrator, the locked permissions or an unknown on
 
 it('resets a role to exactly its default permissions', function () {
     $this->actingAs(admin(twoFactor: true));
-    $this->post('/admin/roles/commercial', ['permission' => 'crm.fiches.delete', 'granted' => false]);
-    $this->post('/admin/roles/commercial', ['permission' => 'catalogue.manage', 'granted' => true]);
+    $this->post('/admin/roles/'.roleId(Role::Commercial), ['permission' => 'crm.fiches.delete', 'granted' => false]);
+    $this->post('/admin/roles/'.roleId(Role::Commercial), ['permission' => 'catalogue.manage', 'granted' => true]);
 
-    $this->post('/admin/roles/commercial/reset')->assertSessionHasNoErrors()
+    $this->post('/admin/roles/'.roleId(Role::Commercial).'/reset')->assertSessionHasNoErrors()
         ->assertSessionHas('status', 'Droits par défaut rétablis pour le rôle Commercial.');
 
     expect(rolePermissions(Role::Commercial))->toBe(collect(Permissions::defaultsFor(Role::Commercial))->sort()->values()->all())
@@ -107,7 +112,7 @@ it('changes only the current organisme, and a later sync never grants a removed 
     $other = Tenant::factory()->create();
     PermissionSync::forTenant($other);
 
-    $this->post('/admin/roles/commercial', ['permission' => 'crm.fiches.delete', 'granted' => false])->assertSessionHasNoErrors();
+    $this->post('/admin/roles/'.roleId(Role::Commercial), ['permission' => 'crm.fiches.delete', 'granted' => false])->assertSessionHasNoErrors();
     PermissionSync::run();
 
     expect(rolePermissions(Role::Commercial))->not->toContain('crm.fiches.delete');
@@ -119,7 +124,7 @@ it('never grants the connectors to another role (an SMTP relay would capture inv
     $this->actingAs(admin(twoFactor: true));
 
     expect(Permissions::LOCKED)->toContain(Permissions::CONNECTORS_MANAGE);
-    $this->post('/admin/roles/direction', ['permission' => Permissions::CONNECTORS_MANAGE, 'granted' => true])->assertForbidden();
+    $this->post('/admin/roles/'.roleId(Role::Direction), ['permission' => Permissions::CONNECTORS_MANAGE, 'granted' => true])->assertForbidden();
     expect(rolePermissions(Role::Direction))->not->toContain(Permissions::CONNECTORS_MANAGE);
 });
 

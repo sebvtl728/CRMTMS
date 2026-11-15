@@ -4,6 +4,7 @@ namespace App\Modules\Core\Users;
 
 use App\Exceptions\UserFacingHttpException;
 use App\Http\Controllers\Controller;
+use App\Modules\Core\Access\RoleCatalogue;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -14,7 +15,8 @@ use Inertia\Response;
 
 /**
  * Account activation through an invitation link (/activation/{token}).
- * Unknown, already used or other-tenant token: 404. Expired token: 410.
+ * Unknown, already used or other-tenant token: 404. Expired token, or role
+ * deleted since the invitation: 410.
  */
 class ActivationController extends Controller
 {
@@ -42,6 +44,11 @@ class ActivationController extends Controller
             $invitation = Invitation::query()->pending()
                 ->where('token_hash', Invitation::hashToken($token))
                 ->lockForUpdate()->first() ?? abort(404);
+
+            // Locked shared until commit: the role cannot be deleted under the activation.
+            if (RoleCatalogue::lockedForAssignment($invitation->role) === null) {
+                throw new UserFacingHttpException(410, Invitation::ROLE_GONE);
+            }
 
             $user = User::query()->where('email', $invitation->email)->lockForUpdate()->first();
 
@@ -74,6 +81,9 @@ class ActivationController extends Controller
         }
         if ($invitation->isExpired()) {
             throw new UserFacingHttpException(410, 'Ce lien d\'activation a expiré. Demandez une nouvelle invitation à votre administrateur.');
+        }
+        if ($invitation->roleModel() === null) {
+            throw new UserFacingHttpException(410, Invitation::ROLE_GONE);
         }
 
         return $invitation;

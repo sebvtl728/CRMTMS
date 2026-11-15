@@ -13,10 +13,11 @@ use Spatie\Permission\PermissionRegistrar;
  * (`php artisan tms:permissions:sync`, run by ops/migrate.sh after each
  * migration; RoleSeeder for a new tenant).
  *
- *  - creates the missing permissions (global catalogue) and roles;
+ *  - creates the missing permissions (global catalogue) and system roles;
  *  - grants each role the default permissions never offered to it yet, and
  *    records them in role_permission_defaults_applied: a permission an
- *    administrator removed is never granted again.
+ *    administrator removed is never granted again. Custom roles
+ *    (RoleCatalogue) never receive default permissions.
  *
  * Idempotent. Runs under RLS, in each tenant's context (runtime connection).
  * One tenant failing never blocks the others; run() returns the failed ones.
@@ -88,7 +89,7 @@ final class PermissionSync
 
             foreach (Role::cases() as $role) {
                 $model = RoleModel::query()->where('name', $role->value)->where('guard_name', RoleSeeder::GUARD)->first()
-                    ?? RoleModel::create(['name' => $role->value, 'guard_name' => RoleSeeder::GUARD]);
+                    ?? RoleModel::create(['name' => $role->value, 'guard_name' => RoleSeeder::GUARD, 'system' => true, 'requires_2fa' => $role->requires2fa()]);
 
                 $new = array_values(array_diff(Permissions::defaultsFor($role), $offered->get($role->value, [])));
 

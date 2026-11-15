@@ -1,6 +1,7 @@
 <?php
 
 use App\Modules\Core\Access\Role;
+use App\Modules\Core\Access\RoleModel;
 use App\Modules\Core\Audit\AuditLog;
 use App\Modules\Core\Tenancy\TenantContext;
 use App\Modules\Core\Users\ExternalIdentity;
@@ -212,20 +213,20 @@ it('a reset token issued on tenant A cannot reset the same-email user of tenant 
 
 it('stores invitation tokens hashed', function () {
     inTenant();
-    $invitation = Invitation::issue('nouveau@cap.test', 'Nouveau Venu', Role::Commercial);
+    $invitation = Invitation::issue('nouveau@cap.test', 'Nouveau Venu', RoleModel::forSystem(Role::Commercial));
     $plain = $invitation->plainToken;
 
     $stored = Invitation::sole();
     expect($plain)->toHaveLength(128)
         ->and($stored->token_hash)->not->toBe($plain)
         ->and($stored->token_hash)->toBe(hash('sha256', $plain))
-        ->and($stored->role)->toBe(Role::Commercial)
+        ->and($stored->role)->toBe('commercial')
         ->and($stored->expires_at->between(now()->addHours(24)->subMinute(), now()->addHours(24)))->toBeTrue();
 });
 
 it('shows the activation page for a valid invitation', function () {
     inTenant();
-    $invitation = Invitation::issue('nouveau@cap.test', 'Nouveau Venu', Role::Commercial);
+    $invitation = Invitation::issue('nouveau@cap.test', 'Nouveau Venu', RoleModel::forSystem(Role::Commercial));
 
     $this->get("/activation/{$invitation->plainToken}")->assertOk()
         ->assertInertia(fn (Assert $page) => $page->component('auth/activate')
@@ -236,7 +237,7 @@ it('shows the activation page for a valid invitation', function () {
 
 it('activation creates the user with an argon2id password', function () {
     inTenant();
-    $invitation = Invitation::issue('nouveau@cap.test', 'Nouveau Venu', Role::Commercial);
+    $invitation = Invitation::issue('nouveau@cap.test', 'Nouveau Venu', RoleModel::forSystem(Role::Commercial));
 
     $this->post("/activation/{$invitation->plainToken}", [
         'password' => 'un-mot-de-passe-solide', 'password_confirmation' => 'un-mot-de-passe-solide',
@@ -256,7 +257,7 @@ it('activation creates the user with an argon2id password', function () {
 it('activation sets the password of an existing account without one', function () {
     inTenant();
     $pending = User::factory()->create(['email' => 'admin@cap.test', 'password' => null]);
-    $invitation = Invitation::issue('admin@cap.test', 'Admin', Role::AdminOrganisme);
+    $invitation = Invitation::issue('admin@cap.test', 'Admin', RoleModel::forSystem(Role::AdminOrganisme));
 
     $this->post("/activation/{$invitation->plainToken}", [
         'password' => 'un-mot-de-passe-solide', 'password_confirmation' => 'un-mot-de-passe-solide',
@@ -268,7 +269,7 @@ it('activation sets the password of an existing account without one', function (
 
 it('rejects passwords shorter than 12 characters', function () {
     inTenant();
-    $invitation = Invitation::issue('nouveau@cap.test', 'Nouveau Venu', Role::Commercial);
+    $invitation = Invitation::issue('nouveau@cap.test', 'Nouveau Venu', RoleModel::forSystem(Role::Commercial));
 
     $this->post("/activation/{$invitation->plainToken}", ['password' => 'Court123!', 'password_confirmation' => 'Court123!'])
         ->assertSessionHasErrors('password');
@@ -279,7 +280,7 @@ it('rejects passwords shorter than 12 characters', function () {
 it('rejects compromised passwords', function () {
     inTenant();
     $this->markPasswordAsCompromised('motdepasse-tres-connu');
-    $invitation = Invitation::issue('nouveau@cap.test', 'Nouveau Venu', Role::Commercial);
+    $invitation = Invitation::issue('nouveau@cap.test', 'Nouveau Venu', RoleModel::forSystem(Role::Commercial));
 
     $this->post("/activation/{$invitation->plainToken}", ['password' => 'motdepasse-tres-connu', 'password_confirmation' => 'motdepasse-tres-connu'])
         ->assertSessionHasErrors('password');
@@ -289,8 +290,8 @@ it('rejects compromised passwords', function () {
 
 it('invitation token is single use and expires after 24h', function () {
     inTenant();
-    $first = Invitation::issue('un@cap.test', 'Un', Role::Commercial);
-    $second = Invitation::issue('deux@cap.test', 'Deux', Role::Assistant);
+    $first = Invitation::issue('un@cap.test', 'Un', RoleModel::forSystem(Role::Commercial));
+    $second = Invitation::issue('deux@cap.test', 'Deux', RoleModel::forSystem(Role::Assistant));
     $password = ['password' => 'un-mot-de-passe-solide', 'password_confirmation' => 'un-mot-de-passe-solide'];
 
     $this->post("/activation/{$first->plainToken}", $password)->assertRedirect('/login');
@@ -308,7 +309,7 @@ it('an invitation of tenant A cannot be used on tenant B', function () {
     config(['tms.mode' => 'multi']);
     $a = tenantOnHost('a.test');
     tenantOnHost('b.test');
-    $invitation = app(TenantContext::class)->run($a, fn () => Invitation::issue('x@y.fr', 'X', Role::Commercial));
+    $invitation = app(TenantContext::class)->run($a, fn () => Invitation::issue('x@y.fr', 'X', RoleModel::forSystem(Role::Commercial)));
 
     $this->get("http://b.test/activation/{$invitation->plainToken}")->assertNotFound();
     $this->post("http://b.test/activation/{$invitation->plainToken}", [
@@ -330,7 +331,7 @@ it('lists only the users of the current tenant', function () {
         ->withRole(Role::AdminOrganisme)->withTwoFactor()->create(['name' => 'Admin A']));
     userIn($a, ['name' => 'Collègue A']);
     userIn($b, ['name' => 'Intrus B']);
-    app(TenantContext::class)->run($a, fn () => Invitation::issue('invite@a.test', 'Invité A', Role::Assistant));
+    app(TenantContext::class)->run($a, fn () => Invitation::issue('invite@a.test', 'Invité A', RoleModel::forSystem(Role::Assistant)));
 
     $this->actingAs($admin)->get('http://a.test/admin/users')->assertOk()
         ->assertInertia(fn (Assert $page) => $page->component('admin/users/index')
@@ -356,7 +357,7 @@ it('invites a user by e-mail', function () {
 
     $invitation = Invitation::sole();
     expect($invitation->email)->toBe('nouveau@cap.test')
-        ->and($invitation->role)->toBe(Role::Commercial)
+        ->and($invitation->role)->toBe('commercial')
         ->and($invitation->invited_by)->toBe($admin->id);
 
     Mail::assertSent(InvitationMail::class, fn (InvitationMail $mail) => $mail->hasTo('nouveau@cap.test')
@@ -378,8 +379,8 @@ it('validates invitations', function () {
 
 it('a new invitation replaces the pending one for the same e-mail', function () {
     inTenant();
-    $old = Invitation::issue('x@y.fr', 'X', Role::Commercial);
-    Invitation::issue('x@y.fr', 'X', Role::Assistant);
+    $old = Invitation::issue('x@y.fr', 'X', RoleModel::forSystem(Role::Commercial));
+    Invitation::issue('x@y.fr', 'X', RoleModel::forSystem(Role::Assistant));
 
     expect(Invitation::count())->toBe(1);
     $this->get("/activation/{$old->plainToken}")->assertNotFound();

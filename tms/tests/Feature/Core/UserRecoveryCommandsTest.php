@@ -1,6 +1,7 @@
 <?php
 
 use App\Modules\Core\Access\Role;
+use App\Modules\Core\Access\RoleModel;
 use App\Modules\Core\Audit\AuditLog;
 use App\Modules\Core\Tenancy\Tenant;
 use App\Modules\Core\Tenancy\TenantContext;
@@ -31,7 +32,7 @@ it('reissues an activation link for an account that never chose a password', fun
     $user = inTenantOnce($this->tenant, function () {
         $user = User::factory()->create(['email' => 'admin@cap.test', 'password' => null]);
         $user->assignPrimaryRole(Role::AdminOrganisme);
-        Invitation::issue('admin@cap.test', $user->name, Role::AdminOrganisme);
+        Invitation::issue('admin@cap.test', $user->name, RoleModel::forSystem(Role::AdminOrganisme));
 
         return $user;
     });
@@ -43,7 +44,7 @@ it('reissues an activation link for an account that never chose a password', fun
 
     inTenantOnce($this->tenant, function () use ($user) {
         $invitation = Invitation::query()->pending()->where('email', 'admin@cap.test')->sole();
-        expect($invitation->role)->toBe(Role::AdminOrganisme)
+        expect($invitation->role)->toBe('admin_organisme')
             ->and($user->fresh()->password)->toBeNull();
 
         $log = AuditLog::query()->where('event', 'users.activation_reissued')->sole();
@@ -58,7 +59,7 @@ it('invites a new address with the given role', function () {
         ->assertSuccessful();
 
     inTenantOnce($this->tenant, function () {
-        expect(Invitation::query()->pending()->where('email', 'secours@cap.test')->sole()->role)->toBe(Role::AdminOrganisme);
+        expect(Invitation::query()->pending()->where('email', 'secours@cap.test')->sole()->role)->toBe('admin_organisme');
     });
 });
 
@@ -70,7 +71,7 @@ it('the printed link activates the account with the given role', function () {
     $this->post("/activation/{$m[1]}", ['password' => 'un-mot-de-passe-solide', 'password_confirmation' => 'un-mot-de-passe-solide'])
         ->assertRedirect('/login');
 
-    expect(User::query()->where('email', 'secours@cap.test')->sole()->role())->toBe(Role::AdminOrganisme);
+    expect(User::query()->where('email', 'secours@cap.test')->sole()->role()?->systemRole())->toBe(Role::AdminOrganisme);
 });
 
 it('requires a role for a new address and refuses unknown roles', function () {

@@ -110,15 +110,15 @@ it('gives each user one primary role and replaces it on assignment', function ()
     Event::fake([PrimaryRoleChanged::class]);
     $user = commercial();
 
-    expect($user->role())->toBe(Role::Commercial);
-    Event::assertDispatched(PrimaryRoleChanged::class, fn ($e) => $e->user->is($user) && $e->previous === null && $e->role === Role::Commercial);
+    expect($user->role()?->systemRole())->toBe(Role::Commercial);
+    Event::assertDispatched(PrimaryRoleChanged::class, fn ($e) => $e->user->is($user) && $e->previous === null && $e->role->systemRole() === Role::Commercial);
 
     $user->assignPrimaryRole(Role::Direction);
 
-    expect($user->role())->toBe(Role::Direction)
-        ->and($user->fresh()->role())->toBe(Role::Direction)
+    expect($user->role()?->systemRole())->toBe(Role::Direction)
+        ->and($user->fresh()->role()?->systemRole())->toBe(Role::Direction)
         ->and($user->roles()->count())->toBe(1);
-    Event::assertDispatched(PrimaryRoleChanged::class, fn ($e) => $e->previous === Role::Commercial && $e->role === Role::Direction);
+    Event::assertDispatched(PrimaryRoleChanged::class, fn ($e) => $e->previous?->systemRole() === Role::Commercial && $e->role->systemRole() === Role::Direction);
 
     // Same role again: nothing changes, nothing to audit.
     $user->assignPrimaryRole(Role::Direction);
@@ -143,14 +143,14 @@ it('refuses to assign a role to a user of another tenant than the current one', 
 
 it('assigns the invited role on activation', function () {
     tenant();
-    $invitation = Invitation::issue('nouveau@cap.test', 'Nouveau', Role::ChargeRelations);
+    $invitation = Invitation::issue('nouveau@cap.test', 'Nouveau', RoleModel::forSystem(Role::ChargeRelations));
 
     $this->post("/activation/{$invitation->plainToken}", [
         'password' => 'un-mot-de-passe-solide',
         'password_confirmation' => 'un-mot-de-passe-solide',
     ])->assertRedirect('/login');
 
-    expect(User::query()->where('email', 'nouveau@cap.test')->sole()->role())->toBe(Role::ChargeRelations);
+    expect(User::query()->where('email', 'nouveau@cap.test')->sole()->role()?->systemRole())->toBe(Role::ChargeRelations);
 });
 
 // ---------------------------------------------------------------- tenant isolation

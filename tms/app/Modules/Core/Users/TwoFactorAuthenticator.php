@@ -2,6 +2,7 @@
 
 namespace App\Modules\Core\Users;
 
+use App\Modules\Core\Access\RoleModel;
 use App\Modules\Core\Tenancy\TenantContext;
 use BaconQrCode\Renderer\Color\Rgb;
 use BaconQrCode\Renderer\Image\SvgImageBackEnd;
@@ -32,12 +33,14 @@ class TwoFactorAuthenticator
     public function __construct(private readonly Google2FA $google2fa) {}
 
     /**
-     * 2FA is mandatory for the user's role, or imposed by the tenant setting
-     * security.force_2fa.
+     * 2FA is mandatory for one of the user's roles (always for admin_organisme
+     * and direction, by choice for the others), or imposed by the tenant
+     * setting security.force_2fa. The roles are read afresh: a role switched
+     * to mandatory 2FA applies at the user's next request.
      */
     public function isRequiredFor(User $user): bool
     {
-        if ($user->role()?->requires2fa() === true) {
+        if ($user->roles()->get()->contains(fn ($role) => $role instanceof RoleModel && $role->requires2fa())) {
             return true;
         }
 

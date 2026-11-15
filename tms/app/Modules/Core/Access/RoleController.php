@@ -10,12 +10,13 @@ use Inertia\Inertia;
 use Inertia\Response;
 
 /**
- * « Rôles et droits » (roles.manage): the permission matrix of the
- * organisme's roles, one cell saved at a time.
+ * « Rôles et droits » (roles.manage): the organisme's roles (system and
+ * custom, RoleCatalogue) and their permission matrix, one cell saved at a
+ * time. {role} is the id of a role of the current organisme (404 otherwise).
  */
 class RoleController extends Controller
 {
-    public function __construct(private readonly RoleMatrix $matrix) {}
+    public function __construct(private readonly RoleMatrix $matrix, private readonly RoleCatalogue $catalogue) {}
 
     public function index(Request $request): Response
     {
@@ -32,13 +33,16 @@ class RoleController extends Controller
         }
 
         return Inertia::render('admin/roles/index', [
-            'roles' => array_map(fn (Role $role) => [
-                'value' => $role->value,
+            'roles' => RoleModel::query()->ordered()->get()->map(fn (RoleModel $role) => [
+                'id' => $role->id,
+                'value' => $role->name,
                 'label' => $role->label(),
+                'system' => $role->system,
+                'requires_2fa' => $role->requires2fa(),
                 'locked' => ! RoleMatrix::editable($role),
                 'granted' => RoleMatrix::granted($role),
-                'defaults' => Permissions::defaultsFor($role),
-            ], Role::cases()),
+                'defaults' => RoleMatrix::defaults($role),
+            ])->values()->all(),
             // Administration last, after the modules' themes.
             'groups' => [...array_values(array_diff_key($groups, [Permissions::CORE_GROUP => true])), ...(isset($groups[Permissions::CORE_GROUP]) ? [$groups[Permissions::CORE_GROUP]] : [])],
             'locked' => Permissions::LOCKED,
@@ -46,9 +50,49 @@ class RoleController extends Controller
         ]);
     }
 
+    public function store(RoleRequest $request): RedirectResponse
+    {
+        $role = $this->catalogue->create((string) $request->label(), (bool) $request->requires2fa(), $request->copyFrom());
+
+        return back()->with('status', "Rôle « {$role->label()} » créé.");
+    }
+
+    /**
+     * Label and/or « double authentification obligatoire ».
+     */
+    public function modify(RoleRequest $request, string $role): RedirectResponse
+    {
+        $role = $this->find($role);
+        $status = [];
+
+        $label = $request->label();
+        if ($label !== null && $label !== $role->label()) {
+            $this->catalogue->rename($role, $label);
+            $status[] = "Rôle renommé : {$role->label()}.";
+        }
+        $required = $request->requires2fa();
+        if ($required !== null && $required !== $role->requires2fa()) {
+            $this->catalogue->setRequires2fa($role, $required);
+            $status[] = $required
+                ? "Double authentification obligatoire pour le rôle {$role->label()}."
+                : "Double authentification facultative pour le rôle {$role->label()}.";
+        }
+
+        return back()->with('status', $status === [] ? 'Aucune modification.' : implode(' ', $status));
+    }
+
+    public function destroy(string $role): RedirectResponse
+    {
+        $role = $this->find($role);
+        $label = $role->label();
+        $this->catalogue->delete($role);
+
+        return back()->with('status', "Rôle « {$label} » supprimé.");
+    }
+
     public function update(Request $request, string $role): RedirectResponse
     {
-        $role = Role::tryFrom($role) ?? abort(404);
+        $role = $this->find($role);
         $data = $request->validate([
             'permission' => ['required', 'string', Rule::in(Permissions::all())],
             'granted' => ['required', 'boolean'],
@@ -70,9 +114,19 @@ class RoleController extends Controller
 
     public function reset(string $role): RedirectResponse
     {
-        $role = Role::tryFrom($role) ?? abort(404);
+        $role = $this->find($role);
         $this->matrix->reset($role);
 
-        return back()->with('status', "Droits par défaut rétablis pour le rôle {$role->label()}.");
+        return back()->with('status', $role->system
+            ? "Droits par défaut rétablis pour le rôle {$role->label()}."
+            : "Tous les droits du rôle {$role->label()} ont été retirés.");
+    }
+
+    /**
+     * A role of the current organisme (BelongsToTenant + RLS), 404 otherwise.
+     */
+    private function find(string $id): RoleModel
+    {
+        return RoleModel::query()->whereKey($id)->where('guard_name', RoleSeeder::GUARD)->first() ?? abort(404);
     }
 }

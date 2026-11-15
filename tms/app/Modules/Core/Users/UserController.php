@@ -3,12 +3,12 @@
 namespace App\Modules\Core\Users;
 
 use App\Http\Controllers\Controller;
-use App\Modules\Core\Access\Role;
+use App\Modules\Core\Access\RoleCatalogue;
+use App\Modules\Core\Access\RoleModel;
 use App\Modules\Core\Audit\AuditRecorder;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 
 /**
@@ -25,13 +25,16 @@ class UserController extends Controller
 
     public function updateRole(Request $request, User $user): RedirectResponse
     {
-        $validated = $request->validate(['role' => ['required', Rule::enum(Role::class)]]);
-        $role = Role::from($validated['role']);
+        $validated = $request->validate(['role' => ['required', 'string', 'max:100']]);
+        $unknown = fn () => ValidationException::withMessages(['role' => 'Ce rôle n\'existe pas.']);
+        $role = RoleModel::named($validated['role']) ?? throw $unknown();
 
-        $changed = DB::transaction(function () use ($user, $role): bool {
-            $this->lastAdmin->ensureStays($user, leavesAdmins: $role !== Role::AdminOrganisme);
+        $changed = DB::transaction(function () use ($user, $role, $unknown): bool {
+            $this->lastAdmin->ensureStays($user, leavesAdmins: ! $role->isAdmin());
+            // Held until commit: a concurrent deletion of the role then counts this user.
+            RoleCatalogue::lockedForAssignment($role->name) ?? throw $unknown();
 
-            if ($user->role() === $role) {
+            if ($user->role()?->is($role) === true) {
                 return false;
             }
 

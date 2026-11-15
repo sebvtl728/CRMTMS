@@ -8,6 +8,8 @@ import { Lock, RotateCcw } from 'lucide-react';
 import { useState } from 'react';
 
 interface RoleColumn {
+    id: string;
+    /** Name of the role (system value, or custom_… never shown). */
     value: string;
     label: string;
     locked: boolean;
@@ -37,10 +39,10 @@ export default function Roles({ roles, groups, locked, status }: RolesProps) {
     const [saving, setSaving] = useState<string | null>(null);
 
     const toggle = (role: RoleColumn, permission: string, granted: boolean) => {
-        const key = `${role.value}:${permission}`;
+        const key = `${role.id}:${permission}`;
         setSaving(key);
         router.post(
-            route('admin.roles.update', role.value),
+            route('admin.roles.update', role.id),
             { permission, granted },
             { preserveScroll: true, preserveState: true, onFinish: () => setSaving(null) },
         );
@@ -49,7 +51,7 @@ export default function Roles({ roles, groups, locked, status }: RolesProps) {
     const reset = (role: RoleColumn) => {
         if (!window.confirm(`Rétablir les droits par défaut du rôle ${role.label} ? Les droits ajoutés ou retirés pour ce rôle seront annulés.`))
             return;
-        router.post(route('admin.roles.reset', role.value), {}, { preserveScroll: true });
+        router.post(route('admin.roles.reset', role.id), {}, { preserveScroll: true });
     };
 
     return (
@@ -88,7 +90,7 @@ export default function Roles({ roles, groups, locked, status }: RolesProps) {
                                     Droit
                                 </th>
                                 {roles.map((role) => (
-                                    <th key={role.value} scope="col" className="px-2 py-2 text-center align-bottom font-medium">
+                                    <th key={role.id} scope="col" className="px-2 py-2 text-center align-bottom font-medium">
                                         <div>{role.label}</div>
                                         {role.value === 'responsable_das' && (
                                             <div className="text-muted-foreground mt-1 text-xs font-normal">
@@ -127,11 +129,11 @@ export default function Roles({ roles, groups, locked, status }: RolesProps) {
                                             const granted = role.granted.includes(p.name);
                                             const changed = granted !== role.defaults.includes(p.name);
                                             const fixed = role.locked || locked.includes(p.name);
-                                            const key = `${role.value}:${p.name}`;
+                                            const key = `${role.id}:${p.name}`;
 
                                             return (
                                                 <td
-                                                    key={role.value}
+                                                    key={role.id}
                                                     className={`px-2 py-2 text-center ${changed ? 'bg-amber-100 dark:bg-amber-900' : ''}`}
                                                     data-changed={changed ? 'true' : undefined}
                                                 >

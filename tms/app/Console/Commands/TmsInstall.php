@@ -3,6 +3,7 @@
 namespace App\Console\Commands;
 
 use App\Modules\Core\Access\Role;
+use App\Modules\Core\Access\RoleModel;
 use App\Modules\Core\Platform\TenantProvisioner;
 use App\Modules\Core\References\CapFormationReferenceSeeder;
 use App\Modules\Core\Tenancy\Tenant;
@@ -71,7 +72,7 @@ class TmsInstall extends Command
                         CapFormationReferenceSeeder::run($tenant);
                     }
 
-                    return Invitation::issue($email, $adminName, Role::AdminOrganisme);
+                    return Invitation::issue($email, $adminName, RoleModel::forSystem(Role::AdminOrganisme));
                 },
                 (bool) $this->option('vat-exempt'),
             );

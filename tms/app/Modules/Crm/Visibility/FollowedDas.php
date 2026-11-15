@@ -5,7 +5,7 @@ namespace App\Modules\Crm\Visibility;
 use App\Modules\Core\Access\AccessScope;
 use App\Modules\Core\Access\PrimaryRoleChanged;
 use App\Modules\Core\Access\RoleModel;
-use App\Modules\Core\Access\RoleSeeder;
+use App\Modules\Core\Access\RoleScopesChanged;
 use App\Modules\Core\Access\Scopes;
 use App\Modules\Core\Audit\AuditRecorder;
 use App\Modules\Core\References\ReferenceItem;
@@ -60,18 +60,43 @@ final class FollowedDas
      */
     public static function onRoleChanged(PrimaryRoleChanged $event): void
     {
-        $role = RoleModel::query()->where('name', $event->role->value)->where('guard_name', RoleSeeder::GUARD)->first();
-        if ($role !== null && Scopes::roleUses($role, AccessScope::Das)) {
+        if (! Scopes::roleUses($event->role, AccessScope::Das)) {
+            self::clear($event->user);
+        }
+    }
+
+    /**
+     * Same rule when the matrix of a role changes: once the role no longer
+     * uses « Ses DAS » on any right, its users (unless another of their roles
+     * still uses it) lose their followed DAS.
+     */
+    public static function onRoleScopesChanged(RoleScopesChanged $event): void
+    {
+        if (Scopes::roleUses($event->role, AccessScope::Das)) {
             return;
         }
 
-        $before = self::ids($event->user);
+        $users = User::query()->whereIn('id', DB::table('model_has_roles')
+            ->where('role_id', $event->role->getKey())
+            ->where('model_type', (new User)->getMorphClass())
+            ->select('model_id'))->get();
+
+        foreach ($users as $user) {
+            if (! self::applies($user)) {
+                self::clear($user);
+            }
+        }
+    }
+
+    private static function clear(User $user): void
+    {
+        $before = self::ids($user);
         if ($before === []) {
             return;
         }
 
-        DB::table('user_das')->where('user_id', $event->user->getKey())->delete();
+        DB::table('user_das')->where('user_id', $user->getKey())->delete();
         sort($before);
-        app(AuditRecorder::class)->record('users.das_changed', $event->user, ['das_ids' => $before], ['das_ids' => []]);
+        app(AuditRecorder::class)->record('users.das_changed', $user, ['das_ids' => $before], ['das_ids' => []]);
     }
 }

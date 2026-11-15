@@ -167,35 +167,41 @@ class User extends Authenticatable
     }
 
     /**
-     * Primary role in the current tenant (one role per user in lot 1a), or
-     * null for an account without role (it then has no permission).
+     * Primary role in the current tenant (one role per user), or null for an
+     * account without role (it then has no permission).
      */
-    public function role(): ?Role
+    public function role(): ?RoleModel
     {
-        /** @var RoleModel|null $record */
         $record = $this->roles->first();
 
-        return $record === null ? null : Role::tryFrom($record->name);
+        return $record instanceof RoleModel ? $record : null;
     }
 
     /**
-     * Replaces the user's role. Must run in the user's own tenant (the role
-     * records are per tenant). Dispatches PrimaryRoleChanged when it changes.
+     * Replaces the user's role (a system role by its enum, or any role of the
+     * organisme). Must run in the user's own tenant (the role records are per
+     * tenant). Dispatches PrimaryRoleChanged when it changes.
      */
-    public function assignPrimaryRole(Role $role): void
+    public function assignPrimaryRole(RoleModel|Role $role): void
     {
         if ($this->tenant_id !== app(TenantContext::class)->id()) {
+            throw new LogicException('Le rôle d\'un utilisateur s\'attribue dans son propre organisme.');
+        }
+        if ($role instanceof Role) {
+            $role = RoleModel::forSystem($role);
+        }
+        if ($role->tenant_id !== $this->tenant_id) {
             throw new LogicException('Le rôle d\'un utilisateur s\'attribue dans son propre organisme.');
         }
 
         $this->unsetRelation('roles');
         $previous = $this->role();
 
-        if ($previous === $role) {
+        if ($previous?->is($role) === true) {
             return;
         }
 
-        DB::transaction(fn () => $this->syncRoles([$role->value]));
+        DB::transaction(fn () => $this->syncRoles([$role]));
         $this->unsetRelation('roles');
         Scopes::forget();
 
