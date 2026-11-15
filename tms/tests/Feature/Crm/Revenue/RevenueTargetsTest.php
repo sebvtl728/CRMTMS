@@ -9,6 +9,7 @@ use App\Modules\Crm\CrmServiceProvider;
 use App\Modules\Crm\Revenue\Period;
 use App\Modules\Crm\Revenue\RevenueTarget;
 use App\Modules\Crm\Revenue\RevenueTargets;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Symfony\Component\HttpKernel\Exception\HttpException;
@@ -84,4 +85,28 @@ it('targets are tenant isolated', function () {
         expect(RevenueTarget::query()->count())->toBe(0);
     });
     expect(RevenueTarget::query()->count())->toBe(1);
+});
+
+it('saves as an update when a concurrent first save created the target meanwhile', function () {
+    $this->actingAs(direction());
+    $das = crmItem(ReferenceList::Das, 'Hôtellerie-restauration');
+    $month = Period::of('month', '2026-11');
+
+    // The other request inserts the same target between our read and our insert.
+    $raced = false;
+    RevenueTarget::creating(function () use (&$raced, $das): void {
+        if ($raced) {
+            return;
+        }
+        $raced = true;
+        DB::table('revenue_targets')->insert([
+            'id' => (string) Str::uuid7(), 'tenant_id' => tenant()->id, 'das_id' => $das->id, 'period_type' => 'month',
+            'period_start' => '2026-11-01', 'amount' => '100.00', 'created_at' => now(), 'updated_at' => now(),
+        ]);
+    });
+
+    app(RevenueTargets::class)->set($das->id, $month, 250000);
+
+    expect(RevenueTarget::query()->count())->toBe(1)
+        ->and(RevenueTarget::query()->sole()->amount)->toBe('2500.00');
 });

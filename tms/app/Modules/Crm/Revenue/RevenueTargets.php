@@ -6,6 +6,7 @@ use App\Modules\Core\References\ReferenceItem;
 use App\Modules\Core\References\ReferenceList;
 use App\Modules\Crm\Permissions;
 use App\Modules\Crm\Quotes\QuoteTotals;
+use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
@@ -31,6 +32,16 @@ final class RevenueTargets
             throw ValidationException::withMessages(['das_id' => 'Ce DAS n\'existe pas.']);
         }
 
+        // A concurrent first save that inserted the target meanwhile: saved again as an update.
+        try {
+            $this->write($dasId, $period, $amountCents);
+        } catch (UniqueConstraintViolationException) {
+            $this->write($dasId, $period, $amountCents);
+        }
+    }
+
+    private function write(string $dasId, Period $period, ?int $amountCents): void
+    {
         DB::transaction(function () use ($dasId, $period, $amountCents): void {
             $target = RevenueTarget::query()
                 ->where('das_id', $dasId)

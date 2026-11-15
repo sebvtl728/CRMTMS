@@ -37,6 +37,8 @@ export function RevenueTargetsDialog({
             setInitial(start);
             setErrors({});
             setSaved([]);
+            // A request cut short (429, network) never leaves the button stuck.
+            setProcessing(false);
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [open]);
@@ -55,6 +57,8 @@ export function RevenueTargetsDialog({
                 return;
             }
             const row = changes[index];
+            // onSuccess / onError not called (too many requests, network error...): stop here.
+            let settled = false;
             router.put(
                 route('crm.revenue.targets'),
                 { das_id: row.das_id, period: period.type, key: period.key, amount: values[row.das_id] ?? '' },
@@ -62,13 +66,21 @@ export function RevenueTargetsDialog({
                     preserveScroll: true,
                     preserveState: true,
                     onSuccess: () => {
+                        settled = true;
                         setInitial((i) => ({ ...i, [row.das_id]: values[row.das_id] ?? '' }));
                         setSaved((x) => [...x, row.das_id]);
                         send(index + 1);
                     },
                     onError: (errs) => {
+                        settled = true;
                         setErrors({ [row.das_id]: errs.amount ?? errs.period ?? errs.das_id ?? 'Objectif refusé.' });
                         setProcessing(false);
+                    },
+                    onFinish: () => {
+                        if (!settled) {
+                            setErrors({ [row.das_id]: "L'objectif n'a pas pu être enregistré. Réessayez dans un instant." });
+                            setProcessing(false);
+                        }
                     },
                 },
             );
@@ -96,7 +108,12 @@ export function RevenueTargetsDialog({
                                     autoComplete="off"
                                     placeholder="Ex. 10 000"
                                     value={values[row.das_id] ?? ''}
-                                    onChange={(e) => setValues((v) => ({ ...v, [row.das_id]: e.target.value }))}
+                                    onChange={(e) => {
+                                        const value = e.target.value;
+                                        setValues((v) => ({ ...v, [row.das_id]: value }));
+                                        // Edited again: « Enregistré. » no longer describes the field.
+                                        setSaved((x) => x.filter((id) => id !== row.das_id));
+                                    }}
                                 />
                                 <span aria-hidden>€</span>
                             </div>
