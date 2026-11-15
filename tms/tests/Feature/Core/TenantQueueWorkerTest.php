@@ -16,7 +16,14 @@ use Tests\Fixtures\ProbeItemJob;
 
 function workQueue(): void
 {
-    Artisan::call('queue:work', ['connection' => 'database', '--stop-when-empty' => true, '--tries' => 1, '--sleep' => 0]);
+    // --memory=0: the worker runs inside the PHPUnit process, whose heap grows
+    // over the whole suite. With the default ceiling (128 MB) the worker stops
+    // after the first job once the suite has passed it (exit code 12), leaving
+    // the next job in the queue: drain the queue whatever the suite's memory.
+    $exitCode = Artisan::call('queue:work', ['connection' => 'database', '--stop-when-empty' => true, '--tries' => 1, '--sleep' => 0, '--memory' => 0]);
+
+    expect($exitCode)->toBe(0)
+        ->and(DB::table('jobs')->count())->toBe(0);
 }
 
 beforeEach(function () {
