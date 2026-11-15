@@ -30,7 +30,7 @@ class QuoteMail extends Mailable
     public function build(): self
     {
         $mail = $this->subject($this->mailSubject)
-            ->text('mail.quote', ['text' => $this->text])
+            ->text('mail.plain-text', ['text' => $this->text])
             ->attachData($this->pdf, $this->fileName, ['mime' => 'application/pdf']);
         foreach ($this->brochures as $brochure) {
             $mail->attachData($brochure['bytes'], $brochure['name'], ['mime' => 'application/pdf']);

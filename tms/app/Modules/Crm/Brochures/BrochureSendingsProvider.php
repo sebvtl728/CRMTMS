@@ -2,15 +2,19 @@
 
 namespace App\Modules\Crm\Brochures;
 
+use App\Modules\Core\Users\User;
+use App\Modules\Crm\Opportunities\Opportunity;
 use App\Modules\Crm\Organisations\Organisation;
 use App\Modules\Crm\People\Person;
 use App\Modules\Crm\Timeline\Timeline;
 use App\Modules\Crm\Timeline\TimelineCursor;
 use App\Modules\Crm\Timeline\TimelineEntry;
 use App\Modules\Crm\Timeline\TimelineProvider;
+use App\Modules\Crm\Visibility\CrmVisibility;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Auth;
 
 /**
  * « Historique » of an entreprise or a person: « Plaquettes envoyées à
@@ -28,8 +32,21 @@ final class BrochureSendingsProvider implements TimelineProvider
             return collect();
         }
 
+        $user = Auth::user();
+        if (! $user instanceof User) {
+            return collect();
+        }
+
+        // Sent from the fiche; for a person also those sent to her from a fiche the viewer sees.
         $sendings = BrochureSending::query()
-            ->where($subject instanceof Organisation ? 'organisation_id' : 'person_id', $subject->getKey())
+            ->where(fn ($q) => $subject instanceof Organisation
+                ? $q->where('organisation_id', $subject->getKey())
+                : $q->where('person_id', $subject->getKey())->orWhere(fn ($r) => $r->where('recipient_person_id', $subject->getKey())
+                    ->where(fn ($f) => $f->whereIn('organisation_id', CrmVisibility::organisations(Organisation::query(), $user)->select('organisations.id'))
+                        ->orWhereIn('person_id', CrmVisibility::people(Person::query(), $user)->select('people.id')))))
+            // Sent from an opportunity: only those the viewer sees (none deleted).
+            ->where(fn ($q) => $q->whereNull('opportunity_id')
+                ->orWhereIn('opportunity_id', CrmVisibility::opportunities(Opportunity::query(), $user)->select('opportunities.id')))
             ->tap(fn ($q) => Timeline::after($q, $before, self::TYPE))
             ->orderByDesc('created_at')->orderByDesc('id')->limit($limit)->get();
 
@@ -43,7 +60,7 @@ final class BrochureSendingsProvider implements TimelineProvider
                 'Plaquettes envoyées à '.$row['recipient'],
                 implode(', ', $row['titles']),
                 $row['author'],
-                ['id' => $row['id'], 'status' => $row['status'], 'status_label' => $row['status_label'], 'titles' => $row['titles']],
+                ['id' => $row['id'], 'status' => $row['status'], 'status_label' => $row['status_label'], 'titles' => $row['titles'], 'versions' => $row['versions']],
             );
         });
     }

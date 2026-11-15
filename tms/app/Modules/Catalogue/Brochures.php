@@ -118,13 +118,13 @@ final class Brochures
     }
 
     /**
-     * The title of the brochure of each version (brochures in the trash
-     * included), for the history of what was sent.
+     * The brochure of each version (brochures in the trash included), for
+     * the history of what was sent.
      *
      * @param  list<string>  $versionIds
-     * @return array<string, string> version id => title
+     * @return array<string, array{brochure_id: string, title: string, trashed: bool}> version id => brochure
      */
-    public function titles(array $versionIds): array
+    public function sent(array $versionIds): array
     {
         $ids = self::uuids($versionIds);
         if ($ids === []) {
@@ -132,7 +132,7 @@ final class Brochures
         }
         $titles = [];
         foreach (BrochureVersion::query()->whereIn('id', $ids)->with(['brochure' => fn ($q) => $q->withTrashed()])->get() as $version) {
-            $titles[$version->id] = (string) $version->brochure?->title;
+            $titles[$version->id] = ['brochure_id' => $version->brochure_id, 'title' => (string) $version->brochure?->title, 'trashed' => $version->brochure?->trashed() ?? true];
         }
 
         return $titles;

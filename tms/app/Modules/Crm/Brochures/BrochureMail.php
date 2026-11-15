@@ -20,7 +20,7 @@ class BrochureMail extends Mailable
 
     public function build(): self
     {
-        $mail = $this->subject($this->mailSubject)->text('mail.quote', ['text' => $this->text]);
+        $mail = $this->subject($this->mailSubject)->text('mail.plain-text', ['text' => $this->text]);
         foreach ($this->files as $file) {
             $mail->attachData($file['bytes'], $file['name'], ['mime' => 'application/pdf']);
         }

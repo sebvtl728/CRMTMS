@@ -14,13 +14,20 @@ export interface BrochureRecipient {
     id: string;
     name: string;
     email: string | null;
+}
+
+/** Subject and message of the « Envoi d'une plaquette » template; {destinataire} is replaced by the chosen recipient's name. */
+interface Template {
     subject: string;
     body: string;
 }
 
+const fillTemplate = (text: string, name: string) => text.split('{destinataire}').join(name);
+
 /** What a fiche page passes to the window (null: not allowed / nobody to write to). */
 export interface BrochureSendProps {
     recipients: BrochureRecipient[];
+    template: Template;
     delivers_nowhere: boolean;
 }
 
@@ -29,18 +36,46 @@ interface Choice {
     title: string;
 }
 
+export interface SentBrochure {
+    brochure_id: string;
+    version_id: string;
+    title: string;
+    downloadable: boolean;
+}
+
 export interface BrochureSendingRow {
     id: string;
     at: string;
     author: string | null;
     recipient: string;
     titles: string[];
+    versions: SentBrochure[];
     status: string;
     status_label: string;
 }
 
 export function SendingStatus({ status, label }: { status: string; label: string }) {
     return <Badge variant={status === 'failed' ? 'destructive' : status === 'sent' ? 'secondary' : 'default'}>{label}</Badge>;
+}
+
+/** The brochures of a sending, each downloadable (the version sent) when the user may. */
+export function SentTitles({ versions }: { versions: SentBrochure[] }) {
+    return (
+        <>
+            {versions.map((v, i) => (
+                <span key={v.version_id}>
+                    {i > 0 && ', '}
+                    {v.downloadable ? (
+                        <a href={route('catalogue.brochures.versions.download', [v.brochure_id, v.version_id])} className="underline">
+                            {v.title}
+                        </a>
+                    ) : (
+                        v.title
+                    )}
+                </span>
+            ))}
+        </>
+    );
 }
 
 /** Latest sendings of an opportunity (never the address nor the message). */
@@ -52,7 +87,7 @@ export function BrochureSendingList({ rows }: { rows: BrochureSendingRow[] }) {
             {rows.map((r) => (
                 <li key={r.id} className="flex flex-wrap items-baseline justify-between gap-x-3 rounded-lg border p-3 text-sm">
                     <span>
-                        <span className="font-medium">{r.recipient}</span> : {r.titles.join(', ')}
+                        <span className="font-medium">{r.recipient}</span> : <SentTitles versions={r.versions} />
                     </span>
                     <span className="text-muted-foreground flex items-center gap-2 text-xs">
                         <SendingStatus status={r.status} label={r.status_label} />
@@ -98,8 +133,8 @@ function BrochureSendDialog({
     const first = withMail[0] ?? send.recipients[0];
     const { data, setData, post, processing, errors, reset, clearErrors } = useForm({
         recipient_person_id: first?.id ?? '',
-        subject: first?.subject ?? '',
-        message: first?.body ?? '',
+        subject: fillTemplate(send.template.subject, first?.name ?? ''),
+        message: fillTemplate(send.template.body, first?.name ?? ''),
         versions: [] as string[],
     });
     const [picked, setPicked] = useState<Choice[]>([]);
@@ -139,8 +174,15 @@ function BrochureSendDialog({
     }, [search, open]);
 
     const choose = (id: string) => {
-        const r = send.recipients.find((x) => x.id === id);
-        setData((d) => ({ ...d, recipient_person_id: id, subject: r?.subject ?? d.subject, message: r?.body ?? d.message }));
+        const previous = send.recipients.find((x) => x.id === data.recipient_person_id);
+        const next = send.recipients.find((x) => x.id === id);
+        // Text already typed is kept: only what still equals the proposal for the previous recipient is refilled.
+        setData((d) => ({
+            ...d,
+            recipient_person_id: id,
+            subject: d.subject === fillTemplate(send.template.subject, previous?.name ?? '') ? fillTemplate(send.template.subject, next?.name ?? '') : d.subject,
+            message: d.message === fillTemplate(send.template.body, previous?.name ?? '') ? fillTemplate(send.template.body, next?.name ?? '') : d.message,
+        }));
     };
     const toggle = (c: Choice, on: boolean) => {
         const next = on ? [...picked, c] : picked.filter((p) => p.version_id !== c.version_id);

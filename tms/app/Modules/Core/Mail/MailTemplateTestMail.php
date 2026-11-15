@@ -14,6 +14,6 @@ class MailTemplateTestMail extends Mailable
 
     public function build(): self
     {
-        return $this->subject('[Test] '.$this->mailSubject)->text('mail.quote', ['text' => $this->text]);
+        return $this->subject('[Test] '.$this->mailSubject)->text('mail.plain-text', ['text' => $this->text]);
     }
 }

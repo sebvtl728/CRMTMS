@@ -14,15 +14,16 @@ use App\Modules\Crm\Support\CrmMailTemplates;
 
 /**
  * What a fiche page needs to open « Envoyer une plaquette »: the people it
- * can go to, each with the subject and message proposed by the organisme's
- * « brochure » e-mail template (still editable in the window). Null without
+ * can go to and the subject and message proposed by the organisme's
+ * « brochure » e-mail template, rendered once with the literal {destinataire}
+ * the window replaces by the chosen recipient's name (still editable). Null without
  * the right (crm.activities.update), on a trashed or anonymised fiche, or
  * when nobody can receive it.
  */
 final class BrochureSendProps
 {
     /**
-     * @return array{recipients: list<array{id: string, name: string, email: string|null, subject: string, body: string}>, delivers_nowhere: bool}|null
+     * @return array{recipients: list<array{id: string, name: string, email: string|null}>, template: array{subject: string, body: string}, delivers_nowhere: bool}|null
      */
     public static function for(Organisation|Person|Opportunity $subject, User $user): ?array
     {
@@ -37,15 +38,15 @@ final class BrochureSendProps
             return null;
         }
 
-        $templates = app(MailTemplates::class);
-        $organisme = app(TenantContext::class)->current()->name ?? '';
+        $template = app(MailTemplates::class)->render(CrmMailTemplates::BROCHURE, [
+            'destinataire' => '{destinataire}',
+            'commercial' => $user->name,
+            'organisme' => app(TenantContext::class)->current()->name ?? '',
+        ]);
 
         return [
-            'recipients' => array_map(function (array $r) use ($templates, $user, $organisme): array {
-                $text = $templates->render(CrmMailTemplates::BROCHURE, ['destinataire' => $r['name'], 'commercial' => $user->name, 'organisme' => $organisme]);
-
-                return [...$r, 'subject' => $text['subject'], 'body' => $text['body']];
-            }, $recipients),
+            'recipients' => $recipients,
+            'template' => $template,
             'delivers_nowhere' => TenantMailer::deliversNowhere(null),
         ];
     }

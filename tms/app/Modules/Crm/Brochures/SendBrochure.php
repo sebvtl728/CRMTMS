@@ -34,6 +34,8 @@ class SendBrochure implements ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, TenantAwareJob;
 
+    public const ANONYMISED = 'Le destinataire a été anonymisé : l\'e-mail n\'est pas parti.';
+
     public int $tries = 3;
 
     public function __construct(public string $sendingId)
@@ -42,17 +44,23 @@ class SendBrochure implements ShouldQueue
     }
 
     /**
-     * @return list<int> seconds before the 2nd and 3rd tries
+     * @return list<int> seconds before the 2nd and the 3rd (last) try
      */
     public function backoff(): array
     {
-        return [60, 300, 900];
+        return [60, 300];
     }
 
     public function handle(Brochures $brochures): void
     {
         $sending = BrochureSending::query()->find($this->sendingId);
-        if ($sending === null || $sending->email_status !== BrochureSending::PENDING || $sending->recipient_email === null || $sending->subject === null || $sending->message === null) {
+        if ($sending === null || $sending->email_status !== BrochureSending::PENDING) {
+            return;
+        }
+        // Cleared by the anonymisation of the recipient before the job ran: nothing to send.
+        if ($sending->recipient_email === null || $sending->subject === null || $sending->message === null) {
+            $this->failed(new BrochureMailFailed(self::ANONYMISED));
+
             return;
         }
 

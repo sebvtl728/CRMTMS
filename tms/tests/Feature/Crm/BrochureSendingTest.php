@@ -166,8 +166,8 @@ it('shows the recipients and the template text on the fiche pages, only with the
         ->has('brochure_send.recipients', 2)
         ->where('brochure_send.recipients.0.name', 'Léa Durand')
         ->where('brochure_send.recipients.0.email', 'lea@example.test')
-        ->where('brochure_send.recipients.0.subject', fn (string $s) => str_starts_with($s, 'Nos formations'))
-        ->where('brochure_send.recipients.0.body', fn (string $b) => str_contains($b, 'Bonjour Léa Durand')));
+        ->where('brochure_send.template.subject', fn (string $s) => str_starts_with($s, 'Nos formations'))
+        ->where('brochure_send.template.body', fn (string $b) => str_contains($b, 'Bonjour {destinataire}')));
 
     $this->actingAs(userWithPermissions(['crm.fiches.view']));
     $this->get("/crm/organisations/{$organisation->id}")->assertInertia(fn (Assert $page) => $page->where('brochure_send', null));
@@ -366,8 +366,8 @@ it('proposes the customised « brochure » template', function () {
     $person = makePerson('Martin', ['first_name' => 'Claire', 'email' => 'm@example.test', 'is_individual' => true]);
 
     $this->get("/crm/people/{$person->id}")->assertInertia(fn (Assert $page) => $page
-        ->where('brochure_send.recipients.0.subject', 'Documentation '.tenant()->name)
-        ->where('brochure_send.recipients.0.body', 'Chère cliente Claire Martin, de la part de '.$user->name.'.'));
+        ->where('brochure_send.template.subject', 'Documentation '.tenant()->name)
+        ->where('brochure_send.template.body', 'Chère cliente {destinataire}, de la part de '.$user->name.'.'));
 });
 
 it('keeps the address, subject and message out of the journal and clears them when the person is anonymised', function () {
@@ -401,4 +401,65 @@ it('follows a merged fiche', function () {
     app(Merger::class)->organisations($keep, $drop, []);
 
     expect(BrochureSending::query()->sole()->organisation_id)->toBe($keep->id);
+});
+
+it('shows a sending on the recipient\'s own fiche, and the sent versions as downloadable', function () {
+    Mail::fake();
+    $this->actingAs(commercial());
+    $organisation = Organisation::query()->create(['name' => 'Le Bistrot']);
+    $lea = makePerson('Durand', ['first_name' => 'Léa', 'email' => 'lea@example.test']);
+    affiliate($lea, $organisation);
+    $version = sendingBrochure('HACCP');
+    $this->post("/crm/organisations/{$organisation->id}/brochures/send", sendingPayload($version, $lea->id))->assertSessionHasNoErrors();
+
+    $entry = brochureEntry($this->getJson("/crm/people/{$lea->id}/timeline"));
+    expect($entry['title'])->toBe('Plaquettes envoyées à Léa Durand')
+        ->and($entry['meta']['versions'])->toBe([[
+            'brochure_id' => $version->brochure_id, 'version_id' => $version->id, 'title' => 'HACCP', 'downloadable' => true,
+        ]]);
+
+    // Without catalogue.view: listed, not downloadable.
+    $this->actingAs(userWithPermissions(['crm.fiches.view']));
+    expect(brochureEntry($this->getJson("/crm/people/{$lea->id}/timeline"))['meta']['versions'][0]['downloadable'])->toBeFalse();
+});
+
+it('hides from the history the sendings of opportunities the viewer does not see or that are trashed', function () {
+    Mail::fake();
+    $this->actingAs(admin(twoFactor: true));
+    $organisation = Organisation::query()->create(['name' => 'Le Bistrot']);
+    $lea = makePerson('Durand', ['email' => 'lea@example.test']);
+    affiliate($lea, $organisation);
+    $mine = crmItem(ReferenceList::Das, 'Hôtellerie-restauration');
+    $other = makeOpportunity($organisation, ['das_id' => crmItem(ReferenceList::Das, 'Métiers supports')->id]);
+    $own = makeOpportunity($organisation, ['das_id' => $mine->id, 'title' => 'Mienne']);
+    $gone = makeOpportunity($organisation, ['das_id' => $mine->id, 'title' => 'Supprimée']);
+    DB::table('organisation_das')->insert(['tenant_id' => tenant()->id, 'organisation_id' => $organisation->id, 'das_id' => $mine->id]);
+    $version = sendingBrochure('HACCP');
+    foreach ([$other, $own, $gone] as $opportunity) {
+        DB::table('opportunity_contacts')->insert(['tenant_id' => tenant()->id, 'opportunity_id' => $opportunity->id, 'person_id' => $lea->id]);
+        $this->post("/crm/opportunities/{$opportunity->id}/brochures/send", sendingPayload($version, $lea->id))->assertSessionHasNoErrors();
+    }
+    $this->post("/crm/organisations/{$organisation->id}/brochures/send", sendingPayload($version, $lea->id))->assertSessionHasNoErrors();
+    $gone->delete();
+
+    $count = fn () => collect($this->getJson("/crm/organisations/{$organisation->id}/timeline")->json('entries'))->where('type', 'brochure_sending')->count();
+    expect($count())->toBe(3); // the fiche's own, the visible opportunity's, the other DAS (admin sees all); trashed one hidden
+
+    $user = userWithRole(Role::ResponsableDas);
+    followDas($user, $mine);
+    $this->actingAs($user);
+    expect($count())->toBe(2); // the fiche's own and the one of his DAS
+});
+
+it('fails a pending sending whose recipient was anonymised before the job ran', function () {
+    Queue::fake();
+    $this->actingAs(commercial());
+    $person = makePerson('Martin', ['email' => 'm@example.test', 'is_individual' => true]);
+    $this->post("/crm/people/{$person->id}/brochures/send", sendingPayload(sendingBrochure('HACCP'), $person->id))->assertSessionHasNoErrors();
+    app(Anonymiser::class)->anonymise($person->refresh(), 'manual');
+
+    (new SendBrochure(BrochureSending::query()->sole()->id))->handle(app(Brochures::class));
+
+    expect(BrochureSending::query()->sole()->email_status)->toBe('failed')
+        ->and(BrochureSending::query()->sole()->email_error)->toBe(SendBrochure::ANONYMISED);
 });
