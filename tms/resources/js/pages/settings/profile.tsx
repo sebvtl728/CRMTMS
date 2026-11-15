@@ -83,7 +83,7 @@ export default function Profile({ mustVerifyEmail, status, daily_digest }: { mus
                             <InputError className="mt-2" message={errors.email} />
                         </div>
 
-                        {auth.permissions.includes('crm.view') && (
+                        {auth.permissions.includes('crm.activities.view') && (
                             <div className="grid gap-2">
                                 <div className="flex items-center gap-2">
                                     <Checkbox

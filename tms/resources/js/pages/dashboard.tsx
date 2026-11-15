@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import AppLayout from '@/layouts/app-layout';
 import { formatAmount } from '@/lib/crm';
+import { canViewCrm } from '@/lib/permissions';
 import { type BreadcrumbItem, type SharedData } from '@/types';
 import { Head, Link, usePage } from '@inertiajs/react';
 import { CalendarClock, Contact, Factory, Search, UserPlus } from 'lucide-react';
@@ -112,9 +113,9 @@ export default function Dashboard({ recent_views, counters, commercial }: Props)
             <div className="flex flex-1 flex-col gap-6 p-4">
                 <Heading title="Accueil" description="Vos raccourcis et les dernières fiches que vous avez consultées." />
 
-                {can('crm.view') && (
+                {canViewCrm(auth.permissions) && (
                     <section aria-label="Raccourcis" className="flex flex-wrap gap-2">
-                        {can('crm.create') && (
+                        {can('crm.fiches.update') && (
                             <>
                                 <Button asChild>
                                     <Link href="/crm/organisations/create">

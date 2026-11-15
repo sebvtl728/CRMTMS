@@ -24,7 +24,7 @@ export interface TimelineEntryData {
 interface Props {
     kind: 'organisation' | 'person';
     subjectId: string;
-    /** May add / remove notes and files (crm.update on a live fiche). */
+    /** May add / remove notes and files (crm.fiches.update on a live fiche). */
     canEdit: boolean;
 }
 

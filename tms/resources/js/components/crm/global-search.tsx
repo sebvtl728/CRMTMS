@@ -1,5 +1,6 @@
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog';
+import { canViewCrm } from '@/lib/permissions';
 import { cn } from '@/lib/utils';
 import { type SharedData } from '@/types';
 import { router, usePage } from '@inertiajs/react';
@@ -38,7 +39,7 @@ function isTyping(target: EventTarget | null): boolean {
  */
 export function GlobalSearch() {
     const { auth } = usePage<SharedData>().props;
-    const allowed = auth.permissions.includes('crm.view');
+    const allowed = canViewCrm(auth.permissions);
 
     const [open, setOpen] = useState(false);
     const [term, setTerm] = useState('');

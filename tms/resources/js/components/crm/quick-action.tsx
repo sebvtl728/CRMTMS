@@ -94,7 +94,7 @@ function contextFromPage(component: string, props: Record<string, unknown>): Qui
 export function QuickActionButton({ className }: { className?: string }) {
     const page = usePage<SharedData>();
     // CRM pages only.
-    if (!page.component.startsWith('crm/') || !page.props.auth.permissions.includes('crm.create')) return null;
+    if (!page.component.startsWith('crm/') || !page.props.auth.permissions.includes('crm.activities.update')) return null;
 
     return (
         <Button
@@ -109,10 +109,10 @@ export function QuickActionButton({ className }: { className?: string }) {
     );
 }
 
-/** « + Action » of a fiche or an opportunity page (live fiche, crm.create). */
+/** « + Action » of a fiche or an opportunity page (live fiche, crm.activities.update). */
 export function QuickActionFicheButton({ context, available = true }: { context: QuickActionContext; available?: boolean }) {
     const { auth } = usePage<SharedData>().props;
-    if (!available || !auth.permissions.includes('crm.create')) return null;
+    if (!available || !auth.permissions.includes('crm.activities.update')) return null;
 
     return (
         <Button type="button" variant="outline" onClick={() => openQuickAction(context)}>
