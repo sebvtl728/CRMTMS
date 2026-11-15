@@ -337,7 +337,7 @@ it('empties the followed DAS when the matrix of their role drops « Ses DAS »',
     $other = User::factory()->create();
     $other->assignPrimaryRole($responsable);
     followDas($other, $das);
-    foreach (CrmPermissions::scoped() as $permission) {
+    foreach ([...CrmPermissions::scoped(), ...App\Modules\Sessions\Permissions::scoped()] as $permission) {
         if ($responsable->permissions()->where('name', $permission)->exists()) {
             $matrix->setScope($responsable, $permission, AccessScope::All);
         }

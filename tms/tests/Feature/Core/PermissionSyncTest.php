@@ -13,15 +13,19 @@ use Illuminate\Support\Facades\DB;
 use Spatie\Permission\PermissionRegistrar;
 
 /**
+ * Without $withSessions, the rights of the Sessions module (lot 2a) are left
+ * out: these tests replay the CRM and catalogue offers.
+ *
  * @return array<string, list<string>> role name => sorted permission names, in $tenant
  */
-function matrixOf(Tenant $tenant): array
+function matrixOf(Tenant $tenant, bool $withSessions = false): array
 {
-    return app(TenantContext::class)->run($tenant, function () {
+    return app(TenantContext::class)->run($tenant, function () use ($withSessions) {
         app(PermissionRegistrar::class)->forgetCachedPermissions();
 
         return RoleModel::query()->with('permissions')->get()
-            ->mapWithKeys(fn (RoleModel $r) => [$r->name => $r->permissions->pluck('name')->sort()->values()->all()])
+            ->mapWithKeys(fn (RoleModel $r) => [$r->name => $r->permissions->pluck('name')
+                ->reject(fn (string $p) => ! $withSessions && str_starts_with($p, 'sessions.'))->sort()->values()->all()])
             ->all();
     });
 }
@@ -60,12 +64,12 @@ it('registers the CRM permissions in the catalogue and their default matrix', fu
 
 it('gives a new tenant the full matrix, CRM included', function () {
     $tenant = Tenant::factory()->create();
-    $matrix = matrixOf($tenant);
+    $matrix = matrixOf($tenant, withSessions: true);
 
     expect($matrix['admin_organisme'])->toBe(collect(Permissions::all())->sort()->values()->all())
-        ->and($matrix['direction'])->toBe(['audit.view', 'catalogue.delete', 'catalogue.manage', 'catalogue.view', 'crm.activities.team', 'crm.activities.view', 'crm.export', 'crm.fiches.view', 'crm.gdpr', 'crm.opportunities.view', 'crm.quotes.view', 'crm.revenue.manage', 'crm.revenue.view', 'exports.run'])
-        ->and($matrix['assistant'])->toBe(['catalogue.view', 'crm.activities.delete', 'crm.activities.update', 'crm.activities.view', 'crm.fiches.update', 'crm.fiches.view', 'crm.opportunities.update', 'crm.opportunities.view', 'crm.quotes.update', 'crm.quotes.view'])
-        ->and($matrix['responsable_das'])->toBe(['catalogue.view', 'crm.activities.view', 'crm.export', 'crm.fiches.view', 'crm.opportunities.view', 'crm.quotes.view', 'crm.revenue.view']);
+        ->and($matrix['direction'])->toBe(['audit.view', 'catalogue.delete', 'catalogue.manage', 'catalogue.view', 'crm.activities.team', 'crm.activities.view', 'crm.export', 'crm.fiches.view', 'crm.gdpr', 'crm.opportunities.view', 'crm.quotes.view', 'crm.revenue.manage', 'crm.revenue.view', 'exports.run', 'sessions.dossiers.view', 'sessions.sessions.view'])
+        ->and($matrix['assistant'])->toBe(['catalogue.view', 'crm.activities.delete', 'crm.activities.update', 'crm.activities.view', 'crm.fiches.update', 'crm.fiches.view', 'crm.opportunities.update', 'crm.opportunities.view', 'crm.quotes.update', 'crm.quotes.view', 'sessions.dossiers.update', 'sessions.dossiers.view', 'sessions.sessions.update', 'sessions.sessions.view'])
+        ->and($matrix['responsable_das'])->toBe(['catalogue.view', 'crm.activities.view', 'crm.export', 'crm.fiches.view', 'crm.opportunities.view', 'crm.quotes.view', 'crm.revenue.view', 'sessions.dossiers.view', 'sessions.sessions.view']);
 });
 
 it('sync adds new default permissions to existing tenants once', function () {
