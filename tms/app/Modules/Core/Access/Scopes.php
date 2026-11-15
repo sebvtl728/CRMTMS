@@ -1,0 +1,85 @@
+<?php
+
+namespace App\Modules\Core\Access;
+
+use App\Modules\Core\Tenancy\TenantContext;
+use App\Modules\Core\Users\User;
+use Illuminate\Support\Facades\DB;
+
+/**
+ * Scope of a user for a scoped permission, read from his roles in the current
+ * organisme. A scoped permission without a row in role_permission_scopes
+ * means « all ». Memoised for the request / job only (forget() at each job
+ * and after each change of the matrix): never shared between processes.
+ */
+final class Scopes
+{
+    public const TABLE = 'role_permission_scopes';
+
+    /** @var array<string, AccessScope|null> */
+    private static array $memo = [];
+
+    /**
+     * null when the user does not hold the permission; otherwise the widest
+     * scope among his roles that grant it.
+     */
+    public static function of(User $user, string $permission): ?AccessScope
+    {
+        $tenant = app(TenantContext::class)->current();
+        $key = ($tenant === null ? '-' : $tenant->id).'|'.$user->getKey().'|'.$permission;
+        if (array_key_exists($key, self::$memo)) {
+            return self::$memo[$key];
+        }
+
+        return self::$memo[$key] = self::resolve($user, $permission);
+    }
+
+    public static function roleUses(RoleModel $role, AccessScope $scope): bool
+    {
+        $granted = $role->permissions()->pluck('name')->all();
+        $rows = DB::table(self::TABLE)->where('role_id', $role->getKey())->pluck('scope', 'permission');
+
+        foreach ($granted as $permission) {
+            if (! Permissions::isScoped($permission)) {
+                continue;
+            }
+            $effective = AccessScope::tryFrom((string) $rows->get($permission, '')) ?? AccessScope::All;
+            if ($effective === $scope) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    public static function forget(): void
+    {
+        self::$memo = [];
+    }
+
+    private static function resolve(User $user, string $permission): ?AccessScope
+    {
+        if (! $user->isActive() || ! $user->checkPermissionTo($permission)) {
+            return null;
+        }
+
+        $rows = DB::table('model_has_roles as mr')
+            ->join('role_has_permissions as rp', 'rp.role_id', '=', 'mr.role_id')
+            ->join('permissions as p', 'p.id', '=', 'rp.permission_id')
+            ->leftJoin(self::TABLE.' as s', fn ($join) => $join->on('s.role_id', '=', 'mr.role_id')->where('s.permission', '=', $permission))
+            ->where('mr.model_type', $user->getMorphClass())
+            ->where('mr.model_id', $user->getKey())
+            ->where('p.name', $permission)
+            ->pluck('s.scope');
+
+        $widest = null;
+        foreach ($rows as $value) {
+            $scope = AccessScope::tryFrom((string) $value) ?? AccessScope::All;
+            if ($widest === null || $scope->rank() > $widest->rank()) {
+                $widest = $scope;
+            }
+        }
+
+        return $widest ?? AccessScope::All;
+    }
+}

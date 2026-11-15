@@ -2,6 +2,7 @@
 
 namespace App\Modules\Core\Access;
 
+use App\Exceptions\UserFacingHttpException;
 use App\Modules\Core\Audit\AuditRecorder;
 use App\Modules\Core\Tenancy\TenantContext;
 use Illuminate\Support\Facades\DB;
@@ -48,7 +49,42 @@ final class RoleMatrix
                 return;
             }
             $granted ? $model->givePermissionTo($permission) : $model->revokePermissionTo($permission);
+            if (! $granted) {
+                DB::table(Scopes::TABLE)->where('role_id', $model->getKey())->where('permission', $permission)->delete();
+            }
             $this->audit->record($granted ? 'roles.permission_granted' : 'roles.permission_revoked', $model, [], ['role' => $role->value, 'permission' => $permission]);
+        });
+
+        $this->forget();
+    }
+
+    /**
+     * Changes the scope of a granted, scoped permission (journaled with the
+     * previous value).
+     */
+    public function setScope(Role $role, string $permission, AccessScope $scope): void
+    {
+        self::guard($role, $permission);
+        if (! Permissions::isScoped($permission)) {
+            throw new AccessDeniedHttpException;
+        }
+        $model = self::model($role) ?? throw new AccessDeniedHttpException;
+
+        DB::transaction(function () use ($model, $permission, $scope): void {
+            if (! $model->permissions()->where('name', $permission)->exists()) {
+                throw new UserFacingHttpException(422, 'Accordez d\'abord ce droit.');
+            }
+            $current = DB::table(Scopes::TABLE)->where('role_id', $model->getKey())->where('permission', $permission)->value('scope');
+            $before = AccessScope::tryFrom((string) $current) ?? AccessScope::All;
+            if ($before === $scope) {
+                return;
+            }
+            DB::table(Scopes::TABLE)->upsert(
+                [['tenant_id' => $this->tenants->id(), 'role_id' => $model->getKey(), 'permission' => $permission, 'scope' => $scope->value, 'updated_at' => now()]],
+                ['role_id', 'permission'],
+                ['scope', 'updated_at'],
+            );
+            $this->audit->record('roles.scope_changed', $model, ['permission' => $permission, 'scope' => $before->value], ['permission' => $permission, 'scope' => $scope->value]);
         });
 
         $this->forget();
@@ -67,6 +103,8 @@ final class RoleMatrix
 
         DB::transaction(function () use ($model, $role, $defaults): void {
             $model->syncPermissions($defaults);
+            DB::table(Scopes::TABLE)->where('role_id', $model->getKey())->delete();
+            PermissionSync::writeDefaultScopes((string) $model->getKey(), $role, $defaults, $this->tenants->id());
             DB::table(PermissionSync::TABLE)->insertOrIgnore(array_map(fn (string $permission) => [
                 'tenant_id' => $this->tenants->id(),
                 'role' => $role->value,
@@ -96,5 +134,6 @@ final class RoleMatrix
     private function forget(): void
     {
         app(PermissionRegistrar::class)->forgetCachedPermissions();
+        Scopes::forget();
     }
 }

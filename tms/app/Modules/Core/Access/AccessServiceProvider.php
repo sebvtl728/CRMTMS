@@ -36,7 +36,10 @@ class AccessServiceProvider extends ServiceProvider
 
         // A long-running worker serves many jobs of the same organisme: reload
         // the permissions at each job (changed meanwhile by the web).
-        Event::listen(JobProcessing::class, fn () => $this->app->make(PermissionRegistrar::class)->clearPermissionsCollection());
+        Event::listen(JobProcessing::class, function (): void {
+            $this->app->make(PermissionRegistrar::class)->clearPermissionsCollection();
+            Scopes::forget();
+        });
 
         // The invited role becomes the primary role once the account is activated.
         Event::listen(InvitationAccepted::class, function (InvitationAccepted $event): void {

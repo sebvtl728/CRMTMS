@@ -53,6 +53,26 @@ final class PermissionSync
         }
     }
 
+    /**
+     * Writes the default scope of the given permissions, when the role's
+     * defaults declare one (called only as a default is granted: a scope the
+     * administrator changed later is never rewritten).
+     *
+     * @param  list<string>  $permissions
+     */
+    public static function writeDefaultScopes(string $roleId, Role $role, array $permissions, ?string $tenantId): void
+    {
+        $rows = [];
+        foreach (Permissions::defaultScopesFor($role) as $permission => $scope) {
+            if (in_array($permission, $permissions, true)) {
+                $rows[] = ['tenant_id' => $tenantId, 'role_id' => $roleId, 'permission' => $permission, 'scope' => $scope->value];
+            }
+        }
+        if ($rows !== []) {
+            DB::table(Scopes::TABLE)->insertOrIgnore($rows);
+        }
+    }
+
     private static function syncCurrentTenant(): void
     {
         $tenantId = app(TenantContext::class)->id();
@@ -77,6 +97,7 @@ final class PermissionSync
                 }
 
                 $model->givePermissionTo($new);
+                self::writeDefaultScopes((string) $model->getKey(), $role, $new, $tenantId);
 
                 DB::table(self::TABLE)->insertOrIgnore(array_map(fn (string $permission) => [
                     'tenant_id' => $tenantId,
@@ -87,5 +108,6 @@ final class PermissionSync
         });
 
         $registrar->forgetCachedPermissions();
+        Scopes::forget();
     }
 }
