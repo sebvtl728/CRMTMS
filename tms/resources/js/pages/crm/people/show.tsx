@@ -85,6 +85,7 @@ interface ShowProps {
         createOpportunity: boolean;
         consent: boolean;
         gdpr: boolean;
+        gdprExport: boolean;
         anonymise: boolean;
     };
     status?: string;

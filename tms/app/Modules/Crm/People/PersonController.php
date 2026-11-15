@@ -13,6 +13,7 @@ use App\Modules\Crm\Gdpr\Consent;
 use App\Modules\Crm\Gdpr\ConsentChannel;
 use App\Modules\Crm\Gdpr\GdprPending;
 use App\Modules\Crm\Gdpr\LegalBasis;
+use App\Modules\Crm\Gdpr\PersonDataExport;
 use App\Modules\Crm\Interests\FicheTrainings;
 use App\Modules\Crm\Opportunities\OpportunityRows;
 use App\Modules\Crm\Opportunities\OpportunityTrainings;
@@ -246,6 +247,8 @@ class PersonController extends Controller
                 'restore' => $person->trashed() && $user->can('restore', $person),
                 'consent' => ! $person->trashed() && $user->can('update', $person),
                 'gdpr' => $user->can('gdpr', $person),
+                // The RGPD export is complete: only for who sees the whole organisme.
+                'gdprExport' => $user->can('gdpr', $person) && PersonDataExport::allowedFor($user),
                 'anonymise' => $person->anonymised_at === null && $user->can('gdpr', $person),
             ],
             'status' => $request->session()->get('status'),

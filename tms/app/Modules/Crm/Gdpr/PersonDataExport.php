@@ -11,13 +11,11 @@ use App\Modules\Crm\Affiliations\Affiliation;
 use App\Modules\Crm\Interests\FicheTraining;
 use App\Modules\Crm\Interests\FicheTrainings;
 use App\Modules\Crm\Opportunities\Opportunity;
-use App\Modules\Crm\Organisations\Organisation;
 use App\Modules\Crm\People\Person;
 use App\Modules\Crm\Permissions;
 use App\Modules\Crm\Quotes\Quote;
 use App\Modules\Crm\Timeline\Attachment;
 use App\Modules\Crm\Timeline\Note;
-use App\Modules\Crm\Visibility\CrmVisibility;
 use DateTimeInterface;
 use Illuminate\Support\Facades\DB;
 
@@ -30,15 +28,32 @@ use Illuminate\Support\Facades\DB;
  * type, subject, status, result, report, place), notes, consents, attachments (listed, not their
  * content), trainings of interest (« Formations d'intérêt »), DAS and dates. Trashed items are included (still held), flagged.
  * Fiches merged into her are listed by id (their data now lives here).
- * Visibility rules apply: each domain within the viewer's view scope; when
- * he does not see every entreprise, only the links to those he sees.
+ * Always complete (RGPD art. 15): nothing is left out for the viewer's
+ * scopes; hence reserved to users who see the whole organisme (allowedFor).
  */
 final class PersonDataExport
 {
+    public const INCOMPLETE = 'L\'export RGPD doit être complet : il est réservé aux rôles qui voient tout l\'organisme.';
+
+    /**
+     * The four domain view rights on « Tout l'organisme »: the complete file
+     * shows nothing the user does not already see.
+     */
+    public static function allowedFor(User $user): bool
+    {
+        foreach (Permissions::views() as $permission) {
+            if (Scopes::of($user, $permission) !== AccessScope::All) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
     /**
      * @return array<string, mixed>
      */
-    public static function for(Person $person, ?User $viewer = null): array
+    public static function for(Person $person): array
     {
         $person->loadMissing(['professionalSituation', 'fundingMode', 'origin', 'das']);
         $label = fn (?ReferenceItem $i) => $i?->label;
@@ -46,23 +61,19 @@ final class PersonDataExport
 
         $links = Affiliation::withTrashed()->with(['organisation' => fn ($q) => $q->withTrashed(), 'decisionRole'])
             ->where('person_id', $person->id)
-            ->when($viewer !== null && Scopes::of($viewer, Permissions::FICHES_VIEW) !== AccessScope::All, fn ($q) => $q->whereIn('organisation_id', CrmVisibility::organisations(Organisation::withTrashed(), $viewer)->select('organisations.id')))
             ->orderBy('created_at')->get();
         $notes = Note::withTrashed()->where('notable_type', $person->getMorphClass())->where('notable_id', $person->id)->orderBy('created_at')->get();
         $files = Attachment::withTrashed()->where('notable_type', $person->getMorphClass())->where('notable_id', $person->id)->orderBy('created_at')->get();
         $opportunities = Opportunity::withTrashed()->with('stage')
             ->where(fn ($q) => $q->where('person_id', $person->id)
                 ->orWhereIn('id', DB::table('opportunity_contacts')->select('opportunity_id')->where('person_id', $person->id)))
-            ->when($viewer !== null, fn ($q) => CrmVisibility::opportunities($q, $viewer))
             ->orderByRaw('person_id is null')->orderBy('created_at')->orderBy('id')->get();
         $actions = Activity::withTrashed()->with(['type', 'result'])
             ->where(fn ($q) => $q->where('person_id', $person->id)
                 ->orWhereIn('opportunity_id', DB::table('opportunities')->select('id')->where('person_id', $person->id)))
-            ->when($viewer !== null, fn ($q) => CrmVisibility::activities($q, $viewer))
             ->orderBy('happened_at')->orderBy('id')->get();
         $quotes = Quote::withTrashed()
             ->where(fn ($q) => $q->where('person_id', $person->id)->orWhere('contact_person_id', $person->id))
-            ->when($viewer !== null, fn ($q) => CrmVisibility::quotes($q, $viewer))
             ->orderBy('issued_on')->orderBy('number')->get();
         $trainings = app(FicheTrainings::class)->rows($person);
         $addedOn = FicheTraining::query()->where('person_id', $person->id)->pluck('created_at', 'training_id');

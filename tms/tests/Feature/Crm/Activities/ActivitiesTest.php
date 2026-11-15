@@ -446,7 +446,9 @@ it('hides from a Responsable DAS the actions of an opportunity outside his DAS, 
         $titles = collect($this->getJson($url)->assertOk()->json('entries'))->where('type', 'activity')->pluck('title')->all();
         expect($titles)->toBe(['Action visible']);
     }
-    expect(array_column(PersonDataExport::for($person->refresh(), $responsable)['actions'], 'objet'))->toBe(['Action visible']);
+    // The RGPD file is complete (reserved to who sees everything): both actions.
+    expect(collect(PersonDataExport::for($person->refresh())['actions'])->pluck('objet')->sort()->values()->all())->toBe(['Action cachée', 'Action visible'])
+        ->and(PersonDataExport::allowedFor($responsable))->toBeFalse();
 
     // System-level: the contact date still counts the hidden action.
     expect($org->refresh()->last_contact_at)->not->toBeNull();

@@ -1,6 +1,7 @@
 <?php
 
 use App\Modules\Core\Access\Role;
+use App\Modules\Core\Access\RoleModel;
 use App\Modules\Core\Audit\AuditLog;
 use App\Modules\Core\References\CapFormationReferenceSeeder;
 use App\Modules\Core\References\ReferenceList;
@@ -19,6 +20,7 @@ use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Storage;
 use Inertia\Testing\AssertableInertia as Assert;
+use Spatie\Permission\PermissionRegistrar;
 
 beforeEach(function () {
     CrmServiceProvider::registerReferenceUsage();
@@ -185,7 +187,7 @@ it('journals no personal value of a quote', function () {
     expect($journal)->not->toContain('Durand')->not->toContain('lea.durand@example.test')->not->toContain('Annecy');
 });
 
-it('lists the quotes of a person in her data export, within what the viewer sees', function () {
+it('lists the quotes of a person in her data export, complete or refused', function () {
     $this->actingAs(commercial());
     $quote = sendableQuote();
     $lea = $quote->contact;
@@ -200,9 +202,21 @@ it('lists the quotes of a person in her data export, within what the viewer sees
         ['numero' => 'CF-2026-0002', 'date' => '2026-11-14', 'role' => 'Compte (particulier)', 'statut' => 'Brouillon', 'total_ttc' => '1200.00', 'devis_signe' => 'non', 'supprime' => false],
     ]);
 
+    // A DAS-restricted exporter would get a trimmed file: refused.
+    RoleModel::findByName(Role::ResponsableDas->value)->givePermissionTo('crm.gdpr');
+    app(PermissionRegistrar::class)->forgetCachedPermissions();
     $responsable = userWithRole(Role::ResponsableDas);
-    followDas($responsable, crmItem(ReferenceList::Das, 'Hôtellerie-restauration'));
-    expect(collect(PersonDataExport::for(Person::query()->findOrFail($lea->id), $responsable)['devis'])->pluck('numero')->all())
-        ->toBe(['CF-2026-0001']);
+    $hotel = crmItem(ReferenceList::Das, 'Hôtellerie-restauration');
+    followDas($responsable, $hotel);
+    // He sees her (her DAS, her entreprise's DAS), not the « Métiers supports » quote.
+    $lea->das()->sync([$hotel->id => ['tenant_id' => tenant()->id]]);
+    $quote->organisation->das()->sync([$hotel->id => ['tenant_id' => tenant()->id]]);
+    $this->actingAs($responsable)->get("/crm/people/{$lea->id}")->assertOk();
+    $this->getJson("/crm/people/{$lea->id}/gdpr-export")
+        ->assertForbidden()->assertJson(['message' => PersonDataExport::INCOMPLETE]);
+
+    // Every domain on « Tout l'organisme »: the full file, the other DAS's quote too.
+    $json = $this->actingAs(direction(twoFactor: true))->get("/crm/people/{$lea->id}/gdpr-export")->assertOk()->getContent();
+    expect(collect(json_decode((string) $json, true)['devis'])->pluck('numero')->all())->toBe(['CF-2026-0001', 'CF-2026-0002']);
     expect($own->number)->toBe('CF-2026-0002');
 });

@@ -10,6 +10,7 @@ use App\Modules\Core\Users\User;
 use App\Modules\Crm\Activities\Activity;
 use App\Modules\Crm\CrmServiceProvider;
 use App\Modules\Crm\Organisations\Organisation;
+use App\Modules\Crm\People\Person;
 use App\Modules\Crm\Permissions;
 use App\Modules\Crm\Quotes\Quote;
 use App\Modules\Crm\Visibility\CrmVisibility;
@@ -305,5 +306,49 @@ it('flags each action with its own rights on the fiche and the opportunity', fun
     $todo = $this->get('/crm/todo')->assertOk()->original->getData()['page']['props']['sections'];
     $todoRows = collect($todo)->flatten(1)->keyBy('subject');
     expect($todoRows['À moi']['can_update'] ?? null)->toBeTrue();
-    expect($mine->fresh())->not->toBeNull();
+    $this->delete("/crm/activities/{$mine->id}")->assertRedirect();
+    expect(Activity::query()->find($mine->id))->toBeNull()
+        ->and(Activity::query()->find($theirs->id))->not->toBeNull();
+});
+
+it('own scope sees responsible or created people only', function () {
+    $me = svUser([Permissions::FICHES_VIEW => AccessScope::Own]);
+    $colleague = commercial();
+    $responsible = svOwn(makePerson('Responsable'), $colleague, $me);
+    $created = svOwn(makePerson('Créée'), $me, null);
+    $other = svOwn(makePerson('Collègue'), $colleague, null);
+
+    expect(CrmVisibility::people(Person::query(), $me)->pluck('last_name')->sort()->values()->all())->toBe(['Créée', 'Responsable']);
+
+    $this->actingAs($me);
+    $this->get("/crm/people/{$other->id}")->assertNotFound();
+    $this->get("/crm/people/{$created->id}")->assertOk();
+    $this->get("/crm/people/{$responsible->id}")->assertOk();
+});
+
+it('merges only within the update and delete scopes', function () {
+    $me = svUser([Permissions::FICHES_VIEW => null, Permissions::FICHES_UPDATE => AccessScope::Own, Permissions::FICHES_DELETE => AccessScope::Own, Permissions::MERGE => null]);
+    $colleague = commercial();
+    $theirKeep = svOwn(Organisation::query()->create(['name' => 'Hôtel du Lac', 'city' => 'Annecy']), $colleague, $colleague);
+    $theirDrop = svOwn(Organisation::query()->create(['name' => 'Hotel du Lac', 'city' => 'Annecy']), $colleague, $colleague);
+    $myKeep = svOwn(Organisation::query()->create(['name' => 'Bistrot du Port', 'city' => 'Lyon']), $colleague, $me);
+    $myDrop = svOwn(Organisation::query()->create(['name' => 'Bistro du Port', 'city' => 'Lyon']), $me, null);
+
+    $this->actingAs($me);
+    $this->get("/crm/merge/organisation/{$theirKeep->id}/{$theirDrop->id}")->assertForbidden();
+    $this->get("/crm/merge/organisation/{$myKeep->id}/{$theirDrop->id}")->assertForbidden();
+    $this->post('/crm/merge/organisation', ['keep' => $theirKeep->id, 'drop' => $theirDrop->id, 'fields' => []])->assertForbidden();
+    $this->post('/crm/merge/organisation', ['keep' => $myKeep->id, 'drop' => $theirDrop->id, 'fields' => []])->assertForbidden();
+    expect($theirDrop->fresh()->merged_into_id)->toBeNull();
+
+    // « Fiches similaires »: merge offered only for what he may absorb.
+    $similar = collect($this->get("/crm/organisations/{$theirKeep->id}")->assertOk()->original->getData()['page']['props']['similar'])->keyBy('id');
+    expect($similar[$theirDrop->id]['can_merge'])->toBeFalse();
+    $similar = collect($this->get("/crm/organisations/{$myKeep->id}")->assertOk()->original->getData()['page']['props']['similar'])->keyBy('id');
+    expect($similar[$myDrop->id]['can_merge'])->toBeTrue();
+
+    $props = $this->get("/crm/merge/organisation/{$myKeep->id}/{$myDrop->id}")->assertOk()->original->getData()['page']['props'];
+    expect($props['canSwap'])->toBeTrue();
+    $this->post('/crm/merge/organisation', ['keep' => $myKeep->id, 'drop' => $myDrop->id, 'fields' => []])->assertRedirect();
+    expect(Organisation::withTrashed()->find($myDrop->id)->merged_into_id)->toBe($myKeep->id);
 });
