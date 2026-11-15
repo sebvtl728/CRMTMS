@@ -191,7 +191,7 @@ Un nouvel organisme reçoit ces droits (identiques au comportement de la version
 | Administrateur de l'organisme | Consulter, modifier, supprimer, périmètre « Tout » | `crm.activities.team`, chiffre d'affaires (consulter « Tout », objectifs), `catalogue.delete`, fusion, import, export, RGPD, catalogue |
 | Direction | Consulter, « Tout » | `crm.activities.team`, chiffre d'affaires (consulter « Tout », objectifs), `catalogue.delete`, export, RGPD, catalogue |
 | Commercial, Chargé de relations | Consulter, modifier, supprimer, « Tout » | Chiffre d'affaires : consulter « Ses fiches » ; fusion, import, export, consulter le catalogue |
-| Assistant | Consulter, modifier, « Tout » | Consulter le catalogue |
+| Assistant | Consulter, modifier, « Tout » ; supprimer des actions (`crm.activities.delete`) | Consulter le catalogue |
 | Responsable DAS | Consulter, « Ses DAS » | Chiffre d'affaires : consulter « Ses DAS » ; export, consulter le catalogue |
 
 Le comportement de la 0.4 est conservé : le Commercial modifie toutes les fiches. Pour qu'il ne modifie que les siennes, réglez le périmètre de « Créer et modifier » sur « Ses fiches ».
