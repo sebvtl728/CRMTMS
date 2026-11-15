@@ -147,6 +147,16 @@ class RoleController extends Controller
             foreach ($scoped as $permission) {
                 $scopes[$permission] = (AccessScope::tryFrom((string) $own->get($permission, '')) ?? AccessScope::All)->value;
             }
+            // Default scopes of a system role (none declared = all): a changed scope is highlighted too.
+            $system = $role->systemRole();
+            $defaultScopes = [];
+            if ($system !== null) {
+                $declared = Permissions::defaultScopesFor($system);
+                foreach ($scoped as $permission) {
+                    $defaultScopes[$permission] = ($declared[$permission] ?? AccessScope::All)->value;
+                }
+            }
+            $granted = RoleMatrix::granted($role);
 
             return [
                 'id' => $role->id,
@@ -156,11 +166,33 @@ class RoleController extends Controller
                 'requires_2fa' => $role->requires2fa(),
                 'locked_2fa' => $role->systemRole()?->requires2fa() === true,
                 'users_count' => (int) ($users[$role->id] ?? 0),
-                'permissions' => RoleMatrix::granted($role),
+                'permissions' => $granted,
                 'defaults' => RoleMatrix::defaults($role),
                 'scopes' => $scopes,
+                'default_scopes' => $defaultScopes,
+                'two_factor_warning' => $this->twoFactorWarning($role, $granted),
             ];
         })->values()->all();
+    }
+
+    /**
+     * Non-blocking warning: a role without mandatory double authentification
+     * holding a sensitive right (Permissions::TWO_FACTOR_ADVISED).
+     *
+     * @param  list<string>  $granted
+     */
+    private function twoFactorWarning(RoleModel $role, array $granted): ?string
+    {
+        if ($role->isAdmin() || $role->requires2fa()) {
+            return null;
+        }
+        $held = array_values(array_intersect(Permissions::TWO_FACTOR_ADVISED, $granted));
+        if ($held === []) {
+            return null;
+        }
+        $labels = array_map(fn (string $p) => Permissions::label($p)['label'] ?? $p, $held);
+
+        return 'Ce rôle détient '.(count($held) > 1 ? 'des droits sensibles' : 'un droit sensible').' ('.implode(', ', $labels).') sans double authentification obligatoire : activez-la.';
     }
 
     /**

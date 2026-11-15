@@ -28,6 +28,10 @@ interface RoleColumn {
     /** Default rights of a system role (empty for a custom role). */
     defaults: string[];
     scopes: Record<string, ScopeValue>;
+    /** Default scopes of a system role (empty for a custom role). */
+    default_scopes: Record<string, ScopeValue>;
+    /** Sensitive right held without mandatory double authentification (non-blocking). */
+    two_factor_warning: string | null;
 }
 
 interface PermissionRow {
@@ -269,7 +273,7 @@ export default function Roles({ roles, groups, scopeOptions, status }: RolesProp
                     </li>
                     <li>
                         Une case <span className="rounded bg-amber-100 px-1 text-amber-900 dark:bg-amber-900 dark:text-amber-100">surlignée</span>{' '}
-                        diffère des droits par défaut du rôle.
+                        diffère des droits ou du périmètre par défaut du rôle.
                     </li>
                     <li>La double authentification reste obligatoire pour l'administrateur et la direction, quels que soient leurs droits.</li>
                 </ul>
@@ -359,6 +363,11 @@ export default function Roles({ roles, groups, scopeOptions, status }: RolesProp
                                                 )}
                                                 <span className="text-muted-foreground text-left">Double authentification obligatoire</span>
                                             </div>
+                                            {role.two_factor_warning && (
+                                                <div className="mt-1 text-left text-xs font-normal text-amber-700 dark:text-amber-300">
+                                                    ⚠ {role.two_factor_warning}
+                                                </div>
+                                            )}
                                         </th>
                                     ))}
                                 </tr>
@@ -386,7 +395,14 @@ export default function Roles({ roles, groups, scopeOptions, status }: RolesProp
                                             </th>
                                             {roles.map((role) => {
                                                 const granted = role.permissions.includes(p.name);
-                                                const changed = role.system && granted !== role.defaults.includes(p.name);
+                                                const byDefault = role.defaults.includes(p.name);
+                                                // A system role's cell differs from its defaults by the right or, both granted, by its scope.
+                                                const changed =
+                                                    role.system &&
+                                                    (granted !== byDefault ||
+                                                        (granted &&
+                                                            p.scoped &&
+                                                            (role.scopes[p.name] ?? 'all') !== (role.default_scopes[p.name] ?? 'all')));
                                                 const fixed = role.admin || p.locked;
                                                 const key = `${role.id}:${p.name}`;
 

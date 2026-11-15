@@ -135,6 +135,6 @@ it('warns about the administration-level rights on the screen', function () {
         // Administration is the last theme.
         ->where('groups', fn ($groups) => collect($groups)->last()['label'] === 'Administration'
             && collect(collect($groups)->last()['permissions'])->whereNotNull('warning')->pluck('name')->sort()->values()->all() === ['exports.run', 'settings.manage']
-            && collect($groups)->flatMap(fn ($g) => $g['permissions'])->whereNotNull('warning')->count() === 2
+            && collect($groups)->flatMap(fn ($g) => $g['permissions'])->whereNotNull('warning')->count() === 3
             && str_contains((string) collect(collect($groups)->last()['permissions'])->firstWhere('name', 'settings.manage')['description'], "modèles d'e-mails")));
 });

@@ -37,9 +37,17 @@ final class Permissions
 
     /** @var array<string, string> permission => warning shown on the « Rôles et droits » screen */
     public const WARNINGS = [
-        self::EXPORTS_RUN => "Droit de niveau administrateur : les exports système portent sur tout l'organisme, sans tenir compte des DAS suivis.",
+        self::EXPORTS_RUN => "Droit de niveau administrateur : les exports système portent sur tout l'organisme, sans tenir compte des périmètres.",
         self::SETTINGS_MANAGE => "Droit de niveau administrateur : sécurité des sessions, textes des e-mails envoyés au nom de l'organisme et durée de conservation RGPD.",
+        // Module permission named by its string: Core never depends on a module.
+        'crm.import' => 'Import : seules les fiches de votre périmètre de modification sont complétées ; une fiche existante hors périmètre est ignorée.',
     ];
+
+    /**
+     * Rights worth a mandatory double authentification: the roles screen
+     * warns when a role without it holds one of them.
+     */
+    public const TWO_FACTOR_ADVISED = [self::SETTINGS_MANAGE, self::AUDIT_VIEW, self::EXPORTS_RUN];
 
     /** Theme of the Core permissions on the « Rôles et droits » screen. */
     public const CORE_GROUP = 'Administration';

@@ -91,3 +91,43 @@ it('refuses a scope for an ungranted, unscoped or administrator permission, or a
     // Neither granted nor scope.
     $this->postJson($url, ['permission' => CrmPermissions::OPPORTUNITIES_VIEW])->assertStatus(422);
 });
+
+it('gives the default scopes of a system role so that a changed scope is highlighted', function () {
+    $this->actingAs(admin(twoFactor: true));
+    $commercial = RoleModel::forSystem(Role::Commercial);
+    app(RoleMatrix::class)->setScope($commercial, CrmPermissions::FICHES_VIEW, AccessScope::Own);
+    $custom = screenRole('Formateur', false, $commercial);
+
+    $this->get('/admin/roles')->assertOk()->assertInertia(fn (Assert $page) => $page
+        ->where('roles', function ($roles) use ($commercial, $custom) {
+            $byId = collect($roles)->keyBy('id');
+            $c = $byId[$commercial->id];
+            $das = $byId[RoleModel::forSystem(Role::ResponsableDas)->id];
+
+            return $c['default_scopes'][CrmPermissions::FICHES_VIEW] === 'all'
+                && $c['scopes'][CrmPermissions::FICHES_VIEW] === 'own'
+                && $c['default_scopes'][CrmPermissions::REVENUE_VIEW] === 'own'
+                && $das['default_scopes'][CrmPermissions::FICHES_VIEW] === 'das'
+                && $byId[$custom->id]['default_scopes'] === [];
+        }));
+});
+
+it('warns when a role without mandatory 2fa holds a sensitive right', function () {
+    $this->actingAs(admin(twoFactor: true));
+    $plain = screenRole('Formateur', false);
+    $sensitive = screenRole('Auditeur', false);
+    app(RoleMatrix::class)->set($sensitive, Permissions::AUDIT_VIEW, true);
+    $protected = screenRole('Contrôleur', true);
+    app(RoleMatrix::class)->set($protected, Permissions::EXPORTS_RUN, true);
+
+    $this->get('/admin/roles')->assertOk()->assertInertia(fn (Assert $page) => $page
+        ->where('roles', function ($roles) use ($plain, $sensitive, $protected) {
+            $byId = collect($roles)->keyBy('id');
+
+            return $byId[$plain->id]['two_factor_warning'] === null
+                && $byId[$protected->id]['two_factor_warning'] === null
+                && $byId[$sensitive->id]['two_factor_warning'] === "Ce rôle détient un droit sensible (Consulter le journal d'audit) sans double authentification obligatoire : activez-la."
+                // Administrator and direction always have it.
+                && $byId[RoleModel::forSystem(Role::Direction)->id]['two_factor_warning'] === null;
+        }));
+});
