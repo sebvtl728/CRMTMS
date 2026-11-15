@@ -42,7 +42,7 @@ it('log context carries tenant id during a request and a job', function () {
         // Statement form: the PendingDispatch is pushed (destructed) inside the context.
         LoggingJob::dispatch()->onConnection('database');
     });
-    Artisan::call('queue:work', ['connection' => 'database', '--stop-when-empty' => true, '--tries' => 1, '--sleep' => 0]);
+    Artisan::call('queue:work', ['connection' => 'database', '--stop-when-empty' => true, '--tries' => 1, '--sleep' => 0, '--memory' => 0]);
 
     $job = collect($logged)->firstWhere('message', 'logging job');
     expect($job->context['tenant_id'] ?? null)->toBe($other->id)
