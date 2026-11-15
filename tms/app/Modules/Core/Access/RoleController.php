@@ -3,8 +3,10 @@
 namespace App\Modules\Core\Access;
 
 use App\Http\Controllers\Controller;
+use App\Modules\Core\Users\User;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -28,24 +30,17 @@ class RoleController extends Controller
                 'name' => $permission,
                 'label' => $label['label'],
                 'description' => $label['description'],
+                'scoped' => Permissions::isScoped($permission),
+                'locked' => in_array($permission, Permissions::LOCKED, true),
                 'warning' => Permissions::WARNINGS[$permission] ?? null,
             ];
         }
 
         return Inertia::render('admin/roles/index', [
-            'roles' => RoleModel::query()->ordered()->get()->map(fn (RoleModel $role) => [
-                'id' => $role->id,
-                'value' => $role->name,
-                'label' => $role->label(),
-                'system' => $role->system,
-                'requires_2fa' => $role->requires2fa(),
-                'locked' => ! RoleMatrix::editable($role),
-                'granted' => RoleMatrix::granted($role),
-                'defaults' => RoleMatrix::defaults($role),
-            ])->values()->all(),
+            'roles' => $this->roles(),
             // Administration last, after the modules' themes.
             'groups' => [...array_values(array_diff_key($groups, [Permissions::CORE_GROUP => true])), ...(isset($groups[Permissions::CORE_GROUP]) ? [$groups[Permissions::CORE_GROUP]] : [])],
-            'locked' => Permissions::LOCKED,
+            'scopeOptions' => AccessScope::options(),
             'status' => $request->session()->get('status'),
         ]);
     }
@@ -95,13 +90,24 @@ class RoleController extends Controller
         $role = $this->find($role);
         $data = $request->validate([
             'permission' => ['required', 'string', Rule::in(Permissions::all())],
-            'granted' => ['required', 'boolean'],
+            'granted' => ['required_without:scope', 'boolean'],
+            'scope' => ['required_without:granted', 'string', Rule::in(array_column(AccessScope::cases(), 'value'))],
         ], [
+            'scope.required_without' => 'Indiquez le périmètre.',
+            'scope.in' => "Ce périmètre n'existe pas.",
             'permission.required' => 'Choisissez un droit.',
             'permission.in' => "Ce droit n'existe pas.",
-            'granted.required' => 'Indiquez si le droit est accordé.',
+            'granted.required_without' => 'Indiquez si le droit est accordé.',
             'granted.boolean' => 'Indiquez si le droit est accordé.',
         ]);
+
+        if (isset($data['scope'])) {
+            $scope = AccessScope::from($data['scope']);
+            $this->matrix->setScope($role, $data['permission'], $scope);
+            $label = Permissions::label($data['permission'])['label'] ?? $data['permission'];
+
+            return back()->with('status', "Périmètre de « {$label} » pour le rôle {$role->label()} : {$scope->label()}.");
+        }
 
         $granted = filter_var($data['granted'], FILTER_VALIDATE_BOOLEAN);
         $this->matrix->set($role, $data['permission'], $granted);
@@ -120,6 +126,41 @@ class RoleController extends Controller
         return back()->with('status', $role->system
             ? "Droits par défaut rétablis pour le rôle {$role->label()}."
             : "Tous les droits du rôle {$role->label()} ont été retirés.");
+    }
+
+    /**
+     * The columns of the matrix: system roles then custom ones, with the
+     * rights, the scope of every scoped right (none declared = all), the
+     * number of users holding the role (active or not).
+     *
+     * @return list<array<string, mixed>>
+     */
+    private function roles(): array
+    {
+        $scoped = array_values(array_filter(Permissions::all(), fn (string $p) => Permissions::isScoped($p)));
+        $rows = DB::table(Scopes::TABLE)->get(['role_id', 'permission', 'scope'])->groupBy('role_id');
+        $users = DB::table('model_has_roles')->where('model_type', (new User)->getMorphClass())->selectRaw('role_id, count(*) as n')->groupBy('role_id')->pluck('n', 'role_id');
+
+        return RoleModel::query()->ordered()->get()->map(function (RoleModel $role) use ($scoped, $rows, $users) {
+            $own = ($rows->get($role->id) ?? collect())->pluck('scope', 'permission');
+            $scopes = [];
+            foreach ($scoped as $permission) {
+                $scopes[$permission] = (AccessScope::tryFrom((string) $own->get($permission, '')) ?? AccessScope::All)->value;
+            }
+
+            return [
+                'id' => $role->id,
+                'label' => $role->label(),
+                'system' => $role->system,
+                'admin' => $role->isAdmin(),
+                'requires_2fa' => $role->requires2fa(),
+                'locked_2fa' => $role->systemRole()?->requires2fa() === true,
+                'users_count' => (int) ($users[$role->id] ?? 0),
+                'permissions' => RoleMatrix::granted($role),
+                'defaults' => RoleMatrix::defaults($role),
+                'scopes' => $scopes,
+            ];
+        })->values()->all();
     }
 
     /**

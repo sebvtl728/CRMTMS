@@ -52,14 +52,14 @@ it('shows the matrix with the default of each cell', function () {
 
     $this->get('/admin/roles')->assertOk()->assertInertia(fn (Assert $page) => $page
         ->component('admin/roles/index')
-        ->where('roles.0.value', 'admin_organisme')
-        ->where('roles.0.locked', true)
-        ->where('roles.1.value', 'direction')
-        ->where('roles.1.locked', false)
-        ->where('roles.1.granted', fn ($granted) => collect($granted)->sort()->values()->all() === collect(Permissions::defaultsFor(Role::Direction))->sort()->values()->all())
+        ->where('roles.0.admin', true)
+        ->where('roles.0.locked_2fa', true)
+        ->where('roles.1.label', Role::Direction->label())
+        ->where('roles.1.admin', false)
+        ->where('roles.1.permissions', fn ($granted) => collect($granted)->sort()->values()->all() === collect(Permissions::defaultsFor(Role::Direction))->sort()->values()->all())
         ->where('roles.1.defaults', fn ($d) => collect($d)->sort()->values()->all() === collect(Permissions::defaultsFor(Role::Direction))->sort()->values()->all())
         ->where('groups', fn ($groups) => collect($groups)->flatMap(fn ($g) => collect($g['permissions'])->pluck('name'))->sort()->values()->all() === collect(Permissions::all())->sort()->values()->all())
-        ->where('locked', Permissions::LOCKED));
+        ->where('groups', fn ($groups) => collect($groups)->flatMap(fn ($g) => $g['permissions'])->where('locked', true)->pluck('name')->sort()->values()->all() === collect(Permissions::LOCKED)->sort()->values()->all()));
 });
 
 it('grants and revokes a permission of a role, journaled, effective at the next request', function () {
