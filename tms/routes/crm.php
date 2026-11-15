@@ -5,6 +5,7 @@ use App\Modules\Crm\Duplicates\MergeController;
 use App\Modules\Crm\Export\ExportController;
 use App\Modules\Crm\Gdpr\GdprController;
 use App\Modules\Crm\Gdpr\PersonGdprController;
+use App\Modules\Crm\Interests\FicheTrainingController;
 use App\Modules\Crm\Organisations\OrganisationController;
 use App\Modules\Crm\Organisations\SireneLookupController;
 use App\Modules\Crm\People\PersonController;
@@ -33,6 +34,10 @@ Route::middleware(['auth'])->group(function () {
     Route::post('crm/organisations/{organisation}/affiliations', [AffiliationController::class, 'store'])->middleware('can:crm.update')->name('crm.affiliations.store');
     Route::put('crm/affiliations/{affiliation}', [AffiliationController::class, 'update'])->middleware('can:crm.update')->name('crm.affiliations.update');
     Route::delete('crm/affiliations/{affiliation}', [AffiliationController::class, 'destroy'])->middleware('can:crm.update')->name('crm.affiliations.destroy');
+
+    // « Formations d'intérêt » of a fiche (same right as editing it).
+    Route::put('crm/organisations/{organisation}/trainings', [FicheTrainingController::class, 'organisation'])->middleware('can:crm.update')->name('crm.organisations.trainings.update');
+    Route::put('crm/people/{person}/trainings', [FicheTrainingController::class, 'person'])->middleware('can:crm.update')->name('crm.people.trainings.update');
 
     // Historique: feed, notes and attachments of a fiche.
     Route::get('crm/organisations/{organisation}/timeline', [TimelineController::class, 'organisation'])->middleware('can:crm.view')->name('crm.organisations.timeline');

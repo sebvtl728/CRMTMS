@@ -94,6 +94,11 @@ class Company extends Model
             $company->quote_prefix = static::freePrefix($company->quote_prefix);
         });
 
+        // The brand shown in the application (Brand) follows the default company.
+        static::saved(fn (Company $company) => Brand::forget($company->tenant_id));
+        static::deleted(fn (Company $company) => Brand::forget($company->tenant_id));
+        static::restored(fn (Company $company) => Brand::forget($company->tenant_id));
+
         // Becoming the default unsets the previous one. Runs inside save()'s
         // transaction, before the write, so the partial unique index holds.
         static::saving(function (Company $company): void {

@@ -225,3 +225,24 @@ it('ignores a stored path outside the company directory', function () {
 
     expect(app(CompanyBranding::class)->logoDataUri($company))->toBeNull();
 });
+
+it('keeps the previous logo intact when saving the replacement fails', function () {
+    inTenant();
+    $company = Company::factory()->create();
+    $first = imageBytes('png');
+    app(CompanyBranding::class)->storeLogo($company, logoUpload('logo.png', $first));
+    $path = $company->refresh()->logo_path;
+
+    Company::saving(function (): void {
+        throw new RuntimeException('database down');
+    });
+    $image = imagecreatetruecolor(8, 8);
+    ob_start();
+    imagepng($image);
+    $second = (string) ob_get_clean();
+    expect(fn () => app(CompanyBranding::class)->storeLogo($company, logoUpload('logo.png', $second)))->toThrow(RuntimeException::class);
+
+    $disk = Storage::disk('local');
+    expect($disk->get($path))->toBe($first)
+        ->and($disk->files(dirname($path)))->toBe([$path]);
+});

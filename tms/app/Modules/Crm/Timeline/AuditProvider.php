@@ -32,6 +32,7 @@ final class AuditProvider implements TimelineProvider
     private const EVENTS = [
         'created', 'updated', 'deleted', 'restored',
         'crm.organisation_das_changed', 'crm.person_das_changed', 'crm.merged',
+        'crm.organisation_trainings_changed', 'crm.person_trainings_changed',
     ];
 
     public function entriesFor(Model $subject, ?TimelineCursor $before, int $limit): Collection
@@ -58,6 +59,7 @@ final class AuditProvider implements TimelineProvider
             'deleted' => 'Fiche supprimée',
             'restored' => 'Fiche restaurée',
             'crm.organisation_das_changed', 'crm.person_das_changed' => 'DAS modifiés',
+            'crm.organisation_trainings_changed', 'crm.person_trainings_changed' => "Formations d'intérêt modifiées",
             'crm.merged' => 'Fiche en double fusionnée dans cette fiche',
             default => $this->updateTitle($log),
         };

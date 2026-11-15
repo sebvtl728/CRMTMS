@@ -46,6 +46,8 @@ interface FormProps {
         funding_mode_id: string | null;
         responsible_user_id: string | null;
         contact_ids: string[];
+        /** Active trainings of interest of the fiche (quantity 1). */
+        training_lines?: TrainingLineInput[];
     } | null;
     contactOptions: Option[];
     options: {
@@ -173,7 +175,10 @@ export default function OpportunityFormPage({ opportunity, account, defaults, co
         funding_mode_id: opportunity?.funding_mode_id ?? defaults?.funding_mode_id ?? '',
         responsible_user_id: opportunity?.responsible_user_id ?? defaults?.responsible_user_id ?? '',
         contact_ids: opportunity?.contact_ids ?? defaults?.contact_ids ?? [],
-        training_lines: (opportunity?.training_lines ?? []).map((l) => ({ training_id: l.training_id, quantity: quantityInput(l.quantity) })),
+        training_lines: (opportunity?.training_lines ?? defaults?.training_lines ?? []).map((l) => ({
+            training_id: l.training_id,
+            quantity: quantityInput(l.quantity),
+        })),
     });
 
     const breadcrumbs: BreadcrumbItem[] = [

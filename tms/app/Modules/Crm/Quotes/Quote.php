@@ -44,6 +44,9 @@ use Illuminate\Support\Facades\Auth;
  * @property string $total_ttc
  * @property array<string, mixed>|null $recipient_snapshot name, address, e-mail frozen when sent
  * @property string|null $pdf_path
+ * @property string|null $signed_path signed copy sent back by the customer (QuoteSignedCopy)
+ * @property string|null $signed_name its original file name (personal)
+ * @property Carbon|null $signed_at when it was attached
  * @property string|null $notes mentions particulières
  * @property array{kind?: string, to?: string, cc?: list<string>, subject?: string, body?: string}|null $email_message last e-mail (sending or reminder), kept to send it again
  * @property string|null $email_status pending|sent|failed (SendQuote)
@@ -63,10 +66,10 @@ class Quote extends Model
      *
      * @var list<string>
      */
-    protected array $auditPersonal = ['notes', 'refusal_reason', 'recipient_snapshot'];
+    protected array $auditPersonal = ['notes', 'refusal_reason', 'recipient_snapshot', 'signed_name'];
 
     /** @var list<string> */
-    protected array $auditIgnore = ['created_by', 'updated_by', 'email_message', 'email_status', 'email_sent_at', 'email_error'];
+    protected array $auditIgnore = ['created_by', 'updated_by', 'email_message', 'email_status', 'email_sent_at', 'email_error', 'signed_path'];
 
     /** @var list<string> */
     protected $fillable = [
@@ -113,6 +116,7 @@ class Quote extends Model
             'recipient_snapshot' => 'array',
             'email_message' => 'array',
             'email_sent_at' => 'datetime',
+            'signed_at' => 'datetime',
         ];
     }
 

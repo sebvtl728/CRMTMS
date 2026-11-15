@@ -3,6 +3,7 @@
 namespace App\Modules\Core\Companies;
 
 use App\Modules\Core\Audit\AuditRecorder;
+use App\Modules\Core\Tenancy\StagedFile;
 use App\Modules\Core\Tenancy\TenantStorage;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
@@ -51,9 +52,10 @@ class CompanyBranding
     }
 
     /**
-     * Replaces the logo: new file first, then the column and the journal
-     * (type, size and SHA-256 of the file, never its content), then the
-     * previous file if it had another name.
+     * Replaces the logo: new file under a temporary name, then the column and
+     * the journal (type, size and SHA-256 of the file, never its content);
+     * once committed, the file takes its name and a previous file of another
+     * name is deleted (StagedFile). A failed save leaves the old logo intact.
      *
      * @throws ValidationException when the file is not an accepted image or cannot be written
      */
@@ -61,20 +63,20 @@ class CompanyBranding
     {
         $extension = self::detectedType($file) ?? throw ValidationException::withMessages(['logo' => self::TYPE_MESSAGE]);
 
-        $name = 'logo.'.$extension;
         $directory = $this->directory($company);
-        $path = $directory.'/'.$name;
+        $path = $directory.'/logo.'.$extension;
         $previous = $company->logo_path;
-        $disk = Storage::disk(TenantStorage::DISK);
 
-        if ($disk->putFileAs($directory, $file, $name) === false) {
+        // The new file under a temporary name: the current logo stays intact until the save is committed.
+        $staged = StagedFile::stage($directory, $file, $extension);
+        if ($staged === null) {
             report(new RuntimeException('Company logo could not be written to the private disk.'));
 
             throw ValidationException::withMessages(['logo' => "Le logo n'a pas pu être enregistré. Réessayez ou contactez l'administrateur."]);
         }
 
         try {
-            DB::transaction(function () use ($company, $path, $previous, $extension, $file): void {
+            DB::transaction(function () use ($company, $path, $previous, $extension, $file, $staged): void {
                 $company->logo_path = $path;
                 $company->save();
                 $this->audit->record('company.logo_changed', $company, ['logo' => $previous === null ? null : pathinfo($previous, PATHINFO_BASENAME)], [
@@ -82,17 +84,13 @@ class CompanyBranding
                     'size' => $file->getSize(),
                     'sha256' => hash_file('sha256', (string) $file->getRealPath()),
                 ]);
+                // The brand (sidebar) is recomputed once the new file is in place.
+                StagedFile::promote($staged, $path, $previous !== null && $this->isOwnPath($company, $previous) ? $previous : null, fn () => Brand::forget($company->tenant_id));
             });
         } catch (\Throwable $e) {
-            if ($previous !== $path) {
-                $disk->delete($path);
-            }
+            StagedFile::discard($staged);
 
             throw $e;
-        }
-
-        if ($previous !== null && $previous !== $path && $this->isOwnPath($company, $previous)) {
-            $disk->delete($previous);
         }
     }
 
@@ -120,6 +118,20 @@ class CompanyBranding
      */
     public function logoDataUri(Company $company): ?string
     {
+        $logo = $this->logoFile($company);
+
+        return $logo === null ? null : 'data:'.$logo['mime'].';base64,'.base64_encode($logo['content']);
+    }
+
+    /**
+     * The stored logo (content, MIME type, SHA-256), for the PDF and the
+     * application's brand (BrandLogoController); null without a logo, when
+     * the file is missing or no longer an accepted image.
+     *
+     * @return array{content: string, mime: string, sha256: string}|null
+     */
+    public function logoFile(Company $company): ?array
+    {
         $path = $company->logo_path;
         if ($path === null || ! $this->isOwnPath($company, $path)) {
             return null;
@@ -135,7 +147,7 @@ class CompanyBranding
             return null;
         }
 
-        return 'data:'.$mime.';base64,'.base64_encode($bytes);
+        return ['content' => $bytes, 'mime' => $mime, 'sha256' => hash('sha256', $bytes)];
     }
 
     private function directory(Company $company): string

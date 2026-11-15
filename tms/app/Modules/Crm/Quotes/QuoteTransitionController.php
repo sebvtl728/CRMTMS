@@ -7,6 +7,8 @@ use App\Modules\Crm\Opportunities\OpportunityStage;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 
 /**
@@ -18,7 +20,7 @@ use Illuminate\Support\Facades\Gate;
  */
 class QuoteTransitionController extends Controller
 {
-    public function __construct(private readonly QuoteTransitions $transitions) {}
+    public function __construct(private readonly QuoteTransitions $transitions, private readonly QuoteSignedCopy $copies) {}
 
     public function send(QuoteMessageRequest $request, Quote $quote): RedirectResponse
     {
@@ -48,7 +50,15 @@ class QuoteTransitionController extends Controller
     {
         Gate::authorize('update', $quote);
         $on = $this->date($request, $quote, 'accepted_on', 'd\'acceptation');
-        $this->transitions->accept($quote, $on);
+        // The signed copy is optional; checked before anything is written.
+        $request->validate(QuoteSignedCopy::rules(false), QuoteSignedCopy::messages());
+        $signed = $request->file(QuoteSignedCopy::FIELD);
+        DB::transaction(function () use ($quote, $on, $signed): void {
+            $this->transitions->accept($quote, $on);
+            if ($signed instanceof UploadedFile) {
+                $this->copies->store($quote, $signed);
+            }
+        });
 
         $redirect = to_route('crm.quotes.show', $quote)->with('status', "Devis {$quote->number} accepté.");
         if ($this->opportunityOpen($quote) && OpportunityStage::closingStage('won') !== null) {

@@ -19,6 +19,20 @@ final class Permissions
     /** The Excel export follows the CRM exports right. */
     public const EXPORT = 'crm.export';
 
+    /** Theme on the « Rôles et droits » screen. */
+    public const GROUP = 'Catalogue de formations';
+
+    /**
+     * @return array<string, array{0: string, 1: string}> permission => [French label, explanation]
+     */
+    public static function labels(): array
+    {
+        return [
+            self::VIEW => ['Consulter le catalogue', 'Voir les formations, leurs tarifs et financements.'],
+            self::MANAGE => ['Gérer le catalogue', 'Créer, modifier, désactiver, importer ou supprimer des formations.'],
+        ];
+    }
+
     /**
      * @return list<string>
      */

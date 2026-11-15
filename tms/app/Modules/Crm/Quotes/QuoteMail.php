@@ -2,6 +2,9 @@
 
 namespace App\Modules\Crm\Quotes;
 
+use App\Modules\Core\Mail\MailTemplates;
+use App\Modules\Core\Tenancy\TenantContext;
+use App\Modules\Crm\Support\CrmMailTemplates;
 use Illuminate\Mail\Mailable;
 
 /**
@@ -38,22 +41,22 @@ class QuoteMail extends Mailable
      */
     public static function defaults(Quote $quote, string $kind): array
     {
-        $company = $quote->company->name ?? '';
-        $validUntil = $quote->valid_until->format('d/m/Y');
-
-        if ($kind === self::KIND_REMIND) {
-            $subject = "Relance : devis {$quote->number} — {$company}";
-            $body = "Bonjour,\n\nNous revenons vers vous au sujet de notre devis {$quote->number}, valable jusqu'au {$validUntil}, que vous trouverez de nouveau ci-joint.\n\nN'hésitez pas à nous contacter pour toute question.\n\nCordialement,\n{$company}";
-        } else {
-            $subject = "Devis {$quote->number} — {$company}";
-            $body = "Bonjour,\n\nVeuillez trouver ci-joint notre devis {$quote->number}, valable jusqu'au {$validUntil}.\n\nNous restons à votre disposition pour toute question.\n\nCordialement,\n{$company}";
-        }
+        $recipient = QuoteRecipient::of($quote);
+        $text = app(MailTemplates::class)->render($kind === self::KIND_REMIND ? CrmMailTemplates::QUOTE_REMIND : CrmMailTemplates::QUOTE_SEND, [
+            'numero_devis' => $quote->number,
+            'societe' => $quote->company->name ?? '',
+            'destinataire' => ($recipient['attention'] ?? null) ?: $recipient['name'],
+            'montant_ttc' => str_replace("\u{00A0}", ' ', QuotePdf::money($quote->total_ttc)),
+            'date_validite' => $quote->valid_until->format('d/m/Y'),
+            'commercial' => $quote->opportunity?->responsible->name ?? '',
+            'organisme' => app(TenantContext::class)->current()->name ?? '',
+        ]);
 
         return [
-            'to' => QuoteRecipient::of($quote)['email'] ?? '',
+            'to' => $recipient['email'] ?? '',
             'cc' => [],
-            'subject' => $subject,
-            'body' => $body,
+            'subject' => $text['subject'],
+            'body' => $text['body'],
         ];
     }
 }

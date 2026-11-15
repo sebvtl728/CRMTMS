@@ -18,6 +18,8 @@ use App\Modules\Crm\Import\ImportBatch;
 use App\Modules\Crm\Import\ImportProfile;
 use App\Modules\Crm\Import\ImportRow;
 use App\Modules\Crm\Import\ImportStamp;
+use App\Modules\Crm\Interests\FicheTraining;
+use App\Modules\Crm\Interests\FicheTrainings;
 use App\Modules\Crm\Opportunities\OpportunitiesProvider;
 use App\Modules\Crm\Opportunities\Opportunity;
 use App\Modules\Crm\Opportunities\OpportunityPolicy;
@@ -32,6 +34,7 @@ use App\Modules\Crm\Quotes\QuoteLine;
 use App\Modules\Crm\Quotes\QuotePolicy;
 use App\Modules\Crm\Quotes\QuotesProvider;
 use App\Modules\Crm\Search\SavedFilter;
+use App\Modules\Crm\Support\CrmMailTemplates;
 use App\Modules\Crm\Support\LinkedData;
 use App\Modules\Crm\Timeline\Attachment;
 use App\Modules\Crm\Timeline\AttachmentsProvider;
@@ -63,7 +66,8 @@ class CrmServiceProvider extends ServiceProvider
     {
         // In register(): the catalogue must be complete before
         // AccessServiceProvider::boot() defines one gate per permission.
-        CorePermissions::registerModule('crm', Permissions::all(), Permissions::defaultsFor(...));
+        CrmMailTemplates::register();
+        CorePermissions::registerModule('crm', Permissions::all(), Permissions::defaultsFor(...), Permissions::labels(), Permissions::GROUP);
 
         MorphAliases::register([
             'organisation' => Organisation::class,
@@ -80,6 +84,7 @@ class CrmServiceProvider extends ServiceProvider
             'opportunity' => Opportunity::class,
             'opportunity_stage_change' => StageChange::class,
             'opportunity_training' => OpportunityTraining::class,
+            'fiche_training' => FicheTraining::class,
             'activity' => Activity::class,
             'quote' => Quote::class,
             'quote_line' => QuoteLine::class,
@@ -105,6 +110,8 @@ class CrmServiceProvider extends ServiceProvider
         // Quote e-mails (send, reminder, « Renvoyer »): 20 a minute per user.
         RateLimiter::for('quote-mail', fn (Request $request) => Limit::perMinute(20)->by('quote-mail:'.($request->user()?->getAuthIdentifier() ?? $request->ip())));
         // A draft's PDF is rendered on each request (Gotenberg): 30 a minute per user.
+        // Signed copy of a quote (upload, download): 30 a minute per user.
+        RateLimiter::for('quote-signed', fn (Request $request) => Limit::perMinute(30)->by('quote-signed:'.($request->user()?->getAuthIdentifier() ?? $request->ip())));
         RateLimiter::for('quote-pdf', fn (Request $request) => Limit::perMinute(30)->by('quote-pdf:'.($request->user()?->getAuthIdentifier() ?? $request->ip())));
 
         Gate::policy(Organisation::class, OrganisationPolicy::class);
@@ -378,17 +385,21 @@ class CrmServiceProvider extends ServiceProvider
             Quote::withTrashed()->where(fn (Builder $q) => $fiche instanceof Organisation
                 ? $q->where('organisation_id', $fiche->getKey())
                 : $q->where('person_id', $fiche->getKey())->orWhere('contact_person_id', $fiche->getKey())), $ids)->exists());
+        LinkedData::register('crm.interest_trainings', fn (Organisation|Person $fiche, array $ids): bool => $except(
+            FicheTraining::query()->where(FicheTrainings::column($fiche), $fiche->getKey()), $ids)->exists());
         LinkedData::register('crm.consents', fn (Organisation|Person $fiche, array $ids): bool => $fiche instanceof Person
             && $except(Consent::query()->where('person_id', $fiche->getKey()), $ids)->exists());
     }
 
     /**
      * A training on an opportunity or a quote (a trashed one too: its lines
-     * stay) is in use: the catalogue refuses to delete it.
+     * stay), or of interest to a fiche, is in use: the catalogue refuses to delete it.
      */
     public static function registerTrainingUsage(): void
     {
         TrainingUsage::register('opportunities', fn (string $trainingId): bool => OpportunityTraining::query()->where('training_id', $trainingId)->exists());
+        // « Formations d'intérêt » of an entreprise or a person.
+        TrainingUsage::register('fiches', fn (string $trainingId): bool => FicheTrainings::uses($trainingId));
         // Lines of a trashed quote stay too.
         TrainingUsage::register('quotes', fn (string $trainingId): bool => QuoteLine::query()->where('training_id', $trainingId)->exists());
     }

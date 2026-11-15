@@ -4,12 +4,15 @@ namespace App\Modules\Crm\Organisations;
 
 use App\Http\Controllers\Controller;
 use App\Modules\Core\Exports\ExportCell;
+use App\Modules\Core\Exports\ExportResource;
 use App\Modules\Core\References\ReferenceItem;
 use App\Modules\Core\References\ReferenceList;
 use App\Modules\Core\Users\User;
 use App\Modules\Crm\Affiliations\Affiliation;
 use App\Modules\Crm\Duplicates\DuplicateGuard;
+use App\Modules\Crm\Interests\FicheTrainings;
 use App\Modules\Crm\Opportunities\OpportunityRows;
+use App\Modules\Crm\Opportunities\OpportunityTrainings;
 use App\Modules\Crm\Permissions;
 use App\Modules\Crm\Quotes\QuoteRows;
 use App\Modules\Crm\Search\CrmResource;
@@ -36,7 +39,7 @@ class OrganisationController extends Controller
 {
     private const RESTORE_CONFLICT = 'Impossible de restaurer cette entreprise : elle entre en conflit avec une autre fiche active.';
 
-    public function __construct(private readonly DuplicateGuard $duplicates, private readonly DasLinks $das) {}
+    public function __construct(private readonly DuplicateGuard $duplicates, private readonly DasLinks $das, private readonly FicheTrainings $trainings) {}
 
     public function index(Request $request): Response
     {
@@ -44,7 +47,8 @@ class OrganisationController extends Controller
         $canDelete = $user->can(Permissions::DELETE);
 
         $filters = OrganisationListQuery::filters($request->query(), $user);
-        $query = OrganisationListQuery::build($filters, $user)->with(CrmResource::Organisations->export()->with($user));
+        $export = CrmResource::Organisations->export();
+        $query = OrganisationListQuery::build($filters, $user)->with($export->with($user));
 
         return Inertia::render('crm/organisations/index', [
             'organisations' => $query->paginate(25)->withQueryString()->through(fn (Organisation $o) => [
@@ -59,7 +63,7 @@ class OrganisationController extends Controller
                 'last_contact_at' => $o->last_contact_at?->toIso8601String(),
                 'created_at' => $o->created_at?->toIso8601String(),
                 'deleted' => $o->trashed(),
-                'cells' => $this->cells(CrmResource::Organisations, $o),
+                'cells' => $this->cells($export, $o),
             ]),
             'filters' => $filters,
             'options' => [
@@ -69,6 +73,7 @@ class OrganisationController extends Controller
                 'origin' => $this->options(ReferenceList::ContactOrigin),
                 'responsible' => User::query()->whereNull('deactivated_at')->orderBy('name')->get(['id', 'name'])
                     ->map(fn (User $u) => ['value' => $u->id, 'label' => $u->name])->all(),
+                'training' => OpportunityTrainings::filterOptions($filters['training']),
             ],
             'can' => ['create' => $user->can(Permissions::CREATE), 'delete' => $canDelete, 'export' => $user->can(Permissions::EXPORT), 'import' => $user->can(Permissions::IMPORT)],
             ...ListExtras::for(CrmResource::Organisations, $user, $request->query('saved')),
@@ -156,6 +161,9 @@ class OrganisationController extends Controller
             'affiliations' => $affiliations->whereNull('ended_on')->map($affiliationRow)->values()->all(),
             'formerAffiliations' => $affiliations->whereNotNull('ended_on')->sortByDesc(fn (Affiliation $a) => $a->ended_on)->map($affiliationRow)->values()->all(),
             'decisionRoles' => FormOptions::reference(ReferenceList::DecisionRole),
+            'interestTrainings' => $this->trainings->rows($organisation),
+            'trainingOptions' => ! $organisation->trashed() && $user->can('update', $organisation) ? $this->trainings->options($organisation) : [],
+            'ficheDasIds' => $organisation->das->pluck('id')->values()->all(),
             'opportunities' => OpportunityRows::forFiche($organisation, $user),
             'quotes' => QuoteRows::forFiche($organisation, $user),
             'similar' => $user->can(Permissions::MERGE) ? $this->duplicates->similarTo($organisation, $user) : [],
@@ -326,10 +334,8 @@ class OrganisationController extends Controller
      *
      * @return array<string, ?string>
      */
-    private function cells(CrmResource $resource, Organisation $organisation): array
+    private function cells(ExportResource $export, Organisation $organisation): array
     {
-        $export = $resource->export();
-
         return collect(array_keys($export->columns()))->mapWithKeys(fn (string $c) => [$c => ExportCell::display($export->value($organisation, $c))])->all();
     }
 

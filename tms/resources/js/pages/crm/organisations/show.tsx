@@ -1,4 +1,5 @@
 import { SimilarFiches, type DuplicateCandidate } from '@/components/crm/duplicate-warning';
+import { InterestTrainings, type InterestTraining, type InterestTrainingOption } from '@/components/crm/interest-trainings';
 import { FicheOpportunities, type OpportunityRow } from '@/components/crm/opportunity-list';
 import { OrganisationContacts, type AffiliationRow } from '@/components/crm/organisation-contacts';
 import { QuickActionFicheButton } from '@/components/crm/quick-action';
@@ -55,6 +56,9 @@ interface ShowProps {
     decisionRoles: Option[];
     opportunities: OpportunityRow[];
     quotes: QuoteRow[];
+    interestTrainings: InterestTraining[];
+    trainingOptions: InterestTrainingOption[];
+    ficheDasIds: string[];
     can: {
         affiliate: boolean;
         createPerson: boolean;
@@ -97,6 +101,9 @@ export default function OrganisationShow({
     decisionRoles,
     opportunities,
     quotes,
+    interestTrainings,
+    trainingOptions,
+    ficheDasIds,
     similar,
     can,
     status,
@@ -231,6 +238,13 @@ export default function OrganisationShow({
                                 <Item label="Adresse">{address.length ? address.map((l, i) => <div key={i}>{l}</div>) : null}</Item>
                             </dl>
                         </section>
+                        <InterestTrainings
+                            trainings={interestTrainings}
+                            options={trainingOptions}
+                            ficheDasIds={ficheDasIds}
+                            updateUrl={route('crm.organisations.trainings.update', o.id)}
+                            canUpdate={can.update}
+                        />
                         <section className="rounded-xl border p-4 lg:col-span-2">
                             <h2 className="mb-3 text-sm font-semibold">Suivi</h2>
                             <dl className="grid gap-3 sm:grid-cols-3">

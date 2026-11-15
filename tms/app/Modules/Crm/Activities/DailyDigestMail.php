@@ -2,7 +2,10 @@
 
 namespace App\Modules\Crm\Activities;
 
+use App\Modules\Core\Mail\MailTemplates;
+use App\Modules\Core\Tenancy\TenantContext;
 use App\Modules\Core\Tenancy\TenantUrl;
+use App\Modules\Crm\Support\CrmMailTemplates;
 use Illuminate\Mail\Mailable;
 use Illuminate\Support\Collection;
 
@@ -39,9 +42,19 @@ class DailyDigestMail extends Mailable
             'time' => $a->due_at?->setTimezone($tz)->format('H:i'),
         ];
 
-        return $this->subject($count === 1 ? 'À faire aujourd\'hui : 1 action' : "À faire aujourd'hui : {$count} actions")
+        // The organisme's text (« Modèles d'e-mails »): introduction before {actions}, signature after.
+        $text = app(MailTemplates::class)->render(CrmMailTemplates::DAILY_DIGEST, [
+            'prenom_utilisateur' => explode(' ', trim($this->name))[0],
+            'nom_utilisateur' => $this->name,
+            'nombre_actions' => $count <= 1 ? "{$count} action" : "{$count} actions",
+            'organisme' => app(TenantContext::class)->current()->name ?? '',
+        ]);
+        [$intro, $signature] = array_pad(explode('{actions}', $text['body'], 2), 2, '');
+
+        return $this->subject($text['subject'])
             ->view('mail.crm-daily-digest', [
-                'name' => $this->name,
+                'intro' => trim($intro),
+                'signature' => trim($signature),
                 'overdue' => $this->overdue->map($line)->all(),
                 'today' => $this->today->map($line)->all(),
                 'url' => $this->url,

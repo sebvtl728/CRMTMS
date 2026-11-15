@@ -1,15 +1,20 @@
 <?php
 
+use App\Modules\Core\Access\PermissionModel;
 use App\Modules\Core\Access\Permissions;
 use App\Modules\Core\Access\PrimaryRoleChanged;
 use App\Modules\Core\Access\Role;
 use App\Modules\Core\Access\RoleModel;
 use App\Modules\Core\Access\RoleSeeder;
+use App\Modules\Core\Tenancy\QueueTenancy;
 use App\Modules\Core\Tenancy\Tenant;
 use App\Modules\Core\Tenancy\TenantContext;
 use App\Modules\Core\Users\Invitation;
 use App\Modules\Core\Users\User;
+use Illuminate\Contracts\Queue\Job;
 use Illuminate\Database\QueryException;
+use Illuminate\Queue\Events\JobProcessing;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Gate;
@@ -27,11 +32,11 @@ it('defines the six roles with French labels and the 2FA requirement', function 
 });
 
 it('lists the core permission catalogue, then the modules\' permissions', function () {
-    expect(array_slice(Permissions::all(), 0, 7))->toBe([
-        'users.manage', 'companies.manage', 'references.manage', 'connectors.manage',
+    expect(array_slice(Permissions::all(), 0, 8))->toBe([
+        'users.manage', 'roles.manage', 'companies.manage', 'references.manage', 'connectors.manage',
         'audit.view', 'settings.manage', 'exports.run',
     ])
-        ->and(array_slice(Permissions::all(), 7))->toBe([...App\Modules\Crm\Permissions::all(), ...App\Modules\Catalogue\Permissions::all()]);
+        ->and(array_slice(Permissions::all(), 8))->toBe([...App\Modules\Crm\Permissions::all(), ...App\Modules\Catalogue\Permissions::all()]);
 });
 
 it('seeds the roles and the default matrix for a tenant', function () {
@@ -217,4 +222,22 @@ it('opens Horizon to platform administrators only', function () {
     expect(Gate::forUser($admin)->allows('viewHorizon'))->toBeFalse()
         ->and(Gate::forUser($platform)->allows('viewHorizon'))->toBeTrue()
         ->and(Gate::forUser(null)->allows('viewHorizon'))->toBeFalse();
+});
+
+it('reloads the permissions of the same organisme at each queued job (long-running worker)', function () {
+    $user = assistant();
+    inTenant();
+    expect($user->can('crm.export'))->toBeFalse();
+
+    // Granted by another process (the web): rows written and the shared cache dropped there,
+    // while this worker keeps its in-memory copy (loaded by the check above).
+    $role = RoleModel::query()->where('name', 'assistant')->sole();
+    $permission = PermissionModel::query()->where('name', 'crm.export')->sole();
+    DB::table('role_has_permissions')->insert(['role_id' => $role->id, 'permission_id' => $permission->id]);
+    Cache::forget(config('permission.cache.key').'.'.tenant()->id);
+    expect($user->fresh()->can('crm.export'))->toBeFalse(); // stale
+
+    event(new JobProcessing('redis', Mockery::mock(Job::class, ['payload' => [QueueTenancy::PAYLOAD_KEY => tenant()->id], 'getConnectionName' => 'redis', 'getQueue' => 'default'])->shouldIgnoreMissing()));
+
+    expect($user->fresh()->can('crm.export'))->toBeTrue();
 });

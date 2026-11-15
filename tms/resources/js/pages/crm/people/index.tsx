@@ -48,6 +48,7 @@ interface Filters {
     funding: string | null;
     origin: string | null;
     responsible: string | null;
+    training: string | null;
     mine: boolean;
     trashed: boolean;
     sort: string;
@@ -57,7 +58,15 @@ interface Filters {
 interface IndexProps {
     people: Paginated<Row>;
     filters: Filters;
-    options: { type: Option[]; status: Option[]; situation: Option[]; funding: Option[]; origin: Option[]; responsible: Option[] };
+    options: {
+        type: Option[];
+        status: Option[];
+        situation: Option[];
+        funding: Option[];
+        origin: Option[];
+        responsible: Option[];
+        training: Option[];
+    };
     can: { create: boolean; delete: boolean; export: boolean; import: boolean };
     savedFilters: SavedFilterRow[];
     activeSavedId: string | null;
@@ -76,7 +85,7 @@ export default function PeopleIndex({ people, filters, options, can, savedFilter
         const next = { ...filters, ...changes };
         const query: Record<string, string> = {};
         if (next.q) query.q = next.q;
-        (['type', 'status', 'situation', 'funding', 'origin', 'responsible'] as const).forEach((k) => {
+        (['type', 'status', 'situation', 'funding', 'origin', 'responsible', 'training'] as const).forEach((k) => {
             if (next[k]) query[k] = String(next[k]);
         });
         if (next.mine) query.mine = '1';
@@ -110,6 +119,7 @@ export default function PeopleIndex({ people, filters, options, can, savedFilter
             filters.funding ||
             filters.origin ||
             filters.responsible ||
+            filters.training ||
             filters.mine ||
             filters.trashed,
     );
@@ -168,6 +178,12 @@ export default function PeopleIndex({ people, filters, options, can, savedFilter
                     <FilterSelect label="Situation" value={filters.situation} options={options.situation} onChange={(v) => visit({ situation: v })} />
                     <FilterSelect label="Financement" value={filters.funding} options={options.funding} onChange={(v) => visit({ funding: v })} />
                     <FilterSelect label="Origine" value={filters.origin} options={options.origin} onChange={(v) => visit({ origin: v })} />
+                    <FilterSelect
+                        label="Formation d'intérêt"
+                        value={filters.training}
+                        options={options.training}
+                        onChange={(v) => visit({ training: v })}
+                    />
                     <FilterSelect
                         label="Responsable"
                         value={filters.responsible}

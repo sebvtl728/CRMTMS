@@ -2,6 +2,7 @@
 
 use App\Modules\Crm\Export\ExportController;
 use App\Modules\Crm\Quotes\QuoteController;
+use App\Modules\Crm\Quotes\QuoteSignedController;
 use App\Modules\Crm\Quotes\QuoteTransitionController;
 use Illuminate\Support\Facades\Route;
 
@@ -25,6 +26,9 @@ Route::middleware(['auth'])->group(function () {
         Route::post('{quote}/resend', [QuoteTransitionController::class, 'resend'])->middleware(['can:crm.update', 'throttle:quote-mail'])->name('resend');
         Route::post('{quote}/accept', [QuoteTransitionController::class, 'accept'])->middleware('can:crm.update')->name('accept');
         Route::post('{quote}/refuse', [QuoteTransitionController::class, 'refuse'])->middleware('can:crm.update')->name('refuse');
+        // Signed copy of an accepted quote: attach / replace, download (limited).
+        Route::post('{quote}/signe', [QuoteSignedController::class, 'store'])->middleware(['can:crm.update', 'throttle:quote-signed'])->name('signed.store');
+        Route::get('{quote}/signe', [QuoteSignedController::class, 'show'])->middleware(['can:crm.view', 'throttle:quote-signed'])->name('signed.show');
         // Archived PDF of a sent quote, or preview of a draft (rendered on the fly: limited).
         Route::get('{quote}/pdf', [QuoteController::class, 'pdf'])->middleware(['can:crm.view', 'throttle:quote-pdf'])->name('pdf');
     });

@@ -5,6 +5,54 @@ Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) ; ve
 
 ## [Non publié]
 
+## [0.4.2] - 2026-11-14
+
+Ajustements après les premiers retours.
+
+### Ajouté
+
+- **Identité de l'organisme** : la barre latérale (et l'en-tête sur téléphone) affiche le **logo** et le **nom de la
+  société par défaut** (Administration › Sociétés) à la place de l'icône et du nom génériques ; le titre de l'onglet du
+  navigateur se termine par ce nom. Sans logo : icône générique ; sans société par défaut : nom de l'application.
+  Le logo est servi aux seuls utilisateurs connectés, mis en cache par le navigateur ; les pages de connexion sont
+  inchangées.
+- **Formations d'intérêt** sur les fiches entreprise et personne : choix parmi les formations actives du catalogue,
+  regroupées par DAS et filtrées par défaut sur les DAS de la fiche (« Afficher toutes les formations » pour élargir) ;
+  une formation désactivée reste affichée, grisée. Même droit que la modification de la fiche, 50 formations au plus.
+- Listes **Entreprises** et **Personnes** : filtre **Formation d'intérêt** et colonne d'export **Formations
+  d'intérêt**.
+- **Nouvelle opportunité** depuis une fiche : ses formations d'intérêt actives sont proposées dans les formations de
+  l'opportunité (modifiables).
+- Historique de la fiche : « Formations d'intérêt modifiées ».
+- **Devis signé** : l'exemplaire signé renvoyé par le client (PDF, JPEG ou PNG, 10 Mo au maximum, type réel vérifié)
+  se joint dans la fenêtre « Accepté » ou plus tard sur un devis accepté (**Joindre le devis signé**, **Remplacer**) ;
+  ouverture depuis le devis, mention « Devis signé ajouté » dans l'historique. Supprimé par l'anonymisation du
+  destinataire ; signalé dans l'export de ses données.
+
+- **Rôles et droits** (Administration) : tableau des droits de chaque rôle, regroupés par thème avec une explication,
+  case par case, droits différents du défaut surlignés, **Rétablir les droits par défaut** par rôle ; journalisé.
+  Nouveau droit `roles.manage` (administrateur seulement). Le rôle administrateur, « Gérer les utilisateurs »,
+  « Gérer les rôles et droits » et « Gérer les connecteurs » ne sont pas modifiables ; « Lancer les exports système »
+  et « Gérer les paramètres » sont signalés comme droits de niveau administrateur.
+
+- **Modèles d'e-mails** (Administration) : objet et texte de l'envoi et de la relance d'un devis, de l'invitation d'un
+  utilisateur et du récapitulatif quotidien, avec variables à insérer, aperçu, e-mail de test et retour au modèle par
+  défaut ; variables inconnues, caractères de contrôle dans l'objet et Markdown dans l'invitation neutralisés, aucun
+  code interprété. Les e-mails de sécurité restent des modèles système.
+
+### Modifié
+
+- Une formation d'intérêt d'une fiche empêche sa suppression du catalogue (désactivation possible).
+- Remplacer le logo d'une société ou le devis signé ne fait plus perdre l'ancien fichier si l'enregistrement échoue.
+- Récapitulatif quotidien : « 0 action » au singulier.
+- Devis signé : une image s'ouvre dans un bac à sable (`Content-Security-Policy: sandbox`, ajouté en second en-tête
+  à la politique globale : il ne peut que la durcir) ; un PDF s'ouvre normalement (type vérifié à l'envoi). Objet
+  proposé pour l'envoi d'un devis limité à 200 caractères.
+- Workers : les droits sont relus à chaque tâche (plus de droits périmés pour un même organisme).
+- Formations d'intérêt : une seule entrée de journal par modification.
+- Fusion de fiches : les formations d'intérêt sont réunies (sans doublon). Anonymisation d'une personne : ses
+  formations d'intérêt sont supprimées. Export RGPD : section « Formations d'intérêt ».
+
 ## [0.4.1] - 2026-11-14
 
 Première publication installable du lot 1d (la 0.4.0 n'a pas pu être publiée).

@@ -2,6 +2,7 @@ import { decimalInput, rateLabel } from '@/components/crm/quote-lines';
 import { QuoteStatusBadge, type QuoteRow } from '@/components/crm/quote-list';
 import { QuoteAnswerDialog, QuoteOutcomeDialog, type ProposeWon, type QuotePipeline } from '@/components/crm/quote-outcome-dialog';
 import { QuoteSendDialog, type QuoteMessageDefaults } from '@/components/crm/quote-send-dialog';
+import { QuoteSignedButton, type SignedCopy } from '@/components/crm/quote-signed';
 import InputError from '@/components/input-error';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -38,6 +39,8 @@ interface QuoteData extends QuoteRow {
     accepted_on: string | null;
     refused_on: string | null;
     refusal_reason: string | null;
+    /** Signed copy sent back by the customer (accepted quote). */
+    signed: SignedCopy | null;
     replaced_by: { id: string; number: string } | null;
     email: { status: 'pending' | 'sent' | 'failed'; error: string | null; sent_at: string | null } | null;
     created_at: string | null;
@@ -47,7 +50,16 @@ interface QuoteData extends QuoteRow {
 
 interface ShowProps {
     quote: QuoteData;
-    can: { update: boolean; delete: boolean; duplicate: boolean; send: boolean; remind: boolean; resend: boolean; answer: boolean };
+    can: {
+        update: boolean;
+        delete: boolean;
+        duplicate: boolean;
+        send: boolean;
+        remind: boolean;
+        resend: boolean;
+        answer: boolean;
+        attachSigned: boolean;
+    };
     send: QuoteMessageDefaults | null;
     remind: QuoteMessageDefaults | null;
     pipeline: QuotePipeline;
@@ -166,6 +178,7 @@ export default function QuoteShow({
                                 </Button>
                             </>
                         )}
+                        {can.attachSigned && <QuoteSignedButton quoteId={q.id} number={q.number} signed={q.signed} />}
                         {can.update && (
                             <Button asChild variant="outline">
                                 <Link href={route('crm.quotes.edit', q.id)}>
@@ -248,6 +261,14 @@ export default function QuoteShow({
                         {q.sent_at && <Item label="Envoyé le">{formatDateTime(q.sent_at)}</Item>}
                         {q.reminded_at && <Item label="Relancé le">{formatDateTime(q.reminded_at)}</Item>}
                         {q.accepted_on && <Item label="Accepté le">{formatDay(q.accepted_on)}</Item>}
+                        {q.signed && (
+                            <Item label="Devis signé">
+                                <a href={q.signed.url} target="_blank" rel="noopener noreferrer" className="underline">
+                                    {q.signed.name ?? 'Ouvrir'}
+                                </a>
+                                {q.signed.at && <span className="text-muted-foreground"> · ajouté le {formatDateTime(q.signed.at)}</span>}
+                            </Item>
+                        )}
                         {q.refused_on && <Item label="Refusé le">{formatDay(q.refused_on)}</Item>}
                         {q.refusal_reason && <Item label="Motif du refus">{q.refusal_reason}</Item>}
                         {q.replaced_by && (

@@ -24,8 +24,7 @@ export interface ProposeWon {
     won_on: string;
 }
 
-const textareaClass =
-    'border-input bg-background focus:ring-ring w-full rounded-md border px-3 py-2 text-sm focus:ring-2 focus:outline-hidden';
+const textareaClass = 'border-input bg-background focus:ring-ring w-full rounded-md border px-3 py-2 text-sm focus:ring-2 focus:outline-hidden';
 
 /**
  * The customer's answer: « Accepté » (date, today by default, never in the
@@ -44,10 +43,16 @@ export function QuoteAnswerDialog({
     answer: 'accept' | 'refuse' | null;
     onClose: () => void;
 }) {
-    const { data, setData, post, processing, errors, reset, clearErrors } = useForm({
+    const { data, setData, post, processing, errors, reset, clearErrors, transform } = useForm<{
+        accepted_on: string;
+        refused_on: string;
+        refusal_reason: string;
+        signed: File | null;
+    }>({
         accepted_on: todayIso(),
         refused_on: todayIso(),
         refusal_reason: '',
+        signed: null,
     });
 
     useEffect(() => {
@@ -60,6 +65,12 @@ export function QuoteAnswerDialog({
 
     const submit: FormEventHandler = (e) => {
         e.preventDefault();
+        // The signed copy goes with « Accepté » only, when one was chosen.
+        transform((d) => {
+            const { signed, ...rest } = d;
+
+            return answer === 'accept' && signed ? { ...rest, signed } : rest;
+        });
         post(route(answer === 'accept' ? 'crm.quotes.accept' : 'crm.quotes.refuse', quoteId), { preserveScroll: true, onSuccess: () => onClose() });
     };
 
@@ -85,6 +96,19 @@ export function QuoteAnswerDialog({
                         />
                         <InputError message={errors[field]} />
                     </div>
+                    {answer === 'accept' && (
+                        <div className="grid gap-2">
+                            <Label htmlFor="quote-signed">Devis signé (facultatif)</Label>
+                            <Input
+                                id="quote-signed"
+                                type="file"
+                                accept=".pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png"
+                                onChange={(e) => setData('signed', e.target.files?.[0] ?? null)}
+                            />
+                            <p className="text-muted-foreground text-xs">PDF, JPEG ou PNG, 10 Mo au maximum.</p>
+                            <InputError message={errors.signed} />
+                        </div>
+                    )}
                     {answer === 'refuse' && (
                         <div className="grid gap-2">
                             <Label htmlFor="quote-refusal-reason">Motif (facultatif)</Label>
@@ -163,7 +187,9 @@ export function QuoteOutcomeDialog({
                     <DialogHeader>
                         <DialogTitle>{won ? "Passer l'opportunité en « Gagné » ?" : "Passer l'opportunité en « Perdu » ?"}</DialogTitle>
                         <DialogDescription>
-                            {won ? `Gagnée le ${proposeWon?.won_on.split('-').reverse().join('/')}, date d'acceptation du devis.` : 'Le motif de perte est obligatoire.'}
+                            {won
+                                ? `Gagnée le ${proposeWon?.won_on.split('-').reverse().join('/')}, date d'acceptation du devis.`
+                                : 'Le motif de perte est obligatoire.'}
                         </DialogDescription>
                     </DialogHeader>
 

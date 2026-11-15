@@ -196,8 +196,8 @@ it('lists the quotes of a person in her data export, within what the viewer sees
 
     $data = PersonDataExport::for(Person::query()->findOrFail($lea->id));
     expect($data['devis'])->toBe([
-        ['numero' => 'CF-2026-0001', 'date' => '2026-11-14', 'role' => 'Destinataire', 'statut' => 'Envoyé', 'total_ttc' => '1200.00', 'supprime' => false],
-        ['numero' => 'CF-2026-0002', 'date' => '2026-11-14', 'role' => 'Compte (particulier)', 'statut' => 'Brouillon', 'total_ttc' => '1200.00', 'supprime' => false],
+        ['numero' => 'CF-2026-0001', 'date' => '2026-11-14', 'role' => 'Destinataire', 'statut' => 'Envoyé', 'total_ttc' => '1200.00', 'devis_signe' => 'non', 'supprime' => false],
+        ['numero' => 'CF-2026-0002', 'date' => '2026-11-14', 'role' => 'Compte (particulier)', 'statut' => 'Brouillon', 'total_ttc' => '1200.00', 'devis_signe' => 'non', 'supprime' => false],
     ]);
 
     $responsable = userWithRole(Role::ResponsableDas);

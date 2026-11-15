@@ -103,6 +103,11 @@ Mêmes colonnes que ci-dessus avec `permission_id`. Non utilisée au lot 1a.
 | `quote_terms`, `quote_footer` | text, null | Conditions générales et pied de page imprimés sur les devis (≤ 5 000 caractères) |
 | `created_at`, `updated_at`, `deleted_at` | timestamp | Suppression logique |
 
+## Modèles d'e-mails (0.4.2, RLS)
+
+### `mail_templates` — textes d'e-mails modifiés par l'organisme
+`id`, `tenant_id` · `key` string(100) (`quote.send`, `quote.remind`, `users.invitation`, `crm.daily_digest` ; déclarés par les modules via `Core\Mail\MailTemplateRegistry`) · `subject` string(200) · `body` text (≤ 10 000, texte brut avec `{variables}`) · `updated_by` (FK `users`, null à la suppression) · `created_at`, `updated_at`. Unique (`tenant_id`, `key`). Pas de ligne = modèle par défaut du code. Journalisée (`mail_template`). Cache par organisme (`<tenant_id>:mail-template:<key>`), vidé à l'enregistrement.
+
 ## Référentiels (RLS)
 
 ### `reference_items` — valeurs des listes paramétrables
@@ -203,6 +208,9 @@ Conventions communes : UUID v7, `tenant_id`, suppression logique (`deleted_at`) 
 ### `person_das` — DAS d'une personne
 `tenant_id` · `person_id` (FK, cascade) · `das_id` ; PK (`person_id`, `das_id`).
 
+### `fiche_trainings` — formations d'intérêt d'une entreprise ou d'une personne (0.4.2)
+`id`, `tenant_id` · `organisation_id` (FK, cascade, null) · `person_id` (FK, cascade, null) — CHECK `fiche_trainings_one_fiche_check` : exactement l'un des deux · `training_id` (FK `trainings`, restrict ; lue par `Catalogue\Trainings` uniquement) · `created_by` (FK `users`, null à la suppression) · `created_at`, `updated_at`. Uniques (`organisation_id`, `training_id`) et (`person_id`, `training_id`), index `training_id`. 50 au plus par fiche (validation). Journalisée (`fiche_training`, identifiants seulement) ; chaque changement de la liste est aussi journalisé sur la fiche (`crm.organisation_trainings_changed` / `crm.person_trainings_changed`, `training_ids` avant/après), affiché dans l'historique « Formations d'intérêt modifiées ». Une formation présente ici ne peut pas être supprimée du catalogue (`TrainingUsage` « fiches »). Fusion : lignes déplacées sur la fiche conservée, dédoublonnées ; anonymisation d'une personne : lignes supprimées ; export RGPD : section `formations_d_interet`.
+
 ### `affiliations` — rattachement d'une personne à une entreprise
 `id`, `tenant_id` · `person_id`, `organisation_id` (FK, cascade) · `job_title` · `decision_role_id` (FK `reference_items`, liste `decision_role`) · `work_email`, `work_phone` · `is_referent` (bool) · `started_on`, `ended_on` (dates ; un rattachement terminé est conservé comme ancien) · `created_by`, `updated_by` · horodatages, `deleted_at`. Index unique partiel (`tenant_id`, `person_id`, `organisation_id`) tant que le rattachement est actif et non supprimé : une personne n'a qu'un rattachement actif par entreprise.
 
@@ -285,7 +293,7 @@ Module `Catalogue` : le Crm ne lit jamais ces tables directement (service `Catal
 | `is_active` | bool, défaut `true` | Désactivée : plus proposée, reste sur les opportunités et devis existants |
 | `source_system`, `source_id` | string(50) / string(255), null | Identifiant d'origine (import) ; unique partiel par organisme (`trainings_source_unique`) |
 | `created_by`, `updated_by` | uuid, null (FK `users`) | |
-| `created_at`, `updated_at`, `deleted_at` | timestamp | Suppression logique ; refusée si la formation est utilisée (`Catalogue\TrainingUsage` : opportunités, lignes de devis, supprimées comprises) |
+| `created_at`, `updated_at`, `deleted_at` | timestamp | Suppression logique ; refusée si la formation est utilisée (`Catalogue\TrainingUsage` : opportunités, lignes de devis, supprimées comprises, formations d'intérêt des fiches) |
 
 Index : (`tenant_id`, `das_id`), (`tenant_id`, `title`). Journalisée (`training`). Cible d'import `trainings` (« Catalogue de formations »).
 
@@ -315,6 +323,9 @@ Index : (`tenant_id`, `das_id`), (`tenant_id`, `title`). Journalisée (`training
 | `vat_exempt` | bool | Régime de la société, recopié à chaque enregistrement du brouillon, figé à l'envoi |
 | `total_ht`, `total_vat`, `total_ttc` | numeric(12,2) | Totaux calculés en centimes entiers (CHECK ≥ 0 et `total_ttc = total_ht + total_vat`) |
 | `recipient_snapshot` | jsonb, null | Destinataire figé à l'envoi (nom, adresse, « à l'attention de », e-mail) ; donnée personnelle (masquée au journal, effacée à l'anonymisation) |
+| `signed_path` | string(500), null | Exemplaire signé renvoyé par le client (devis accepté), `tenants/<id>/quotes/<quote_id>/signe.<pdf\|jpg\|png>` (stockage privé, remplacé à chaque ajout) ; null après anonymisation (fichier supprimé). Ignoré par le journal |
+| `signed_name` | string(255), null | Nom d'origine du fichier signé (donnée personnelle : masqué dans le journal) |
+| `signed_at` | timestamptz, null | Ajout de l'exemplaire signé ; évènement de journal `quote.signed_added` (type, taille, SHA-256) |
 | `pdf_path` | string, null | PDF archivé à l'envoi, `tenants/<id>/quotes/<quote_id>/<numéro>.pdf` (stockage privé) ; null après anonymisation (PDF supprimé, réponse 410) |
 | `notes` | text, null | Mentions particulières (donnée personnelle possible) |
 | `email_message` | jsonb, null | Dernier message : type, `to`, `cc`, objet, corps (pour **Renvoyer**) ; hors journal |

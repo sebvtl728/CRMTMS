@@ -5,6 +5,8 @@ Ce guide s'adresse à l'**administrateur de l'organisme** (rôle « Administrate
 | Écran | Chemin | Permission |
 |---|---|---|
 | Sociétés | `/admin/companies` | `companies.manage` |
+| Rôles et droits | `/admin/roles` | `roles.manage` |
+| Modèles d'e-mails | `/admin/mail-templates` | `settings.manage` |
 | Utilisateurs | `/admin/users` | `users.manage` |
 | Référentiels | `/admin/references` | `references.manage` |
 | Connecteurs | `/admin/connectors` | `connectors.manage` |
@@ -46,10 +48,11 @@ Pour chaque société : raison sociale, forme juridique, capital (montant et « 
 - Les **mentions légales** se construisent automatiquement et s'affichent en aperçu pendant la saisie, par exemple : « CAP FORMATION – SCOP SARL à capital variable – RCS Lyon 732 829 320 – SIRET 732 829 320 00074 ». Une société exonérée de TVA porte en plus la mention d'exonération.
 - Le SIRET est obligatoire à l'enregistrement.
 - Exactement **une société par défaut** par organisme ; pour en changer, cochez « Société par défaut » sur une autre société.
+- **Identité dans l'application** : la barre latérale (et l'en-tête sur téléphone) affiche le **nom** et le **logo** de la société par défaut, et le titre de l'onglet du navigateur se termine par ce nom. Sans logo, l'icône générique s'affiche ; sans société par défaut, le nom de l'application. Un changement de nom ou de logo se voit dès la page suivante. Les pages de connexion n'affichent ni ce nom ni ce logo (rien n'est révélé avant la connexion). Le logo est servi aux seuls utilisateurs connectés (`/branding/logo`, mis en cache une heure par le navigateur).
 
 **Section « Devis »** de la société :
 
-- **Logo** : PNG ou JPEG, 1 Mo au maximum (un SVG ou un fichier renommé est refusé) ; enregistrez d'abord la société, puis ajoutez-le. Il est intégré au PDF des devis. **Supprimer le logo** le retire. Chaque changement est journalisé (nom, taille et empreinte du fichier, jamais son contenu).
+- **Logo** : PNG ou JPEG, 1 Mo au maximum (un SVG ou un fichier renommé est refusé) ; enregistrez d'abord la société, puis ajoutez-le. Il est intégré au PDF des devis et, pour la société par défaut, affiché dans la barre latérale. **Supprimer le logo** le retire. Chaque changement est journalisé (nom, taille et empreinte du fichier, jamais son contenu).
 - **Préfixe de numérotation** : lettres majuscules et chiffres, 10 caractères au plus (`DEV` par défaut). Les numéros sont `<préfixe>-<année>-<numéro sur 4 chiffres>` (`CF-2026-0001`), sans trou, avec un compteur par préfixe et par année civile (heure de Paris) qui repart à 1 le 1er janvier. **Chaque société a son propre préfixe** dans l'organisme : un préfixe déjà pris est refusé (« Ce préfixe est déjà celui d'une autre société »). Pour une nouvelle société, remplacez donc le `DEV` proposé, déjà porté par la société créée à l'installation. Changer de préfixe ne renumérote pas les devis existants.
 - **Durée de validité (jours)** : 1 à 365, 30 par défaut ; date « Valable jusqu'au » proposée sur un nouveau devis.
 - **Conditions générales** et **Pied de page** (5 000 caractères chacun) : imprimés sur chaque devis, sous les lignes et en bas du document.
@@ -118,6 +121,16 @@ Filtres : utilisateur, évènement, type d'objet, période (du / au). Chaque lig
 
 Autres garanties (non paramétrables) : mots de passe Argon2id d'au moins 12 caractères, limitation du nombre d'essais de code 2FA, codes de récupération à usage unique, journal d'audit non modifiable, isolation stricte des données entre organismes.
 
+### Modèles d'e-mails
+
+Administration › **Modèles d'e-mails** (droit `settings.manage`, celui de l'écran Sécurité : l'administrateur par défaut). Quatre e-mails sont modifiables (objet de 200 caractères au plus, texte brut de 10 000 caractères au plus) :
+
+- **Envoi d'un devis** et **Relance d'un devis** : proposés dans la fenêtre d'envoi, toujours modifiables au cas par cas avant l'envoi ; le PDF est joint par le système.
+- **Invitation d'un utilisateur** : votre texte (la première ligne sert de formule d'appel) ; le bouton d'activation, la durée de validité du lien et la mention « Si vous n'attendiez pas cette invitation » sont toujours ajoutés.
+- **Récapitulatif quotidien des relances** : le texte avant `{actions}` sert d'introduction, celui après de signature ; la liste des actions et le lien vers « À faire » restent générés. `{actions}` est obligatoire.
+
+Chaque modèle liste ses **variables** (`{numero_devis}`, `{societe}`, `{destinataire}`, `{montant_ttc}`, `{date_validite}`, `{commercial}`, `{organisme}`, `{prenom_utilisateur}`…) : un clic les insère à l'endroit du curseur. Une variable inconnue ou une accolade mal formée est refusée à l'enregistrement. Rien n'est interprété comme du code : chaque `{variable}` est simplement remplacée par sa valeur, en texte (échappée dans les e-mails HTML). **Aperçu** montre le résultat avec des données d'exemple ; **Envoyer un e-mail de test** l'envoie à votre adresse par la messagerie de l'organisme (objet préfixé « [Test] », 10 par minute au plus) ; **Rétablir le modèle par défaut** reprend le texte du TMS. Les e-mails de sécurité (réinitialisation du mot de passe, double authentification, alertes d'exploitation) sont affichés en lecture seule (« modèle système »). Les modèles sont propres à chaque organisme et journalisés.
+
 ## 9. Récupérer l'accès administrateur
 
 Deux commandes d'exploitation, lancées sur le serveur, rétablissent l'accès sans jamais afficher ni fixer de mot de passe. Elles agissent dans un seul organisme (`--tenant=<identifiant>`, par défaut celui de l'installation) et sont consignées dans le journal d'audit.
@@ -161,6 +174,15 @@ Le **catalogue de formations** a deux permissions à part :
 Le rôle *Responsable DAS* garde la lecture seule et l'export, limités à ses DAS suivis (devis compris : ceux des opportunités de ses DAS) : il voit les opportunités de ses DAS (et leurs actions), et les actions sans opportunité des fiches qu'il voit. La **direction** et l'**administrateur** voient en plus les actions de toute l'équipe (**À faire › Équipe**) et le planning d'un **collègue**.
 
 **Mises à jour et personnalisation.** À chaque installation ou mise à jour (`ops/migrate.sh` lance `php artisan tms:permissions:sync`), la synchronisation des permissions accorde à chaque organisme les droits par défaut **nouveaux** de chaque rôle, une seule fois : un droit que vous avez retiré à un rôle n'est pas rétabli par une mise à jour. La matrice rôle → permission est propre à chaque organisme.
+
+**Écran « Rôles et droits »** (Administration › **Rôles et droits**, droit `roles.manage`, accordé par défaut au seul administrateur de l'organisme). Un tableau croise les rôles (en colonnes) et les droits (en lignes, regroupés par thème, chacun avec une phrase d'explication). Cochez ou décochez une case : elle est enregistrée aussitôt (message de confirmation), et les utilisateurs du rôle ont leurs nouveaux droits dès leur page suivante, sans être déconnectés. Une case surlignée diffère des droits par défaut du rôle ; **Rétablir les droits par défaut** (avec confirmation) remet exactement le tableau ci-dessus pour ce rôle.
+
+- Le rôle **Administrateur de l'organisme** n'est pas modifiable : il garde tous les droits.
+- **Gérer les utilisateurs** (`users.manage`), **Gérer les rôles et droits** (`roles.manage`) et **Gérer les connecteurs** (`connectors.manage`) ne s'accordent qu'à l'administrateur : sinon, qui les détiendrait pourrait se donner tous les droits (pour les connecteurs : faire passer la messagerie de l'organisme par son propre serveur et intercepter le lien d'invitation suivant).
+- **Lancer les exports système** (`exports.run`) et **Gérer les paramètres** (`settings.manage`) sont des droits de niveau administrateur, signalés sur l'écran : les exports système portent sur tout l'organisme sans tenir compte des DAS suivis ; les paramètres couvrent la sécurité des sessions, les modèles d'e-mails (dont le texte de l'invitation) et la durée de conservation RGPD.
+- La **double authentification** reste liée au rôle (administrateur, direction), pas aux droits.
+- Le **Responsable DAS** ne voit que les fiches de ses DAS suivis : c'est une règle de données, pas un droit ; l'écran ne la change pas.
+- Chaque changement est journalisé (`roles.permission_granted`, `roles.permission_revoked`, `roles.reset` : rôle et droit). Les modifications n'ont aucun effet sur un autre organisme, et une mise à jour ne rétablit jamais un droit retiré.
 
 ## 11. RGPD : durée de conservation et anonymisation
 

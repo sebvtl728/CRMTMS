@@ -26,7 +26,7 @@ class CatalogueServiceProvider extends ServiceProvider
     {
         // In register(): the catalogue must be complete before
         // AccessServiceProvider::boot() defines one gate per permission.
-        CorePermissions::registerModule('catalogue', Permissions::all(), Permissions::defaultsFor(...));
+        CorePermissions::registerModule('catalogue', Permissions::all(), Permissions::defaultsFor(...), Permissions::labels(), Permissions::GROUP);
 
         MorphAliases::register(['training' => Training::class]);
 
