@@ -214,6 +214,8 @@ it('lists the quotes of a person in her data export, complete or refused', funct
     $this->actingAs($responsable)->get("/crm/people/{$lea->id}")->assertOk();
     $this->getJson("/crm/people/{$lea->id}/gdpr-export")
         ->assertForbidden()->assertJson(['message' => PersonDataExport::INCOMPLETE]);
+    // The export is a plain download link: the HTML error page shows the reason.
+    $this->get("/crm/people/{$lea->id}/gdpr-export")->assertForbidden()->assertSee(PersonDataExport::INCOMPLETE);
 
     // Every domain on « Tout l'organisme »: the full file, the other DAS's quote too.
     $json = $this->actingAs(direction(twoFactor: true))->get("/crm/people/{$lea->id}/gdpr-export")->assertOk()->getContent();
