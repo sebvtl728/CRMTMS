@@ -82,6 +82,19 @@ final readonly class Period
             : self::quarter($before->year, intdiv($before->month - 1, 3) + 1);
     }
 
+    public function next(): self
+    {
+        if ($this->type === 'year') {
+            return self::year($this->start->year + 1);
+        }
+
+        $after = $this->start->addMonths($this->type === 'month' ? 1 : 3);
+
+        return $this->type === 'month'
+            ? self::month($after->year, $after->month)
+            : self::quarter($after->year, intdiv($after->month - 1, 3) + 1);
+    }
+
     private static function month(int $year, int $month): self
     {
         $start = CarbonImmutable::create($year, $month, 1, 0, 0, 0, self::TIMEZONE);

@@ -352,6 +352,18 @@ L'écran **RGPD** (menu Commercial, réservé aux personnes ayant ce droit) pré
 
 Chaque nuit où des personnes sont nouvellement listées, les responsables RGPD reçoivent un e-mail avec le nombre de personnes concernées (sans leurs noms).
 
+## 13 bis. Chiffre d'affaires par DAS
+
+Menu **Commercial > Chiffre d'affaires** (droit « Consulter le chiffre d'affaires »). Le tableau donne, pour la période choisie (**Mois**, **Trimestre** ou **Année**, flèches pour changer de période), le chiffre d'affaires HT de chaque DAS :
+
+- **CA devis acceptés** : lignes des devis acceptés dans la période (date d'acceptation), par DAS de la ligne ;
+- **CA opportunités gagnées sans devis** : montant des opportunités gagnées dans la période qui n'ont aucun devis accepté (une opportunité gagnée avec un devis accepté n'est jamais comptée deux fois) ;
+- **Total**, **Objectif** et **Atteint** (barre et pourcentage).
+
+Cliquez sur un DAS pour ouvrir le détail (devis et opportunités, au centime, avec un lien vers chacun). Avec le droit « Gérer les objectifs de chiffre d'affaires », le bouton **Objectifs** fixe l'objectif de chaque DAS pour la période affichée (montant en euros, par exemple « 10 000 » ou « 10 000,50 » ; champ vide pour retirer l'objectif). L'objectif d'un trimestre n'est pas la somme de ses mois : chaque type de période a ses propres objectifs.
+
+Avec le périmètre « Ses fiches », le tableau ne compte que vos devis et vos opportunités, sans objectif. L'accueil affiche la carte « CA signé » du mois dans votre périmètre.
+
 ## 14. Utilisateurs et droits (administrateur)
 
 Le menu **Administration › Utilisateurs** permet à l'administrateur de l'organisme d'**inviter** des collègues, de **changer leur rôle**, de **désactiver** / **réactiver** un compte, de **renvoyer** ou **révoquer** une invitation et d'attribuer les **DAS suivis** à un Responsable de DAS. Un organisme garde toujours au moins un administrateur actif. Les droits CRM par rôle sont détaillés dans `admin.md`.

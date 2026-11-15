@@ -5,6 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import AppLayout from '@/layouts/app-layout';
 import { formatAmount } from '@/lib/crm';
 import { canViewCrm } from '@/lib/permissions';
+import { formatCentsWhole } from '@/lib/revenue';
 import { type BreadcrumbItem, type SharedData } from '@/types';
 import { Head, Link, usePage } from '@inertiajs/react';
 import { CalendarClock, Contact, Factory, Search, UserPlus } from 'lucide-react';
@@ -42,6 +43,8 @@ interface Commercial {
     /** Quotes sent this month, accepted among them; rate in %, null when none was sent. */
     quotes: { sent: number; accepted: number; rate: number | null; month: string };
     meetings: Meeting[];
+    /** Signed revenue of the month within the user's scope; null without crm.revenue.view. */
+    revenue: { total_cents: number; target_cents: number | null; month: string; own: boolean } | null;
 }
 
 interface Props {
@@ -215,6 +218,28 @@ export default function Dashboard({ recent_views, counters, commercial }: Props)
                                             <CardDescription>
                                                 {numberFormat.format(commercial.quotes.sent)} envoyé{commercial.quotes.sent > 1 ? 's' : ''},{' '}
                                                 {numberFormat.format(commercial.quotes.accepted)} accepté{commercial.quotes.accepted > 1 ? 's' : ''}
+                                            </CardDescription>
+                                        </CardHeader>
+                                    </Card>
+                                </Link>
+                            </section>
+                        )}
+                        {commercial?.revenue && (
+                            <section aria-label="CA signé du mois">
+                                <Link
+                                    href={route('crm.revenue.index')}
+                                    className="focus-visible:ring-ring block h-full rounded-xl focus-visible:ring-2 focus-visible:outline-none"
+                                >
+                                    <Card className="hover:bg-muted/50 h-full transition-colors">
+                                        <CardHeader>
+                                            <CardDescription>CA signé · {commercial.revenue.month}</CardDescription>
+                                            <CardTitle className="text-3xl">{formatCentsWhole(commercial.revenue.total_cents)}</CardTitle>
+                                            <CardDescription>
+                                                {commercial.revenue.own
+                                                    ? 'Vos devis et opportunités'
+                                                    : commercial.revenue.target_cents !== null
+                                                      ? `Objectif : ${formatCentsWhole(commercial.revenue.target_cents)}`
+                                                      : 'Devis acceptés et opportunités gagnées'}
                                             </CardDescription>
                                         </CardHeader>
                                     </Card>
