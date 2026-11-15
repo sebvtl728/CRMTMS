@@ -85,6 +85,7 @@ return new class extends Migration
             DB::table('role_has_permissions')->whereIn('permission_id', $old)->delete();
             DB::table('model_has_permissions')->whereIn('permission_id', $old)->delete();
             DB::table('role_permission_defaults_applied')->whereIn('permission', self::OLD)->delete();
+            $this->forgetTenantCache($tenantId);
         });
 
         DB::table('permissions')->whereIn('name', self::OLD)->delete();
@@ -115,6 +116,7 @@ return new class extends Migration
             $newIds = $this->idsOf($new);
             DB::table('role_has_permissions')->whereIn('permission_id', $newIds)->delete();
             DB::table('model_has_permissions')->whereIn('permission_id', $newIds)->delete();
+            $this->forgetTenantCache($tenantId);
         });
 
         DB::table('permissions')->whereIn('name', $new)->delete();
@@ -284,5 +286,15 @@ return new class extends Migration
     private function forgetCache(): void
     {
         app(PermissionRegistrar::class)->forgetCachedPermissions();
+    }
+
+    /**
+     * The spatie cache is per tenant (TenantPermissionRegistrar: key
+     * « <permission.cache.key>.<tenant id> »): forgetCache() alone, run
+     * outside any tenant context, would leave each tenant's copy in place.
+     */
+    private function forgetTenantCache(string $tenantId): void
+    {
+        app(PermissionRegistrar::class)->getCacheStore()->forget(config('permission.cache.key').'.'.$tenantId);
     }
 };

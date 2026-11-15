@@ -7,6 +7,7 @@ use App\Modules\Core\Access\Role;
 use App\Modules\Core\Access\RoleModel;
 use App\Modules\Core\Access\Scopes;
 use App\Modules\Core\Tenancy\Tenant;
+use App\Modules\Core\Tenancy\TenantContext;
 use Illuminate\Support\Facades\DB;
 use Spatie\Permission\PermissionRegistrar;
 
@@ -192,4 +193,17 @@ it('migrates every organisme in its own context', function () {
     expect(crmMatrix()['commercial'])->toContain('crm.fiches.delete');
     inTenant($other);
     expect(crmMatrix()['commercial'])->not->toContain('crm.fiches.delete')->toContain('crm.quotes.view');
+});
+
+it('forgets the cached permissions of every organisme', function () {
+    $tenant = backTo042();
+    $key = config('permission.cache.key').'.'.$tenant->id;
+    $store = app(PermissionRegistrar::class)->getCacheStore();
+    $store->put($key, 'stale 0.4.2 catalogue', 3600);
+
+    // As in « artisan migrate »: no tenant context.
+    app(TenantContext::class)->clear();
+    splitMigration()->up();
+
+    expect($store->get($key))->toBeNull();
 });
