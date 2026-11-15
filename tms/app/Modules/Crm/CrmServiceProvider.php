@@ -68,11 +68,14 @@ class CrmServiceProvider extends ServiceProvider
         // In register(): the catalogue must be complete before
         // AccessServiceProvider::boot() defines one gate per permission.
         CrmMailTemplates::register();
-        // One theme of the « Rôles et droits » screen per domain.
+        // One theme of the « Rôles et droits » screen per domain. « Imports,
+        // exports et RGPD » comes after the Catalogue (registered by its own
+        // provider): added while the application boots, still before
+        // AccessServiceProvider::boot().
         $index = 0;
         foreach (Permissions::GROUPS as $group => $permissions) {
-            CorePermissions::registerModule(
-                'crm.'.$index++,
+            $register = fn () => CorePermissions::registerModule(
+                'crm.'.$index,
                 $permissions,
                 fn (Role $role): array => array_values(array_intersect(Permissions::defaultsFor($role), $permissions)),
                 Permissions::labels(),
@@ -80,6 +83,8 @@ class CrmServiceProvider extends ServiceProvider
                 array_values(array_intersect(Permissions::scoped(), $permissions)),
                 fn (Role $role): array => array_intersect_key(Permissions::defaultScopesFor($role), array_flip($permissions)),
             );
+            $index++;
+            $group === Permissions::DATA_GROUP ? $this->app->booting($register) : $register();
         }
 
         MorphAliases::register([
@@ -254,7 +259,9 @@ class CrmServiceProvider extends ServiceProvider
         });
 
         // An action: visible with its opportunity when it has one (its DAS),
-        // otherwise with one of its fiches; on a trashed fiche only with crm.activities.delete.
+        // otherwise with one of its fiches; on a trashed fiche only with
+        // crm.fiches.delete, like the fiche (the assistant may remove actions,
+        // not read the corbeille).
         Route::bind('activity', function (string $value): Activity {
             if (! Str::isUuid($value)) {
                 throw (new ModelNotFoundException)->setModel(Activity::class, [$value]);
@@ -267,7 +274,7 @@ class CrmServiceProvider extends ServiceProvider
             }
             $activity = $query->with(['organisation', 'person', 'opportunity.organisation', 'opportunity.person'])->findOrFail($value);
 
-            if ($user instanceof User && $activity->ficheTrashed() && ! $user->can(Permissions::ACTIVITIES_DELETE)) {
+            if ($user instanceof User && $activity->ficheTrashed() && ! $user->can(Permissions::FICHES_DELETE)) {
                 throw (new ModelNotFoundException)->setModel(Activity::class, [$value]);
             }
 

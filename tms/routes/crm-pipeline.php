@@ -43,7 +43,7 @@ Route::middleware(['auth'])->prefix('crm/activities')->name('crm.activities.')->
     Route::post('/', [ActivityController::class, 'store'])->middleware('can:crm.activities.update')->name('store');
     Route::get('{activity}', [ActivityController::class, 'show'])->middleware('can:crm.activities.view')->name('show');
     Route::put('{activity}', [ActivityController::class, 'update'])->middleware('can:crm.activities.update')->name('update');
-    Route::delete('{activity}', [ActivityController::class, 'destroy'])->middleware('can:crm.activities.update')->name('destroy');
+    Route::delete('{activity}', [ActivityController::class, 'destroy'])->middleware('can:crm.activities.delete')->name('destroy');
     Route::patch('{activity}/due', [ActivityController::class, 'postpone'])->middleware('can:crm.activities.update')->name('postpone');
     Route::post('{activity}/done', [ActivityController::class, 'complete'])->middleware('can:crm.activities.update')->name('done');
 });

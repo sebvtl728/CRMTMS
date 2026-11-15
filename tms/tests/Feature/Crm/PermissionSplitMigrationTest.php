@@ -82,6 +82,9 @@ it('migration maps every default role', function () {
         ->and(DB::table('role_has_permissions')->join('permissions', 'permissions.id', '=', 'role_has_permissions.permission_id')->whereIn('permissions.name', $old)->count())->toBe(0)
         ->and(DB::table('role_permission_defaults_applied')->whereIn('permission', $old)->count())->toBe(0);
 
+    // The assistant keeps removing actions (crm.update), and nothing else.
+    expect(collect(crmMatrix()['assistant'])->filter(fn (string $p) => str_ends_with($p, '.delete'))->values()->all())->toBe(['crm.activities.delete']);
+
     // The administrator of the organisme keeps everything.
     $admin = admin();
     foreach (Permissions::all() as $permission) {
@@ -94,14 +97,15 @@ it('migration keeps revoked rights revoked', function () {
     RoleModel::query()->where('name', 'commercial')->sole()->revokePermissionTo('crm.delete');
 
     splitMigration()->up();
+    // Removing an action was part of crm.update: kept; nothing else to delete.
     $deletes = fn () => array_values(array_filter(crmMatrix()['commercial'], fn (string $p) => str_ends_with($p, '.delete')));
-    expect($deletes())->toBe([])
+    expect($deletes())->toBe(['crm.activities.delete'])
         ->and(crmMatrix()['commercial'])->toContain('crm.fiches.update', 'crm.quotes.view');
 
     // Every new name is recorded as offered: the sync right after grants nothing more.
     $before = crmMatrix();
     PermissionSync::run();
-    expect($deletes())->toBe([])
+    expect($deletes())->toBe(['crm.activities.delete'])
         ->and(crmMatrix())->toBe($before);
 });
 
@@ -113,7 +117,7 @@ it('migration restricts responsable das by scope', function () {
     splitMigration()->up();
 
     expect(scopesOfRole(Role::ResponsableDas))->toBe([
-        'crm.activities.update' => 'das', 'crm.activities.view' => 'das',
+        'crm.activities.delete' => 'das', 'crm.activities.update' => 'das', 'crm.activities.view' => 'das',
         'crm.fiches.update' => 'das', 'crm.fiches.view' => 'das',
         'crm.opportunities.update' => 'das', 'crm.opportunities.view' => 'das',
         'crm.quotes.update' => 'das', 'crm.quotes.view' => 'das',
@@ -159,16 +163,21 @@ it('splits the rights granted to a user directly, and down() merges them back', 
     backTo042();
     $user = assistant();
     $user->givePermissionTo('crm.delete');
+    $editor = userWithPermissions([]);
+    $editor->givePermissionTo('crm.update');
 
     splitMigration()->up();
     app(PermissionRegistrar::class)->forgetCachedPermissions();
-    expect($user->fresh()->getDirectPermissions()->pluck('name')->sort()->values()->all())
-        ->toBe(['crm.activities.delete', 'crm.fiches.delete', 'crm.opportunities.delete', 'crm.quotes.delete']);
+    $direct = fn ($u) => $u->fresh()->getDirectPermissions()->pluck('name')->sort()->values()->all();
+    expect($direct($user))->toBe(['crm.activities.delete', 'crm.fiches.delete', 'crm.opportunities.delete', 'crm.quotes.delete'])
+        // Removing an action was part of crm.update.
+        ->and($direct($editor))->toBe(['crm.activities.delete', 'crm.activities.update', 'crm.fiches.update', 'crm.opportunities.update', 'crm.quotes.update']);
 
     splitMigration()->down();
     app(PermissionRegistrar::class)->forgetCachedPermissions();
-    expect($user->fresh()->getDirectPermissions()->pluck('name')->all())->toBe(['crm.delete'])
-        ->and(crmMatrix())->toEqualCanonicalizing(MATRIX_042);
+    expect($direct($user))->toBe(['crm.delete'])
+        ->and($direct($editor))->toBe(['crm.create', 'crm.update'])
+        ->and(collect(crmMatrix())->only(array_keys(MATRIX_042))->all())->toEqualCanonicalizing(MATRIX_042);
 });
 
 it('migrates every organisme in its own context', function () {

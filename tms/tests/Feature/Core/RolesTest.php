@@ -127,6 +127,9 @@ it('warns about the administration-level rights on the screen', function () {
     $this->actingAs(admin(twoFactor: true));
 
     $this->get('/admin/roles')->assertInertia(fn (Assert $page) => $page
-        ->where('groups.0.permissions', fn ($rows) => collect($rows)->whereNotNull('warning')->pluck('name')->sort()->values()->all() === ['exports.run', 'settings.manage'])
-        ->where('groups.0.permissions', fn ($rows) => str_contains((string) collect($rows)->firstWhere('name', 'settings.manage')['description'], "modèles d'e-mails")));
+        // Administration is the last theme.
+        ->where('groups', fn ($groups) => collect($groups)->last()['label'] === 'Administration'
+            && collect(collect($groups)->last()['permissions'])->whereNotNull('warning')->pluck('name')->sort()->values()->all() === ['exports.run', 'settings.manage']
+            && collect($groups)->flatMap(fn ($g) => $g['permissions'])->whereNotNull('warning')->count() === 2
+            && str_contains((string) collect(collect($groups)->last()['permissions'])->firstWhere('name', 'settings.manage')['description'], "modèles d'e-mails")));
 });

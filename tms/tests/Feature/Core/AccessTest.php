@@ -36,7 +36,12 @@ it('lists the core permission catalogue, then the modules\' permissions', functi
         'users.manage', 'roles.manage', 'companies.manage', 'references.manage', 'connectors.manage',
         'audit.view', 'settings.manage', 'exports.run',
     ])
-        ->and(array_slice(Permissions::all(), 8))->toBe([...App\Modules\Crm\Permissions::all(), ...App\Modules\Catalogue\Permissions::all()]);
+        // The CRM themes, the Catalogue, then « Imports, exports et RGPD » (CrmServiceProvider).
+        ->and(array_slice(Permissions::all(), 8))->toBe([
+            ...array_values(array_diff(App\Modules\Crm\Permissions::all(), App\Modules\Crm\Permissions::GROUPS[App\Modules\Crm\Permissions::DATA_GROUP])),
+            ...App\Modules\Catalogue\Permissions::all(),
+            ...App\Modules\Crm\Permissions::GROUPS[App\Modules\Crm\Permissions::DATA_GROUP],
+        ]);
 });
 
 it('seeds the roles and the default matrix for a tenant', function () {

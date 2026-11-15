@@ -39,7 +39,8 @@ class RoleController extends Controller
                 'granted' => RoleMatrix::granted($role),
                 'defaults' => Permissions::defaultsFor($role),
             ], Role::cases()),
-            'groups' => array_values($groups),
+            // Administration last, after the modules' themes.
+            'groups' => [...array_values(array_diff_key($groups, [Permissions::CORE_GROUP => true])), ...(isset($groups[Permissions::CORE_GROUP]) ? [$groups[Permissions::CORE_GROUP]] : [])],
             'locked' => Permissions::LOCKED,
             'status' => $request->session()->get('status'),
         ]);

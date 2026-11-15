@@ -69,13 +69,16 @@ final class Permissions
      *
      * @var array<string, list<string>>
      */
+    /** Theme registered after the Catalogue's (see CrmServiceProvider). */
+    public const DATA_GROUP = 'Imports, exports et RGPD';
+
     public const GROUPS = [
         'Entreprises et personnes' => [self::FICHES_VIEW, self::FICHES_UPDATE, self::FICHES_DELETE, self::MERGE],
         'Opportunités' => [self::OPPORTUNITIES_VIEW, self::OPPORTUNITIES_UPDATE, self::OPPORTUNITIES_DELETE],
         'Devis' => [self::QUOTES_VIEW, self::QUOTES_UPDATE, self::QUOTES_DELETE],
         'Actions et agenda' => [self::ACTIVITIES_VIEW, self::ACTIVITIES_UPDATE, self::ACTIVITIES_DELETE, self::ACTIVITIES_TEAM],
         "Chiffre d'affaires" => [self::REVENUE_VIEW, self::REVENUE_MANAGE],
-        'Imports, exports et RGPD' => [self::IMPORT, self::EXPORT, self::GDPR],
+        self::DATA_GROUP => [self::IMPORT, self::EXPORT, self::GDPR],
     ];
 
     /**
@@ -95,8 +98,8 @@ final class Permissions
             self::QUOTES_UPDATE => ['Créer et modifier les devis', 'Créer, modifier et dupliquer les devis, les envoyer et enregistrer la réponse du client.'],
             self::QUOTES_DELETE => ['Supprimer des devis', 'Mettre des devis brouillons à la corbeille, et consulter ceux des fiches à la corbeille.'],
             self::ACTIVITIES_VIEW => ['Consulter les actions', 'Voir les actions, « À faire », le planning et l\'agenda.'],
-            self::ACTIVITIES_UPDATE => ['Créer et modifier les actions', 'Créer, modifier, terminer et retirer des actions, saisir un compte rendu de RDV.'],
-            self::ACTIVITIES_DELETE => ['Actions des fiches à la corbeille', 'Consulter les actions des fiches mises à la corbeille.'],
+            self::ACTIVITIES_UPDATE => ['Créer et modifier les actions', 'Créer, modifier, reporter et terminer des actions, saisir un compte rendu de RDV.'],
+            self::ACTIVITIES_DELETE => ['Supprimer des actions', 'Supprimer des actions.'],
             self::ACTIVITIES_TEAM => ['Voir les actions de l\'équipe', 'Afficher « À faire » et le planning de toute l\'équipe.'],
             self::REVENUE_VIEW => ['Consulter le chiffre d\'affaires', 'Voir le chiffre d\'affaires signé par DAS.'],
             self::REVENUE_MANAGE => ['Gérer les objectifs de chiffre d\'affaires', 'Fixer les objectifs de chiffre d\'affaires de chaque DAS.'],
@@ -176,7 +179,8 @@ final class Permissions
             Role::AdminOrganisme => self::all(),
             Role::Direction => [...$views, self::ACTIVITIES_TEAM, self::REVENUE_VIEW, self::REVENUE_MANAGE, self::EXPORT, self::GDPR],
             Role::Commercial, Role::ChargeRelations => [...self::domains(), self::MERGE, self::REVENUE_VIEW, self::IMPORT, self::EXPORT],
-            Role::Assistant => [...$views, ...$updates],
+            // Removing an action was part of « Modifier » before 0.5.0.
+            Role::Assistant => [...$views, ...$updates, self::ACTIVITIES_DELETE],
             Role::ResponsableDas => [...$views, self::REVENUE_VIEW, self::EXPORT],
         };
     }

@@ -10,7 +10,8 @@ use Spatie\Permission\PermissionRegistrar;
  * opportunités, devis, actions), without changing anybody's access:
  *
  *  - crm.view   -> the four *.view; crm.update -> the four *.update (creating
- *    is part of « Modifier »); crm.delete -> the four *.delete; crm.create
+ *    is part of « Modifier ») and crm.activities.delete (removing an action
+ *    was part of crm.update); crm.delete -> the four *.delete; crm.create
  *    has no right of its own any more;
  *  - catalogue.manage also gives the new catalogue.delete;
  *  - new rights follow the default matrix: crm.activities.team (replaces the
@@ -36,7 +37,7 @@ return new class extends Migration
     /** Old right => its new names. */
     private const SPLIT = [
         'crm.view' => ['crm.fiches.view', 'crm.opportunities.view', 'crm.quotes.view', 'crm.activities.view'],
-        'crm.update' => ['crm.fiches.update', 'crm.opportunities.update', 'crm.quotes.update', 'crm.activities.update'],
+        'crm.update' => ['crm.fiches.update', 'crm.opportunities.update', 'crm.quotes.update', 'crm.activities.update', 'crm.activities.delete'],
         'crm.delete' => ['crm.fiches.delete', 'crm.opportunities.delete', 'crm.quotes.delete', 'crm.activities.delete'],
         'catalogue.manage' => ['catalogue.delete'],
     ];
@@ -146,7 +147,9 @@ return new class extends Migration
 
     /**
      * Inverse of split(): a « Consulter » of any domain gives crm.view, a
-     * « Modifier » crm.create and crm.update, a « Supprimer » crm.delete.
+     * « Modifier » crm.create and crm.update, a « Supprimer » of a fiche, an
+     * opportunity or a quote crm.delete (crm.activities.delete alone came
+     * with crm.update).
      *
      * @param  list<string>  $held
      * @return list<string>
@@ -155,7 +158,7 @@ return new class extends Migration
     {
         $old = [];
         foreach (['view' => ['crm.view'], 'update' => ['crm.create', 'crm.update'], 'delete' => ['crm.delete']] as $action => $names) {
-            foreach (self::DOMAINS as $domain) {
+            foreach ($action === 'delete' ? array_diff(self::DOMAINS, ['activities']) : self::DOMAINS as $domain) {
                 if (in_array("crm.{$domain}.{$action}", $held, true)) {
                     array_push($old, ...$names);
                     break;

@@ -267,6 +267,8 @@ class OpportunityController extends Controller
             $quote = Quote::query()->whereKey($validated['quote_id'])->where('opportunity_id', $opportunity->id)
                 ->where('status', QuoteStatus::Accepted)->first()
                 ?? throw ValidationException::withMessages(['quote_id' => OpportunityStage::QUOTE_NOT_ACCEPTED]);
+            // Its amount is read only by whoever may see the quote.
+            Gate::authorize('view', $quote);
         }
 
         DB::transaction(function () use ($opportunity, $to, $validated, $wonOn, $quote): void {
