@@ -5,6 +5,15 @@ Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) ; ve
 
 ## [Non publié]
 
+## [0.5.1] - 2026-11-15
+
+Publication de la 0.5.0 (même contenu) : la vérification automatique de la 0.5.0 avait échoué sur un test de la
+file de traitement, sans défaut de l'application.
+
+### Corrigé
+
+- Test du traitement en arrière-plan : il ne dépend plus de la mémoire occupée par la suite de tests.
+
 ## [0.5.0] - 2026-11-15
 
 Droits par domaine et par périmètre, rôles personnalisés, chiffre d'affaires par DAS.
@@ -270,7 +279,8 @@ Lot 1a : socle de l'application.
   mise à jour avec retour arrière automatique.
 - Publication : image multi-architecture signée (cosign), archive de version, sommes de contrôle.
 
-[Non publié]: https://github.com/sebvtl728/CRMTMS/compare/v0.5.0...HEAD
+[Non publié]: https://github.com/sebvtl728/CRMTMS/compare/v0.5.1...HEAD
+[0.5.1]: https://github.com/sebvtl728/CRMTMS/compare/v0.5.0...v0.5.1
 [0.5.0]: https://github.com/sebvtl728/CRMTMS/compare/v0.4.2...v0.5.0
 [0.4.1]: https://github.com/sebvtl728/CRMTMS/compare/v0.4.0...v0.4.1
 [0.4.0]: https://github.com/sebvtl728/CRMTMS/compare/v0.3.1...v0.4.0
