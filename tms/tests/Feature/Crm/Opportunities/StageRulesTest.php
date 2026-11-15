@@ -156,10 +156,10 @@ it('refuses an inactive or foreign stage', function () {
     $this->postJson("/crm/opportunities/{$opportunity->id}/stage", ['stage_id' => 'pas-un-id'])->assertJsonValidationErrors('stage_id');
 });
 
-it('lets only crm.update move a stage', function () {
+it('lets only crm.opportunities.update move a stage', function () {
     $opportunity = stageOpportunity();
 
-    // A Responsable DAS sees the opportunity (crm.view) but may not move it.
+    // A Responsable DAS sees the opportunity (crm.opportunities.view) but may not move it.
     $responsable = userWithRole(Role::ResponsableDas);
     followDas($responsable, crmItem(ReferenceList::Das, 'Hôtellerie-restauration'));
 

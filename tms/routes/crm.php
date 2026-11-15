@@ -19,54 +19,54 @@ use Illuminate\Support\Facades\Route;
 
 Route::middleware(['auth'])->group(function () {
     Route::prefix('crm/organisations')->name('crm.organisations.')->group(function () {
-        Route::get('/', [OrganisationController::class, 'index'])->middleware('can:crm.view')->name('index');
-        Route::get('export', [ExportController::class, 'organisations'])->middleware(['can:crm.export', 'throttle:crm-export'])->name('export');
-        Route::get('export/check', [ExportController::class, 'checkOrganisations'])->middleware(['can:crm.export', 'throttle:crm-export'])->name('export.check');
-        Route::get('create', [OrganisationController::class, 'create'])->middleware('can:crm.create')->name('create');
-        Route::post('/', [OrganisationController::class, 'store'])->middleware('can:crm.create')->name('store');
-        Route::get('{organisation}', [OrganisationController::class, 'show'])->middleware('can:crm.view')->name('show');
-        Route::get('{organisation}/edit', [OrganisationController::class, 'edit'])->middleware('can:crm.update')->name('edit');
-        Route::put('{organisation}', [OrganisationController::class, 'update'])->middleware('can:crm.update')->name('update');
-        Route::delete('{organisation}', [OrganisationController::class, 'destroy'])->middleware('can:crm.delete')->name('destroy');
-        Route::post('{organisation}/restore', [OrganisationController::class, 'restore'])->middleware('can:crm.delete')->name('restore');
+        Route::get('/', [OrganisationController::class, 'index'])->middleware('can:crm.fiches.view')->name('index');
+        Route::get('export', [ExportController::class, 'organisations'])->middleware(['can:crm.fiches.view', 'can:crm.export', 'throttle:crm-export'])->name('export');
+        Route::get('export/check', [ExportController::class, 'checkOrganisations'])->middleware(['can:crm.fiches.view', 'can:crm.export', 'throttle:crm-export'])->name('export.check');
+        Route::get('create', [OrganisationController::class, 'create'])->middleware('can:crm.fiches.update')->name('create');
+        Route::post('/', [OrganisationController::class, 'store'])->middleware('can:crm.fiches.update')->name('store');
+        Route::get('{organisation}', [OrganisationController::class, 'show'])->middleware('can:crm.fiches.view')->name('show');
+        Route::get('{organisation}/edit', [OrganisationController::class, 'edit'])->middleware('can:crm.fiches.update')->name('edit');
+        Route::put('{organisation}', [OrganisationController::class, 'update'])->middleware('can:crm.fiches.update')->name('update');
+        Route::delete('{organisation}', [OrganisationController::class, 'destroy'])->middleware('can:crm.fiches.delete')->name('destroy');
+        Route::post('{organisation}/restore', [OrganisationController::class, 'restore'])->middleware('can:crm.fiches.delete')->name('restore');
     });
 
-    Route::post('crm/organisations/{organisation}/affiliations', [AffiliationController::class, 'store'])->middleware('can:crm.update')->name('crm.affiliations.store');
-    Route::put('crm/affiliations/{affiliation}', [AffiliationController::class, 'update'])->middleware('can:crm.update')->name('crm.affiliations.update');
-    Route::delete('crm/affiliations/{affiliation}', [AffiliationController::class, 'destroy'])->middleware('can:crm.update')->name('crm.affiliations.destroy');
+    Route::post('crm/organisations/{organisation}/affiliations', [AffiliationController::class, 'store'])->middleware('can:crm.fiches.update')->name('crm.affiliations.store');
+    Route::put('crm/affiliations/{affiliation}', [AffiliationController::class, 'update'])->middleware('can:crm.fiches.update')->name('crm.affiliations.update');
+    Route::delete('crm/affiliations/{affiliation}', [AffiliationController::class, 'destroy'])->middleware('can:crm.fiches.update')->name('crm.affiliations.destroy');
 
     // « Formations d'intérêt » of a fiche (same right as editing it).
-    Route::put('crm/organisations/{organisation}/trainings', [FicheTrainingController::class, 'organisation'])->middleware('can:crm.update')->name('crm.organisations.trainings.update');
-    Route::put('crm/people/{person}/trainings', [FicheTrainingController::class, 'person'])->middleware('can:crm.update')->name('crm.people.trainings.update');
+    Route::put('crm/organisations/{organisation}/trainings', [FicheTrainingController::class, 'organisation'])->middleware('can:crm.fiches.update')->name('crm.organisations.trainings.update');
+    Route::put('crm/people/{person}/trainings', [FicheTrainingController::class, 'person'])->middleware('can:crm.fiches.update')->name('crm.people.trainings.update');
 
     // Historique: feed, notes and attachments of a fiche.
-    Route::get('crm/organisations/{organisation}/timeline', [TimelineController::class, 'organisation'])->middleware('can:crm.view')->name('crm.organisations.timeline');
-    Route::get('crm/people/{person}/timeline', [TimelineController::class, 'person'])->middleware('can:crm.view')->name('crm.people.timeline');
-    Route::post('crm/organisations/{organisation}/notes', [NoteController::class, 'storeForOrganisation'])->middleware('can:crm.update')->name('crm.organisations.notes.store');
-    Route::post('crm/people/{person}/notes', [NoteController::class, 'storeForPerson'])->middleware('can:crm.update')->name('crm.people.notes.store');
-    Route::delete('crm/notes/{note}', [NoteController::class, 'destroy'])->middleware('can:crm.update')->name('crm.notes.destroy');
-    Route::post('crm/organisations/{organisation}/attachments', [AttachmentController::class, 'storeForOrganisation'])->middleware('can:crm.update')->name('crm.organisations.attachments.store');
-    Route::post('crm/people/{person}/attachments', [AttachmentController::class, 'storeForPerson'])->middleware('can:crm.update')->name('crm.people.attachments.store');
-    Route::get('crm/attachments/{attachment}', [AttachmentController::class, 'download'])->middleware('can:crm.view')->name('crm.attachments.download');
-    Route::delete('crm/attachments/{attachment}', [AttachmentController::class, 'destroy'])->middleware('can:crm.update')->name('crm.attachments.destroy');
+    Route::get('crm/organisations/{organisation}/timeline', [TimelineController::class, 'organisation'])->middleware('can:crm.fiches.view')->name('crm.organisations.timeline');
+    Route::get('crm/people/{person}/timeline', [TimelineController::class, 'person'])->middleware('can:crm.fiches.view')->name('crm.people.timeline');
+    Route::post('crm/organisations/{organisation}/notes', [NoteController::class, 'storeForOrganisation'])->middleware('can:crm.fiches.update')->name('crm.organisations.notes.store');
+    Route::post('crm/people/{person}/notes', [NoteController::class, 'storeForPerson'])->middleware('can:crm.fiches.update')->name('crm.people.notes.store');
+    Route::delete('crm/notes/{note}', [NoteController::class, 'destroy'])->middleware('can:crm.fiches.update')->name('crm.notes.destroy');
+    Route::post('crm/organisations/{organisation}/attachments', [AttachmentController::class, 'storeForOrganisation'])->middleware('can:crm.fiches.update')->name('crm.organisations.attachments.store');
+    Route::post('crm/people/{person}/attachments', [AttachmentController::class, 'storeForPerson'])->middleware('can:crm.fiches.update')->name('crm.people.attachments.store');
+    Route::get('crm/attachments/{attachment}', [AttachmentController::class, 'download'])->middleware('can:crm.fiches.view')->name('crm.attachments.download');
+    Route::delete('crm/attachments/{attachment}', [AttachmentController::class, 'destroy'])->middleware('can:crm.fiches.update')->name('crm.attachments.destroy');
 
     Route::prefix('crm/people')->name('crm.people.')->group(function () {
-        Route::get('/', [PersonController::class, 'index'])->middleware('can:crm.view')->name('index');
-        Route::get('search', [PersonController::class, 'search'])->middleware('can:crm.view')->name('search');
-        Route::get('export', [ExportController::class, 'people'])->middleware(['can:crm.export', 'throttle:crm-export'])->name('export');
-        Route::get('export/check', [ExportController::class, 'checkPeople'])->middleware(['can:crm.export', 'throttle:crm-export'])->name('export.check');
-        Route::get('create', [PersonController::class, 'create'])->middleware('can:crm.create')->name('create');
-        Route::post('/', [PersonController::class, 'store'])->middleware('can:crm.create')->name('store');
-        Route::get('{person}', [PersonController::class, 'show'])->middleware('can:crm.view')->name('show');
-        Route::get('{person}/edit', [PersonController::class, 'edit'])->middleware('can:crm.update')->name('edit');
-        Route::put('{person}', [PersonController::class, 'update'])->middleware('can:crm.update')->name('update');
-        Route::delete('{person}', [PersonController::class, 'destroy'])->middleware('can:crm.delete')->name('destroy');
-        Route::post('{person}/restore', [PersonController::class, 'restore'])->middleware('can:crm.delete')->name('restore');
+        Route::get('/', [PersonController::class, 'index'])->middleware('can:crm.fiches.view')->name('index');
+        Route::get('search', [PersonController::class, 'search'])->middleware('can:crm.fiches.view')->name('search');
+        Route::get('export', [ExportController::class, 'people'])->middleware(['can:crm.fiches.view', 'can:crm.export', 'throttle:crm-export'])->name('export');
+        Route::get('export/check', [ExportController::class, 'checkPeople'])->middleware(['can:crm.fiches.view', 'can:crm.export', 'throttle:crm-export'])->name('export.check');
+        Route::get('create', [PersonController::class, 'create'])->middleware('can:crm.fiches.update')->name('create');
+        Route::post('/', [PersonController::class, 'store'])->middleware('can:crm.fiches.update')->name('store');
+        Route::get('{person}', [PersonController::class, 'show'])->middleware('can:crm.fiches.view')->name('show');
+        Route::get('{person}/edit', [PersonController::class, 'edit'])->middleware('can:crm.fiches.update')->name('edit');
+        Route::put('{person}', [PersonController::class, 'update'])->middleware('can:crm.fiches.update')->name('update');
+        Route::delete('{person}', [PersonController::class, 'destroy'])->middleware('can:crm.fiches.delete')->name('destroy');
+        Route::post('{person}/restore', [PersonController::class, 'restore'])->middleware('can:crm.fiches.delete')->name('restore');
     });
 
     // GDPR: consents, opposition, data export, anonymisation, retention list.
-    Route::post('crm/people/{person}/consents', [PersonGdprController::class, 'storeConsent'])->middleware('can:crm.update')->name('crm.people.consents.store');
-    Route::post('crm/people/{person}/prospecting-opt-out', [PersonGdprController::class, 'optOut'])->middleware('can:crm.update')->name('crm.people.opt-out');
+    Route::post('crm/people/{person}/consents', [PersonGdprController::class, 'storeConsent'])->middleware('can:crm.fiches.update')->name('crm.people.consents.store');
+    Route::post('crm/people/{person}/prospecting-opt-out', [PersonGdprController::class, 'optOut'])->middleware('can:crm.fiches.update')->name('crm.people.opt-out');
     Route::get('crm/people/{person}/gdpr-export', [PersonGdprController::class, 'export'])->middleware(['can:crm.gdpr', 'throttle:crm-export'])->name('crm.people.gdpr-export');
     Route::post('crm/people/{person}/anonymise', [PersonGdprController::class, 'anonymise'])->middleware('can:crm.gdpr')->name('crm.people.anonymise');
     Route::get('crm/gdpr', [GdprController::class, 'index'])->middleware('can:crm.gdpr')->name('crm.gdpr.index');
@@ -77,8 +77,8 @@ Route::middleware(['auth'])->group(function () {
     Route::get('crm/sirene/{siret}', SireneLookupController::class)->middleware('throttle:crm-sirene')->name('crm.sirene');
 
     // Global search (Ctrl+K), saved filters; the Excel exports are above, next to their lists.
-    Route::get('crm/search', SearchController::class)->middleware(['can:crm.view', 'throttle:crm-search'])->name('crm.search');
-    Route::prefix('crm/saved-filters')->name('crm.saved-filters.')->middleware('can:crm.view')->group(function () {
+    Route::get('crm/search', SearchController::class)->middleware(['can:crm.any-view', 'throttle:crm-search'])->name('crm.search');
+    Route::prefix('crm/saved-filters')->name('crm.saved-filters.')->middleware('can:crm.any-view')->group(function () {
         Route::get('/', [SavedFilterController::class, 'index'])->name('index');
         Route::post('/', [SavedFilterController::class, 'store'])->name('store');
         Route::put('{savedFilter}', [SavedFilterController::class, 'update'])->name('update');

@@ -68,7 +68,8 @@ it('does not overwrite the matrix of an existing role when seeding again', funct
     RoleSeeder::seedFor($tenant);
 
     expect(RoleModel::findByName('direction')->permissions->pluck('name')->all())
-        ->toEqualCanonicalizing(['audit.view', 'crm.view', 'crm.export', 'crm.gdpr', 'catalogue.view', 'catalogue.manage']);
+        ->toEqualCanonicalizing(['audit.view', 'crm.fiches.view', 'crm.opportunities.view', 'crm.quotes.view', 'crm.activities.view', 'crm.activities.team',
+            'crm.revenue.view', 'crm.revenue.manage', 'crm.export', 'crm.gdpr', 'catalogue.view', 'catalogue.manage', 'catalogue.delete']);
 });
 
 // ---------------------------------------------------------------- authorization

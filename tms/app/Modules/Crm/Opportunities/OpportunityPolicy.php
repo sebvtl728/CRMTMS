@@ -7,34 +7,34 @@ use App\Modules\Crm\Permissions;
 use App\Modules\Crm\Visibility\CrmVisibility;
 
 /**
- * Permissions crm.* plus the DAS visibility (invisible opportunities are
+ * Permissions crm.opportunities.* plus the DAS visibility (invisible opportunities are
  * already 404 at route binding).
  */
 class OpportunityPolicy
 {
     public function viewAny(User $user): bool
     {
-        return $user->can(Permissions::VIEW);
+        return $user->can(Permissions::OPPORTUNITIES_VIEW);
     }
 
     public function view(User $user, Opportunity $opportunity): bool
     {
-        return $user->can(Permissions::VIEW) && $this->visible($user, $opportunity);
+        return $user->can(Permissions::OPPORTUNITIES_VIEW) && $this->visible($user, $opportunity);
     }
 
     public function create(User $user): bool
     {
-        return $user->can(Permissions::CREATE);
+        return $user->can(Permissions::OPPORTUNITIES_UPDATE);
     }
 
     public function update(User $user, Opportunity $opportunity): bool
     {
-        return $user->can(Permissions::UPDATE) && $this->visible($user, $opportunity) && ! $this->ficheTrashed($opportunity);
+        return $user->can(Permissions::OPPORTUNITIES_UPDATE) && $this->visible($user, $opportunity) && ! $this->ficheTrashed($opportunity);
     }
 
     public function delete(User $user, Opportunity $opportunity): bool
     {
-        return $user->can(Permissions::DELETE) && $this->visible($user, $opportunity) && ! $this->ficheTrashed($opportunity);
+        return $user->can(Permissions::OPPORTUNITIES_DELETE) && $this->visible($user, $opportunity) && ! $this->ficheTrashed($opportunity);
     }
 
     /**

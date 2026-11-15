@@ -8,8 +8,8 @@ use App\Modules\Crm\Permissions;
 use App\Modules\Crm\Visibility\CrmVisibility;
 
 /**
- * Same rights as the opportunities (crm.create / crm.update / crm.delete),
- * on a visible opportunity (invisible quotes are already 404 at route
+ * Permissions crm.quotes.* (creating is part of crm.quotes.update), on a
+ * visible opportunity (invisible quotes are already 404 at route
  * binding) whose fiche is not trashed. Whether the quote is still a draft is
  * checked by the controller (409, not a matter of rights).
  */
@@ -17,12 +17,12 @@ class QuotePolicy
 {
     public function viewAny(User $user): bool
     {
-        return $user->can(Permissions::VIEW);
+        return $user->can(Permissions::QUOTES_VIEW);
     }
 
     public function view(User $user, Quote $quote): bool
     {
-        return $user->can(Permissions::VIEW) && $this->visible($user, $quote);
+        return $user->can(Permissions::QUOTES_VIEW) && $this->visible($user, $quote);
     }
 
     /**
@@ -30,17 +30,17 @@ class QuotePolicy
      */
     public function create(User $user, Opportunity $opportunity): bool
     {
-        return $user->can(Permissions::CREATE) && $this->opportunityOpen($user, $opportunity);
+        return $user->can(Permissions::QUOTES_UPDATE) && $this->opportunityOpen($user, $opportunity);
     }
 
     public function update(User $user, Quote $quote): bool
     {
-        return $user->can(Permissions::UPDATE) && $this->editable($user, $quote);
+        return $user->can(Permissions::QUOTES_UPDATE) && $this->editable($user, $quote);
     }
 
     public function delete(User $user, Quote $quote): bool
     {
-        return $user->can(Permissions::DELETE) && $this->editable($user, $quote);
+        return $user->can(Permissions::QUOTES_DELETE) && $this->editable($user, $quote);
     }
 
     public function duplicate(User $user, Quote $quote): bool

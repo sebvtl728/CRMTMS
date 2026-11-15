@@ -37,7 +37,7 @@ final class OrganisationListQuery
             'training' => FilterInput::id($input['training'] ?? null),
             'origin' => FilterInput::id($input['origin'] ?? null),
             'mine' => FilterInput::bool($input['mine'] ?? false),
-            'trashed' => $user->can(Permissions::DELETE) && FilterInput::bool($input['trashed'] ?? false),
+            'trashed' => $user->can(Permissions::FICHES_DELETE) && FilterInput::bool($input['trashed'] ?? false),
             'sort' => FilterInput::oneOf($input['sort'] ?? null, self::SORTS) ?? 'name',
             'dir' => ($input['dir'] ?? null) === 'desc' ? 'desc' : 'asc',
         ];

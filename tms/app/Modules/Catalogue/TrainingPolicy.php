@@ -32,6 +32,6 @@ class TrainingPolicy
 
     public function delete(User $user, Training $training): bool
     {
-        return $user->can(Permissions::MANAGE);
+        return $user->can(Permissions::DELETE);
     }
 }

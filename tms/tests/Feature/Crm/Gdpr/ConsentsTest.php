@@ -90,7 +90,7 @@ it('records the opposition to prospecting and shows a badge', function () {
     expect($person->refresh()->prospecting_opt_out_at)->toBeNull();
 });
 
-it('needs crm.update to record consents', function () {
+it('needs crm.fiches.update to record consents', function () {
     $person = makePerson('Roux');
 
     $this->actingAs(direction(twoFactor: true))->post("/crm/people/{$person->id}/consents", ['channel' => 'email', 'granted' => true])->assertForbidden();

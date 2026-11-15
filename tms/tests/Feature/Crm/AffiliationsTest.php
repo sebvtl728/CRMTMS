@@ -150,7 +150,7 @@ it('rejects an affiliation the user cannot make', function () {
     $person = makePerson('Fermée');
     $this->actingAs(userWithRole(Role::Direction, twoFactor: true))->post("/crm/organisations/{$org->id}/affiliations", ['person_id' => $person->id])->assertForbidden();
 
-    // Creating a new person from the entreprise needs crm.create as well as crm.update.
+    // Creating a new person from the entreprise needs crm.fiches.update.
     expect(Affiliation::count())->toBe(0);
 });
 
@@ -164,7 +164,7 @@ it('hides entreprises and affiliations a Responsable DAS may not see', function 
     $user = userWithRole(Role::ResponsableDas);
     followDas($user, $mine);
     // The default Responsable DAS is read-only: give him the right to edit to test the visibility.
-    $user->givePermissionTo('crm.update', 'crm.create');
+    $user->givePermissionTo('crm.fiches.update');
     $this->actingAs($user);
 
     $this->post("/crm/organisations/{$hidden->id}/affiliations", ['last_name' => 'X'])->assertNotFound();

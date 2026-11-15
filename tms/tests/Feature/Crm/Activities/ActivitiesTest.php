@@ -313,12 +313,12 @@ it('answers 404 for the action of a fiche a Responsable DAS cannot see', functio
     $this->post("/crm/activities/{$hidden->id}/done")->assertNotFound();
     $this->getJson('/crm/activities/not-a-uuid')->assertNotFound();
 
-    // No creation on a fiche he cannot see (even when granted crm.create).
-    $responsable->givePermissionTo('crm.create');
+    // No creation on a fiche he cannot see (even when granted crm.activities.update).
+    $responsable->givePermissionTo('crm.activities.update');
     $this->post('/crm/activities', ['type_id' => actionType('Appel'), 'organisation_id' => $hiddenOrg->id])->assertSessionHasErrors('organisation_id');
 });
 
-it('reads the action of a trashed fiche only with crm.delete, and never edits it', function () {
+it('reads the action of a trashed fiche only with crm.activities.delete, and never edits it', function () {
     $this->actingAs(commercial());
     $org = Organisation::query()->create(['name' => 'Supprimée']);
     $activity = makeActivity(['organisation_id' => $org->id]);

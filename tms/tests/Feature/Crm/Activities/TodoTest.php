@@ -183,7 +183,7 @@ it('refuses to postpone to the past, without date, or a done action', function (
     expect($action->refresh()->due_at?->equalTo(todoAt('2026-11-16 14:00:00')))->toBeTrue();
 });
 
-it('postpone needs crm.update and the visibility of the action', function () {
+it('postpone needs crm.activities.update and the visibility of the action', function () {
     $this->travelTo(todoAt('2026-11-16 10:00:00'));
     $mine = crmItem(ReferenceList::Das, 'Hôtellerie-restauration');
     $other = crmItem(ReferenceList::Das, 'Métiers supports');

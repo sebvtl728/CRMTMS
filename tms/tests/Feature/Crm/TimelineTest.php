@@ -280,7 +280,7 @@ it('validates the note text', function () {
     expect(Note::count())->toBe(1);
 });
 
-it('forbids notes without crm.update and the feed without crm.view', function () {
+it('forbids notes without crm.fiches.update and the feed without crm.fiches.view', function () {
     $org = tlOrg();
 
     $this->actingAs(userWithRole(Role::Direction, twoFactor: true))

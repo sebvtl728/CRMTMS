@@ -139,7 +139,7 @@ it('shares an explicit whitelist of user fields and the permission names', funct
 
 it('shares only the permissions the user holds', function () {
     $this->actingAs(direction(twoFactor: true))->get('/dashboard')->assertInertia(fn (Assert $page) => $page
-        ->where('auth.permissions', fn ($permissions) => collect($permissions)->sort()->values()->all() === ['audit.view', 'catalogue.manage', 'catalogue.view', 'crm.export', 'crm.gdpr', 'crm.view', 'exports.run']));
+        ->where('auth.permissions', fn ($permissions) => collect($permissions)->sort()->values()->all() === ['audit.view', 'catalogue.delete', 'catalogue.manage', 'catalogue.view', 'crm.activities.team', 'crm.activities.view', 'crm.export', 'crm.fiches.view', 'crm.gdpr', 'crm.opportunities.view', 'crm.quotes.view', 'crm.revenue.manage', 'crm.revenue.view', 'exports.run']));
 });
 
 it('lets a 300-minute setting outlive the 120-minute session default', function () {

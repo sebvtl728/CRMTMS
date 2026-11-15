@@ -8,6 +8,7 @@ use App\Modules\Crm\Activities\Activity;
 use App\Modules\Crm\CrmServiceProvider;
 use App\Modules\Crm\Opportunities\OpportunityStage;
 use App\Modules\Crm\Organisations\Organisation;
+use App\Modules\Crm\Permissions;
 use Carbon\CarbonImmutable;
 
 beforeEach(function () {
@@ -130,7 +131,7 @@ it('keeps a responsable das to his das', function () {
     expect(dashCommercial(direction(twoFactor: true))['pipeline']['weighted_amount'])->toBe('600.00');
 });
 
-it('cuts the month on paris time and leaves the summary out without crm.view', function () {
+it('cuts the month on paris time and leaves the summary out without a crm view right', function () {
     // 1 December 00:30 in Paris is still 30 November in UTC.
     $this->travelTo(CarbonImmutable::parse('2026-12-01 00:30:00', 'Europe/Paris'));
     $me = commercial();
@@ -142,6 +143,6 @@ it('cuts the month on paris time and leaves the summary out without crm.view', f
     expect(dashCommercial($me)['pipeline'])->toMatchArray(['weighted_amount' => '200.00', 'month' => 'Décembre 2026']);
 
     $nobody = User::factory()->create();
-    expect($nobody->can('crm.view'))->toBeFalse()
+    expect(Permissions::anyView($nobody))->toBeFalse()
         ->and(dashCommercial($nobody))->toBeNull();
 });

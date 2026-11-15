@@ -7,26 +7,27 @@ use App\Modules\Crm\Permissions;
 use App\Modules\Crm\Visibility\CrmVisibility;
 
 /**
- * Permissions crm.* plus the visibility of what the action hangs on
- * (invisible actions are already 404 at route binding). Like a note, an
- * action is edited, completed or removed with crm.update, never on a
- * trashed fiche.
+ * Permissions crm.activities.* plus the visibility of what the action hangs
+ * on (invisible actions are already 404 at route binding). Like a note, an
+ * action is edited, completed or removed with crm.activities.update, never
+ * on a trashed fiche (crm.activities.delete only reads the actions of a
+ * trashed fiche, see the route binding).
  */
 class ActivityPolicy
 {
     public function view(User $user, Activity $activity): bool
     {
-        return $user->can(Permissions::VIEW) && $this->visible($user, $activity);
+        return $user->can(Permissions::ACTIVITIES_VIEW) && $this->visible($user, $activity);
     }
 
     public function create(User $user): bool
     {
-        return $user->can(Permissions::CREATE);
+        return $user->can(Permissions::ACTIVITIES_UPDATE);
     }
 
     public function update(User $user, Activity $activity): bool
     {
-        return $user->can(Permissions::UPDATE) && $this->visible($user, $activity) && ! $activity->ficheTrashed();
+        return $user->can(Permissions::ACTIVITIES_UPDATE) && $this->visible($user, $activity) && ! $activity->ficheTrashed();
     }
 
     public function delete(User $user, Activity $activity): bool

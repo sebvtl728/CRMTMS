@@ -16,7 +16,7 @@ use Illuminate\Validation\Validator;
 
 /**
  * Validation of an opportunity (create and update). Authorisation is done by
- * the route middleware (crm.create / crm.update) and the policy. The account
+ * the route middleware (crm.opportunities.update) and the policy. The account
  * (entreprise or particulier) and the stage are chosen at creation only: the
  * stage then moves through POST …/stage (rules and history).
  */
@@ -136,7 +136,7 @@ class OpportunityRequest extends FormRequest
     }
 
     /**
-     * A Responsable DAS (granted crm.create / crm.update) only works in the DAS he follows.
+     * A Responsable DAS (granted crm.opportunities.update) only works in the DAS he follows.
      */
     private function followedDas(User $user, ?string $keep): Closure
     {

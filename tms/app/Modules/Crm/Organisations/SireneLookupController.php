@@ -25,7 +25,7 @@ class SireneLookupController extends Controller
     public function __invoke(Request $request, string $siret, SireneClient $sirene): JsonResponse
     {
         $user = $request->user();
-        abort_unless($user !== null && ($user->can(Permissions::CREATE) || $user->can(Permissions::UPDATE)), 403);
+        abort_unless($user !== null && $user->can(Permissions::FICHES_UPDATE), 403);
 
         $validator = Validator::make(['siret' => $siret], ['siret' => ['required', new Siret]]);
         if ($validator->fails()) {

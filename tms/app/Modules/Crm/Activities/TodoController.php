@@ -3,7 +3,6 @@
 namespace App\Modules\Crm\Activities;
 
 use App\Http\Controllers\Controller;
-use App\Modules\Core\Access\Role;
 use App\Modules\Core\Users\User;
 use App\Modules\Crm\Permissions;
 use Carbon\CarbonImmutable;
@@ -13,8 +12,9 @@ use Inertia\Response;
 
 /**
  * « À faire »: the viewer's actions in three sections (en retard,
- * aujourd'hui, cette semaine). Direction and admin may switch to the whole
- * team (every action they may see); for the others the filter is ignored.
+ * aujourd'hui, cette semaine). With crm.activities.team the viewer may
+ * switch to the whole team (every action he may see); otherwise the filter
+ * is ignored.
  */
 class TodoController extends Controller
 {
@@ -23,7 +23,7 @@ class TodoController extends Controller
         $user = $request->user();
         assert($user instanceof User);
 
-        $canTeam = in_array($user->role(), [Role::AdminOrganisme, Role::Direction], true);
+        $canTeam = $user->can(Permissions::ACTIVITIES_TEAM);
         $team = $canTeam && $request->boolean('team');
         $todo = TodoQuery::for($user, CarbonImmutable::now(), $team);
 
@@ -31,7 +31,7 @@ class TodoController extends Controller
             'sections' => array_map(fn ($rows) => $rows->map(fn (Activity $a) => ActivityRows::row($a))->values()->all(), $todo),
             'team' => $team,
             'can_team' => $canTeam,
-            'can_edit' => $user->can(Permissions::UPDATE),
+            'can_edit' => $user->can(Permissions::ACTIVITIES_UPDATE),
             'status' => $request->session()->get('status'),
         ]);
     }

@@ -52,7 +52,7 @@ it('answers 404 for a malformed id or an opportunity of a trashed fiche', functi
     $this->get("/crm/opportunities/{$opportunity->id}")->assertNotFound();
     expect(collect($this->get('/crm/opportunities')->original->getData()['page']['props']['opportunities']['data']))->toBeEmpty();
 
-    // With crm.delete the fiche (and its opportunity) stays readable.
+    // With crm.fiches.delete / crm.opportunities.delete the fiche (and its opportunity) stays readable.
     $this->actingAs(commercial())->get("/crm/opportunities/{$opportunity->id}")->assertOk();
 });
 
@@ -67,9 +67,9 @@ it('refuses to create on a fiche the user cannot see', function () {
     ])->assertJsonValidationErrors('organisation_id');
     $this->get("/crm/opportunities/create?organisation={$trashed->id}")->assertNotFound();
 
-    // A Responsable DAS granted crm.create only creates in the DAS he follows, on fiches he sees.
+    // A Responsable DAS granted crm.opportunities.update only creates in the DAS he follows, on fiches he sees.
     $responsable = userWithRole(Role::ResponsableDas);
-    $responsable->givePermissionTo('crm.create');
+    $responsable->givePermissionTo('crm.opportunities.update');
     followDas($responsable, $mine);
     $this->actingAs($responsable)->postJson('/crm/opportunities', [
         'organisation_id' => $hidden->id, 'title' => 'X', 'das_id' => $mine->id, 'stage_id' => pipelineStage('Nouveau')->id,
@@ -82,7 +82,7 @@ it('refuses to edit an opportunity of a trashed fiche', function () {
     $opportunity = makeOpportunity($organisation);
     $organisation->delete();
 
-    // crm.delete reads it, but nothing is edited on a trashed fiche.
+    // crm.opportunities.delete reads it, but nothing is edited on a trashed fiche.
     $this->actingAs(commercial())->get("/crm/opportunities/{$opportunity->id}")
         ->assertOk()
         ->assertInertia(fn ($page) => $page->where('can.update', false)->where('can.delete', false));

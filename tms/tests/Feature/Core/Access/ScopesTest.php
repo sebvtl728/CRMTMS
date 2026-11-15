@@ -165,13 +165,15 @@ it('writes the default scopes again on reset and tells which scopes a role uses'
     $matrix = app(RoleMatrix::class);
     $matrix->setScope(Role::Commercial, SCOPED, AccessScope::Das);
     expect(Scopes::roleUses(commercialRole(), AccessScope::Das))->toBeTrue()
-        ->and(Scopes::roleUses(commercialRole(), AccessScope::Own))->toBeFalse();
+        ->and(DB::table('role_permission_scopes')->where('role_id', commercialRole()->id)->where('permission', SCOPED)->value('scope'))->toBe('das');
 
     $matrix->reset(Role::Commercial);
 
     expect(DB::table('role_permission_scopes')->where('permission', SCOPED)->value('scope'))->toBe('own')
         ->and(Scopes::roleUses(commercialRole(), AccessScope::Own))->toBeTrue()
-        ->and(Scopes::roleUses(commercialRole(), AccessScope::All))->toBeFalse();
+        // The CRM rights of the commercial (no row) are « all »; none is « das » any more.
+        ->and(Scopes::roleUses(commercialRole(), AccessScope::All))->toBeTrue()
+        ->and(Scopes::roleUses(commercialRole(), AccessScope::Das))->toBeFalse();
 });
 
 it('exposes the scope options in French', function () {
@@ -181,7 +183,7 @@ it('exposes the scope options in French', function () {
         ['value' => 'all', 'label' => "Tout l'organisme"],
     ])->and(Permissions::isScoped(SCOPED))->toBeTrue()
         ->and(Permissions::isScoped(UNSCOPED))->toBeFalse()
-        ->and(Permissions::defaultScopesFor(Role::Commercial))->toBe([SCOPED => AccessScope::Own]);
+        ->and(Permissions::defaultScopesFor(Role::Commercial))->toBe(['crm.revenue.view' => AccessScope::Own, SCOPED => AccessScope::Own]);
 });
 
 it('keeps the default scope when a right is revoked then granted again', function () {

@@ -53,7 +53,7 @@ class OpportunityController extends Controller
             ],
             'filters' => $filters,
             'options' => OpportunityListQuery::options($filters['training']),
-            'can' => ['create' => $user->can(Permissions::CREATE), 'export' => $user->can(Permissions::EXPORT)],
+            'can' => ['create' => $user->can(Permissions::OPPORTUNITIES_UPDATE), 'export' => $user->can(Permissions::EXPORT)],
             'status' => $request->session()->get('status'),
         ]);
     }

@@ -358,7 +358,7 @@ it('keeps « Mon agenda » and the feed to the users of the CRM', function () {
 
     $user = commercial();
     $token = CalendarToken::issue($user);
-    $user->syncRoles([]); // no crm.view any more
+    $user->syncRoles([]); // no crm.activities.view any more
 
     $this->get(feedPath($token))->assertNotFound();
     $this->actingAs($user->fresh())->get('/settings/calendar')->assertForbidden();

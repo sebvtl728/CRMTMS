@@ -13,8 +13,8 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
 
 /**
  * « Joindre le devis signé » / « Remplacer » on an accepted quote
- * (crm.update on an editable quote: not trashed, nor its opportunity or
- * fiche), and the download of the copy (crm.view, never cached).
+ * (crm.quotes.update on an editable quote: not trashed, nor its opportunity or
+ * fiche), and the download of the copy (crm.quotes.view, never cached).
  */
 class QuoteSignedController extends Controller
 {

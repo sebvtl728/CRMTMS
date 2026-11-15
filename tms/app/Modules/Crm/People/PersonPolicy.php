@@ -7,30 +7,30 @@ use App\Modules\Crm\Permissions;
 use App\Modules\Crm\Visibility\CrmVisibility;
 
 /**
- * Permissions crm.* plus the visibility rule (invisible people are already
+ * Permissions crm.fiches.* plus the visibility rule (invisible people are already
  * 404 at route binding).
  */
 class PersonPolicy
 {
     public function viewAny(User $user): bool
     {
-        return $user->can(Permissions::VIEW);
+        return $user->can(Permissions::FICHES_VIEW);
     }
 
     public function view(User $user, Person $person): bool
     {
-        return $user->can(Permissions::VIEW) && $this->visible($user, $person);
+        return $user->can(Permissions::FICHES_VIEW) && $this->visible($user, $person);
     }
 
     public function create(User $user): bool
     {
-        return $user->can(Permissions::CREATE);
+        return $user->can(Permissions::FICHES_UPDATE);
     }
 
     public function update(User $user, Person $person): bool
     {
         // An anonymised fiche is never filled again.
-        return $user->can(Permissions::UPDATE) && $person->anonymised_at === null && $this->visible($user, $person);
+        return $user->can(Permissions::FICHES_UPDATE) && $person->anonymised_at === null && $this->visible($user, $person);
     }
 
     /** Data export, anonymisation, « Conserver ». */
@@ -41,7 +41,7 @@ class PersonPolicy
 
     public function delete(User $user, Person $person): bool
     {
-        return $user->can(Permissions::DELETE) && $this->visible($user, $person);
+        return $user->can(Permissions::FICHES_DELETE) && $this->visible($user, $person);
     }
 
     public function restore(User $user, Person $person): bool

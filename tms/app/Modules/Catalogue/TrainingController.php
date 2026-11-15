@@ -21,7 +21,8 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
 
 /**
  * « Catalogue » screens: list with filters (read by every CRM role), create
- * / edit form, activation and deletion (catalogue.manage), Excel export.
+ * / edit form, activation (catalogue.manage), deletion (catalogue.delete),
+ * Excel export.
  */
 class TrainingController extends Controller
 {
@@ -38,7 +39,7 @@ class TrainingController extends Controller
                 ->through(fn (Training $t) => self::row($t, $export)),
             'filters' => $filters,
             'options' => TrainingListQuery::options(),
-            'can' => ['manage' => $user->can(Permissions::MANAGE), 'export' => $user->can(Permissions::EXPORT)],
+            'can' => ['manage' => $user->can(Permissions::MANAGE), 'delete' => $user->can(Permissions::DELETE), 'export' => $user->can(Permissions::EXPORT)],
             'status' => $request->session()->get('status'),
         ]);
     }

@@ -71,9 +71,9 @@ it('grants and revokes a permission of a role, journaled, effective at the next 
     $this->actingAs($assistant->fresh())->get('/crm/organisations/export/check')->assertOk();
 
     $this->actingAs(admin(twoFactor: true));
-    $this->post('/admin/roles/assistant', ['permission' => 'crm.create', 'granted' => false])->assertSessionHasNoErrors();
-    expect(rolePermissions(Role::Assistant))->not->toContain('crm.create')
-        ->and(AuditLog::query()->where('event', 'roles.permission_revoked')->sole()->new_values)->toBe(['role' => 'assistant', 'permission' => 'crm.create']);
+    $this->post('/admin/roles/assistant', ['permission' => 'crm.quotes.update', 'granted' => false])->assertSessionHasNoErrors();
+    expect(rolePermissions(Role::Assistant))->not->toContain('crm.quotes.update')
+        ->and(AuditLog::query()->where('event', 'roles.permission_revoked')->sole()->new_values)->toBe(['role' => 'assistant', 'permission' => 'crm.quotes.update']);
 });
 
 it('refuses to change the administrator, the locked permissions or an unknown one', function () {
@@ -92,7 +92,7 @@ it('refuses to change the administrator, the locked permissions or an unknown on
 
 it('resets a role to exactly its default permissions', function () {
     $this->actingAs(admin(twoFactor: true));
-    $this->post('/admin/roles/commercial', ['permission' => 'crm.delete', 'granted' => false]);
+    $this->post('/admin/roles/commercial', ['permission' => 'crm.fiches.delete', 'granted' => false]);
     $this->post('/admin/roles/commercial', ['permission' => 'catalogue.manage', 'granted' => true]);
 
     $this->post('/admin/roles/commercial/reset')->assertSessionHasNoErrors()
@@ -107,12 +107,12 @@ it('changes only the current organisme, and a later sync never grants a removed 
     $other = Tenant::factory()->create();
     PermissionSync::forTenant($other);
 
-    $this->post('/admin/roles/commercial', ['permission' => 'crm.delete', 'granted' => false])->assertSessionHasNoErrors();
+    $this->post('/admin/roles/commercial', ['permission' => 'crm.fiches.delete', 'granted' => false])->assertSessionHasNoErrors();
     PermissionSync::run();
 
-    expect(rolePermissions(Role::Commercial))->not->toContain('crm.delete');
+    expect(rolePermissions(Role::Commercial))->not->toContain('crm.fiches.delete');
     $theirs = app(TenantContext::class)->run($other, fn () => rolePermissions(Role::Commercial));
-    expect($theirs)->toContain('crm.delete');
+    expect($theirs)->toContain('crm.fiches.delete');
 });
 
 it('never grants the connectors to another role (an SMTP relay would capture invitation links)', function () {

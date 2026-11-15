@@ -75,7 +75,7 @@ class KanbanController extends Controller
             'lossReasons' => FormOptions::reference(ReferenceList::LossReason),
             'closedDays' => self::CLOSED_DAYS,
             'cardsLimit' => self::CARDS,
-            'can' => ['update' => $user->can(Permissions::UPDATE), 'export' => $user->can(Permissions::EXPORT)],
+            'can' => ['update' => $user->can(Permissions::OPPORTUNITIES_UPDATE), 'export' => $user->can(Permissions::EXPORT)],
             'status' => $request->session()->get('status'),
         ]);
     }

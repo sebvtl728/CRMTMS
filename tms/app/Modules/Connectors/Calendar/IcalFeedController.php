@@ -19,7 +19,7 @@ class IcalFeedController extends Controller
         $calendar = CalendarToken::findActive($token);
         $user = $calendar?->user;
 
-        if ($calendar === null || $user === null || ! $user->isActive() || ! $user->can(Permissions::VIEW)) {
+        if ($calendar === null || $user === null || ! $user->isActive() || ! $user->can(Permissions::ACTIVITIES_VIEW)) {
             abort(404);
         }
 

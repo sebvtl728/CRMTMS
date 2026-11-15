@@ -128,7 +128,7 @@ it('keeps hostile file names harmless', function () {
         ->and($response->headers->get('Content-Disposition'))->not->toContain("\r")->not->toContain("\n");
 });
 
-it('forbids the upload and the removal without crm.update', function () {
+it('forbids the upload and the removal without crm.fiches.update', function () {
     $org = attOrg();
     $this->actingAs(commercial())->post("/crm/organisations/{$org->id}/attachments", ['file' => pdf()]);
     $attachment = Attachment::query()->sole();
@@ -140,12 +140,12 @@ it('forbids the upload and the removal without crm.update', function () {
     expect(Attachment::count())->toBe(1);
 });
 
-it('answers 403 to the download of a user without crm.view', function () {
+it('answers 403 to the download of a user without crm.fiches.view', function () {
     $org = attOrg();
     $this->actingAs(commercial())->post("/crm/organisations/{$org->id}/attachments", ['file' => pdf()]);
     $attachment = Attachment::query()->sole();
 
-    RoleModel::findByName('direction')->revokePermissionTo('crm.view');
+    RoleModel::findByName('direction')->revokePermissionTo('crm.fiches.view');
 
     $this->actingAs(userWithRole(Role::Direction, twoFactor: true))->get("/crm/attachments/{$attachment->id}")->assertForbidden();
 });

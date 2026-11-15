@@ -3,7 +3,6 @@
 namespace App\Modules\Crm\Activities;
 
 use App\Http\Controllers\Controller;
-use App\Modules\Core\Access\Role;
 use App\Modules\Core\Users\User;
 use App\Modules\Crm\Permissions;
 use App\Modules\Crm\Support\FilterInput;
@@ -15,8 +14,8 @@ use Inertia\Response;
 
 /**
  * « Planning »: the meetings and planned calls of a week (« ?week=2026-W47 »,
- * the current week when missing or invalid). Direction and admin may show
- * a colleague's (« ?user= »); for the others the choice is ignored. The
+ * the current week when missing or invalid). With crm.activities.team the
+ * viewer may show a colleague's (« ?user= »); otherwise the choice is ignored. The
  * rows are always those the viewer may see.
  */
 class PlanningController extends Controller
@@ -26,7 +25,7 @@ class PlanningController extends Controller
         $viewer = $request->user();
         assert($viewer instanceof User);
 
-        $canTeam = in_array($viewer->role(), [Role::AdminOrganisme, Role::Direction], true);
+        $canTeam = $viewer->can(Permissions::ACTIVITIES_TEAM);
         $owner = $viewer;
         $chosen = $canTeam ? FilterInput::id($request->query('user')) : null;
         if ($chosen !== null) {
@@ -48,7 +47,7 @@ class PlanningController extends Controller
             'user_name' => $owner->name,
             'users' => $canTeam ? FormOptions::responsible($owner->id) : [],
             'can_team' => $canTeam,
-            'can_report' => $viewer->can(Permissions::UPDATE),
+            'can_report' => $viewer->can(Permissions::ACTIVITIES_UPDATE),
         ]);
     }
 }

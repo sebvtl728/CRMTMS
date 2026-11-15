@@ -39,7 +39,7 @@ class DailyDigest implements ShouldQueue
         ForEachTenant::run(function () use (&$count): void {
             User::query()->where('daily_digest', true)->whereNull('deactivated_at')->orderBy('id')
                 ->each(function (User $user) use (&$count): void {
-                    if ($user->can(Permissions::VIEW)) {
+                    if ($user->can(Permissions::ACTIVITIES_VIEW)) {
                         self::dispatch($user->id);
                         $count++;
                     }
@@ -52,7 +52,7 @@ class DailyDigest implements ShouldQueue
     public function handle(): void
     {
         $user = User::query()->find($this->userId);
-        if ($user === null || ! $user->daily_digest || ! $user->isActive() || ! $user->can(Permissions::VIEW)) {
+        if ($user === null || ! $user->daily_digest || ! $user->isActive() || ! $user->can(Permissions::ACTIVITIES_VIEW)) {
             return;
         }
 

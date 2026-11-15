@@ -11,7 +11,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\DB;
 
 /**
- * Who sees which fiche. Everybody with crm.view sees everything in the
+ * Who sees which fiche. Everybody with a « Consulter » right sees everything in the
  * organisme, except the Responsable DAS who only sees what belongs to the
  * DAS he follows (table user_das, managed from the users page).
  */
@@ -137,7 +137,7 @@ final class CrmVisibility
      * that opportunity (its DAS), whatever its fiches: the fiche of the
      * opportunity is stamped on every such action. An action without
      * opportunity is seen when its entreprise or its person is. Trashed
-     * fiches are left to the caller (readable with crm.delete only).
+     * fiches are left to the caller (readable with crm.fiches.delete only).
      *
      * @template TModel of \Illuminate\Database\Eloquent\Model
      *

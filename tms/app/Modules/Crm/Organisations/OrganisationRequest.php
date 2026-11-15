@@ -13,7 +13,7 @@ use Illuminate\Validation\Rule;
 
 /**
  * Validation of an entreprise (create and update). Authorisation is done by
- * the route middleware (crm.create / crm.update).
+ * the route middleware (crm.fiches.update).
  */
 class OrganisationRequest extends FormRequest
 {

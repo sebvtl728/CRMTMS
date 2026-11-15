@@ -18,7 +18,7 @@ use Inertia\Response;
  * « Accueil »: shortcuts, counters, the commercial summary (« Mes relances »,
  * weighted pipeline and quotes of the month, next meetings) and the last fiches the
  * user opened. Everything follows what the user may see (Responsable DAS:
- * his DAS only); nothing CRM without crm.view.
+ * his DAS only); nothing CRM without one « Consulter » right of a domain.
  */
 class DashboardController extends Controller
 {
@@ -26,7 +26,7 @@ class DashboardController extends Controller
     {
         $user = $request->user();
         assert($user instanceof User);
-        $crm = $user->can(Permissions::VIEW);
+        $crm = Permissions::anyView($user);
 
         return Inertia::render('dashboard', [
             'recent_views' => $crm ? RecentViews::for($user) : [],
