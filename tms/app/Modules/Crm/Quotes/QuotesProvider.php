@@ -24,8 +24,8 @@ use Illuminate\Support\Facades\Auth;
  * refusé / expiré », « Devis signé ajouté (DEV-2026-0012) ». Read from the journal of the quotes (their creation and
  * their status changes): every transition is there, with its author and its
  * instant, without a table of its own. Deleted quotes and quotes of a
- * deleted opportunity are left out; a Responsable DAS only sees those of
- * his DAS; none without a signed-in viewer.
+ * deleted opportunity are left out; only the quotes the viewer sees
+ * (scope of crm.quotes.view); none without a signed-in viewer.
  */
 final class QuotesProvider implements TimelineProvider
 {

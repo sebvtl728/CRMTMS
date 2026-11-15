@@ -13,7 +13,7 @@ use Illuminate\Support\Facades\Gate;
 
 /**
  * Sending, reminder, « Renvoyer », acceptance and refusal of a quote
- * (crm.update on an editable quote; the transition itself is checked by
+ * (crm.quotes.update on an editable quote; the transition itself is checked by
  * QuoteTransitions, 409 otherwise). An outcome proposes the matching move
  * of the opportunity (proposeWon / proposeLost, flashed): the window then
  * calls the stage endpoint, the user may decline.

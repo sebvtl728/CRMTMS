@@ -241,7 +241,7 @@ it('refuses meetings and opportunities the user may not touch', function () {
 
     $responsable = userWithRole(Role::ResponsableDas);
     followDas($responsable, $mine);
-    $responsable->givePermissionTo(['crm.create', 'crm.update']); // what a Responsable DAS may be granted
+    $responsable->givePermissionTo(['crm.activities.update', 'crm.opportunities.update']); // what a Responsable DAS may be granted
     $hiddenRdv = meeting($responsable, '2026-11-18 14:00:00', ['organisation_id' => $hidden->id]);
     $rdv = meeting($responsable, '2026-11-18 15:00:00', ['organisation_id' => $visible->id]);
     $done = meeting($responsable, '2026-11-18 10:00:00', ['organisation_id' => $visible->id, 'done_at' => reportAt('2026-11-18 11:00:00')]);
@@ -262,7 +262,7 @@ it('refuses meetings and opportunities the user may not touch', function () {
         ->and($hiddenRdv->fresh()->done_at)->toBeNull()
         ->and($foreign->fresh()->stage_id)->toBe(pipelineStage('Nouveau')->id);
 
-    // Direction cannot write in the CRM (no crm.update): 403.
+    // Direction cannot write in the CRM (no crm.activities.update): 403.
     $this->actingAs(direction(twoFactor: true))->post('/crm/report', ['activity_id' => $rdv->id])->assertForbidden();
 });
 

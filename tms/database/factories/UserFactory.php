@@ -3,6 +3,7 @@
 namespace Database\Factories;
 
 use App\Modules\Core\Access\Role;
+use App\Modules\Core\Access\RoleModel;
 use App\Modules\Core\Users\TwoFactorAuthenticator;
 use App\Modules\Core\Users\User;
 use Illuminate\Database\Eloquent\Factories\Factory;
@@ -64,10 +65,10 @@ class UserFactory extends Factory
     }
 
     /**
-     * Primary role, assigned after creation (needs the user's tenant as the
-     * current tenant context, as every user creation does).
+     * Primary role (system or custom), assigned after creation (needs the
+     * user's tenant as the current tenant context, as every user creation does).
      */
-    public function withRole(Role $role): static
+    public function withRole(Role|RoleModel $role): static
     {
         return $this->afterCreating(fn (User $user) => $user->assignPrimaryRole($role));
     }

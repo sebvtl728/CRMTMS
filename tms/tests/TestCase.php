@@ -2,6 +2,7 @@
 
 namespace Tests;
 
+use App\Modules\Core\Access\Scopes;
 use App\Modules\Core\Tenancy\Tenant;
 use App\Modules\Core\Tenancy\TenantContext;
 use Illuminate\Foundation\Testing\TestCase as BaseTestCase;
@@ -60,6 +61,8 @@ abstract class TestCase extends BaseTestCase
     {
         $context = $this->app->make(TenantContext::class);
         $previous = $context->current();
+        // Each request is a fresh PHP process in production: no memoised scope.
+        Scopes::forget();
 
         try {
             return parent::call($method, $uri, $parameters, $cookies, $files, $server, $content);

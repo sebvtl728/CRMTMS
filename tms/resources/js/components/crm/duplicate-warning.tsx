@@ -8,6 +8,8 @@ export interface DuplicateCandidate {
     reason: string;
     reason_label: string;
     score: number;
+    /** « Fusionner » allowed (scopes of crm.fiches.update / delete). */
+    can_merge?: boolean;
 }
 
 export type FicheType = 'organisation' | 'person';
@@ -69,6 +71,7 @@ export function DuplicateWarning({ type, duplicates, canMerge, currentId, proces
                                 </a>
                             </Button>
                             {canMerge &&
+                                d.can_merge !== false &&
                                 (currentId === null ? (
                                     <Button type="button" variant="outline" size="sm" disabled={processing} onClick={() => onCreateAndMerge(d.id)}>
                                         <Merge className="h-4 w-4" aria-hidden />
@@ -118,12 +121,14 @@ export function SimilarFiches({ type, currentId, similar }: { type: FicheType; c
                             </Link>
                             <div className="text-muted-foreground text-xs">{d.reason_label}</div>
                         </div>
-                        <Button variant="outline" size="sm" asChild>
-                            <Link href={mergeRoute(type, currentId, d.id)}>
-                                <Merge className="h-4 w-4" aria-hidden />
-                                Fusionner
-                            </Link>
-                        </Button>
+                        {d.can_merge !== false && (
+                            <Button variant="outline" size="sm" asChild>
+                                <Link href={mergeRoute(type, currentId, d.id)}>
+                                    <Merge className="h-4 w-4" aria-hidden />
+                                    Fusionner
+                                </Link>
+                            </Button>
+                        )}
                     </li>
                 ))}
             </ul>

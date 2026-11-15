@@ -55,11 +55,11 @@ it('leaves out a fiche the user may not use', function () {
     $responsable = userWithRole(Role::ResponsableDas);
     followDas($responsable, $mine);
     $this->actingAs($responsable)->getJson("/crm/activities/options?organisation={$hidden->id}")->assertForbidden();
-    $responsable->givePermissionTo('crm.create');
+    $responsable->givePermissionTo('crm.activities.update');
     expect($this->getJson("/crm/activities/options?organisation={$hidden->id}")->json('context.organisation'))->toBeNull();
 });
 
-it('quick entry needs crm.create', function () {
+it('quick entry needs crm.activities.update', function () {
     $org = Organisation::query()->create(['name' => 'Hôtel du Lac']);
     $this->actingAs(direction(twoFactor: true));
 

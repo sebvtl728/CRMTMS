@@ -114,7 +114,7 @@ it('lists the actions of a person in her data export', function () {
         ['date' => '2026-11-20T09:00:00+01:00', 'type' => 'Rappel', 'objet' => 'Rappel – Claire Durand', 'statut' => 'À faire', 'resultat' => null, 'compte_rendu' => null, 'lieu' => null, 'supprimee' => false],
     ]);
 
-    // A Responsable DAS only gets the actions he may see.
-    $responsable = userWithRole(Role::ResponsableDas);
-    expect(PersonDataExport::for($person, $responsable)['actions'])->toBe([]);
+    // The file is always complete: a Responsable DAS (who would not see them) cannot run it.
+    expect(PersonDataExport::allowedFor(userWithRole(Role::ResponsableDas)))->toBeFalse()
+        ->and(PersonDataExport::allowedFor(direction()))->toBeTrue();
 });

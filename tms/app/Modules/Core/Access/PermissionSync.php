@@ -13,10 +13,11 @@ use Spatie\Permission\PermissionRegistrar;
  * (`php artisan tms:permissions:sync`, run by ops/migrate.sh after each
  * migration; RoleSeeder for a new tenant).
  *
- *  - creates the missing permissions (global catalogue) and roles;
+ *  - creates the missing permissions (global catalogue) and system roles;
  *  - grants each role the default permissions never offered to it yet, and
  *    records them in role_permission_defaults_applied: a permission an
- *    administrator removed is never granted again.
+ *    administrator removed is never granted again. Custom roles
+ *    (RoleCatalogue) never receive default permissions.
  *
  * Idempotent. Runs under RLS, in each tenant's context (runtime connection).
  * One tenant failing never blocks the others; run() returns the failed ones.
@@ -53,6 +54,26 @@ final class PermissionSync
         }
     }
 
+    /**
+     * Writes the default scope of the given permissions, when the role's
+     * defaults declare one (called only as a default is granted: a scope the
+     * administrator changed later is never rewritten).
+     *
+     * @param  list<string>  $permissions
+     */
+    public static function writeDefaultScopes(string $roleId, Role $role, array $permissions, ?string $tenantId): void
+    {
+        $rows = [];
+        foreach (Permissions::defaultScopesFor($role) as $permission => $scope) {
+            if (in_array($permission, $permissions, true)) {
+                $rows[] = ['tenant_id' => $tenantId, 'role_id' => $roleId, 'permission' => $permission, 'scope' => $scope->value];
+            }
+        }
+        if ($rows !== []) {
+            DB::table(Scopes::TABLE)->insertOrIgnore($rows);
+        }
+    }
+
     private static function syncCurrentTenant(): void
     {
         $tenantId = app(TenantContext::class)->id();
@@ -68,7 +89,7 @@ final class PermissionSync
 
             foreach (Role::cases() as $role) {
                 $model = RoleModel::query()->where('name', $role->value)->where('guard_name', RoleSeeder::GUARD)->first()
-                    ?? RoleModel::create(['name' => $role->value, 'guard_name' => RoleSeeder::GUARD]);
+                    ?? RoleModel::create(['name' => $role->value, 'guard_name' => RoleSeeder::GUARD, 'system' => true, 'requires_2fa' => $role->requires2fa()]);
 
                 $new = array_values(array_diff(Permissions::defaultsFor($role), $offered->get($role->value, [])));
 
@@ -77,6 +98,7 @@ final class PermissionSync
                 }
 
                 $model->givePermissionTo($new);
+                self::writeDefaultScopes((string) $model->getKey(), $role, $new, $tenantId);
 
                 DB::table(self::TABLE)->insertOrIgnore(array_map(fn (string $permission) => [
                     'tenant_id' => $tenantId,
@@ -87,5 +109,6 @@ final class PermissionSync
         });
 
         $registrar->forgetCachedPermissions();
+        Scopes::forget();
     }
 }

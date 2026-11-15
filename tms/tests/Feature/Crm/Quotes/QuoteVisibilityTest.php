@@ -51,8 +51,8 @@ it('das visibility on quotes and pdf', function () {
         ->assertInertia(fn (Assert $page) => $page->has('quotes', 1)->where('quotes.0.number', $visible->number));
     expect(Timeline::for($organisation)->where('type', 'quote')->pluck('meta.quote_id')->all())->toBe([$visible->id]);
 
-    // A Responsable DAS granted crm.create does not create on an opportunity he does not see.
-    $responsable->givePermissionTo('crm.create');
+    // A Responsable DAS granted crm.quotes.update does not create on an opportunity he does not see.
+    $responsable->givePermissionTo('crm.quotes.update');
     $this->get("/crm/opportunities/{$hiddenOpportunity->id}/quotes/create")->assertNotFound();
     $this->postJson('/crm/quotes', quotePayload($hiddenOpportunity, $visible->company))->assertJsonValidationErrors('opportunity_id');
     expect(Quote::query()->count())->toBe(2);
@@ -80,7 +80,7 @@ it('answers 404 for a malformed id, another organisme or a quote of a trashed fi
     $this->get("/crm/quotes/{$quote->id}")->assertNotFound();
     expect(collect($this->get('/crm/quotes')->original->getData()['page']['props']['quotes']['data']))->toBeEmpty();
 
-    // With crm.delete the quote stays readable, but nothing is changed on a trashed fiche.
+    // With crm.quotes.delete the quote stays readable, but nothing is changed on a trashed fiche.
     $this->actingAs(commercial());
     $this->get("/crm/quotes/{$quote->id}")->assertOk()->assertInertia(fn (Assert $page) => $page->where('can.update', false)->where('can.delete', false));
     $this->get("/crm/quotes/{$quote->id}/edit")->assertForbidden();

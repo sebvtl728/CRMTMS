@@ -1,12 +1,15 @@
 <?php
 
+use App\Modules\Core\Access\AccessScope;
 use App\Modules\Core\Access\Role;
+use App\Modules\Core\Access\Scopes;
 use App\Modules\Core\References\CapFormationReferenceSeeder;
 use App\Modules\Core\References\ReferenceItem;
 use App\Modules\Core\References\ReferenceList;
 use App\Modules\Core\Users\User;
 use App\Modules\Crm\Organisations\Organisation;
 use App\Modules\Crm\People\Person;
+use App\Modules\Crm\Permissions;
 use App\Modules\Crm\Visibility\CrmVisibility;
 use Illuminate\Support\Facades\DB;
 
@@ -22,7 +25,7 @@ it('does not restrict anybody but the Responsable DAS', function () {
 
     foreach ([Role::AdminOrganisme, Role::Direction, Role::Commercial, Role::ChargeRelations, Role::Assistant] as $role) {
         $user = userWithRole($role);
-        expect(CrmVisibility::restricts($user))->toBeFalse()
+        expect(Scopes::of($user, Permissions::FICHES_VIEW) === AccessScope::Das)->toBeFalse()
             ->and(CrmVisibility::organisations(Organisation::query(), $user)->count())->toBe(1);
     }
 });
@@ -37,7 +40,7 @@ it('limits the Responsable DAS to the organisations of his followed DAS', functi
 
     $ids = CrmVisibility::organisations(Organisation::query(), $user)->pluck('id')->all();
 
-    expect(CrmVisibility::restricts($user))->toBeTrue()
+    expect(Scopes::of($user, Permissions::FICHES_VIEW) === AccessScope::Das)->toBeTrue()
         ->and($ids)->toBe([$both->id])
         ->and($ids)->not->toContain($none->id)
         ->and(CrmVisibility::followedDas($user))->toBe([$mine->id]);

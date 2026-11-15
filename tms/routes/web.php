@@ -27,4 +27,5 @@ require __DIR__.'/crm.php';
 require __DIR__.'/crm-import.php';
 require __DIR__.'/crm-pipeline.php';
 require __DIR__.'/crm-quotes.php';
+require __DIR__.'/crm-revenue.php';
 require __DIR__.'/catalogue.php';

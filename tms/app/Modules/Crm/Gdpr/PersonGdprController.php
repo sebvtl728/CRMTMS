@@ -2,6 +2,7 @@
 
 namespace App\Modules\Crm\Gdpr;
 
+use App\Exceptions\UserFacingHttpException;
 use App\Http\Controllers\Controller;
 use App\Modules\Core\Audit\AuditRecorder;
 use App\Modules\Core\Users\User;
@@ -58,8 +59,11 @@ class PersonGdprController extends Controller
     {
         Gate::authorize('gdpr', $person);
         $viewer = $request->user();
+        if (! $viewer instanceof User || ! PersonDataExport::allowedFor($viewer)) {
+            throw new UserFacingHttpException(403, PersonDataExport::INCOMPLETE);
+        }
 
-        $json = json_encode(PersonDataExport::for($person, $viewer instanceof User ? $viewer : null), JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR);
+        $json = json_encode(PersonDataExport::for($person), JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR);
         $this->audit->record('gdpr.exported', $person, [], ['format' => 'json']);
 
         return response($json, 200, [

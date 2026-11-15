@@ -4,6 +4,8 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import AppLayout from '@/layouts/app-layout';
 import { formatAmount } from '@/lib/crm';
+import { canViewCrm } from '@/lib/permissions';
+import { formatCentsWhole, formatRate } from '@/lib/revenue';
 import { type BreadcrumbItem, type SharedData } from '@/types';
 import { Head, Link, usePage } from '@inertiajs/react';
 import { CalendarClock, Contact, Factory, Search, UserPlus } from 'lucide-react';
@@ -41,6 +43,16 @@ interface Commercial {
     /** Quotes sent this month, accepted among them; rate in %, null when none was sent. */
     quotes: { sent: number; accepted: number; rate: number | null; month: string };
     meetings: Meeting[];
+    /** Signed revenue of the month within the user's scope; null without crm.revenue.view. */
+    revenue: {
+        total_cents: number;
+        target_cents: number | null;
+        /** Revenue of the DAS that have a target (compared with target_cents). */
+        targeted_total_cents: number | null;
+        rate: number | null;
+        month: string;
+        own: boolean;
+    } | null;
 }
 
 interface Props {
@@ -112,9 +124,9 @@ export default function Dashboard({ recent_views, counters, commercial }: Props)
             <div className="flex flex-1 flex-col gap-6 p-4">
                 <Heading title="Accueil" description="Vos raccourcis et les dernières fiches que vous avez consultées." />
 
-                {can('crm.view') && (
+                {canViewCrm(auth.permissions) && (
                     <section aria-label="Raccourcis" className="flex flex-wrap gap-2">
-                        {can('crm.create') && (
+                        {can('crm.fiches.update') && (
                             <>
                                 <Button asChild>
                                     <Link href="/crm/organisations/create">
@@ -214,6 +226,31 @@ export default function Dashboard({ recent_views, counters, commercial }: Props)
                                             <CardDescription>
                                                 {numberFormat.format(commercial.quotes.sent)} envoyé{commercial.quotes.sent > 1 ? 's' : ''},{' '}
                                                 {numberFormat.format(commercial.quotes.accepted)} accepté{commercial.quotes.accepted > 1 ? 's' : ''}
+                                            </CardDescription>
+                                        </CardHeader>
+                                    </Card>
+                                </Link>
+                            </section>
+                        )}
+                        {commercial?.revenue && (
+                            <section aria-label="CA signé du mois">
+                                <Link
+                                    href={route('crm.revenue.index')}
+                                    className="focus-visible:ring-ring block h-full rounded-xl focus-visible:ring-2 focus-visible:outline-none"
+                                >
+                                    <Card className="hover:bg-muted/50 h-full transition-colors">
+                                        <CardHeader>
+                                            <CardDescription>CA signé · {commercial.revenue.month}</CardDescription>
+                                            <CardTitle className="text-3xl">{formatCentsWhole(commercial.revenue.total_cents)}</CardTitle>
+                                            <CardDescription>
+                                                {commercial.revenue.own
+                                                    ? 'Vos devis et opportunités'
+                                                    : commercial.revenue.target_cents !== null
+                                                      ? `Objectif des DAS concernés : ${formatCentsWhole(commercial.revenue.target_cents)}` +
+                                                        (commercial.revenue.rate !== null
+                                                            ? ` · atteint ${formatRate(commercial.revenue.rate)} (${formatCentsWhole(commercial.revenue.targeted_total_cents)} signés sur ces DAS)`
+                                                            : '')
+                                                      : 'Devis acceptés et opportunités gagnées'}
                                             </CardDescription>
                                         </CardHeader>
                                     </Card>

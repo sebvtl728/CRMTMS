@@ -28,6 +28,8 @@ interface TodoRow {
     organisation: Fiche | null;
     person: Fiche | null;
     opportunity: Fiche | null;
+    /** « Fait » and « Reporter »: scope of crm.activities.update. */
+    can_update: boolean;
 }
 
 interface TodoProps {
@@ -139,7 +141,7 @@ function TodoItem({ row, canEdit, team }: { row: TodoRow; canEdit: boolean; team
                 </p>
             </div>
             <div className="flex flex-wrap items-center gap-2">
-                {canEdit && (
+                {canEdit && row.can_update && (
                     <>
                         <Button type="button" size="sm" onClick={() => completeActivity(row.id)}>
                             <Check className="h-4 w-4" />

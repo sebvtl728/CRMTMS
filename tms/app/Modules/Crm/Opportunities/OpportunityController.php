@@ -53,7 +53,7 @@ class OpportunityController extends Controller
             ],
             'filters' => $filters,
             'options' => OpportunityListQuery::options($filters['training']),
-            'can' => ['create' => $user->can(Permissions::CREATE), 'export' => $user->can(Permissions::EXPORT)],
+            'can' => ['create' => $user->can(Permissions::OPPORTUNITIES_UPDATE), 'export' => $user->can(Permissions::EXPORT)],
             'status' => $request->session()->get('status'),
         ]);
     }
@@ -145,10 +145,9 @@ class OpportunityController extends Controller
                 'at' => $c->changed_at->toIso8601String(),
             ])->all(),
             // Its actions (the 100 latest), those the user sees.
-            'activities' => CrmVisibility::activities(Activity::query(), $user)->with(ActivityRows::WITH)
+            'activities' => ActivityRows::rows(CrmVisibility::activities(Activity::query(), $user)->with(ActivityRows::WITH)
                 ->where('opportunity_id', $opportunity->id)
-                ->orderByDesc('happened_at')->orderByDesc('id')->limit(100)->get()
-                ->map(fn (Activity $a) => ActivityRows::row($a))->all(),
+                ->orderByDesc('happened_at')->orderByDesc('id')->limit(100)->get(), $user),
             'training_summary' => [
                 'lines' => OpportunityTrainings::lines($opportunity),
                 'estimate' => OpportunityTrainings::proposal($opportunity),
@@ -267,6 +266,8 @@ class OpportunityController extends Controller
             $quote = Quote::query()->whereKey($validated['quote_id'])->where('opportunity_id', $opportunity->id)
                 ->where('status', QuoteStatus::Accepted)->first()
                 ?? throw ValidationException::withMessages(['quote_id' => OpportunityStage::QUOTE_NOT_ACCEPTED]);
+            // Its amount is read only by whoever may see the quote.
+            Gate::authorize('view', $quote);
         }
 
         DB::transaction(function () use ($opportunity, $to, $validated, $wonOn, $quote): void {

@@ -11,7 +11,7 @@ use Illuminate\Validation\Rule;
 
 /**
  * Validation of a person (create and update). Authorisation is done by the
- * route middleware (crm.create / crm.update). Only the last name is required.
+ * route middleware (crm.fiches.update). Only the last name is required.
  */
 class PersonRequest extends FormRequest
 {

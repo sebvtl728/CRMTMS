@@ -142,7 +142,7 @@ it('serves the search as json, with a minimum of two characters', function () {
     $this->getJson('/crm/search?q[]=x')->assertOk()->assertExactJson(['organisations' => [], 'people' => []]);
 });
 
-it('requires crm.view and a signed-in user', function () {
+it('requires a crm view right and a signed-in user', function () {
     $this->getJson('/crm/search?q=hotel')->assertUnauthorized();
 
     $this->actingAs(assistant());

@@ -230,7 +230,7 @@ it('checks again on edit only when an identifying field changes', function () {
 it('only shows the candidates the user may see', function () {
     $das = crmItem(ReferenceList::Das, 'Hôtellerie-restauration');
     $user = userWithRole(Role::ResponsableDas);
-    $user->givePermissionTo('crm.create');
+    $user->givePermissionTo('crm.fiches.update');
     followDas($user, $das);
     dupOrg('Invisible', ['email' => 'lac@hotel.fr']);
 

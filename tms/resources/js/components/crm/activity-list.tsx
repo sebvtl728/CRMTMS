@@ -18,13 +18,16 @@ export interface ActivityRow {
     responsible: string | null;
     status: 'todo' | 'overdue' | 'done';
     status_label: string;
+    /** The viewer's rights on this action (scope of crm.activities.update / delete). */
+    can_update: boolean;
+    can_delete: boolean;
 }
 
 /**
  * Actions of an opportunity, most recent first; « Fait » on those to do.
  * Reloads the `activities` prop once an action was saved.
  */
-export function ActivityList({ activities, canEdit }: { activities: ActivityRow[]; canEdit: boolean }) {
+export function ActivityList({ activities }: { activities: ActivityRow[] }) {
     useEffect(() => {
         const reload = () => router.reload({ only: ['activities'] });
         window.addEventListener(ACTIVITY_SAVED_EVENT, reload);
@@ -56,7 +59,7 @@ export function ActivityList({ activities, canEdit }: { activities: ActivityRow[
                         </p>
                         {a.report && <p className="mt-1 text-sm break-words whitespace-pre-line">{a.report}</p>}
                     </div>
-                    {canEdit && a.status !== 'done' && (
+                    {a.can_update && a.status !== 'done' && (
                         <Button type="button" variant="outline" size="sm" onClick={() => completeActivity(a.id)}>
                             <Check className="h-4 w-4" />
                             Fait

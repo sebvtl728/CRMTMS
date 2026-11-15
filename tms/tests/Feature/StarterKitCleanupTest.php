@@ -1,6 +1,7 @@
 <?php
 
 use App\Modules\Core\Access\Role;
+use App\Modules\Core\Access\RoleModel;
 use App\Modules\Core\Users\Invitation;
 use App\Modules\Core\Users\User;
 use Illuminate\Support\Facades\Route;
@@ -33,7 +34,7 @@ it('translates the password reset link message', function () {
 });
 
 it('shows an expired activation link in French', function () {
-    $invitation = Invitation::issue('nouveau@cap.test', 'Nouveau', Role::Commercial);
+    $invitation = Invitation::issue('nouveau@cap.test', 'Nouveau', RoleModel::forSystem(Role::Commercial));
     $this->travel(25)->hours();
     config(['app.debug' => false]);
 

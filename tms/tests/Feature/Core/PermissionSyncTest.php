@@ -42,15 +42,20 @@ function forgetCrmOffers(Tenant $tenant): void
 
 it('registers the CRM permissions in the catalogue and their default matrix', function () {
     expect(CrmPermissions::all())->toBe([
-        'crm.view', 'crm.create', 'crm.update', 'crm.delete', 'crm.merge', 'crm.import', 'crm.export', 'crm.gdpr',
+        'crm.fiches.view', 'crm.fiches.update', 'crm.fiches.delete', 'crm.merge',
+        'crm.opportunities.view', 'crm.opportunities.update', 'crm.opportunities.delete',
+        'crm.quotes.view', 'crm.quotes.update', 'crm.quotes.delete',
+        'crm.activities.view', 'crm.activities.update', 'crm.activities.delete', 'crm.activities.team',
+        'crm.revenue.view', 'crm.revenue.manage',
+        'crm.import', 'crm.export', 'crm.gdpr',
     ])
         ->and(Permissions::all())->toContain(...CrmPermissions::all())
         ->and(Permissions::defaultsFor(Role::AdminOrganisme))->toContain(...CrmPermissions::all())
-        ->and(CrmPermissions::defaultsFor(Role::Direction))->toBe(['crm.view', 'crm.export', 'crm.gdpr'])
-        ->and(CrmPermissions::defaultsFor(Role::Commercial))->toBe(['crm.view', 'crm.create', 'crm.update', 'crm.delete', 'crm.merge', 'crm.import', 'crm.export'])
+        ->and(CrmPermissions::defaultsFor(Role::Direction))->toBe(['crm.fiches.view', 'crm.opportunities.view', 'crm.quotes.view', 'crm.activities.view', 'crm.activities.team', 'crm.revenue.view', 'crm.revenue.manage', 'crm.export', 'crm.gdpr'])
+        ->and(CrmPermissions::defaultsFor(Role::Commercial))->toBe([...CrmPermissions::domains(), 'crm.merge', 'crm.revenue.view', 'crm.import', 'crm.export'])
         ->and(CrmPermissions::defaultsFor(Role::ChargeRelations))->toBe(CrmPermissions::defaultsFor(Role::Commercial))
-        ->and(CrmPermissions::defaultsFor(Role::Assistant))->toBe(['crm.view', 'crm.create', 'crm.update'])
-        ->and(CrmPermissions::defaultsFor(Role::ResponsableDas))->toBe(['crm.view', 'crm.export']);
+        ->and(CrmPermissions::defaultsFor(Role::Assistant))->toBe(['crm.fiches.view', 'crm.opportunities.view', 'crm.quotes.view', 'crm.activities.view', 'crm.fiches.update', 'crm.opportunities.update', 'crm.quotes.update', 'crm.activities.update', 'crm.activities.delete'])
+        ->and(CrmPermissions::defaultsFor(Role::ResponsableDas))->toBe(['crm.fiches.view', 'crm.opportunities.view', 'crm.quotes.view', 'crm.activities.view', 'crm.revenue.view', 'crm.export']);
 });
 
 it('gives a new tenant the full matrix, CRM included', function () {
@@ -58,9 +63,9 @@ it('gives a new tenant the full matrix, CRM included', function () {
     $matrix = matrixOf($tenant);
 
     expect($matrix['admin_organisme'])->toBe(collect(Permissions::all())->sort()->values()->all())
-        ->and($matrix['direction'])->toBe(['audit.view', 'catalogue.manage', 'catalogue.view', 'crm.export', 'crm.gdpr', 'crm.view', 'exports.run'])
-        ->and($matrix['assistant'])->toBe(['catalogue.view', 'crm.create', 'crm.update', 'crm.view'])
-        ->and($matrix['responsable_das'])->toBe(['catalogue.view', 'crm.export', 'crm.view']);
+        ->and($matrix['direction'])->toBe(['audit.view', 'catalogue.delete', 'catalogue.manage', 'catalogue.view', 'crm.activities.team', 'crm.activities.view', 'crm.export', 'crm.fiches.view', 'crm.gdpr', 'crm.opportunities.view', 'crm.quotes.view', 'crm.revenue.manage', 'crm.revenue.view', 'exports.run'])
+        ->and($matrix['assistant'])->toBe(['catalogue.view', 'crm.activities.delete', 'crm.activities.update', 'crm.activities.view', 'crm.fiches.update', 'crm.fiches.view', 'crm.opportunities.update', 'crm.opportunities.view', 'crm.quotes.update', 'crm.quotes.view'])
+        ->and($matrix['responsable_das'])->toBe(['catalogue.view', 'crm.activities.view', 'crm.export', 'crm.fiches.view', 'crm.opportunities.view', 'crm.quotes.view', 'crm.revenue.view']);
 });
 
 it('sync adds new default permissions to existing tenants once', function () {
@@ -72,9 +77,9 @@ it('sync adds new default permissions to existing tenants once', function () {
 
     $this->artisan('tms:permissions:sync')->assertSuccessful();
 
-    expect(PermissionModel::query()->where('name', 'like', 'crm.%')->count())->toBe(8)
-        ->and(matrixOf($tenant)['commercial'])->toBe(['catalogue.view', 'crm.create', 'crm.delete', 'crm.export', 'crm.import', 'crm.merge', 'crm.update', 'crm.view'])
-        ->and(matrixOf($tenant)['direction'])->toBe(['audit.view', 'catalogue.manage', 'catalogue.view', 'crm.export', 'crm.gdpr', 'crm.view', 'exports.run']);
+    expect(PermissionModel::query()->where('name', 'like', 'crm.%')->count())->toBe(19)
+        ->and(matrixOf($tenant)['commercial'])->toBe(['catalogue.view', 'crm.activities.delete', 'crm.activities.update', 'crm.activities.view', 'crm.export', 'crm.fiches.delete', 'crm.fiches.update', 'crm.fiches.view', 'crm.import', 'crm.merge', 'crm.opportunities.delete', 'crm.opportunities.update', 'crm.opportunities.view', 'crm.quotes.delete', 'crm.quotes.update', 'crm.quotes.view', 'crm.revenue.view'])
+        ->and(matrixOf($tenant)['direction'])->toBe(['audit.view', 'catalogue.delete', 'catalogue.manage', 'catalogue.view', 'crm.activities.team', 'crm.activities.view', 'crm.export', 'crm.fiches.view', 'crm.gdpr', 'crm.opportunities.view', 'crm.quotes.view', 'crm.revenue.manage', 'crm.revenue.view', 'exports.run']);
 
     // Idempotent.
     $before = matrixOf($tenant);
@@ -92,7 +97,7 @@ it('sync offers the catalogue permissions once to existing tenants', function ()
             $role->revokePermissionTo(array_values(array_intersect(['catalogue.view', 'catalogue.manage'], $role->permissions->pluck('name')->all())));
         }
         DB::table('role_permission_defaults_applied')->where('permission', 'like', 'catalogue.%')->delete();
-        RoleModel::findByName('assistant')->revokePermissionTo('crm.update');
+        RoleModel::findByName('assistant')->revokePermissionTo('crm.fiches.update');
     });
 
     PermissionSync::run();
@@ -101,7 +106,7 @@ it('sync offers the catalogue permissions once to existing tenants', function ()
         ->and(matrixOf($tenant)['direction'])->toContain('catalogue.view', 'catalogue.manage')
         ->and(matrixOf($tenant)['admin_organisme'])->toContain('catalogue.view', 'catalogue.manage')
         // Offered once: what an administrator removed earlier stays removed.
-        ->and(matrixOf($tenant)['assistant'])->toBe(['catalogue.view', 'crm.create', 'crm.view']);
+        ->and(matrixOf($tenant)['assistant'])->toBe(['catalogue.view', 'crm.activities.delete', 'crm.activities.update', 'crm.activities.view', 'crm.fiches.view', 'crm.opportunities.update', 'crm.opportunities.view', 'crm.quotes.update', 'crm.quotes.view']);
 
     app(TenantContext::class)->run($tenant, fn () => RoleModel::findByName('commercial')->revokePermissionTo('catalogue.view'));
     PermissionSync::run();
@@ -112,13 +117,13 @@ it('sync never re-adds a permission an admin removed', function () {
     $tenant = Tenant::factory()->create();
 
     app(TenantContext::class)->run($tenant, function () {
-        RoleModel::findByName('commercial')->revokePermissionTo('crm.delete');
+        RoleModel::findByName('commercial')->revokePermissionTo('crm.fiches.delete');
         RoleModel::findByName('direction')->revokePermissionTo('exports.run');
     });
 
     PermissionSync::run();
 
-    expect(matrixOf($tenant)['commercial'])->not->toContain('crm.delete')
+    expect(matrixOf($tenant)['commercial'])->not->toContain('crm.fiches.delete')
         ->and(matrixOf($tenant)['direction'])->not->toContain('exports.run');
 });
 
@@ -128,7 +133,7 @@ it('sync reaches suspended tenants and leaves no context behind', function () {
 
     PermissionSync::run();
 
-    expect(matrixOf($tenant)['assistant'])->toBe(['catalogue.view', 'crm.create', 'crm.update', 'crm.view'])
+    expect(matrixOf($tenant)['assistant'])->toBe(['catalogue.view', 'crm.activities.delete', 'crm.activities.update', 'crm.activities.view', 'crm.fiches.update', 'crm.fiches.view', 'crm.opportunities.update', 'crm.opportunities.view', 'crm.quotes.update', 'crm.quotes.view'])
         ->and(app(TenantContext::class)->current())->toBeNull();
 });
 
@@ -144,7 +149,7 @@ it('keeps the offers of each tenant under row level security', function () {
 
 it('shares the CRM permissions of the user with the frontend', function () {
     $this->actingAs(commercial())->get('/dashboard')
-        ->assertInertia(fn ($page) => $page->where('auth.permissions', fn ($p) => collect($p)->contains('crm.view') && ! collect($p)->contains('crm.gdpr')));
+        ->assertInertia(fn ($page) => $page->where('auth.permissions', fn ($p) => collect($p)->contains('crm.fiches.view') && ! collect($p)->contains('crm.gdpr')));
 });
 
 it('reports the failing tenant and exits with an error', function () {
@@ -167,7 +172,7 @@ it('reports the failing tenant and exits with an error', function () {
         ->assertExitCode(1);
 
     // The other organisme is still brought up to date.
-    expect(matrixOf($fine)['assistant'])->toBe(['catalogue.view', 'crm.create', 'crm.update', 'crm.view']);
+    expect(matrixOf($fine)['assistant'])->toBe(['catalogue.view', 'crm.activities.delete', 'crm.activities.update', 'crm.activities.view', 'crm.fiches.update', 'crm.fiches.view', 'crm.opportunities.update', 'crm.opportunities.view', 'crm.quotes.update', 'crm.quotes.view']);
 });
 
 it('exposes the tenants that failed in ForEachTenant', function () {

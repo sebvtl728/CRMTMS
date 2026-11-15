@@ -44,7 +44,7 @@ class OrganisationController extends Controller
     public function index(Request $request): Response
     {
         $user = $this->user($request);
-        $canDelete = $user->can(Permissions::DELETE);
+        $canDelete = $user->can(Permissions::FICHES_DELETE);
 
         $filters = OrganisationListQuery::filters($request->query(), $user);
         $export = CrmResource::Organisations->export();
@@ -75,7 +75,7 @@ class OrganisationController extends Controller
                     ->map(fn (User $u) => ['value' => $u->id, 'label' => $u->name])->all(),
                 'training' => OpportunityTrainings::filterOptions($filters['training']),
             ],
-            'can' => ['create' => $user->can(Permissions::CREATE), 'delete' => $canDelete, 'export' => $user->can(Permissions::EXPORT), 'import' => $user->can(Permissions::IMPORT)],
+            'can' => ['create' => $user->can(Permissions::FICHES_UPDATE), 'delete' => $canDelete, 'export' => $user->can(Permissions::EXPORT), 'import' => $user->can(Permissions::IMPORT)],
             ...ListExtras::for(CrmResource::Organisations, $user, $request->query('saved')),
             'status' => $request->session()->get('status'),
         ]);
@@ -170,8 +170,8 @@ class OrganisationController extends Controller
             'can' => [
                 'merge' => ! $organisation->trashed() && $user->can(Permissions::MERGE),
                 'affiliate' => ! $organisation->trashed() && $user->can('update', $organisation),
-                'createPerson' => $user->can(Permissions::CREATE),
-                'createOpportunity' => ! $organisation->trashed() && $user->can(Permissions::CREATE),
+                'createPerson' => $user->can(Permissions::FICHES_UPDATE),
+                'createOpportunity' => ! $organisation->trashed() && $user->can(Permissions::OPPORTUNITIES_UPDATE),
                 'update' => ! $organisation->trashed() && $user->can('update', $organisation),
                 'delete' => ! $organisation->trashed() && $user->can('delete', $organisation),
                 'restore' => $organisation->trashed() && $user->can('restore', $organisation),

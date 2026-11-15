@@ -9,6 +9,7 @@ use App\Modules\Crm\Affiliations\Affiliation;
 use App\Modules\Crm\Organisations\Organisation;
 use App\Modules\Crm\Organisations\OrganisationStatus;
 use App\Modules\Crm\People\Person;
+use App\Modules\Crm\Permissions;
 use App\Modules\Crm\Timeline\Attachment;
 use App\Modules\Crm\Timeline\Note;
 use App\Modules\Crm\Visibility\CrmVisibility;
@@ -22,11 +23,22 @@ use Inertia\Response;
 
 /**
  * Side-by-side merge screen of two fiches and its confirmation.
- * Route middleware: crm.merge. Both fiches must be visible and active.
+ * Route middleware: crm.merge. Both fiches must be visible and active; the
+ * kept one within the scope of crm.fiches.update, the absorbed one within
+ * that of crm.fiches.delete (403 otherwise).
  */
 class MergeController extends Controller
 {
     public function __construct(private readonly Merger $merger) {}
+
+    /**
+     * $user may keep $keep (crm.fiches.update) and absorb $drop (crm.fiches.delete).
+     */
+    public static function allowed(User $user, Organisation|Person $keep, Organisation|Person $drop): bool
+    {
+        return CrmVisibility::allows($user, Permissions::FICHES_UPDATE, $keep)
+            && CrmVisibility::allows($user, Permissions::FICHES_DELETE, $drop);
+    }
 
     public function show(Request $request, string $type, string $keep, string $drop): Response
     {
@@ -34,6 +46,7 @@ class MergeController extends Controller
         $k = $this->find($type, $keep, $user);
         $d = $this->find($type, $drop, $user);
         abort_if($k === null || $d === null || $k->getKey() === $d->getKey(), 404);
+        abort_unless(self::allowed($user, $k, $d), 403);
 
         $fields = collect($type === 'person' ? Merger::PERSON_FIELDS : Merger::ORGANISATION_FIELDS)
             ->map(function (string $label, string $name) use ($k, $d) {
@@ -56,6 +69,8 @@ class MergeController extends Controller
             'drop' => $this->summary($d),
             'fields' => $fields,
             'counts' => ['keep' => $this->counts($k), 'drop' => $this->counts($d)],
+            // « Inverser »: the other fiche kept, this one absorbed.
+            'canSwap' => self::allowed($user, $d, $k),
         ]);
     }
 
@@ -71,6 +86,7 @@ class MergeController extends Controller
         if ($drop === null) {
             throw ValidationException::withMessages(['drop' => 'Fiche à absorber introuvable ou déjà fusionnée.']);
         }
+        abort_unless(self::allowed($user, $keep, $drop), 403);
 
         if ($keep instanceof Organisation && $drop instanceof Organisation) {
             $this->merger->organisations($keep, $drop, $request->choices());

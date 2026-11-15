@@ -60,7 +60,7 @@ class HandleInertiaRequests extends Middleware
                 'permissions' => $user === null ? [] : array_values(array_filter(Permissions::all(), fn (string $p) => $user->can($p))),
             ],
             // Menu badge of « À faire »: overdue + today, cached 60 s (lazy: skipped by partial reloads).
-            'todo_count' => fn () => $user !== null && $user->can(CrmPermissions::VIEW) ? TodoQuery::badge($user) : 0,
+            'todo_count' => fn () => $user !== null && $user->can(CrmPermissions::ACTIVITIES_VIEW) ? TodoQuery::badge($user) : 0,
         ]);
     }
 }

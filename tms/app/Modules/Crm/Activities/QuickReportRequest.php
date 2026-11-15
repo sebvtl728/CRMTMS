@@ -30,7 +30,7 @@ class QuickReportRequest extends FormRequest
     {
         $user = $this->user();
 
-        // Completing a meeting needs crm.update (route); a new action also needs crm.create.
+        // Completing a meeting or recording a new action: crm.activities.update (route).
         return $user instanceof User && ($this->input('activity_id') !== null || $user->can('create', Activity::class));
     }
 

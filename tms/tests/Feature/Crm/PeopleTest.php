@@ -302,5 +302,5 @@ it('protects reference items used by a person or an affiliation', function () {
 
 it('shows Personnes in the navigation data of a commercial', function () {
     $this->actingAs(commercial())->get('/crm/people')->assertInertia(fn (Assert $page) => $page
-        ->component('crm/people/index')->where('auth.permissions', fn ($p) => collect($p)->contains('crm.view')));
+        ->component('crm/people/index')->where('auth.permissions', fn ($p) => collect($p)->contains('crm.fiches.view')));
 });

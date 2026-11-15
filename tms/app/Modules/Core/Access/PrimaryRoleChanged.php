@@ -15,7 +15,7 @@ class PrimaryRoleChanged
 
     public function __construct(
         public readonly User $user,
-        public readonly ?Role $previous,
-        public readonly Role $role,
+        public readonly ?RoleModel $previous,
+        public readonly RoleModel $role,
     ) {}
 }

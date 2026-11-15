@@ -36,7 +36,12 @@ it('lists the core permission catalogue, then the modules\' permissions', functi
         'users.manage', 'roles.manage', 'companies.manage', 'references.manage', 'connectors.manage',
         'audit.view', 'settings.manage', 'exports.run',
     ])
-        ->and(array_slice(Permissions::all(), 8))->toBe([...App\Modules\Crm\Permissions::all(), ...App\Modules\Catalogue\Permissions::all()]);
+        // The CRM themes, the Catalogue, then « Imports, exports et RGPD » (CrmServiceProvider).
+        ->and(array_slice(Permissions::all(), 8))->toBe([
+            ...array_values(array_diff(App\Modules\Crm\Permissions::all(), App\Modules\Crm\Permissions::GROUPS[App\Modules\Crm\Permissions::DATA_GROUP])),
+            ...App\Modules\Catalogue\Permissions::all(),
+            ...App\Modules\Crm\Permissions::GROUPS[App\Modules\Crm\Permissions::DATA_GROUP],
+        ]);
 });
 
 it('seeds the roles and the default matrix for a tenant', function () {
@@ -68,7 +73,8 @@ it('does not overwrite the matrix of an existing role when seeding again', funct
     RoleSeeder::seedFor($tenant);
 
     expect(RoleModel::findByName('direction')->permissions->pluck('name')->all())
-        ->toEqualCanonicalizing(['audit.view', 'crm.view', 'crm.export', 'crm.gdpr', 'catalogue.view', 'catalogue.manage']);
+        ->toEqualCanonicalizing(['audit.view', 'crm.fiches.view', 'crm.opportunities.view', 'crm.quotes.view', 'crm.activities.view', 'crm.activities.team',
+            'crm.revenue.view', 'crm.revenue.manage', 'crm.export', 'crm.gdpr', 'catalogue.view', 'catalogue.manage', 'catalogue.delete']);
 });
 
 // ---------------------------------------------------------------- authorization
@@ -104,15 +110,15 @@ it('gives each user one primary role and replaces it on assignment', function ()
     Event::fake([PrimaryRoleChanged::class]);
     $user = commercial();
 
-    expect($user->role())->toBe(Role::Commercial);
-    Event::assertDispatched(PrimaryRoleChanged::class, fn ($e) => $e->user->is($user) && $e->previous === null && $e->role === Role::Commercial);
+    expect($user->role()?->systemRole())->toBe(Role::Commercial);
+    Event::assertDispatched(PrimaryRoleChanged::class, fn ($e) => $e->user->is($user) && $e->previous === null && $e->role->systemRole() === Role::Commercial);
 
     $user->assignPrimaryRole(Role::Direction);
 
-    expect($user->role())->toBe(Role::Direction)
-        ->and($user->fresh()->role())->toBe(Role::Direction)
+    expect($user->role()?->systemRole())->toBe(Role::Direction)
+        ->and($user->fresh()->role()?->systemRole())->toBe(Role::Direction)
         ->and($user->roles()->count())->toBe(1);
-    Event::assertDispatched(PrimaryRoleChanged::class, fn ($e) => $e->previous === Role::Commercial && $e->role === Role::Direction);
+    Event::assertDispatched(PrimaryRoleChanged::class, fn ($e) => $e->previous?->systemRole() === Role::Commercial && $e->role->systemRole() === Role::Direction);
 
     // Same role again: nothing changes, nothing to audit.
     $user->assignPrimaryRole(Role::Direction);
@@ -137,14 +143,14 @@ it('refuses to assign a role to a user of another tenant than the current one', 
 
 it('assigns the invited role on activation', function () {
     tenant();
-    $invitation = Invitation::issue('nouveau@cap.test', 'Nouveau', Role::ChargeRelations);
+    $invitation = Invitation::issue('nouveau@cap.test', 'Nouveau', RoleModel::forSystem(Role::ChargeRelations));
 
     $this->post("/activation/{$invitation->plainToken}", [
         'password' => 'un-mot-de-passe-solide',
         'password_confirmation' => 'un-mot-de-passe-solide',
     ])->assertRedirect('/login');
 
-    expect(User::query()->where('email', 'nouveau@cap.test')->sole()->role())->toBe(Role::ChargeRelations);
+    expect(User::query()->where('email', 'nouveau@cap.test')->sole()->role()?->systemRole())->toBe(Role::ChargeRelations);
 });
 
 // ---------------------------------------------------------------- tenant isolation

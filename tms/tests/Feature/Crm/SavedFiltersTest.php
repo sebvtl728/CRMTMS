@@ -139,7 +139,7 @@ it('is audited without keeping search terms', function () {
     expect(json_encode($log->new_values, JSON_UNESCAPED_UNICODE))->not->toContain('Dupont');
 });
 
-it('needs crm.view', function () {
+it('needs a crm view right', function () {
     $this->actingAs(userWithRole(Role::Assistant));
     $this->postJson('/crm/saved-filters', ['resource' => 'organisations', 'name' => 'ok', 'filters' => []])->assertCreated();
 

@@ -8,6 +8,7 @@ use App\Modules\Core\Users\User;
 use App\Modules\Crm\Visibility\CrmVisibility;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Collection as EloquentCollection;
 
 /**
  * The week planning of a user: meetings (to do or done) and planned calls
@@ -74,7 +75,7 @@ final class WeekPlanning
         $nextMonday = $monday->addDays(7)->startOfDay();
         $format = fn (CarbonImmutable $at): string => $at->format('Y-m-d H:i:sP');
 
-        $rows = $types === [] ? collect() : TodoQuery::onLiveFiches(CrmVisibility::activities(Activity::query(), $viewer))
+        $rows = $types === [] ? new EloquentCollection : TodoQuery::onLiveFiches(CrmVisibility::activities(Activity::query(), $viewer))
             ->where('responsible_user_id', $owner->id)
             ->whereIn('type_id', array_keys($types))
             ->where(fn (Builder $q) => $q->whereIn('type_id', $meetings)->orWhereNotNull('due_at'))
@@ -84,10 +85,11 @@ final class WeekPlanning
             ->limit(self::LIMIT)
             ->get();
 
+        $rights = ActivityRows::rights($rows, $viewer);
         $byDay = [];
         foreach ($rows as $activity) {
             $at = CarbonImmutable::instance($activity->due_at ?? $activity->done_at)->setTimezone(self::tz());
-            $row = ActivityRows::row($activity);
+            $row = [...ActivityRows::row($activity), ...$rights[(string) $activity->id]];
             unset($row['report']); // a list: the report stays on the fiche
             $byDay[$at->toDateString()][] = [
                 ...$row,

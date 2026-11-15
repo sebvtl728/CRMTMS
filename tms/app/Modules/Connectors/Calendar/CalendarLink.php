@@ -78,7 +78,7 @@ class CalendarLink extends Model
         $link = self::query()->where('user_id', $userId)->where('status', self::ACTIVE)->first();
         $user = $link?->user;
 
-        return $link !== null && $user !== null && $user->isActive() && $user->can(Permissions::VIEW) ? $link : null;
+        return $link !== null && $user !== null && $user->isActive() && $user->can(Permissions::ACTIVITIES_VIEW) ? $link : null;
     }
 
     public function isActive(): bool

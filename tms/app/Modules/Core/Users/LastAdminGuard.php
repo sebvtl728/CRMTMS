@@ -29,6 +29,8 @@ class LastAdminGuard
      * Must run in a transaction.
      *
      * @param  bool  $leavesAdmins  false when the change keeps the target an active administrator
+     *                              (the administrator's role is the system role admin_organisme:
+     *                              a custom role never makes an administrator)
      *
      * @throws ValidationException
      * @throws LogicException outside a transaction (the locks would be released at once)

@@ -34,7 +34,7 @@ interface Props {
     optOutAt: string | null;
     anonymisedAt: string | null;
     gdpr: GdprData;
-    can: { consent: boolean; gdpr: boolean; anonymise: boolean };
+    can: { consent: boolean; gdpr: boolean; gdprExport: boolean; anonymise: boolean };
 }
 
 const normalise = (text: string) => text.trim().replace(/\s+/g, ' ').toLowerCase();
@@ -72,7 +72,7 @@ export function PersonGdpr({ personId, name, legalBasis, optOutAt, anonymisedAt,
                     RGPD
                 </h2>
                 <div className="flex flex-wrap gap-2">
-                    {can.gdpr && (
+                    {can.gdprExport && (
                         <Button variant="outline" size="sm" asChild>
                             <a href={route('crm.people.gdpr-export', personId)} download>
                                 <Download className="h-4 w-4" />

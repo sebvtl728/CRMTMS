@@ -2,10 +2,13 @@
 
 namespace App\Modules\Crm\Opportunities;
 
+use App\Modules\Core\Access\AccessScope;
+use App\Modules\Core\Access\Scopes;
 use App\Modules\Core\References\ReferenceItem;
 use App\Modules\Core\References\ReferenceList;
 use App\Modules\Core\Users\User;
 use App\Modules\Crm\People\PersonRequest;
+use App\Modules\Crm\Permissions;
 use App\Modules\Crm\Support\ReferenceRules;
 use App\Modules\Crm\Visibility\CrmVisibility;
 use Closure;
@@ -16,7 +19,7 @@ use Illuminate\Validation\Validator;
 
 /**
  * Validation of an opportunity (create and update). Authorisation is done by
- * the route middleware (crm.create / crm.update) and the policy. The account
+ * the route middleware (crm.opportunities.update) and the policy. The account
  * (entreprise or particulier) and the stage are chosen at creation only: the
  * stage then moves through POST …/stage (rules and history).
  */
@@ -136,12 +139,12 @@ class OpportunityRequest extends FormRequest
     }
 
     /**
-     * A Responsable DAS (granted crm.create / crm.update) only works in the DAS he follows.
+     * With crm.opportunities.update on « Ses DAS », only the DAS the user follows.
      */
     private function followedDas(User $user, ?string $keep): Closure
     {
         return function (string $attribute, mixed $value, Closure $fail) use ($user, $keep): void {
-            if (CrmVisibility::restricts($user) && $value !== $keep && ! in_array($value, CrmVisibility::followedDas($user), true)) {
+            if (Scopes::of($user, Permissions::OPPORTUNITIES_UPDATE) === AccessScope::Das && $value !== $keep && ! in_array($value, CrmVisibility::followedDas($user), true)) {
                 $fail('Vous ne suivez pas ce DAS.');
             }
         };

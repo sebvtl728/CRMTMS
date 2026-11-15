@@ -123,7 +123,7 @@ it('install creates an admin who must activate via a single-use link', function 
     expect($admin->fresh()->hasRole(Role::AdminOrganisme->value))->toBeTrue();
 
     $invitation = Invitation::query()->pending()->where('email', 'admin@cap.test')->sole();
-    expect($invitation->role)->toBe(Role::AdminOrganisme)
+    expect($invitation->role)->toBe(Role::AdminOrganisme->value)
         ->and($invitation->expires_at->isBetween(now()->addHours(23), now()->addHours(25)))->toBeTrue();
 
     Notification::assertSentOnDemand(InvitationNotification::class);

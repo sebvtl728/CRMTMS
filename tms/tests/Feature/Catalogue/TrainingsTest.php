@@ -101,6 +101,19 @@ it('lets an administrator create, edit, deactivate and delete a training', funct
         ->and(Training::withTrashed()->count())->toBe(1);
 });
 
+it('needs catalogue.delete to delete a training', function () {
+    $training = makeTraining('Hygiène');
+
+    $this->actingAs(userWithPermissions(['catalogue.view', 'catalogue.manage']));
+    $this->get('/catalogue')->assertInertia(fn (Assert $page) => $page->where('can.manage', true)->where('can.delete', false));
+    $this->delete("/catalogue/{$training->id}")->assertForbidden();
+    expect(Training::query()->count())->toBe(1);
+
+    $this->actingAs(direction(twoFactor: true))->get('/catalogue')->assertInertia(fn (Assert $page) => $page->where('can.delete', true));
+    $this->delete("/catalogue/{$training->id}")->assertRedirect('/catalogue');
+    expect(Training::query()->count())->toBe(0);
+});
+
 it('lets direction manage the catalogue', function () {
     $this->actingAs(direction(twoFactor: true))->post('/catalogue/create', trainingPayload())->assertRedirect('/catalogue');
 

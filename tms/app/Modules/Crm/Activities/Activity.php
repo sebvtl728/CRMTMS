@@ -204,7 +204,7 @@ class Activity extends Model
 
     /**
      * Whether a fiche it hangs on (or its opportunity) is in the trash:
-     * readable with crm.delete only, never edited.
+     * readable with crm.fiches.delete only, never edited.
      */
     public function ficheTrashed(): bool
     {

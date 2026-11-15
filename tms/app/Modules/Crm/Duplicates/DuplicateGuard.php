@@ -2,9 +2,11 @@
 
 namespace App\Modules\Crm\Duplicates;
 
+use App\Modules\Core\Access\Scopes;
 use App\Modules\Core\Users\User;
 use App\Modules\Crm\Organisations\Organisation;
 use App\Modules\Crm\People\Person;
+use App\Modules\Crm\Permissions;
 use App\Modules\Crm\Visibility\CrmVisibility;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
@@ -43,7 +45,7 @@ class DuplicateGuard
         $found = $this->finder->forOrganisation($attributes, $current?->id);
         $visible = $this->visibleIds($found, fn (User $u) => CrmVisibility::organisations(Organisation::query(), $u)->select('organisations.id'), $request);
 
-        return $this->respond($request, $found->filter(fn (DuplicateCandidate $c) => in_array($c->id, $visible, true))->values(), $formUrl);
+        return $this->respond($request, $found->filter(fn (DuplicateCandidate $c) => in_array($c->id, $visible, true))->values(), $formUrl, Organisation::class, $current);
     }
 
     /**
@@ -59,7 +61,7 @@ class DuplicateGuard
         $found = $this->finder->forPerson($attributes, $current?->id);
         $visible = $this->visibleIds($found, fn (User $u) => CrmVisibility::people(Person::query(), $u)->select('people.id'), $request);
 
-        return $this->respond($request, $found->filter(fn (DuplicateCandidate $c) => in_array($c->id, $visible, true))->values(), $formUrl);
+        return $this->respond($request, $found->filter(fn (DuplicateCandidate $c) => in_array($c->id, $visible, true))->values(), $formUrl, Person::class, $current);
     }
 
     /**
@@ -87,8 +89,12 @@ class DuplicateGuard
         }
         $ids = $visible->whereKey($found->pluck('id')->all())->pluck('id')->map(fn ($id) => (string) $id)->all();
 
+        // « Fusionner » keeps this fiche (crm.fiches.update) and absorbs the candidate (crm.fiches.delete).
+        $keepable = CrmVisibility::allows($user, Permissions::FICHES_UPDATE, $fiche);
+        $absorbable = CrmVisibility::allowedIds($user, Permissions::FICHES_DELETE, $fiche::query()->whereKey($ids)->get());
+
         return $found->filter(fn (DuplicateCandidate $c) => in_array($c->id, $ids, true))
-            ->map(fn (DuplicateCandidate $c) => $c->toArray())->values()->all();
+            ->map(fn (DuplicateCandidate $c) => [...$c->toArray(), 'can_merge' => $keepable && isset($absorbable[$c->id])])->values()->all();
     }
 
     /**
@@ -157,15 +163,25 @@ class DuplicateGuard
     }
 
     /**
+     * « Fusionner » from the warning keeps the candidate (crm.fiches.update)
+     * and absorbs the fiche being saved (crm.fiches.delete; a new fiche is
+     * the user's own).
+     *
      * @param  Collection<int, DuplicateCandidate>  $candidates
+     * @param  class-string<Organisation|Person>  $class
      */
-    private function respond(Request $request, Collection $candidates, string $formUrl): ?Response
+    private function respond(Request $request, Collection $candidates, string $formUrl, string $class, Organisation|Person|null $current): ?Response
     {
         if ($candidates->isEmpty()) {
             return null;
         }
 
-        $list = $candidates->map(fn (DuplicateCandidate $c) => $c->toArray())->all();
+        $user = $request->user();
+        $keepable = $user instanceof User ? CrmVisibility::allowedIds($user, Permissions::FICHES_UPDATE, $class::query()->whereKey($candidates->pluck('id')->all())->get()) : [];
+        $absorbable = $user instanceof User && ($current === null
+            ? Scopes::of($user, Permissions::FICHES_DELETE) !== null
+            : CrmVisibility::allows($user, Permissions::FICHES_DELETE, $current));
+        $list = $candidates->map(fn (DuplicateCandidate $c) => [...$c->toArray(), 'can_merge' => $absorbable && isset($keepable[$c->id])])->all();
 
         if ($request->header('X-Inertia') === null && $request->expectsJson()) {
             return response()->json(['message' => self::MESSAGE, 'duplicates' => $list], 409);

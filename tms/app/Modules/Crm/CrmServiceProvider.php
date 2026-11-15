@@ -3,8 +3,12 @@
 namespace App\Modules\Crm;
 
 use App\Modules\Catalogue\TrainingUsage;
+use App\Modules\Core\Access\AccessScope;
 use App\Modules\Core\Access\Permissions as CorePermissions;
 use App\Modules\Core\Access\PrimaryRoleChanged;
+use App\Modules\Core\Access\Role;
+use App\Modules\Core\Access\RoleScopesChanged;
+use App\Modules\Core\Access\Scopes;
 use App\Modules\Core\Audit\MorphAliases;
 use App\Modules\Core\References\ReferenceList;
 use App\Modules\Core\References\ReferenceUsage;
@@ -33,6 +37,7 @@ use App\Modules\Crm\Quotes\Quote;
 use App\Modules\Crm\Quotes\QuoteLine;
 use App\Modules\Crm\Quotes\QuotePolicy;
 use App\Modules\Crm\Quotes\QuotesProvider;
+use App\Modules\Crm\Revenue\RevenueTarget;
 use App\Modules\Crm\Search\SavedFilter;
 use App\Modules\Crm\Support\CrmMailTemplates;
 use App\Modules\Crm\Support\LinkedData;
@@ -67,7 +72,24 @@ class CrmServiceProvider extends ServiceProvider
         // In register(): the catalogue must be complete before
         // AccessServiceProvider::boot() defines one gate per permission.
         CrmMailTemplates::register();
-        CorePermissions::registerModule('crm', Permissions::all(), Permissions::defaultsFor(...), Permissions::labels(), Permissions::GROUP);
+        // One theme of the « Rôles et droits » screen per domain. « Imports,
+        // exports et RGPD » comes after the Catalogue (registered by its own
+        // provider): added while the application boots, still before
+        // AccessServiceProvider::boot().
+        $index = 0;
+        foreach (Permissions::GROUPS as $group => $permissions) {
+            $register = fn () => CorePermissions::registerModule(
+                'crm.'.$index,
+                $permissions,
+                fn (Role $role): array => array_values(array_intersect(Permissions::defaultsFor($role), $permissions)),
+                Permissions::labels(),
+                $group,
+                array_values(array_intersect(Permissions::scoped(), $permissions)),
+                fn (Role $role): array => array_intersect_key(Permissions::defaultScopesFor($role), array_flip($permissions)),
+            );
+            $index++;
+            $group === Permissions::DATA_GROUP ? $this->app->booting($register) : $register();
+        }
 
         MorphAliases::register([
             'organisation' => Organisation::class,
@@ -88,6 +110,7 @@ class CrmServiceProvider extends ServiceProvider
             'activity' => Activity::class,
             'quote' => Quote::class,
             'quote_line' => QuoteLine::class,
+            'revenue_target' => RevenueTarget::class,
         ]);
 
         // Sources of the « Historique »; later increments tag their own.
@@ -102,17 +125,23 @@ class CrmServiceProvider extends ServiceProvider
         self::registerContactSources();
         FollowedDas::registerOnUsersPage();
         Event::listen(PrimaryRoleChanged::class, FollowedDas::onRoleChanged(...));
+        Event::listen(RoleScopesChanged::class, FollowedDas::onRoleScopesChanged(...));
 
         // Check + download count together: 10 exports a minute per user.
         RateLimiter::for('crm-export', fn (Request $request) => Limit::perMinute(20)->by('crm-export:'.($request->user()?->getAuthIdentifier() ?? $request->ip()))
             ->response(fn (Request $request, array $headers) => response()->json(['message' => 'Trop d\'exports en peu de temps. Réessayez dans une minute.'], 429, $headers)));
 
+        // Revenue targets (one request per changed DAS line): 60 a minute per user.
+        RateLimiter::for('revenue-targets', fn (Request $request) => Limit::perMinute(60)->by('revenue-targets:'.($request->user()?->getAuthIdentifier() ?? $request->ip())));
         // Quote e-mails (send, reminder, « Renvoyer »): 20 a minute per user.
         RateLimiter::for('quote-mail', fn (Request $request) => Limit::perMinute(20)->by('quote-mail:'.($request->user()?->getAuthIdentifier() ?? $request->ip())));
-        // A draft's PDF is rendered on each request (Gotenberg): 30 a minute per user.
         // Signed copy of a quote (upload, download): 30 a minute per user.
         RateLimiter::for('quote-signed', fn (Request $request) => Limit::perMinute(30)->by('quote-signed:'.($request->user()?->getAuthIdentifier() ?? $request->ip())));
+        // A draft's PDF is rendered on each request (Gotenberg): 30 a minute per user.
         RateLimiter::for('quote-pdf', fn (Request $request) => Limit::perMinute(30)->by('quote-pdf:'.($request->user()?->getAuthIdentifier() ?? $request->ip())));
+
+        // Menu CRM, global search, saved filters: at least one « Consulter » right.
+        Gate::define(Permissions::ANY_VIEW, fn (User $user): bool => Permissions::anyView($user));
 
         Gate::policy(Organisation::class, OrganisationPolicy::class);
         Gate::policy(Person::class, PersonPolicy::class);
@@ -133,10 +162,10 @@ class CrmServiceProvider extends ServiceProvider
             // A merged fiche is resolved before the visibility filter (it has
             // lost its DAS and links): only the final kept fiche must be visible.
             self::redirectIfMerged(Organisation::withTrashed()->whereKey($value)->whereNotNull('merged_into_id')->first(), $value,
-                fn () => $user instanceof User ? CrmVisibility::organisations(Organisation::withTrashed(), $user) : Organisation::withTrashed(), 'crm.organisations.show');
+                fn () => self::filters($user, Permissions::FICHES_VIEW) ? CrmVisibility::organisations(Organisation::withTrashed(), $user) : Organisation::withTrashed(), 'crm.organisations.show');
 
             $query = Organisation::withTrashed();
-            if ($user instanceof User) {
+            if (self::filters($user, Permissions::FICHES_VIEW)) {
                 $query = CrmVisibility::organisations($query, $user);
             }
 
@@ -153,10 +182,10 @@ class CrmServiceProvider extends ServiceProvider
             // A merged fiche is resolved before the visibility filter (it has
             // lost its DAS and links): only the final kept fiche must be visible.
             self::redirectIfMerged(Person::withTrashed()->whereKey($value)->whereNotNull('merged_into_id')->first(), $value,
-                fn () => $user instanceof User ? CrmVisibility::people(Person::withTrashed(), $user) : Person::withTrashed(), 'crm.people.show');
+                fn () => self::filters($user, Permissions::FICHES_VIEW) ? CrmVisibility::people(Person::withTrashed(), $user) : Person::withTrashed(), 'crm.people.show');
 
             $query = Person::withTrashed();
-            if ($user instanceof User) {
+            if (self::filters($user, Permissions::FICHES_VIEW)) {
                 $query = CrmVisibility::people($query, $user);
             }
 
@@ -173,8 +202,9 @@ class CrmServiceProvider extends ServiceProvider
             $user = request()->user();
 
             if ($user instanceof User) {
-                // Trashed entreprises: only with crm.delete, like the fiche itself.
-                $query->whereIn('organisation_id', CrmVisibility::organisations(self::organisationsFor($user), $user)->select('organisations.id'));
+                // Trashed entreprises: only with crm.fiches.delete, like the fiche itself.
+                $organisations = self::organisationsFor($user);
+                $query->whereIn('organisation_id', (Scopes::of($user, Permissions::FICHES_VIEW) !== null ? CrmVisibility::organisations($organisations, $user) : $organisations)->select('organisations.id'));
             }
 
             return $query->findOrFail($value);
@@ -192,7 +222,7 @@ class CrmServiceProvider extends ServiceProvider
             return ($user instanceof User ? $query->visibleTo($user) : $query)->findOrFail($value);
         });
 
-        // An opportunity: DAS visibility; on a trashed fiche only with crm.delete.
+        // An opportunity: scope of crm.opportunities.view; on a trashed fiche only with crm.opportunities.delete.
         Route::bind('opportunity', function (string $value): Opportunity {
             if (! Str::isUuid($value)) {
                 throw (new ModelNotFoundException)->setModel(Opportunity::class, [$value]);
@@ -200,21 +230,21 @@ class CrmServiceProvider extends ServiceProvider
 
             $user = request()->user();
             $query = Opportunity::query();
-            if ($user instanceof User) {
+            if (self::filters($user, Permissions::OPPORTUNITIES_VIEW)) {
                 $query = CrmVisibility::opportunities($query, $user);
             }
             $opportunity = $query->with(['organisation', 'person'])->findOrFail($value);
 
             $fiche = $opportunity->organisation ?? $opportunity->person;
-            if ($user instanceof User && ($fiche === null || $fiche->trashed()) && ! $user->can(Permissions::DELETE)) {
+            if ($user instanceof User && ($fiche === null || $fiche->trashed()) && ! $user->can(Permissions::OPPORTUNITIES_DELETE)) {
                 throw (new ModelNotFoundException)->setModel(Opportunity::class, [$value]);
             }
 
             return $opportunity;
         });
 
-        // A quote: visible with its opportunity (its DAS), which must not be
-        // trashed; on a trashed fiche only with crm.delete, like the opportunity.
+        // A quote: scope of crm.quotes.view, its opportunity must not be
+        // trashed; on a trashed fiche only with crm.quotes.delete, like the opportunity.
         Route::bind('quote', function (string $value): Quote {
             if (! Str::isUuid($value)) {
                 throw (new ModelNotFoundException)->setModel(Quote::class, [$value]);
@@ -222,7 +252,7 @@ class CrmServiceProvider extends ServiceProvider
 
             $user = request()->user();
             $query = Quote::query();
-            if ($user instanceof User) {
+            if (self::filters($user, Permissions::QUOTES_VIEW)) {
                 $query = CrmVisibility::quotes($query, $user);
             }
             $quote = $query->with(['company', 'opportunity.organisation', 'opportunity.person'])->findOrFail($value);
@@ -230,15 +260,17 @@ class CrmServiceProvider extends ServiceProvider
             $opportunity = $quote->opportunity;
             $fiche = $opportunity->organisation ?? $opportunity->person;
             if ($opportunity->trashed()
-                || ($user instanceof User && ($fiche === null || $fiche->trashed()) && ! $user->can(Permissions::DELETE))) {
+                || ($user instanceof User && ($fiche === null || $fiche->trashed()) && ! $user->can(Permissions::QUOTES_DELETE))) {
                 throw (new ModelNotFoundException)->setModel(Quote::class, [$value]);
             }
 
             return $quote;
         });
 
-        // An action: visible with its opportunity when it has one (its DAS),
-        // otherwise with one of its fiches; on a trashed fiche only with crm.delete.
+        // An action: scope of crm.activities.view (its opportunity when it has
+        // one, otherwise one of its fiches); on a trashed fiche only with
+        // crm.fiches.delete, like the fiche (the assistant may remove actions,
+        // not read the corbeille).
         Route::bind('activity', function (string $value): Activity {
             if (! Str::isUuid($value)) {
                 throw (new ModelNotFoundException)->setModel(Activity::class, [$value]);
@@ -246,12 +278,12 @@ class CrmServiceProvider extends ServiceProvider
 
             $user = request()->user();
             $query = Activity::query();
-            if ($user instanceof User) {
+            if (self::filters($user, Permissions::ACTIVITIES_VIEW)) {
                 $query = CrmVisibility::activities($query, $user);
             }
             $activity = $query->with(['organisation', 'person', 'opportunity.organisation', 'opportunity.person'])->findOrFail($value);
 
-            if ($user instanceof User && $activity->ficheTrashed() && ! $user->can(Permissions::DELETE)) {
+            if ($user instanceof User && $activity->ficheTrashed() && ! $user->can(Permissions::FICHES_DELETE)) {
                 throw (new ModelNotFoundException)->setModel(Activity::class, [$value]);
             }
 
@@ -264,11 +296,23 @@ class CrmServiceProvider extends ServiceProvider
     }
 
     /**
+     * A signed-in user holding the view right of the domain: the record must
+     * be in its scope (404 otherwise). Without the right at all, nothing is
+     * filtered here: the route's permission or the policy answers 403.
+     *
+     * @phpstan-assert-if-true User $user
+     */
+    private static function filters(mixed $user, string $permission): bool
+    {
+        return $user instanceof User && Scopes::of($user, $permission) !== null;
+    }
+
+    /**
      * @return Builder<Organisation>
      */
     private static function organisationsFor(User $user): Builder
     {
-        return $user->can(Permissions::DELETE) ? Organisation::withTrashed() : Organisation::query();
+        return $user->can(Permissions::FICHES_DELETE) ? Organisation::withTrashed() : Organisation::query();
     }
 
     /**
@@ -276,11 +320,11 @@ class CrmServiceProvider extends ServiceProvider
      */
     private static function peopleFor(User $user): Builder
     {
-        return $user->can(Permissions::DELETE) ? Person::withTrashed() : Person::query();
+        return $user->can(Permissions::FICHES_DELETE) ? Person::withTrashed() : Person::query();
     }
 
     /**
-     * A trashed fiche is readable by URL only with crm.delete, like the
+     * A trashed fiche is readable by URL only with crm.fiches.delete, like the
      * « corbeille » filter of the lists: anybody else gets a 404.
      *
      * @template TModel of Organisation|Person
@@ -290,7 +334,7 @@ class CrmServiceProvider extends ServiceProvider
      */
     private static function unlessTrashedForbidden(Organisation|Person $fiche, mixed $user): Organisation|Person
     {
-        if ($fiche->trashed() && $user instanceof User && ! $user->can(Permissions::DELETE)) {
+        if ($fiche->trashed() && $user instanceof User && ! $user->can(Permissions::FICHES_DELETE)) {
             throw (new ModelNotFoundException)->setModel($fiche::class, [$fiche->getKey()]);
         }
 
@@ -348,13 +392,20 @@ class CrmServiceProvider extends ServiceProvider
 
         $user = request()->user();
 
-        // Subjects: the fiches the user sees, trashed ones only with crm.delete.
-        if ($user instanceof User && (CrmVisibility::restricts($user) || ! $user->can(Permissions::DELETE))) {
-            $query->where(fn (Builder $q) => $q
-                ->where(fn (Builder $o) => $o->where('notable_type', (new Organisation)->getMorphClass())
-                    ->whereIn('notable_id', CrmVisibility::organisations(self::organisationsFor($user), $user)->select('organisations.id')))
-                ->orWhere(fn (Builder $p) => $p->where('notable_type', (new Person)->getMorphClass())
-                    ->whereIn('notable_id', CrmVisibility::people(self::peopleFor($user), $user)->select('people.id'))));
+        // Subjects: the fiches the user sees, trashed ones only with crm.fiches.delete.
+        // Without crm.fiches.view at all: only the trash rule (the policy answers 403).
+        if ($user instanceof User) {
+            $scope = Scopes::of($user, Permissions::FICHES_VIEW);
+            $scoped = $scope !== null && $scope !== AccessScope::All;
+            if ($scoped || ! $user->can(Permissions::FICHES_DELETE)) {
+                $organisations = $scoped ? CrmVisibility::organisations(self::organisationsFor($user), $user) : self::organisationsFor($user);
+                $people = $scoped ? CrmVisibility::people(self::peopleFor($user), $user) : self::peopleFor($user);
+                $query->where(fn (Builder $q) => $q
+                    ->where(fn (Builder $o) => $o->where('notable_type', (new Organisation)->getMorphClass())
+                        ->whereIn('notable_id', $organisations->select('organisations.id')))
+                    ->orWhere(fn (Builder $p) => $p->where('notable_type', (new Person)->getMorphClass())
+                        ->whereIn('notable_id', $people->select('people.id'))));
+            }
         }
 
         return $query->findOrFail($value);
@@ -475,5 +526,6 @@ class CrmServiceProvider extends ServiceProvider
         ReferenceUsage::register(ReferenceList::ActionType, 'activities', 'type_id');
         ReferenceUsage::register(ReferenceList::ActionResult, 'activities', 'result_id');
         ReferenceUsage::register(ReferenceList::Das, 'quote_lines', 'das_id');
+        ReferenceUsage::register(ReferenceList::Das, 'revenue_targets', 'das_id');
     }
 }

@@ -2,6 +2,11 @@
 
 namespace App\Modules\Crm\Activities;
 
+use App\Modules\Core\Users\User;
+use App\Modules\Crm\Permissions;
+use App\Modules\Crm\Visibility\CrmVisibility;
+use Illuminate\Database\Eloquent\Collection;
+
 /**
  * An action as shown on screen (fiche of an opportunity, « Fait » dialog).
  */
@@ -37,5 +42,42 @@ final class ActivityRows
             'person' => $activity->person === null ? null : ['id' => $activity->person->id, 'name' => $activity->person->fullName()],
             'opportunity' => $activity->opportunity === null ? null : ['id' => $activity->opportunity->id, 'name' => $activity->opportunity->title],
         ];
+    }
+
+    /**
+     * Rows with the viewer's rights on each action (the policy's rule, in
+     * two queries): « Fait », « Reporter » with can_update, the bin with can_delete.
+     *
+     * @param  Collection<int, Activity>  $activities
+     * @return list<array<string, mixed>>
+     */
+    public static function rows(Collection $activities, User $user): array
+    {
+        $rights = self::rights($activities, $user);
+
+        return $activities->map(fn (Activity $a) => [...self::row($a), ...$rights[(string) $a->id]])->values()->all();
+    }
+
+    /**
+     * Same rule as ActivityPolicy::update / delete: in the scope of the
+     * right, never on a trashed fiche.
+     *
+     * @param  Collection<int, Activity>  $activities
+     * @return array<string, array{can_update: bool, can_delete: bool}>
+     */
+    public static function rights(Collection $activities, User $user): array
+    {
+        $activities->loadMissing(['organisation:id,deleted_at', 'person:id,deleted_at', 'opportunity.organisation:id,deleted_at', 'opportunity.person:id,deleted_at']);
+        $update = CrmVisibility::allowedIds($user, Permissions::ACTIVITIES_UPDATE, $activities);
+        $delete = CrmVisibility::allowedIds($user, Permissions::ACTIVITIES_DELETE, $activities);
+
+        $rights = [];
+        foreach ($activities as $activity) {
+            $id = (string) $activity->id;
+            $live = ! $activity->ficheTrashed();
+            $rights[$id] = ['can_update' => $live && isset($update[$id]), 'can_delete' => $live && isset($delete[$id])];
+        }
+
+        return $rights;
     }
 }

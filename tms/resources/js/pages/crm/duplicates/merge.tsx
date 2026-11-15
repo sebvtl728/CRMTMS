@@ -41,6 +41,8 @@ interface MergeProps {
     drop: Summary;
     fields: FieldRow[];
     counts: { keep: Counts; drop: Counts };
+    /** « Inverser » allowed: the other fiche kept, this one absorbed. */
+    canSwap: boolean;
 }
 
 function Value({ value }: { value: string | null }) {
@@ -68,7 +70,7 @@ function Choice({ field, side, checked, onChange }: { field: FieldRow; side: Sid
     );
 }
 
-export default function MergePage({ type, keep, drop, fields, counts }: MergeProps) {
+export default function MergePage({ type, keep, drop, fields, counts, canSwap }: MergeProps) {
     const isOrg = type === 'organisation';
     const [choices, setChoices] = useState<Record<string, Side>>(() => Object.fromEntries(fields.map((f) => [f.name, f.default])));
     const [confirming, setConfirming] = useState(false);
@@ -126,14 +128,16 @@ export default function MergePage({ type, keep, drop, fields, counts }: MergePro
                     {header('keep', keep, counts.keep)}
                     {header('drop', drop, counts.drop)}
                 </div>
-                <div>
-                    <Button variant="outline" size="sm" asChild>
-                        <Link href={mergeRoute(type, drop.id, keep.id)}>
-                            <ArrowLeftRight className="h-4 w-4" aria-hidden />
-                            Inverser : conserver l'autre fiche
-                        </Link>
-                    </Button>
-                </div>
+                {canSwap && (
+                    <div>
+                        <Button variant="outline" size="sm" asChild>
+                            <Link href={mergeRoute(type, drop.id, keep.id)}>
+                                <ArrowLeftRight className="h-4 w-4" aria-hidden />
+                                Inverser : conserver l'autre fiche
+                            </Link>
+                        </Button>
+                    </div>
+                )}
 
                 <InputError message={errors.keep ?? errors.drop ?? errors.fields} />
 

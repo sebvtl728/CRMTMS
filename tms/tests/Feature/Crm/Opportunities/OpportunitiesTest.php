@@ -171,7 +171,7 @@ it('records a manual probability as overridden and edits the opportunity', funct
     expect($opportunity->refresh()->probability_overridden)->toBeFalse();
 });
 
-it('lets only crm.delete remove an opportunity', function () {
+it('lets only crm.opportunities.delete remove an opportunity', function () {
     $opportunity = makeOpportunity(Organisation::query()->create(['name' => 'Le Bistrot']));
 
     $this->actingAs(assistant())->delete("/crm/opportunities/{$opportunity->id}")->assertForbidden();

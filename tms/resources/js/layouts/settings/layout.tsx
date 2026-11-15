@@ -38,7 +38,7 @@ const calendarNavItem: NavItem = {
 export default function SettingsLayout({ children }: { children: React.ReactNode }) {
     const currentPath = window.location.pathname;
     const { auth } = usePage<SharedData>().props;
-    const navItems = auth.permissions.includes('crm.view') ? [...sidebarNavItems, calendarNavItem] : sidebarNavItems;
+    const navItems = auth.permissions.includes('crm.activities.view') ? [...sidebarNavItems, calendarNavItem] : sidebarNavItems;
 
     return (
         <div className="px-4 py-6">

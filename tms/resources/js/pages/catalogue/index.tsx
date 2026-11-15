@@ -39,7 +39,7 @@ interface IndexProps {
     trainings: Paginated<TrainingRow>;
     filters: Filters;
     options: { das: Option[]; funding: Option[]; status: Option[]; sort: Option[] };
-    can: { manage: boolean; export: boolean };
+    can: { manage: boolean; delete: boolean; export: boolean };
     status?: string;
 }
 
@@ -117,9 +117,11 @@ export default function CatalogueIndex({ trainings, filters, options, can, statu
                 <Button type="button" variant="outline" size="sm" onClick={() => toggle(row)}>
                     {row.is_active ? 'Désactiver' : 'Activer'}
                 </Button>
-                <Button type="button" variant="ghost" size="sm" className="text-destructive" onClick={() => destroy(row)}>
-                    Supprimer
-                </Button>
+                {can.delete && (
+                    <Button type="button" variant="ghost" size="sm" className="text-destructive" onClick={() => destroy(row)}>
+                        Supprimer
+                    </Button>
+                )}
             </div>
         );
 

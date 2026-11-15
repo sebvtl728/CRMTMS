@@ -1,6 +1,7 @@
 <?php
 
 use App\Modules\Core\Access\Role;
+use App\Modules\Core\Access\RoleModel;
 use App\Modules\Core\Audit\AuditLog;
 use App\Modules\Core\Audit\AuditRecorder;
 use App\Modules\Core\Tenancy\TenantContext;
@@ -202,8 +203,8 @@ it('records a role change', function () {
 
     $log = lastAudit('access.role_changed');
     expect($log->auditable_id)->toBe($user->id)
-        ->and($log->old_values)->toBe(['role' => 'commercial'])
-        ->and($log->new_values)->toBe(['role' => 'direction']);
+        ->and($log->old_values)->toEqual(['role' => 'commercial', 'role_label' => 'Commercial'])
+        ->and($log->new_values)->toEqual(['role' => 'direction', 'role_label' => 'Direction']);
 });
 
 it('leaves no role audit row when the surrounding transaction rolls back', function () {
@@ -238,7 +239,7 @@ it('records the role change when the surrounding transaction commits', function 
 
 it('records an activation with its role change', function () {
     $tenant = inTenant();
-    $invitation = Invitation::issue('nouveau@example.test', 'Nouveau', Role::Commercial);
+    $invitation = Invitation::issue('nouveau@example.test', 'Nouveau', RoleModel::forSystem(Role::Commercial));
 
     $this->post('/activation/'.$invitation->plainToken, [
         'password' => AUDIT_PASSWORD, 'password_confirmation' => AUDIT_PASSWORD,

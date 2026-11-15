@@ -37,9 +37,17 @@ final class Permissions
 
     /** @var array<string, string> permission => warning shown on the « Rôles et droits » screen */
     public const WARNINGS = [
-        self::EXPORTS_RUN => "Droit de niveau administrateur : les exports système portent sur tout l'organisme, sans tenir compte des DAS suivis.",
+        self::EXPORTS_RUN => "Droit de niveau administrateur : les exports système portent sur tout l'organisme, sans tenir compte des périmètres.",
         self::SETTINGS_MANAGE => "Droit de niveau administrateur : sécurité des sessions, textes des e-mails envoyés au nom de l'organisme et durée de conservation RGPD.",
+        // Module permission named by its string: Core never depends on a module.
+        'crm.import' => 'Import : seules les fiches de votre périmètre de modification sont complétées ; une fiche existante hors périmètre est ignorée.',
     ];
+
+    /**
+     * Rights worth a mandatory double authentification: the roles screen
+     * warns when a role without it holds one of them.
+     */
+    public const TWO_FACTOR_ADVISED = [self::SETTINGS_MANAGE, self::AUDIT_VIEW, self::EXPORTS_RUN];
 
     /** Theme of the Core permissions on the « Rôles et droits » screen. */
     public const CORE_GROUP = 'Administration';
@@ -60,7 +68,7 @@ final class Permissions
      * Permissions of the modules (crm.*, ...), registered by their service
      * provider so that Core never depends on a module.
      *
-     * @var array<string, array{permissions: list<string>, defaults: callable(Role): list<string>, labels: array<string, array{0: string, 1: string}>, group: string}>
+     * @var array<string, array{permissions: list<string>, defaults: callable(Role): list<string>, labels: array<string, array{0: string, 1: string}>, group: string, scoped: list<string>, defaultScopes: (callable(Role): array<string, AccessScope>)|null}>
      */
     private static array $modules = [];
 
@@ -75,10 +83,48 @@ final class Permissions
      * @param  list<string>  $permissions
      * @param  callable(Role): list<string>  $defaultsFor
      * @param  array<string, array{0: string, 1: string}>  $labels  permission => [label, explanation]
+     * @param  list<string>  $scoped  permissions that carry a scope (own / das / all)
+     * @param  (callable(Role): array<string, AccessScope>)|null  $defaultScopesFor  default scope of the scoped permissions, per role (all when missing)
      */
-    public static function registerModule(string $module, array $permissions, callable $defaultsFor, array $labels = [], string $group = ''): void
+    public static function registerModule(string $module, array $permissions, callable $defaultsFor, array $labels = [], string $group = '', array $scoped = [], ?callable $defaultScopesFor = null): void
     {
-        self::$modules[$module] = ['permissions' => $permissions, 'defaults' => $defaultsFor, 'labels' => $labels, 'group' => $group];
+        self::$modules[$module] = ['permissions' => $permissions, 'defaults' => $defaultsFor, 'labels' => $labels, 'group' => $group, 'scoped' => $scoped, 'defaultScopes' => $defaultScopesFor];
+    }
+
+    /**
+     * Forgets a module (tests registering a fake one).
+     */
+    public static function unregisterModule(string $module): void
+    {
+        unset(self::$modules[$module]);
+    }
+
+    public static function isScoped(string $permission): bool
+    {
+        foreach (self::$modules as $module) {
+            if (in_array($permission, $module['scoped'], true)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * Default scope of the scoped permissions for a role (permission => scope).
+     *
+     * @return array<string, AccessScope>
+     */
+    public static function defaultScopesFor(Role $role): array
+    {
+        $scopes = [];
+        foreach (self::$modules as $module) {
+            if ($module['defaultScopes'] !== null) {
+                $scopes = [...$scopes, ...($module['defaultScopes'])($role)];
+            }
+        }
+
+        return $scopes;
     }
 
     /**

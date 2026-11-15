@@ -64,6 +64,14 @@ const EVENT_LABELS: Record<string, string> = {
     'users.invitation_send_failed': "Échec d'envoi de l'invitation",
     'users.activation_reissued': "Lien d'activation réémis",
     'settings.security_changed': 'Paramètres de sécurité modifiés',
+    'roles.created': 'Rôle créé',
+    'roles.renamed': 'Rôle renommé',
+    'roles.2fa_changed': 'Double authentification du rôle modifiée',
+    'roles.deleted': 'Rôle supprimé',
+    'roles.permission_granted': 'Droit accordé à un rôle',
+    'roles.permission_revoked': 'Droit retiré à un rôle',
+    'roles.scope_changed': "Périmètre d'un droit modifié",
+    'roles.reset': 'Droits du rôle rétablis',
 };
 
 const dateTime = new Intl.DateTimeFormat('fr-FR', { dateStyle: 'short', timeStyle: 'medium', timeZone: 'Europe/Paris' });
@@ -73,6 +81,7 @@ const TYPE_LABELS: Record<string, string> = {
     tenant: 'Organisme',
     user: 'Utilisateur',
     invitation: 'Invitation',
+    role: 'Rôle',
     company: 'Société',
     reference_item: 'Référentiel',
     connector_config: 'Connecteur',

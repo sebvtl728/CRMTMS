@@ -26,7 +26,7 @@ Aucun compte par défaut n'existe : chaque compte est créé par invitation.
 
 ## 2. Double authentification (2FA)
 
-La 2FA par code à usage unique (TOTP, 6 chiffres, renouvelé toutes les 30 secondes) est **obligatoire** pour les rôles *Administrateur de l'organisme* et *Direction*, et pour tous les comptes si l'option « Imposer la double authentification » est cochée (voir *Sécurité*).
+La 2FA par code à usage unique (TOTP, 6 chiffres, renouvelé toutes les 30 secondes) est **obligatoire** pour les rôles *Administrateur de l'organisme* et *Direction* (toujours), pour les autres rôles dont l'interrupteur « Double authentification obligatoire » est actif (§ 10), et pour tous les comptes si l'option « Imposer la double authentification » est cochée (voir *Sécurité*).
 
 Activation, à la première connexion :
 
@@ -65,14 +65,14 @@ Pour chaque société : raison sociale, forme juridique, capital (montant et « 
 
 Inviter : **Inviter un utilisateur** → nom, adresse e-mail, rôle → **Envoyer l'invitation**. Un e-mail contenant le lien d'activation (usage unique, 24 h) est envoyé par le connecteur SMTP de l'organisme (voir *Connecteurs*), à défaut par la messagerie de l'instance ; l'invitation apparaît dans « Invitations en attente » avec sa date d'expiration. Si l'e-mail ne peut pas partir (serveur refusé, erreur SMTP) ou si aucune messagerie n'est configurée, l'invitation est conservée et le lien d'activation s'affiche une seule fois à l'écran, avec un bouton « Copier le lien » : transmettez-le vous-même à la personne invitée (journal : « Échec d'envoi de l'invitation », avec la raison). Il est impossible d'inviter une adresse qui a déjà un compte actif dans l'organisme. L'envoi est consigné dans le journal d'audit (« Invitation envoyée »).
 
-Rôles disponibles : Administrateur de l'organisme, Direction, Commercial, Chargé de relations, Assistant, Responsable DAS. Les changements de rôle sont consignés (« Changement de rôle »).
+Rôles disponibles : les six rôles système (Administrateur de l'organisme, Direction, Commercial, Chargé de relations, Assistant, Responsable DAS) et les rôles personnalisés de l'organisme (voir § 10). Les changements de rôle sont consignés (« Changement de rôle »).
 
 Autres actions de la liste :
 
 - **Changer le rôle** : la personne est déconnectée de ses autres sessions pour que ses nouveaux droits s'appliquent aussitôt.
 - **Désactiver** / **Réactiver** un compte (sessions révoquées à la désactivation). Vous ne pouvez pas désactiver votre propre compte, et **il doit toujours rester au moins un administrateur actif** : l'application refuse sinon, avec un message.
 - **Renvoyer** une invitation (le lien précédent est annulé, nouveau délai de 24 h) ou la **Révoquer**.
-- **DAS suivis** : pour un utilisateur au rôle *Responsable DAS*, choisissez les DAS qu'il suit. Il ne voit alors dans le CRM que les entreprises rattachées à ces DAS, et les personnes liées à ces entreprises ou, sans entreprise, rattachées à l'un de ces DAS. Sans DAS suivi, il ne voit aucune fiche. Les autres rôles voient toutes les fiches de l'organisme, quel que soit leur DAS. Un DAS utilisé comme DAS suivi ne peut pas être supprimé des référentiels (désactivez-le).
+- **DAS suivis** : choisissez les DAS d'un utilisateur dont un droit a le périmètre « Ses DAS » (par défaut le *Responsable DAS*). Il ne voit alors dans le CRM que les entreprises rattachées à ces DAS, et les personnes liées à ces entreprises ou, sans entreprise, rattachées à l'un de ces DAS. Sans DAS suivi, il ne voit aucune fiche pour ce droit. Les droits à un autre périmètre ne dépendent pas des DAS suivis. Un DAS utilisé comme DAS suivi ne peut pas être supprimé des référentiels (désactivez-le).
 
 ## 5. Référentiels
 
@@ -149,40 +149,96 @@ docker compose -f compose.prod.yaml --env-file .env exec app php artisan tms:use
 - `tms:user:reset-2fa` efface le secret et les codes de récupération ; un administrateur ou un membre de la direction devra enrôler un nouvel appareil à sa prochaine connexion. Journal : `auth.2fa_reset_by_operator`.
 - Rôles possibles pour `--role` : `admin_organisme`, `direction`, `commercial`, `charge_relations`, `assistant`, `responsable_das`.
 
-## 10. Droits du CRM par rôle
+## 10. Rôles et droits
 
-Le CRM (fiches, import, export, RGPD) ajoute huit permissions, accordées par défaut selon le rôle :
+### Les droits, par domaine
 
-| Permission | Ce qu'elle permet | Admin. | Direction | Commercial / Chargé de relations | Assistant | Resp. DAS |
-|---|---|:-:|:-:|:-:|:-:|:-:|
-| `crm.view` | Voir les entreprises, personnes, opportunités, pipeline, historiques, **devis** et leur PDF ; rechercher ; **À faire**, **Planning**, **Mon agenda** (iCal, Outlook) ; menu Commercial | oui | oui | oui | oui | oui (ses DAS) |
-| `crm.create` | Créer entreprises, personnes, rattachements, **opportunités**, **actions** (« + Action ») et **devis** (dont **Nouvelle version**) ; ajouter notes et pièces jointes | oui | non | oui | oui | non |
-| `crm.update` | Modifier les fiches, les opportunités et les devis brouillons, **changer d'étape**, marquer une action **faite**, la **reporter** ou la supprimer ; **Compte rendu de RDV** ; **envoyer**, **relancer**, **renvoyer** un devis, enregistrer son **acceptation** ou son **refus** | oui | non | oui | oui | non |
-| `crm.delete` | Supprimer et restaurer les fiches, supprimer une opportunité ou un devis brouillon, retirer notes et pièces jointes | oui | non | oui | non | non |
-| `crm.merge` | Fusionner deux fiches | oui | non | oui | non | non |
-| `crm.import` | Menu **Imports** : importer, annuler un import | oui | non | oui | non | non |
-| `crm.export` | **Exporter (.xlsx)** les listes (entreprises, personnes, opportunités, devis ; catalogue avec `catalogue.view`) | oui | oui | oui | non | oui |
-| `crm.gdpr` | Écran **RGPD** (liste à anonymiser, conservation), export de données d'une personne, anonymisation, durée de conservation | oui | oui | non | non | non |
+Chaque domaine du CRM a ses droits **Consulter**, **Créer et modifier** (créer est inclus dans « modifier ») et **Supprimer**. Un rôle peut donc, par exemple, voir les devis sans pouvoir les modifier. L'écran regroupe les droits en huit thèmes : *Entreprises et personnes*, *Opportunités*, *Devis*, *Actions et agenda*, *Chiffre d'affaires*, *Catalogue*, *Imports, exports et RGPD*, *Administration*.
 
-Le **catalogue de formations** a deux permissions à part :
+| Droit | Ce qu'il permet |
+|---|---|
+| `crm.fiches.view` / `.update` / `.delete` | Voir les entreprises et personnes (rattachements, notes, pièces jointes) ; les créer et les modifier ; les mettre à la corbeille et les restaurer |
+| `crm.merge` | Fusionner deux fiches en double |
+| `crm.opportunities.view` / `.update` / `.delete` | Voir les opportunités et le pipeline ; les créer, les modifier, changer leur étape ; les mettre à la corbeille |
+| `crm.quotes.view` / `.update` / `.delete` | Voir les devis et leur PDF ; créer, modifier, envoyer, relancer, enregistrer la réponse du client, **Nouvelle version** ; supprimer un brouillon |
+| `crm.activities.view` / `.update` / `.delete` | Voir les actions, **À faire**, **Planning**, **Mon agenda** (iCal, Outlook) ; les créer, les modifier, les terminer, les reporter, saisir un compte rendu de RDV ; les supprimer |
+| `crm.activities.team` | **À faire › Équipe** et planning d'un collègue (remplace l'ancien test « administrateur ou direction ») |
+| `crm.revenue.view` | Consulter le chiffre d'affaires par DAS (à périmètre) |
+| `crm.revenue.manage` | Fixer les objectifs de chiffre d'affaires |
+| `crm.import`, `crm.export`, `crm.gdpr` | Imports ; exports Excel des listes ; écran RGPD, export des données d'une personne, anonymisation, durée de conservation |
+| `catalogue.view` | Menu **Catalogue** : voir les formations (tout le catalogue, quel que soit le DAS) |
+| `catalogue.manage` (« Modifier le catalogue ») | Créer, modifier, désactiver une formation ; importer un catalogue (avec `crm.import`) |
+| `catalogue.delete` | Supprimer une formation |
 
-| Permission | Ce qu'elle permet | Admin. | Direction | Commercial / Chargé de relations | Assistant | Resp. DAS |
-|---|---|:-:|:-:|:-:|:-:|:-:|
-| `catalogue.view` | Menu **Catalogue** : voir les formations (tout le catalogue, quel que soit le DAS) | oui | oui | oui | oui | oui |
-| `catalogue.manage` | Créer, modifier, désactiver, supprimer une formation ; importer un catalogue (avec `crm.import`) | oui | oui | non | non | non |
+Les droits d'**administration** (`users.manage`, `roles.manage`, `companies.manage`, `references.manage`, `connectors.manage`, `audit.view`, `settings.manage`, `exports.run`) sont inchangés.
 
-Le rôle *Responsable DAS* garde la lecture seule et l'export, limités à ses DAS suivis (devis compris : ceux des opportunités de ses DAS) : il voit les opportunités de ses DAS (et leurs actions), et les actions sans opportunité des fiches qu'il voit. La **direction** et l'**administrateur** voient en plus les actions de toute l'équipe (**À faire › Équipe**) et le planning d'un **collègue**.
+### Périmètres
 
-**Mises à jour et personnalisation.** À chaque installation ou mise à jour (`ops/migrate.sh` lance `php artisan tms:permissions:sync`), la synchronisation des permissions accorde à chaque organisme les droits par défaut **nouveaux** de chaque rôle, une seule fois : un droit que vous avez retiré à un rôle n'est pas rétabli par une mise à jour. La matrice rôle → permission est propre à chaque organisme.
+Les droits **Consulter**, **Créer et modifier**, **Supprimer** des quatre domaines, ainsi que « Consulter le chiffre d'affaires », ont un **périmètre**, réglé par une liste à côté de la case :
 
-**Écran « Rôles et droits »** (Administration › **Rôles et droits**, droit `roles.manage`, accordé par défaut au seul administrateur de l'organisme). Un tableau croise les rôles (en colonnes) et les droits (en lignes, regroupés par thème, chacun avec une phrase d'explication). Cochez ou décochez une case : elle est enregistrée aussitôt (message de confirmation), et les utilisateurs du rôle ont leurs nouveaux droits dès leur page suivante, sans être déconnectés. Une case surlignée diffère des droits par défaut du rôle ; **Rétablir les droits par défaut** (avec confirmation) remet exactement le tableau ci-dessus pour ce rôle.
+- **Ses fiches** : uniquement ce dont l'utilisateur est le **responsable** ou le **créateur** (fiche, opportunité ou action). Un devis est « à soi » quand son opportunité l'est ou qu'il en est le créateur. Une fiche sans responsable créée par un collègue n'est pas visible ; celle qu'il vient de créer lui-même l'est.
+- **Ses DAS** : ce qui touche les DAS qu'il suit (**DAS suivis** de la page Utilisateurs). Sans DAS suivi, rien n'est visible.
+- **Tout l'organisme** : tout.
 
-- Le rôle **Administrateur de l'organisme** n'est pas modifiable : il garde tous les droits.
-- **Gérer les utilisateurs** (`users.manage`), **Gérer les rôles et droits** (`roles.manage`) et **Gérer les connecteurs** (`connectors.manage`) ne s'accordent qu'à l'administrateur : sinon, qui les détiendrait pourrait se donner tous les droits (pour les connecteurs : faire passer la messagerie de l'organisme par son propre serveur et intercepter le lien d'invitation suivant).
-- **Lancer les exports système** (`exports.run`) et **Gérer les paramètres** (`settings.manage`) sont des droits de niveau administrateur, signalés sur l'écran : les exports système portent sur tout l'organisme sans tenir compte des DAS suivis ; les paramètres couvrent la sécurité des sessions, les modèles d'e-mails (dont le texte de l'invitation) et la durée de conservation RGPD.
-- La **double authentification** reste liée au rôle (administrateur, direction), pas aux droits.
-- Le **Responsable DAS** ne voit que les fiches de ses DAS suivis : c'est une règle de données, pas un droit ; l'écran ne la change pas.
-- Chaque changement est journalisé (`roles.permission_granted`, `roles.permission_revoked`, `roles.reset` : rôle et droit). Les modifications n'ont aucun effet sur un autre organisme, et une mise à jour ne rétablit jamais un droit retiré.
+Le périmètre d'un droit sans réglage enregistré vaut « Tout l'organisme ». Les périmètres de consultation et de modification sont indépendants : avec « Consulter : Ses DAS » et « Modifier : Tout l'organisme », une fiche hors de ses DAS reste introuvable (404), même par son adresse directe. Créer un devis (ou une nouvelle version) exige de voir son opportunité ; modifier ou supprimer un devis existant suit les périmètres des droits « Devis » eux-mêmes. Un droit détenu par une permission accordée directement à un utilisateur (hors rôle, sans écran pour le faire) vaut « Tout l'organisme ».
+
+- **Import** (`crm.import`) : l'import ne complète que les fiches du périmètre « Créer et modifier » des fiches de l'utilisateur qui le lance. Une ligne qui correspond (SIRET, e-mail, identifiant source, fiche d'une note) à une fiche existante hors de ce périmètre est **ignorée** avec le motif « Fiche existante hors de votre périmètre », sans modifier la fiche ni créer de doublon ; le rapport et la simulation l'indiquent. L'écran « Rôles et droits » le rappelle sous le droit.
+- **Chiffre d'affaires sous « Ses DAS »** : le détail d'un DAS liste les devis dont une ligne porte ce DAS, même si l'opportunité du devis est rattachée à un DAS que l'utilisateur ne suit pas ; le lien vers ce devis aboutit alors à une page introuvable (404).
+
+### Droits par défaut
+
+Un nouvel organisme reçoit ces droits (identiques au comportement de la version 0.4, plus les nouveautés) :
+
+| Rôle | Fiches, opportunités, devis, actions | Autres droits |
+|---|---|---|
+| Administrateur de l'organisme | Consulter, modifier, supprimer, périmètre « Tout » | `crm.activities.team`, chiffre d'affaires (consulter « Tout », objectifs), `catalogue.delete`, fusion, import, export, RGPD, catalogue |
+| Direction | Consulter, « Tout » | `crm.activities.team`, chiffre d'affaires (consulter « Tout », objectifs), `catalogue.delete`, export, RGPD, catalogue |
+| Commercial, Chargé de relations | Consulter, modifier, supprimer, « Tout » | Chiffre d'affaires : consulter « Ses fiches » ; fusion, import, export, consulter le catalogue |
+| Assistant | Consulter, modifier, « Tout » ; supprimer des actions (`crm.activities.delete`) | Consulter le catalogue |
+| Responsable DAS | Consulter, « Ses DAS » | Chiffre d'affaires : consulter « Ses DAS » ; export, consulter le catalogue |
+
+Le comportement de la 0.4 est conservé : le Commercial modifie toutes les fiches. Pour qu'il ne modifie que les siennes, réglez le périmètre de « Créer et modifier » sur « Ses fiches ».
+
+### Correspondance avec les anciens droits (mise à jour vers la 0.5.0)
+
+La migration convertit **automatiquement** les droits de chaque organisme, rôle par rôle : chaque utilisateur garde exactement ses accès, un droit que vous aviez retiré reste retiré, et un Responsable DAS reste limité à ses DAS (périmètre « Ses DAS »).
+
+| Ancien droit | Nouveaux droits |
+|---|---|
+| `crm.view` | `crm.fiches.view`, `crm.opportunities.view`, `crm.quotes.view`, `crm.activities.view` |
+| `crm.update` | `crm.fiches.update`, `crm.opportunities.update`, `crm.quotes.update`, `crm.activities.update`, et `crm.activities.delete` (retirer une action faisait partie de « modifier ») |
+| `crm.create` | aucun droit propre : absorbé par les droits « Créer et modifier » |
+| `crm.delete` | `crm.fiches.delete`, `crm.opportunities.delete`, `crm.quotes.delete`, `crm.activities.delete` |
+| `catalogue.manage` | `catalogue.manage` (renommé « Modifier le catalogue ») et `catalogue.delete` |
+| (nouveaux) | `crm.activities.team`, `crm.revenue.view`, `crm.revenue.manage` : accordés une fois selon le tableau des droits par défaut |
+
+Un rôle qui n'avait que `crm.create` sans `crm.update` ne reçoit aucun droit de modification (aucun rôle par défaut n'est dans ce cas). La migration crée aussi de nouveaux index sur les tables des fiches : le verrou est bref lors de la mise à jour.
+
+### Mises à jour
+
+À chaque installation ou mise à jour (`ops/migrate.sh` lance `php artisan tms:permissions:sync`), la synchronisation accorde à chaque organisme les droits par défaut **nouveaux** de chaque rôle, une seule fois : un droit que vous avez retiré n'est pas rétabli. La matrice rôle → droit est propre à chaque organisme.
+
+### L'écran « Rôles et droits »
+
+Administration › **Rôles et droits** (droit `roles.manage`, accordé au seul administrateur). Un tableau croise les rôles (en colonnes) et les droits (en lignes, regroupés par thème, avec une phrase d'explication). Cochez ou décochez une case : elle est enregistrée aussitôt, et les utilisateurs du rôle ont leurs nouveaux droits dès leur page suivante, sans être déconnectés. Une case surlignée diffère des droits ou du périmètre par défaut du rôle (rôles système). Un rôle **sans** double authentification obligatoire qui détient « Gérer les paramètres », « Consulter le journal d'audit » ou « Lancer les exports système » affiche un avertissement sous son en-tête (non bloquant) : activez la double authentification pour ce rôle. La liste de périmètre est grisée tant que la case est décochée. L'en-tête de chaque colonne indique le nombre d'utilisateurs, l'interrupteur « Double authentification obligatoire » et un menu **Renommer** / **Revenir aux droits par défaut** (avec confirmation : remet exactement le tableau ci-dessus pour un rôle système, retire tous les droits d'un rôle personnalisé) / **Supprimer**.
+
+### Rôles personnalisés
+
+**Nouveau rôle** crée un rôle propre à l'organisme : libellé (unique, 80 caractères au plus), rôle dont reprendre les droits et périmètres (ou aucun) et double authentification (cochée par défaut). Le rôle apparaît ensuite dans la liste des rôles des invitations et du changement de rôle. Un rôle personnalisé se renomme et se supprime.
+
+- **Suppression** : impossible tant qu'un utilisateur (actif **ou** désactivé) porte le rôle ou qu'une invitation non expirée le vise ; réattribuez-les d'abord. Les six rôles système (Administrateur de l'organisme, Direction, Commercial, Chargé de relations, Assistant, Responsable DAS) ne se suppriment jamais ; leurs libellés se renomment.
+- **DAS suivis** : un utilisateur dont un droit a le périmètre « Ses DAS » se voit attribuer ses DAS suivis sur la page Utilisateurs, quel que soit son rôle ; sans DAS suivi, il ne voit aucune fiche pour ce droit. Un DAS suivi ne peut pas être supprimé des référentiels (désactivez-le).
+
+### Double authentification par rôle
+
+La double authentification est **toujours obligatoire** pour l'Administrateur et la Direction (interrupteur verrouillé). Pour les autres rôles, système ou personnalisés, l'interrupteur est libre. Quand elle devient obligatoire pour un rôle, ses utilisateurs déjà connectés sont envoyés vers l'activation à leur prochaine page, sans attendre une nouvelle connexion.
+
+### Règles qui ne changent pas
+
+- Le rôle **Administrateur de l'organisme** n'est pas modifiable (droits, périmètres, libellé, double authentification, suppression) : il garde tous les droits.
+- **Gérer les utilisateurs** (`users.manage`), **Gérer les rôles et droits** (`roles.manage`) et **Gérer les connecteurs** (`connectors.manage`) ne s'accordent à aucun autre rôle, système ou personnalisé : qui les détiendrait pourrait se donner tous les droits (pour les connecteurs : faire passer la messagerie de l'organisme par son propre serveur et intercepter le lien d'invitation suivant).
+- **Lancer les exports système** (`exports.run`) et **Gérer les paramètres** (`settings.manage`) sont des droits de niveau administrateur, signalés sur l'écran : les exports système portent sur tout l'organisme sans tenir compte des périmètres ; les paramètres couvrent la sécurité des sessions, les modèles d'e-mails (dont le texte de l'invitation) et la durée de conservation RGPD.
+- Chaque changement est journalisé (`roles.permission_granted`, `roles.permission_revoked`, `roles.scope_changed`, `roles.reset`, création, renommage, suppression d'un rôle, double authentification). Les modifications n'ont aucun effet sur un autre organisme, et une mise à jour ne rétablit jamais un droit retiré.
 
 ## 11. RGPD : durée de conservation et anonymisation
 
@@ -213,9 +269,9 @@ Les imports de fichiers (CRM) s'exécutent en arrière-plan.
 
 ## 13. Pipeline et relances : traitements planifiés
 
-- **Récapitulatif quotidien** : chaque jour à **7 h 30** (heure de Paris), `tms:crm:daily-digest` envoie à chaque utilisateur qui l'a demandé (**Paramètres › Profil › Recevoir le récapitulatif quotidien**, désactivé par défaut) la liste de ses actions en retard et du jour. Aucun e-mail aux comptes désactivés, sans droit `crm.view`, ni les jours sans action. L'envoi passe par la messagerie de l'organisme (connecteur SMTP).
+- **Récapitulatif quotidien** : chaque jour à **7 h 30** (heure de Paris), `tms:crm:daily-digest` envoie à chaque utilisateur qui l'a demandé (**Paramètres › Profil › Recevoir le récapitulatif quotidien**, désactivé par défaut) la liste de ses actions en retard et du jour. Aucun e-mail aux comptes désactivés, sans droit « Consulter les actions » (`crm.activities.view`), ni les jours sans action. L'envoi passe par la messagerie de l'organisme (connecteur SMTP).
 - **Envoi vers Outlook** : file par défaut, en arrière-plan, quelques instants après chaque modification d'une action ; une indisponibilité de Microsoft est retentée pendant 24 h (journal d'exécution du connecteur, sans donnée personnelle).
-- **Lien iCal** : l'adresse est privée (jeton aléatoire dont seule l'empreinte est stockée) et limitée en nombre d'appels ; un utilisateur désactivé ou sans `crm.view` n'obtient plus rien. Révoquer un lien : l'utilisateur le fait lui-même dans **Mon agenda** ; désactiver son compte coupe aussi le flux.
+- **Lien iCal** : l'adresse est privée (jeton aléatoire dont seule l'empreinte est stockée) et limitée en nombre d'appels ; un utilisateur désactivé ou sans « Consulter les actions » n'obtient plus rien. Révoquer un lien : l'utilisateur le fait lui-même dans **Mon agenda** ; désactiver son compte coupe aussi le flux.
 - Ces traitements reposent, comme les autres, sur le **planificateur** et le *worker* (voir § 11).
 
 ## 14. Devis : envoi, expiration et archives

@@ -275,6 +275,9 @@ refute() {
     [ ! -e "$TMS_DIR/.bundle-new" ]
     [ "$(psql_owner "select to_regclass('public.bats_update_ok') is not null")" = "t" ]
     [ "$(psql_owner "select count(*) from companies where name = 'bats-avant-maj'")" -eq 1 ]
+    # 0.5.0 rights split applied by the update: a commercial role holds crm.fiches.view, the old crm.view is gone
+    [ "$(psql_owner "select count(*) from role_has_permissions rp join roles r on r.id = rp.role_id join permissions p on p.id = rp.permission_id where r.name = 'commercial' and p.name = 'crm.fiches.view'")" -ge 1 ]
+    [ "$(psql_owner "select count(*) from permissions where name = 'crm.view'")" -eq 0 ]
 
     run health
     [[ "$output" == *'"status":"ok"'* ]] || false

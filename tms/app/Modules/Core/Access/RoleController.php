@@ -3,19 +3,22 @@
 namespace App\Modules\Core\Access;
 
 use App\Http\Controllers\Controller;
+use App\Modules\Core\Users\User;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 use Inertia\Response;
 
 /**
- * « Rôles et droits » (roles.manage): the permission matrix of the
- * organisme's roles, one cell saved at a time.
+ * « Rôles et droits » (roles.manage): the organisme's roles (system and
+ * custom, RoleCatalogue) and their permission matrix, one cell saved at a
+ * time. {role} is the id of a role of the current organisme (404 otherwise).
  */
 class RoleController extends Controller
 {
-    public function __construct(private readonly RoleMatrix $matrix) {}
+    public function __construct(private readonly RoleMatrix $matrix, private readonly RoleCatalogue $catalogue) {}
 
     public function index(Request $request): Response
     {
@@ -27,36 +30,84 @@ class RoleController extends Controller
                 'name' => $permission,
                 'label' => $label['label'],
                 'description' => $label['description'],
+                'scoped' => Permissions::isScoped($permission),
+                'locked' => in_array($permission, Permissions::LOCKED, true),
                 'warning' => Permissions::WARNINGS[$permission] ?? null,
             ];
         }
 
         return Inertia::render('admin/roles/index', [
-            'roles' => array_map(fn (Role $role) => [
-                'value' => $role->value,
-                'label' => $role->label(),
-                'locked' => ! RoleMatrix::editable($role),
-                'granted' => RoleMatrix::granted($role),
-                'defaults' => Permissions::defaultsFor($role),
-            ], Role::cases()),
-            'groups' => array_values($groups),
-            'locked' => Permissions::LOCKED,
+            'roles' => $this->roles(),
+            // Administration last, after the modules' themes.
+            'groups' => [...array_values(array_diff_key($groups, [Permissions::CORE_GROUP => true])), ...(isset($groups[Permissions::CORE_GROUP]) ? [$groups[Permissions::CORE_GROUP]] : [])],
+            'scopeOptions' => AccessScope::options(),
             'status' => $request->session()->get('status'),
         ]);
     }
 
+    public function store(RoleRequest $request): RedirectResponse
+    {
+        $role = $this->catalogue->create((string) $request->label(), (bool) $request->requires2fa(), $request->copyFrom());
+
+        return back()->with('status', "Rôle « {$role->label()} » créé.");
+    }
+
+    /**
+     * Label and/or « double authentification obligatoire ».
+     */
+    public function modify(RoleRequest $request, string $role): RedirectResponse
+    {
+        $role = $this->find($role);
+        $status = [];
+
+        $label = $request->label();
+        if ($label !== null && $label !== $role->label()) {
+            $this->catalogue->rename($role, $label);
+            $status[] = "Rôle renommé : {$role->label()}.";
+        }
+        $required = $request->requires2fa();
+        if ($required !== null && $required !== $role->requires2fa()) {
+            $this->catalogue->setRequires2fa($role, $required);
+            $status[] = $required
+                ? "Double authentification obligatoire pour le rôle {$role->label()}."
+                : "Double authentification facultative pour le rôle {$role->label()}.";
+        }
+
+        return back()->with('status', $status === [] ? 'Aucune modification.' : implode(' ', $status));
+    }
+
+    public function destroy(string $role): RedirectResponse
+    {
+        $role = $this->find($role);
+        $label = $role->label();
+        $this->catalogue->delete($role);
+
+        return back()->with('status', "Rôle « {$label} » supprimé.");
+    }
+
     public function update(Request $request, string $role): RedirectResponse
     {
-        $role = Role::tryFrom($role) ?? abort(404);
+        $role = $this->find($role);
         $data = $request->validate([
             'permission' => ['required', 'string', Rule::in(Permissions::all())],
-            'granted' => ['required', 'boolean'],
+            'granted' => ['required_without:scope', 'boolean'],
+            'scope' => ['required_without:granted', 'string', Rule::in(array_column(AccessScope::cases(), 'value'))],
         ], [
+            'scope.required_without' => 'Indiquez le périmètre.',
+            'scope.in' => "Ce périmètre n'existe pas.",
             'permission.required' => 'Choisissez un droit.',
             'permission.in' => "Ce droit n'existe pas.",
-            'granted.required' => 'Indiquez si le droit est accordé.',
+            'granted.required_without' => 'Indiquez si le droit est accordé.',
             'granted.boolean' => 'Indiquez si le droit est accordé.',
         ]);
+
+        if (isset($data['scope'])) {
+            $scope = AccessScope::from($data['scope']);
+            $this->matrix->setScope($role, $data['permission'], $scope);
+            $label = Permissions::label($data['permission'])['label'] ?? $data['permission'];
+
+            return back()->with('status', "Périmètre de « {$label} » pour le rôle {$role->label()} : {$scope->label()}.");
+        }
 
         $granted = filter_var($data['granted'], FILTER_VALIDATE_BOOLEAN);
         $this->matrix->set($role, $data['permission'], $granted);
@@ -69,9 +120,86 @@ class RoleController extends Controller
 
     public function reset(string $role): RedirectResponse
     {
-        $role = Role::tryFrom($role) ?? abort(404);
+        $role = $this->find($role);
         $this->matrix->reset($role);
 
-        return back()->with('status', "Droits par défaut rétablis pour le rôle {$role->label()}.");
+        return back()->with('status', $role->system
+            ? "Droits par défaut rétablis pour le rôle {$role->label()}."
+            : "Tous les droits du rôle {$role->label()} ont été retirés.");
+    }
+
+    /**
+     * The columns of the matrix: system roles then custom ones, with the
+     * rights, the scope of every scoped right (none declared = all), the
+     * number of users holding the role (active or not).
+     *
+     * @return list<array<string, mixed>>
+     */
+    private function roles(): array
+    {
+        $scoped = array_values(array_filter(Permissions::all(), fn (string $p) => Permissions::isScoped($p)));
+        $rows = DB::table(Scopes::TABLE)->get(['role_id', 'permission', 'scope'])->groupBy('role_id');
+        $users = DB::table('model_has_roles')->where('model_type', (new User)->getMorphClass())->selectRaw('role_id, count(*) as n')->groupBy('role_id')->pluck('n', 'role_id');
+
+        return RoleModel::query()->ordered()->get()->map(function (RoleModel $role) use ($scoped, $rows, $users) {
+            $own = ($rows->get($role->id) ?? collect())->pluck('scope', 'permission');
+            $scopes = [];
+            foreach ($scoped as $permission) {
+                $scopes[$permission] = (AccessScope::tryFrom((string) $own->get($permission, '')) ?? AccessScope::All)->value;
+            }
+            // Default scopes of a system role (none declared = all): a changed scope is highlighted too.
+            $system = $role->systemRole();
+            $defaultScopes = [];
+            if ($system !== null) {
+                $declared = Permissions::defaultScopesFor($system);
+                foreach ($scoped as $permission) {
+                    $defaultScopes[$permission] = ($declared[$permission] ?? AccessScope::All)->value;
+                }
+            }
+            $granted = RoleMatrix::granted($role);
+
+            return [
+                'id' => $role->id,
+                'label' => $role->label(),
+                'system' => $role->system,
+                'admin' => $role->isAdmin(),
+                'requires_2fa' => $role->requires2fa(),
+                'locked_2fa' => $role->systemRole()?->requires2fa() === true,
+                'users_count' => (int) ($users[$role->id] ?? 0),
+                'permissions' => $granted,
+                'defaults' => RoleMatrix::defaults($role),
+                'scopes' => $scopes,
+                'default_scopes' => $defaultScopes,
+                'two_factor_warning' => $this->twoFactorWarning($role, $granted),
+            ];
+        })->values()->all();
+    }
+
+    /**
+     * Non-blocking warning: a role without mandatory double authentification
+     * holding a sensitive right (Permissions::TWO_FACTOR_ADVISED).
+     *
+     * @param  list<string>  $granted
+     */
+    private function twoFactorWarning(RoleModel $role, array $granted): ?string
+    {
+        if ($role->isAdmin() || $role->requires2fa()) {
+            return null;
+        }
+        $held = array_values(array_intersect(Permissions::TWO_FACTOR_ADVISED, $granted));
+        if ($held === []) {
+            return null;
+        }
+        $labels = array_map(fn (string $p) => Permissions::label($p)['label'] ?? $p, $held);
+
+        return 'Ce rôle détient '.(count($held) > 1 ? 'des droits sensibles' : 'un droit sensible').' ('.implode(', ', $labels).') sans double authentification obligatoire : activez-la.';
+    }
+
+    /**
+     * A role of the current organisme (BelongsToTenant + RLS), 404 otherwise.
+     */
+    private function find(string $id): RoleModel
+    {
+        return RoleModel::query()->whereKey($id)->where('guard_name', RoleSeeder::GUARD)->first() ?? abort(404);
     }
 }

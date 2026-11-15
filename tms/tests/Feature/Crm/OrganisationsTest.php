@@ -311,8 +311,8 @@ it('refuses DAS on a user who is not Responsable DAS and needs users.manage', fu
     $this->actingAs($commercial)->put("/admin/users/{$commercial->id}/das", ['das_ids' => []])->assertForbidden();
 });
 
-it('shares crm.view with the sidebar for a commercial', function () {
-    $this->actingAs(commercial())->get('/dashboard')->assertInertia(fn (Assert $page) => $page->where('auth.permissions', fn ($p) => collect($p)->contains('crm.view')));
+it('shares crm.fiches.view with the sidebar for a commercial', function () {
+    $this->actingAs(commercial())->get('/dashboard')->assertInertia(fn (Assert $page) => $page->where('auth.permissions', fn ($p) => collect($p)->contains('crm.fiches.view')));
 });
 
 it('keeps a deactivated responsible until changed but never assigns a new one', function () {
@@ -371,7 +371,7 @@ it('shows a trashed fiche by url only to who may delete', function () {
     $this->get("/crm/people/{$person->id}")->assertOk();
 });
 
-it('reaches the notes, attachments and affiliations of a trashed fiche only with crm.delete', function () {
+it('reaches the notes, attachments and affiliations of a trashed fiche only with crm.fiches.delete', function () {
     Storage::fake('local');
     $org = Organisation::query()->create(['name' => 'Disparue']);
     $person = makePerson('Liée');

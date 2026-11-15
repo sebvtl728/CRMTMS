@@ -20,7 +20,8 @@ use Illuminate\Support\Facades\Auth;
  * « Historique » of an entreprise or a person: the actions on the fiche or
  * on one of its opportunities, at their done date (their due date while to
  * do), with type, status, result and report. Only the actions the viewer
- * sees (CrmVisibility); none without a signed-in viewer.
+ * sees (CrmVisibility), each with his rights on it (can_update,
+ * can_delete); none without a signed-in viewer.
  */
 final class ActivitiesProvider implements TimelineProvider
 {
@@ -34,15 +35,18 @@ final class ActivitiesProvider implements TimelineProvider
         }
 
         $column = $subject instanceof Organisation ? 'organisation_id' : 'person_id';
-        $query = Activity::query()->with(['type', 'result', 'responsible:id,name', 'opportunity:id,title'])
+        $query = Activity::query()->with(['type', 'result', 'responsible:id,name', 'opportunity:id,title,organisation_id,person_id,deleted_at'])
             ->where(fn ($q) => $q->where($column, $subject->getKey())
                 ->orWhereIn('opportunity_id', Opportunity::withTrashed()->select('id')->where($column, $subject->getKey())));
         $now = CarbonImmutable::now();
 
-        return CrmVisibility::activities($query, $user)
+        $activities = CrmVisibility::activities($query, $user)
             ->tap(fn ($q) => Timeline::after($q, $before, self::TYPE, 'happened_at'))
-            ->orderByDesc('happened_at')->orderByDesc('id')->limit($limit)->get()
-            ->map(function (Activity $activity) use ($now): TimelineEntry {
+            ->orderByDesc('happened_at')->orderByDesc('id')->limit($limit)->get();
+        $rights = ActivityRows::rights($activities, $user);
+
+        return $activities->toBase()
+            ->map(function (Activity $activity) use ($now, $rights): TimelineEntry {
                 $status = $activity->status($now);
                 assert($activity->happened_at !== null);
 
@@ -61,6 +65,7 @@ final class ActivitiesProvider implements TimelineProvider
                         'duration_minutes' => $activity->duration_minutes,
                         'opportunity_id' => $activity->opportunity_id,
                         'opportunity' => $activity->opportunity?->title,
+                        ...$rights[(string) $activity->id],
                     ],
                 );
             });

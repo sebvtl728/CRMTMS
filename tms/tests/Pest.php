@@ -1,6 +1,8 @@
 <?php
 
 use App\Modules\Core\Access\Role;
+use App\Modules\Core\Access\RoleModel;
+use App\Modules\Core\Access\RoleSeeder;
 use App\Modules\Core\Companies\Company;
 use App\Modules\Core\References\ReferenceItem;
 use App\Modules\Core\References\ReferenceList;
@@ -27,7 +29,9 @@ use Illuminate\Filesystem\Filesystem;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 use PragmaRX\Google2FA\Google2FA;
+use Spatie\Permission\PermissionRegistrar;
 use Tests\RefreshDatabaseAsOwner;
 use Tests\TestCase;
 
@@ -142,6 +146,25 @@ function commercial(bool $twoFactor = false): User
 function assistant(bool $twoFactor = false): User
 {
     return userWithRole(Role::Assistant, $twoFactor);
+}
+
+/**
+ * A user of the current tenant whose only role is a custom one holding
+ * exactly $permissions (a role created directly, as an administrator would
+ * from « Rôles et droits »).
+ *
+ * @param  list<string>  $permissions
+ */
+function userWithPermissions(array $permissions): User
+{
+    tenant();
+    $role = RoleModel::create(['name' => 'custom_'.Str::uuid7(), 'guard_name' => RoleSeeder::GUARD]);
+    $role->givePermissionTo($permissions);
+    $user = User::factory()->create();
+    $user->syncRoles([$role]);
+    app(PermissionRegistrar::class)->forgetCachedPermissions();
+
+    return $user->fresh();
 }
 
 /**

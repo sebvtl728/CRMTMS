@@ -2,6 +2,8 @@
 
 namespace App\Modules\Core\Access;
 
+use App\Exceptions\UserFacingHttpException;
+use App\Modules\Core\Users\Invitation;
 use App\Modules\Core\Users\InvitationAccepted;
 use App\Modules\Core\Users\User;
 use Illuminate\Cache\RateLimiting\Limit;
@@ -36,11 +38,15 @@ class AccessServiceProvider extends ServiceProvider
 
         // A long-running worker serves many jobs of the same organisme: reload
         // the permissions at each job (changed meanwhile by the web).
-        Event::listen(JobProcessing::class, fn () => $this->app->make(PermissionRegistrar::class)->clearPermissionsCollection());
+        Event::listen(JobProcessing::class, function (): void {
+            $this->app->make(PermissionRegistrar::class)->clearPermissionsCollection();
+            Scopes::forget();
+        });
 
         // The invited role becomes the primary role once the account is activated.
+        // (ActivationController checked, under lock, that the role still exists.)
         Event::listen(InvitationAccepted::class, function (InvitationAccepted $event): void {
-            $event->user->assignPrimaryRole($event->invitation->role);
+            $event->user->assignPrimaryRole($event->invitation->roleModel() ?? throw new UserFacingHttpException(410, Invitation::ROLE_GONE));
         });
     }
 }

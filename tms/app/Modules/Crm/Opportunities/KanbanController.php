@@ -7,8 +7,10 @@ use App\Modules\Core\References\ReferenceList;
 use App\Modules\Core\Users\User;
 use App\Modules\Crm\Permissions;
 use App\Modules\Crm\Support\FormOptions;
+use App\Modules\Crm\Visibility\CrmVisibility;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -52,7 +54,7 @@ class KanbanController extends Controller
         $stages = OpportunityStage::options();
         $active = array_column($stages, 'value');
         $held = array_values(array_diff(array_map('strval', $totals->keys()->all()), $active));
-        $columns = array_map(function (array $stage) use ($query, $totals, $active): array {
+        $columns = array_map(function (array $stage) use ($query, $totals, $active, $user): array {
             $total = $totals->get($stage['value']);
 
             return [
@@ -61,9 +63,8 @@ class KanbanController extends Controller
                 'count' => (int) ($total->count ?? 0),
                 'amount' => number_format((float) ($total->amount ?? 0), 2, '.', ''),
                 'weighted_amount' => number_format((float) ($total->weighted ?? 0), 2, '.', ''),
-                'cards' => $query()->where('opportunities.stage_id', $stage['value'])
-                    ->with(OpportunityRows::WITH)->limit(self::CARDS)->get()
-                    ->map(fn (Opportunity $o) => OpportunityRows::row($o))->values()->all(),
+                'cards' => self::cards($query()->where('opportunities.stage_id', $stage['value'])
+                    ->with(OpportunityRows::WITH)->limit(self::CARDS)->get(), $user),
             ];
         }, $held === [] ? $stages : OpportunityStage::options($held));
 
@@ -75,8 +76,22 @@ class KanbanController extends Controller
             'lossReasons' => FormOptions::reference(ReferenceList::LossReason),
             'closedDays' => self::CLOSED_DAYS,
             'cardsLimit' => self::CARDS,
-            'can' => ['update' => $user->can(Permissions::UPDATE), 'export' => $user->can(Permissions::EXPORT)],
+            'can' => ['update' => $user->can(Permissions::OPPORTUNITIES_UPDATE), 'export' => $user->can(Permissions::EXPORT)],
             'status' => $request->session()->get('status'),
         ]);
+    }
+
+    /**
+     * Cards with can_update: the scope of crm.opportunities.update (the
+     * list never holds an opportunity of a trashed fiche).
+     *
+     * @param  Collection<int, Opportunity>  $opportunities
+     * @return list<array<string, mixed>>
+     */
+    private static function cards(Collection $opportunities, User $user): array
+    {
+        $updatable = CrmVisibility::allowedIds($user, Permissions::OPPORTUNITIES_UPDATE, $opportunities);
+
+        return $opportunities->map(fn (Opportunity $o) => [...OpportunityRows::row($o), 'can_update' => isset($updatable[(string) $o->id])])->values()->all();
     }
 }

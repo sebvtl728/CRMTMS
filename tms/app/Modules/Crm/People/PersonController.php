@@ -13,6 +13,7 @@ use App\Modules\Crm\Gdpr\Consent;
 use App\Modules\Crm\Gdpr\ConsentChannel;
 use App\Modules\Crm\Gdpr\GdprPending;
 use App\Modules\Crm\Gdpr\LegalBasis;
+use App\Modules\Crm\Gdpr\PersonDataExport;
 use App\Modules\Crm\Interests\FicheTrainings;
 use App\Modules\Crm\Opportunities\OpportunityRows;
 use App\Modules\Crm\Opportunities\OpportunityTrainings;
@@ -48,7 +49,7 @@ class PersonController extends Controller
     public function index(Request $request): Response
     {
         $user = $this->user($request);
-        $canDelete = $user->can(Permissions::DELETE);
+        $canDelete = $user->can(Permissions::FICHES_DELETE);
 
         $filters = PersonListQuery::filters($request->query(), $user);
         $export = CrmResource::People->export();
@@ -86,7 +87,7 @@ class PersonController extends Controller
                 'responsible' => FormOptions::responsible(),
                 'training' => OpportunityTrainings::filterOptions($filters['training']),
             ],
-            'can' => ['create' => $user->can(Permissions::CREATE), 'delete' => $canDelete, 'export' => $user->can(Permissions::EXPORT), 'import' => $user->can(Permissions::IMPORT)],
+            'can' => ['create' => $user->can(Permissions::FICHES_UPDATE), 'delete' => $canDelete, 'export' => $user->can(Permissions::EXPORT), 'import' => $user->can(Permissions::IMPORT)],
             ...ListExtras::for(CrmResource::People, $user, $request->query('saved')),
             'status' => $request->session()->get('status'),
         ]);
@@ -240,12 +241,14 @@ class PersonController extends Controller
             'similar' => $user->can(Permissions::MERGE) ? $this->duplicates->similarTo($person, $user) : [],
             'can' => [
                 'merge' => ! $person->trashed() && $person->anonymised_at === null && $user->can(Permissions::MERGE),
-                'createOpportunity' => $person->is_individual && ! $person->trashed() && $person->anonymised_at === null && $user->can(Permissions::CREATE),
+                'createOpportunity' => $person->is_individual && ! $person->trashed() && $person->anonymised_at === null && $user->can(Permissions::OPPORTUNITIES_UPDATE),
                 'update' => ! $person->trashed() && $user->can('update', $person),
                 'delete' => ! $person->trashed() && $user->can('delete', $person),
                 'restore' => $person->trashed() && $user->can('restore', $person),
                 'consent' => ! $person->trashed() && $user->can('update', $person),
                 'gdpr' => $user->can('gdpr', $person),
+                // The RGPD export is complete: only for who sees the whole organisme.
+                'gdprExport' => $user->can('gdpr', $person) && PersonDataExport::allowedFor($user),
                 'anonymise' => $person->anonymised_at === null && $user->can('gdpr', $person),
             ],
             'status' => $request->session()->get('status'),

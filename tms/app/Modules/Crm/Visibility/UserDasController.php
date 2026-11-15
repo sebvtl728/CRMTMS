@@ -3,7 +3,6 @@
 namespace App\Modules\Crm\Visibility;
 
 use App\Http\Controllers\Controller;
-use App\Modules\Core\Access\Role;
 use App\Modules\Core\Audit\AuditRecorder;
 use App\Modules\Core\References\ReferenceList;
 use App\Modules\Core\Tenancy\TenantContext;
@@ -15,7 +14,7 @@ use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 
 /**
- * « DAS suivis » of a Responsable DAS (users.manage), audited.
+ * « DAS suivis » of a user whose role uses « Ses DAS » (users.manage), audited.
  */
 class UserDasController extends Controller
 {
@@ -31,8 +30,8 @@ class UserDasController extends Controller
             'das_ids.*.exists' => 'Ce DAS n\'existe pas ou n\'est plus disponible.',
         ]);
 
-        if ($user->role() !== Role::ResponsableDas) {
-            throw ValidationException::withMessages(['das_ids' => 'Seul un utilisateur ayant le rôle Responsable DAS suit des DAS.']);
+        if (! FollowedDas::applies($user)) {
+            throw ValidationException::withMessages(['das_ids' => 'Seul un utilisateur dont le rôle porte sur « Ses DAS » suit des DAS.']);
         }
 
         $after = array_values($data['das_ids']);

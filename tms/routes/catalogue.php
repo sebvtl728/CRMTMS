@@ -12,5 +12,5 @@ Route::middleware(['auth'])->prefix('catalogue')->name('catalogue.')->group(func
     Route::get('{training}/edit', [TrainingController::class, 'edit'])->middleware('can:catalogue.manage')->name('edit');
     Route::put('{training}/edit', [TrainingController::class, 'update'])->middleware('can:catalogue.manage')->name('update');
     Route::post('{training}/toggle', [TrainingController::class, 'toggle'])->middleware('can:catalogue.manage')->name('toggle');
-    Route::delete('{training}', [TrainingController::class, 'destroy'])->middleware('can:catalogue.manage')->name('destroy');
+    Route::delete('{training}', [TrainingController::class, 'destroy'])->middleware('can:catalogue.delete')->name('destroy');
 });
