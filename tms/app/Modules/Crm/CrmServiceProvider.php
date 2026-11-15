@@ -37,6 +37,7 @@ use App\Modules\Crm\Quotes\Quote;
 use App\Modules\Crm\Quotes\QuoteLine;
 use App\Modules\Crm\Quotes\QuotePolicy;
 use App\Modules\Crm\Quotes\QuotesProvider;
+use App\Modules\Crm\Revenue\RevenueTarget;
 use App\Modules\Crm\Search\SavedFilter;
 use App\Modules\Crm\Support\CrmMailTemplates;
 use App\Modules\Crm\Support\LinkedData;
@@ -109,6 +110,7 @@ class CrmServiceProvider extends ServiceProvider
             'activity' => Activity::class,
             'quote' => Quote::class,
             'quote_line' => QuoteLine::class,
+            'revenue_target' => RevenueTarget::class,
         ]);
 
         // Sources of the « Historique »; later increments tag their own.
@@ -522,5 +524,6 @@ class CrmServiceProvider extends ServiceProvider
         ReferenceUsage::register(ReferenceList::ActionType, 'activities', 'type_id');
         ReferenceUsage::register(ReferenceList::ActionResult, 'activities', 'result_id');
         ReferenceUsage::register(ReferenceList::Das, 'quote_lines', 'das_id');
+        ReferenceUsage::register(ReferenceList::Das, 'revenue_targets', 'das_id');
     }
 }

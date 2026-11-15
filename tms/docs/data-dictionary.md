@@ -357,6 +357,19 @@ Index : `opportunity_id`, `organisation_id`, `person_id`, `contact_person_id`, (
 
 Index : `quote_id`, `training_id`, `das_id`. Journalisée (`quote_line`). La TVA se calcule **par taux** sur la somme des lignes du même taux, pas ligne par ligne.
 
+### `revenue_targets` — objectifs de chiffre d'affaires par DAS
+| Colonne | Type | Rôle |
+|---|---|---|
+| `id`, `tenant_id` | uuid | |
+| `das_id` | uuid (FK `reference_items`) | DAS (`ReferenceUsage` : un DAS ayant un objectif ne se supprime pas) |
+| `period_type` | string(10) | `month`, `quarter` ou `year` (CHECK) |
+| `period_start` | date | Premier jour de la période |
+| `amount` | numeric(12,2) | Objectif HT (CHECK ≥ 0) ; 0 ou vide = pas d'objectif (ligne supprimée) |
+| `created_by`, `updated_by` | uuid, null | |
+| `created_at`, `updated_at` | timestamp | |
+
+Unique (`tenant_id`, `das_id`, `period_type`, `period_start`) : l'objectif d'un trimestre n'est pas la somme de ses mois. Journalisée (`revenue_target`).
+
 Étape « devis envoyé » : clé `meta.quote_stage = true` sur une seule valeur `pipeline_stage` de `reference_items` par organisme.
 
 ## CRM : import (lot 1b, RLS)
