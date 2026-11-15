@@ -151,3 +151,16 @@ it('opens the CRM with any one view right', function () {
     $this->getJson('/crm/search?q=abc')->assertForbidden();
     $this->get('/crm/organisations/export/check')->assertForbidden();
 });
+
+it('quote rights alone never reach the creation of a quote on an opportunity', function () {
+    $user = userWithPermissions([Permissions::QUOTES_VIEW, Permissions::QUOTES_UPDATE]);
+    $org = Organisation::query()->create(['name' => 'Hôtel du Parc']);
+    $opportunity = makeOpportunity($org);
+    $company = Company::factory()->default()->create();
+
+    $this->actingAs($user);
+    $status = $this->get("/crm/opportunities/{$opportunity->id}/quotes/create")->status();
+    expect($status)->toBeIn([403, 404]);
+    $this->post('/crm/quotes', quotePayload($opportunity, $company))->assertSessionHasErrors('opportunity_id');
+    expect(Quote::query()->count())->toBe(0);
+});

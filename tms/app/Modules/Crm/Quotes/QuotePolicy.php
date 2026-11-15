@@ -26,11 +26,14 @@ class QuotePolicy
     }
 
     /**
-     * A new quote (or a new version) on $opportunity.
+     * A new quote (or a new version) on $opportunity: only by whoever sees
+     * that opportunity (as QuoteRequest::opportunity() on store).
      */
     public function create(User $user, Opportunity $opportunity): bool
     {
-        return $this->opportunityOpen($opportunity) && CrmVisibility::quotable($user, Permissions::QUOTES_UPDATE, $opportunity);
+        return $this->opportunityOpen($opportunity)
+            && CrmVisibility::allows($user, Permissions::OPPORTUNITIES_VIEW, $opportunity)
+            && CrmVisibility::quotable($user, Permissions::QUOTES_UPDATE, $opportunity);
     }
 
     public function update(User $user, Quote $quote): bool
