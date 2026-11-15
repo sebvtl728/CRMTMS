@@ -19,7 +19,7 @@ class OrganisationPolicy
 
     public function view(User $user, Organisation $organisation): bool
     {
-        return $user->can(Permissions::FICHES_VIEW) && $this->visible($user, $organisation);
+        return CrmVisibility::allows($user, Permissions::FICHES_VIEW, $organisation);
     }
 
     public function create(User $user): bool
@@ -29,22 +29,16 @@ class OrganisationPolicy
 
     public function update(User $user, Organisation $organisation): bool
     {
-        return $user->can(Permissions::FICHES_UPDATE) && $this->visible($user, $organisation);
+        return CrmVisibility::allows($user, Permissions::FICHES_UPDATE, $organisation);
     }
 
     public function delete(User $user, Organisation $organisation): bool
     {
-        return $user->can(Permissions::FICHES_DELETE) && $this->visible($user, $organisation);
+        return CrmVisibility::allows($user, Permissions::FICHES_DELETE, $organisation);
     }
 
     public function restore(User $user, Organisation $organisation): bool
     {
         return $this->delete($user, $organisation);
-    }
-
-    private function visible(User $user, Organisation $organisation): bool
-    {
-        return ! CrmVisibility::restricts($user)
-            || CrmVisibility::organisations(Organisation::withTrashed(), $user)->whereKey($organisation->getKey())->exists();
     }
 }

@@ -24,7 +24,7 @@ export interface TimelineEntryData {
 interface Props {
     kind: 'organisation' | 'person';
     subjectId: string;
-    /** May add / remove notes and files (crm.fiches.update on a live fiche). */
+    /** May add / remove notes and files (crm.fiches.update on a live fiche); actions carry their own rights (meta.can_update, meta.can_delete). */
     canEdit: boolean;
 }
 
@@ -295,7 +295,7 @@ export function Timeline({ kind, subjectId, canEdit }: Props) {
                                     </p>
                                 )}
                             </div>
-                            {canEdit && entry.type === 'activity' && entry.meta.status !== 'done' && entry.meta.id && (
+                            {entry.type === 'activity' && entry.meta.can_update === true && entry.meta.status !== 'done' && entry.meta.id && (
                                 <Button
                                     type="button"
                                     variant="outline"
@@ -307,7 +307,7 @@ export function Timeline({ kind, subjectId, canEdit }: Props) {
                                     Fait
                                 </Button>
                             )}
-                            {canEdit && REMOVABLE.includes(entry.type) && entry.meta.id && (
+                            {(entry.type === 'activity' ? entry.meta.can_delete === true : canEdit) && REMOVABLE.includes(entry.type) && entry.meta.id && (
                                 <Button
                                     type="button"
                                     variant="ghost"

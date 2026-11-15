@@ -7,8 +7,8 @@ use App\Modules\Crm\Permissions;
 use App\Modules\Crm\Visibility\CrmVisibility;
 
 /**
- * Permissions crm.opportunities.* plus the DAS visibility (invisible opportunities are
- * already 404 at route binding).
+ * Permissions crm.opportunities.* within their scope (CrmVisibility::allows;
+ * opportunities outside the view scope are already 404 at route binding).
  */
 class OpportunityPolicy
 {
@@ -19,7 +19,7 @@ class OpportunityPolicy
 
     public function view(User $user, Opportunity $opportunity): bool
     {
-        return $user->can(Permissions::OPPORTUNITIES_VIEW) && $this->visible($user, $opportunity);
+        return CrmVisibility::allows($user, Permissions::OPPORTUNITIES_VIEW, $opportunity);
     }
 
     public function create(User $user): bool
@@ -29,12 +29,12 @@ class OpportunityPolicy
 
     public function update(User $user, Opportunity $opportunity): bool
     {
-        return $user->can(Permissions::OPPORTUNITIES_UPDATE) && $this->visible($user, $opportunity) && ! $this->ficheTrashed($opportunity);
+        return ! $this->ficheTrashed($opportunity) && CrmVisibility::allows($user, Permissions::OPPORTUNITIES_UPDATE, $opportunity);
     }
 
     public function delete(User $user, Opportunity $opportunity): bool
     {
-        return $user->can(Permissions::OPPORTUNITIES_DELETE) && $this->visible($user, $opportunity) && ! $this->ficheTrashed($opportunity);
+        return ! $this->ficheTrashed($opportunity) && CrmVisibility::allows($user, Permissions::OPPORTUNITIES_DELETE, $opportunity);
     }
 
     /**
@@ -45,11 +45,5 @@ class OpportunityPolicy
         $fiche = $opportunity->organisation_id !== null ? $opportunity->organisation : $opportunity->person;
 
         return $fiche === null || $fiche->trashed();
-    }
-
-    private function visible(User $user, Opportunity $opportunity): bool
-    {
-        return ! CrmVisibility::restricts($user)
-            || CrmVisibility::opportunities(Opportunity::withTrashed(), $user)->whereKey($opportunity->getKey())->exists();
     }
 }

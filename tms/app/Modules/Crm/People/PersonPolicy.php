@@ -19,7 +19,7 @@ class PersonPolicy
 
     public function view(User $user, Person $person): bool
     {
-        return $user->can(Permissions::FICHES_VIEW) && $this->visible($user, $person);
+        return CrmVisibility::allows($user, Permissions::FICHES_VIEW, $person);
     }
 
     public function create(User $user): bool
@@ -30,28 +30,22 @@ class PersonPolicy
     public function update(User $user, Person $person): bool
     {
         // An anonymised fiche is never filled again.
-        return $user->can(Permissions::FICHES_UPDATE) && $person->anonymised_at === null && $this->visible($user, $person);
+        return $person->anonymised_at === null && CrmVisibility::allows($user, Permissions::FICHES_UPDATE, $person);
     }
 
     /** Data export, anonymisation, « Conserver ». */
     public function gdpr(User $user, Person $person): bool
     {
-        return $user->can(Permissions::GDPR) && $this->visible($user, $person);
+        return $user->can(Permissions::GDPR) && CrmVisibility::allows($user, Permissions::FICHES_VIEW, $person);
     }
 
     public function delete(User $user, Person $person): bool
     {
-        return $user->can(Permissions::FICHES_DELETE) && $this->visible($user, $person);
+        return CrmVisibility::allows($user, Permissions::FICHES_DELETE, $person);
     }
 
     public function restore(User $user, Person $person): bool
     {
         return $this->delete($user, $person);
-    }
-
-    private function visible(User $user, Person $person): bool
-    {
-        return ! CrmVisibility::restricts($user)
-            || CrmVisibility::people(Person::withTrashed(), $user)->whereKey($person->getKey())->exists();
     }
 }

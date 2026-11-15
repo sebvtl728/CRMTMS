@@ -2,6 +2,8 @@
 
 namespace App\Modules\Crm\Gdpr;
 
+use App\Modules\Core\Access\AccessScope;
+use App\Modules\Core\Access\Scopes;
 use App\Modules\Core\References\ReferenceItem;
 use App\Modules\Core\Users\User;
 use App\Modules\Crm\Activities\Activity;
@@ -11,6 +13,7 @@ use App\Modules\Crm\Interests\FicheTrainings;
 use App\Modules\Crm\Opportunities\Opportunity;
 use App\Modules\Crm\Organisations\Organisation;
 use App\Modules\Crm\People\Person;
+use App\Modules\Crm\Permissions;
 use App\Modules\Crm\Quotes\Quote;
 use App\Modules\Crm\Timeline\Attachment;
 use App\Modules\Crm\Timeline\Note;
@@ -27,8 +30,8 @@ use Illuminate\Support\Facades\DB;
  * type, subject, status, result, report, place), notes, consents, attachments (listed, not their
  * content), trainings of interest (« Formations d'intérêt »), DAS and dates. Trashed items are included (still held), flagged.
  * Fiches merged into her are listed by id (their data now lives here).
- * Visibility rules apply: for a restricted viewer (Responsable DAS), only
- * the links to entreprises he may see.
+ * Visibility rules apply: each domain within the viewer's view scope; when
+ * he does not see every entreprise, only the links to those he sees.
  */
 final class PersonDataExport
 {
@@ -43,7 +46,7 @@ final class PersonDataExport
 
         $links = Affiliation::withTrashed()->with(['organisation' => fn ($q) => $q->withTrashed(), 'decisionRole'])
             ->where('person_id', $person->id)
-            ->when($viewer !== null && CrmVisibility::restricts($viewer), fn ($q) => $q->whereIn('organisation_id', CrmVisibility::organisations(Organisation::withTrashed(), $viewer)->select('organisations.id')))
+            ->when($viewer !== null && Scopes::of($viewer, Permissions::FICHES_VIEW) !== AccessScope::All, fn ($q) => $q->whereIn('organisation_id', CrmVisibility::organisations(Organisation::withTrashed(), $viewer)->select('organisations.id')))
             ->orderBy('created_at')->get();
         $notes = Note::withTrashed()->where('notable_type', $person->getMorphClass())->where('notable_id', $person->id)->orderBy('created_at')->get();
         $files = Attachment::withTrashed()->where('notable_type', $person->getMorphClass())->where('notable_id', $person->id)->orderBy('created_at')->get();

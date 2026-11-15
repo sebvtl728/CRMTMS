@@ -16,7 +16,7 @@ use Carbon\CarbonImmutable;
 
 /**
  * The commercial blocks of « Accueil », always within what the user may
- * see (Responsable DAS: his DAS only):
+ * see (each block within the view scope of its domain):
  * - « Mes relances »: his own actions overdue and due today (as « À faire »);
  * - « Pipeline pondéré du mois »: weighted amount of the open opportunities
  *   expected to close in the current Paris month (as the list filtered so);

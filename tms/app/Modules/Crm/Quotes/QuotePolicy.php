@@ -22,7 +22,7 @@ class QuotePolicy
 
     public function view(User $user, Quote $quote): bool
     {
-        return $user->can(Permissions::QUOTES_VIEW) && $this->visible($user, $quote);
+        return CrmVisibility::allows($user, Permissions::QUOTES_VIEW, $quote);
     }
 
     /**
@@ -30,50 +30,43 @@ class QuotePolicy
      */
     public function create(User $user, Opportunity $opportunity): bool
     {
-        return $user->can(Permissions::QUOTES_UPDATE) && $this->opportunityOpen($user, $opportunity);
+        return $this->opportunityOpen($opportunity) && CrmVisibility::quotable($user, Permissions::QUOTES_UPDATE, $opportunity);
     }
 
     public function update(User $user, Quote $quote): bool
     {
-        return $user->can(Permissions::QUOTES_UPDATE) && $this->editable($user, $quote);
+        return $this->editable($quote) && CrmVisibility::allows($user, Permissions::QUOTES_UPDATE, $quote);
     }
 
     public function delete(User $user, Quote $quote): bool
     {
-        return $user->can(Permissions::QUOTES_DELETE) && $this->editable($user, $quote);
+        return $this->editable($quote) && CrmVisibility::allows($user, Permissions::QUOTES_DELETE, $quote);
     }
 
     public function duplicate(User $user, Quote $quote): bool
     {
         $opportunity = $quote->opportunity;
 
-        return $opportunity !== null && $this->visible($user, $quote) && $this->create($user, $opportunity);
+        return $opportunity !== null && $this->view($user, $quote) && $this->create($user, $opportunity);
     }
 
-    private function editable(User $user, Quote $quote): bool
+    private function editable(Quote $quote): bool
     {
         $opportunity = $quote->opportunity;
 
-        return ! $quote->trashed() && $opportunity !== null && $this->visible($user, $quote) && $this->opportunityOpen($user, $opportunity);
+        return ! $quote->trashed() && $opportunity !== null && $this->opportunityOpen($opportunity);
     }
 
     /**
-     * Visible, not trashed, on a fiche that is not trashed either.
+     * Not trashed, on a fiche that is not trashed either.
      */
-    private function opportunityOpen(User $user, Opportunity $opportunity): bool
+    private function opportunityOpen(Opportunity $opportunity): bool
     {
         if ($opportunity->trashed()) {
             return false;
         }
         $fiche = $opportunity->organisation_id !== null ? $opportunity->organisation : $opportunity->person;
 
-        return $fiche !== null && ! $fiche->trashed()
-            && (! CrmVisibility::restricts($user) || CrmVisibility::opportunities(Opportunity::query(), $user)->whereKey($opportunity->getKey())->exists());
-    }
-
-    private function visible(User $user, Quote $quote): bool
-    {
-        return ! CrmVisibility::restricts($user)
-            || CrmVisibility::quotes(Quote::withTrashed(), $user)->whereKey($quote->getKey())->exists();
+        return $fiche !== null && ! $fiche->trashed();
     }
 }

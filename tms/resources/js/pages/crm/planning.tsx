@@ -30,6 +30,8 @@ interface PlanningItem {
     organisation: Fiche | null;
     person: Fiche | null;
     opportunity: Fiche | null;
+    /** Compte rendu: scope of crm.activities.update. */
+    can_update: boolean;
 }
 
 interface PlanningDay {
@@ -78,7 +80,7 @@ function Item({ item, canReport, today, day }: { item: PlanningItem; canReport: 
     const fiche = item.person?.name ?? item.organisation?.name ?? item.opportunity?.name;
     const duration = formatDuration(item.duration_minutes);
     const Icon = item.kind === 'call' ? Phone : CalendarDays;
-    const reportable = canReport && item.kind === 'meeting' && item.status !== 'done' && day === today;
+    const reportable = canReport && item.can_update && item.kind === 'meeting' && item.status !== 'done' && day === today;
 
     return (
         <li

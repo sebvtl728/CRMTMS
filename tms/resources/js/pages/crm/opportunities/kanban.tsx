@@ -30,6 +30,9 @@ import { Head, Link, router } from '@inertiajs/react';
 import { GripVertical, List } from 'lucide-react';
 import { useMemo, useState } from 'react';
 
+/** A card: the viewer may move it (scope of crm.opportunities.update). */
+type KanbanCard = OpportunityRow & { can_update: boolean };
+
 interface Column {
     stage: StageOption;
     /** Deactivated stage still holding opportunities: shown, never a drop target. */
@@ -37,7 +40,7 @@ interface Column {
     count: number;
     amount: string;
     weighted_amount: string;
-    cards: OpportunityRow[];
+    cards: KanbanCard[];
 }
 
 interface KanbanProps {
@@ -132,7 +135,7 @@ function KanbanColumn({
     canUpdate,
 }: {
     column: Column;
-    cards: OpportunityRow[];
+    cards: KanbanCard[];
     closedDays: number;
     cardsLimit: number;
     canUpdate: boolean;
@@ -148,7 +151,7 @@ function KanbanColumn({
             <ColumnHeader column={column} closedDays={closedDays} />
             <ul className="grid min-h-24 content-start gap-2 p-2">
                 {cards.map((card) => (
-                    <DraggableCard key={card.id} card={card} disabled={!canUpdate} />
+                    <DraggableCard key={card.id} card={card} disabled={!canUpdate || !card.can_update} />
                 ))}
             </ul>
             {column.count > column.cards.length && (
@@ -177,7 +180,7 @@ export default function OpportunitiesKanban({ columns, filters, options, stages,
 
     const cardsByStage = useMemo(() => {
         const all = columns.flatMap((c) => c.cards);
-        const byStage: Record<string, OpportunityRow[]> = {};
+        const byStage: Record<string, KanbanCard[]> = {};
         columns.forEach((c) => (byStage[c.stage.value] = []));
         all.forEach((card) => byStage[pending[card.id] ?? card.stage.id]?.push(card));
 
@@ -311,7 +314,7 @@ export default function OpportunitiesKanban({ columns, filters, options, stages,
                                     {column.cards.map((card) => (
                                         <li key={card.id} className="rounded-lg border p-2">
                                             <CardBody card={card} />
-                                            {can.update && (
+                                            {can.update && card.can_update && (
                                                 <Button
                                                     type="button"
                                                     variant="outline"

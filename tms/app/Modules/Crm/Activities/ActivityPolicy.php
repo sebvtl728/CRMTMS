@@ -17,7 +17,7 @@ class ActivityPolicy
 {
     public function view(User $user, Activity $activity): bool
     {
-        return $user->can(Permissions::ACTIVITIES_VIEW) && $this->visible($user, $activity);
+        return CrmVisibility::allows($user, Permissions::ACTIVITIES_VIEW, $activity);
     }
 
     public function create(User $user): bool
@@ -27,17 +27,11 @@ class ActivityPolicy
 
     public function update(User $user, Activity $activity): bool
     {
-        return $user->can(Permissions::ACTIVITIES_UPDATE) && $this->visible($user, $activity) && ! $activity->ficheTrashed();
+        return ! $activity->ficheTrashed() && CrmVisibility::allows($user, Permissions::ACTIVITIES_UPDATE, $activity);
     }
 
     public function delete(User $user, Activity $activity): bool
     {
-        return $user->can(Permissions::ACTIVITIES_DELETE) && $this->visible($user, $activity) && ! $activity->ficheTrashed();
-    }
-
-    private function visible(User $user, Activity $activity): bool
-    {
-        return ! CrmVisibility::restricts($user)
-            || CrmVisibility::activities(Activity::withTrashed(), $user)->whereKey($activity->getKey())->exists();
+        return ! $activity->ficheTrashed() && CrmVisibility::allows($user, Permissions::ACTIVITIES_DELETE, $activity);
     }
 }

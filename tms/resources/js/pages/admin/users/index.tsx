@@ -20,6 +20,8 @@ interface UserRow {
     last_login_at: string | null;
     role: string | null;
     das_ids?: string[];
+    // Provided by the CRM module: the role uses the « Ses DAS » scope.
+    follows_das?: boolean;
     is_self: boolean;
     two_factor: boolean;
 }
@@ -102,7 +104,7 @@ function ActivationLinkNotice({ warning, link }: { warning: string; link?: strin
     );
 }
 
-// « DAS suivis » of a Responsable DAS: what he sees in the CRM.
+// « DAS suivis » of a user whose role uses « Ses DAS »: what he sees in the CRM.
 function DasDialog({ user, options, onClose }: { user: UserRow | null; options: { value: string; label: string }[]; onClose: () => void }) {
     const [selected, setSelected] = useState<string[]>(user?.das_ids ?? []);
     const [saving, setSaving] = useState(false);
@@ -245,7 +247,7 @@ export default function UsersIndex({ users, dasOptions, roleOptions, invitations
                                     <td className="px-4 py-2">{formatDate(user.last_login_at)}</td>
                                     {dasOptions && (
                                         <td className="px-4 py-2">
-                                            {user.role === 'responsable_das' ? (
+                                            {user.follows_das ? (
                                                 <Button type="button" variant="outline" size="sm" onClick={() => setDasUser(user)}>
                                                     {(user.das_ids ?? []).length === 0
                                                         ? 'Aucun (à définir)'

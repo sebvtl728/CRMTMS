@@ -3,9 +3,11 @@
 namespace App\Modules\Crm;
 
 use App\Modules\Catalogue\TrainingUsage;
+use App\Modules\Core\Access\AccessScope;
 use App\Modules\Core\Access\Permissions as CorePermissions;
 use App\Modules\Core\Access\PrimaryRoleChanged;
 use App\Modules\Core\Access\Role;
+use App\Modules\Core\Access\Scopes;
 use App\Modules\Core\Audit\MorphAliases;
 use App\Modules\Core\References\ReferenceList;
 use App\Modules\Core\References\ReferenceUsage;
@@ -154,10 +156,10 @@ class CrmServiceProvider extends ServiceProvider
             // A merged fiche is resolved before the visibility filter (it has
             // lost its DAS and links): only the final kept fiche must be visible.
             self::redirectIfMerged(Organisation::withTrashed()->whereKey($value)->whereNotNull('merged_into_id')->first(), $value,
-                fn () => $user instanceof User ? CrmVisibility::organisations(Organisation::withTrashed(), $user) : Organisation::withTrashed(), 'crm.organisations.show');
+                fn () => self::filters($user, Permissions::FICHES_VIEW) ? CrmVisibility::organisations(Organisation::withTrashed(), $user) : Organisation::withTrashed(), 'crm.organisations.show');
 
             $query = Organisation::withTrashed();
-            if ($user instanceof User) {
+            if (self::filters($user, Permissions::FICHES_VIEW)) {
                 $query = CrmVisibility::organisations($query, $user);
             }
 
@@ -174,10 +176,10 @@ class CrmServiceProvider extends ServiceProvider
             // A merged fiche is resolved before the visibility filter (it has
             // lost its DAS and links): only the final kept fiche must be visible.
             self::redirectIfMerged(Person::withTrashed()->whereKey($value)->whereNotNull('merged_into_id')->first(), $value,
-                fn () => $user instanceof User ? CrmVisibility::people(Person::withTrashed(), $user) : Person::withTrashed(), 'crm.people.show');
+                fn () => self::filters($user, Permissions::FICHES_VIEW) ? CrmVisibility::people(Person::withTrashed(), $user) : Person::withTrashed(), 'crm.people.show');
 
             $query = Person::withTrashed();
-            if ($user instanceof User) {
+            if (self::filters($user, Permissions::FICHES_VIEW)) {
                 $query = CrmVisibility::people($query, $user);
             }
 
@@ -195,7 +197,8 @@ class CrmServiceProvider extends ServiceProvider
 
             if ($user instanceof User) {
                 // Trashed entreprises: only with crm.fiches.delete, like the fiche itself.
-                $query->whereIn('organisation_id', CrmVisibility::organisations(self::organisationsFor($user), $user)->select('organisations.id'));
+                $organisations = self::organisationsFor($user);
+                $query->whereIn('organisation_id', (Scopes::of($user, Permissions::FICHES_VIEW) !== null ? CrmVisibility::organisations($organisations, $user) : $organisations)->select('organisations.id'));
             }
 
             return $query->findOrFail($value);
@@ -213,7 +216,7 @@ class CrmServiceProvider extends ServiceProvider
             return ($user instanceof User ? $query->visibleTo($user) : $query)->findOrFail($value);
         });
 
-        // An opportunity: DAS visibility; on a trashed fiche only with crm.opportunities.delete.
+        // An opportunity: scope of crm.opportunities.view; on a trashed fiche only with crm.opportunities.delete.
         Route::bind('opportunity', function (string $value): Opportunity {
             if (! Str::isUuid($value)) {
                 throw (new ModelNotFoundException)->setModel(Opportunity::class, [$value]);
@@ -221,7 +224,7 @@ class CrmServiceProvider extends ServiceProvider
 
             $user = request()->user();
             $query = Opportunity::query();
-            if ($user instanceof User) {
+            if (self::filters($user, Permissions::OPPORTUNITIES_VIEW)) {
                 $query = CrmVisibility::opportunities($query, $user);
             }
             $opportunity = $query->with(['organisation', 'person'])->findOrFail($value);
@@ -234,7 +237,7 @@ class CrmServiceProvider extends ServiceProvider
             return $opportunity;
         });
 
-        // A quote: visible with its opportunity (its DAS), which must not be
+        // A quote: scope of crm.quotes.view, its opportunity must not be
         // trashed; on a trashed fiche only with crm.quotes.delete, like the opportunity.
         Route::bind('quote', function (string $value): Quote {
             if (! Str::isUuid($value)) {
@@ -243,7 +246,7 @@ class CrmServiceProvider extends ServiceProvider
 
             $user = request()->user();
             $query = Quote::query();
-            if ($user instanceof User) {
+            if (self::filters($user, Permissions::QUOTES_VIEW)) {
                 $query = CrmVisibility::quotes($query, $user);
             }
             $quote = $query->with(['company', 'opportunity.organisation', 'opportunity.person'])->findOrFail($value);
@@ -258,8 +261,8 @@ class CrmServiceProvider extends ServiceProvider
             return $quote;
         });
 
-        // An action: visible with its opportunity when it has one (its DAS),
-        // otherwise with one of its fiches; on a trashed fiche only with
+        // An action: scope of crm.activities.view (its opportunity when it has
+        // one, otherwise one of its fiches); on a trashed fiche only with
         // crm.fiches.delete, like the fiche (the assistant may remove actions,
         // not read the corbeille).
         Route::bind('activity', function (string $value): Activity {
@@ -269,7 +272,7 @@ class CrmServiceProvider extends ServiceProvider
 
             $user = request()->user();
             $query = Activity::query();
-            if ($user instanceof User) {
+            if (self::filters($user, Permissions::ACTIVITIES_VIEW)) {
                 $query = CrmVisibility::activities($query, $user);
             }
             $activity = $query->with(['organisation', 'person', 'opportunity.organisation', 'opportunity.person'])->findOrFail($value);
@@ -284,6 +287,18 @@ class CrmServiceProvider extends ServiceProvider
         // A note / attachment is reachable through the fiche it belongs to.
         Route::bind('note', fn (string $value): Note => self::bindOnSubject(Note::query(), $value, Note::class));
         Route::bind('attachment', fn (string $value): Attachment => self::bindOnSubject(Attachment::query(), $value, Attachment::class));
+    }
+
+    /**
+     * A signed-in user holding the view right of the domain: the record must
+     * be in its scope (404 otherwise). Without the right at all, nothing is
+     * filtered here: the route's permission or the policy answers 403.
+     *
+     * @phpstan-assert-if-true User $user
+     */
+    private static function filters(mixed $user, string $permission): bool
+    {
+        return $user instanceof User && Scopes::of($user, $permission) !== null;
     }
 
     /**
@@ -372,12 +387,19 @@ class CrmServiceProvider extends ServiceProvider
         $user = request()->user();
 
         // Subjects: the fiches the user sees, trashed ones only with crm.fiches.delete.
-        if ($user instanceof User && (CrmVisibility::restricts($user) || ! $user->can(Permissions::FICHES_DELETE))) {
-            $query->where(fn (Builder $q) => $q
-                ->where(fn (Builder $o) => $o->where('notable_type', (new Organisation)->getMorphClass())
-                    ->whereIn('notable_id', CrmVisibility::organisations(self::organisationsFor($user), $user)->select('organisations.id')))
-                ->orWhere(fn (Builder $p) => $p->where('notable_type', (new Person)->getMorphClass())
-                    ->whereIn('notable_id', CrmVisibility::people(self::peopleFor($user), $user)->select('people.id'))));
+        // Without crm.fiches.view at all: only the trash rule (the policy answers 403).
+        if ($user instanceof User) {
+            $scope = Scopes::of($user, Permissions::FICHES_VIEW);
+            $scoped = $scope !== null && $scope !== AccessScope::All;
+            if ($scoped || ! $user->can(Permissions::FICHES_DELETE)) {
+                $organisations = $scoped ? CrmVisibility::organisations(self::organisationsFor($user), $user) : self::organisationsFor($user);
+                $people = $scoped ? CrmVisibility::people(self::peopleFor($user), $user) : self::peopleFor($user);
+                $query->where(fn (Builder $q) => $q
+                    ->where(fn (Builder $o) => $o->where('notable_type', (new Organisation)->getMorphClass())
+                        ->whereIn('notable_id', $organisations->select('organisations.id')))
+                    ->orWhere(fn (Builder $p) => $p->where('notable_type', (new Person)->getMorphClass())
+                        ->whereIn('notable_id', $people->select('people.id'))));
+            }
         }
 
         return $query->findOrFail($value);

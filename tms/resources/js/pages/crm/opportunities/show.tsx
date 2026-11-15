@@ -182,7 +182,7 @@ export default function OpportunityShow({
                     </section>
                     <section className="rounded-xl border p-4 lg:col-span-2">
                         <h2 className="mb-3 text-sm font-semibold">Actions</h2>
-                        <ActivityList activities={activities} canEdit={can.update} />
+                        <ActivityList activities={activities} />
                     </section>
                     <section className="rounded-xl border p-4 lg:col-span-2">
                         <h2 className="mb-3 text-sm font-semibold">Historique des étapes</h2>

@@ -28,7 +28,7 @@ class TodoController extends Controller
         $todo = TodoQuery::for($user, CarbonImmutable::now(), $team);
 
         return Inertia::render('crm/todo', [
-            'sections' => array_map(fn ($rows) => $rows->map(fn (Activity $a) => ActivityRows::row($a))->values()->all(), $todo),
+            'sections' => array_map(fn ($rows) => ActivityRows::rows($rows, $user), $todo),
             'team' => $team,
             'can_team' => $canTeam,
             'can_edit' => $user->can(Permissions::ACTIVITIES_UPDATE),
