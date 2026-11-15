@@ -5,6 +5,30 @@ Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) ; ve
 
 ## [Non publié]
 
+## [0.5.0] - 2026-11-15
+
+Droits par domaine et par périmètre, rôles personnalisés, chiffre d'affaires par DAS.
+
+### Ajouté
+
+- **Droits par domaine** : Consulter, Créer et modifier, Supprimer pour les entreprises et personnes, les opportunités,
+  les devis et les actions ; nouveaux droits « Voir les actions de l'équipe », « Consulter le chiffre d'affaires »,
+  « Gérer les objectifs de chiffre d'affaires » et « Supprimer des formations » ; menus et pages suivent ces droits.
+- **Périmètres** « Ses fiches », « Ses DAS », « Tout l'organisme » réglables par droit et par rôle.
+- **Rôles personnalisés** (Administration › Rôles et droits › Nouveau rôle) : création, renommage, suppression (refusée
+  tant qu'un utilisateur ou une invitation en cours porte le rôle), double authentification réglable par rôle
+  (toujours obligatoire pour l'administrateur et la direction).
+- **Chiffre d'affaires par DAS** (Commercial › Chiffre d'affaires) : devis acceptés et opportunités gagnées sans devis,
+  par mois, trimestre ou année, avec détail, objectifs par DAS et carte « CA signé » sur l'accueil.
+
+### Modifié
+
+- Les droits `crm.view`, `crm.create`, `crm.update`, `crm.delete` sont remplacés par les droits par domaine. La
+  migration convertit **automatiquement** les droits de chaque organisme : chaque utilisateur garde exactement ses
+  accès, un droit retiré reste retiré, le Responsable DAS reste limité à ses DAS. Elle crée aussi de nouveaux index
+  (verrou bref lors de la mise à jour).
+- Le Responsable DAS n'est plus reconnu par son nom de rôle : la visibilité suit le périmètre « Ses DAS » du droit.
+
 ## [0.4.2] - 2026-11-14
 
 Ajustements après les premiers retours.
@@ -242,7 +266,8 @@ Lot 1a : socle de l'application.
   mise à jour avec retour arrière automatique.
 - Publication : image multi-architecture signée (cosign), archive de version, sommes de contrôle.
 
-[Non publié]: https://github.com/sebvtl728/CRMTMS/compare/v0.4.1...HEAD
+[Non publié]: https://github.com/sebvtl728/CRMTMS/compare/v0.5.0...HEAD
+[0.5.0]: https://github.com/sebvtl728/CRMTMS/compare/v0.4.2...v0.5.0
 [0.4.1]: https://github.com/sebvtl728/CRMTMS/compare/v0.4.0...v0.4.1
 [0.4.0]: https://github.com/sebvtl728/CRMTMS/compare/v0.3.1...v0.4.0
 [0.3.1]: https://github.com/sebvtl728/CRMTMS/compare/v0.3.0...v0.3.1
