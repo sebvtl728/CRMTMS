@@ -84,8 +84,8 @@ class RevenueController extends Controller
         $period = Period::of($data['period'], $data['key']);
 
         $amount = Amount::parse($data['amount'] ?? null);
-        if ($amount !== null && preg_match('/^\d+(\.\d{1,2})?$/', (string) $amount) !== 1) {
-            throw ValidationException::withMessages(['amount' => 'Indiquez un montant positif avec deux décimales au plus (par exemple 10 000,50).']);
+        if ($amount !== null && preg_match('/^\d{1,10}(\.\d{1,2})?$/', (string) $amount) !== 1) {
+            throw ValidationException::withMessages(['amount' => 'Indiquez un montant positif avec deux décimales au plus (par exemple 10 000,50), de 9 999 999 999,99 € au plus.']);
         }
 
         $targets->set($data['das_id'], $period, $amount === null ? null : QuoteTotals::cents((string) $amount));

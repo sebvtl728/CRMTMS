@@ -169,3 +169,22 @@ it('shows the signed revenue of the month on the home page', function () {
     $this->actingAs(assistant(true));
     expect(test()->get('/dashboard')->original->getData()['page']['props']['commercial']['revenue'])->toBeNull();
 });
+
+it('refuses an oversized target with a French message, not a 500', function () {
+    $resto = crmItem(ReferenceList::Das, 'Hôtellerie-restauration');
+    $this->actingAs(direction(true));
+
+    $this->put('/crm/revenue/targets', ['das_id' => $resto->id, 'period' => 'month', 'key' => '2026-11', 'amount' => '99999999999999999999,99'])
+        ->assertSessionHasErrors('amount');
+    expect(RevenueTarget::query()->count())->toBe(0);
+});
+
+it('shows no target on the home card of a user limited to his own fiches', function () {
+    $resto = crmItem(ReferenceList::Das, 'Hôtellerie-restauration');
+    $this->actingAs(direction(true));
+    app(RevenueTargets::class)->set($resto->id, Period::of('month', '2026-11'), 100000);
+
+    $this->actingAs(commercial(true));
+    $revenue = test()->get('/dashboard')->original->getData()['page']['props']['commercial']['revenue'];
+    expect($revenue)->toMatchArray(['own' => true, 'target_cents' => null, 'total_cents' => 0]);
+});

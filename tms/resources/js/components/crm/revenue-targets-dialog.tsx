@@ -28,6 +28,7 @@ export function RevenueTargetsDialog({
     const [initial, setInitial] = useState<Record<string, string>>({});
     const [errors, setErrors] = useState<Record<string, string>>({});
     const [processing, setProcessing] = useState(false);
+    const [saved, setSaved] = useState<string[]>([]);
 
     useEffect(() => {
         if (open) {
@@ -35,6 +36,7 @@ export function RevenueTargetsDialog({
             setValues(start);
             setInitial(start);
             setErrors({});
+            setSaved([]);
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [open]);
@@ -59,7 +61,11 @@ export function RevenueTargetsDialog({
                 {
                     preserveScroll: true,
                     preserveState: true,
-                    onSuccess: () => send(index + 1),
+                    onSuccess: () => {
+                        setInitial((i) => ({ ...i, [row.das_id]: values[row.das_id] ?? '' }));
+                        setSaved((x) => [...x, row.das_id]);
+                        send(index + 1);
+                    },
                     onError: (errs) => {
                         setErrors({ [row.das_id]: errs.amount ?? errs.period ?? errs.das_id ?? 'Objectif refusé.' });
                         setProcessing(false);
@@ -94,6 +100,7 @@ export function RevenueTargetsDialog({
                                 />
                                 <span aria-hidden>€</span>
                             </div>
+                            {saved.includes(row.das_id) && !errors[row.das_id] && <p className="text-xs text-green-600">Enregistré.</p>}
                             <InputError message={errors[row.das_id]} />
                         </div>
                     ))}
