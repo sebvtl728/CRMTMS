@@ -79,7 +79,7 @@ it('splits an accepted quote by the DAS of its lines', function () {
     expect($rows['Hôtellerie-restauration']['quotes_cents'])->toBe(100000)
         ->and($rows['Métiers supports']['quotes_cents'])->toBe(25050)
         ->and($rows['Métiers supports']['total_cents'])->toBe(25050)
-        ->and($result['totals'])->toBe(['quotes_cents' => 125050, 'opportunities_cents' => 0, 'total_cents' => 125050, 'target_cents' => null]);
+        ->and($result['totals'])->toBe(['quotes_cents' => 125050, 'opportunities_cents' => 0, 'total_cents' => 125050, 'target_cents' => null, 'targeted_total_cents' => 0, 'rate' => null]);
 });
 
 it('a line without DAS uses the DAS of the opportunity', function () {
@@ -236,6 +236,23 @@ it('computes the rate with and without target, on the exact period type', functi
     $quarter = collect(DasRevenue::for(direction(), Period::of('quarter', '2026-T4'))['rows'])->keyBy('das_label');
     expect($quarter['Métiers supports']['rate'])->toBe(50.0)
         ->and($quarter['Hôtellerie-restauration']['target_cents'])->toBeNull();
+});
+
+it('computes the total rate on the DAS that have a target only', function () {
+    $resto = crmItem(ReferenceList::Das, 'Hôtellerie-restauration');
+    $supports = crmItem(ReferenceList::Das, 'Métiers supports');
+    rvQuote(['2000.00'], dasIds: [$resto->id]);
+    rvQuote(['50000.00'], dasIds: [$supports->id]);
+    $this->actingAs(direction());
+    app(RevenueTargets::class)->set($resto->id, rvPeriod(), 1000000);
+
+    $totals = DasRevenue::for(direction(), rvPeriod())['totals'];
+
+    // 2 000 € of the 10 000 € target: the 50 000 € of the DAS without target do not count.
+    expect($totals['total_cents'])->toBe(5200000)
+        ->and($totals['target_cents'])->toBe(1000000)
+        ->and($totals['targeted_total_cents'])->toBe(200000)
+        ->and($totals['rate'])->toBe(20.0);
 });
 
 it('never uses floats: 0,10 € on three lines is exactly 30 cents', function () {

@@ -170,6 +170,21 @@ it('shows the signed revenue of the month on the home page', function () {
     expect(test()->get('/dashboard')->original->getData()['page']['props']['commercial']['revenue'])->toBeNull();
 });
 
+it('compares the home card with the target on the DAS that have one', function () {
+    $resto = crmItem(ReferenceList::Das, 'Hôtellerie-restauration');
+    $supports = crmItem(ReferenceList::Das, 'Métiers supports');
+    revQuote('2000.00', $resto->id);
+    revQuote('50000.00', $supports->id);
+    $this->actingAs(direction(true));
+    app(RevenueTargets::class)->set($resto->id, Period::of('month', '2026-11'), 1000000);
+
+    $revenue = test()->get('/dashboard')->original->getData()['page']['props']['commercial']['revenue'];
+    expect($revenue)->toMatchArray(['total_cents' => 5200000, 'target_cents' => 1000000, 'targeted_total_cents' => 200000, 'rate' => 20.0]);
+
+    $totals = revPage(direction(true))['totals'];
+    expect($totals['rate'])->toBe(20.0)->and($totals['targeted_total_cents'])->toBe(200000);
+});
+
 it('refuses an oversized target with a French message, not a 500', function () {
     $resto = crmItem(ReferenceList::Das, 'Hôtellerie-restauration');
     $this->actingAs(direction(true));

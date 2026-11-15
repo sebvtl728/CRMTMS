@@ -5,7 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import AppLayout from '@/layouts/app-layout';
 import { formatAmount } from '@/lib/crm';
 import { canViewCrm } from '@/lib/permissions';
-import { formatCentsWhole } from '@/lib/revenue';
+import { formatCentsWhole, formatRate } from '@/lib/revenue';
 import { type BreadcrumbItem, type SharedData } from '@/types';
 import { Head, Link, usePage } from '@inertiajs/react';
 import { CalendarClock, Contact, Factory, Search, UserPlus } from 'lucide-react';
@@ -44,7 +44,15 @@ interface Commercial {
     quotes: { sent: number; accepted: number; rate: number | null; month: string };
     meetings: Meeting[];
     /** Signed revenue of the month within the user's scope; null without crm.revenue.view. */
-    revenue: { total_cents: number; target_cents: number | null; month: string; own: boolean } | null;
+    revenue: {
+        total_cents: number;
+        target_cents: number | null;
+        /** Revenue of the DAS that have a target (compared with target_cents). */
+        targeted_total_cents: number | null;
+        rate: number | null;
+        month: string;
+        own: boolean;
+    } | null;
 }
 
 interface Props {
@@ -238,7 +246,10 @@ export default function Dashboard({ recent_views, counters, commercial }: Props)
                                                 {commercial.revenue.own
                                                     ? 'Vos devis et opportunités'
                                                     : commercial.revenue.target_cents !== null
-                                                      ? `Objectif : ${formatCentsWhole(commercial.revenue.target_cents)}`
+                                                      ? `Objectif des DAS concernés : ${formatCentsWhole(commercial.revenue.target_cents)}` +
+                                                        (commercial.revenue.rate !== null
+                                                            ? ` · atteint ${formatRate(commercial.revenue.rate)} (${formatCentsWhole(commercial.revenue.targeted_total_cents)} signés sur ces DAS)`
+                                                            : '')
                                                       : 'Devis acceptés et opportunités gagnées'}
                                             </CardDescription>
                                         </CardHeader>

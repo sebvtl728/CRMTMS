@@ -26,8 +26,11 @@ final class DasRevenue
     /**
      * @return array{
      *     rows: list<array{das_id: string, das_label: string, quotes_cents: int, opportunities_cents: int, total_cents: int, target_cents: int|null, rate: float|null}>,
-     *     totals: array{quotes_cents: int, opportunities_cents: int, total_cents: int, target_cents: int|null}
+     *     totals: array{quotes_cents: int, opportunities_cents: int, total_cents: int, target_cents: int|null, targeted_total_cents: int, rate: float|null}
      * }
+     *
+     * totals.rate compares the target with targeted_total_cents, the revenue
+     * of the DAS that have a target only (null without any target).
      */
     public static function for(User $user, Period $period): array
     {
@@ -50,6 +53,7 @@ final class DasRevenue
         $followed = $scope === AccessScope::Das ? CrmVisibility::followedDas($user) : null;
         $rows = [];
         $totals = [BigInteger::zero(), BigInteger::zero(), null];
+        $targeted = BigInteger::zero();
 
         foreach (ReferenceItem::query()->where('list', ReferenceList::Das)->orderBy('position')->orderBy('label')->get() as $das) {
             $id = (string) $das->getKey();
@@ -76,6 +80,9 @@ final class DasRevenue
                 'rate' => $target === null || $target->isZero() ? null : self::rate($total, $target),
             ];
             $totals = [$totals[0]->plus($q), $totals[1]->plus($o), $target === null ? $totals[2] : ($totals[2] ?? BigInteger::zero())->plus($target)];
+            if ($target !== null) {
+                $targeted = $targeted->plus($total);
+            }
         }
 
         return [
@@ -85,6 +92,8 @@ final class DasRevenue
                 'opportunities_cents' => $totals[1]->toInt(),
                 'total_cents' => $totals[0]->plus($totals[1])->toInt(),
                 'target_cents' => $totals[2]?->toInt(),
+                'targeted_total_cents' => $targeted->toInt(),
+                'rate' => $totals[2] === null || $totals[2]->isZero() ? null : self::rate($targeted, $totals[2]),
             ],
         ];
     }

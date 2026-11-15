@@ -15,6 +15,10 @@ interface Totals {
     opportunities_cents: number;
     total_cents: number;
     target_cents: number | null;
+    /** Revenue of the DAS that have a target: what the target is compared with. */
+    targeted_total_cents: number;
+    /** Percent of the total target reached (server side, one decimal), null without target. */
+    rate: number | null;
 }
 
 interface Source {
@@ -135,7 +139,8 @@ export default function RevenueIndex({ period, rows, totals, own, can, status }:
     const [targetsOpen, setTargetsOpen] = useState(false);
 
     const go = (type: string, key?: string) => route('crm.revenue.index', key ? { period: type, key } : { period: type });
-    const totalRate = totals.target_cents ? Math.round((totals.total_cents * 1000) / totals.target_cents) / 10 : null;
+    // Some DAS without target: the total « Atteint » only compares the DAS that have one.
+    const partialTarget = totals.target_cents !== null && totals.targeted_total_cents !== totals.total_cents;
 
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
@@ -233,13 +238,19 @@ export default function RevenueIndex({ period, rows, totals, own, can, status }:
                                 {!own && <td className="px-4 py-2 text-right tabular-nums">{formatCentsWhole(totals.target_cents)}</td>}
                                 {!own && (
                                     <td className="px-4 py-2">
-                                        <Progress rate={totalRate} label="total" />
+                                        <Progress rate={totals.rate} label="total" />
                                     </td>
                                 )}
                             </tr>
                         </tfoot>
                     </table>
                 </div>
+                {!own && partialTarget && (
+                    <p className="text-muted-foreground text-sm">
+                        « Atteint » du total : calculé sur les seuls DAS ayant un objectif ({formatCentsWhole(totals.targeted_total_cents)} signés
+                        sur {formatCentsWhole(totals.total_cents)}).
+                    </p>
+                )}
             </div>
 
             <SourcesPanel row={detail} period={period} onClose={() => setDetail(null)} />

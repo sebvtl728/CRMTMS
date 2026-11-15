@@ -35,7 +35,7 @@ final class CommercialSummary
     public const MEETINGS = 5;
 
     /**
-     * @return array{follow_ups: array{overdue: int, today: int}, pipeline: array{weighted_amount: string, count: int, month: string, close_from: string, close_to: string}, quotes: array{sent: int, accepted: int, rate: float|null, month: string}, meetings: list<array<string, mixed>>, revenue: array{total_cents: int, target_cents: int|null, month: string, own: bool}|null}
+     * @return array{follow_ups: array{overdue: int, today: int}, pipeline: array{weighted_amount: string, count: int, month: string, close_from: string, close_to: string}, quotes: array{sent: int, accepted: int, rate: float|null, month: string}, meetings: list<array<string, mixed>>, revenue: array{total_cents: int, target_cents: int|null, targeted_total_cents: int|null, rate: float|null, month: string, own: bool}|null}
      */
     public static function for(User $user, CarbonImmutable $now): array
     {
@@ -50,9 +50,10 @@ final class CommercialSummary
 
     /**
      * Signed revenue of the Paris month within the user's scope (null without crm.revenue.view).
-     * « Ses fiches » (own) has no target to compare with.
+     * « Ses fiches » (own) has no target to compare with. The rate compares
+     * the target with the revenue of the DAS that have one (targeted_total_cents).
      *
-     * @return array{total_cents: int, target_cents: int|null, month: string, own: bool}|null
+     * @return array{total_cents: int, target_cents: int|null, targeted_total_cents: int|null, rate: float|null, month: string, own: bool}|null
      */
     private static function revenue(User $user, CarbonImmutable $now): ?array
     {
@@ -68,6 +69,8 @@ final class CommercialSummary
         return [
             'total_cents' => $totals['total_cents'],
             'target_cents' => $own ? null : $totals['target_cents'],
+            'targeted_total_cents' => $own || $totals['target_cents'] === null ? null : $totals['targeted_total_cents'],
+            'rate' => $own ? null : $totals['rate'],
             'month' => $month->label(),
             'own' => $own,
         ];
