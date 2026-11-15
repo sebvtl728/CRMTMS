@@ -28,6 +28,10 @@ Droits par domaine et par périmètre, rôles personnalisés, chiffre d'affaires
   accès, un droit retiré reste retiré, le Responsable DAS reste limité à ses DAS. Elle crée aussi de nouveaux index
   (verrou bref lors de la mise à jour).
 - Le Responsable DAS n'est plus reconnu par son nom de rôle : la visibilité suit le périmètre « Ses DAS » du droit.
+- **Import** : seules les fiches du périmètre « Créer et modifier » de l'utilisateur qui lance l'import sont complétées ;
+  une ligne qui correspond à une fiche existante hors de ce périmètre est ignorée (« Fiche existante hors de votre
+  périmètre »), sans doublon.
+- Le pourcentage « Atteint » du total du chiffre d'affaires ne compte que les DAS qui ont un objectif.
 
 ## [0.4.2] - 2026-11-14
 

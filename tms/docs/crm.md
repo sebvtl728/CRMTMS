@@ -297,6 +297,8 @@ Choisissez **Que faire quand la fiche existe déjà ?** :
 
 Quand une ligne porte un **identifiant source** déjà importé, c'est cette fiche qui est mise à jour, quelle que soit la stratégie.
 
+L'import ne modifie que les fiches que vous pouvez vous-même modifier (votre périmètre « Créer et modifier » des fiches, par exemple « Ses fiches ») : une ligne qui correspond à une fiche existante hors de ce périmètre, ou une note destinée à une telle fiche, est **ignorée** avec le motif « Fiche existante hors de votre périmètre » ; la fiche n'est pas touchée et aucun doublon n'est créé.
+
 ### Étape 5 : Lancer l'import
 
 **Lancer l'import**, puis confirmez. Une barre de progression suit l'avancement ; vous pouvez fermer la page et revenir plus tard dans **Imports**.
@@ -358,7 +360,13 @@ Menu **Commercial > Chiffre d'affaires** (droit « Consulter le chiffre d'affair
 
 - **CA devis acceptés** : lignes des devis acceptés dans la période (date d'acceptation), par DAS de la ligne ;
 - **CA opportunités gagnées sans devis** : montant des opportunités gagnées dans la période qui n'ont aucun devis accepté (une opportunité gagnée avec un devis accepté n'est jamais comptée deux fois) ;
-- **Total**, **Objectif** et **Atteint** (barre et pourcentage).
+- **Total**, **Objectif** et **Atteint** (barre et pourcentage). Sur la ligne Total, « Atteint » compare l'objectif au seul chiffre d'affaires des DAS **qui ont un objectif** (un DAS sans objectif ne gonfle pas le pourcentage) ; une phrase sous le tableau le rappelle quand certains DAS n'en ont pas. La carte « CA signé » de l'accueil fait de même.
+
+Règles de calcul :
+
+- une ligne de devis sans DAS compte pour le DAS de l'opportunité du devis ;
+- les devis et les opportunités en corbeille ne comptent pas ;
+- une opportunité gagnée ne compte que si elle n'a **aucun devis accepté** hors corbeille (sinon c'est le devis qui compte).
 
 Cliquez sur un DAS pour ouvrir le détail (devis et opportunités, au centime, avec un lien vers chacun). Avec le droit « Gérer les objectifs de chiffre d'affaires », le bouton **Objectifs** fixe l'objectif de chaque DAS pour la période affichée (montant en euros, par exemple « 10 000 » ou « 10 000,50 » ; champ vide pour retirer l'objectif). L'objectif d'un trimestre n'est pas la somme de ses mois : chaque type de période a ses propres objectifs.
 

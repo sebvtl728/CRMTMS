@@ -180,7 +180,10 @@ Les droits **Consulter**, **Créer et modifier**, **Supprimer** des quatre domai
 - **Ses DAS** : ce qui touche les DAS qu'il suit (**DAS suivis** de la page Utilisateurs). Sans DAS suivi, rien n'est visible.
 - **Tout l'organisme** : tout.
 
-Le périmètre d'un droit sans réglage enregistré vaut « Tout l'organisme ». Les périmètres de consultation et de modification sont indépendants : avec « Consulter : Ses DAS » et « Modifier : Tout l'organisme », une fiche hors de ses DAS reste introuvable (404), même par son adresse directe. Un devis ne peut jamais être créé ni modifié par quelqu'un qui ne voit pas son opportunité.
+Le périmètre d'un droit sans réglage enregistré vaut « Tout l'organisme ». Les périmètres de consultation et de modification sont indépendants : avec « Consulter : Ses DAS » et « Modifier : Tout l'organisme », une fiche hors de ses DAS reste introuvable (404), même par son adresse directe. Créer un devis (ou une nouvelle version) exige de voir son opportunité ; modifier ou supprimer un devis existant suit les périmètres des droits « Devis » eux-mêmes. Un droit détenu par une permission accordée directement à un utilisateur (hors rôle, sans écran pour le faire) vaut « Tout l'organisme ».
+
+- **Import** (`crm.import`) : l'import ne complète que les fiches du périmètre « Créer et modifier » des fiches de l'utilisateur qui le lance. Une ligne qui correspond (SIRET, e-mail, identifiant source, fiche d'une note) à une fiche existante hors de ce périmètre est **ignorée** avec le motif « Fiche existante hors de votre périmètre », sans modifier la fiche ni créer de doublon ; le rapport et la simulation l'indiquent. L'écran « Rôles et droits » le rappelle sous le droit.
+- **Chiffre d'affaires sous « Ses DAS »** : le détail d'un DAS liste les devis dont une ligne porte ce DAS, même si l'opportunité du devis est rattachée à un DAS que l'utilisateur ne suit pas ; le lien vers ce devis aboutit alors à une page introuvable (404).
 
 ### Droits par défaut
 
@@ -217,7 +220,7 @@ Un rôle qui n'avait que `crm.create` sans `crm.update` ne reçoit aucun droit d
 
 ### L'écran « Rôles et droits »
 
-Administration › **Rôles et droits** (droit `roles.manage`, accordé au seul administrateur). Un tableau croise les rôles (en colonnes) et les droits (en lignes, regroupés par thème, avec une phrase d'explication). Cochez ou décochez une case : elle est enregistrée aussitôt, et les utilisateurs du rôle ont leurs nouveaux droits dès leur page suivante, sans être déconnectés. Une case surlignée diffère des droits par défaut du rôle. La liste de périmètre est grisée tant que la case est décochée. L'en-tête de chaque colonne indique le nombre d'utilisateurs, l'interrupteur « Double authentification obligatoire » et un menu **Renommer** / **Revenir aux droits par défaut** (avec confirmation : remet exactement le tableau ci-dessus pour un rôle système, retire tous les droits d'un rôle personnalisé) / **Supprimer**.
+Administration › **Rôles et droits** (droit `roles.manage`, accordé au seul administrateur). Un tableau croise les rôles (en colonnes) et les droits (en lignes, regroupés par thème, avec une phrase d'explication). Cochez ou décochez une case : elle est enregistrée aussitôt, et les utilisateurs du rôle ont leurs nouveaux droits dès leur page suivante, sans être déconnectés. Une case surlignée diffère des droits ou du périmètre par défaut du rôle (rôles système). Un rôle **sans** double authentification obligatoire qui détient « Gérer les paramètres », « Consulter le journal d'audit » ou « Lancer les exports système » affiche un avertissement sous son en-tête (non bloquant) : activez la double authentification pour ce rôle. La liste de périmètre est grisée tant que la case est décochée. L'en-tête de chaque colonne indique le nombre d'utilisateurs, l'interrupteur « Double authentification obligatoire » et un menu **Renommer** / **Revenir aux droits par défaut** (avec confirmation : remet exactement le tableau ci-dessus pour un rôle système, retire tous les droits d'un rôle personnalisé) / **Supprimer**.
 
 ### Rôles personnalisés
 
@@ -234,7 +237,7 @@ La double authentification est **toujours obligatoire** pour l'Administrateur et
 
 - Le rôle **Administrateur de l'organisme** n'est pas modifiable (droits, périmètres, libellé, double authentification, suppression) : il garde tous les droits.
 - **Gérer les utilisateurs** (`users.manage`), **Gérer les rôles et droits** (`roles.manage`) et **Gérer les connecteurs** (`connectors.manage`) ne s'accordent à aucun autre rôle, système ou personnalisé : qui les détiendrait pourrait se donner tous les droits (pour les connecteurs : faire passer la messagerie de l'organisme par son propre serveur et intercepter le lien d'invitation suivant).
-- **Lancer les exports système** (`exports.run`) et **Gérer les paramètres** (`settings.manage`) sont des droits de niveau administrateur, signalés sur l'écran : les exports système portent sur tout l'organisme sans tenir compte des DAS suivis ; les paramètres couvrent la sécurité des sessions, les modèles d'e-mails (dont le texte de l'invitation) et la durée de conservation RGPD.
+- **Lancer les exports système** (`exports.run`) et **Gérer les paramètres** (`settings.manage`) sont des droits de niveau administrateur, signalés sur l'écran : les exports système portent sur tout l'organisme sans tenir compte des périmètres ; les paramètres couvrent la sécurité des sessions, les modèles d'e-mails (dont le texte de l'invitation) et la durée de conservation RGPD.
 - Chaque changement est journalisé (`roles.permission_granted`, `roles.permission_revoked`, `roles.scope_changed`, `roles.reset`, création, renommage, suppression d'un rôle, double authentification). Les modifications n'ont aucun effet sur un autre organisme, et une mise à jour ne rétablit jamais un droit retiré.
 
 ## 11. RGPD : durée de conservation et anonymisation
