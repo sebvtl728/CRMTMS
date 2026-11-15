@@ -8,6 +8,7 @@ use App\Modules\Core\Exports\ExportResource;
 use App\Modules\Core\References\ReferenceItem;
 use App\Modules\Core\References\ReferenceList;
 use App\Modules\Core\Users\User;
+use App\Modules\Crm\Brochures\BrochureSendProps;
 use App\Modules\Crm\Duplicates\DuplicateGuard;
 use App\Modules\Crm\Gdpr\Consent;
 use App\Modules\Crm\Gdpr\ConsentChannel;
@@ -238,6 +239,7 @@ class PersonController extends Controller
             ...$this->interests($person, $user),
             'opportunities' => OpportunityRows::forFiche($person, $user),
             'quotes' => QuoteRows::forFiche($person, $user),
+            'brochure_send' => BrochureSendProps::for($person, $user),
             'similar' => $user->can(Permissions::MERGE) ? $this->duplicates->similarTo($person, $user) : [],
             'can' => [
                 'merge' => ! $person->trashed() && $person->anonymised_at === null && $user->can(Permissions::MERGE),

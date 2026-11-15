@@ -61,3 +61,39 @@ test('brochure library: deposit, rename, replace the file (new version), downloa
     expect(file.suggestedFilename()).toBe('hygiene-v2.pdf');
     await context.close();
 });
+
+test('send a brochure from a person fiche: dialog, e-mail recorded in the history', async ({ browser }) => {
+    expect(existsSync(ADMIN_STATE), 'run admin.spec.ts first (it signs the administrator in)').toBe(true);
+    const context = await browser.newContext({ storageState: ADMIN_STATE, locale: 'fr-FR', viewport: { width: 1400, height: 1000 } });
+    const page = await context.newPage();
+
+    await page.goto('/catalogue/brochures/create');
+    await page.locator('#title').fill('E2E Plaquette envoi');
+    await page.locator('#file').setInputFiles({ name: 'envoi.pdf', mimeType: 'application/pdf', buffer: pdf('envoi') });
+    await page.getByRole('button', { name: 'Enregistrer' }).click();
+    await expect(page.getByText('Plaquette ajoutée.')).toBeVisible();
+
+    await page.goto('/crm/people/create');
+    await page.locator('#first_name').fill('Brigitte');
+    await page.locator('#last_name').fill('Plaquette E2E');
+    await page.locator('#email').fill('brigitte.plaquette@example.test');
+    await page.getByRole('button', { name: 'Enregistrer' }).click();
+    await expect(page.getByRole('heading', { name: /Brigitte Plaquette E2E/ })).toBeVisible();
+
+    await page.getByRole('button', { name: 'Envoyer une plaquette' }).click();
+    const dialog = page.getByRole('dialog');
+    await expect(dialog.getByLabel('Destinataire *')).toContainText('brigitte.plaquette@example.test');
+    await expect(dialog.getByLabel('Message *')).toHaveValue(/Bonjour Brigitte Plaquette E2E/);
+    // Nothing chosen: refused under the field.
+    await dialog.getByRole('button', { name: 'Envoyer', exact: true }).click();
+    await expect(dialog.getByText('Choisissez au moins une plaquette.')).toBeVisible();
+    await dialog.getByLabel('Rechercher une plaquette').fill('Plaquette envoi');
+    await dialog.getByLabel('E2E Plaquette envoi').check();
+    await dialog.getByRole('button', { name: 'Envoyer', exact: true }).click();
+    await expect(page.getByText('Plaquette en cours d\'envoi.')).toBeVisible();
+
+    await page.getByRole('tab', { name: 'Historique' }).click();
+    await expect(page.getByText('Plaquettes envoyées à Brigitte Plaquette E2E')).toBeVisible();
+    await expect(page.getByText('E2E Plaquette envoi', { exact: true })).toBeVisible();
+    await context.close();
+});

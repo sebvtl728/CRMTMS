@@ -3,6 +3,7 @@ import { InterestTrainings, type InterestTraining, type InterestTrainingOption }
 import { FicheOpportunities, type OpportunityRow } from '@/components/crm/opportunity-list';
 import { PersonGdpr, type GdprData } from '@/components/crm/person-gdpr';
 import { PersonTypeBadges } from '@/components/crm/person-type-badges';
+import { BrochureSendButton, type BrochureSendProps } from '@/components/crm/brochure-send';
 import { QuickActionFicheButton } from '@/components/crm/quick-action';
 import { FicheQuotes, type QuoteRow } from '@/components/crm/quote-list';
 import { Timeline } from '@/components/crm/timeline';
@@ -74,6 +75,7 @@ interface ShowProps {
     gdpr: GdprData;
     opportunities: OpportunityRow[];
     quotes: QuoteRow[];
+    brochure_send: BrochureSendProps | null;
     interestTrainings: InterestTraining[];
     trainingOptions: InterestTrainingOption[];
     ficheDasIds: string[];
@@ -122,6 +124,7 @@ export default function PersonShow({
     gdpr,
     opportunities,
     quotes,
+    brochure_send,
     interestTrainings,
     trainingOptions,
     ficheDasIds,
@@ -193,6 +196,7 @@ export default function PersonShow({
                     </div>
                     <div className="flex flex-wrap gap-2">
                         <QuickActionFicheButton context={{ person_id: p.id }} available={!p.deleted && !p.anonymised} />
+                        <BrochureSendButton send={brochure_send} routeName="crm.people.brochures.send" subjectId={p.id} />
                         {can.update && (
                             <Button asChild variant="outline">
                                 <Link href={route('crm.people.edit', p.id)}>

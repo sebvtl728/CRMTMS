@@ -357,6 +357,19 @@ Index : `opportunity_id`, `organisation_id`, `person_id`, `contact_person_id`, (
 
 Index : `quote_id`, `training_id`, `das_id`. Journalisée (`quote_line`). La TVA se calcule **par taux** sur la somme des lignes du même taux, pas ligne par ligne.
 
+### `brochure_sendings` — plaquettes envoyées depuis une fiche
+| Colonne | Type | Rôle |
+|---|---|---|
+| `id`, `tenant_id` | uuid | |
+| `organisation_id` / `person_id` | uuid (FK, cascade) | Fiche d'où part l'envoi (exactement une des deux ; le compte de l'opportunité le cas échéant) |
+| `opportunity_id` | uuid nullable (FK, set null) | Opportunité d'où part l'envoi |
+| `recipient_person_id` | uuid (FK `people`) | Destinataire |
+| `recipient_email`, `subject`, `message` | texte nullable | Copie figée de ce qui est parti (données personnelles : hors journal, effacées par l'anonymisation) |
+| `email_status` | `pending` / `sent` / `failed` | État de l'envoi ; `email_error` : raison fixe en français, jamais le texte du serveur |
+| `sent_at`, `created_by`, `created_at`, `updated_at` | | |
+
+Journalisée (`brochure_sending`). `brochure_sending_versions` (`brochure_sending_id`, `brochure_version_id` FK restrict, `position`) garde les versions exactement envoyées.
+
 ### `quote_brochures` — plaquettes jointes à l'e-mail d'un devis
 | Colonne | Type | Rôle |
 |---|---|---|

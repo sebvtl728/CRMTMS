@@ -17,6 +17,8 @@ use App\Modules\Crm\Activities\ActivitiesProvider;
 use App\Modules\Crm\Activities\Activity;
 use App\Modules\Crm\Activities\ActivityPolicy;
 use App\Modules\Crm\Affiliations\Affiliation;
+use App\Modules\Crm\Brochures\BrochureSending;
+use App\Modules\Crm\Brochures\BrochureSendingsProvider;
 use App\Modules\Crm\Gdpr\Consent;
 use App\Modules\Crm\Import\ImportBatch;
 use App\Modules\Crm\Import\ImportProfile;
@@ -112,11 +114,12 @@ class CrmServiceProvider extends ServiceProvider
             'quote' => Quote::class,
             'quote_line' => QuoteLine::class,
             'quote_brochure' => QuoteBrochure::class,
+            'brochure_sending' => BrochureSending::class,
             'revenue_target' => RevenueTarget::class,
         ]);
 
         // Sources of the « Historique »; later increments tag their own.
-        $this->app->tag([NotesProvider::class, AttachmentsProvider::class, AuditProvider::class, OpportunitiesProvider::class, ActivitiesProvider::class, QuotesProvider::class], Timeline::TAG);
+        $this->app->tag([NotesProvider::class, AttachmentsProvider::class, AuditProvider::class, OpportunitiesProvider::class, ActivitiesProvider::class, QuotesProvider::class, BrochureSendingsProvider::class], Timeline::TAG);
     }
 
     public function boot(): void
@@ -137,6 +140,8 @@ class CrmServiceProvider extends ServiceProvider
         RateLimiter::for('revenue-targets', fn (Request $request) => Limit::perMinute(60)->by('revenue-targets:'.($request->user()?->getAuthIdentifier() ?? $request->ip())));
         // Quote e-mails (send, reminder, « Renvoyer »): 20 a minute per user.
         RateLimiter::for('quote-mail', fn (Request $request) => Limit::perMinute(20)->by('quote-mail:'.($request->user()?->getAuthIdentifier() ?? $request->ip())));
+        // « Envoyer une plaquette » from a fiche: 20 a minute per user.
+        RateLimiter::for('brochure-mail', fn (Request $request) => Limit::perMinute(20)->by('brochure-mail:'.($request->user()?->getAuthIdentifier() ?? $request->ip())));
         // Signed copy of a quote (upload, download): 30 a minute per user.
         RateLimiter::for('quote-signed', fn (Request $request) => Limit::perMinute(30)->by('quote-signed:'.($request->user()?->getAuthIdentifier() ?? $request->ip())));
         // A draft's PDF is rendered on each request (Gotenberg): 30 a minute per user.
@@ -438,6 +443,11 @@ class CrmServiceProvider extends ServiceProvider
             Quote::withTrashed()->where(fn (Builder $q) => $fiche instanceof Organisation
                 ? $q->where('organisation_id', $fiche->getKey())
                 : $q->where('person_id', $fiche->getKey())->orWhere('contact_person_id', $fiche->getKey())), $ids)->exists());
+        // Brochures sent from the fiche, or to the person.
+        LinkedData::register('crm.brochure_sendings', fn (Organisation|Person $fiche, array $ids): bool => $except(
+            BrochureSending::query()->where(fn (Builder $q) => $fiche instanceof Organisation
+                ? $q->where('organisation_id', $fiche->getKey())
+                : $q->where('person_id', $fiche->getKey())->orWhere('recipient_person_id', $fiche->getKey())), $ids)->exists());
         LinkedData::register('crm.interest_trainings', fn (Organisation|Person $fiche, array $ids): bool => $except(
             FicheTraining::query()->where(FicheTrainings::column($fiche), $fiche->getKey()), $ids)->exists());
         LinkedData::register('crm.consents', fn (Organisation|Person $fiche, array $ids): bool => $fiche instanceof Person

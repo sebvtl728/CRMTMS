@@ -99,6 +99,46 @@ final class Brochures
     }
 
     /**
+     * Among these version ids, the rows of those still offered for a new
+     * sending: the current version of a brochure that is not in the trash
+     * (an older version, or one of a trashed brochure, is left out).
+     *
+     * @param  list<string>  $versionIds
+     * @return list<array{version_id: string, path: string, original_name: string, size: int}>
+     */
+    public function offered(array $versionIds): array
+    {
+        $ids = self::uuids($versionIds);
+        if ($ids === []) {
+            return [];
+        }
+        $current = Brochure::query()->whereIn('current_version_id', $ids)->pluck('current_version_id')->all();
+
+        return array_values(array_filter($this->versions($ids), fn (array $v) => in_array($v['version_id'], $current, true)));
+    }
+
+    /**
+     * The title of the brochure of each version (brochures in the trash
+     * included), for the history of what was sent.
+     *
+     * @param  list<string>  $versionIds
+     * @return array<string, string> version id => title
+     */
+    public function titles(array $versionIds): array
+    {
+        $ids = self::uuids($versionIds);
+        if ($ids === []) {
+            return [];
+        }
+        $titles = [];
+        foreach (BrochureVersion::query()->whereIn('id', $ids)->with(['brochure' => fn ($q) => $q->withTrashed()])->get() as $version) {
+            $titles[$version->id] = (string) $version->brochure?->title;
+        }
+
+        return $titles;
+    }
+
+    /**
      * Brochures to choose from (not in the trash), by title, optionally those
      * whose title holds every word of $search (accent-insensitive).
      *

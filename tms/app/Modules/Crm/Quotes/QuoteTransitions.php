@@ -6,6 +6,7 @@ use App\Exceptions\UserFacingHttpException;
 use App\Modules\Catalogue\Brochures;
 use App\Modules\Core\Companies\VatRegime;
 use App\Modules\Core\Tenancy\TenantStorage;
+use App\Modules\Crm\Brochures\BrochureAttachments;
 use App\Modules\Crm\Opportunities\Opportunity;
 use App\Modules\Crm\Opportunities\OpportunityStage;
 use App\Modules\Crm\Organisations\Organisation;
@@ -48,11 +49,11 @@ final class QuoteTransitions
     public const NO_ARCHIVE = 'Le PDF archivé de ce devis est introuvable : il ne peut pas être joint au message. Contactez l\'administrateur.';
 
     /** Bytes: the quote PDF and the brochures of one e-mail. */
-    public const MAX_ATTACHMENTS_BYTES = 20 * 1024 * 1024;
+    public const MAX_ATTACHMENTS_BYTES = BrochureAttachments::MAX_BYTES;
 
-    public const ATTACHMENTS_TOO_BIG = 'Les pièces jointes dépassent 20 Mo : retirez une plaquette.';
+    public const ATTACHMENTS_TOO_BIG = BrochureAttachments::TOO_BIG;
 
-    public const BROCHURE_GONE = 'Cette plaquette n\'existe plus.';
+    public const BROCHURE_GONE = BrochureAttachments::GONE;
 
     public function __construct(
         private readonly QuoteFreezer $freezer,
@@ -254,7 +255,7 @@ final class QuoteTransitions
         if (count($versions) !== count($ids)) {
             throw new UserFacingHttpException(422, self::BROCHURE_GONE);
         }
-        if (array_sum(array_column($versions, 'size')) > self::MAX_ATTACHMENTS_BYTES) {
+        if (BrochureAttachments::tooBig(array_sum(array_column($versions, 'size')))) {
             throw new UserFacingHttpException(422, self::ATTACHMENTS_TOO_BIG);
         }
 
@@ -275,7 +276,7 @@ final class QuoteTransitions
         }
         $disk = Storage::disk(TenantStorage::DISK);
         $path = (string) $quote->pdf_path;
-        if ((int) $disk->size($path) + array_sum(array_column($versions, 'size')) > self::MAX_ATTACHMENTS_BYTES) {
+        if (BrochureAttachments::tooBig((int) $disk->size($path) + array_sum(array_column($versions, 'size')))) {
             $disk->delete($path);
 
             throw new UserFacingHttpException(422, self::ATTACHMENTS_TOO_BIG);

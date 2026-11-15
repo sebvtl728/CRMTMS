@@ -11,6 +11,7 @@ use App\Modules\Core\Tenancy\Tenant;
 use App\Modules\Core\Tenancy\TenantAwareJob;
 use App\Modules\Core\Tenancy\TenantContext;
 use App\Modules\Core\Tenancy\TenantStorage;
+use App\Modules\Crm\Brochures\BrochureAttachments;
 use Carbon\CarbonImmutable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
@@ -43,7 +44,7 @@ class SendQuote implements ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, TenantAwareJob;
 
-    public const NO_BROCHURE = 'Une plaquette jointe est introuvable : l\'e-mail n\'est pas parti.';
+    public const NO_BROCHURE = BrochureAttachments::MISSING;
 
     public const NO_DOCUMENT = 'Le PDF archivé du devis est introuvable : l\'e-mail n\'est pas parti.';
 
@@ -82,16 +83,12 @@ class SendQuote implements ShouldQueue
 
         // The versions recorded at sending, whatever became of their brochure since.
         $versions = $brochures->versions(QuoteBrochure::query()->where('quote_id', $quote->id)->orderBy('position')->pluck('brochure_version_id')->all());
-        $disk = Storage::disk(TenantStorage::DISK);
-        $joined = [];
-        foreach ($versions as $version) {
-            if (! $disk->exists($version['path'])) {
-                Log::warning('Fichier de plaquette introuvable', ['quote_id' => $quote->id, 'version_id' => $version['version_id']]);
-                $this->failed(new QuoteMailFailed(self::NO_BROCHURE));
+        $joined = BrochureAttachments::read($versions);
+        if ($joined === null) {
+            Log::warning('Fichier de plaquette introuvable', ['quote_id' => $quote->id]);
+            $this->failed(new QuoteMailFailed(self::NO_BROCHURE));
 
-                return;
-            }
-            $joined[] = ['bytes' => (string) $disk->get($version['path']), 'name' => $version['original_name']];
+            return;
         }
 
         $error = null;
@@ -182,7 +179,7 @@ class SendQuote implements ShouldQueue
     /**
      * The SMTP reply code (4xx / 5xx) of a transport failure, else 0.
      */
-    private static function smtpCode(Throwable $e): int
+    public static function smtpCode(Throwable $e): int
     {
         if (! $e instanceof TransportExceptionInterface && ! $e instanceof RuntimeException) {
             return 0;

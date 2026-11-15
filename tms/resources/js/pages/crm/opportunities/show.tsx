@@ -1,6 +1,7 @@
 import { ActivityList, type ActivityRow } from '@/components/crm/activity-list';
 import { StageBadge, type OpportunityRow } from '@/components/crm/opportunity-list';
 import { OpportunityTrainingsSummary, type TrainingEstimate, type TrainingLine } from '@/components/crm/opportunity-trainings';
+import { BrochureSendButton, BrochureSendingList, type BrochureSendingRow, type BrochureSendProps } from '@/components/crm/brochure-send';
 import { QuickActionFicheButton } from '@/components/crm/quick-action';
 import { QuoteCards, type QuoteRow } from '@/components/crm/quote-list';
 import { StageDialog, type StageOption } from '@/components/crm/stage-dialog';
@@ -31,6 +32,8 @@ interface ShowProps {
     history: { id: string; from: string | null; to: string | null; by: string | null; at: string }[];
     activities: ActivityRow[];
     quotes: QuoteRow[];
+    brochure_send: BrochureSendProps | null;
+    brochure_sendings: BrochureSendingRow[];
     training_summary: { lines: TrainingLine[]; estimate: TrainingEstimate };
     stages: StageOption[];
     lossReasons: Option[];
@@ -52,6 +55,8 @@ export default function OpportunityShow({
     history,
     activities,
     quotes,
+    brochure_send,
+    brochure_sendings,
     training_summary: trainings,
     stages,
     lossReasons,
@@ -95,6 +100,7 @@ export default function OpportunityShow({
                             </Button>
                         )}
                         <QuickActionFicheButton context={{ opportunity_id: o.id }} available={can.update} />
+                        <BrochureSendButton send={brochure_send} routeName="crm.opportunities.brochures.send" subjectId={o.id} />
                         {can.update && (
                             <Button asChild variant="outline">
                                 <Link href={route('crm.opportunities.edit', o.id)}>
@@ -180,6 +186,14 @@ export default function OpportunityShow({
                             <QuoteCards rows={quotes} showAccount={false} />
                         )}
                     </section>
+                    {(brochure_sendings.length > 0 || brochure_send !== null) && (
+                        <section className="rounded-xl border p-4 lg:col-span-2" aria-labelledby="opportunity-brochures">
+                            <h2 id="opportunity-brochures" className="mb-3 text-sm font-semibold">
+                                Plaquettes envoyées
+                            </h2>
+                            <BrochureSendingList rows={brochure_sendings} />
+                        </section>
+                    )}
                     <section className="rounded-xl border p-4 lg:col-span-2">
                         <h2 className="mb-3 text-sm font-semibold">Actions</h2>
                         <ActivityList activities={activities} />
