@@ -183,13 +183,22 @@ final class RoleCatalogue
     }
 
     /**
-     * Locks the organisme's roles and refuses a label already used (by
-     * another role, or reserved by a system role).
+     * Serialises the label changes of the organisme, then refuses a label
+     * already used (by another role, or reserved by a system role). Must run
+     * in a transaction.
+     *
+     * Row locks alone would not do: in READ COMMITTED a waiting SELECT … FOR
+     * UPDATE does not see a role inserted meanwhile. A per-organisme advisory
+     * lock, taken before reading, makes every create/rename run one at a
+     * time; the read below is a fresh statement, so it sees what the previous
+     * one committed (same pattern as LastAdminGuard).
      */
     private function ensureUnique(string $label, ?RoleModel $except = null): void
     {
+        DB::select('select pg_advisory_xact_lock(hashtext(?))', [self::labelLockKey((string) $this->tenants->id())]);
+
         $wanted = RoleModel::normaliseLabel($label);
-        $roles = RoleModel::query()->where('guard_name', RoleSeeder::GUARD)->orderBy('id')->lockForUpdate()->get();
+        $roles = RoleModel::query()->where('guard_name', RoleSeeder::GUARD)->get();
 
         $taken = [];
         foreach ($roles as $role) {
@@ -207,6 +216,11 @@ final class RoleCatalogue
         if (in_array($wanted, $taken, true)) {
             throw ValidationException::withMessages(['label' => self::DUPLICATE]);
         }
+    }
+
+    public static function labelLockKey(string $tenantId): string
+    {
+        return 'roles-label:'.$tenantId;
     }
 
     private function forget(): void

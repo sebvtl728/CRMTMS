@@ -71,14 +71,14 @@ it('grants and revokes a permission of a role, journaled, effective at the next 
         ->assertRedirect('/admin/roles')->assertSessionHas('status', 'Droit « Exporter vers Excel » accordé au rôle Assistant.');
     expect(rolePermissions(Role::Assistant))->toContain('crm.export');
     $log = AuditLog::query()->where('event', 'roles.permission_granted')->sole();
-    expect($log->new_values)->toBe(['role' => 'assistant', 'permission' => 'crm.export']);
+    expect($log->new_values)->toEqual(['role' => 'assistant', 'role_label' => 'Assistant', 'permission' => 'crm.export']);
 
     $this->actingAs($assistant->fresh())->get('/crm/organisations/export/check')->assertOk();
 
     $this->actingAs(admin(twoFactor: true));
     $this->post('/admin/roles/'.roleId(Role::Assistant), ['permission' => 'crm.quotes.update', 'granted' => false])->assertSessionHasNoErrors();
     expect(rolePermissions(Role::Assistant))->not->toContain('crm.quotes.update')
-        ->and(AuditLog::query()->where('event', 'roles.permission_revoked')->sole()->new_values)->toBe(['role' => 'assistant', 'permission' => 'crm.quotes.update']);
+        ->and(AuditLog::query()->where('event', 'roles.permission_revoked')->sole()->new_values)->toEqual(['role' => 'assistant', 'role_label' => 'Assistant', 'permission' => 'crm.quotes.update']);
 });
 
 it('refuses to change the administrator, the locked permissions or an unknown one', function () {
@@ -104,7 +104,7 @@ it('resets a role to exactly its default permissions', function () {
         ->assertSessionHas('status', 'Droits par défaut rétablis pour le rôle Commercial.');
 
     expect(rolePermissions(Role::Commercial))->toBe(collect(Permissions::defaultsFor(Role::Commercial))->sort()->values()->all())
-        ->and(AuditLog::query()->where('event', 'roles.reset')->sole()->new_values)->toBe(['role' => 'commercial']);
+        ->and(AuditLog::query()->where('event', 'roles.reset')->sole()->new_values)->toEqual(['role' => 'commercial', 'role_label' => 'Commercial']);
 });
 
 it('changes only the current organisme, and a later sync never grants a removed right again', function () {

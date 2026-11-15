@@ -203,8 +203,8 @@ it('records a role change', function () {
 
     $log = lastAudit('access.role_changed');
     expect($log->auditable_id)->toBe($user->id)
-        ->and($log->old_values)->toBe(['role' => 'commercial'])
-        ->and($log->new_values)->toBe(['role' => 'direction']);
+        ->and($log->old_values)->toEqual(['role' => 'commercial', 'role_label' => 'Commercial'])
+        ->and($log->new_values)->toEqual(['role' => 'direction', 'role_label' => 'Direction']);
 });
 
 it('leaves no role audit row when the surrounding transaction rolls back', function () {

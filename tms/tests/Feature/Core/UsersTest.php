@@ -422,5 +422,5 @@ it('audits the invitation event', function () {
         ->assertRedirect('/admin/users');
 
     $log = AuditLog::query()->where('event', 'users.invitation_sent')->sole();
-    expect($log->new_values)->toEqual(['email' => 'nouvelle@cap.test', 'role' => 'commercial']);
+    expect($log->new_values)->toEqual(['email' => 'nouvelle@cap.test', 'role' => 'commercial', 'role_label' => 'Commercial']);
 });

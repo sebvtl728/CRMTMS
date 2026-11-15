@@ -64,7 +64,7 @@ final class RoleMatrix
             if ($granted && $system !== null) {
                 PermissionSync::writeDefaultScopes((string) $model->getKey(), $system, [$permission], $this->tenants->id());
             }
-            $this->audit->record($granted ? 'roles.permission_granted' : 'roles.permission_revoked', $model, [], ['role' => $model->name, 'permission' => $permission]);
+            $this->audit->record($granted ? 'roles.permission_granted' : 'roles.permission_revoked', $model, [], ['role' => $model->name, 'role_label' => $model->label(), 'permission' => $permission]);
         });
 
         $this->changed($model);
@@ -95,7 +95,7 @@ final class RoleMatrix
                 ['role_id', 'permission'],
                 ['scope', 'updated_at'],
             );
-            $this->audit->record('roles.scope_changed', $model, ['permission' => $permission, 'scope' => $before->value], ['permission' => $permission, 'scope' => $scope->value]);
+            $this->audit->record('roles.scope_changed', $model, ['permission' => $permission, 'scope' => $before->value], ['permission' => $permission, 'scope' => $scope->value, 'role' => $model->name, 'role_label' => $model->label()]);
         });
 
         $this->changed($model);
@@ -124,7 +124,7 @@ final class RoleMatrix
                     'permission' => $permission,
                 ], $defaults));
             }
-            $this->audit->record('roles.reset', $model, [], ['role' => $model->name]);
+            $this->audit->record('roles.reset', $model, [], ['role' => $model->name, 'role_label' => $model->label()]);
         });
 
         $this->changed($model);

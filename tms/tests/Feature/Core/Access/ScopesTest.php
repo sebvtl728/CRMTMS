@@ -75,7 +75,7 @@ it('stores a scope and journals the change with the previous value', function ()
 
     expect(Scopes::of($user, SCOPED))->toBe(AccessScope::Das);
     $log = AuditLog::query()->where('event', 'roles.scope_changed')->sole();
-    expect($log->new_values)->toEqual(['permission' => SCOPED, 'scope' => 'das'])
+    expect($log->new_values)->toEqual(['permission' => SCOPED, 'scope' => 'das', 'role' => 'commercial', 'role_label' => 'Commercial'])
         ->and($log->old_values)->toEqual(['permission' => SCOPED, 'scope' => 'all']);
 });
 

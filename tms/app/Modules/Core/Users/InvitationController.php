@@ -120,7 +120,7 @@ class InvitationController extends Controller
         abort_if($invitation->accepted_at !== null, 404);
 
         DB::transaction(function () use ($invitation) {
-            $this->audit->record('users.invitation_revoked', $invitation, [], ['email' => $invitation->email, 'role' => $invitation->role]);
+            $this->audit->record('users.invitation_revoked', $invitation, [], ['email' => $invitation->email, 'role' => $invitation->role, 'role_label' => $invitation->roleLabel()]);
             $invitation->delete();
         });
 
@@ -137,7 +137,7 @@ class InvitationController extends Controller
     {
         $url = route('activation.show', $invitation->plainToken);
         $company = Company::query()->where('is_default', true)->first();
-        $audited = ['email' => $invitation->email, 'role' => $invitation->role];
+        $audited = ['email' => $invitation->email, 'role' => $invitation->role, 'role_label' => $invitation->roleLabel()];
         $verb = $kind === 'resent' ? 'renvoyée' : 'envoyée';
 
         if (TenantMailer::deliversNowhere($company)) {

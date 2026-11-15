@@ -104,6 +104,7 @@ class UserActivationLink extends Command
             $audit->record('users.activation_reissued', $invitation, [], [
                 'email' => $email,
                 'role' => $role->name,
+                'role_label' => $role->label(),
                 'by' => 'console',
             ]);
 

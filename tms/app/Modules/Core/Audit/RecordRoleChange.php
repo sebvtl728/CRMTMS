@@ -18,8 +18,8 @@ class RecordRoleChange implements ShouldHandleEventsAfterCommit
         $this->recorder->record(
             'access.role_changed',
             $event->user,
-            ['role' => $event->previous?->name],
-            ['role' => $event->role->name],
+            $event->previous === null ? ['role' => null] : ['role' => $event->previous->name, 'role_label' => $event->previous->label()],
+            ['role' => $event->role->name, 'role_label' => $event->role->label()],
         );
     }
 }

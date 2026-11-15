@@ -76,10 +76,14 @@ final class FollowedDas
             return;
         }
 
-        $users = User::query()->whereIn('id', DB::table('model_has_roles')
-            ->where('role_id', $event->role->getKey())
-            ->where('model_type', (new User)->getMorphClass())
-            ->select('model_id'))->get();
+        // Only the holders that follow DAS have something to lose.
+        $users = User::query()
+            ->whereIn('id', DB::table('model_has_roles')
+                ->where('role_id', $event->role->getKey())
+                ->where('model_type', (new User)->getMorphClass())
+                ->select('model_id'))
+            ->whereIn('id', DB::table('user_das')->select('user_id'))
+            ->get();
 
         foreach ($users as $user) {
             if (! self::applies($user)) {
@@ -95,8 +99,10 @@ final class FollowedDas
             return;
         }
 
-        DB::table('user_das')->where('user_id', $user->getKey())->delete();
         sort($before);
-        app(AuditRecorder::class)->record('users.das_changed', $user, ['das_ids' => $before], ['das_ids' => []]);
+        DB::transaction(function () use ($user, $before): void {
+            DB::table('user_das')->where('user_id', $user->getKey())->delete();
+            app(AuditRecorder::class)->record('users.das_changed', $user, ['das_ids' => $before], ['das_ids' => []]);
+        });
     }
 }

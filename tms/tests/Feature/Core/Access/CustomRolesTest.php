@@ -299,7 +299,7 @@ it('updateRole accepts a custom role of the organisme', function () {
     $this->patch("/admin/users/{$user->id}/role", ['role' => $role->name])->assertSessionHasNoErrors()
         ->assertSessionHas('status', "Rôle de {$user->name} modifié : Formateur.");
     expect($user->fresh()->role()?->is($role))->toBeTrue()
-        ->and(AuditLog::query()->where('event', 'access.role_changed')->latest('id')->first()->new_values)->toBe(['role' => $role->name]);
+        ->and(AuditLog::query()->where('event', 'access.role_changed')->latest('id')->first()->new_values)->toEqual(['role' => $role->name, 'role_label' => 'Formateur']);
 
     $tenant = Tenant::factory()->create();
     PermissionSync::forTenant($tenant);
@@ -332,7 +332,7 @@ it('empties the followed DAS when the matrix of their role drops « Ses DAS »',
     $log = AuditLog::query()->where('event', 'users.das_changed')->sole();
     expect($log->old_values)->toBe(['das_ids' => [$das->id]])->and($log->new_values)->toBe(['das_ids' => []]);
 
-    // A system role reset to its defaults without « Ses DAS » too.
+    // A system role whose scopes are all set to « Tout l'organisme » too.
     $responsable = RoleModel::forSystem(Role::ResponsableDas);
     $other = User::factory()->create();
     $other->assignPrimaryRole($responsable);
@@ -344,4 +344,48 @@ it('empties the followed DAS when the matrix of their role drops « Ses DAS »',
     }
     expect(DB::table('user_das')->where('user_id', $other->id)->count())->toBe(0);
     expect(Scopes::roleUses($responsable, AccessScope::Das))->toBeFalse();
+});
+
+it('empties the followed DAS when a role is reset to defaults without « Ses DAS »', function () {
+    $role = customRole('Suivi DAS');
+    $matrix = app(RoleMatrix::class);
+    $matrix->set($role, CrmPermissions::FICHES_VIEW, true);
+    $matrix->setScope($role, CrmPermissions::FICHES_VIEW, AccessScope::Das);
+    $user = User::factory()->create();
+    $user->assignPrimaryRole($role);
+    CapFormationReferenceSeeder::run(tenant());
+    followDas($user, crmItem(ReferenceList::Das, 'Hôtellerie-restauration'));
+    // A holder following nothing is left alone (no audit row).
+    $idle = User::factory()->create();
+    $idle->assignPrimaryRole($role);
+
+    $matrix->reset($role);
+
+    expect(DB::table('user_das')->where('user_id', $user->id)->count())->toBe(0)
+        ->and(AuditLog::query()->where('event', 'users.das_changed')->pluck('auditable_id')->all())->toBe([$user->id]);
+
+    // Commercial (defaults without « Ses DAS ») given « Ses DAS » then reset.
+    $commercial = RoleModel::forSystem(Role::Commercial);
+    $matrix->setScope($commercial, CrmPermissions::FICHES_VIEW, AccessScope::Das);
+    $seller = User::factory()->create();
+    $seller->assignPrimaryRole($commercial);
+    followDas($seller, crmItem(ReferenceList::Das, 'Hôtellerie-restauration'));
+    $matrix->reset($commercial);
+    expect(DB::table('user_das')->where('user_id', $seller->id)->count())->toBe(0);
+});
+
+it('serialises label checks of an organisme with an advisory lock', function () {
+    $tenant = tenant();
+    customRole('Formateur');
+
+    // The lock is held until the end of the transaction: another connection cannot take it.
+    config(['database.connections.label_probe' => config('database.connections.'.config('database.default'))]);
+    $probe = DB::connection('label_probe');
+    $free = $probe->selectOne('select pg_try_advisory_lock(hashtext(?)) as ok', [RoleCatalogue::labelLockKey($tenant->id)])->ok;
+    $other = $probe->selectOne('select pg_try_advisory_lock(hashtext(?)) as ok', [RoleCatalogue::labelLockKey('another-tenant')])->ok;
+    $probe->select('select pg_advisory_unlock_all()');
+    DB::purge('label_probe');
+
+    expect($free)->toBeFalse()->and($other)->toBeTrue()
+        ->and(fn () => customRole('FORMATÉUR'))->toThrow(ValidationException::class, RoleCatalogue::DUPLICATE);
 });
