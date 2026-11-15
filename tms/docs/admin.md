@@ -166,9 +166,9 @@ Chaque domaine du CRM a ses droits **Consulter**, **Créer et modifier** (créer
 | `crm.revenue.view` | Consulter le chiffre d'affaires par DAS (à périmètre) |
 | `crm.revenue.manage` | Fixer les objectifs de chiffre d'affaires |
 | `crm.import`, `crm.export`, `crm.gdpr` | Imports ; exports Excel des listes ; écran RGPD, export des données d'une personne, anonymisation, durée de conservation |
-| `catalogue.view` | Menu **Catalogue** : voir les formations (tout le catalogue, quel que soit le DAS) |
-| `catalogue.manage` (« Modifier le catalogue ») | Créer, modifier, désactiver une formation ; importer un catalogue (avec `crm.import`) |
-| `catalogue.delete` | Supprimer une formation |
+| `catalogue.view` | Menu **Catalogue** : voir les formations (tout le catalogue, quel que soit le DAS) ; voir et télécharger les plaquettes |
+| `catalogue.manage` (« Modifier le catalogue ») | Créer, modifier, désactiver une formation ; importer un catalogue (avec `crm.import`) ; déposer et modifier des plaquettes |
+| `catalogue.delete` | Supprimer une formation ; mettre une plaquette à la corbeille |
 
 Les droits d'**administration** (`users.manage`, `roles.manage`, `companies.manage`, `references.manage`, `connectors.manage`, `audit.view`, `settings.manage`, `exports.run`) sont inchangés.
 

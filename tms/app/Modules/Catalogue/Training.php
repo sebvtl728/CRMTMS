@@ -2,6 +2,7 @@
 
 namespace App\Modules\Catalogue;
 
+use App\Modules\Catalogue\Brochures\BrochureStore;
 use App\Modules\Core\Audit\Auditable;
 use App\Modules\Core\References\ReferenceItem;
 use App\Modules\Core\Tenancy\BelongsToTenant;
@@ -65,6 +66,8 @@ class Training extends Model
             $training->created_by ??= Auth::id();
             $training->updated_by ??= Auth::id();
         });
+        // A deleted training no longer carries brochures (they stay in the library).
+        static::deleted(fn (Training $training) => BrochureStore::detachTraining($training->id));
         static::updating(function (Training $training): void {
             if (Auth::id() !== null) {
                 $training->updated_by = Auth::id();

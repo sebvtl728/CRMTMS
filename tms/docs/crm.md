@@ -113,6 +113,8 @@ Sur la page d'une opportunité, **Changer d'étape** ouvre la même fenêtre.
 - **Exporter (.xlsx)** (avec le droit d'export) : la liste filtrée, tarifs et durées en vrais nombres.
 - **Importer un catalogue** : menu **Imports**, type **Catalogue de formations** (gestionnaires du catalogue ayant aussi le droit d'import), voir § 11.
 
+**Plaquettes** (bouton **Plaquettes** du catalogue) : la bibliothèque des plaquettes PDF de l'organisme. Une plaquette a un **titre**, un fichier **PDF de 10 Mo au plus** (le contenu est vérifié : un fichier renommé en .pdf est refusé) et se rattache à des **formations** et/ou à des **DAS** (toutes les formations du DAS). Tout le monde les voit et les télécharge (`catalogue.view`) ; **Nouvelle plaquette** et **Modifier** demandent `catalogue.manage`, **Corbeille** `catalogue.delete`. **Remplacer le fichier** crée une nouvelle **version** : les anciennes restent téléchargeables depuis **Modifier** et les envois déjà faits gardent la version envoyée. Une plaquette à la corbeille n'est plus proposée mais son fichier n'est jamais effacé. La page de modification d'une formation liste ses plaquettes (rattachées directement ou par son DAS) ; supprimer la formation la détache simplement de ses plaquettes.
+
 ## 5. Devis
 
 Un **devis** se crée depuis une **opportunité** : il en reprend le compte (entreprise ou particulier), les formations et le DAS. Écran **Devis** pour la liste, section **Devis** de la page d'une opportunité, onglet **Devis** des fiches.

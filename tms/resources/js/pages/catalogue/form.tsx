@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import AppLayout from '@/layouts/app-layout';
-import { amountInput, itemError, type Option } from '@/lib/crm';
+import { amountInput, formatSize, itemError, type Option } from '@/lib/crm';
 import { type BreadcrumbItem } from '@/types';
 import { Head, Link, useForm } from '@inertiajs/react';
 import { LoaderCircle } from 'lucide-react';
@@ -28,6 +28,8 @@ interface FormProps {
         funding_mode_ids: string[];
     } | null;
     options: { das: Option[]; funding_mode: Option[] };
+    brochures?: { id: string; title: string; original_name: string; size: number; source: 'training' | 'das' }[];
+    can?: { brochures: boolean };
 }
 
 type TrainingForm = {
@@ -53,7 +55,7 @@ function decimalInput(value: string | null | undefined): string {
 
 const textareaClass = 'border-input bg-background focus:ring-ring w-full rounded-md border px-3 py-2 text-sm focus:ring-2 focus:outline-hidden';
 
-export default function TrainingFormPage({ training, options }: FormProps) {
+export default function TrainingFormPage({ training, options, brochures = [], can }: FormProps) {
     const editing = training !== null;
 
     const { data, setData, post, put, processing, errors } = useForm<TrainingForm>({
@@ -179,6 +181,35 @@ export default function TrainingFormPage({ training, options }: FormProps) {
                         ))}
                         <InputError message={errors.funding_mode_ids ?? itemError(errors, 'funding_mode_ids')} />
                     </fieldset>
+
+                    {editing && (
+                        <section aria-label="Plaquettes" className="grid gap-2 rounded-xl border p-4">
+                            <h2 className="text-sm font-semibold">Plaquettes</h2>
+                            {brochures.length === 0 ? (
+                                <p className="text-muted-foreground text-sm">Aucune plaquette rattachée à cette formation ni à son DAS.</p>
+                            ) : (
+                                <ul className="grid gap-1 text-sm">
+                                    {brochures.map((b) => (
+                                        <li key={b.id} className="flex flex-wrap items-center gap-2">
+                                            {can?.brochures ? (
+                                                <a className="underline" href={route('catalogue.brochures.download', b.id)}>
+                                                    {b.title}
+                                                </a>
+                                            ) : (
+                                                <span>{b.title}</span>
+                                            )}
+                                            <span className="text-muted-foreground">
+                                                {b.original_name} · {formatSize(b.size)} · {b.source === 'das' ? 'via le DAS' : 'rattachée à la formation'}
+                                            </span>
+                                        </li>
+                                    ))}
+                                </ul>
+                            )}
+                            <Link className="text-sm underline" href={route('catalogue.brochures.index')}>
+                                Gérer les plaquettes
+                            </Link>
+                        </section>
+                    )}
 
                     <div className="flex flex-wrap gap-2">
                         <Button type="submit" disabled={processing}>
