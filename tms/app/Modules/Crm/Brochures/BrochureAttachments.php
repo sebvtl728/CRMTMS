@@ -2,6 +2,7 @@
 
 namespace App\Modules\Crm\Brochures;
 
+use App\Modules\Catalogue\Brochures;
 use App\Modules\Core\Tenancy\TenantStorage;
 use Illuminate\Support\Facades\Storage;
 
@@ -28,7 +29,8 @@ final class BrochureAttachments
 
     /**
      * The files of these versions (Catalogue\Brochures::versions rows), in
-     * order; null when one is no longer on the disk (nothing is sent).
+     * order; null when one is no longer on the disk or is not in the tenant's
+     * brochures area (nothing is sent).
      *
      * @param  list<array{version_id: string, path: string, original_name: string, size: int}>  $versions
      * @return list<array{bytes: string, name: string}>|null
@@ -38,7 +40,7 @@ final class BrochureAttachments
         $disk = Storage::disk(TenantStorage::DISK);
         $files = [];
         foreach ($versions as $version) {
-            if (! $disk->exists($version['path'])) {
+            if (! Brochures::isOwnPath($version['path']) || ! $disk->exists($version['path'])) {
                 return null;
             }
             $files[] = ['bytes' => (string) $disk->get($version['path']), 'name' => $version['original_name']];

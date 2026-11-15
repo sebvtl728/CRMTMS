@@ -182,9 +182,7 @@ class BrochureController extends Controller
      */
     private static function isOwnPath(BrochureVersion $version): bool
     {
-        return str_starts_with($version->path, TenantStorage::path('brochures').'/')
-            && ! str_contains($version->path, '..')
-            && ! str_contains($version->path, "\0");
+        return BrochureLibrary::isOwnPath($version->path);
     }
 
     /**

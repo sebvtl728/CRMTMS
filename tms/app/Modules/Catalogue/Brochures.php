@@ -4,6 +4,7 @@ namespace App\Modules\Catalogue;
 
 use App\Modules\Catalogue\Brochures\Brochure;
 use App\Modules\Catalogue\Brochures\BrochureVersion;
+use App\Modules\Core\Tenancy\TenantStorage;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 
@@ -31,6 +32,16 @@ final class Brochures
     public static function registerSentCheck(string $name, callable $wasSent): void
     {
         self::$sentChecks[$name] = \Closure::fromCallable($wasSent);
+    }
+
+    /**
+     * Only files in the tenant's own brochures directory are ever read.
+     */
+    public static function isOwnPath(string $path): bool
+    {
+        return str_starts_with($path, TenantStorage::path('brochures').'/')
+            && ! str_contains($path, '..')
+            && ! str_contains($path, "\0");
     }
 
     public static function wasSent(string $versionId): bool

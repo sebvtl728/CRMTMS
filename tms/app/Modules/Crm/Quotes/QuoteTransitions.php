@@ -15,6 +15,7 @@ use App\Modules\Crm\Timeline\LastContact;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Validation\ValidationException;
 
 /**
  * Life of a quote after its draft: sending (frozen, archived, e-mailed,
@@ -264,10 +265,13 @@ final class QuoteTransitions
 
     /**
      * The archived PDF and the brochures together stay within the limit of
-     * one e-mail; otherwise the archive just written is removed (the
-     * transaction rolls the quote back to a draft).
+     * one e-mail; otherwise the archive just written is deleted from the disk
+     * and a field error on brochure_version_ids is raised (the exception
+     * rolls the transaction back: the quote stays a draft).
      *
      * @param  list<array{version_id: string, path: string, original_name: string, size: int}>  $versions
+     *
+     * @throws ValidationException
      */
     private function requireRoom(Quote $quote, array $versions): void
     {
@@ -279,7 +283,7 @@ final class QuoteTransitions
         if (BrochureAttachments::tooBig((int) $disk->size($path) + array_sum(array_column($versions, 'size')))) {
             $disk->delete($path);
 
-            throw new UserFacingHttpException(422, self::ATTACHMENTS_TOO_BIG);
+            throw ValidationException::withMessages(['brochure_version_ids' => self::ATTACHMENTS_TOO_BIG]);
         }
     }
 

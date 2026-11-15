@@ -424,6 +424,10 @@ it('isolates organismes: no read, download, change or deletion of another one\'s
     expect($service->versions([$foreign->current_version_id]))->toBe([])
         ->and(collect($service->options(null))->pluck('title')->all())->toBe(['Mienne']);
     app(TenantContext::class)->run($other, fn () => expect(Brochure::query()->sole()->title)->toBe('Étrangère'));
+
+    // The route that also resolves trashed brochures never reaches another organisme's.
+    app(TenantContext::class)->run($other, fn () => $foreign->delete());
+    $this->get("/catalogue/brochures/{$foreign->id}/versions/{$foreign->current_version_id}")->assertNotFound();
 });
 
 it('stores an original name that is valid UTF-8 even when the browser sent broken bytes', function () {

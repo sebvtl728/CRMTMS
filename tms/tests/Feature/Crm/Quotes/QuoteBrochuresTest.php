@@ -190,7 +190,8 @@ it('refuses when the quote pdf tips the total over 20 Mo', function () {
     $a = quoteBrochure('Pile', size: 20 * 1024 * 1024);
     $quote = sendableQuote();
 
-    $this->postJson("/crm/quotes/{$quote->id}/send", quoteMessage(['brochure_version_ids' => [$a->id]]))->assertStatus(422);
+    $this->postJson("/crm/quotes/{$quote->id}/send", quoteMessage(['brochure_version_ids' => [$a->id]]))->assertStatus(422)
+        ->assertJsonValidationErrors(['brochure_version_ids' => 'Les pièces jointes dépassent 20 Mo : retirez une plaquette.']);
 
     Mail::assertNothingSent();
     $quote->refresh();
@@ -253,4 +254,19 @@ it('keeps the behaviour unchanged without any brochure', function () {
     $this->post("/crm/quotes/{$quote->id}/send", quoteMessage())->assertSessionHasNoErrors();
 
     expect(attachedCount(Mail::sent(QuoteMail::class)->sole()))->toBe(1);
+});
+
+it('keeps a version sent only with a quote downloadable after its brochure was trashed, and never an unsent one', function () {
+    Mail::fake();
+    $this->actingAs(admin(twoFactor: true));
+    $sent = quoteBrochure('Envoyée');
+    $unsentVersion = quoteBrochureVersion($sent->brochure, "%PDF-1.4 jamais envoyée\n", current: false);
+    $quote = sendableQuote();
+    $this->post("/crm/quotes/{$quote->id}/send", quoteMessage(['brochure_version_ids' => [$sent->id]]))->assertSessionHasNoErrors();
+    expect(DB::table('brochure_sending_versions')->count())->toBe(0);
+
+    $sent->brochure->delete();
+
+    $this->get("/catalogue/brochures/{$sent->brochure_id}/versions/{$sent->id}")->assertOk();
+    $this->get("/catalogue/brochures/{$sent->brochure_id}/versions/{$unsentVersion->id}")->assertNotFound();
 });
