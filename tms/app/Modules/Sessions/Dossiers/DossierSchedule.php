@@ -10,8 +10,8 @@ use Illuminate\Support\Facades\DB;
 
 /**
  * The span of the sessions a dossier enrols trainees on: earliest start and
- * latest end of the sessions of its enrolments (cancelled enrolments, and
- * cancelled or trashed sessions, aside), from which « En cours » /
+ * latest end of the sessions of its enrolments (cancelled and waitlisted
+ * enrolments, and cancelled or trashed sessions, aside), from which « En cours » /
  * « Réalisé » are computed (DossierStatus::effective()). spans() reads a
  * page of dossiers in one query; firstStart() / lastEnd() are the same
  * values as correlated sub-queries, for the state filter of the list.
@@ -72,7 +72,7 @@ final class DossierSchedule
     {
         return DB::table('enrolments')
             ->join('training_sessions', 'training_sessions.id', '=', 'enrolments.training_session_id')
-            ->where('enrolments.status', '<>', EnrolmentStatus::Cancelled->value)
+            ->whereNotIn('enrolments.status', EnrolmentStatus::values([EnrolmentStatus::Cancelled, EnrolmentStatus::Waitlisted]))
             ->where('training_sessions.status', '<>', SessionStatus::Cancelled->value)
             ->whereNull('training_sessions.deleted_at');
     }

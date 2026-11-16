@@ -295,7 +295,7 @@ class DossierController extends Controller
     {
         Gate::authorize('delete', $dossier);
 
-        DB::transaction(fn () => $dossier->delete());
+        $this->writer->trash($dossier);
 
         return to_route('dossiers.index')->with('status', "Dossier {$dossier->number} mis à la corbeille.");
     }

@@ -15,6 +15,7 @@ use App\Modules\Crm\Organisations\Organisation;
 use App\Modules\Crm\People\Person;
 use App\Modules\Sessions\Dossiers\Dossier;
 use App\Modules\Sessions\Dossiers\DossierLine;
+use App\Modules\Sessions\Dossiers\DossierSchedule;
 use App\Modules\Sessions\Dossiers\DossierWriter;
 use App\Modules\Sessions\Enrolments\Enrolment;
 use App\Modules\Sessions\Enrolments\Enrolments;
@@ -25,6 +26,7 @@ use App\Modules\Sessions\Sessions\TrainingSession;
 use App\Modules\Sessions\SessionsServiceProvider;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Inertia\Testing\AssertableInertia as Assert;
@@ -536,4 +538,91 @@ it('exports the dossiers without a query per row, and answers the export pre-fli
     $this->getJson('/dossiers/export/check')->assertOk()->assertJson(['rows' => 3, 'allowed' => true, 'message' => null]);
     config(['tms.crm.export_max_rows' => 2]);
     $this->getJson('/dossiers/export/check')->assertOk()->assertJsonPath('allowed', false);
+});
+
+// ---------------------------------------------------------------- review round 1
+
+it('rate-limits the trainee search and creation with a named limiter', function () {
+    foreach (['sessions.trainees', 'sessions.trainees.store'] as $name) {
+        expect(Route::getRoutes()->getByName($name)->gatherMiddleware())->toContain('throttle:sessions-trainees');
+    }
+});
+
+it('cancels the enrolments of a cancelled dossier and refuses to trash a dossier with trainees', function () {
+    $session = enrSession();
+    $dossier = enrDossier();
+    $other = enrDossier(Organisation::query()->create(['name' => 'Autre']));
+    $a = enrol($dossier, $session);
+    $b = enrol($dossier, $session);
+    $kept = enrol($other, $session);
+    $this->actingAs(admin(true));
+
+    $this->delete("/dossiers/{$dossier->id}")->assertStatus(409);
+    expect($dossier->fresh()->trashed())->toBeFalse();
+
+    $this->post("/dossiers/{$dossier->id}/cancel", ['cancelled_reason_id' => crmItem(ReferenceList::CancelReason, 'Effectif insuffisant')->id])->assertRedirect();
+    expect($a->fresh()->status)->toBe(EnrolmentStatus::Cancelled)->and($b->fresh()->status)->toBe(EnrolmentStatus::Cancelled)
+        ->and($a->fresh()->price_share)->toBeNull()
+        ->and($kept->fresh()->status)->toBe(EnrolmentStatus::Enrolled)
+        ->and(AuditLog::query()->where('auditable_id', $a->id)->where('event', 'updated')->exists())->toBeTrue();
+
+    $this->delete("/dossiers/{$dossier->id}")->assertRedirect();
+    expect(Dossier::withTrashed()->find($dossier->id)->trashed())->toBeTrue();
+});
+
+it('cancels the enrolments of a cancelled session, shows it on the fiche and offers no action', function () {
+    $session = enrSession();
+    $other = enrSession();
+    $dossier = enrDossier();
+    $person = makePerson('Martin');
+    $a = enrol($dossier, $session, $person);
+    $elsewhere = enrol($dossier, $other);
+    expect($elsewhere->fresh()->price_share)->toBe('500.00');
+
+    app(SessionWriter::class)->cancel($session, crmItem(ReferenceList::CancelReason, 'Effectif insuffisant')->id);
+    expect($a->fresh()->status)->toBe(EnrolmentStatus::Cancelled)
+        // The shares of the line follow.
+        ->and($elsewhere->fresh()->price_share)->toBe('1000.00');
+
+    $this->actingAs(admin(true))->get("/crm/people/{$person->id}")->assertInertia(fn (Assert $page) => $page
+        ->where('blocks.0.rows.0.badge', 'Session annulée'));
+    $this->get("/sessions/{$session->id}")->assertInertia(fn (Assert $page) => $page
+        ->where('enrolments.0.session.cancelled', true)->where('enrolments.0.can_update', false));
+});
+
+it('sends the adaptation needs and the notes only to who may update the enrolment', function () {
+    $session = enrSession();
+    enrol(enrDossier(), $session, makePerson('Martin'), ['adaptation_needs' => 'Fauteuil roulant', 'notes' => 'Note']);
+
+    $this->actingAs(enrUser([Permissions::SESSIONS_VIEW => null, Permissions::DOSSIERS_VIEW => null]))
+        ->get("/sessions/{$session->id}")->assertInertia(fn (Assert $page) => $page
+        ->where('enrolments.0.person.label', 'Martin')
+        ->where('enrolments.0.adaptation_needs', null)->where('enrolments.0.notes', null));
+
+    $this->actingAs(admin(true))->get("/sessions/{$session->id}")->assertInertia(fn (Assert $page) => $page
+        ->where('enrolments.0.adaptation_needs', 'Fauteuil roulant')->where('enrolments.0.notes', 'Note'));
+});
+
+it('keeps the stored values of the keys absent from an update', function () {
+    $bpf = crmItem(ReferenceList::BpfCategory, 'Autres');
+    $enrolment = enrol(enrDossier(), enrSession(), null, ['adaptation_needs' => 'Malvoyant', 'notes' => 'Note', 'bpf_category_id' => $bpf->id]);
+
+    app(Enrolments::class)->update($enrolment, ['notes' => 'Autre note']);
+    $fresh = $enrolment->fresh();
+    expect($fresh->notes)->toBe('Autre note')->and($fresh->adaptation_needs)->toBe('Malvoyant')
+        ->and($fresh->bpf_category_id)->toBe($bpf->id)->and($fresh->entered_on->toDateString())->toBe('2026-12-07');
+
+    // A key sent empty clears it.
+    app(Enrolments::class)->update($enrolment, ['adaptation_needs' => '']);
+    expect($enrolment->fresh()->adaptation_needs)->toBeNull()->and($enrolment->fresh()->notes)->toBe('Autre note');
+});
+
+it('leaves the waiting list out of the span of a dossier', function () {
+    $full = enrSession(null, ['capacity' => 1, 'starts_on' => '2026-11-10', 'ends_on' => '2026-11-20']);
+    enrol(enrDossier(Organisation::query()->create(['name' => 'Premier'])), $full);
+    $waiting = enrDossier();
+    enrol($waiting, $full);
+
+    expect(DossierSchedule::spans([$waiting->id]))->toBe([])
+        ->and($waiting->effectiveStatus(Dossier::today())->value)->toBe('created');
 });

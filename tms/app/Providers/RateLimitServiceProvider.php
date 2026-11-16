@@ -18,6 +18,7 @@ class RateLimitServiceProvider extends ServiceProvider
     /** @var array<string, int> limiter name => requests per minute */
     public const LIMITS = [
         'crm-search' => 60,
+        'sessions-trainees' => 60,
         'crm-sirene' => 30,
         'import-upload' => 20,
         'import-status' => 120,

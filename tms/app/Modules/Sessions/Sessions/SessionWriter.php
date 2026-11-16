@@ -8,6 +8,7 @@ use App\Modules\Core\References\ReferenceList;
 use App\Modules\Core\Tenancy\TenantContext;
 use App\Modules\Crm\Public\Fiches;
 use App\Modules\Sessions\Enrolments\Enrolment;
+use App\Modules\Sessions\Enrolments\Enrolments;
 use App\Modules\Sessions\Enrolments\EnrolmentStatus;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\Auth;
@@ -25,7 +26,8 @@ use Illuminate\Validation\ValidationException;
  * entreprise. A cancelled session no longer changes (409); a trashed intra
  * session comes back only with its entreprise (409). Once trainees are
  * enrolled (cancelled enrolments aside), its training, type and entreprise
- * no longer change and it does not go to the trash (409).
+ * no longer change and it does not go to the trash (409); cancelling it
+ * cancels its enrolments.
  *
  * @phpstan-type SessionData array<string, mixed>
  */
@@ -136,7 +138,9 @@ final class SessionWriter
         ])->validate();
 
         return DB::transaction(function () use ($session, $reasonId): TrainingSession {
-            $locked = TrainingSession::query()->lockForUpdate()->findOrFail($session->id);
+            // Dossiers of its trainees, then the session (the order of Enrolments).
+            $enrolments = app(Enrolments::class);
+            $locked = $enrolments->lockSession($session);
             if ($locked->isCancelled()) {
                 throw new UserFacingHttpException(409, self::ALREADY_CANCELLED);
             }
@@ -144,6 +148,8 @@ final class SessionWriter
             $locked->cancel_reason_id = $reasonId;
             $locked->cancelled_on = TrainingSession::today();
             $locked->save();
+            // Its trainees are unenrolled (shares of their lines computed again).
+            $enrolments->cancelAllOfSession($locked);
 
             return $locked;
         });

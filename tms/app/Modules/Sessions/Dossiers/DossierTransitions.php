@@ -5,6 +5,7 @@ namespace App\Modules\Sessions\Dossiers;
 use App\Exceptions\UserFacingHttpException;
 use App\Modules\Core\References\ReferenceList;
 use App\Modules\Core\Tenancy\TenantContext;
+use App\Modules\Sessions\Enrolments\Enrolments;
 use Carbon\CarbonImmutable;
 use Closure;
 use Illuminate\Support\Facades\DB;
@@ -112,6 +113,8 @@ final class DossierTransitions
             $locked->status = DossierStatus::Cancelled;
             $locked->cancelled_reason_id = $reasonId;
             $locked->cancelled_on = Dossier::today();
+            // Its trainees are unenrolled (sessions locked after the dossier).
+            app(Enrolments::class)->cancelAllOfDossier($locked);
         }, checkCancelled: false);
     }
 

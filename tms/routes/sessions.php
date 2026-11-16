@@ -25,8 +25,8 @@ Route::middleware(['auth'])->prefix('sessions')->name('sessions.')->group(functi
     Route::delete('{trainingSession}', [SessionController::class, 'destroy'])->middleware('can:sessions.sessions.delete')->name('destroy');
     Route::post('{trainingSession}/restore', [SessionController::class, 'restore'])->middleware('can:sessions.sessions.delete')->name('restore');
     // Enrolments: sessions.sessions.update on the session (SessionPolicy).
-    Route::get('{trainingSession}/trainees', [EnrolmentController::class, 'trainees'])->middleware('can:sessions.sessions.update')->name('trainees');
-    Route::post('{trainingSession}/trainees', [EnrolmentController::class, 'createTrainee'])->middleware('can:sessions.sessions.update')->name('trainees.store');
+    Route::get('{trainingSession}/trainees', [EnrolmentController::class, 'trainees'])->middleware(['can:sessions.sessions.update', 'throttle:sessions-trainees'])->name('trainees');
+    Route::post('{trainingSession}/trainees', [EnrolmentController::class, 'createTrainee'])->middleware(['can:sessions.sessions.update', 'throttle:sessions-trainees'])->name('trainees.store');
     Route::post('{trainingSession}/enrolments', [EnrolmentController::class, 'store'])->middleware('can:sessions.sessions.update')->name('enrolments.store');
 });
 

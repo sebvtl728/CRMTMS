@@ -53,6 +53,8 @@ final class DossierWriter
 
     public const LINE_GONE = 'Une ligne de ce dossier a été supprimée entre-temps : rechargez la page.';
 
+    public const ENROLLED = 'Désinscrivez d\'abord les stagiaires de ce dossier.';
+
     public function __construct(
         private readonly DossierNumbering $numbering,
         private readonly Trainings $trainings,
@@ -100,6 +102,21 @@ final class DossierWriter
             $this->writeLines($locked, $lines);
 
             return $locked->unsetRelation('lines');
+        });
+    }
+
+    /**
+     * Puts the dossier in the trash, unless trainees are still enrolled on
+     * it (cancelled enrolments aside): 409.
+     */
+    public function trash(Dossier $dossier): void
+    {
+        DB::transaction(function () use ($dossier): void {
+            $locked = Dossier::query()->lockForUpdate()->findOrFail($dossier->id);
+            if (Enrolment::query()->where('dossier_id', $locked->id)->where('status', '<>', EnrolmentStatus::Cancelled->value)->exists()) {
+                throw new UserFacingHttpException(409, self::ENROLLED);
+            }
+            $locked->delete();
         });
     }
 

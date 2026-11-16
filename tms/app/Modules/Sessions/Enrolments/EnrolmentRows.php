@@ -21,7 +21,9 @@ use Illuminate\Database\Eloquent\Collection;
  * fiche of a person. On a session, the names of the trainees of every
  * dossier are shown, but the dossier (number, contractant) and the price
  * share only to who sees that dossier (sessions.dossiers.view and its
- * scope, spec lot 2a § 9). One query per source for the whole list.
+ * scope, spec lot 2a § 9). The adaptation needs and the notes (personal
+ * data) only to who may update the enrolment; a cancelled session offers
+ * no action. One query per source for the whole list.
  */
 final class EnrolmentRows
 {
@@ -54,6 +56,8 @@ final class EnrolmentRows
             $session = $e->session;
             $dossier = $e->dossier;
             $seesDossier = $dossier !== null && isset($visibleDossiers[$dossier->id]);
+            // A cancelled session takes no action; personal details only for who manages the enrolment.
+            $canUpdate = $session !== null && ! $session->isCancelled() && isset($updatable[$session->id]);
 
             return [
                 'id' => $e->id,
@@ -69,6 +73,7 @@ final class EnrolmentRows
                     'starts_on' => $session->starts_on->toDateString(),
                     'ends_on' => $session->ends_on->toDateString(),
                     'can_open' => isset($visibleSessions[$session->id]),
+                    'cancelled' => $session->isCancelled(),
                 ],
                 'dossier' => ! $seesDossier ? null : [
                     'id' => $dossier->id,
@@ -86,9 +91,9 @@ final class EnrolmentRows
                 'price_share' => $seesDossier && $e->price_share !== null ? Amounts::display(Amounts::cents((string) $e->price_share)) : null,
                 'bpf_category_id' => $e->bpf_category_id,
                 'bpf_category' => $e->bpf_category_id === null ? null : ($labels[$e->bpf_category_id] ?? null),
-                'adaptation_needs' => $e->adaptation_needs,
-                'notes' => $e->notes,
-                'can_update' => $session !== null && isset($updatable[$session->id]),
+                'adaptation_needs' => $canUpdate ? $e->adaptation_needs : null,
+                'notes' => $canUpdate ? $e->notes : null,
+                'can_update' => $canUpdate,
             ];
         })->values()->all();
     }
@@ -144,7 +149,7 @@ final class EnrolmentRows
                     'title' => $s === null ? 'Session introuvable' : ($trainings[$s->training_id]->title ?? 'Formation introuvable'),
                     'subtitle' => $s === null ? null : "Session {$s->number} · du {$s->starts_on->format('d/m/Y')} au {$s->ends_on->format('d/m/Y')}",
                     'meta' => $e->left_on === null ? null : "Sortie le {$e->left_on->format('d/m/Y')}",
-                    'badge' => $e->status->label(),
+                    'badge' => $s?->isCancelled() ? 'Session annulée' : $e->status->label(),
                     'href' => $s === null ? null : route('sessions.show', $s->id, false),
                 ];
             })->all(),

@@ -11,6 +11,7 @@ use App\Modules\Sessions\Dossiers\DossierLine;
 use App\Modules\Sessions\Sessions\SessionKind;
 use App\Modules\Sessions\Sessions\TrainingSession;
 use Carbon\CarbonImmutable;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rule;
@@ -202,18 +203,78 @@ final class Enrolments
         if ($enrolment->isCancelled()) {
             throw new UserFacingHttpException(409, self::CANCELLED);
         }
-        $values = $this->validatedExtra($data, $enrolment);
+        // Only the keys sent change: the others keep their stored value.
+        $values = array_intersect_key($this->validatedExtra($data, $enrolment), $data);
 
         return $this->locked($enrolment, function (Enrolment $locked) use ($values): void {
             if ($locked->isCancelled()) {
                 throw new UserFacingHttpException(409, self::CANCELLED);
             }
-            $values['entered_on'] ??= $locked->entered_on?->toDateString();
-            if ($locked->left_on !== null && $values['entered_on'] !== null && $values['entered_on'] > $locked->left_on->toDateString()) {
+            if (array_key_exists('entered_on', $values) && $values['entered_on'] === null) {
+                unset($values['entered_on']);
+            }
+            $entered = $values['entered_on'] ?? $locked->entered_on?->toDateString();
+            if ($locked->left_on !== null && $entered !== null && $entered > $locked->left_on->toDateString()) {
                 throw ValidationException::withMessages(['entered_on' => 'La date d\'entrée ne peut pas suivre la date de sortie.']);
             }
             $locked->fill($values)->save();
         });
+    }
+
+    /**
+     * The dossier is being cancelled ($dossier locked by the caller, in its
+     * transaction): every enrolment not yet cancelled is cancelled, its
+     * sessions locked in id order (dossier → session, as everywhere), the
+     * shares of its lines computed again. Journaled per enrolment.
+     */
+    public function cancelAllOfDossier(Dossier $dossier): void
+    {
+        $active = fn () => Enrolment::query()->where('dossier_id', $dossier->id)
+            ->where('status', '<>', EnrolmentStatus::Cancelled->value);
+        $sessionIds = $active()->distinct()->orderBy('training_session_id')->pluck('training_session_id')->all();
+        TrainingSession::withTrashed()->whereKey($sessionIds)->orderBy('id')->lockForUpdate()->get();
+        $this->cancelEach($active()->lockForUpdate()->get());
+    }
+
+    /**
+     * The session is being cancelled (in the caller's transaction): the
+     * dossiers of its enrolments are locked in id order, then the session,
+     * then every enrolment not yet cancelled is cancelled and the shares of
+     * the lines concerned computed again.
+     */
+    public function cancelAllOfSession(TrainingSession $session): void
+    {
+        $this->lockSession($session);
+        $this->cancelEach(Enrolment::query()->where('training_session_id', $session->id)
+            ->where('status', '<>', EnrolmentStatus::Cancelled->value)->lockForUpdate()->get());
+    }
+
+    /**
+     * Locks, in the caller's transaction, the dossiers of the enrolments of
+     * $session in id order, then the session (the order Enrolments follows):
+     * returns the session locked.
+     */
+    public function lockSession(TrainingSession $session): TrainingSession
+    {
+        $dossierIds = Enrolment::query()->where('training_session_id', $session->id)
+            ->where('status', '<>', EnrolmentStatus::Cancelled->value)->distinct()->pluck('dossier_id')->all();
+        Dossier::withTrashed()->whereKey($dossierIds)->orderBy('id')->lockForUpdate()->get();
+
+        return TrainingSession::withTrashed()->lockForUpdate()->findOrFail($session->id);
+    }
+
+    /**
+     * @param  Collection<int, Enrolment>  $enrolments
+     */
+    private function cancelEach($enrolments): void
+    {
+        foreach ($enrolments as $enrolment) {
+            $enrolment->status = EnrolmentStatus::Cancelled;
+            $enrolment->waitlist_position = null;
+            $enrolment->save();
+        }
+        DossierLine::query()->whereKey($enrolments->pluck('dossier_line_id')->unique()->values()->all())->get()
+            ->each(fn (DossierLine $line) => PriceShares::recompute($line));
     }
 
     /**

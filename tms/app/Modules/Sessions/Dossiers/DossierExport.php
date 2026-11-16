@@ -17,7 +17,8 @@ use Illuminate\Database\Eloquent\Model;
  * CSV export of the dossiers list (same query, so same filters and scope).
  * Names of the contractants, contacts, trainings and DAS, and the span of
  * the sessions (effective state), are read for each chunk of rows in one
- * query per source (prefetch()): no query per row. Amounts in French
+ * query per source (prefetch()): no query per row. Needs an exporter that
+ * honours PrefetchesRows (CsvExporter; XlsxExporter does not call prefetch()). Amounts in French
  * (Amounts::french: integer cents, never a float).
  */
 final class DossierExport implements ExportResource, PrefetchesRows
