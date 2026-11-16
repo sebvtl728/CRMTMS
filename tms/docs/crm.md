@@ -225,7 +225,8 @@ Le bouton **+ Action** (en haut de chaque écran du CRM, et sur les fiches et op
 - l'**objet** est facultatif (par défaut « Type – fiche ») ;
 - **Motif** (pourquoi l'appel ou le rendez-vous) et **Suite à donner** : deux textes facultatifs (2 000 caractères chacun), modifiables ensuite avec **Modifier**, **Fait** et le **Compte rendu de RDV** ; le motif s'affiche sous l'objet dans **À faire** (sur une ligne, **Voir tout** pour le texte entier) et dans le planning, les deux dans l'historique des fiches et les actions d'une opportunité ; le motif est repris dans l'évènement Outlook, jamais la suite à donner ni le compte rendu. Comme le compte rendu, ils sont masqués dans le journal et effacés par l'anonymisation ;
 - **Fait maintenant** (coché par défaut) enregistre un échange qui vient d'avoir lieu, avec son **résultat** et son **compte rendu** ; décoché, l'action est **à faire** le jour et à l'heure choisis (une date sans heure = 9 h) ;
-- **Prochaine relance** : **Demain**, **Dans 1 semaine**, **Dans 1 mois** ou une date, et un type (Rappel par défaut) : une action à faire est créée sur les mêmes fiches, pour le même responsable.
+- **Prochaine relance** : **Demain**, **Dans 1 semaine**, **Dans 1 mois** ou une date, et un type (Rappel par défaut) : une action à faire est créée sur les mêmes fiches, pour le même responsable ;
+- **Attribuer à** : le responsable de l'action, vous par défaut ; choisissez un autre utilisateur actif de l'organisme (quel que soit son rôle) pour la lui confier dès la création (voir « Confier une action » ci-dessous).
 
 Une action faite met à jour la date de **dernier contact** de la fiche. Une action ne peut pas être datée « faite » dans le futur.
 
@@ -236,10 +237,20 @@ Une action faite met à jour la date de **dernier contact** de la fiche. Une act
 - **Fait** ouvre la fenêtre de compte rendu (résultat, motif, compte rendu, suite à donner, prochaine relance) ;
 - **Reporter** : **Demain**, **Dans 1 semaine** ou une date (une date seule = 9 h) ;
 - **Modifier** ouvre la fenêtre de l'action (type, objet, échéance et heure, durée, lieu, responsable ; les fiches concernées ne changent pas) : le même bouton figure dans le planning, l'historique des fiches et les actions d'une opportunité ;
-- **Ouvrir la fiche** ;
+- **Confier à…** (voir ci-dessous) ;
+- **Ouvrir la fiche** (absent si vous n'avez pas accès à la fiche : son nom seul est affiché) ;
 - **Équipe** (direction et administrateur) affiche les actions de toute l'équipe.
 
 Le nombre affiché à côté de **À faire** dans le menu (en retard + aujourd'hui) se met à jour dans la minute.
+
+### Confier une action à un collègue
+
+**Confier à…** (dans **À faire**, l'historique des fiches et les actions d'une opportunité, sur une action à faire) ouvre une petite fenêtre : choisissez l'utilisateur (tout utilisateur actif de l'organisme) et, si vous le souhaitez, un **message** (500 caractères au plus). Il faut le droit de **modifier** l'action (`crm.activities.update` et son périmètre) ; le champ **Responsable** de **Modifier** et **Attribuer à** à la création font de même.
+
+- Le nouveau responsable reçoit un **e-mail** (modèle « Action confiée », paramétrable par l'administrateur) : qui la confie, type, objet, échéance, motif, votre message et un lien qui ouvre l'action dans **À faire**. Jamais le compte rendu ni la suite à donner. Pas d'e-mail quand vous vous confiez l'action à vous-même, quand le responsable ne change pas, ni pour une action déjà faite.
+- Il **voit toujours** l'action (À faire, compteur du menu, planning) et peut la réaliser ou la modifier, même si la fiche ou l'opportunité est hors de son périmètre : il n'en voit alors que le nom, sans pouvoir l'ouvrir.
+- L'action quitte votre **À faire** ; l'historique de la fiche indique « Action confiée à X par Y ».
+- Si l'agenda Outlook est relié, le rendez-vous quitte l'agenda de l'ancien responsable et rejoint celui du nouveau.
 
 ### Récapitulatif quotidien par e-mail
 
