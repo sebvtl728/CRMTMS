@@ -158,13 +158,22 @@ class ImportController extends Controller
             return $this->toShow($batch);
         }
 
+        // A mapping already saved (or from a profile) is shown as is; otherwise
+        // the proposal reads the first non-empty rows (in memory only).
+        $guessing = $batch->field_map === null;
         try {
             $reader = $batch->reader();
             $headers = $reader->headers();
             $preview = [];
+            $samples = [];
             foreach ($reader->rows() as $row) {
-                $preview[] = array_map(fn (string $h) => $row[$h] ?? '', $headers);
-                if (count($preview) === 5) {
+                if (count($preview) < 5) {
+                    $preview[] = array_map(fn (string $h) => $row[$h] ?? '', $headers);
+                }
+                if ($guessing && implode('', array_map('trim', $row)) !== '') {
+                    $samples[] = $row;
+                }
+                if (count($preview) === 5 && (! $guessing || count($samples) === ColumnGuesser::SAMPLE)) {
                     break;
                 }
             }
@@ -173,7 +182,9 @@ class ImportController extends Controller
         }
 
         $target = $batch->target;
-        $map = $batch->field_map ?? FieldMap::guess($target, $headers)->toArray();
+        $guess = $guessing ? ColumnGuesser::guess($target, $headers, $samples) : [];
+        unset($samples);
+        $map = $batch->field_map ?? array_map(fn (array $g) => $g['field'], $guess);
 
         return Inertia::render('crm/import/mapping', [
             'batch' => $this->summary($batch),
@@ -184,6 +195,7 @@ class ImportController extends Controller
             'fields' => array_map(fn (string $value, string $label) => ['value' => $value, 'label' => $label, 'required' => in_array($value, $target->requiredFields(), true)],
                 array_keys($target->fields()), array_values($target->fields())),
             'map' => (object) $map,
+            'reasons' => (object) array_map(fn (array $g) => $g['reason'], $guess),
             'identifierFields' => $target->identifierFields(),
             'sourceSystem' => $batch->sourceSystem(),
             'profileName' => $batch->profile_id !== null ? ImportProfile::query()->whereKey($batch->profile_id)->value('name') : null,
@@ -235,6 +247,7 @@ class ImportController extends Controller
         $profileName = trim((string) ($input['profile_name'] ?? ''));
         $this->checkProfileName($batch, $profileName, $this->user($request));
         $this->startSimulation($batch, $map, $batch->valueMapper());
+        HeaderChoices::remember($batch->target, $given);
         if ($profileName !== '') {
             $this->saveProfile($batch, $profileName);
         }

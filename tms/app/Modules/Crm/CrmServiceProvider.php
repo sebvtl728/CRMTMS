@@ -21,6 +21,7 @@ use App\Modules\Crm\Affiliations\Affiliation;
 use App\Modules\Crm\Brochures\BrochureSending;
 use App\Modules\Crm\Brochures\BrochureSendingsProvider;
 use App\Modules\Crm\Gdpr\Consent;
+use App\Modules\Crm\Import\HeaderChoice;
 use App\Modules\Crm\Import\ImportBatch;
 use App\Modules\Crm\Import\ImportProfile;
 use App\Modules\Crm\Import\ImportRow;
@@ -107,6 +108,7 @@ class CrmServiceProvider extends ServiceProvider
             'import_batch' => ImportBatch::class,
             'import_row' => ImportRow::class,
             'import_stamp' => ImportStamp::class,
+            'import_header_choice' => HeaderChoice::class,
             'consent' => Consent::class,
             'opportunity' => Opportunity::class,
             'opportunity_stage_change' => StageChange::class,

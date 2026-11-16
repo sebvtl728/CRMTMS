@@ -42,45 +42,17 @@ final class FieldMap
     }
 
     /**
-     * Proposed mapping: a header equal to a field label or to one of its
-     * synonyms, ignoring accents, case, punctuation and spacing. Exact labels
-     * win over synonyms; each field is proposed once, to its first column.
+     * Proposed mapping (see ColumnGuesser): the organisme's previous choices,
+     * then a header equal to a field label or synonym (ignoring accents, case,
+     * punctuation and spacing), then a close header, then the content of the
+     * sample rows. Each field is proposed once, to its surest column.
      *
      * @param  list<string>  $headers
+     * @param  list<array<string, string>>  $sampleRows  column => value
      */
-    public static function guess(ImportTarget $target, array $headers): self
+    public static function guess(ImportTarget $target, array $headers, array $sampleRows = []): self
     {
-        $fields = array_keys($target->fields());
-        $map = [];
-
-        foreach ([true, false] as $labelsOnly) {
-            foreach ($headers as $header) {
-                if (isset($map[$header])) {
-                    continue;
-                }
-                $key = Text::key($header);
-                foreach ($fields as $field) {
-                    if (in_array($field, $map, true)) {
-                        continue;
-                    }
-                    $candidates = $labelsOnly ? [Text::key($target->fields()[$field])] : $target->synonyms($field);
-                    if ($key !== '' && in_array($key, $candidates, true)) {
-                        $map[$header] = $field;
-                        break;
-                    }
-                }
-            }
-        }
-
-        // File order.
-        $ordered = [];
-        foreach ($headers as $header) {
-            if (isset($map[$header])) {
-                $ordered[$header] = $map[$header];
-            }
-        }
-
-        return new self($target, $ordered);
+        return new self($target, array_map(fn (array $guess) => $guess['field'], ColumnGuesser::guess($target, $headers, $sampleRows)));
     }
 
     /**

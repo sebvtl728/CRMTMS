@@ -6,13 +6,22 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Link, useForm } from '@inertiajs/react';
 import { AlertTriangle, Check } from 'lucide-react';
-import { type FormEventHandler } from 'react';
+import { useState, type FormEventHandler } from 'react';
 
 interface Field {
     value: string;
     label: string;
     required: boolean;
 }
+
+type Reason = 'memory' | 'header' | 'similar' | 'content';
+
+const REASON_LABELS: Record<Reason, string> = {
+    memory: 'Proposé : choix précédent',
+    header: 'Proposé d’après l’en-tête',
+    similar: 'Proposé d’après l’en-tête',
+    content: 'Proposé d’après le contenu',
+};
 
 interface MappingProps {
     batch: BatchSummary;
@@ -22,6 +31,7 @@ interface MappingProps {
     info: string;
     fields: Field[];
     map: Record<string, string>;
+    reasons: Partial<Record<string, Reason>>;
     identifierFields: string[];
     sourceSystem: string | null;
     profileName: string | null;
@@ -36,6 +46,7 @@ export default function ImportMapping({
     info,
     fields,
     map,
+    reasons,
     identifierFields,
     sourceSystem,
     profileName,
@@ -53,7 +64,13 @@ export default function ImportMapping({
     const identifierMapped = identifierFields.some((f) => used.has(f));
     const mappedCount = used.size;
 
-    const setField = (column: string, field: string) => form.setData('map', { ...form.data.map, [column]: field });
+    // A proposal's reason is shown until the user changes that column.
+    const [changed, setChanged] = useState<Set<string>>(() => new Set());
+
+    const setField = (column: string, field: string) => {
+        form.setData('map', { ...form.data.map, [column]: field });
+        setChanged((previous) => new Set(previous).add(column));
+    };
 
     const submit: FormEventHandler = (e) => {
         e.preventDefault();
@@ -123,6 +140,7 @@ export default function ImportMapping({
                     {headers.map((header, i) => {
                         const value = form.data.map[header] ?? '';
                         const examples = preview.map((row) => row[i]).filter((v) => v !== undefined && v !== '');
+                        const reason = changed.has(header) ? undefined : reasons[header];
 
                         return (
                             <li key={header} className="grid gap-2 p-3 md:grid-cols-[minmax(0,1fr)_minmax(0,18rem)] md:items-center md:gap-4">
@@ -134,16 +152,29 @@ export default function ImportMapping({
                                         {examples.length > 0 ? examples.join(' · ') : 'Colonne vide dans les 5 premières lignes'}
                                     </p>
                                 </div>
-                                <select id={`col-${i}`} className={selectClass} value={value} onChange={(e) => setField(header, e.target.value)}>
-                                    <option value="">Ignorer</option>
-                                    {fields.map((f) => (
-                                        <option key={f.value} value={f.value} disabled={used.has(f.value) && value !== f.value}>
-                                            {f.label}
-                                            {f.required ? ' (obligatoire)' : ''}
-                                            {used.has(f.value) && value !== f.value ? ' : déjà utilisé' : ''}
-                                        </option>
-                                    ))}
-                                </select>
+                                <div className="grid gap-1">
+                                    <select
+                                        id={`col-${i}`}
+                                        className={selectClass}
+                                        value={value}
+                                        onChange={(e) => setField(header, e.target.value)}
+                                        aria-describedby={reason ? `col-${i}-reason` : undefined}
+                                    >
+                                        <option value="">Ignorer</option>
+                                        {fields.map((f) => (
+                                            <option key={f.value} value={f.value} disabled={used.has(f.value) && value !== f.value}>
+                                                {f.label}
+                                                {f.required ? ' (obligatoire)' : ''}
+                                                {used.has(f.value) && value !== f.value ? ' : déjà utilisé' : ''}
+                                            </option>
+                                        ))}
+                                    </select>
+                                    {reason && (
+                                        <p id={`col-${i}-reason`} className="text-muted-foreground text-xs">
+                                            {REASON_LABELS[reason]}
+                                        </p>
+                                    )}
+                                </div>
                             </li>
                         );
                     })}

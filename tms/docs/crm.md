@@ -322,7 +322,13 @@ Déposez le fichier (CSV avec séparateur `;`, `,` ou tabulation, en UTF-8 ou en
 
 ### Étape 2 : Associer les colonnes
 
-Pour chaque colonne du fichier, indiquez le champ du TMS correspondant, ou **Ignorer**. L'écran devine les associations d'après les titres de colonnes ; il indique les **champs obligatoires** manquants et prévient si une colonne est vide dans les 5 premières lignes. Vous pouvez enregistrer l'association sous un nom de **profil** : au prochain fichier du même format, les colonnes seront déjà associées. Puis **Continuer : analyser le fichier**.
+Pour chaque colonne du fichier, indiquez le champ du TMS correspondant, ou **Ignorer**. L'écran propose les associations et indique sous chaque liste pourquoi (le texte disparaît dès que vous changez la valeur) :
+
+- **Proposé : choix précédent** : l'organisme a déjà associé (ou ignoré) une colonne de même titre pour ce type d'import ; ce choix est mémorisé à chaque validation de l'écran et passe avant tout le reste ;
+- **Proposé d'après l'en-tête** : le titre est celui d'un champ ou un synonyme connu, ou il s'en approche (« Tél portable contact » → Mobile, « CP » → Code postal, « Raison sociale client » → Raison sociale ; les abréviations courantes sont comprises, les petits mots comme « de », « client », « contact » ignorés) ;
+- **Proposé d'après le contenu** : au moins 80 % des cellules remplies parmi les 50 premières lignes ont la forme attendue (e-mail, mobile ou téléphone français, code postal, SIRET valide, date, site web, civilité). Les valeurs ne sont lues que pour cette proposition, jamais conservées.
+
+Chaque champ n'est proposé qu'une fois, à la colonne la plus sûre ; une colonne qui ressemble autant à deux champs reste sur **Ignorer**. Un profil choisi au dépôt, ou une association déjà enregistrée pour ce fichier, est repris tel quel, sans proposition. L'écran indique les **champs obligatoires** manquants et prévient si une colonne est vide dans les 5 premières lignes. Vous pouvez enregistrer l'association sous un nom de **profil** : au prochain fichier du même format, les colonnes seront déjà associées. Puis **Continuer : analyser le fichier**.
 
 ### Étape 3 : Associer les valeurs (si besoin)
 
