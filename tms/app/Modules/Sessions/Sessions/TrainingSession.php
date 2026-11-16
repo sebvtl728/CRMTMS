@@ -24,8 +24,9 @@ use Illuminate\Support\Facades\Auth;
  * @property string $number S-<AAAA>-<NNNN>, unique in the organisme
  * @property string $training_id
  * @property string $das_id the training's DAS (« Ses DAS » visibility)
- * @property string $kind intra|inter (SessionKind)
- * @property string|null $organisation_id the entreprise of an intra session
+ * @property string $kind intra|inter|individual (SessionKind)
+ * @property string $modality_id « Modalités de formation » (reference item)
+ * @property string|null $organisation_id the entreprise of an intra session (optional on an individual one)
  * @property CarbonImmutable $starts_on
  * @property CarbonImmutable $ends_on
  * @property string|null $planned_hours numeric(6,2) as a string
@@ -62,7 +63,7 @@ class TrainingSession extends Model
 
     /** @var list<string> */
     protected $fillable = [
-        'training_id', 'das_id', 'kind', 'organisation_id', 'starts_on', 'ends_on', 'planned_hours',
+        'training_id', 'das_id', 'kind', 'modality_id', 'organisation_id', 'starts_on', 'ends_on', 'planned_hours',
         'location_kind', 'location_text', 'capacity', 'responsible_user_id', 'status', 'notes',
     ];
 

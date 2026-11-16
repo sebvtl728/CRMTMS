@@ -27,8 +27,9 @@ final class SessionRows
         $trainings = app(Trainings::class)->findMany($sessions->pluck('training_id')->unique()->values()->all());
         $organisations = app(Fiches::class)->organisationLabels($sessions->pluck('organisation_id')->filter()->unique()->values()->all());
         $das = ReferenceItem::query()->whereKey($sessions->pluck('das_id')->unique()->values()->all())->pluck('label', 'id')->all();
+        $modalities = ReferenceItem::query()->withTrashed()->whereKey($sessions->pluck('modality_id')->unique()->values()->all())->pluck('label', 'id')->all();
 
-        return $sessions->map(fn (TrainingSession $s) => self::row($s, $trainings[$s->training_id] ?? null, $organisations, $das, $today))->values()->all();
+        return $sessions->map(fn (TrainingSession $s) => self::row($s, $trainings[$s->training_id] ?? null, $organisations, $das, $modalities, $today))->values()->all();
     }
 
     /**
@@ -50,9 +51,10 @@ final class SessionRows
     /**
      * @param  array<string, array{label: string, trashed: bool}>  $organisations
      * @param  array<string, string>  $das
+     * @param  array<string, string>  $modalities
      * @return array<string, mixed>
      */
-    private static function row(TrainingSession $s, ?TrainingData $training, array $organisations, array $das, CarbonImmutable $today): array
+    private static function row(TrainingSession $s, ?TrainingData $training, array $organisations, array $das, array $modalities, CarbonImmutable $today): array
     {
         $status = $s->effectiveStatus($today);
         $organisation = $s->organisation_id === null ? null : ($organisations[$s->organisation_id] ?? null);
@@ -64,6 +66,7 @@ final class SessionRows
             'das' => $das[$s->das_id] ?? null,
             'kind' => $s->kind,
             'kind_label' => SessionKind::from($s->kind)->label(),
+            'modality' => $modalities[$s->modality_id] ?? null,
             'organisation' => $organisation === null ? null : ['id' => $s->organisation_id, 'label' => $organisation['label'], 'trashed' => $organisation['trashed']],
             'starts_on' => $s->starts_on->toDateString(),
             'ends_on' => $s->ends_on->toDateString(),

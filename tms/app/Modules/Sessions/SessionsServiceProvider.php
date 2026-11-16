@@ -144,6 +144,7 @@ class SessionsServiceProvider extends ServiceProvider
     {
         ReferenceUsage::register(ReferenceList::Das, 'training_sessions', 'das_id');
         ReferenceUsage::register(ReferenceList::CancelReason, 'training_sessions', 'cancel_reason_id');
+        ReferenceUsage::register(ReferenceList::TrainingModality, 'training_sessions', 'modality_id');
         ReferenceUsage::register(ReferenceList::Das, 'dossiers', 'das_id');
         ReferenceUsage::register(ReferenceList::Das, 'dossier_lines', 'das_id');
         ReferenceUsage::register(ReferenceList::CancelReason, 'dossiers', 'cancelled_reason_id');

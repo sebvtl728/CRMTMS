@@ -16,12 +16,15 @@ interface Entreprise {
     label: string;
 }
 
+type Kind = 'intra' | 'inter' | 'individual';
+
 interface FormProps {
     session: {
         id: string;
         number: string;
         training_id: string;
-        kind: 'intra' | 'inter';
+        kind: Kind;
+        modality_id: string;
         organisation: Entreprise | null;
         starts_on: string;
         ends_on: string;
@@ -33,10 +36,12 @@ interface FormProps {
         status: string;
         notes: string | null;
     } | null;
-    defaults: { kind: 'intra' | 'inter'; organisation: Entreprise | null; responsible_user_id: string } | null;
+    defaults: { kind: Kind; organisation: Entreprise | null; responsible_user_id: string } | null;
     options: {
         training: (Option & { hours: string | null })[];
         kind: Option[];
+        modality: Option[];
+        default_modality: string | null;
         location: Option[];
         status: Option[];
         responsible: Option[];
@@ -46,6 +51,7 @@ interface FormProps {
 type SessionForm = {
     training_id: string;
     kind: string;
+    modality_id: string;
     organisation_id: string;
     starts_on: string;
     ends_on: string;
@@ -59,6 +65,12 @@ type SessionForm = {
 };
 
 const NONE = 'none';
+
+const KIND_LABELS: Record<string, string> = {
+    intra: 'Intra (une entreprise)',
+    inter: 'Inter (plusieurs entreprises ou particuliers)',
+    individual: 'Individuel (un seul stagiaire)',
+};
 
 const textareaClass = 'border-input bg-background focus:ring-ring w-full rounded-md border px-3 py-2 text-sm focus:ring-2 focus:outline-hidden';
 
@@ -137,6 +149,7 @@ export default function SessionFormPage({ session, defaults, options }: FormProp
     const { data, setData, post, put, processing, errors } = useForm<SessionForm>({
         training_id: session?.training_id ?? '',
         kind: session?.kind ?? defaults?.kind ?? 'inter',
+        modality_id: session?.modality_id ?? options.default_modality ?? '',
         organisation_id: session?.organisation?.id ?? defaults?.organisation?.id ?? '',
         starts_on: session?.starts_on ?? '',
         ends_on: session?.ends_on ?? '',
@@ -232,16 +245,16 @@ export default function SessionFormPage({ session, defaults, options }: FormProp
                                 {options.kind.map((k) => (
                                     <label key={k.value} className="flex items-center gap-2 text-sm">
                                         <input type="radio" name="kind" checked={data.kind === k.value} onChange={() => setData('kind', k.value)} />
-                                        {k.value === 'intra' ? 'Intra (une entreprise)' : 'Inter (plusieurs entreprises ou particuliers)'}
+                                        {KIND_LABELS[k.value] ?? k.label}
                                     </label>
                                 ))}
                             </div>
                             <InputError message={errors.kind} />
                         </fieldset>
 
-                        {data.kind === 'intra' ? (
+                        {data.kind !== 'inter' ? (
                             <div className="grid gap-2 md:col-span-2">
-                                <Label htmlFor="organisation_search">Entreprise *</Label>
+                                <Label htmlFor="organisation_search">{data.kind === 'intra' ? 'Entreprise *' : 'Entreprise (facultatif)'}</Label>
                                 <EntreprisePicker value={organisation} onPick={pickOrganisation} />
                                 <InputError message={errors.organisation_id} />
                             </div>
@@ -297,6 +310,7 @@ export default function SessionFormPage({ session, defaults, options }: FormProp
                             />
                             <InputError message={errors.planned_hours} />
                         </div>
+                        {select('modality_id', 'Modalité *', options.modality)}
                         {select('location_kind', 'Lieu *', options.location)}
                         <div className="grid gap-2 md:col-span-2">
                             <Label htmlFor="location_text">

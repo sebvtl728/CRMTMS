@@ -17,7 +17,7 @@ use Illuminate\Database\Eloquent\Builder;
  * trash only with sessions.sessions.delete). The state filter is the
  * effective state of the Paris day (« En cours » / « Terminée » from the dates).
  *
- * @phpstan-type Filters array{q: string, status: ?string, kind: ?string, das: ?string, training: ?string, responsible: ?string, from: ?string, to: ?string, trashed: bool, sort: string, dir: string}
+ * @phpstan-type Filters array{q: string, status: ?string, kind: ?string, modality: ?string, das: ?string, training: ?string, responsible: ?string, from: ?string, to: ?string, trashed: bool, sort: string, dir: string}
  */
 final class SessionListQuery
 {
@@ -36,6 +36,7 @@ final class SessionListQuery
             'q' => is_string($input['q'] ?? null) ? mb_substr(trim($input['q']), 0, 100) : '',
             'status' => self::oneOf($input['status'] ?? null, array_map(fn (SessionStatus $s) => $s->value, SessionStatus::cases())),
             'kind' => self::oneOf($input['kind'] ?? null, array_map(fn (SessionKind $k) => $k->value, SessionKind::cases())),
+            'modality' => self::id($input['modality'] ?? null),
             'das' => self::id($input['das'] ?? null),
             'training' => self::id($input['training'] ?? null),
             'responsible' => self::id($input['responsible'] ?? null),
@@ -71,6 +72,7 @@ final class SessionListQuery
             })
             ->when($filters['status'], fn (Builder $b, string $status) => self::status($b, SessionStatus::from($status), $today))
             ->when($filters['kind'], fn (Builder $b, string $kind) => $b->where('training_sessions.kind', $kind))
+            ->when($filters['modality'], fn (Builder $b, string $id) => $b->where('training_sessions.modality_id', $id))
             ->when($filters['das'], fn (Builder $b, string $id) => $b->where('training_sessions.das_id', $id))
             ->when($filters['training'], fn (Builder $b, string $id) => $b->where('training_sessions.training_id', $id))
             ->when($filters['responsible'], fn (Builder $b, string $id) => $b->where('training_sessions.responsible_user_id', $id))
@@ -86,7 +88,7 @@ final class SessionListQuery
      * Sessions visible to $user overlapping the month starting on $first, not
      * trashed, by start date (the calendar).
      *
-     * @param  array{kind?: ?string, das?: ?string}  $filters
+     * @param  array{kind?: ?string, modality?: ?string, das?: ?string}  $filters
      * @return Builder<TrainingSession>
      */
     public static function month(CarbonImmutable $first, User $user, array $filters = []): Builder
@@ -95,6 +97,7 @@ final class SessionListQuery
             ->where('training_sessions.starts_on', '<=', $first->endOfMonth()->toDateString())
             ->where('training_sessions.ends_on', '>=', $first->toDateString())
             ->when($filters['kind'] ?? null, fn (Builder $b, string $kind) => $b->where('training_sessions.kind', $kind))
+            ->when($filters['modality'] ?? null, fn (Builder $b, string $id) => $b->where('training_sessions.modality_id', $id))
             ->when($filters['das'] ?? null, fn (Builder $b, string $id) => $b->where('training_sessions.das_id', $id))
             ->orderBy('training_sessions.starts_on')->orderBy('training_sessions.number');
     }
@@ -107,6 +110,7 @@ final class SessionListQuery
         return [
             'status' => SessionStatus::options(),
             'kind' => SessionKind::options(),
+            'modality' => self::reference(ReferenceList::TrainingModality),
             'das' => self::reference(ReferenceList::Das),
             'training' => array_map(fn ($t) => ['value' => $t->id, 'label' => $t->title], app(Trainings::class)->options()),
             'responsible' => self::responsible(),

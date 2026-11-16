@@ -67,6 +67,11 @@ final class EnrolmentOptions
             ->whereIn('training_sessions.training_id', $lines->pluck('training_id')->unique()->values()->all())
             ->where('training_sessions.status', '<>', SessionStatus::Cancelled->value)
             ->where(fn (Builder $q) => $q->where('training_sessions.kind', SessionKind::Inter->value)
+                // An individual session still free takes any contractant.
+                ->orWhere(fn (Builder $i) => $i->where('training_sessions.kind', SessionKind::Individual->value)
+                    ->whereNotExists(fn ($e) => $e->selectRaw('1')->from('enrolments')
+                        ->whereColumn('enrolments.training_session_id', 'training_sessions.id')
+                        ->where('enrolments.status', '<>', EnrolmentStatus::Cancelled->value)))
                 ->when($dossier->account_organisation_id !== null, fn (Builder $o) => $o->orWhere('training_sessions.organisation_id', $dossier->account_organisation_id)))
             ->orderByDesc('training_sessions.starts_on')->limit(self::LIMIT)->get();
 

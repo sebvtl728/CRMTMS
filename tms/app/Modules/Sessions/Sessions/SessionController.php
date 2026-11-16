@@ -62,7 +62,8 @@ class SessionController extends Controller
             : TrainingSession::today()->startOfMonth();
         assert($first instanceof CarbonImmutable);
         $filters = [
-            'kind' => in_array($request->query('kind'), ['intra', 'inter'], true) ? (string) $request->query('kind') : null,
+            'kind' => SessionListQuery::filters(['kind' => $request->query('kind')])['kind'],
+            'modality' => SessionListQuery::filters(['modality' => $request->query('modality')])['modality'],
             'das' => SessionListQuery::filters(['das' => $request->query('das')])['das'],
         ];
 
@@ -74,7 +75,7 @@ class SessionController extends Controller
             'today' => TrainingSession::today()->toDateString(),
             'sessions' => SessionRows::rows(SessionListQuery::month($first, $user, $filters)->get(), TrainingSession::today()),
             'filters' => $filters,
-            'options' => ['kind' => SessionKind::options(), 'das' => SessionListQuery::reference(ReferenceList::Das)],
+            'options' => ['kind' => SessionKind::options(), 'modality' => SessionListQuery::reference(ReferenceList::TrainingModality), 'das' => SessionListQuery::reference(ReferenceList::Das)],
             'can' => ['create' => $user->can(Permissions::SESSIONS_UPDATE)],
         ]);
     }
@@ -163,6 +164,7 @@ class SessionController extends Controller
                 'cancelled' => $s->isCancelled(),
                 'training_id' => $s->training_id,
                 'kind' => $s->kind,
+                'modality_id' => $s->modality_id,
                 'organisation' => $organisation === null ? null : ['id' => $s->organisation_id, 'label' => $organisation['label']],
                 'starts_on' => $s->starts_on->toDateString(),
                 'ends_on' => $s->ends_on->toDateString(),
@@ -243,7 +245,7 @@ class SessionController extends Controller
     }
 
     /**
-     * @return array<string, list<array{value: string, label: string}>>
+     * @return array<string, mixed>
      */
     private static function formOptions(?TrainingSession $current): array
     {
@@ -259,6 +261,8 @@ class SessionController extends Controller
         return [
             'training' => $options,
             'kind' => SessionKind::options(),
+            'modality' => SessionListQuery::reference(ReferenceList::TrainingModality, $current === null ? [] : [$current->modality_id]),
+            'default_modality' => SessionWriter::defaultModalityId(),
             'location' => SessionLocation::options(),
             'status' => array_map(fn (SessionStatus $s) => $s->toOption(), SessionStatus::SETTABLE),
             'responsible' => SessionListQuery::responsible($current?->responsible_user_id),

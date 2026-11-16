@@ -417,13 +417,14 @@ Nommée ainsi pour ne pas se confondre avec la table `sessions` (sessions web). 
 | `number` | string(20) | `S-<AAAA>-<NNNN>` ; unique (`tenant_id`, `number`) |
 | `training_id` | uuid (FK `trainings`) | Formation du catalogue |
 | `das_id` | uuid (FK `reference_items`, DAS) | DAS de la formation, recopié à chaque enregistrement (périmètre « Ses DAS ») |
-| `kind` | string(10) | `intra` / `inter` (CHECK) |
-| `organisation_id` | uuid, null (FK `organisations`) | Entreprise d'une session intra (obligatoire en intra, vide en inter : CHECK) |
+| `kind` | string(10) | `intra` / `inter` / `individual` « Individuel » (CHECK) |
+| `modality_id` | uuid (FK `reference_items`, liste `training_modality`) | Modalité : Présentiel, Distanciel (classe virtuelle), FOAD / e-learning, Mixte (paramétrable) ; obligatoire |
+| `organisation_id` | uuid, null (FK `organisations`) | Entreprise d'une session intra (obligatoire en intra, vide en inter, facultative en individuel : CHECK) |
 | `starts_on`, `ends_on` | date | Jours de Paris ; CHECK `ends_on >= starts_on` |
 | `planned_hours` | numeric(6,2), null | Heures prévues, reprises de la formation sauf saisie |
 | `location_kind` | string(10) | `address` (adresse obligatoire), `client` (chez le client), `remote` (distanciel) |
 | `location_text` | string(500), null | Adresse, précision ou lien |
-| `capacity` | int, null | Places d'une session inter (≥ 1, vide en intra : CHECK) |
+| `capacity` | int, null | Places d'une session inter (≥ 1, vide en intra et en individuel : CHECK). Une session individuelle n'accueille qu'un stagiaire (inscription non annulée), sans liste d'attente |
 | `responsible_user_id` | uuid, null (FK `users`) | Responsable (créateur par défaut) |
 | `status` | string(20) | `planned`, `confirmed`, `running`, `done`, `cancelled` (CHECK). « En cours » et « Terminée » se calculent à la lecture d'après les dates tant que l'état posé est `planned` ou `confirmed` |
 | `cancel_reason_id`, `cancelled_on` | uuid (FK `reference_items`, motifs d'annulation), date | Renseignés ensemble si et seulement si `status = cancelled` (CHECK) |

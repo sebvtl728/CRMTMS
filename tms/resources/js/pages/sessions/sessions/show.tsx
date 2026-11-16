@@ -178,7 +178,8 @@ export default function SessionShow({ session, can, cancel_reasons, enrolments, 
                         {field('Dates', sessionDates(session))}
                         {field('Heures prévues', session.planned_hours ? `${session.planned_hours} h` : '—')}
                         {field('Lieu', sessionLocation(session))}
-                        {session.kind === 'intra'
+                        {field('Modalité', session.modality ?? '—')}
+                        {session.kind !== 'inter'
                             ? field(
                                   'Entreprise',
                                   session.organisation ? (

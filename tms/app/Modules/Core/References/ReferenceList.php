@@ -27,6 +27,7 @@ enum ReferenceList: string
     case CancelReason = 'cancel_reason';
     case BpfCategory = 'bpf_category';
     case EducationLevel = 'education_level';
+    case TrainingModality = 'training_modality';
 
     public function label(): string
     {
@@ -50,6 +51,7 @@ enum ReferenceList: string
             self::CancelReason => 'Motifs d\'annulation (dossiers et sessions)',
             self::BpfCategory => 'Catégories de stagiaires (BPF)',
             self::EducationLevel => 'Niveaux de diplôme',
+            self::TrainingModality => 'Modalités de formation',
         };
     }
 

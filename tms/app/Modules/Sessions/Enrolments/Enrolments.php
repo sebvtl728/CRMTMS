@@ -9,6 +9,7 @@ use App\Modules\Crm\Public\Fiches;
 use App\Modules\Sessions\Dossiers\Dossier;
 use App\Modules\Sessions\Dossiers\DossierLine;
 use App\Modules\Sessions\Sessions\SessionKind;
+use App\Modules\Sessions\Sessions\SessionWriter;
 use App\Modules\Sessions\Sessions\TrainingSession;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Collection;
@@ -29,6 +30,8 @@ use Illuminate\Validation\ValidationException;
  *    a cancelled session or dossier takes nobody; a trainee once per
  *    session. An inter session full (enrolled + confirmed ≥ places) puts
  *    the enrolment on the waiting list, in order of arrival;
+ *    An individual session takes one trainee (cancelled enrolments aside),
+ *    from any contractant, and never has a waiting list;
  *  - promote(): manual, a waitlisted enrolment while a place is free;
  *  - abandon(): a leaving day and a reason, the share kept;
  *  - cancel(): the place freed, nobody promoted automatically.
@@ -38,6 +41,8 @@ final class Enrolments
     public const DOSSIER_CLOSED = 'Ce dossier est annulé ou à la corbeille : il ne reçoit plus d\'inscription.';
 
     public const SESSION_CLOSED = 'Cette session est annulée ou à la corbeille : elle ne reçoit plus d\'inscription.';
+
+    public const INDIVIDUAL_TAKEN = 'Une session individuelle n\'accueille qu\'un stagiaire.';
 
     public const NOT_WAITLISTED = 'Seule une inscription en attente peut être promue.';
 
@@ -83,6 +88,9 @@ final class Enrolments
             }
             if ($session->kind === SessionKind::Intra->value && $dossier->account_organisation_id !== $session->organisation_id) {
                 $errors['training_session_id'] = 'Cette session intra est réservée à son entreprise : le contractant de ce dossier est différent.';
+            }
+            if ($session->kind === SessionKind::Individual->value && SessionWriter::hasEnrolments($session)) {
+                $errors['training_session_id'] = self::INDIVIDUAL_TAKEN;
             }
             if ($this->fiches->person($personId) === null) {
                 $errors['person_id'] = 'Stagiaire introuvable.';

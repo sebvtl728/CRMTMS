@@ -4,8 +4,10 @@ export interface SessionRow {
     number: string;
     training: { id: string; code: string | null; title: string; is_active: boolean } | null;
     das: string | null;
-    kind: 'intra' | 'inter';
+    kind: 'intra' | 'inter' | 'individual';
     kind_label: string;
+    /** Label of the « Modalités de formation » value. */
+    modality: string | null;
     organisation: { id: string; label: string; trashed: boolean } | null;
     starts_on: string;
     ends_on: string;

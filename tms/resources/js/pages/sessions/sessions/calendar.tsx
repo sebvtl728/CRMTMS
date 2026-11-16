@@ -18,8 +18,8 @@ interface CalendarProps {
     /** Paris day, YYYY-MM-DD */
     today: string;
     sessions: SessionRow[];
-    filters: { kind: string | null; das: string | null };
-    options: { kind: Option[]; das: Option[] };
+    filters: { kind: string | null; modality: string | null; das: string | null };
+    options: { kind: Option[]; modality: Option[]; das: Option[] };
     can: { create: boolean };
 }
 
@@ -63,10 +63,10 @@ const statusClass: Record<SessionRow['status'], string> = {
 };
 
 export default function SessionsCalendar({ month, label, prev, next, today, sessions, filters, options, can }: CalendarProps) {
-    const visit = (changes: Partial<{ month: string; kind: string | null; das: string | null }>) => {
+    const visit = (changes: Partial<{ month: string; kind: string | null; modality: string | null; das: string | null }>) => {
         const query: Record<string, string> = {};
         const all = { month, ...filters, ...changes };
-        (['month', 'kind', 'das'] as const).forEach((k) => {
+        (['month', 'kind', 'modality', 'das'] as const).forEach((k) => {
             if (all[k]) query[k] = String(all[k]);
         });
         router.get(route('sessions.calendar'), query, { preserveState: true, replace: true });
@@ -116,8 +116,9 @@ export default function SessionsCalendar({ month, label, prev, next, today, sess
                             </Button>
                         )}
                     </div>
-                    <div className="grid grid-cols-2 gap-3 sm:w-96">
+                    <div className="grid grid-cols-3 gap-3 sm:w-[32rem]">
                         <FilterSelect label="Type" value={filters.kind} options={options.kind} onChange={(v) => visit({ kind: v })} />
+                        <FilterSelect label="Modalité" value={filters.modality} options={options.modality} onChange={(v) => visit({ modality: v })} />
                         <FilterSelect label="DAS" value={filters.das} options={options.das} onChange={(v) => visit({ das: v })} />
                     </div>
                 </div>
@@ -177,7 +178,7 @@ export default function SessionsCalendar({ month, label, prev, next, today, sess
                                 {s.training?.title ?? s.number}
                             </Link>
                             <div className="text-muted-foreground text-xs">
-                                {[s.number, sessionDates(s), s.kind_label, s.organisation?.label, s.status_label].filter(Boolean).join(' · ')}
+                                {[s.number, sessionDates(s), s.kind_label, s.modality, s.organisation?.label, s.status_label].filter(Boolean).join(' · ')}
                             </div>
                         </li>
                     ))}

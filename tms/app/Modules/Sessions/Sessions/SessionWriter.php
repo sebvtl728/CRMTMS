@@ -4,6 +4,7 @@ namespace App\Modules\Sessions\Sessions;
 
 use App\Exceptions\UserFacingHttpException;
 use App\Modules\Catalogue\Trainings;
+use App\Modules\Core\References\ReferenceItem;
 use App\Modules\Core\References\ReferenceList;
 use App\Modules\Core\Tenancy\TenantContext;
 use App\Modules\Crm\Public\Fiches;
@@ -23,7 +24,9 @@ use Illuminate\Validation\ValidationException;
  * assistant), number at creation in the same transaction, DAS always the
  * training's, hours the training's unless typed. Intra: an entreprise of the
  * CRM (Crm\Public\Fiches, not trashed), no places; inter: places ≥ 1, no
- * entreprise. A cancelled session no longer changes (409); a trashed intra
+ * entreprise; individual: no places, entreprise optional. Every session has a
+ * modality (« Modalités de formation »): required, « Présentiel » when the key
+ * is missing on creation, unchanged when missing on update. A cancelled session no longer changes (409); a trashed intra
  * session comes back only with its entreprise (409). Once trainees are
  * enrolled (cancelled enrolments aside), its training, type and entreprise
  * no longer change and it does not go to the trash (409); cancelling it
@@ -56,6 +59,10 @@ final class SessionWriter
      */
     public function create(array $data): TrainingSession
     {
+        // Creation without the key (other writers, imports): the default modality.
+        if (! array_key_exists('modality_id', $data)) {
+            $data['modality_id'] = self::defaultModalityId();
+        }
         $values = $this->validated($data, null);
 
         return DB::transaction(function () use ($values): TrainingSession {
@@ -76,6 +83,9 @@ final class SessionWriter
     {
         if ($session->isCancelled()) {
             throw new UserFacingHttpException(409, self::CANCELLED);
+        }
+        if (! array_key_exists('modality_id', $data)) {
+            $data['modality_id'] = $session->modality_id;
         }
         $values = $this->validated($data, $session);
 
@@ -189,6 +199,7 @@ final class SessionWriter
             'training_id' => ['bail', 'required', 'uuid'],
             'kind' => ['required', Rule::enum(SessionKind::class)],
             'organisation_id' => ['bail', 'nullable', 'required_if:kind,intra', 'uuid'],
+            'modality_id' => ['bail', 'required', ...self::referenceRule(ReferenceList::TrainingModality, $current?->modality_id)],
             'starts_on' => ['bail', 'required', 'date_format:Y-m-d'],
             'ends_on' => ['bail', 'required', 'date_format:Y-m-d', 'after_or_equal:starts_on'],
             'planned_hours' => ['nullable', 'regex:/^\d{1,4}(\.\d{1,2})?$/'],
@@ -213,7 +224,7 @@ final class SessionWriter
             } elseif (! $training->is_active && $training->id !== $current?->training_id) {
                 $v->errors()->add('training_id', 'Cette formation est désactivée.');
             }
-            if (($data['kind'] ?? null) === SessionKind::Intra->value && is_string($data['organisation_id'] ?? null)
+            if (in_array($data['kind'] ?? null, [SessionKind::Intra->value, SessionKind::Individual->value], true) && is_string($data['organisation_id'] ?? null)
                 && ! $v->errors()->has('organisation_id') && $this->fiches->organisation($data['organisation_id']) === null) {
                 $v->errors()->add('organisation_id', 'Entreprise introuvable.');
             }
@@ -221,7 +232,7 @@ final class SessionWriter
         $validator->validate();
         assert($training !== null);
 
-        $intra = $data['kind'] === SessionKind::Intra->value;
+        $kind = SessionKind::from($data['kind']);
         $hours = $data['planned_hours'] ?? null;
         if ($hours === null && ($current === null || $current->training_id !== $training->id)) {
             $hours = $training->duration_hours;
@@ -231,13 +242,14 @@ final class SessionWriter
             'training_id' => $training->id,
             'das_id' => $training->das_id,
             'kind' => $data['kind'],
-            'organisation_id' => $intra ? $data['organisation_id'] : null,
+            'modality_id' => $data['modality_id'],
+            'organisation_id' => $kind === SessionKind::Inter ? null : $data['organisation_id'],
             'starts_on' => $data['starts_on'],
             'ends_on' => $data['ends_on'],
             'planned_hours' => $hours,
             'location_kind' => $data['location_kind'],
             'location_text' => $data['location_text'] ?? null,
-            'capacity' => $intra ? null : (int) $data['capacity'],
+            'capacity' => $kind === SessionKind::Inter ? (int) $data['capacity'] : null,
             'responsible_user_id' => $data['responsible_user_id'] ?? ($current === null ? Auth::id() : null),
             'status' => $data['status'],
             'notes' => $data['notes'] ?? null,
@@ -252,7 +264,7 @@ final class SessionWriter
      */
     private static function normalise(array $data): array
     {
-        foreach (['training_id', 'kind', 'organisation_id', 'starts_on', 'ends_on', 'planned_hours', 'location_kind', 'location_text', 'capacity', 'responsible_user_id', 'status', 'notes'] as $key) {
+        foreach (['training_id', 'kind', 'organisation_id', 'modality_id', 'starts_on', 'ends_on', 'planned_hours', 'location_kind', 'location_text', 'capacity', 'responsible_user_id', 'status', 'notes'] as $key) {
             $value = $data[$key] ?? null;
             if (is_string($value)) {
                 $value = trim($value);
@@ -272,13 +284,24 @@ final class SessionWriter
      *
      * @return list<mixed>
      */
-    private static function referenceRule(ReferenceList $list): array
+    private static function referenceRule(ReferenceList $list, ?string $keep = null): array
     {
         return ['uuid', Rule::exists('reference_items', 'id')
             ->where('tenant_id', app(TenantContext::class)->id())
             ->where('list', $list->value)
             ->whereNull('deleted_at')
-            ->where('is_active', true)];
+            ->where(fn ($q) => $q->where('is_active', true)->when($keep, fn ($q2, $id) => $q2->orWhere('id', $id)))];
+    }
+
+    /**
+     * The « Présentiel » item of the organisme (null when it deleted it).
+     */
+    public static function defaultModalityId(): ?string
+    {
+        $id = ReferenceItem::query()->where('list', ReferenceList::TrainingModality)->where('code', 'presentiel')
+            ->where('is_active', true)->value('id');
+
+        return is_string($id) ? $id : null;
     }
 
     /**
@@ -291,6 +314,8 @@ final class SessionWriter
             'training_id.uuid' => 'Formation introuvable.',
             'kind.required' => 'Choisissez le type de session.',
             'kind.*' => 'Type de session inconnu.',
+            'modality_id.required' => 'Choisissez la modalité de formation.',
+            'modality_id.*' => 'Modalité de formation inconnue.',
             'organisation_id.required_if' => 'Choisissez l\'entreprise de la session intra.',
             'organisation_id.uuid' => 'Entreprise introuvable.',
             'starts_on.required' => 'Indiquez la date de début.',

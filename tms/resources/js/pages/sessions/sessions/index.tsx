@@ -17,6 +17,7 @@ interface Filters {
     q: string;
     status: string | null;
     kind: string | null;
+    modality: string | null;
     das: string | null;
     training: string | null;
     responsible: string | null;
@@ -30,7 +31,7 @@ interface Filters {
 interface IndexProps {
     sessions: Paginated<SessionRow>;
     filters: Filters;
-    options: { status: Option[]; kind: Option[]; das: Option[]; training: Option[]; responsible: Option[]; sort: Option[] };
+    options: { status: Option[]; kind: Option[]; modality: Option[]; das: Option[]; training: Option[]; responsible: Option[]; sort: Option[] };
     can: { create: boolean; trash: boolean };
     status?: string;
 }
@@ -40,7 +41,7 @@ const breadcrumbs: BreadcrumbItem[] = [{ title: 'Sessions', href: '/sessions' }]
 function sessionsQuery(filters: Filters): Record<string, string> {
     const query: Record<string, string> = {};
     if (filters.q) query.q = filters.q;
-    (['status', 'kind', 'das', 'training', 'responsible', 'from', 'to'] as const).forEach((k) => {
+    (['status', 'kind', 'modality', 'das', 'training', 'responsible', 'from', 'to'] as const).forEach((k) => {
         if (filters[k]) query[k] = String(filters[k]);
     });
     if (filters.trashed) query.trashed = '1';
@@ -53,6 +54,8 @@ function sessionsQuery(filters: Filters): Record<string, string> {
 }
 
 function places(row: SessionRow): string {
+    if (row.kind === 'individual') return '1 stagiaire';
+
     return row.kind === 'inter' && row.capacity !== null ? `${row.capacity} place${row.capacity > 1 ? 's' : ''}` : '—';
 }
 
@@ -90,6 +93,7 @@ export default function SessionsIndex({ sessions, filters, options, can, status 
         filters.q ||
             filters.status ||
             filters.kind ||
+            filters.modality ||
             filters.das ||
             filters.training ||
             filters.responsible ||
@@ -146,6 +150,7 @@ export default function SessionsIndex({ sessions, filters, options, can, status 
                     </div>
                     <FilterSelect label="État" value={filters.status} options={options.status} onChange={(v) => visit({ status: v })} />
                     <FilterSelect label="Type" value={filters.kind} options={options.kind} onChange={(v) => visit({ kind: v })} />
+                    <FilterSelect label="Modalité" value={filters.modality} options={options.modality} onChange={(v) => visit({ modality: v })} />
                     <FilterSelect label="DAS" value={filters.das} options={options.das} onChange={(v) => visit({ das: v })} />
                     <FilterSelect label="Formation" value={filters.training} options={options.training} onChange={(v) => visit({ training: v })} />
                     <FilterSelect
@@ -198,6 +203,7 @@ export default function SessionsIndex({ sessions, filters, options, can, status 
                                         {sortHeader('number', 'Numéro')}
                                         <th className="px-3 py-2 font-medium">Formation</th>
                                         <th className="px-3 py-2 font-medium">Type</th>
+                                        <th className="px-3 py-2 font-medium">Modalité</th>
                                         {sortHeader('starts_on', 'Dates')}
                                         <th className="px-3 py-2 font-medium">Lieu</th>
                                         <th className="px-3 py-2 font-medium">Places</th>
@@ -221,6 +227,7 @@ export default function SessionsIndex({ sessions, filters, options, can, status 
                                                 {s.kind_label}
                                                 {s.organisation && <div className="text-muted-foreground text-xs">{s.organisation.label}</div>}
                                             </td>
+                                            <td className="px-3 py-2">{s.modality ?? '—'}</td>
                                             <td className="px-3 py-2 whitespace-nowrap">{sessionDates(s)}</td>
                                             <td className="px-3 py-2">{sessionLocation(s)}</td>
                                             <td className="px-3 py-2 whitespace-nowrap">{places(s)}</td>
@@ -243,7 +250,7 @@ export default function SessionsIndex({ sessions, filters, options, can, status 
                                     </div>
                                     <div>{s.training?.title ?? '—'}</div>
                                     <div className="text-muted-foreground text-xs">
-                                        {[s.kind_label, s.organisation?.label, sessionDates(s), places(s)].filter(Boolean).join(' · ')}
+                                        {[s.kind_label, s.modality, s.organisation?.label, sessionDates(s), places(s)].filter(Boolean).join(' · ')}
                                     </div>
                                 </li>
                             ))}
