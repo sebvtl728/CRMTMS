@@ -151,6 +151,8 @@ Les boutons **Accepté** et **Refusé** apparaissent sur un devis envoyé ou rel
 - Rien n'est proposé si l'opportunité est déjà gagnée ou perdue.
 - **Devis signé** : la fenêtre **Accepté** permet de joindre, si vous l'avez, l'exemplaire signé renvoyé par le client (PDF, JPEG ou PNG, 10 Mo au maximum ; un fichier renommé ou un SVG est refusé). Sur un devis accepté, **Joindre le devis signé** (ou **Remplacer le devis signé**) l'ajoute plus tard ; le nouveau fichier remplace l'ancien. Il s'ouvre depuis la ligne **Devis signé** du devis. L'historique indique « Devis signé ajouté (CF-2026-0001) », sans le nom du fichier. L'anonymisation du particulier ou de l'interlocuteur destinataire supprime l'exemplaire signé ; son export de données indique pour chaque devis s'il y en a un.
 
+- **Créer le dossier** : sur un devis accepté, ce bouton ouvre l'assistant du dossier de formation (une seule fois par devis ; ensuite **Voir le dossier**). Un dossier mis à la corbeille bloque toujours la création d'un nouveau dossier pour ce devis : restaurez-le.
+
 ### Expiration
 
 Chaque nuit à **0 h 05** (heure de Paris), un devis **envoyé** ou **relancé** dont la date de validité est dépassée passe **Expiré** : un devis valable jusqu'au 14 l'est encore toute la journée du 14. Les brouillons et les devis acceptés ou refusés ne changent pas.

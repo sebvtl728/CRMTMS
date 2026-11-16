@@ -2,6 +2,7 @@
 
 namespace App\Modules\Sessions\Dossiers;
 
+use App\Exceptions\UserFacingHttpException;
 use App\Http\Controllers\Controller;
 use App\Modules\Core\References\ReferenceList;
 use App\Modules\Core\Users\User;
@@ -35,6 +36,10 @@ class DossierFromQuoteController extends Controller
         // 404 first: an unknown or invisible quote says nothing of its dossier.
         $plan = $this->service->prepare($quoteId, $user);
         $existing = DossierFromQuote::existing($quoteId);
+        // The button is not offered (DAS of the quote outside « Ses DAS »): the page neither.
+        if ($existing === null && $this->service->link($quoteId, $user) === null) {
+            throw new UserFacingHttpException(403, DossierFromQuote::OUTSIDE_DAS);
+        }
 
         return Inertia::render('sessions/dossiers/from-quote', [
             'existing' => $existing === null ? null : DossierExists::link($existing, $user),

@@ -75,7 +75,8 @@ interface NewPerson {
     confirm_duplicate: boolean;
 }
 
-type Trainee = { key: number; person: { id: string; label: string } } | { key: number; new_person: NewPerson };
+/** A person of the CRM, or a person to create (by its ref: one person however many lines list it). */
+type Trainee = { key: number; person: { id: string; label: string } } | { key: number; ref: string };
 
 interface LineState {
     choice: 'existing' | 'new' | 'later';
@@ -103,12 +104,28 @@ function sessionLabel(s: SessionOption): string {
     return `${s.number} · ${s.kind_label} · ${dates}${s.capacity ? ` · ${s.capacity} places` : ''}`;
 }
 
-function traineeLabel(t: Trainee): string {
-    if ('person' in t) {
-        return t.person.label;
-    }
+function newPersonLabel(p: NewPerson | undefined): string {
+    return `${[p?.first_name, p?.last_name].filter(Boolean).join(' ')} (à créer)`;
+}
 
-    return `${[t.new_person.first_name, t.new_person.last_name].filter(Boolean).join(' ')} (à créer)`;
+function traineeLabel(t: Trainee, people: Record<string, NewPerson>): string {
+    return 'person' in t ? t.person.label : newPersonLabel(people[t.ref]);
+}
+
+/** A failure answered without the errors of the plan: a French message, whatever the server said. */
+function failure(status: number): string {
+    switch (status) {
+        case 419:
+            return 'Session expirée, rechargez la page.';
+        case 404:
+            return 'Ce devis est introuvable ou n’est plus accepté : rechargez la page.';
+        case 403:
+            return 'Vous n’avez pas le droit de créer ce dossier, ses sessions ou ses inscriptions (droits ou DAS du devis).';
+        case 429:
+            return 'Trop de requêtes, réessayez dans quelques instants.';
+        default:
+            return 'La création a échoué, réessayez.';
+    }
 }
 
 /** The step of the assistant where an error of the plan is corrected. */
@@ -144,6 +161,7 @@ export default function DossierFromQuote({ existing, plan, options, can }: Props
         })),
     );
     const [drafts, setDrafts] = useState<Record<number, NewPerson | null>>({});
+    const [newPeople, setNewPeople] = useState<Record<string, NewPerson>>({});
     const [pickerKeys, setPickerKeys] = useState<Record<number, number>>({});
 
     const breadcrumbs: BreadcrumbItem[] = [
@@ -175,12 +193,7 @@ export default function DossierFromQuote({ existing, plan, options, can }: Props
     const update = (i: number, change: Partial<LineState>) => setLines((ls) => ls.map((l, j) => (j === i ? { ...l, ...change } : l)));
     const updateSession = (i: number, change: Partial<NewSession>) =>
         setLines((ls) => ls.map((l, j) => (j === i ? { ...l, new_session: { ...l.new_session, ...change } } : l)));
-    const updateTrainee = (i: number, key: number, change: Partial<NewPerson>) =>
-        setLines((ls) =>
-            ls.map((l, j) =>
-                j === i ? { ...l, trainees: l.trainees.map((t) => (t.key === key && 'new_person' in t ? { ...t, new_person: { ...t.new_person, ...change } } : t)) } : l,
-            ),
-        );
+    const updatePerson = (ref: string, change: Partial<NewPerson>) => setNewPeople((p) => ({ ...p, [ref]: { ...p[ref], ...change } }));
     const err = (key: string) => errors[key];
     const training = plan.lines.filter((l) => l.kind === 'training');
     const withSession = lines.map((l, i) => plan.lines[i].kind === 'training' && l.choice !== 'later');
@@ -208,7 +221,7 @@ export default function DossierFromQuote({ existing, plan, options, can }: Props
             return {
                 pricing_mode: l.pricing_mode,
                 ...session,
-                trainees: l.choice === 'later' ? [] : l.trainees.map((t) => ('person' in t ? t.person.id : { new_person: t.new_person })),
+                trainees: l.choice === 'later' ? [] : l.trainees.map((t) => ('person' in t ? t.person.id : { new_person: { ...newPeople[t.ref], ref: t.ref } })),
             };
         }),
     });
@@ -241,7 +254,7 @@ export default function DossierFromQuote({ existing, plan, options, can }: Props
                 setErrors(flat);
                 setStep(Math.min(...Object.keys(flat).map(stepOf)));
             } else {
-                setErrors({ form: json.message ?? 'La création a échoué, réessayez.' });
+                setErrors({ form: failure(response.status) });
             }
         } catch {
             setErrors({ form: 'La création a échoué, réessayez.' });
@@ -251,10 +264,11 @@ export default function DossierFromQuote({ existing, plan, options, can }: Props
     };
 
     const where = (key: string): string => {
-        const m = /^lines\.(\d+)\./.exec(key);
+        const m = /^lines\.(\d+)\.(?:trainees\.(\d+))?/.exec(key);
         const line = m ? plan.lines[Number(m[1])] : undefined;
+        const trainee = m && m[2] !== undefined ? lines[Number(m[1])]?.trainees[Number(m[2])] : undefined;
 
-        return line ? `${line.label} : ` : '';
+        return line ? `${line.label}${trainee ? `, ${traineeLabel(trainee, newPeople)}` : ''} : ` : '';
     };
     const messages = Object.entries(errors);
 
@@ -458,12 +472,12 @@ export default function DossierFromQuote({ existing, plan, options, can }: Props
                                             {lines[i].trainees.map((t, j) => (
                                                 <li key={t.key} className="grid gap-1 rounded-md border px-3 py-2 text-sm">
                                                     <div className="flex items-center justify-between gap-2">
-                                                        <span>{traineeLabel(t)}</span>
+                                                        <span>{traineeLabel(t, newPeople)}</span>
                                                         <Button
                                                             type="button"
                                                             variant="ghost"
                                                             size="sm"
-                                                            aria-label={`Retirer ${traineeLabel(t)}`}
+                                                            aria-label={`Retirer ${traineeLabel(t, newPeople)}`}
                                                             onClick={() => update(i, { trainees: lines[i].trainees.filter((x) => x.key !== t.key) })}
                                                         >
                                                             <X className="h-4 w-4" />
@@ -474,12 +488,12 @@ export default function DossierFromQuote({ existing, plan, options, can }: Props
                                                         .map(([k, m]) => (
                                                             <InputError key={k} message={m} />
                                                         ))}
-                                                    {'new_person' in t && err(`lines.${i}.trainees.${j}`)?.startsWith('Des personnes similaires') && (
+                                                    {'ref' in t && err(`lines.${i}.trainees.${j}`)?.startsWith('Des personnes similaires') && (
                                                         <label className="flex items-center gap-2 text-xs">
                                                             <input
                                                                 type="checkbox"
-                                                                checked={t.new_person.confirm_duplicate}
-                                                                onChange={(e) => updateTrainee(i, t.key, { confirm_duplicate: e.target.checked })}
+                                                                checked={newPeople[t.ref]?.confirm_duplicate ?? false}
+                                                                onChange={(e) => updatePerson(t.ref, { confirm_duplicate: e.target.checked })}
                                                             />
                                                             Créer quand même
                                                         </label>
@@ -506,6 +520,22 @@ export default function DossierFromQuote({ existing, plan, options, can }: Props
                                             placeholder="Nom, prénom ou e-mail (2 lettres au moins)"
                                         />
                                     </div>
+                                    {Object.keys(newPeople)
+                                        .filter((ref) => withSession.some((w, k) => w && k !== i && lines[k].trainees.some((t) => 'ref' in t && t.ref === ref)))
+                                        .filter((ref) => !lines[i].trainees.some((t) => 'ref' in t && t.ref === ref))
+                                        .map((ref) => (
+                                            <div key={ref}>
+                                                <Button
+                                                    type="button"
+                                                    variant="outline"
+                                                    size="sm"
+                                                    onClick={() => update(i, { trainees: [...lines[i].trainees, { key: nextKey++, ref }] })}
+                                                >
+                                                    <Plus className="h-4 w-4" />
+                                                    Ajouter {newPersonLabel(newPeople[ref])}
+                                                </Button>
+                                            </div>
+                                        ))}
                                     {draft === null ? (
                                         <div>
                                             <Button type="button" variant="outline" size="sm" onClick={() => setDrafts((d) => ({ ...d, [i]: emptyPerson() }))}>
@@ -521,7 +551,9 @@ export default function DossierFromQuote({ existing, plan, options, can }: Props
                                             onChange={(change) => setDrafts((d) => ({ ...d, [i]: { ...draft, ...change } }))}
                                             onCancel={() => setDrafts((d) => ({ ...d, [i]: null }))}
                                             onAdd={() => {
-                                                update(i, { trainees: [...lines[i].trainees, { key: nextKey++, new_person: draft }] });
+                                                const ref = `n${nextKey++}`;
+                                                setNewPeople((p) => ({ ...p, [ref]: draft }));
+                                                update(i, { trainees: [...lines[i].trainees, { key: nextKey++, ref }] });
                                                 setDrafts((d) => ({ ...d, [i]: null }));
                                             }}
                                         />

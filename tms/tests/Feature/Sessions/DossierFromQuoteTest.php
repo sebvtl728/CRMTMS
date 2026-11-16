@@ -2,6 +2,8 @@
 
 use App\Exceptions\UserFacingHttpException;
 use App\Modules\Catalogue\Training;
+use App\Modules\Core\Access\AccessScope;
+use App\Modules\Core\Access\Scopes;
 use App\Modules\Core\Companies\Company;
 use App\Modules\Core\References\CapFormationReferenceSeeder;
 use App\Modules\Core\References\ReferenceList;
@@ -27,6 +29,7 @@ use App\Modules\Sessions\Sessions\SessionWriter;
 use App\Modules\Sessions\Sessions\TrainingSession;
 use App\Modules\Sessions\SessionsServiceProvider;
 use Carbon\CarbonImmutable;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Inertia\Testing\AssertableInertia as Assert;
 
@@ -398,3 +401,43 @@ function dfqDossier(Organisation $org): Dossier
         'lines' => [['kind' => DossierLine::TRAINING, 'training_id' => dfqTraining('Hygiène')->id, 'label' => 'Hygiène', 'quantity' => '1', 'unit' => 'forfait', 'unit_price' => '900', 'discount_percent' => '']],
     ]);
 }
+
+it('creates once a new trainee listed on two lines (same ref)', function () {
+    $org = Organisation::query()->create(['name' => 'Hôtel du Parc']);
+    $quote = dfqQuote($org);
+    $inter = dfqInter();
+    $zoe = ['ref' => 'n1', 'first_name' => 'Zoé', 'last_name' => 'Nouvelle', 'email' => 'zoe.nouvelle@example.test', 'employee' => true];
+
+    $this->actingAs(admin(true))->postJson(route('dossiers.from-quote.store', $quote->id), ['lines' => [
+        ['session_id' => $inter->id, 'trainees' => [['new_person' => $zoe]]],
+        ['new_session' => dfqNewSession(), 'trainees' => [['new_person' => $zoe]]],
+        [],
+    ]])->assertCreated();
+
+    $person = Person::query()->where('last_name', 'Nouvelle')->sole();
+    expect(Enrolment::query()->where('person_id', $person->id)->count())->toBe(2)
+        ->and(Affiliation::query()->where('person_id', $person->id)->count())->toBe(1);
+
+    // Two people of the same name without the same ref: the second one is a possible duplicate.
+    $other = dfqQuote($org);
+    $this->actingAs(admin(true))->postJson(route('dossiers.from-quote.store', $other->id), ['lines' => [
+        ['session_id' => $inter->id, 'trainees' => [['new_person' => ['ref' => 'a', 'last_name' => 'Martin', 'first_name' => 'Jo', 'email' => 'jo@example.test']]]],
+        ['new_session' => dfqNewSession(), 'trainees' => [['new_person' => ['ref' => 'b', 'last_name' => 'Martin', 'first_name' => 'Jo', 'email' => 'jo@example.test']]]],
+        [],
+    ]])->assertUnprocessable()->assertJsonValidationErrors(['lines.1.trainees.0']);
+});
+
+it('refuses the assistant when the quote\'s DAS is outside « Ses DAS » for the dossiers', function () {
+    $quote = dfqQuote(Organisation::query()->create(['name' => 'Hôtel du Parc']));
+    $user = userWithPermissions([CrmPermissions::QUOTES_VIEW, Permissions::DOSSIERS_VIEW, Permissions::DOSSIERS_UPDATE]);
+    DB::table(Scopes::TABLE)->insert([
+        'tenant_id' => tenant()->id, 'role_id' => $user->roles()->firstOrFail()->id,
+        'permission' => Permissions::DOSSIERS_UPDATE, 'scope' => AccessScope::Das->value,
+    ]);
+    Scopes::forget();
+
+    $this->actingAs($user)->get(route('dossiers.from-quote', $quote->id))->assertForbidden();
+    $this->actingAs($user)->postJson(route('dossiers.from-quote.store', $quote->id), ['lines' => [[], [], []]])->assertForbidden();
+    $this->actingAs($user)->get(route('crm.quotes.show', $quote))->assertOk()
+        ->assertInertia(fn (Assert $page) => $page->where('links', []));
+});

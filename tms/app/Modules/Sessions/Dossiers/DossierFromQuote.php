@@ -59,7 +59,8 @@ use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
  * A plan: lines[i] (i = position of the quote line) = {session_id | new_session: {kind,
  * starts_on, ends_on, modality_id, planned_hours, location_kind, location_text, capacity},
  * pricing_mode, trainees: list<person id | {person_id} | {new_person: {first_name,
- * last_name, email, phone, birth_date, employee, confirm_duplicate}}>}.
+ * last_name, email, phone, birth_date, employee, confirm_duplicate, ref}}>}: one
+ * person per ref, however many lines list it.
  */
 final class DossierFromQuote
 {
@@ -172,6 +173,9 @@ final class DossierFromQuote
 
                 $dossier = $this->dossiers->create(self::dossierData($quote, $lines), ['quote_id' => $quote->id, 'opportunity_id' => $quote->opportunity_id]);
                 $dossierLines = $dossier->lines()->get()->values();
+                // A new person listed on several lines (same ref) is created once, with the DAS of each training.
+                $created = [];
+                $refDas = self::refDas($lines, $quote, $trainings);
 
                 foreach ($lines as $i => $line) {
                     if ($line['session'] === null) {
@@ -181,7 +185,7 @@ final class DossierFromQuote
                     $session = $line['session'] instanceof TrainingSession ? $line['session']
                         : $this->newSession($i, $line['session'], $training, $quote);
                     foreach ($line['trainees'] as $j => $trainee) {
-                        $personId = $trainee['person_id'] ?? $this->newTrainee($i, $j, $trainee['new_person'] ?? [], $training, $quote);
+                        $personId = $trainee['person_id'] ?? $this->newTrainee($i, $j, $trainee['new_person'] ?? [], $training, $quote, $created, $refDas);
                         $this->enrol($i, $j, $dossier, $dossierLines[$i], $session, $personId);
                     }
                 }
@@ -412,26 +416,75 @@ final class DossierFromQuote
      * A trainee created as an ordinary person of the CRM, given the DAS of
      * the training (and, with « employee », employed by the contractant).
      *
+     * The same « ref » (given by the assistant to a person to create) on
+     * several lines is one person: created at its first occurrence.
+     *
      * @param  array<string, mixed>  $input
+     * @param  array<string, string>  $created  ref => id of the person created
+     * @param  array<string, list<string>>  $refDas  ref => DAS of the trainings it is enrolled on
      *
      * @throws ValidationException
      */
-    private function newTrainee(int $i, int $j, array $input, TrainingData $training, AcceptedQuoteData $quote): string
+    private function newTrainee(int $i, int $j, array $input, TrainingData $training, AcceptedQuoteData $quote, array &$created, array $refDas): string
     {
+        $ref = self::ref($input);
+        if ($ref !== null && isset($created[$ref])) {
+            return $created[$ref];
+        }
         $employer = $quote->account['type'] === 'organisation' && filter_var($input['employee'] ?? false, FILTER_VALIDATE_BOOLEAN) ? $quote->account['id'] : null;
         try {
-            return $this->trainees->create([
+            $id = $this->trainees->create([
                 ...array_intersect_key($input, array_flip(self::NEW_PERSON_FIELDS)),
                 'organisation_id' => $employer,
-                'das_ids' => [$training->das_id],
+                'das_ids' => $ref === null ? [$training->das_id] : ($refDas[$ref] ?? [$training->das_id]),
                 'confirm_duplicate' => filter_var($input['confirm_duplicate'] ?? false, FILTER_VALIDATE_BOOLEAN),
             ]);
+            if ($ref !== null) {
+                $created[$ref] = $id;
+            }
+
+            return $id;
         } catch (DuplicateTrainee $e) {
             $names = implode(', ', array_map(fn (array $c) => trim(($c['first_name'] ?? '').' '.$c['last_name']).($c['organisation_label'] ? " ({$c['organisation_label']})" : ''), array_slice($e->candidates, 0, 5)));
             throw ValidationException::withMessages(["lines.{$i}.trainees.{$j}" => "Des personnes similaires existent déjà : {$names}. Choisissez-la dans la recherche, ou cochez « Créer quand même »."]);
         } catch (ValidationException $e) {
             throw self::rekeyed($e, "lines.{$i}.trainees.{$j}.");
         }
+    }
+
+    /**
+     * The ref of a person to create (null without one).
+     *
+     * @param  array<string, mixed>  $input
+     */
+    private static function ref(array $input): ?string
+    {
+        $ref = $input['ref'] ?? null;
+
+        return is_string($ref) && trim($ref) !== '' ? mb_substr(trim($ref), 0, 100) : null;
+    }
+
+    /**
+     * For each ref of a person to create, the DAS of the trainings of the lines listing it.
+     *
+     * @param  array<int, array{session: mixed, pricing_mode: ?string, trainees: list<array<string, mixed>>}>  $lines
+     * @param  array<string, TrainingData>  $trainings
+     * @return array<string, list<string>>
+     */
+    private static function refDas(array $lines, AcceptedQuoteData $quote, array $trainings): array
+    {
+        $das = [];
+        foreach ($lines as $i => $line) {
+            $training = $trainings[(string) $quote->lines[$i]['training_id']] ?? null;
+            foreach ($line['session'] === null || $training === null ? [] : $line['trainees'] as $trainee) {
+                $ref = is_array($trainee['new_person'] ?? null) ? self::ref($trainee['new_person']) : null;
+                if ($ref !== null && ! in_array($training->das_id, $das[$ref] ?? [], true)) {
+                    $das[$ref][] = $training->das_id;
+                }
+            }
+        }
+
+        return $das;
     }
 
     /**
