@@ -49,13 +49,14 @@ final class TrainerRows
     public static function userOptions(): array
     {
         $linked = Trainer::query()->whereNotNull('user_id')->pluck('user_id')->all();
+        $users = User::query()->whereNotIn('id', $linked)->whereNull('deactivated_at')->orderBy('name')->get(['id', 'name', 'email']);
+        $trainers = array_flip(Scopes::usersWith(Permissions::SEANCES_VIEW, AccessScope::Trainer, $users->pluck('id')->all()));
 
-        return User::query()->whereNotIn('id', $linked)->orderBy('name')->get()
-            ->filter(fn (User $u) => $u->isActive())
+        return $users
             ->map(fn (User $u): array => [
                 'value' => $u->id,
                 'label' => "{$u->name} ({$u->email})",
-                'trainer_role' => Scopes::of($u, Permissions::SEANCES_VIEW) === AccessScope::Trainer,
+                'trainer_role' => isset($trainers[$u->id]),
             ])
             ->sortBy(fn (array $o) => ($o['trainer_role'] ? '0' : '1').Str::lower(Str::ascii($o['label'])))
             ->values()->all();

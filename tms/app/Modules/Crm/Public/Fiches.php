@@ -124,28 +124,52 @@ final class Fiches
     }
 
     /**
-     * The person behind a trainer of the Sessions module: the one person of
-     * the organisme (out of the trash, not anonymised) whose primary e-mail
-     * is $email, when exactly one has it; otherwise a new ordinary person
-     * (journaled as any creation), with that e-mail.
+     * The person behind a trainer of the Sessions module. Reused only when
+     * exactly one person of the organisme (out of the trash, not anonymised)
+     * has the primary e-mail $email AND the same last name (accents and case
+     * aside); else a trashed one with both (exactly one, never merged nor
+     * anonymised) is restored; otherwise a new person is created. A new one
+     * is no prospect (status « Inactif »: no commercial relation), has no
+     * creator nor responsible, so it never lands in anybody's « Ses fiches ».
      *
      * @return string the person's id
      */
     public function personForTrainer(string $lastName, ?string $firstName, ?string $email): string
     {
         $email = $email === null || trim($email) === '' ? null : mb_strtolower(trim($email));
+        $name = self::comparable($lastName);
         if ($email !== null) {
-            $matches = $this->peopleWithEmail($email);
-            if (count($matches) === 1) {
-                return $matches[0];
+            $live = Person::query()->whereNull('people.anonymised_at')->whereRaw('lower(people.email) = ?', [$email])->get(['id', 'last_name']);
+            if ($live->count() === 1 && self::comparable((string) $live->first()?->last_name) === $name) {
+                return (string) $live->firstOrFail()->id;
+            }
+            if ($live->isEmpty()) {
+                $trashed = Person::onlyTrashed()->whereNull('people.anonymised_at')->whereNull('people.merged_into_id')
+                    ->whereRaw('lower(people.email) = ?', [$email])->get()
+                    ->filter(fn (Person $p) => self::comparable($p->last_name) === $name);
+                if ($trashed->count() === 1) {
+                    $person = $trashed->firstOrFail();
+                    $person->restore();
+
+                    return (string) $person->id;
+                }
             }
         }
         $firstName = $firstName === null || trim($firstName) === '' ? null : trim($firstName);
 
-        return (string) Person::query()->create([
+        $id = (string) Person::query()->create([
             'last_name' => trim($lastName), 'first_name' => $firstName, 'email' => $email,
-            'country' => 'FR', 'status' => OrganisationStatus::Prospect->value,
+            'country' => 'FR', 'status' => OrganisationStatus::Inactif->value,
         ])->getKey();
+        // Nobody's fiche: no creator (the creating hook sets the current user).
+        Person::query()->whereKey($id)->update(['created_by' => null]);
+
+        return $id;
+    }
+
+    private static function comparable(string $name): string
+    {
+        return Str::lower(Str::ascii(Str::squish($name)));
     }
 
     /**

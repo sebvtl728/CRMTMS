@@ -24,8 +24,10 @@ class MyPlanningController extends Controller
     public function show(Request $request, Fiches $fiches): Response
     {
         $user = $this->user($request);
-        $trainer = Trainers::forUser($user);
-        abort_if($trainer === null && Scopes::of($user, Permissions::SEANCES_VIEW) !== AccessScope::Trainer, 403);
+        $scoped = Scopes::of($user, Permissions::SEANCES_VIEW) === AccessScope::Trainer;
+        // A trainer-scoped user without trainer record gets it now (missed role change, unlinked).
+        $trainer = Trainers::forUser($user) ?? ($scoped ? Trainers::ensureForUser($user) : null);
+        abort_if($trainer === null && ! $scoped, 403);
 
         return Inertia::render('sessions/my-planning', [
             'trainer' => $trainer === null ? null : [

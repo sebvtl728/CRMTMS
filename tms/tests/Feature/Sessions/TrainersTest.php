@@ -1,6 +1,8 @@
 <?php
 
+use App\Modules\Core\Access\AccessScope;
 use App\Modules\Core\Access\Role;
+use App\Modules\Core\Access\RoleMatrix;
 use App\Modules\Core\Access\RoleModel;
 use App\Modules\Core\Tenancy\Tenant;
 use App\Modules\Core\Tenancy\TenantContext;
@@ -330,12 +332,102 @@ it('lets a linked trainer record and remove his own unavailabilities, never anot
 
 it('refuses « Mon planning » unavailabilities to a user linked to no trainer', function () {
     $account = userWithRole(Role::Formateur);
-    // Unlinked by a manager afterwards.
+    // Unlinked by a manager, and two trainers share his e-mail: nothing can be linked automatically.
     Trainers::link(Trainers::forUser($account) ?? throw new RuntimeException('Formateur sans fiche.'), null);
+    makeTrainer(makePerson('Homonyme', ['email' => $account->email]));
 
     $this->actingAs($account)->get('/mon-planning')->assertOk()->assertInertia(fn (Assert $page) => $page->where('trainer', null));
     $this->actingAs($account)->post('/mon-planning/unavailabilities', ['starts_at' => '2027-01-05T08:00', 'ends_at' => '2027-01-05T18:00'])->assertNotFound();
     $this->actingAs(commercial())->get('/mon-planning')->assertForbidden();
+});
+
+it('links the trainer again when a trainer-scoped user opens « Mon planning »', function () {
+    $account = userWithRole(Role::Formateur);
+    $trainer = Trainers::forUser($account) ?? throw new RuntimeException('Formateur sans fiche.');
+    Trainers::link($trainer, null);
+
+    $this->actingAs($account)->get('/mon-planning')->assertInertia(fn (Assert $page) => $page->where('trainer.id', $trainer->id));
+    expect($trainer->refresh()->user_id)->toBe($account->id);
+});
+
+// ---------------------------------------------------------------- scope changes, safer person reuse
+
+it('creates the trainers of a custom role switched to « Ses séances »', function () {
+    $account = userWithPermissions([Permissions::SEANCES_VIEW]);
+    expect(Trainers::forUser($account))->toBeNull();
+
+    app(RoleMatrix::class)->setScope($account->roles()->firstOrFail(), Permissions::SEANCES_VIEW, AccessScope::Trainer);
+
+    expect(Trainers::forUser($account)?->user_id)->toBe($account->id);
+});
+
+it('creates the trainer again when the Formateur role gets its séances right back', function () {
+    $account = userWithRole(Role::Formateur);
+    $trainer = Trainers::forUser($account) ?? throw new RuntimeException('Formateur sans fiche.');
+    Trainers::delete($trainer);
+    $role = RoleModel::forSystem(Role::Formateur);
+
+    app(RoleMatrix::class)->set($role, Permissions::SEANCES_VIEW, false);
+    expect(Trainers::forUser($account))->toBeNull();
+    app(RoleMatrix::class)->set($role, Permissions::SEANCES_VIEW, true);
+
+    // Same person: the trashed trainer comes back, linked.
+    expect(Trainers::forUser($account)?->id)->toBe($trainer->id);
+});
+
+it('never takes over a CRM contact sharing the e-mail under another name', function () {
+    $manager = userWithRole(Role::Commercial);
+    $client = makePerson('Durand', ['first_name' => 'Léa', 'email' => 'lea@example.test', 'status' => 'client', 'responsible_user_id' => $manager->id]);
+    $before = $client->fresh()->toArray();
+    $account = userIn(tenant(), ['name' => 'Léa Martin', 'email' => 'lea@example.test']);
+
+    $this->actingAs(trainersManager())->post('/trainers', ['user_id' => $account->id, 'status' => 'employee'])->assertRedirect();
+
+    $person = Person::query()->findOrFail(Trainer::query()->sole()->person_id);
+    expect($person->id)->not->toBe($client->id)->and($person->last_name)->toBe('Martin')
+        ->and($client->fresh()->toArray())->toBe($before);
+});
+
+it('reuses the person whose name matches, accents and case aside', function () {
+    $person = makePerson('Lefèvre', ['email' => 'jl@example.test']);
+    $account = userIn(tenant(), ['name' => 'Jean LEFEVRE', 'email' => 'jl@example.test']);
+
+    $this->actingAs(trainersManager())->post('/trainers', ['user_id' => $account->id, 'status' => 'employee'])->assertRedirect();
+
+    expect(Trainer::query()->sole()->person_id)->toBe($person->id);
+});
+
+it('restores a trashed person with the e-mail and the name rather than duplicating her', function () {
+    $person = makePerson('Corbeille', ['email' => 'corbeille@example.test']);
+    $person->delete();
+
+    $this->actingAs(trainersManager())->post('/trainers', ['person' => ['last_name' => 'corbeille', 'first_name' => '', 'email' => 'corbeille@example.test'], 'status' => 'employee'])
+        ->assertRedirect();
+
+    expect(Trainer::query()->sole()->person_id)->toBe($person->id)
+        ->and($person->fresh()?->trashed())->toBeFalse()
+        ->and(Person::withTrashed()->where('email', 'corbeille@example.test')->count())->toBe(1);
+});
+
+it('links the one TMS user having the e-mail of a trainer entered without account', function () {
+    $account = userIn(tenant(), ['name' => 'Marc Petit', 'email' => 'marc@example.test']);
+
+    $this->actingAs(trainersManager())->post('/trainers', ['person' => ['last_name' => 'Petit', 'first_name' => 'Marc', 'email' => 'MARC@example.test'], 'status' => 'employee'])
+        ->assertRedirect();
+
+    expect(Trainer::query()->sole()->user_id)->toBe($account->id);
+});
+
+it('keeps the people created for trainers out of the prospects and of the manager\'s fiches', function () {
+    $manager = trainersManager();
+
+    $this->actingAs($manager)->post('/trainers', ['person' => ['last_name' => 'Neutre', 'first_name' => 'Nina', 'email' => 'nina@example.test'], 'status' => 'employee'])
+        ->assertRedirect();
+
+    $person = Person::query()->findOrFail(Trainer::query()->sole()->person_id);
+    expect($person->status->value)->not->toBe('prospect')
+        ->and($person->created_by)->toBeNull()
+        ->and($person->responsible_user_id)->toBeNull();
 });
 
 // ---------------------------------------------------------------- CRM fiche, merge, anonymisation, RLS

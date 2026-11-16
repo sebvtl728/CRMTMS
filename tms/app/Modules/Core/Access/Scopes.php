@@ -72,6 +72,36 @@ final class Scopes
         return $held > 0;
     }
 
+    /**
+     * Ids of the users of the current organisme (among $userIds when given)
+     * one of whose roles grants $permission on $scope, in one query (a list
+     * of users). A scope never offered for the right is never matched.
+     *
+     * @param  list<string>|null  $userIds
+     * @return list<string>
+     */
+    public static function usersWith(string $permission, AccessScope $scope, ?array $userIds = null): array
+    {
+        if ($scope !== AccessScope::All && ! Permissions::allowsScope($permission, $scope)) {
+            return [];
+        }
+        $query = DB::table('model_has_roles as mr')
+            ->join('role_has_permissions as rp', 'rp.role_id', '=', 'mr.role_id')
+            ->join('permissions as p', 'p.id', '=', 'rp.permission_id')
+            ->leftJoin(self::TABLE.' as s', fn ($join) => $join->on('s.role_id', '=', 'mr.role_id')->where('s.permission', '=', $permission))
+            ->where('mr.tenant_id', app(TenantContext::class)->id())
+            ->where('mr.model_type', (new User)->getMorphClass())
+            ->where('p.name', $permission);
+        $scope === AccessScope::All
+            ? $query->where(fn ($q) => $q->whereNull('s.scope')->orWhere('s.scope', AccessScope::All->value))
+            : $query->where('s.scope', $scope->value);
+        if ($userIds !== null) {
+            $query->whereIn('mr.model_id', $userIds);
+        }
+
+        return $query->distinct()->pluck('mr.model_id')->map(fn ($id) => (string) $id)->all();
+    }
+
     public static function forget(): void
     {
         self::$memo = [];

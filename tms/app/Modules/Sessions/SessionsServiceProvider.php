@@ -7,6 +7,7 @@ use App\Modules\Core\Access\AccessScope;
 use App\Modules\Core\Access\Permissions as CorePermissions;
 use App\Modules\Core\Access\PrimaryRoleChanged;
 use App\Modules\Core\Access\Role;
+use App\Modules\Core\Access\RoleScopesChanged;
 use App\Modules\Core\Access\Scopes;
 use App\Modules\Core\Audit\MorphAliases;
 use App\Modules\Core\References\ReferenceList;
@@ -42,6 +43,7 @@ use App\Modules\Sessions\Trainers\TrainerUnavailability;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Route;
@@ -104,6 +106,11 @@ class SessionsServiceProvider extends ServiceProvider
                 Trainers::ensureForUser($event->user);
             }
         });
+        // …and so does every user of a role whose rights or scopes change that way (after commit).
+        Event::listen(RoleScopesChanged::class, fn (RoleScopesChanged $event) => Trainers::ensureForTrainerScoped(
+            DB::table('model_has_roles')->where('role_id', $event->role->getKey())->where('model_type', (new User)->getMorphClass())
+                ->pluck('model_id')->map(fn ($id) => (string) $id)->all(),
+        ));
 
         // Rooms, closure periods, trainers and their unavailabilities: malformed
         // or of another organisme (RLS) is a 404.

@@ -3,8 +3,11 @@
 namespace App\Modules\Sessions\Trainers;
 
 use App\Exceptions\UserFacingHttpException;
+use App\Modules\Core\Access\AccessScope;
+use App\Modules\Core\Access\Scopes;
 use App\Modules\Core\Users\User;
 use App\Modules\Crm\Public\Fiches;
+use App\Modules\Sessions\Permissions;
 use Carbon\CarbonImmutable;
 use Closure;
 use Illuminate\Support\Collection;
@@ -92,16 +95,28 @@ final class Trainers
      */
     public static function declarePerson(string $lastName, ?string $firstName, ?string $email, TrainerStatus $status): Trainer
     {
+        $email = $email === null || trim($email) === '' ? null : mb_strtolower(trim($email));
+
         return DB::transaction(function () use ($lastName, $firstName, $email, $status): Trainer {
-            if ($email !== null && trim($email) !== '' && self::withEmail($email)->isNotEmpty()) {
-                throw ValidationException::withMessages(['person.email' => self::EMAIL_TAKEN]);
+            if ($email !== null) {
+                self::lockEmail($email);
+                if (self::withEmail($email)->isNotEmpty()) {
+                    throw ValidationException::withMessages(['person.email' => self::EMAIL_TAKEN]);
+                }
             }
             $personId = app(Fiches::class)->personForTrainer($lastName, $firstName, $email);
             try {
-                return self::declare($personId, $status);
+                $trainer = self::declare($personId, $status);
             } catch (ValidationException) {
                 throw ValidationException::withMessages(['person.email' => self::EMAIL_TAKEN]);
             }
+            // The one active account of the organisme with this e-mail, not yet trainer: linked now.
+            $accounts = $email === null ? collect() : User::query()->whereRaw('lower(email) = ?', [$email])->whereNull('deactivated_at')->get();
+            if ($accounts->count() === 1 && self::forUser($accounts->firstOrFail()) === null) {
+                self::link($trainer, $accounts->firstOrFail());
+            }
+
+            return $trainer->refresh();
         });
     }
 
@@ -141,6 +156,7 @@ final class Trainers
     public static function ensureForUser(User $user, TrainerStatus $status = TrainerStatus::Employee): ?Trainer
     {
         return DB::transaction(function () use ($user, $status): ?Trainer {
+            self::lockEmail($user->email);
             $existing = self::forUser($user);
             if ($existing !== null) {
                 return $existing;
@@ -164,6 +180,35 @@ final class Trainers
 
             return $trainer->refresh();
         });
+    }
+
+    /**
+     * The rights or scopes of a role changed (RoleScopesChanged), or a user
+     * opens « Mon planning »: each active user of the role whose séances are
+     * on « Ses séances » gets his trainer (ensureForUser); an ambiguous one
+     * is left to a manager.
+     *
+     * @param  list<string>  $userIds
+     */
+    public static function ensureForTrainerScoped(array $userIds): void
+    {
+        $scoped = Scopes::usersWith(Permissions::SEANCES_VIEW, AccessScope::Trainer, $userIds);
+        foreach (User::query()->whereIn('id', $scoped)->whereNull('deactivated_at')->get() as $user) {
+            try {
+                self::ensureForUser($user);
+            } catch (ValidationException) {
+                // Left to a manager (« Compte lié » on the trainer page).
+            }
+        }
+    }
+
+    /**
+     * Serialises the trainer writes about one e-mail (two managers, an
+     * invitation and a role change at once).
+     */
+    private static function lockEmail(string $email): void
+    {
+        DB::select('select pg_advisory_xact_lock(hashtext(?))', ['trainer-email:'.mb_strtolower(trim($email))]);
     }
 
     /**
