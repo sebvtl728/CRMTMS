@@ -77,9 +77,23 @@ final class ValueShapes
     {
         return match (strlen($digits)) {
             5 => self::POSTCODE,
-            9 => self::luhn($digits) ? self::SIREN : null,
+            9 => self::nineDigits($digits),
             14 => self::isSiret($digits) ? self::SIRET : null,
             10 => self::phone($digits),
+            default => null,
+        };
+    }
+
+    /** A valid SIREN; else a phone number whose leading 0 Excel dropped (6/7: mobile, 1-5/9: landline). */
+    private static function nineDigits(string $digits): ?string
+    {
+        if (self::luhn($digits)) {
+            return self::SIREN;
+        }
+
+        return match (true) {
+            preg_match('/^[67]/', $digits) === 1 => self::MOBILE,
+            preg_match('/^[1-59]/', $digits) === 1 => self::PHONE,
             default => null,
         };
     }

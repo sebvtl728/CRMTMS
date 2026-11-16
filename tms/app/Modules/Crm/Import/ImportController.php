@@ -158,32 +158,23 @@ class ImportController extends Controller
             return $this->toShow($batch);
         }
 
-        // A mapping already saved (or from a profile) is shown as is; otherwise
-        // the proposal reads the first non-empty rows (in memory only).
-        $guessing = $batch->field_map === null;
         try {
             $reader = $batch->reader();
             $headers = $reader->headers();
             $preview = [];
-            $samples = [];
             foreach ($reader->rows() as $row) {
-                if (count($preview) < 5) {
-                    $preview[] = array_map(fn (string $h) => $row[$h] ?? '', $headers);
-                }
-                if ($guessing && implode('', array_map('trim', $row)) !== '') {
-                    $samples[] = $row;
-                }
-                if (count($preview) === 5 && (! $guessing || count($samples) === ColumnGuesser::SAMPLE)) {
+                $preview[] = array_map(fn (string $h) => $row[$h] ?? '', $headers);
+                if (count($preview) === 5) {
                     break;
                 }
             }
+            // A mapping already saved (or from a profile) is shown as is.
+            $guess = $batch->field_map === null ? $this->proposals($batch) : [];
         } catch (ImportFileException $e) {
             return to_route('crm.import.index')->withErrors(['batch' => $e->getMessage()]);
         }
 
         $target = $batch->target;
-        $guess = $guessing ? ColumnGuesser::guess($target, $headers, $samples) : [];
-        unset($samples);
         $map = $batch->field_map ?? array_map(fn (array $g) => $g['field'], $guess);
 
         return Inertia::render('crm/import/mapping', [
@@ -246,8 +237,9 @@ class ImportController extends Controller
 
         $profileName = trim((string) ($input['profile_name'] ?? ''));
         $this->checkProfileName($batch, $profileName, $this->user($request));
+        // Remembered before the simulation starts (the job may run at once).
+        HeaderChoices::remember($batch->target, HeaderChoices::deliberate($this->proposals($batch), $given));
         $this->startSimulation($batch, $map, $batch->valueMapper());
-        HeaderChoices::remember($batch->target, $given);
         if ($profileName !== '') {
             $this->saveProfile($batch, $profileName);
         }
@@ -638,6 +630,30 @@ class ImportController extends Controller
     /**
      * Records the choices and queues the simulation (the caller set the options).
      */
+    /**
+     * The server's proposal for the columns step, from the file's first
+     * ColumnGuesser::SAMPLE non-empty rows (read in memory, never kept).
+     *
+     * @return array<string, array{field: string, reason: 'memory'|'header'|'similar'|'content'}>
+     *
+     * @throws ImportFileException
+     */
+    private function proposals(ImportBatch $batch): array
+    {
+        $reader = $batch->reader();
+        $samples = [];
+        foreach ($reader->rows() as $row) {
+            if (implode('', array_map('trim', $row)) !== '') {
+                $samples[] = $row;
+                if (count($samples) === ColumnGuesser::SAMPLE) {
+                    break;
+                }
+            }
+        }
+
+        return ColumnGuesser::guess($batch->target, $reader->headers(), $samples);
+    }
+
     private function startSimulation(ImportBatch $batch, FieldMap $map, ValueMapper $values): void
     {
         if (! $batch->startSimulation($map, $values)) {

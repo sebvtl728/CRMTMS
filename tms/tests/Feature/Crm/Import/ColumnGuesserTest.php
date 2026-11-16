@@ -82,11 +82,16 @@ it('guesses from the content when the header says nothing', function () {
             'C' => ['M.', 'Mme', 'Madame'],
             'D' => ['16/11/1980', '01/02/1975', '1990-05-04'],
         ])))->toBe([
+            // A column of dates is never taken for birth dates.
             'A' => ['field' => 'mobile', 'reason' => 'content'],
             'B' => ['field' => 'postal_code', 'reason' => 'content'],
             'C' => ['field' => 'civility', 'reason' => 'content'],
-            'D' => ['field' => 'birth_date', 'reason' => 'content'],
         ])
+        // Fewer than 3 filled cells: too few to judge.
+        ->and(ColumnGuesser::guess(ImportTarget::People, ['Col 3'], sampleRows(['Col 3' => [...emails(2), '', '']])))->toBe([])
+        // Excel dropped the leading 0 of the mobiles.
+        ->and(ColumnGuesser::guess(ImportTarget::People, ['Col 3'], sampleRows(['Col 3' => ['612345679', '798765432', '611223344']])))
+        ->toBe(['Col 3' => ['field' => 'mobile', 'reason' => 'content']])
         // A shape without a matching field for the target: nothing.
         ->and(ColumnGuesser::guess(ImportTarget::Trainings, ['Col 3'], sampleRows(['Col 3' => emails(10)])))->toBe([]);
 });
@@ -102,9 +107,21 @@ it('validates SIRET with the Luhn key', function () {
 it('leaves an ambiguous column on Ignore', function () {
     // « Code » is close to « Code NAF », « Code postal »... and « Nom du
     // responsable » to « Nom » and « Responsable » for a person.
-    expect(ColumnGuesser::guess(ImportTarget::People, ['Nom du responsable', 'Date'], []))->toBe(['Date' => ['field' => 'birth_date', 'reason' => 'similar']])
+    expect(ColumnGuesser::guess(ImportTarget::People, ['Nom du responsable'], []))->toBe([])
         ->and(ColumnGuesser::guess(ImportTarget::Affiliations, ['Date'], []))->toBe([])
         ->and(ColumnGuesser::guess(ImportTarget::Organisations, ['Nom du responsable'], []))->toBe(['Nom du responsable' => ['field' => 'responsible', 'reason' => 'similar']]);
+});
+
+it('proposes a birth date only from a clear header', function () {
+    expect(ColumnGuesser::guess(ImportTarget::People, ['Date', 'Date de création', 'Dernier contact'], sampleRows([
+        'Date' => ['16/11/1980', '01/02/1975', '04/05/1990'],
+        'Date de création' => ['16/11/2026', '15/11/2026', '14/11/2026'],
+        'Dernier contact' => ['16/11/2026', '15/11/2026', '14/11/2026'],
+    ])))->toBe([])
+        ->and(ColumnGuesser::guess(ImportTarget::People, ['Date de naissance'], []))->toBe(['Date de naissance' => ['field' => 'birth_date', 'reason' => 'header']])
+        ->and(ColumnGuesser::guess(ImportTarget::People, ['Né le'], []))->toBe(['Né le' => ['field' => 'birth_date', 'reason' => 'header']])
+        ->and(ColumnGuesser::guess(ImportTarget::People, ['Naissance'], []))->toBe(['Naissance' => ['field' => 'birth_date', 'reason' => 'header']])
+        ->and(ColumnGuesser::guess(ImportTarget::People, ['Date naiss.'], []))->toBe(['Date naiss.' => ['field' => 'birth_date', 'reason' => 'similar']]);
 });
 
 it('proposes each field once, to the surest column', function () {
@@ -118,13 +135,13 @@ it('proposes each field once, to the surest column', function () {
 });
 
 it('remembers the organisme\'s choices', function () {
-    $csv = "Nom;Portable perso;Divers\nDupont;06 12 34 56 78;a@example.test\nMartin;07 12 34 56 78;b@example.test\n";
+    $csv = "Nom;Portable perso;Divers\nDupont;06 12 34 56 78;a@example.test\nMartin;07 12 34 56 78;b@example.test\nLeroy;;e@example.test\n";
     $first = uploadImport($csv, ImportTarget::People);
     $this->put("/crm/import/{$first->id}/mapping", ['map' => ['Nom' => 'last_name', 'Portable perso' => 'mobile', 'Divers' => '']])
         ->assertSessionHasNoErrors();
 
     // Same headers, other spelling, other values.
-    $second = uploadImport("NOM;portable  perso;Divers\nDurand;Inconnu;c@example.test\nLeroy;;d@example.test\n", ImportTarget::People);
+    $second = uploadImport("NOM;portable  perso;Divers\nDurand;Inconnu;c@example.test\nLeroy;;d@example.test\nPetit;;f@example.test\n", ImportTarget::People);
     $this->get("/crm/import/{$second->id}/mapping")->assertInertia(fn (Assert $page) => $page
         ->where('map', ['NOM' => 'last_name', 'portable  perso' => 'mobile'])
         ->where('reasons', ['NOM' => 'memory', 'portable  perso' => 'memory']));
@@ -172,4 +189,39 @@ it('stores no cell value', function () {
         ['target' => 'people', 'header_key' => 'prenom', 'field' => 'first_name', 'uses' => 1],
     ])
         ->and(json_encode(DB::table('import_header_choices')->get()))->not->toContain('Dupont')->not->toContain('lea@example.test');
+});
+
+/** Rows of import_header_choices: header key => field (null: « Ignorer »). */
+function rememberedChoices(): array
+{
+    return DB::table('import_header_choices')->orderBy('header_key')->pluck('field', 'header_key')->all();
+}
+
+it('remembers only deliberate choices', function () {
+    // Nom: exact header, kept. Tél portable contact: close header, kept.
+    // Col A: e-mails, proposal from the content kept: not remembered.
+    // Col B: postcodes, proposal turned into « Ignorer »: remembered as ignored.
+    // Col C: nothing proposed, left on « Ignorer »: not remembered.
+    // Col D: nothing proposed, chosen by the user: remembered.
+    // Col E: civilities proposed from the content, changed by the user: remembered.
+    $csv = "Nom;Tél portable contact;Col A;Col B;Col C;Col D;Col E\n"
+        ."Dupont;0612345678;a@example.test;75011;?;Lyon;M.\n"
+        ."Martin;0712345678;b@example.test;69002;?;Pau;Mme\n"
+        ."Leroy;0698765432;c@example.test;13001;?;Nice;Madame\n";
+    $batch = uploadImport($csv, ImportTarget::People);
+
+    $this->get("/crm/import/{$batch->id}/mapping")->assertInertia(fn (Assert $page) => $page
+        ->where('reasons', ['Nom' => 'header', 'Tél portable contact' => 'similar', 'Col A' => 'content', 'Col B' => 'content', 'Col E' => 'content']));
+
+    // The client cannot pretend a proposal: the server recomputes it.
+    $this->put("/crm/import/{$batch->id}/mapping", ['map' => ['Nom' => 'last_name', 'Tél portable contact' => 'mobile', 'Col A' => 'email',
+        'Col B' => '', 'Col C' => '', 'Col D' => 'city', 'Col E' => 'first_name'], 'reasons' => ['Col A' => 'header']])->assertSessionHasNoErrors();
+
+    expect(rememberedChoices())->toBe([
+        'col b' => null,
+        'col d' => 'city',
+        'col e' => 'first_name',
+        'nom' => 'last_name',
+        'tel portable contact' => 'mobile',
+    ]);
 });

@@ -15,6 +15,36 @@ final class HeaderChoices
     private const MAX_KEY = 200;
 
     /**
+     * The choices worth remembering, compared with what the server proposed
+     * (ColumnGuesser, recomputed at save, never taken from the client):
+     * a field the user chose or changed, or a proposal from the memory or the
+     * header he kept; « Ignorer » only when it replaced a proposal. A content
+     * proposal left as is, or a column left on « Ignorer » untouched, says
+     * nothing about the header: not remembered.
+     *
+     * @param  array<string, array{field: string, reason: string}>  $proposals  ColumnGuesser::guess()
+     * @param  array<string, string|null>  $given  column => field ('' or null: « Ignorer »)
+     * @return array<string, string|null>
+     */
+    public static function deliberate(array $proposals, array $given): array
+    {
+        $choices = [];
+        foreach ($given as $column => $field) {
+            $field = $field === '' ? null : $field;
+            $proposal = $proposals[$column] ?? null;
+            if ($field === null) {
+                if ($proposal !== null) {
+                    $choices[$column] = null;
+                }
+            } elseif ($proposal === null || $proposal['field'] !== $field || $proposal['reason'] !== ColumnGuesser::CONTENT) {
+                $choices[$column] = $field;
+            }
+        }
+
+        return $choices;
+    }
+
+    /**
      * Records the validated choices: column => field, null for « Ignorer ».
      *
      * @param  array<string, string|null>  $columnToField

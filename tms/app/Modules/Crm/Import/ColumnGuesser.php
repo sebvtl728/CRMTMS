@@ -13,8 +13,9 @@ namespace App\Modules\Crm\Import;
  * 3. similar: once abbreviations are written out and stop words left out,
  *    the header contains a synonym, or is part of one (« Tél portable
  *    contact » → mobile); the longest match wins;
- * 4. content: at least 80 % of the first 50 filled cells of the column have
- *    the shape of a field (ValueShapes).
+ * 4. content: at least 3 filled cells, 80 % of them having the shape of a
+ *    field (ValueShapes). The sample is the file's first 50 non-empty rows
+ *    (not 50 filled cells per column), read by the caller.
  *
  * Each field goes to one column, the surest; a column whose best level names
  * two fields equally is left on « Ignorer ». Sample rows are read, never kept.
@@ -29,8 +30,11 @@ final class ColumnGuesser
 
     public const CONTENT = 'content';
 
-    /** Filled cells of a column read for its content. */
+    /** Non-empty rows of the file the caller reads as sample (not per column). */
     public const SAMPLE = 50;
+
+    /** Filled cells needed to judge a column from its content. */
+    private const MIN_FILLED = 3;
 
     /** Share of the filled cells that must have the shape. */
     private const THRESHOLD = 0.8;
@@ -111,6 +115,8 @@ final class ColumnGuesser
 
     /**
      * Fields whose label (score 2) or a synonym (score 1) equals the header key.
+     * Two fields sharing a synonym (« référence » for code and source_id) are
+     * no ambiguity here: the legacy rule keeps the first field of the target.
      *
      * @return array<string, float>
      */
@@ -134,7 +140,8 @@ final class ColumnGuesser
     /**
      * Fields close to the header, with the size of the match: the number of
      * words of the synonym the header contains, or (a little less) of the
-     * header contained in a synonym it covers at least half.
+     * header contained in a synonym it covers more than half (« Date » is
+     * not « Date de naissance »).
      *
      * @return array<string, float>
      */
@@ -154,7 +161,7 @@ final class ColumnGuesser
                 $score = 0.0;
                 if (array_diff($synonymWords, $words) === []) {
                     $score = count($synonymWords);
-                } elseif (array_diff($words, $synonymWords) === [] && count($words) * 2 >= count($synonymWords)) {
+                } elseif (array_diff($words, $synonymWords) === [] && count($words) * 2 > count($synonymWords)) {
                     $score = count($words) - 0.5;
                 }
                 if ($score > ($scores[$field] ?? 0.0)) {
@@ -217,7 +224,7 @@ final class ColumnGuesser
                 break;
             }
         }
-        if ($filled === 0) {
+        if ($filled < self::MIN_FILLED) {
             return null;
         }
         arsort($shapes);

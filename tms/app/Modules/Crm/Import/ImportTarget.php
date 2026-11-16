@@ -148,8 +148,8 @@ enum ImportTarget: string
             self::Organisations => [ValueShapes::EMAIL => 'email', ValueShapes::PHONE => 'phone', ValueShapes::POSTCODE => 'postal_code',
                 ValueShapes::SIRET => 'siret', ValueShapes::WEBSITE => 'website'],
             self::People => [ValueShapes::EMAIL => 'email', ValueShapes::MOBILE => 'mobile', ValueShapes::PHONE => 'phone',
-                ValueShapes::POSTCODE => 'postal_code', ValueShapes::DATE => 'birth_date', ValueShapes::CIVILITY => 'civility'],
-            // A date may be a birth date or the start of the affiliation: no proposal.
+                ValueShapes::POSTCODE => 'postal_code', ValueShapes::CIVILITY => 'civility'],
+            // A column of dates is rarely the birth date (creation, last contact...): never proposed from the content.
             self::Affiliations => [ValueShapes::EMAIL => 'email', ValueShapes::MOBILE => 'mobile', ValueShapes::PHONE => 'phone',
                 ValueShapes::POSTCODE => 'postal_code', ValueShapes::CIVILITY => 'civility', ValueShapes::SIRET => 'organisation.siret'],
             self::Notes => [ValueShapes::EMAIL => 'subject_email', ValueShapes::SIRET => 'subject_siret', ValueShapes::DATE => 'date'],
