@@ -128,3 +128,20 @@ it('journals monthly hours with ids and minutes, and shows them in the history o
         ->toContain('Léa Durand — Heures de septembre 2026 (HACCP 3 jours) modifiées : 10 h')
         ->toContain('Léa Durand — Heures de septembre 2026 (HACCP 3 jours) effacées');
 });
+
+it('clears monthly hours of a trainee of the session on an interval module only', function () {
+    $session = plSession('2026-09-01', '2026-10-31');
+    $module = mhModule($session);
+    $seances = SessionModule::query()->create(['training_session_id' => $session->id, 'position' => 2, 'title' => 'Ateliers', 'planned_minutes' => 600, 'dating_mode' => 'seances']);
+    $lea = atEnrol($session);
+    $other = atEnrol(plSession('2026-09-01', '2026-10-31'), 'Ailleurs');
+    $hours = app(MonthlyHours::class);
+    $hours->record($lea->id, $module, '2026-09', 60, null);
+
+    expect(fn () => $hours->clear($lea->id, $seances, '2026-09'))
+        ->toThrow(ValidationException::class, 'Ce module est daté par séances : ses heures se saisissent par les présences.');
+    expect(fn () => $hours->clear($other->id, $module, '2026-09'))->toThrow(ValidationException::class, 'Stagiaire introuvable sur cette session.');
+    expect(MonthlyHour::query()->count())->toBe(1);
+    $hours->clear($lea->id, $module, '2026-09');
+    expect(MonthlyHour::query()->count())->toBe(0);
+});

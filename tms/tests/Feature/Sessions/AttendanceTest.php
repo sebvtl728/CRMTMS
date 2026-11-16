@@ -11,11 +11,13 @@ use App\Modules\Sessions\Enrolments\Enrolments;
 use App\Modules\Sessions\History\SessionsHistory;
 use App\Modules\Sessions\Modules\SessionModules;
 use App\Modules\Sessions\Permissions;
+use App\Modules\Sessions\Planning\Events\SeanceChanged;
 use App\Modules\Sessions\Planning\Seance;
 use App\Modules\Sessions\Planning\Seances;
 use App\Modules\Sessions\Trainers\Trainers;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Event;
 use Illuminate\Validation\ValidationException;
 
 require_once __DIR__.'/Support/lot2a.php';
@@ -163,8 +165,9 @@ it('puts the attendance « à revoir » when the séance hours change: present r
     app(Seances::class)->reschedule($seance, ['ends_at' => '12:00', 'break_minutes' => 0]);
 
     $rows = Attendance::query()->get()->keyBy('enrolment_id');
+    // A partial above the new duration is capped and becomes present (partial stays < duration).
     expect($rows[$present->id]->minutes)->toBe(180)->and($rows[$present->id]->status)->toBe('present')
-        ->and($rows[$partial->id]->minutes)->toBe(180)->and($rows[$partial->id]->status)->toBe('partial')
+        ->and($rows[$partial->id]->minutes)->toBe(180)->and($rows[$partial->id]->status)->toBe('present')
         ->and($rows[$short->id]->minutes)->toBe(60)
         ->and($rows[$absent->id]->minutes)->toBe(0)
         ->and($rows->every(fn (Attendance $a) => $a->needs_review))->toBeTrue();
@@ -188,10 +191,10 @@ it('sets the attendance of a cancelled séance to 0 minute, kept and journaled',
     app(Seances::class)->cancel($seance, 'Formateur malade');
 
     $attendance->refresh();
-    expect($attendance->minutes)->toBe(0)->and($attendance->status)->toBe('present');
+    expect($attendance->minutes)->toBe(0)->and($attendance->status)->toBe('present')->and($attendance->needs_review)->toBeTrue();
     $log = DB::table('audit_logs')->where('auditable_type', 'attendance')->where('auditable_id', $attendance->id)->where('event', 'updated')->sole();
-    expect(json_decode((string) $log->old_values, true))->toBe(['minutes' => 180])
-        ->and(json_decode((string) $log->new_values, true))->toBe(['minutes' => 0]);
+    expect(json_decode((string) $log->old_values, true))->toBe(['minutes' => 180, 'needs_review' => false])
+        ->and(json_decode((string) $log->new_values, true))->toBe(['minutes' => 0, 'needs_review' => true]);
 });
 
 it('refuses to delete a séance with attendance, even absent (Review Focus 2)', function () {
@@ -336,4 +339,54 @@ it('clears the reasons of her attendance when a trainee is anonymised, minutes k
     $rows = Attendance::query()->get()->keyBy('enrolment_id');
     expect($rows[$lea->id]->reason)->toBeNull()->and($rows[$lea->id]->minutes)->toBe(60)
         ->and($rows[$marc->id]->reason)->toBe('Panne');
+});
+
+it('reviews the attendance inside the séance transaction: a failing review rolls the change back', function () {
+    $session = plSession();
+    $seance = plSeance(plModule($session), '2026-09-02', '09:00', '12:00');
+    $lea = atEnrol($session);
+    app(Attendances::class)->record($seance, $lea->id, 'present', null, null);
+    Seances::onScheduleChange('test', function (): void {
+        throw new RuntimeException('Échec de la revue');
+    });
+
+    expect(fn () => app(Seances::class)->reschedule($seance, ['ends_at' => '11:00']))->toThrow(RuntimeException::class);
+    expect($seance->refresh()->end())->toBe('12:00')->and(Attendance::query()->sole()->minutes)->toBe(180);
+    expect(fn () => app(Seances::class)->cancel($seance, 'Grève'))->toThrow(RuntimeException::class);
+    expect($seance->refresh()->status)->toBe('planned')->and(Attendance::query()->sole()->minutes)->toBe(180);
+})->after(fn () => Seances::onScheduleChange('test', null));
+
+it('reviews the attendance even when SeanceChanged is faked (no listener needed)', function () {
+    Event::fake([SeanceChanged::class]);
+    $session = plSession();
+    $seance = plSeance(plModule($session), '2026-09-02', '09:00', '12:00');
+    $lea = atEnrol($session);
+    app(Attendances::class)->record($seance, $lea->id, 'present', null, null);
+
+    app(Seances::class)->reschedule($seance, ['ends_at' => '11:00']);
+    expect(Attendance::query()->sole()->minutes)->toBe(120);
+    app(Seances::class)->cancel($seance->refresh(), 'Grève');
+    expect(Attendance::query()->sole()->minutes)->toBe(0);
+});
+
+it('takes the session lock before the module and the séance when writing a séance', function () {
+    $session = plSession();
+    $module = plModule($session);
+    DB::enableQueryLog();
+    $seance = plSeance($module, '2026-09-02');
+    app(Seances::class)->reschedule($seance, ['ends_at' => '11:00']);
+    app(Seances::class)->cancel($seance->refresh(), 'Grève');
+    $log = collect(DB::getQueryLog())->pluck('query');
+    DB::disableQueryLog();
+
+    $locks = $log->filter(fn (string $q) => str_contains($q, ' for update') || str_contains($q, ' for share'))
+        ->map(fn (string $q) => (str_contains($q, '"training_sessions"') ? 'session' : (str_contains($q, '"session_modules"') ? 'module' : (str_contains($q, '"seances"') ? 'seance' : 'other')))
+            .(str_contains($q, ' for share') ? ':share' : ':update'))
+        ->values()->all();
+    // create: session → module; reschedule: session → modules → séance; cancel: session → séance.
+    expect(array_slice($locks, 0, 2))->toBe(['session:share', 'module:update'])
+        ->and(array_values(array_filter($locks, fn ($l) => str_starts_with($l, 'session'))))->toBe(['session:share', 'session:share', 'session:share']);
+    foreach ([['session:share', 'module:update'], ['session:share', 'seance:update']] as [$first, $then]) {
+        expect(array_search($first, $locks, true))->toBeLessThan(array_search($then, $locks, true));
+    }
 });

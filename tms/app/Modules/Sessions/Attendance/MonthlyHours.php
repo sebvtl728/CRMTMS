@@ -26,6 +26,8 @@ final class MonthlyHours
     /** 31 days of 24 h. */
     public const MAX_MINUTES = 44640;
 
+    public const SEANCES_MODULE = 'Ce module est daté par séances : ses heures se saisissent par les présences.';
+
     /**
      * @throws ValidationException
      */
@@ -61,6 +63,13 @@ final class MonthlyHours
         DB::transaction(function () use ($enrolmentId, $module, $first): void {
             TrainingSession::withTrashed()->whereKey($module->training_session_id)->sharedLock()->firstOrFail();
             Closures::assertOpen($module->training_session_id, $first->toDateString());
+            // Like record(): an interval module, a trainee of its session (his dates aside: what was entered may go).
+            if (SessionModule::query()->findOrFail($module->id)->dating_mode !== DatingMode::Interval->value) {
+                throw ValidationException::withMessages(['session_module_id' => self::SEANCES_MODULE]);
+            }
+            if (! Str::isUuid($enrolmentId) || ! Enrolment::query()->where('training_session_id', $module->training_session_id)->whereKey($enrolmentId)->exists()) {
+                throw ValidationException::withMessages(['enrolment_id' => Attendances::UNKNOWN_TRAINEE]);
+            }
             MonthlyHour::query()->where('enrolment_id', $enrolmentId)->where('session_module_id', $module->id)
                 ->where('month', $first->toDateString())->lockForUpdate()->first()?->delete();
         });
@@ -102,7 +111,7 @@ final class MonthlyHours
     private static function validated(SessionModule $module, string $month): CarbonImmutable
     {
         if ($module->dating_mode !== DatingMode::Interval->value) {
-            throw ValidationException::withMessages(['session_module_id' => 'Ce module est daté par séances : ses heures se saisissent par les présences.']);
+            throw ValidationException::withMessages(['session_module_id' => self::SEANCES_MODULE]);
         }
         $first = Months::required($month);
         $session = TrainingSession::withTrashed()->findOrFail($module->training_session_id);
@@ -126,7 +135,7 @@ final class MonthlyHours
         Closures::assertOpen($module->training_session_id, $first->toDateString());
         $current = SessionModule::query()->findOrFail($module->id);
         if ($current->dating_mode !== DatingMode::Interval->value) {
-            throw ValidationException::withMessages(['session_module_id' => 'Ce module est daté par séances : ses heures se saisissent par les présences.']);
+            throw ValidationException::withMessages(['session_module_id' => self::SEANCES_MODULE]);
         }
         $enrolment = Str::isUuid($enrolmentId)
             ? Enrolment::query()->where('training_session_id', $module->training_session_id)->find($enrolmentId)

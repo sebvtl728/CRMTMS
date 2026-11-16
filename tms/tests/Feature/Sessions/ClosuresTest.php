@@ -83,6 +83,8 @@ it('locks attendance, monthly hours and the séances of a closed month (409 in F
         ->and($seance->refresh()->end())->toBe('12:00')
         ->and(Seance::query()->find($empty->id))->not->toBeNull();
     app(Seances::class)->reschedule($seance, ['note' => 'Salle B']);
+    // The refused moves rewrote no attendance of the closed month.
+    expect(Attendance::query()->sole()->minutes)->toBe(180)->and(Attendance::query()->sole()->needs_review)->toBeFalse();
     // October stays open.
     app(Attendances::class)->record($october, $lea->id, 'present', null, null);
 });

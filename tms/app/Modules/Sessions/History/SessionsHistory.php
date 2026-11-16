@@ -232,8 +232,8 @@ final class SessionsHistory
             $title = match (true) {
                 $log->event === 'created' => "{$what} : {$value}",
                 $log->event === 'deleted' => "{$what} effacée",
+                $seance->isCancelled() && ($new['minutes'] ?? null) === 0 => "{$what} : séance annulée, 0 h",
                 ($new['needs_review'] ?? false) === true => "{$what} à revoir (séance modifiée) : {$value}",
-                $seance->isCancelled() && array_keys($new) === ['minutes'] => "{$what} : séance annulée, 0 h",
                 default => "{$what} modifiée : {$value}",
             };
             $entries[] = ['type' => 'attendance', 'at' => CarbonImmutable::instance($log->created_at), 'id' => $log->id, 'title' => $title, 'body' => null, 'author' => $log->user?->name];

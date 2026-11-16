@@ -18,8 +18,8 @@ use InvalidArgumentException;
  * Public service of the realised hours (spec § 4.7), read by the invoicing
  * (0.9): whole minutes, Paris days and months, never a float.
  *
- *  - realised: the attendance minutes of the séances (cancelled ones count
- *    0) and the monthly hours of the interval modules, only within the
+ *  - realised: the attendance minutes of the séances (never a cancelled
+ *    one) and the monthly hours of the interval modules, only within the
  *    trainee's entry and leaving days (months for monthly hours): what was
  *    entered outside them (the dates changed afterwards) never counts;
  *  - planned: the planned minutes of the session's modules (a module without
@@ -85,6 +85,8 @@ final class RealisedHours
             ->join('enrolments', 'enrolments.id', '=', 'attendances.enrolment_id')
             ->whereIn('attendances.enrolment_id', $ids)
             ->whereNull('seances.deleted_at')
+            // A cancelled séance never counts, whatever minutes its attendance still holds.
+            ->where('seances.status', '<>', 'cancelled')
             ->where(fn ($q) => $q->whereNull('enrolments.entered_on')->orWhereColumn('seances.date', '>=', 'enrolments.entered_on'))
             ->where(fn ($q) => $q->whereNull('enrolments.left_on')->orWhereColumn('seances.date', '<=', 'enrolments.left_on'))
             ->when($first, fn ($q, $m) => $q->whereBetween('seances.date', [$m->toDateString(), $m->endOfMonth()->toDateString()]))

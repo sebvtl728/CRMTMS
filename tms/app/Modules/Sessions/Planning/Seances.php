@@ -23,8 +23,11 @@ use Illuminate\Validation\ValidationException;
  * write runs under the lock of its module (the generator takes it too).
  *
  * A séance with attendance (task 4, registerAttendance) is never deleted:
- * cancelled with a reason. Moving its day or hours, or cancelling it,
- * dispatches SeanceChanged after commit (the attendance is reviewed).
+ * cancelled with a reason. Moving its day or hours, or cancelling it, runs
+ * the onScheduleChange hooks in the same transaction (the attendance is
+ * reviewed atomically), then dispatches SeanceChanged after commit (a
+ * notification only). Each write holds the session row shared first, then
+ * locks the module and the séance (order session → module → séance).
  * Every write on a day goes through assertMonthOpen() first: the one guard
  * of a closed month (task 4 wires Closures::isClosed there, 409).
  * Alerts (Conflicts) never block a write.
@@ -47,6 +50,9 @@ final class Seances
     /** @var (Closure(TrainingSession, string): void)|null */
     private ?Closure $monthGuard = null;
 
+    /** @var array<string, Closure(Seance, string): void> */
+    private array $scheduleHooks = [];
+
     /**
      * @param  array<string, mixed>  $data  session_module_id, date, starts_at, ends_at, break_minutes, trainer_id, room_id, place_text, note
      *
@@ -58,6 +64,7 @@ final class Seances
         $values = self::validated($session, $data, null);
 
         return DB::transaction(function () use ($session, $values): Seance {
+            self::holdSession($session->id);
             $module = self::lockModule($values['session_module_id']);
             self::assertMonthOpen($session, $values['date']);
             self::assertFree($values, null);
@@ -97,6 +104,7 @@ final class Seances
         $values = self::validated($session, array_replace($current, array_intersect_key($data, $current)), $seance);
 
         return DB::transaction(function () use ($seance, $session, $values): Seance {
+            self::holdSession($session->id);
             // Moving to another module: both modules locked, in id order (no deadlock).
             $ids = array_unique([$seance->session_module_id, $values['session_module_id']]);
             sort($ids);
@@ -116,6 +124,8 @@ final class Seances
             $locked->fill($values);
             $locked = self::insert($locked);
             if ($moved) {
+                // The attendance is reviewed in this transaction, under the séance's lock.
+                self::runScheduleHooks($locked, SeanceChanged::RESCHEDULED);
                 SeanceChanged::dispatch($locked->id, SeanceChanged::RESCHEDULED);
             }
             $seance->setRawAttributes($locked->getAttributes(), true);
@@ -143,6 +153,7 @@ final class Seances
         $session = TrainingSession::withTrashed()->findOrFail($seance->training_session_id);
 
         return DB::transaction(function () use ($seance, $session, $reason): Seance {
+            self::holdSession($session->id);
             $locked = Seance::query()->lockForUpdate()->findOrFail($seance->id);
             if ($locked->isCancelled()) {
                 throw new UserFacingHttpException(409, self::ALREADY_CANCELLED);
@@ -151,6 +162,7 @@ final class Seances
             $locked->status = Seance::CANCELLED;
             $locked->cancel_reason = $reason;
             $locked->save();
+            self::runScheduleHooks($locked, SeanceChanged::CANCELLED);
             SeanceChanged::dispatch($locked->id, SeanceChanged::CANCELLED);
             $seance->setRawAttributes($locked->getAttributes(), true);
 
@@ -165,6 +177,7 @@ final class Seances
     {
         $session = TrainingSession::withTrashed()->findOrFail($seance->training_session_id);
         DB::transaction(function () use ($seance, $session): void {
+            self::holdSession($session->id);
             $locked = Seance::query()->lockForUpdate()->findOrFail($seance->id);
             self::assertMonthOpen($session, $locked->date->toDateString());
             if (self::hasAttendance($locked->id)) {
@@ -208,6 +221,40 @@ final class Seances
     public static function guardMonthsWith(?Closure $guard): void
     {
         self::registry()->monthGuard = $guard;
+    }
+
+    /**
+     * Declares what follows a change of hours or a cancellation of a séance
+     * (the attendance review): run inside the writing transaction, under the
+     * séance's lock, with the séance as saved and SeanceChanged::RESCHEDULED
+     * or ::CANCELLED. A hook that throws rolls the change back. Null removes it.
+     *
+     * @param  (Closure(Seance, string): void)|null  $hook
+     */
+    public static function onScheduleChange(string $key, ?Closure $hook): void
+    {
+        if ($hook === null) {
+            unset(self::registry()->scheduleHooks[$key]);
+        } else {
+            self::registry()->scheduleHooks[$key] = $hook;
+        }
+    }
+
+    private static function runScheduleHooks(Seance $locked, string $kind): void
+    {
+        foreach (self::registry()->scheduleHooks as $hook) {
+            $hook($locked, $kind);
+        }
+    }
+
+    /**
+     * The session row held shared for the whole write (Closures::close takes
+     * it FOR UPDATE): the closed-month check and the write are atomic. Lock
+     * order everywhere: session → module(s) → séance → attendance.
+     */
+    private static function holdSession(string $sessionId): void
+    {
+        TrainingSession::withTrashed()->whereKey($sessionId)->sharedLock()->firstOrFail();
     }
 
     /**

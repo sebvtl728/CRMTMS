@@ -126,3 +126,13 @@ it('answers within a fixed number of queries for a session of many trainees and 
     expect($rows)->toHaveCount(8)->and($rows[0]['realised_minutes'])->toBe(20 * 210)->and($queries)->toBeLessThanOrEqual(8);
     expect($enrolments)->toHaveCount(8);
 });
+
+it('never counts a cancelled séance, even with minutes left on its attendance', function () {
+    ['lea' => $lea] = rhMixed();
+    // Stale minutes on the cancelled séance of 6 October (written around the services).
+    $cancelled = Seance::query()->where('date', '2026-10-06')->sole();
+    DB::table('attendances')->where('seance_id', $cancelled->id)->update(['minutes' => 180]);
+
+    expect(RealisedHours::forEnrolment($lea->id)['realised_minutes'])->toBe(1190)
+        ->and(RealisedHours::forEnrolment($lea->id, '2026-10')['realised_minutes'])->toBe(360);
+});

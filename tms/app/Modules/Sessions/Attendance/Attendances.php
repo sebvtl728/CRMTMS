@@ -155,33 +155,28 @@ final class Attendances
     }
 
     /**
-     * The séance changed its hours (« à revoir »: present recomputed, partial
-     * above the new duration capped) or was cancelled (0 minute, kept).
-     * Each changed row is journaled.
+     * Seances::onScheduleChange hook, inside the séance's transaction and
+     * under its lock: the séance moved to other hours (« à revoir »: present
+     * recomputed, a partial at or above the new duration capped to it and
+     * made present) or was cancelled (0 minute, kept, « à revoir »). Each
+     * changed row is journaled; a failure rolls the séance change back.
      */
-    public static function onSeanceChanged(SeanceChanged $event): void
+    public static function review(Seance $seance, string $kind): void
     {
-        DB::transaction(function () use ($event): void {
-            $seance = Seance::withTrashed()->lockForUpdate()->find($event->seanceId);
-            if ($seance === null) {
-                return;
+        /** @var Collection<int, Attendance> $rows */
+        $rows = Attendance::query()->where('seance_id', $seance->id)->orderBy('id')->lockForUpdate()->get();
+        foreach ($rows as $attendance) {
+            $attendance->needs_review = true;
+            if ($kind === SeanceChanged::CANCELLED || $seance->isCancelled()) {
+                $attendance->minutes = 0;
+            } elseif ($attendance->status === Attendance::PRESENT) {
+                $attendance->minutes = $seance->duration_minutes;
+            } elseif ($attendance->status === Attendance::PARTIAL && $attendance->minutes >= $seance->duration_minutes) {
+                $attendance->status = Attendance::PRESENT;
+                $attendance->minutes = $seance->duration_minutes;
             }
-            /** @var Collection<int, Attendance> $rows */
-            $rows = Attendance::query()->where('seance_id', $seance->id)->orderBy('id')->lockForUpdate()->get();
-            foreach ($rows as $attendance) {
-                if ($event->kind === SeanceChanged::CANCELLED || $seance->isCancelled()) {
-                    $attendance->minutes = 0;
-                } else {
-                    $attendance->needs_review = true;
-                    if ($attendance->status === Attendance::PRESENT) {
-                        $attendance->minutes = $seance->duration_minutes;
-                    } elseif ($attendance->status === Attendance::PARTIAL && $attendance->minutes > $seance->duration_minutes) {
-                        $attendance->minutes = $seance->duration_minutes;
-                    }
-                }
-                $attendance->save();
-            }
-        });
+            $attendance->save();
+        }
     }
 
     /**

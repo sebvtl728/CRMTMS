@@ -37,7 +37,6 @@ use App\Modules\Sessions\Gdpr\PersonSessionsExport;
 use App\Modules\Sessions\Gdpr\RetentionHolds;
 use App\Modules\Sessions\History\SessionsHistory;
 use App\Modules\Sessions\Modules\SessionModule;
-use App\Modules\Sessions\Planning\Events\SeanceChanged;
 use App\Modules\Sessions\Planning\PlacementPeriod;
 use App\Modules\Sessions\Planning\PlacementPeriodHost;
 use App\Modules\Sessions\Planning\Seance;
@@ -262,13 +261,13 @@ class SessionsServiceProvider extends ServiceProvider
      * The attendance and the séances (spec § 4 bis 5, 6): a séance with
      * attendance is never deleted; a closed month refuses its séances
      * (created, moved, cancelled, deleted; 409); a séance moved or
-     * cancelled reviews its attendance (after commit).
+     * cancelled reviews its attendance in the same transaction.
      */
     public static function registerAttendance(): void
     {
         Seances::registerAttendance('sessions.attendance', fn (string $seanceId): bool => Attendance::query()->where('seance_id', $seanceId)->exists());
         Seances::guardMonthsWith(fn (TrainingSession $session, string $date) => Closures::assertOpen($session->id, $date));
-        Event::listen(SeanceChanged::class, fn (SeanceChanged $event) => Attendances::onSeanceChanged($event));
+        Seances::onScheduleChange('sessions.attendance', fn (Seance $seance, string $kind) => Attendances::review($seance, $kind));
     }
 
     /**
