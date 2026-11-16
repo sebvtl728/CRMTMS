@@ -1,3 +1,4 @@
+import { SendingStatus, SentTitles, type SentBrochure } from '@/components/crm/brochure-send';
 import { ACTIVITY_SAVED_EVENT, completeActivity } from '@/components/crm/quick-action';
 import InputError from '@/components/input-error';
 import { Badge } from '@/components/ui/badge';
@@ -43,6 +44,7 @@ function EntryIcon({ type }: { type: string }) {
     if (type === 'opportunity') return <Handshake className={cls} aria-hidden />;
     if (type === 'activity') return <ClipboardCheck className={cls} aria-hidden />;
     if (type === 'quote') return <FileText className={cls} aria-hidden />;
+    if (type === 'brochure_sending') return <Paperclip className={cls} aria-hidden />;
 
     return <History className={cls} aria-hidden />;
 }
@@ -279,13 +281,22 @@ export function Timeline({ kind, subjectId, canEdit }: Props) {
                                         <span className="text-sm font-medium">{entry.title}</span>
                                     )}
                                     {entry.type === 'activity' && <ActivityBadges meta={entry.meta} />}
+                                    {entry.type === 'brochure_sending' && typeof entry.meta.status === 'string' && (
+                                        <SendingStatus status={entry.meta.status} label={String(entry.meta.status_label ?? entry.meta.status)} />
+                                    )}
                                     <span className="text-muted-foreground text-xs">
                                         {entry.type === 'activity' && entry.meta.status !== 'done' ? 'Échéance : ' : ''}
                                         {formatDateTime(entry.at)}
                                         {entry.author && ` · ${entry.author}`}
                                     </span>
                                 </div>
-                                {entry.body && <p className="mt-1 text-sm break-words whitespace-pre-line">{entry.body}</p>}
+                                {entry.type === 'brochure_sending' && Array.isArray(entry.meta.versions) ? (
+                                    <p className="mt-1 text-sm break-words">
+                                        <SentTitles versions={entry.meta.versions as SentBrochure[]} />
+                                    </p>
+                                ) : (
+                                    entry.body && <p className="mt-1 text-sm break-words whitespace-pre-line">{entry.body}</p>
+                                )}
                                 {entry.type === 'activity' && typeof entry.meta.opportunity_id === 'string' && (
                                     <p className="text-muted-foreground mt-1 text-xs">
                                         Opportunité :{' '}

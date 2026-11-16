@@ -9,6 +9,7 @@ use App\Modules\Core\References\ReferenceItem;
 use App\Modules\Core\References\ReferenceList;
 use App\Modules\Core\Users\User;
 use App\Modules\Crm\Affiliations\Affiliation;
+use App\Modules\Crm\Brochures\BrochureSendProps;
 use App\Modules\Crm\Duplicates\DuplicateGuard;
 use App\Modules\Crm\Interests\FicheTrainings;
 use App\Modules\Crm\Opportunities\OpportunityRows;
@@ -166,6 +167,7 @@ class OrganisationController extends Controller
             'ficheDasIds' => $organisation->das->pluck('id')->values()->all(),
             'opportunities' => OpportunityRows::forFiche($organisation, $user),
             'quotes' => QuoteRows::forFiche($organisation, $user),
+            'brochure_send' => BrochureSendProps::for($organisation, $user),
             'similar' => $user->can(Permissions::MERGE) ? $this->duplicates->similarTo($organisation, $user) : [],
             'can' => [
                 'merge' => ! $organisation->trashed() && $user->can(Permissions::MERGE),

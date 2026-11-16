@@ -5,6 +5,7 @@ namespace App\Modules\Crm\Gdpr;
 use App\Modules\Core\Audit\AuditRecorder;
 use App\Modules\Core\Tenancy\TenantStorage;
 use App\Modules\Crm\Activities\Events\ActivityChanged;
+use App\Modules\Crm\Brochures\BrochureSendingAnonymisation;
 use App\Modules\Crm\Import\ImportBatch;
 use App\Modules\Crm\Interests\FicheTrainings;
 use App\Modules\Crm\People\Person;
@@ -32,6 +33,8 @@ use Throwable;
  *   with numbers, lines, totals and statuses; recipient copy, mentions,
  *   refusal reason and last e-mail cleared, archived PDFs deleted (files
  *   after the commit); her address leaves the e-mails of other quotes;
+ * - the brochures sent to her (BrochureSendingAnonymisation): her address,
+ *   the subject and the message cleared, the sending itself kept;
  * - her actions (hers, or on her opportunities as particulier; trashed
  *   too): kept with type, dates and result, the report and place cleared,
  *   the subject (« Appel – <her name> ») reset to the type;
@@ -163,6 +166,7 @@ class Anonymiser
         FicheTrainings::forgetPeople($subjects);
         $quotes = QuoteAnonymisation::scrub($subjects, $traces->emails);
         $files = [...$files, ...$quotes['files']];
+        BrochureSendingAnonymisation::scrub($subjects);
         $activities = DB::table('activities')
             ->where(fn ($q) => $q->whereIn('person_id', $subjects)
                 ->orWhereIn('opportunity_id', DB::table('opportunities')->select('id')->whereIn('person_id', $subjects)))

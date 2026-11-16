@@ -2,6 +2,7 @@ import { SimilarFiches, type DuplicateCandidate } from '@/components/crm/duplica
 import { InterestTrainings, type InterestTraining, type InterestTrainingOption } from '@/components/crm/interest-trainings';
 import { FicheOpportunities, type OpportunityRow } from '@/components/crm/opportunity-list';
 import { OrganisationContacts, type AffiliationRow } from '@/components/crm/organisation-contacts';
+import { BrochureSendButton, type BrochureSendProps } from '@/components/crm/brochure-send';
 import { QuickActionFicheButton } from '@/components/crm/quick-action';
 import { FicheQuotes, type QuoteRow } from '@/components/crm/quote-list';
 import { Timeline } from '@/components/crm/timeline';
@@ -56,6 +57,7 @@ interface ShowProps {
     decisionRoles: Option[];
     opportunities: OpportunityRow[];
     quotes: QuoteRow[];
+    brochure_send: BrochureSendProps | null;
     interestTrainings: InterestTraining[];
     trainingOptions: InterestTrainingOption[];
     ficheDasIds: string[];
@@ -101,6 +103,7 @@ export default function OrganisationShow({
     decisionRoles,
     opportunities,
     quotes,
+    brochure_send,
     interestTrainings,
     trainingOptions,
     ficheDasIds,
@@ -144,6 +147,7 @@ export default function OrganisationShow({
                     </div>
                     <div className="flex flex-wrap gap-2">
                         <QuickActionFicheButton context={{ organisation_id: o.id }} available={!o.deleted} />
+                        <BrochureSendButton send={brochure_send} routeName="crm.organisations.brochures.send" subjectId={o.id} />
                         {can.update && (
                             <Button asChild variant="outline">
                                 <Link href={route('crm.organisations.edit', o.id)}>

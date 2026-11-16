@@ -82,7 +82,7 @@ formation créée dans le catalogue, ajoutée à une opportunité « Étude », 
 depuis l'opportunité, aperçu PDF (vrai rendu par le service `gotenberg` de la pile, réponse `application/pdf`),
 envoi (mailer `log` de la pile e2e : le résultat est vérifié à l'écran, statut « Envoyé », sans boîte aux lettres),
 opportunité passée en « Proposition », « Accepté » puis « Gagné », devis listé avec un taux de réussite du mois de
-100 %. La société créée par `admin.spec.ts` y prend le préfixe `CF` (celui de la société d'installation est `DEV`). `tests/e2e/interests.spec.ts` vérifie le nom et le logo de la société par défaut dans la barre latérale et le titre de l'onglet, puis les **formations d'intérêt** d'une entreprise (choix, filtre de la liste, formation proposée sur une nouvelle opportunité).
+100 %. La société créée par `admin.spec.ts` y prend le préfixe `CF` (celui de la société d'installation est `DEV`). `tests/e2e/brochures.spec.ts` couvre la bibliothèque de plaquettes (dépôt, PDF invalide refusé, titre modifié, fichier remplacé = nouvelle version, téléchargements). `tests/e2e/interests.spec.ts` vérifie le nom et le logo de la société par défaut dans la barre latérale et le titre de l'onglet, puis les **formations d'intérêt** d'une entreprise (choix, filtre de la liste, formation proposée sur une nouvelle opportunité).
 Tous réutilisent la session de
 l'administrateur : les fichiers se lancent ensemble, dans l'ordre alphabétique (un seul processus).
 

@@ -2,6 +2,9 @@
 
 namespace App\Modules\Catalogue;
 
+use App\Modules\Catalogue\Brochures\Brochure;
+use App\Modules\Catalogue\Brochures\BrochurePolicy;
+use App\Modules\Catalogue\Brochures\BrochureVersion;
 use App\Modules\Core\Access\Permissions as CorePermissions;
 use App\Modules\Core\Audit\MorphAliases;
 use App\Modules\Core\References\ReferenceList;
@@ -28,9 +31,10 @@ class CatalogueServiceProvider extends ServiceProvider
         // AccessServiceProvider::boot() defines one gate per permission.
         CorePermissions::registerModule('catalogue', Permissions::all(), Permissions::defaultsFor(...), Permissions::labels(), Permissions::GROUP);
 
-        MorphAliases::register(['training' => Training::class]);
+        MorphAliases::register(['training' => Training::class, 'brochure' => Brochure::class, 'brochure_version' => BrochureVersion::class]);
 
         $this->app->singleton(Trainings::class);
+        $this->app->singleton(Brochures::class);
     }
 
     public function boot(): void
@@ -41,6 +45,7 @@ class CatalogueServiceProvider extends ServiceProvider
             ->response(fn (Request $request, array $headers) => response()->json(['message' => 'Trop d\'exports en peu de temps. Réessayez dans une minute.'], 429, $headers)));
 
         Gate::policy(Training::class, TrainingPolicy::class);
+        Gate::policy(Brochure::class, BrochurePolicy::class);
 
         // A training of another organisme (RLS) or deleted is a 404.
         Route::bind('training', function (string $value): Training {
@@ -49,6 +54,17 @@ class CatalogueServiceProvider extends ServiceProvider
             }
 
             return Training::query()->findOrFail($value);
+        });
+
+        // A brochure of another organisme (RLS) or in the trash is a 404, except for the download of a
+        // version (the controller then requires that this version was sent).
+        Route::bind('brochure', function (string $value, \Illuminate\Routing\Route $route): Brochure {
+            if (! Str::isUuid($value)) {
+                throw (new ModelNotFoundException)->setModel(Brochure::class, [$value]);
+            }
+            $query = $route->getName() === 'catalogue.brochures.versions.download' ? Brochure::withTrashed() : Brochure::query();
+
+            return $query->findOrFail($value);
         });
     }
 
@@ -60,5 +76,6 @@ class CatalogueServiceProvider extends ServiceProvider
     {
         ReferenceUsage::register(ReferenceList::Das, 'trainings', 'das_id');
         ReferenceUsage::register(ReferenceList::FundingMode, 'training_funding_modes', 'funding_mode_id');
+        ReferenceUsage::register(ReferenceList::Das, 'brochure_das', 'das_id');
     }
 }

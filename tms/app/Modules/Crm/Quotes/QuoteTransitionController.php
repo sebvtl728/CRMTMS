@@ -25,7 +25,7 @@ class QuoteTransitionController extends Controller
     public function send(QuoteMessageRequest $request, Quote $quote): RedirectResponse
     {
         Gate::authorize('update', $quote);
-        $this->transitions->send($quote, $request->message());
+        $this->transitions->send($quote, $request->message(), $request->brochureVersionIds());
 
         return to_route('crm.quotes.show', $quote)->with('status', "Devis {$quote->number} envoyé.");
     }
