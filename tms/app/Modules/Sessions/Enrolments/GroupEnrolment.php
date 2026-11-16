@@ -16,11 +16,12 @@ use Illuminate\Validation\ValidationException;
 /**
  * Enrolment of a group of trainees on a session for one line of a dossier
  * (a group journey, and the later waves of it): one transaction for the
- * batch, each trainee through Enrolments::enrol() (places of an inter
+ * batch, each trainee through Enrolments::enrolInBatch() (places of an inter
  * session — the extras on the waiting list, in order —, intra entreprise,
  * duplicates, hours). A trainee is a person of the CRM ({person_id}) or one
  * created on the spot ({new_person: {…, employee, confirm_duplicate, ref}},
- * the same ref being one person, as in the dossier assistant). The entry
+ * the same ref being one person, as in the dossier assistant); the shares
+ * of the line are computed once, after the batch. The entry
  * day is common (default the session start) and may be given per trainee.
  * Every trainee is checked; one refused, nothing is written and the errors
  * come back per trainee: trainees.<j> (the person) or trainees.<j>.<field>;
@@ -81,8 +82,11 @@ final class GroupEnrolment
                 try {
                     $personId = $this->person($j, $trainee, $dossier, $das, $created);
                     $extra = array_intersect_key($trainee, array_flip(self::EXTRA_FIELDS));
-                    $extra['entered_on'] ??= $enteredOn;
-                    $enrolment = $this->enrolments->enrol($dossier, $line, $session, $personId, $extra);
+                    // No day of his own (absent, null or blank): the common one.
+                    if (! is_string($extra['entered_on'] ?? null) || trim($extra['entered_on']) === '') {
+                        $extra['entered_on'] = $enteredOn;
+                    }
+                    $enrolment = $this->enrolments->enrolInBatch($dossier, $line, $session, $personId, $extra);
                     $counts[$enrolment->status === EnrolmentStatus::Waitlisted ? 'waitlisted' : 'enrolled']++;
                 } catch (ValidationException $e) {
                     foreach ($e->errors() as $key => $messages) {
@@ -93,6 +97,11 @@ final class GroupEnrolment
             if ($errors !== []) {
                 // Nothing of the batch is kept.
                 throw ValidationException::withMessages($errors);
+            }
+            // The shares of the line, once for the whole batch.
+            $fresh = DossierLine::query()->where('dossier_id', $dossier->id)->find($line->id);
+            if ($fresh instanceof DossierLine) {
+                PriceShares::recompute($fresh);
             }
 
             return $counts;

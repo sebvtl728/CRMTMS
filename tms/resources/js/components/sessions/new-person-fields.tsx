@@ -42,8 +42,26 @@ export function NewPersonFields({
 }) {
     const [missing, setMissing] = useState(false);
 
+    const add = () => {
+        if (value.last_name.trim() === '') {
+            setMissing(true);
+
+            return;
+        }
+        onAdd();
+    };
+
     return (
-        <fieldset className="grid gap-3 rounded-md border p-3 md:grid-cols-2">
+        // Enter in a field adds the person (it never submits the surrounding form, which would drop her).
+        <fieldset
+            className="grid gap-3 rounded-md border p-3 md:grid-cols-2"
+            onKeyDown={(e) => {
+                if (e.key === 'Enter' && e.target instanceof HTMLInputElement) {
+                    e.preventDefault();
+                    if (e.target.type !== 'checkbox') add();
+                }
+            }}
+        >
             <legend className="px-1 text-sm font-medium">Nouveau stagiaire</legend>
             <div className="grid gap-1">
                 <Label htmlFor={`new_first_name_${index}`}>Prénom</Label>
@@ -74,18 +92,7 @@ export function NewPersonFields({
                 </label>
             )}
             <div className="flex gap-2 md:col-span-2">
-                <Button
-                    type="button"
-                    size="sm"
-                    onClick={() => {
-                        if (value.last_name.trim() === '') {
-                            setMissing(true);
-
-                            return;
-                        }
-                        onAdd();
-                    }}
-                >
+                <Button type="button" size="sm" onClick={add}>
                     Ajouter
                 </Button>
                 <Button type="button" variant="ghost" size="sm" onClick={onCancel}>

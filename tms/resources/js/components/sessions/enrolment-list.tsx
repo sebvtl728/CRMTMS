@@ -305,7 +305,7 @@ export function EnrolmentList({
                                             ? `Dossier ${row.dossier.number}${row.dossier.account ? ` · ${row.dossier.account}` : ''}`
                                             : 'Dossier non visible'
                                         : row.session
-                                          ? `Session ${row.session.label} · ${sessionDates(row.session)}`
+                                          ? `${row.session.title ? row.session.label : `Session ${row.session.label}`} · ${sessionDates(row.session)}`
                                           : null,
                                     row.entered_on && `entrée le ${formatDay(row.entered_on)}`,
                                     row.planned_hours && `${row.planned_hours} h prévues`,

@@ -16,12 +16,14 @@ use App\Modules\Sessions\Dossiers\DossierWriter;
 use App\Modules\Sessions\Enrolments\Enrolment;
 use App\Modules\Sessions\Enrolments\Enrolments;
 use App\Modules\Sessions\Enrolments\EnrolmentStatus;
+use App\Modules\Sessions\Enrolments\GroupEnrolment;
 use App\Modules\Sessions\Permissions;
 use App\Modules\Sessions\Sessions\SessionWriter;
 use App\Modules\Sessions\Sessions\TrainingSession;
 use App\Modules\Sessions\SessionsServiceProvider;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Route;
 use Inertia\Testing\AssertableInertia as Assert;
 
 /*
@@ -315,4 +317,67 @@ it('takes any positive hours when the session has none', function () {
     ]);
     $enrolment = app(Enrolments::class)->enrol($dossier, $dossier->lines()->firstOrFail(), $session, makePerson('A')->id, ['planned_hours' => '12']);
     expect($enrolment->planned_hours)->toBe('12.00');
+});
+
+// ---------------------------------------------------------------- review fixes
+
+it('lowers the hours of the trainees above the new hours of the session, journaled', function () {
+    $session = grpSession();
+    $dossier = grpDossier();
+    $line = $dossier->lines()->firstOrFail();
+    $full = app(Enrolments::class)->enrol($dossier, $line, $session, makePerson('A')->id);
+    $part = app(Enrolments::class)->enrol($dossier, $line, $session, makePerson('B')->id, ['planned_hours' => '20']);
+    $this->actingAs(admin(true));
+
+    $this->put("/sessions/{$session->id}", [
+        'title' => '', 'training_id' => grpTraining()->id, 'kind' => 'inter', 'starts_on' => '2026-11-30', 'ends_on' => '2027-03-05',
+        'location_kind' => 'remote', 'capacity' => '10', 'status' => 'planned', 'planned_hours' => '28',
+    ])->assertSessionHasNoErrors();
+
+    expect($full->fresh()->planned_hours)->toBe('28.00')->and($part->fresh()->planned_hours)->toBe('20.00')
+        ->and(AuditLog::query()->where('auditable_type', 'enrolment')->where('auditable_id', $full->id)->where('event', 'updated')
+            ->where('new_values->planned_hours', '28.00')->exists())->toBeTrue();
+
+    // Raising them back leaves the trainees' hours alone.
+    $this->put("/sessions/{$session->id}", [
+        'training_id' => grpTraining()->id, 'kind' => 'inter', 'starts_on' => '2026-11-30', 'ends_on' => '2027-03-05',
+        'location_kind' => 'remote', 'capacity' => '10', 'status' => 'planned', 'planned_hours' => '35',
+    ])->assertSessionHasNoErrors();
+    expect($full->fresh()->planned_hours)->toBe('28.00');
+});
+
+it('computes the shares of the line once for the whole group, with the same result', function () {
+    $session = grpSession();
+    $dossier = grpDossier();
+    $this->actingAs(admin(true));
+    $updates = 0;
+    DB::listen(function ($query) use (&$updates): void {
+        if (str_starts_with($query->sql, 'update "enrolments" set "price_share"')) {
+            $updates++;
+        }
+    });
+
+    $this->post("/sessions/{$session->id}/enrolments/group", grpPayload($dossier, collect(range(1, 3))->map(fn (int $i) => ['person_id' => makePerson("P{$i}")->id])->all()))
+        ->assertSessionHas('status', '3 stagiaires inscrits.');
+
+    expect(Enrolment::query()->orderBy('created_at')->orderBy('id')->pluck('price_share')->all())->toBe(['2000.00', '2000.00', '2000.00'])
+        ->and($updates)->toBe(3);
+});
+
+it('takes the common entry day for a trainee whose own day is empty', function () {
+    $session = grpSession();
+    $dossier = grpDossier();
+    app(GroupEnrolment::class)->enrol($dossier, $dossier->lines()->firstOrFail(), $session, [
+        ['person_id' => makePerson('A')->id, 'entered_on' => ''],
+        ['person_id' => makePerson('B')->id, 'entered_on' => '  '],
+        ['person_id' => makePerson('C')->id, 'entered_on' => '2026-12-14'],
+    ], '2026-12-07');
+
+    expect(Enrolment::query()->orderBy('created_at')->orderBy('id')->get()->map(fn (Enrolment $e) => $e->entered_on?->toDateString())->all())
+        ->toBe(['2026-12-07', '2026-12-07', '2026-12-14']);
+});
+
+it('rate-limits the group enrolment with the named limiter of the trainee searches', function () {
+    $route = collect(Route::getRoutes()->getRoutes())->first(fn ($r) => $r->getName() === 'sessions.enrolments.group');
+    expect($route->gatherMiddleware())->toContain('throttle:sessions-trainees');
 });

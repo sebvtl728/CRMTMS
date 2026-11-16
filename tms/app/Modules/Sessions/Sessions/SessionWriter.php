@@ -8,6 +8,7 @@ use App\Modules\Core\References\ReferenceItem;
 use App\Modules\Core\References\ReferenceList;
 use App\Modules\Core\Tenancy\TenantContext;
 use App\Modules\Crm\Public\Fiches;
+use App\Modules\Sessions\Amounts;
 use App\Modules\Sessions\Enrolments\Enrolment;
 use App\Modules\Sessions\Enrolments\Enrolments;
 use App\Modules\Sessions\Enrolments\EnrolmentStatus;
@@ -30,7 +31,8 @@ use Illuminate\Validation\ValidationException;
  * session comes back only with its entreprise (409). Once trainees are
  * enrolled (cancelled enrolments aside), its training, type and entreprise
  * no longer change and it does not go to the trash (409); cancelling it
- * cancels its enrolments.
+ * cancels its enrolments. Lowering its hours lowers those of the trainees
+ * planned above them (journaled).
  *
  * @phpstan-type SessionData array<string, mixed>
  */
@@ -103,10 +105,30 @@ final class SessionWriter
             if ($moved && self::hasEnrolments($locked)) {
                 throw new UserFacingHttpException(409, self::LOCKED);
             }
+            $lowered = $values['planned_hours'] !== null && ($locked->planned_hours === null
+                || Amounts::cents((string) $values['planned_hours']) < Amounts::cents($locked->planned_hours));
             $locked->update($values);
+            if ($lowered) {
+                self::clampEnrolmentHours($locked);
+            }
 
             return $locked;
         });
+    }
+
+    /**
+     * The session's hours went down: the trainees planned above them are
+     * brought down to them, one by one (journaled), under the session lock.
+     */
+    private static function clampEnrolmentHours(TrainingSession $session): void
+    {
+        $hours = (string) $session->planned_hours;
+        Enrolment::query()->where('training_session_id', $session->id)->where('planned_hours', '>', $hours)
+            ->orderBy('id')->lockForUpdate()->get()
+            ->each(function (Enrolment $enrolment) use ($hours): void {
+                $enrolment->planned_hours = $hours;
+                $enrolment->save();
+            });
     }
 
     /**

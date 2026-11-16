@@ -77,9 +77,32 @@ final class Enrolments
      */
     public function enrol(Dossier $dossier, DossierLine $line, TrainingSession $session, string $personId, array $extra = []): Enrolment
     {
+        return $this->enrolOne($dossier, $line, $session, $personId, $extra, true);
+    }
+
+    /**
+     * enrol() for GroupEnrolment: the shares of the line are left to the
+     * caller, computed once for the whole batch (PriceShares::recompute).
+     *
+     * @param  array<string, mixed>  $extra
+     *
+     * @throws ValidationException
+     */
+    public function enrolInBatch(Dossier $dossier, DossierLine $line, TrainingSession $session, string $personId, array $extra = []): Enrolment
+    {
+        return $this->enrolOne($dossier, $line, $session, $personId, $extra, false);
+    }
+
+    /**
+     * @param  array<string, mixed>  $extra
+     *
+     * @throws ValidationException
+     */
+    private function enrolOne(Dossier $dossier, DossierLine $line, TrainingSession $session, string $personId, array $extra, bool $shares): Enrolment
+    {
         $values = $this->validatedExtra($extra, null);
 
-        return DB::transaction(function () use ($dossier, $line, $session, $personId, $values): Enrolment {
+        return DB::transaction(function () use ($dossier, $line, $session, $personId, $values, $shares): Enrolment {
             $dossier = Dossier::withTrashed()->lockForUpdate()->findOrFail($dossier->id);
             $session = TrainingSession::withTrashed()->lockForUpdate()->findOrFail($session->id);
             if ($dossier->isCancelled() || $dossier->trashed()) {
@@ -131,7 +154,9 @@ final class Enrolments
                 'entered_on' => $values['entered_on'] ?? $session->starts_on->toDateString(),
                 'planned_hours' => $values['planned_hours'] ?? $session->planned_hours,
             ]);
-            PriceShares::recompute($line);
+            if ($shares) {
+                PriceShares::recompute($line);
+            }
 
             return $enrolment->refresh();
         });

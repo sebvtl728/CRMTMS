@@ -172,6 +172,11 @@ export function EnrolDialog({ source, onClose }: { source: Source; onClose: () =
     const start = source.from === 'session' ? source.sessionStart : (chosen?.starts_on ?? '');
 
     const label = (t: Trainee) => ('person' in t ? t.person.label : newPersonLabel(newPeople[t.ref]));
+    // The errors of the trainees are keyed by their position: a removal shifts it, so they go with it.
+    const remove = (key: number) => {
+        setTrainees((ts) => ts.filter((x) => x.key !== key));
+        setErrors((errs) => Object.fromEntries(Object.entries(errs).filter(([k]) => k !== 'trainees' && !k.startsWith('trainees.'))));
+    };
     const change = (key: number, patch: Partial<Pick<Trainee, 'entered_on' | 'planned_hours'>>) =>
         setTrainees((ts) => ts.map((t) => (t.key === key ? { ...t, ...patch } : t)));
 
@@ -313,7 +318,7 @@ export function EnrolDialog({ source, onClose }: { source: Source; onClose: () =
                                                         variant="ghost"
                                                         size="sm"
                                                         aria-label={`Retirer ${label(t)}`}
-                                                        onClick={() => setTrainees((ts) => ts.filter((x) => x.key !== t.key))}
+                                                        onClick={() => remove(t.key)}
                                                     >
                                                         <X className="h-4 w-4" />
                                                     </Button>

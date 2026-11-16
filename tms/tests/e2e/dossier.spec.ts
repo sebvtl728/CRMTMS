@@ -108,7 +108,8 @@ test('dossier from an accepted quote: summary, new intra session, trainees found
     await trainees.getByRole('button', { name: 'Créer un stagiaire' }).click();
     await trainees.getByLabel('Prénom').fill('Noé');
     await trainees.getByLabel('Nom *').fill('E2E Garnier');
-    await trainees.getByRole('button', { name: 'Ajouter' }).click();
+    // Enter in a field adds the person (never submits the assistant).
+    await trainees.getByLabel('Nom *').press('Enter');
     await expect(trainees.getByText('Noé E2E Garnier (à créer)')).toBeVisible();
     await page.getByRole('button', { name: 'Créer le dossier' }).click();
 

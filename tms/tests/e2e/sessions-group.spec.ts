@@ -104,8 +104,10 @@ test('sessions: a titled inter session, a group of four enrolled at once (one cr
     await dialog.getByRole('button', { name: 'Créer un stagiaire' }).click();
     await dialog.getByLabel('Prénom').fill(PEOPLE[3].first_name);
     await dialog.getByLabel('Nom *').fill(PEOPLE[3].last_name);
-    await dialog.getByRole('button', { name: 'Ajouter' }).click();
+    // Enter in a field adds the person: it does not submit the group.
+    await dialog.getByLabel('Nom *').press('Enter');
     await expect(dialog.getByText(`${PEOPLE[3].first_name} ${PEOPLE[3].last_name} (à créer)`)).toBeVisible();
+    await expect(dialog.getByRole('button', { name: 'Inscrire les 4 stagiaires' })).toBeVisible();
     // Removing one from the group before sending, then adding him back.
     await dialog.getByRole('button', { name: new RegExp(`^Retirer ${PEOPLE[2].first_name} ${PEOPLE[2].last_name}`) }).click();
     await expect(dialog.getByRole('list', { name: 'Stagiaires à inscrire' }).getByText(`${PEOPLE[2].first_name} ${PEOPLE[2].last_name}`)).toHaveCount(
@@ -127,7 +129,16 @@ test('sessions: a titled inter session, a group of four enrolled at once (one cr
     await page.getByRole('button', { name: 'Inscrire des stagiaires' }).click();
     await choose(page, dialog.getByLabel('Dossier *'), new RegExp(CLIENT));
     await dialog.getByLabel("Date d'entrée commune").fill('2027-01-18');
+    // One already enrolled: the batch is refused, the error under her; removed, the error goes with her.
+    await addFound(dialog, PEOPLE[0]);
     await addFound(dialog, { first_name: 'Zoé', last_name: 'E2E Perrin' });
+    await dialog.getByRole('button', { name: 'Inscrire les 2 stagiaires' }).click();
+    const group = dialog.getByRole('list', { name: 'Stagiaires à inscrire' });
+    await expect(
+        group.getByRole('listitem').filter({ hasText: PEOPLE[0].last_name }).getByText('Ce stagiaire est déjà inscrit à cette session.'),
+    ).toBeVisible();
+    await dialog.getByRole('button', { name: new RegExp(`^Retirer ${PEOPLE[0].first_name} ${PEOPLE[0].last_name}`) }).click();
+    await expect(dialog.getByText('Ce stagiaire est déjà inscrit à cette session.')).toHaveCount(0);
     await dialog.getByRole('button', { name: 'Inscrire', exact: true }).click();
     await expect(page.getByText("1 stagiaire en liste d'attente.")).toBeVisible();
     const waiting = page.getByRole('region', { name: "Liste d'attente" });
