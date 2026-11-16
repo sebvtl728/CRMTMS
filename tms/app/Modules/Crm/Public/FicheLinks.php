@@ -5,7 +5,9 @@ namespace App\Modules\Crm\Public;
 use App\Modules\Crm\Organisations\Organisation;
 use App\Modules\Crm\People\Person;
 use App\Modules\Crm\Support\LinkedData;
+use Carbon\CarbonImmutable;
 use Closure;
+use Illuminate\Database\Query\Builder as QueryBuilder;
 
 /**
  * What another module (Sessions…) keeps on the fiches of the CRM, declared
@@ -21,7 +23,10 @@ use Closure;
  *    transaction;
  *  - export: the sections the module adds to the RGPD export of a person
  *    (complete, whatever the viewer's scopes), with the view rights that must
- *    reach « Tout l'organisme » for a user to download that export.
+ *    reach « Tout l'organisme » for a user to download that export;
+ *  - retention hold: the people the module still has a contractual reason
+ *    to keep (an enrolment, a dossier, a funding within the retention
+ *    period): the RGPD retention never lists them (RetentionPolicy).
  *
  * The registry lives in the application container: a fresh application
  * (each test) starts with only what the providers register.
@@ -39,6 +44,9 @@ final class FicheLinks
 
     /** @var array<string, list<string>> */
     private array $exportPermissions = [];
+
+    /** @var array<string, Closure(CarbonImmutable): QueryBuilder> */
+    private array $retentionHolds = [];
 
     /**
      * @param  string  $key  unique name (module.data); a second registration replaces the first
@@ -75,6 +83,25 @@ final class FicheLinks
     {
         self::registry()->exports[$key] = $sections;
         self::registry()->exportPermissions[$key] = $viewPermissions;
+    }
+
+    /**
+     * @param  Closure(CarbonImmutable): QueryBuilder  $hold  threshold of the retention (now minus the period) => query
+     *                                                        selecting a column `person_id` (never null) of the people held
+     */
+    public static function registerRetentionHold(string $key, Closure $hold): void
+    {
+        self::registry()->retentionHolds[$key] = $hold;
+    }
+
+    /**
+     * Called by RetentionPolicy: the queries of the people held.
+     *
+     * @return list<QueryBuilder>
+     */
+    public static function retentionHolds(CarbonImmutable $threshold): array
+    {
+        return array_values(array_map(fn (Closure $hold): QueryBuilder => $hold($threshold), self::registry()->retentionHolds));
     }
 
     /**

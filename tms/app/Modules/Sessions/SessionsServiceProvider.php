@@ -25,9 +25,11 @@ use App\Modules\Sessions\Fundings\Funding;
 use App\Modules\Sessions\Gdpr\EnrolmentAnonymisation;
 use App\Modules\Sessions\Gdpr\FicheReferences;
 use App\Modules\Sessions\Gdpr\PersonSessionsExport;
+use App\Modules\Sessions\Gdpr\RetentionHolds;
 use App\Modules\Sessions\History\SessionsHistory;
 use App\Modules\Sessions\Sessions\SessionPolicy;
 use App\Modules\Sessions\Sessions\TrainingSession;
+use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Route;
@@ -153,13 +155,18 @@ class SessionsServiceProvider extends ServiceProvider
      * funding names; a merge repoints them (refused for two people enrolled
      * on the same session); the anonymisation clears adaptation needs and
      * notes; the RGPD export lists her enrolments and dossiers (downloadable
-     * with both view rights of the module on « Tout l'organisme »).
+     * with both view rights of the module on « Tout l'organisme »); the RGPD
+     * retention never lists a person still enrolled, contractant, contact or
+     * funder within the period (RetentionHolds).
      */
     public static function registerFicheLinks(): void
     {
         FicheLinks::registerLinked('sessions.references', fn (string $type, string $id): bool => FicheReferences::linked($type, $id));
         FicheLinks::registerMerge('sessions.references', fn (string $type, string $keepId, string $dropId) => FicheReferences::merge($type, $keepId, $dropId));
         FicheLinks::registerAnonymisation('sessions.enrolments', fn (array $personIds) => EnrolmentAnonymisation::scrub($personIds));
+        FicheLinks::registerRetentionHold('sessions.enrolments', fn (CarbonImmutable $threshold) => RetentionHolds::enrolments($threshold));
+        FicheLinks::registerRetentionHold('sessions.dossiers', fn (CarbonImmutable $threshold) => RetentionHolds::dossiers($threshold));
+        FicheLinks::registerRetentionHold('sessions.fundings', fn (CarbonImmutable $threshold) => RetentionHolds::fundings($threshold));
         FicheLinks::registerExport('sessions', fn (string $personId): array => PersonSessionsExport::for($personId), [Permissions::DOSSIERS_VIEW, Permissions::SESSIONS_VIEW]);
     }
 

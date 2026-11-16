@@ -5,8 +5,11 @@ use App\Modules\Core\References\CapFormationReferenceSeeder;
 use App\Modules\Core\References\ReferenceList;
 use App\Modules\Crm\CrmServiceProvider;
 use App\Modules\Crm\Duplicates\Merger;
+use App\Modules\Crm\Gdpr\AnonymiseExpired;
 use App\Modules\Crm\Gdpr\Anonymiser;
+use App\Modules\Crm\Gdpr\GdprPending;
 use App\Modules\Crm\Gdpr\PersonDataExport;
+use App\Modules\Crm\Gdpr\RetentionPolicy;
 use App\Modules\Crm\Import\ImportTarget;
 use App\Modules\Crm\Import\UndoImport;
 use App\Modules\Crm\Organisations\Organisation;
@@ -21,6 +24,7 @@ use App\Modules\Sessions\Permissions;
 use App\Modules\Sessions\SessionsServiceProvider;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Validation\ValidationException;
 
 require_once __DIR__.'/Support/lot2a.php';
@@ -66,6 +70,76 @@ it('clears the adaptation needs and notes of her enrolments and the notes of her
 
     // The journal of the anonymisation holds no value.
     expect(DB::table('audit_logs')->where('new_values', 'like', '%Fauteuil%')->exists())->toBeFalse();
+});
+
+// ---------------------------------------------------------------- retention
+
+/** A person whose last contact (and creation) is $years years old. */
+function l2Aged(string $name, int $years, array $attributes = []): Person
+{
+    $person = makePerson($name, $attributes);
+    $at = now()->subYears($years)->subDay();
+    DB::table('people')->where('id', $person->id)->update(['created_at' => $at, 'last_contact_at' => $at]);
+
+    return $person->refresh();
+}
+
+/** @return list<string> */
+function l2Expired(): array
+{
+    return RetentionPolicy::expiredPeople()->orderBy('last_name')->pluck('last_name')->all();
+}
+
+it('never lists for the RGPD retention a person enrolled on a session of the period', function () {
+    $enrolled = l2Aged('Inscrite', 6);
+    $cancelled = l2Aged('Annulee', 6);
+    $old = l2Aged('Ancienne', 6);
+    $hotel = l2Dossier();
+    DB::table('dossiers')->where('id', $hotel->id)->update(['created_at' => now()->subYears(6)]);
+    l2Enrol($hotel, l2Session(), $enrolled);
+    app(Enrolments::class)->cancel(l2Enrol($hotel, l2Session(), $cancelled));
+    // A session finished 4 years ago, beyond the 3 years of the organisme.
+    $past = l2Session();
+    DB::table('training_sessions')->where('id', $past->id)->update(['starts_on' => '2022-11-01', 'ends_on' => '2022-11-03']);
+    l2Enrol($hotel, $past->refresh(), $old);
+    // A session finished 2 years ago, within the period.
+    $recent = l2Aged('Recente', 6);
+    $within = l2Session();
+    DB::table('training_sessions')->where('id', $within->id)->update(['starts_on' => '2024-11-01', 'ends_on' => '2024-11-03']);
+    l2Enrol($hotel, $within->refresh(), $recent);
+
+    expect(l2Expired())->toBe(['Ancienne', 'Annulee']);
+});
+
+it('never lists the particulier, the contact or the funder of a dossier of the period', function () {
+    $particulier = l2Aged('Particulier', 6, ['is_individual' => true]);
+    $contact = l2Aged('Contact', 6);
+    $funder = l2Aged('Financeur', 6);
+    $oldContact = l2Aged('AncienContact', 6);
+    $own = l2Dossier($particulier);
+    $own->forceFill(['contact_person_id' => $contact->id])->save();
+    l2Funding($own, ['funder_organisation_id' => null, 'funder_person_id' => $funder->id, 'funding_type_id' => crmItem(ReferenceList::FundingType, 'Personnel')->id]);
+    $old = l2Dossier();
+    $old->forceFill(['contact_person_id' => $oldContact->id])->save();
+    DB::table('dossiers')->where('id', $old->id)->update(['created_at' => now()->subYears(4)]);
+
+    expect(l2Expired())->toBe(['AncienContact']);
+
+    DB::table('dossiers')->where('id', $own->id)->update(['created_at' => now()->subYears(4)]);
+    DB::table('fundings')->where('dossier_id', $own->id)->update(['created_at' => now()->subYears(4)]);
+    expect(l2Expired())->toBe(['AncienContact', 'Contact', 'Financeur', 'Particulier']);
+});
+
+it('takes off the pending list a person enrolled since she was listed', function () {
+    Mail::fake();
+    $lea = l2Aged('Durand', 6);
+    AnonymiseExpired::dispatch();
+    expect(GdprPending::query()->pluck('person_id')->all())->toBe([$lea->id]);
+
+    l2Enrol(l2Dossier(), l2Session(), $lea);
+    AnonymiseExpired::dispatch();
+
+    expect(GdprPending::query()->count())->toBe(0)->and($lea->refresh()->anonymised_at)->toBeNull();
 });
 
 // ---------------------------------------------------------------- RGPD export
