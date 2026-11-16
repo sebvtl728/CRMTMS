@@ -6,11 +6,12 @@ use App\Modules\Core\Access\AccessScope;
 use App\Modules\Core\Access\Scopes;
 use App\Modules\Core\Users\User;
 use App\Modules\Crm\Public\UserDas;
+use App\Modules\Sessions\Dossiers\Dossier;
 use App\Modules\Sessions\Sessions\TrainingSession;
 use Illuminate\Database\Eloquent\Builder;
 
 /**
- * Who reaches which session (and, from Task 4, which dossier): the scope
+ * Who reaches which session and which dossier: the scope
  * (Scopes) of the requested permission, as CrmVisibility does for the CRM.
  *
  *  - right not granted: nothing;
@@ -35,17 +36,28 @@ final class SessionsVisibility
     }
 
     /**
-     * $permission reaches $session (trashed or not).
+     * @template TModel of \Illuminate\Database\Eloquent\Model
+     *
+     * @param  Builder<TModel>  $query  on dossiers
+     * @return Builder<TModel>
      */
-    public static function allows(User $user, string $permission, TrainingSession $session): bool
+    public static function dossiers(Builder $query, User $user, string $permission = Permissions::DOSSIERS_VIEW): Builder
+    {
+        return self::scoped($query, $user, Scopes::of($user, $permission));
+    }
+
+    /**
+     * $permission reaches $record, a session or a dossier (trashed or not).
+     */
+    public static function allows(User $user, string $permission, TrainingSession|Dossier $record): bool
     {
         $scope = Scopes::of($user, $permission);
 
         return match ($scope) {
             null => false,
             AccessScope::All => true,
-            AccessScope::Own => in_array($user->getKey(), [$session->responsible_user_id, $session->created_by], true),
-            AccessScope::Das => in_array($session->das_id, UserDas::ids($user), true),
+            AccessScope::Own => in_array($user->getKey(), [$record->responsible_user_id, $record->created_by], true),
+            AccessScope::Das => in_array($record->das_id, UserDas::ids($user), true),
         };
     }
 

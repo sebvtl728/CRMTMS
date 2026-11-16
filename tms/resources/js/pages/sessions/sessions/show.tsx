@@ -14,7 +14,9 @@ import { LoaderCircle, Pencil } from 'lucide-react';
 import { FormEventHandler, useState, type ReactNode } from 'react';
 
 interface ShowProps {
-    session: SessionRow & {
+    session: Omit<SessionRow, 'organisation'> & {
+        /** can_open: the user may open the fiche (a link then, plain text otherwise). */
+        organisation: (NonNullable<SessionRow['organisation']> & { can_open: boolean }) | null;
         stored_status: string;
         notes: string | null;
         cancel_reason: string | null;
@@ -170,10 +172,14 @@ export default function SessionShow({ session, can, cancel_reasons, status }: Sh
                             ? field(
                                   'Entreprise',
                                   session.organisation ? (
-                                      <Link href={route('crm.organisations.show', session.organisation.id)} className="hover:underline">
-                                          {session.organisation.label}
-                                          {session.organisation.trashed && ' (supprimée)'}
-                                      </Link>
+                                      session.organisation.can_open ? (
+                                          <Link href={route('crm.organisations.show', session.organisation.id)} className="hover:underline">
+                                              {session.organisation.label}
+                                              {session.organisation.trashed && ' (supprimée)'}
+                                          </Link>
+                                      ) : (
+                                          `${session.organisation.label}${session.organisation.trashed ? ' (supprimée)' : ''}`
+                                      )
                                   ) : (
                                       '—'
                                   ),

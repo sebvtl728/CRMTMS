@@ -1,5 +1,6 @@
 <?php
 
+use App\Modules\Sessions\Dossiers\DossierController;
 use App\Modules\Sessions\Sessions\SessionController;
 use App\Modules\Sessions\Settings\AbandonRuleController;
 use Illuminate\Support\Facades\Route;
@@ -22,4 +23,21 @@ Route::middleware(['auth'])->prefix('sessions')->name('sessions.')->group(functi
     Route::post('{trainingSession}/cancel', [SessionController::class, 'cancel'])->middleware('can:sessions.sessions.update')->name('cancel');
     Route::delete('{trainingSession}', [SessionController::class, 'destroy'])->middleware('can:sessions.sessions.delete')->name('destroy');
     Route::post('{trainingSession}/restore', [SessionController::class, 'restore'])->middleware('can:sessions.sessions.delete')->name('restore');
+});
+
+// Dossiers de formation: scoped rights sessions.dossiers.* (DossierPolicy).
+Route::middleware(['auth'])->prefix('dossiers')->name('dossiers.')->group(function () {
+    Route::get('/', [DossierController::class, 'index'])->middleware('can:sessions.dossiers.view')->name('index');
+    Route::get('export', [DossierController::class, 'export'])->middleware(['can:sessions.dossiers.view', 'can:crm.export', 'throttle:crm-export'])->name('export');
+    Route::get('create', [DossierController::class, 'create'])->middleware('can:sessions.dossiers.update')->name('create');
+    Route::get('organisations', [DossierController::class, 'organisations'])->middleware('can:sessions.dossiers.update')->name('organisations');
+    Route::get('people', [DossierController::class, 'people'])->middleware('can:sessions.dossiers.update')->name('people');
+    Route::post('/', [DossierController::class, 'store'])->middleware('can:sessions.dossiers.update')->name('store');
+    Route::get('{dossier}', [DossierController::class, 'show'])->middleware('can:sessions.dossiers.view')->name('show');
+    Route::get('{dossier}/edit', [DossierController::class, 'edit'])->middleware('can:sessions.dossiers.update')->name('edit');
+    Route::put('{dossier}', [DossierController::class, 'update'])->middleware('can:sessions.dossiers.update')->name('update');
+    Route::post('{dossier}/steps/{step}', [DossierController::class, 'step'])->whereIn('step', array_keys(DossierController::STEPS))->middleware('can:sessions.dossiers.update')->name('step');
+    Route::post('{dossier}/cancel', [DossierController::class, 'cancel'])->middleware('can:sessions.dossiers.update')->name('cancel');
+    Route::delete('{dossier}', [DossierController::class, 'destroy'])->middleware('can:sessions.dossiers.delete')->name('destroy');
+    Route::post('{dossier}/restore', [DossierController::class, 'restore'])->middleware('can:sessions.dossiers.delete')->name('restore');
 });

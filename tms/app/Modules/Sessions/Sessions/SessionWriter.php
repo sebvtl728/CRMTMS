@@ -20,7 +20,8 @@ use Illuminate\Validation\ValidationException;
  * assistant), number at creation in the same transaction, DAS always the
  * training's, hours the training's unless typed. Intra: an entreprise of the
  * CRM (Crm\Public\Fiches, not trashed), no places; inter: places ≥ 1, no
- * entreprise. A cancelled session no longer changes (409).
+ * entreprise. A cancelled session no longer changes (409); a trashed intra
+ * session comes back only with its entreprise (409).
  *
  * @phpstan-type SessionData array<string, mixed>
  */
@@ -29,6 +30,8 @@ final class SessionWriter
     public const CANCELLED = 'Une session annulée ne se modifie plus.';
 
     public const ALREADY_CANCELLED = 'Cette session est déjà annulée.';
+
+    public const ORGANISATION_GONE = 'L\'entreprise de cette session intra est à la corbeille : restaurez-la d\'abord.';
 
     public function __construct(
         private readonly SessionNumbering $numbering,
@@ -84,6 +87,10 @@ final class SessionWriter
      */
     public function cancel(TrainingSession $session, ?string $reasonId): TrainingSession
     {
+        // The state first: a cancelled session answers 409 whatever the reason.
+        if ($session->isCancelled()) {
+            throw new UserFacingHttpException(409, self::ALREADY_CANCELLED);
+        }
         Validator::make(['cancel_reason_id' => $reasonId], [
             'cancel_reason_id' => ['bail', 'required', ...self::referenceRule(ReferenceList::CancelReason)],
         ], [
@@ -100,6 +107,24 @@ final class SessionWriter
             $locked->cancel_reason_id = $reasonId;
             $locked->cancelled_on = TrainingSession::today();
             $locked->save();
+
+            return $locked;
+        });
+    }
+
+    /**
+     * Restores a trashed session; an intra session only while its entreprise
+     * is live (out of the trash): otherwise 409.
+     */
+    public function restore(TrainingSession $session): TrainingSession
+    {
+        return DB::transaction(function () use ($session): TrainingSession {
+            $locked = TrainingSession::withTrashed()->lockForUpdate()->findOrFail($session->id);
+            if ($locked->organisation_id !== null && $this->fiches->organisation($locked->organisation_id) === null) {
+                throw new UserFacingHttpException(409, self::ORGANISATION_GONE);
+            }
+            $locked->restore();
+            $session->setRawAttributes($locked->getAttributes(), true);
 
             return $locked;
         });

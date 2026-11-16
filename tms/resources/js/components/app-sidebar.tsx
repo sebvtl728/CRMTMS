@@ -10,6 +10,7 @@ import {
     CalendarDays,
     CalendarRange,
     ClipboardPen,
+    ClipboardList,
     Columns3,
     Contact,
     Euro,
@@ -48,8 +49,9 @@ const commercialNavItems: (NavItem & { permission: string })[] = [
     { title: 'RGPD', url: '/crm/gdpr', icon: ShieldAlert, permission: 'crm.gdpr' },
 ];
 
-// « Formation »: the operational side (sessions, then dossiers and enrolments).
+// « Formation »: the operational side (dossiers, sessions, then enrolments).
 const trainingNavItems: (NavItem & { permission: string })[] = [
+    { title: 'Dossiers', url: '/dossiers', icon: ClipboardList, permission: 'sessions.dossiers.view' },
     { title: 'Sessions', url: '/sessions', icon: CalendarDays, permission: 'sessions.sessions.view' },
 ];
 

@@ -111,9 +111,15 @@ class SessionController extends Controller
         $session = $trainingSession->load(['responsible:id,name', 'creator:id,name']);
         $cancelReason = $session->cancel_reason_id === null ? null : ReferenceItem::query()->find($session->cancel_reason_id)?->label;
 
+        $row = SessionRows::one($session, TrainingSession::today());
+        if (is_array($row['organisation'])) {
+            // A link to the fiche only when the user can open it (plain text otherwise).
+            $row['organisation']['can_open'] = app(Fiches::class)->openable($user, 'organisation', [(string) $session->organisation_id]) !== [];
+        }
+
         return Inertia::render('sessions/sessions/show', [
             'session' => [
-                ...SessionRows::one($session, TrainingSession::today()),
+                ...$row,
                 'stored_status' => $session->status->value,
                 'notes' => $session->notes,
                 'cancel_reason' => $cancelReason,
@@ -196,7 +202,7 @@ class SessionController extends Controller
     {
         Gate::authorize('restore', $trainingSession);
 
-        DB::transaction(fn () => $trainingSession->restore());
+        $this->writer->restore($trainingSession);
 
         return to_route('sessions.show', $trainingSession)->with('status', 'Session restaurée.');
     }

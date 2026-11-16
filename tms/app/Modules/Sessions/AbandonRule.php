@@ -4,6 +4,7 @@ namespace App\Modules\Sessions;
 
 use App\Modules\Core\Tenancy\Tenant;
 use App\Modules\Core\Tenancy\TenantContext;
+use App\Modules\Sessions\Dossiers\Dossier;
 
 /**
  * « Règle en cas d'abandon » of an organisme (spec lot 2a § 5.6), stored in
@@ -15,9 +16,9 @@ use App\Modules\Core\Tenancy\TenantContext;
  * A force majeure abandon reason never costs a dédit (reference item flag
  * meta.force_majeure): the callers apply that, this class only states the rule.
  *
- * forTenant() is the organisme's rule. forDossier(), which will return the
- * dossier's own override (dossiers.abandon_mode / abandon_dedit_percent) and
- * otherwise this rule, is added with the Dossier model (lot 2a, task 4).
+ * forTenant() is the organisme's rule; forDossier() the dossier's own
+ * override (dossiers.abandon_mode / abandon_dedit_percent) when it has one,
+ * otherwise the organisme's rule.
  * 2a records and shows the rule; the hours attended (2d) and the invoices
  * (lot 3) will apply it.
  */
@@ -41,6 +42,32 @@ final class AbandonRule
         $tenant ??= app(TenantContext::class)->current();
 
         return self::normalise(data_get($tenant->settings ?? [], 'sessions.abandon_rule'));
+    }
+
+    /**
+     * The rule applicable to $dossier, and whether it is its own override.
+     *
+     * @return array{mode: 'prorata'|'prorata_dedit', dedit_percent: ?int, overridden: bool}
+     */
+    public static function forDossier(Dossier $dossier): array
+    {
+        if ($dossier->abandon_mode !== null) {
+            return [...self::normalise(['mode' => $dossier->abandon_mode, 'dedit_percent' => $dossier->abandon_dedit_percent]), 'overridden' => true];
+        }
+
+        return [...self::forTenant(), 'overridden' => false];
+    }
+
+    /**
+     * French wording of a rule: « Prorata seulement », « Prorata et dédit de 30 % ».
+     *
+     * @param  array{mode: string, dedit_percent: ?int}  $rule
+     */
+    public static function label(array $rule): string
+    {
+        return $rule['mode'] === self::PRORATA_DEDIT
+            ? "Prorata et dédit de {$rule['dedit_percent']} %"
+            : 'Prorata seulement';
     }
 
     /**

@@ -10,6 +10,9 @@ use App\Modules\Core\Audit\MorphAliases;
 use App\Modules\Core\References\ReferenceList;
 use App\Modules\Core\References\ReferenceUsage;
 use App\Modules\Core\Users\User;
+use App\Modules\Sessions\Dossiers\Dossier;
+use App\Modules\Sessions\Dossiers\DossierLine;
+use App\Modules\Sessions\Dossiers\DossierPolicy;
 use App\Modules\Sessions\Sessions\SessionPolicy;
 use App\Modules\Sessions\Sessions\TrainingSession;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
@@ -41,7 +44,11 @@ class SessionsServiceProvider extends ServiceProvider
             );
         }
 
-        MorphAliases::register([TrainingSession::MORPH_ALIAS => TrainingSession::class]);
+        MorphAliases::register([
+            TrainingSession::MORPH_ALIAS => TrainingSession::class,
+            Dossier::MORPH_ALIAS => Dossier::class,
+            DossierLine::MORPH_ALIAS => DossierLine::class,
+        ]);
     }
 
     public function boot(): void
@@ -50,6 +57,7 @@ class SessionsServiceProvider extends ServiceProvider
         self::registerTrainingUsage();
 
         Gate::policy(TrainingSession::class, SessionPolicy::class);
+        Gate::policy(Dossier::class, DossierPolicy::class);
 
         // A session outside the view scope, of another organisme (RLS) or
         // malformed is a 404; a trashed one only with sessions.sessions.delete.
@@ -68,6 +76,23 @@ class SessionsServiceProvider extends ServiceProvider
 
             return SessionsVisibility::sessions($query, $user)->findOrFail($value);
         });
+
+        // Same rules for a dossier with sessions.dossiers.view / delete.
+        Route::bind('dossier', function (string $value): Dossier {
+            if (! Str::isUuid($value)) {
+                throw (new ModelNotFoundException)->setModel(Dossier::class, [$value]);
+            }
+            $user = request()->user();
+            $query = Dossier::query();
+            if (! $user instanceof User) {
+                return $query->findOrFail($value);
+            }
+            if (Scopes::of($user, Permissions::DOSSIERS_DELETE) !== null) {
+                $query->withTrashed();
+            }
+
+            return SessionsVisibility::dossiers($query, $user)->findOrFail($value);
+        });
     }
 
     /**
@@ -78,14 +103,18 @@ class SessionsServiceProvider extends ServiceProvider
     {
         ReferenceUsage::register(ReferenceList::Das, 'training_sessions', 'das_id');
         ReferenceUsage::register(ReferenceList::CancelReason, 'training_sessions', 'cancel_reason_id');
+        ReferenceUsage::register(ReferenceList::Das, 'dossiers', 'das_id');
+        ReferenceUsage::register(ReferenceList::Das, 'dossier_lines', 'das_id');
+        ReferenceUsage::register(ReferenceList::CancelReason, 'dossiers', 'cancelled_reason_id');
     }
 
     /**
-     * A training used by a session (trashed ones included: they can come
-     * back) is never deleted from the catalogue.
+     * A training used by a session or a line of a dossier (trashed ones
+     * included: they can come back) is never deleted from the catalogue.
      */
     public static function registerTrainingUsage(): void
     {
-        TrainingUsage::register('sessions', fn (string $trainingId): bool => TrainingSession::withTrashed()->where('training_id', $trainingId)->exists());
+        TrainingUsage::register('sessions', fn (string $trainingId): bool => TrainingSession::withTrashed()->where('training_id', $trainingId)->exists()
+            || DossierLine::query()->where('training_id', $trainingId)->exists());
     }
 }

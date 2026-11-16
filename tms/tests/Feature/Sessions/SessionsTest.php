@@ -10,12 +10,12 @@ use App\Modules\Core\Tenancy\Tenant;
 use App\Modules\Core\Tenancy\TenantContext;
 use App\Modules\Crm\CrmServiceProvider;
 use App\Modules\Crm\Organisations\Organisation;
+use App\Modules\Sessions\Permissions;
 use App\Modules\Sessions\Sessions\SessionStatus;
 use App\Modules\Sessions\Sessions\SessionWriter;
 use App\Modules\Sessions\Sessions\TrainingSession;
 use App\Modules\Sessions\SessionsServiceProvider;
 use Carbon\CarbonImmutable;
-use Illuminate\Validation\ValidationException;
 use Inertia\Testing\AssertableInertia as Assert;
 
 beforeEach(function () {
@@ -93,13 +93,22 @@ it('numbers the sessions per organisme and Paris year', function () {
     expect($writer->create(sessPayload($training))->number)->toBe('S-2027-0002');
 });
 
-it('gives the number back when the creation rolls back', function () {
+it('gives the number back when the creation fails inside its transaction', function () {
     $training = sessTraining();
     $this->actingAs(commercial());
     $this->travelTo(CarbonImmutable::parse('2026-06-01 10:00', 'Europe/Paris'));
+    // The number is taken, then the insert fails: the sequence must roll back with it.
+    $fail = true;
+    TrainingSession::creating(function () use (&$fail): void {
+        if ($fail) {
+            $fail = false;
+            throw new RuntimeException('Échec au milieu de la création.');
+        }
+    });
 
-    expect(fn () => app(SessionWriter::class)->create(sessPayload($training, ['ends_on' => '2026-12-01'])))->toThrow(ValidationException::class);
-    expect(app(SessionWriter::class)->create(sessPayload($training))->number)->toBe('S-2026-0001');
+    expect(fn () => app(SessionWriter::class)->create(sessPayload($training)))->toThrow(RuntimeException::class);
+    expect(TrainingSession::query()->count())->toBe(0)
+        ->and(app(SessionWriter::class)->create(sessPayload($training))->number)->toBe('S-2026-0001');
 });
 
 // ---------------------------------------------------------------- creation and validation
@@ -259,6 +268,8 @@ it('cancels a session with a reason of the list, then refuses to change it', fun
         ->and($session->cancelled_on->toDateString())->toBe('2026-11-20');
 
     $this->post("/sessions/{$session->id}/cancel", ['cancel_reason_id' => cancelReason()->id])->assertStatus(409);
+    // Already cancelled comes before the reason: 409 even without one.
+    $this->post("/sessions/{$session->id}/cancel", [])->assertStatus(409);
     $this->put("/sessions/{$session->id}", sessPayload($training))->assertStatus(409);
 
     $this->get("/sessions/{$session->id}")->assertInertia(fn (Assert $page) => $page
@@ -387,4 +398,29 @@ it('keeps showing the entreprise of an intra session once trashed', function () 
 
     $this->get("/sessions/{$session->id}")->assertInertia(fn (Assert $page) => $page
         ->where('session.organisation.label', 'Hôtel du Parc')->where('session.organisation.trashed', true));
+});
+
+it('links the entreprise of an intra session only when the user can open its fiche', function () {
+    $organisation = Organisation::query()->create(['name' => 'Hôtel du Parc']);
+    $session = app(SessionWriter::class)->create(sessPayload(sessTraining(), ['kind' => 'intra', 'organisation_id' => $organisation->id]));
+
+    $this->actingAs(commercial())->get("/sessions/{$session->id}")->assertInertia(fn (Assert $page) => $page
+        ->where('session.organisation.label', 'Hôtel du Parc')->where('session.organisation.can_open', true));
+    $this->actingAs(userWithPermissions([Permissions::SESSIONS_VIEW]))->get("/sessions/{$session->id}")->assertOk()->assertInertia(fn (Assert $page) => $page
+        ->where('session.organisation.label', 'Hôtel du Parc')->where('session.organisation.can_open', false));
+});
+
+it('refuses to restore an intra session whose entreprise is no longer live', function () {
+    $organisation = Organisation::query()->create(['name' => 'Hôtel du Parc']);
+    $session = app(SessionWriter::class)->create(sessPayload(sessTraining(), ['kind' => 'intra', 'organisation_id' => $organisation->id]));
+    $session->delete();
+    $organisation->delete();
+    $this->actingAs(admin(twoFactor: true));
+
+    $this->postJson("/sessions/{$session->id}/restore")->assertStatus(409)->assertJsonPath('message', SessionWriter::ORGANISATION_GONE);
+    expect($session->fresh()->trashed())->toBeTrue();
+
+    $organisation->restore();
+    $this->post("/sessions/{$session->id}/restore")->assertRedirect("/sessions/{$session->id}");
+    expect($session->fresh()->trashed())->toBeFalse();
 });

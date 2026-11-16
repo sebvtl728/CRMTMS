@@ -435,6 +435,35 @@ Une formation utilisée par une session (corbeille comprise) ne se supprime pas 
 ### `session_sequences` — compteurs de numérotation des sessions
 `tenant_id` (FK `tenants`, cascade) · `year` smallint (année civile de Paris à la création, CHECK 2000–2999) · `last_number` int (CHECK > 0) · `created_at`, `updated_at`. PK (`tenant_id`, `year`). Même mécanique que `quote_sequences` (incrément atomique dans la transaction de création, numéro rendu en cas d'échec).
 
+### `dossiers` — dossiers de formation
+Module `Sessions` (`Dossier`, écrit par `DossierWriter`, états par `DossierTransitions`) ; contractant et contact lus par `Crm\Public\Fiches`, jamais par les tables du CRM.
+
+| Colonne | Type | Rôle |
+|---|---|---|
+| `id`, `tenant_id` | uuid | |
+| `number` | string(20) | `D-<AAAA>-<NNNN>` ; unique (`tenant_id`, `number`) |
+| `company_id` | uuid (FK `companies`) | Société émettrice (par défaut celle de l'organisme) |
+| `account_organisation_id` / `account_person_id` | uuid, null (FK `organisations` / `people`) | Contractant : une entreprise **ou** un particulier (exactement un : CHECK) |
+| `contact_person_id` | uuid, null (FK `people`) | Contact du dossier |
+| `responsible_user_id` | uuid, null (FK `users`) | Responsable (créateur par défaut) |
+| `quote_id` | uuid, null (FK `quotes`), **unique** | Devis accepté d'origine (un seul dossier par devis) |
+| `opportunity_id` | uuid, null (FK `opportunities`) | Opportunité d'origine |
+| `das_id` | uuid (FK `reference_items`, DAS) | DAS principal, obligatoire (périmètre « Ses DAS ») |
+| `status` | string(20) | `created`, `convention_sent`, `convention_signed`, `convocations_sent`, `running`, `done`, `cancelled` ; `invoiced`, `settled` réservés au lot 3 (CHECK). « En cours » / « Réalisé » se calculent d'après les sessions des inscriptions tant qu'une étape antérieure est posée ; posés à la main, ils ne sont plus recalculés |
+| `convention_sent_on`, `convention_signed_on`, `convocations_sent_on` | date, null | Jours des étapes manuelles (chacune pas avant la précédente) |
+| `cancelled_reason_id`, `cancelled_on` | uuid (FK `reference_items`, motifs d'annulation), date | Renseignés ensemble si et seulement si `status = cancelled` (CHECK) ; annulation refusée après « Réalisé » |
+| `abandon_mode`, `abandon_dedit_percent` | string(20), smallint, null | Surcharge de la règle d'abandon de l'organisme (`prorata` ; `prorata_dedit` avec 1 à 100 % : CHECK) ; vides : règle de l'organisme (`AbandonRule::forDossier`) |
+| `notes` | text, null | Journalisé sans valeur (`$auditPersonal`) |
+| `created_by`, `updated_by`, `created_at`, `updated_at`, `deleted_at` | | Suppression logique (corbeille) |
+
+Prix du dossier = somme des `total_ht` de ses lignes (`Dossier::priceCents()`, centimes entiers).
+
+### `dossier_lines` — lignes d'un dossier
+`id`, `tenant_id` · `dossier_id` (FK, cascade) · `position` smallint · `kind` (`training` : formation du catalogue, `training_id` obligatoire, `pricing_mode` `per_trainee` ou `group` ; `fee` : frais sans formation ni mode de prix — CHECK) · `training_id` (FK `trainings`, null) · `das_id` (FK `reference_items`, null : DAS de la formation, ou du dossier pour des frais) · `label` string(255) · `quantity` numeric(8,2) > 0 · `unit` (`stagiaire`, `jour`, `heure`, `forfait`, `session`) · `unit_price` numeric(12,2) · `discount_percent` numeric(5,2) 0–100 · `total_ht` numeric(12,2) = arrondi au demi supérieur de quantité × prix × (1 − remise), en centimes entiers · `created_at`, `updated_at`. Mode de prix proposé d'après l'unité (« stagiaire » → par stagiaire, sinon de groupe). Une formation utilisée par une ligne (dossier à la corbeille compris) ne se supprime pas du catalogue.
+
+### `dossier_sequences` — compteurs de numérotation des dossiers
+Même forme et même mécanique que `session_sequences`.
+
 ## Permissions CRM (catalogue global `permissions`)
 
 CRM : `crm.fiches.view|update|delete`, `crm.opportunities.view|update|delete`, `crm.quotes.view|update|delete`, `crm.activities.view|update|delete`, `crm.activities.team`, `crm.revenue.view`, `crm.revenue.manage`, `crm.merge`, `crm.import`, `crm.export`, `crm.gdpr` ; catalogue : `catalogue.view`, `catalogue.manage`, `catalogue.delete`. Les anciens `crm.view|create|update|delete` sont supprimés par la migration 0.5.0 (convertis organisme par organisme). La matrice par rôle est dans `admin.md`. `role_permission_defaults_applied` (`tenant_id`, `role`, `permission`) mémorise les droits par défaut déjà accordés à chaque organisme, pour qu'une mise à jour n'ajoute que les nouveaux droits sans rétablir ceux qu'un administrateur a retirés. `role_permission_scopes` (`tenant_id`, `role_id`, `permission`, `scope` = `own`/`das`/`all`) : périmètre d'un rôle pour un droit à périmètre ; sans ligne, le périmètre vaut `all`.

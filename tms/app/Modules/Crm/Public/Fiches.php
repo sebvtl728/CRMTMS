@@ -2,8 +2,11 @@
 
 namespace App\Modules\Crm\Public;
 
+use App\Modules\Core\Users\User;
 use App\Modules\Crm\Organisations\Organisation;
 use App\Modules\Crm\People\Person;
+use App\Modules\Crm\Permissions;
+use App\Modules\Crm\Visibility\CrmVisibility;
 use Illuminate\Support\Str;
 
 /**
@@ -50,6 +53,65 @@ final class Fiches
         $person = Str::isUuid($id) ? Person::query()->whereNull('people.anonymised_at')->find($id) : null;
 
         return $person === null ? null : ['id' => $person->id, 'label' => $person->fullName(), 'birth_date' => $person->birth_date?->toDateString()];
+    }
+
+    /**
+     * A particulier (person flagged « Particulier », out of the trash, not
+     * anonymised): the contractant of a dossier when it is not an entreprise.
+     *
+     * @return array{id: string, label: string}|null
+     */
+    public function individual(string $id): ?array
+    {
+        $person = Str::isUuid($id) ? Person::query()->whereNull('people.anonymised_at')->where('people.is_individual', true)->find($id) : null;
+
+        return $person === null ? null : ['id' => $person->id, 'label' => $person->fullName()];
+    }
+
+    /**
+     * Names of these people keyed by id, trashed ones included (anonymised:
+     * their anonymised name). Unknown ids are left out.
+     *
+     * @param  list<string>  $ids
+     * @return array<string, array{label: string, trashed: bool}>
+     */
+    public function personLabels(array $ids): array
+    {
+        $ids = array_values(array_unique(array_filter($ids, fn (string $id) => Str::isUuid($id))));
+        if ($ids === []) {
+            return [];
+        }
+
+        return Person::withTrashed()->whereKey($ids)->get()
+            ->mapWithKeys(fn (Person $p) => [$p->id => ['label' => $p->fullName(), 'trashed' => $p->trashed()]])->all();
+    }
+
+    /**
+     * Ids among $ids of the fiches (type organisation or person) that $user
+     * can open in the CRM: crm.fiches.view and its scope, a trashed fiche
+     * only with crm.fiches.delete, never a merged one. The other modules
+     * show a link to the fiche for these, plain text otherwise.
+     *
+     * @param  'organisation'|'person'  $type
+     * @param  list<string>  $ids
+     * @return array<string, true>
+     */
+    public function openable(User $user, string $type, array $ids): array
+    {
+        $ids = array_values(array_unique(array_filter($ids, fn (string $id) => Str::isUuid($id))));
+        if ($ids === [] || ! $user->can(Permissions::FICHES_VIEW)) {
+            return [];
+        }
+        $query = $type === 'organisation'
+            ? CrmVisibility::organisations(Organisation::withTrashed(), $user)
+            : CrmVisibility::people(Person::withTrashed(), $user);
+        $model = $query->getModel();
+        $query->whereKey($ids)->whereNull($model->qualifyColumn('merged_into_id'));
+        if (! $user->can(Permissions::FICHES_DELETE)) {
+            $query->whereNull($model->qualifyColumn('deleted_at'));
+        }
+
+        return array_fill_keys($query->pluck($model->qualifyColumn('id'))->map(fn ($id) => (string) $id)->all(), true);
     }
 
     /**
