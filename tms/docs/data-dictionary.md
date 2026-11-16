@@ -406,6 +406,35 @@ Unique (`tenant_id`, `das_id`, `period_type`, `period_start`) : l'objectif d'un 
 ### `gdpr_pending` — liste « À anonymiser »
 `person_id` (PK, FK cascade) · `tenant_id` · `listed_at`. Une personne y est inscrite par le traitement de nuit quand sa durée de conservation est dépassée ; elle est anonymisée 30 jours après `listed_at` si elle y est toujours.
 
+## Sessions : sessions de formation (lot 2a, RLS)
+
+### `training_sessions` — sessions de formation
+Nommée ainsi pour ne pas se confondre avec la table `sessions` (sessions web). Module `Sessions` (`TrainingSession`, écrite par `SessionWriter`) ; il lit la formation par `Catalogue\Trainings` et l'entreprise par `Crm\Public\Fiches`, jamais par leurs tables.
+
+| Colonne | Type | Rôle |
+|---|---|---|
+| `id`, `tenant_id` | uuid | |
+| `number` | string(20) | `S-<AAAA>-<NNNN>` ; unique (`tenant_id`, `number`) |
+| `training_id` | uuid (FK `trainings`) | Formation du catalogue |
+| `das_id` | uuid (FK `reference_items`, DAS) | DAS de la formation, recopié à chaque enregistrement (périmètre « Ses DAS ») |
+| `kind` | string(10) | `intra` / `inter` (CHECK) |
+| `organisation_id` | uuid, null (FK `organisations`) | Entreprise d'une session intra (obligatoire en intra, vide en inter : CHECK) |
+| `starts_on`, `ends_on` | date | Jours de Paris ; CHECK `ends_on >= starts_on` |
+| `planned_hours` | numeric(6,2), null | Heures prévues, reprises de la formation sauf saisie |
+| `location_kind` | string(10) | `address` (adresse obligatoire), `client` (chez le client), `remote` (distanciel) |
+| `location_text` | string(500), null | Adresse, précision ou lien |
+| `capacity` | int, null | Places d'une session inter (≥ 1, vide en intra : CHECK) |
+| `responsible_user_id` | uuid, null (FK `users`) | Responsable (créateur par défaut) |
+| `status` | string(20) | `planned`, `confirmed`, `running`, `done`, `cancelled` (CHECK). « En cours » et « Terminée » se calculent à la lecture d'après les dates tant que l'état posé est `planned` ou `confirmed` |
+| `cancel_reason_id`, `cancelled_on` | uuid (FK `reference_items`, motifs d'annulation), date | Renseignés ensemble si et seulement si `status = cancelled` (CHECK) |
+| `notes` | text, null | Journalisé sans valeur (`$auditPersonal`) |
+| `created_by`, `updated_by`, `created_at`, `updated_at`, `deleted_at` | | Suppression logique (corbeille) |
+
+Une formation utilisée par une session (corbeille comprise) ne se supprime pas du catalogue (`TrainingUsage` « sessions »).
+
+### `session_sequences` — compteurs de numérotation des sessions
+`tenant_id` (FK `tenants`, cascade) · `year` smallint (année civile de Paris à la création, CHECK 2000–2999) · `last_number` int (CHECK > 0) · `created_at`, `updated_at`. PK (`tenant_id`, `year`). Même mécanique que `quote_sequences` (incrément atomique dans la transaction de création, numéro rendu en cas d'échec).
+
 ## Permissions CRM (catalogue global `permissions`)
 
 CRM : `crm.fiches.view|update|delete`, `crm.opportunities.view|update|delete`, `crm.quotes.view|update|delete`, `crm.activities.view|update|delete`, `crm.activities.team`, `crm.revenue.view`, `crm.revenue.manage`, `crm.merge`, `crm.import`, `crm.export`, `crm.gdpr` ; catalogue : `catalogue.view`, `catalogue.manage`, `catalogue.delete`. Les anciens `crm.view|create|update|delete` sont supprimés par la migration 0.5.0 (convertis organisme par organisme). La matrice par rôle est dans `admin.md`. `role_permission_defaults_applied` (`tenant_id`, `role`, `permission`) mémorise les droits par défaut déjà accordés à chaque organisme, pour qu'une mise à jour n'ajoute que les nouveaux droits sans rétablir ceux qu'un administrateur a retirés. `role_permission_scopes` (`tenant_id`, `role_id`, `permission`, `scope` = `own`/`das`/`all`) : périmètre d'un rôle pour un droit à périmètre ; sans ligne, le périmètre vaut `all`.

@@ -54,7 +54,7 @@ class UndoImport implements ShouldQueue
 
     public const KEPT_LINKED = 'Liée à des données ajoutées depuis l\'import, conservée.';
 
-    public const KEPT_USED = 'Formation utilisée depuis l\'import (opportunités, devis), conservée.';
+    public const KEPT_USED = 'Formation utilisée depuis l\'import (opportunités, devis, sessions), conservée.';
 
     public int $tries = 1;
 

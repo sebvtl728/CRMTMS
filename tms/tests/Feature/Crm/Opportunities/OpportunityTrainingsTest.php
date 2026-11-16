@@ -163,7 +163,7 @@ it('refuses to delete a training an opportunity uses, even a deleted opportunity
         ->and(TrainingUsage::isUsed($free->id))->toBeFalse();
 
     $this->actingAs(admin(twoFactor: true))->delete("/catalogue/{$haccp->id}")
-        ->assertSessionHasErrors(['training' => 'Cette formation est utilisée (opportunités, devis) : désactivez-la plutôt.']);
+        ->assertSessionHasErrors(['training' => 'Cette formation est utilisée (opportunités, devis, sessions) : désactivez-la plutôt.']);
     expect($haccp->refresh()->trashed())->toBeFalse();
     $this->delete("/catalogue/{$free->id}")->assertSessionHasNoErrors();
 });

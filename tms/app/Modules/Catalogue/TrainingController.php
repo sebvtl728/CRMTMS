@@ -26,7 +26,7 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
  */
 class TrainingController extends Controller
 {
-    public const IN_USE_MESSAGE = 'Cette formation est utilisée (opportunités, devis) : désactivez-la plutôt.';
+    public const IN_USE_MESSAGE = 'Cette formation est utilisée (opportunités, devis, sessions) : désactivez-la plutôt.';
 
     public function index(Request $request): Response
     {

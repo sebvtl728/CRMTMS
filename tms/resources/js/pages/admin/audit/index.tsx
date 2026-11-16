@@ -92,7 +92,8 @@ const TYPE_LABELS: Record<string, string> = {
     note: 'Note',
     attachment: 'Pièce jointe',
     import_batch: 'Import',
-    import_profile: 'Profil d\'import',
+    import_profile: "Profil d'import",
+    training_session: 'Session',
 };
 // Older journal rows hold the class name: show its last segment.
 const typeLabel = (type: string | null) => (type ? (TYPE_LABELS[type] ?? type.split('\\').pop() ?? type) : '—');

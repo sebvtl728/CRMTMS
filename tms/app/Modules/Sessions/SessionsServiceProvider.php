@@ -2,9 +2,21 @@
 
 namespace App\Modules\Sessions;
 
+use App\Modules\Catalogue\TrainingUsage;
 use App\Modules\Core\Access\Permissions as CorePermissions;
 use App\Modules\Core\Access\Role;
+use App\Modules\Core\Access\Scopes;
+use App\Modules\Core\Audit\MorphAliases;
+use App\Modules\Core\References\ReferenceList;
+use App\Modules\Core\References\ReferenceUsage;
+use App\Modules\Core\Users\User;
+use App\Modules\Sessions\Sessions\SessionPolicy;
+use App\Modules\Sessions\Sessions\TrainingSession;
+use Illuminate\Database\Eloquent\ModelNotFoundException;
+use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Facades\Route;
 use Illuminate\Support\ServiceProvider;
+use Illuminate\Support\Str;
 
 /**
  * Module Sessions (lot 2a): dossiers, sessions de formation, inscriptions.
@@ -28,5 +40,52 @@ class SessionsServiceProvider extends ServiceProvider
                 fn (Role $role): array => array_intersect_key(Permissions::defaultScopesFor($role), array_flip($permissions)),
             );
         }
+
+        MorphAliases::register([TrainingSession::MORPH_ALIAS => TrainingSession::class]);
+    }
+
+    public function boot(): void
+    {
+        self::registerReferenceUsage();
+        self::registerTrainingUsage();
+
+        Gate::policy(TrainingSession::class, SessionPolicy::class);
+
+        // A session outside the view scope, of another organisme (RLS) or
+        // malformed is a 404; a trashed one only with sessions.sessions.delete.
+        Route::bind('trainingSession', function (string $value): TrainingSession {
+            if (! Str::isUuid($value)) {
+                throw (new ModelNotFoundException)->setModel(TrainingSession::class, [$value]);
+            }
+            $user = request()->user();
+            $query = TrainingSession::query();
+            if (! $user instanceof User) {
+                return $query->findOrFail($value);
+            }
+            if (Scopes::of($user, Permissions::SESSIONS_DELETE) !== null) {
+                $query->withTrashed();
+            }
+
+            return SessionsVisibility::sessions($query, $user)->findOrFail($value);
+        });
+    }
+
+    /**
+     * Reference columns of the module (an item in use cannot be deleted).
+     * Public so tests can re-register after ReferenceUsage::flush().
+     */
+    public static function registerReferenceUsage(): void
+    {
+        ReferenceUsage::register(ReferenceList::Das, 'training_sessions', 'das_id');
+        ReferenceUsage::register(ReferenceList::CancelReason, 'training_sessions', 'cancel_reason_id');
+    }
+
+    /**
+     * A training used by a session (trashed ones included: they can come
+     * back) is never deleted from the catalogue.
+     */
+    public static function registerTrainingUsage(): void
+    {
+        TrainingUsage::register('sessions', fn (string $trainingId): bool => TrainingSession::withTrashed()->where('training_id', $trainingId)->exists());
     }
 }
