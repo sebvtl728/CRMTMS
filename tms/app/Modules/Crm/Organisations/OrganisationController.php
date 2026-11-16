@@ -130,6 +130,8 @@ class OrganisationController extends Controller
             ->get()
             ->sortBy(fn (Affiliation $a) => [$a->is_referent ? 0 : 1, mb_strtolower((string) $a->person?->last_name), mb_strtolower((string) $a->person?->first_name)])
             ->values();
+        // A person's mobile is shown only when the viewer may see that person.
+        $visiblePeople = CrmVisibility::allowedIds($user, Permissions::FICHES_VIEW, $affiliations->map(fn (Affiliation $a) => $a->person)->filter()->values());
         $affiliationRow = fn (Affiliation $a) => [
             'id' => $a->id,
             'person' => ['id' => $a->person_id, 'name' => $a->person?->fullName(), 'civility' => $a->person?->civility],
@@ -138,6 +140,7 @@ class OrganisationController extends Controller
             'decision_role' => $label($a->decisionRole),
             'work_email' => $a->work_email,
             'work_phone' => $a->work_phone,
+            'mobile' => isset($visiblePeople[$a->person_id]) ? $a->person?->mobile : null,
             'is_referent' => $a->is_referent,
             'started_on' => $a->started_on?->toDateString(),
             'ended_on' => $a->ended_on?->toDateString(),

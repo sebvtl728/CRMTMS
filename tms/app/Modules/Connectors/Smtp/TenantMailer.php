@@ -3,15 +3,19 @@
 namespace App\Modules\Connectors\Smtp;
 
 use App\Modules\Connectors\Core\ConnectorConfig;
+use App\Modules\Connectors\Mail365\GraphMailClient;
+use App\Modules\Connectors\Mail365\GraphTransport;
+use App\Modules\Connectors\Mail365\Microsoft365MailConnector;
 use App\Modules\Core\Companies\Company;
 use Illuminate\Contracts\Mail\Mailer as MailerContract;
 use Illuminate\Mail\Mailer;
 use Illuminate\Support\Facades\Mail;
 
 /**
- * The mailer of an organisme: built from its active SMTP configuration,
- * the company's own first, then the organisme-wide one, and finally the
- * instance default mailer (MAIL_* in .env).
+ * The mailer of an organisme, by priority: the company's own SMTP
+ * configuration, then Microsoft 365 (organisme-wide microsoft365_mail,
+ * GraphTransport), then the organisme-wide SMTP configuration, and finally
+ * the instance default mailer (MAIL_* in .env).
  */
 final class TenantMailer
 {
@@ -23,17 +27,19 @@ final class TenantMailer
             return Mail::mailer();
         }
 
-        $transport = app(SmtpTransportFactory::class)->make($config->settings, $config->secrets ?? []);
+        $transport = $config->connector_key === Microsoft365MailConnector::key()
+            ? new GraphTransport(app(GraphMailClient::class), $config)
+            : app(SmtpTransportFactory::class)->make($config->settings, $config->secrets ?? []);
 
-        $mailer = new Mailer('tenant-smtp', app('view'), $transport, app('events'));
+        $mailer = new Mailer($config->connector_key === Microsoft365MailConnector::key() ? 'tenant-m365' : 'tenant-smtp', app('view'), $transport, app('events'));
         $mailer->alwaysFrom((string) $config->settings['from_address'], ($config->settings['from_name'] ?? '') ?: null);
 
         return $mailer;
     }
 
     /**
-     * True when a message could end up delivered nowhere: no active SMTP
-     * configuration and the instance mailer only logs or keeps messages in
+     * True when a message could end up delivered nowhere: no active SMTP or
+     * Microsoft 365 configuration and the instance mailer only logs or keeps messages in
      * memory (MAIL_MAILER=log or array), or a failover chain ending in such a
      * mailer (a failed send is silently swallowed) or a round-robin including
      * one (some sends vanish).
@@ -69,7 +75,8 @@ final class TenantMailer
     }
 
     /**
-     * The SMTP configuration used for $company (its own, else the organisme-wide one), or null.
+     * The delivery configuration used for $company, or null (instance
+     * mailer): its own SMTP, else Microsoft 365, else the organisme-wide SMTP.
      */
     public static function activeConfig(?Company $company): ?ConnectorConfig
     {
@@ -80,6 +87,7 @@ final class TenantMailer
             ->get();
 
         return ($company === null ? null : $candidates->firstWhere('company_id', $company->id))
+            ?? Microsoft365MailConnector::activeConfig()
             ?? $candidates->firstWhere('company_id', null);
     }
 }

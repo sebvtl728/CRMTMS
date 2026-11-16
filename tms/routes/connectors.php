@@ -8,6 +8,6 @@ Route::middleware(['auth', 'can:connectors.manage'])->prefix('admin/connectors')
     Route::post('runs/{run}/retry', [ConnectorController::class, 'retry'])->name('runs.retry');
     Route::get('{key}', [ConnectorController::class, 'edit'])->name('edit');
     Route::put('{key}', [ConnectorController::class, 'update'])->name('update');
-    Route::post('{key}/test', [ConnectorController::class, 'test'])->name('test');
+    Route::post('{key}/test', [ConnectorController::class, 'test'])->middleware('throttle:connector-test')->name('test');
     Route::delete('{key}/secrets/{secret}', [ConnectorController::class, 'clearSecret'])->name('secrets.clear');
 });

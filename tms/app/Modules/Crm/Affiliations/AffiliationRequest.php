@@ -27,7 +27,7 @@ class AffiliationRequest extends FormRequest
 
     public const ALREADY_ACTIVE = 'Cette personne est déjà rattachée à cette entreprise : un seul rattachement peut être actif.';
 
-    private const TEXT = ['civility', 'first_name', 'last_name', 'job_title', 'work_email', 'work_phone', 'started_on', 'ended_on'];
+    private const TEXT = ['civility', 'first_name', 'last_name', 'job_title', 'work_email', 'work_phone', 'mobile', 'started_on', 'ended_on'];
 
     public function authorize(): bool
     {
@@ -44,8 +44,10 @@ class AffiliationRequest extends FormRequest
                 $clean[$key] = $value === '' ? null : $value;
             }
         }
-        if (is_string($clean['work_phone'] ?? null)) {
-            $clean['work_phone'] = PhoneNumber::normalise($clean['work_phone']);
+        foreach (['work_phone', 'mobile'] as $key) {
+            if (is_string($clean[$key] ?? null)) {
+                $clean[$key] = PhoneNumber::normalise($clean[$key]);
+            }
         }
         if (is_string($clean['work_email'] ?? null)) {
             $clean['work_email'] = mb_strtolower($clean['work_email']);
@@ -84,6 +86,8 @@ class AffiliationRequest extends FormRequest
                 'last_name' => ['required_without:person_id', 'nullable', 'string', 'max:255'],
                 'first_name' => ['nullable', 'string', 'max:255'],
                 'civility' => ['nullable', Rule::in(['M.', 'Mme'])],
+                // Mobile of a new person only (stored on the person, ignored with person_id).
+                'mobile' => ['nullable', 'string', 'max:30'],
             ];
             $rules['ended_on'][] = 'after_or_equal:started_on';
         }

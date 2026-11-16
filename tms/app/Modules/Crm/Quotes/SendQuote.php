@@ -4,6 +4,7 @@ namespace App\Modules\Crm\Quotes;
 
 use App\Modules\Catalogue\Brochures;
 use App\Modules\Connectors\Core\ConnectorRun;
+use App\Modules\Connectors\Core\PermanentDeliveryFailure;
 use App\Modules\Connectors\Smtp\SmtpHostRefused;
 use App\Modules\Connectors\Smtp\TenantMailer;
 use App\Modules\Core\Documents\PdfRenderingFailed;
@@ -36,7 +37,9 @@ use Throwable;
  * Failures are rethrown as QuoteMailFailed (reason and SMTP code only).
  * Three tries with a backoff, then email_status « failed » and a fixed
  * French reason (the SMTP code at most): the quote stays « Envoyé » and its
- * page offers « Renvoyer ». With an SMTP connector, each try is journaled in
+ * page offers « Renvoyer ». A refusal Microsoft 365 would repeat
+ * (PermanentDeliveryFailure, e.g. Microsoft 365: permission, secret) fails at once, without retry. With
+ * an SMTP or Microsoft 365 connector, each try is journaled in
  * connector_runs with the quote number only, never an address nor the
  * server's text.
  */
@@ -126,8 +129,8 @@ class SendQuote implements ShouldQueue
         if ($error !== null) {
             // Never the transport's own text: it may quote the address or the account.
             $failure = new QuoteMailFailed(self::reason($error), self::smtpCode($error));
-            if ($this->job instanceof SyncJob) {
-                // No worker (sync queue): no retry, the page shows the banner.
+            if ($this->job instanceof SyncJob || $error instanceof PermanentDeliveryFailure) {
+                // No worker (sync queue), or a refusal a retry would repeat: the page shows the banner.
                 $this->failed($failure);
 
                 return;
@@ -160,8 +163,8 @@ class SendQuote implements ShouldQueue
      */
     public static function reason(Throwable $e): string
     {
-        if ($e instanceof QuoteMailFailed) {
-            return $e->getMessage();
+        if ($e instanceof QuoteMailFailed || $e instanceof PermanentDeliveryFailure) {
+            return $e->getMessage(); // fixed French texts, never the server's
         }
         if ($e instanceof SmtpHostRefused) {
             return 'L\'adresse du serveur d\'envoi est refusée (adresse interne).';

@@ -19,6 +19,7 @@ export interface AffiliationRow {
     decision_role: { id: string; label: string } | null;
     work_email: string | null;
     work_phone: string | null;
+    mobile: string | null;
     is_referent: boolean;
     started_on: string | null;
     ended_on: string | null;
@@ -48,6 +49,7 @@ type AffiliationForm = {
     decision_role_id: string;
     work_email: string;
     work_phone: string;
+    mobile: string;
     is_referent: boolean;
     started_on: string;
     ended_on: string;
@@ -78,8 +80,8 @@ function Field({
 }
 
 /** Contact links of an affiliation line. */
-function ContactLinks({ email, phone }: { email: string | null; phone: string | null }) {
-    if (!email && !phone) return <span className="text-muted-foreground">—</span>;
+function ContactLinks({ email, phone, mobile }: { email: string | null; phone: string | null; mobile: string | null }) {
+    if (!email && !phone && !mobile) return <span className="text-muted-foreground">—</span>;
 
     return (
         <div className="flex flex-col gap-0.5 break-all">
@@ -91,6 +93,11 @@ function ContactLinks({ email, phone }: { email: string | null; phone: string | 
             {phone && (
                 <a href={`tel:${phone.replace(/[^+\d]/g, '')}`} className="whitespace-nowrap underline">
                     {formatPhone(phone)}
+                </a>
+            )}
+            {mobile && (
+                <a href={`tel:${mobile.replace(/[^+\d]/g, '')}`} className="whitespace-nowrap underline">
+                    {formatPhone(mobile)} <span className="text-muted-foreground">(mobile)</span>
                 </a>
             )}
         </div>
@@ -129,6 +136,7 @@ function AffiliationDialog({
         decision_role_id: editing?.decision_role_id ?? '',
         work_email: editing?.work_email ?? '',
         work_phone: editing?.work_phone ?? '',
+        mobile: '',
         is_referent: editing?.is_referent ?? false,
         started_on: editing?.started_on ?? '',
         ended_on: editing?.ended_on ?? '',
@@ -147,7 +155,7 @@ function AffiliationDialog({
             } as AffiliationForm;
         }
 
-        return mode === 'existing' ? { ...d, civility: '', first_name: '', last_name: '' } : { ...d, person_id: '' };
+        return mode === 'existing' ? { ...d, civility: '', first_name: '', last_name: '', mobile: '' } : { ...d, person_id: '' };
     });
 
     // Debounced lookup of the people that can be attached.
@@ -248,6 +256,17 @@ function AffiliationDialog({
                                     onChange={(e) => setData('last_name', e.target.value)}
                                     required
                                     autoFocus
+                                    autoComplete="off"
+                                />
+                            </Field>
+                            <Field id="aff-mobile" label="Mobile" error={errors.mobile}>
+                                <Input
+                                    id="aff-mobile"
+                                    type="tel"
+                                    value={data.mobile}
+                                    onChange={(e) => setData('mobile', e.target.value)}
+                                    maxLength={30}
+                                    placeholder="06 12 34 56 78"
                                     autoComplete="off"
                                 />
                             </Field>
@@ -510,7 +529,7 @@ export function OrganisationContacts({ organisationId, affiliations, former, dec
                                         <td className="px-4 py-2">{a.job_title ?? '—'}</td>
                                         <td className="px-4 py-2">{a.decision_role?.label ?? '—'}</td>
                                         <td className="px-4 py-2">
-                                            <ContactLinks email={a.work_email} phone={a.work_phone} />
+                                            <ContactLinks email={a.work_email} phone={a.work_phone} mobile={a.mobile} />
                                         </td>
                                         <td className="px-4 py-2">{actions(a)}</td>
                                     </tr>
@@ -529,7 +548,7 @@ export function OrganisationContacts({ organisationId, affiliations, former, dec
                                 </div>
                                 {subtitle(a) && <p className="text-muted-foreground mt-1 text-sm">{subtitle(a)}</p>}
                                 <div className="mt-2 text-sm">
-                                    <ContactLinks email={a.work_email} phone={a.work_phone} />
+                                    <ContactLinks email={a.work_email} phone={a.work_phone} mobile={a.mobile} />
                                 </div>
                                 <div className="mt-3">{actions(a)}</div>
                             </li>
