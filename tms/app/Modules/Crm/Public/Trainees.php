@@ -16,6 +16,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
+use InvalidArgumentException;
 
 /**
  * Public façade of the people as trainees (lot 2a, enrolments).
@@ -32,6 +33,9 @@ final class Trainees
     private const MAX_LIMIT = 50;
 
     /** Fields a trainee is created with. */
+    /** Fields of the training profile updateProfile() accepts. */
+    private const PROFILE_FIELDS = ['education_level_id', 'professional_situation_id', 'birth_date'];
+
     private const FIELDS = ['civility', 'first_name', 'last_name', 'email', 'phone', 'mobile', 'postal_code', 'city', 'birth_date', 'is_individual'];
 
     public function __construct(private readonly DuplicateFinder $duplicates) {}
@@ -103,29 +107,38 @@ final class Trainees
     }
 
     /**
-     * Sets the training profile of a person: education level and professional
-     * situation (active values of their reference lists, or the ones already
-     * stored) and birth date (Y-m-d). A null clears the value. Journaled like
-     * any change of the fiche (the birth date as a personal value).
+     * Updates the training profile of a person: only the keys present in
+     * $changes (education_level_id, professional_situation_id, birth_date as
+     * Y-m-d) are changed, a present null clears the value, an absent key is
+     * kept. Reference values must be active ones of their list, or the one
+     * already stored. Journaled like any change of the fiche (the birth date
+     * as a personal value). InvalidArgumentException on an unknown key;
      * ValidationException (French messages) on invalid data; a missing or
      * anonymised person is a ModelNotFoundException.
+     *
+     * @param  array<string, string|null>  $changes
      */
-    public function updateProfile(string $personId, ?string $educationLevelId, ?string $professionalSituationId, ?string $birthDate): void
+    public function updateProfile(string $personId, array $changes): void
     {
+        $unknown = array_diff(array_keys($changes), self::PROFILE_FIELDS);
+        if ($unknown !== []) {
+            throw new InvalidArgumentException('Champ de profil inconnu : '.implode(', ', $unknown));
+        }
+
         $person = Str::isUuid($personId) ? Person::query()->whereNull('people.anonymised_at')->find($personId) : null;
         if ($person === null) {
             throw (new ModelNotFoundException)->setModel(Person::class, [$personId]);
         }
 
-        $rules = [
+        $rules = array_intersect_key([
             'education_level_id' => ['nullable', ...ReferenceRules::item(ReferenceList::EducationLevel, $person->education_level_id)],
             'professional_situation_id' => ['nullable', ...ReferenceRules::item(ReferenceList::ProfessionalSituation, $person->professional_situation_id)],
             'birth_date' => PersonRequest::fieldRules()['birth_date'],
-        ];
+        ], $changes);
 
-        /** @var array{education_level_id: ?string, professional_situation_id: ?string, birth_date: ?string} $validated */
+        /** @var array<string, string|null> $validated */
         $validated = Validator::make(
-            ['education_level_id' => $educationLevelId, 'professional_situation_id' => $professionalSituationId, 'birth_date' => $birthDate],
+            $changes,
             $rules,
             PersonRequest::validationMessages(),
             ['education_level_id' => 'niveau de diplôme', 'professional_situation_id' => 'situation professionnelle'],

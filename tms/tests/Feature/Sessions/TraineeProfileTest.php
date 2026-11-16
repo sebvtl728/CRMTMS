@@ -54,7 +54,7 @@ it('updates the training profile through the public service, journaled', functio
     $person = makePerson('Durand', ['birth_date' => '1990-01-01']);
     $situation = crmItem(ReferenceList::ProfessionalSituation, "Demandeur d'emploi");
 
-    app(Trainees::class)->updateProfile($person->id, levelId('niveau-3-cap-bep'), $situation->id, '1991-02-03');
+    app(Trainees::class)->updateProfile($person->id, ['education_level_id' => levelId('niveau-3-cap-bep'), 'professional_situation_id' => $situation->id, 'birth_date' => '1991-02-03']);
 
     $fresh = $person->fresh();
     expect($fresh->education_level_id)->toBe(levelId('niveau-3-cap-bep'))->and($fresh->professional_situation_id)->toBe($situation->id)
@@ -65,15 +65,32 @@ it('updates the training profile through the public service, journaled', functio
         ->and(json_encode($log->new_values))->not->toContain('1991-02-03');
 
     // A null clears.
-    app(Trainees::class)->updateProfile($person->id, null, null, null);
+    app(Trainees::class)->updateProfile($person->id, ['education_level_id' => null, 'professional_situation_id' => null, 'birth_date' => null]);
     expect($person->fresh()->education_level_id)->toBeNull()->and($person->fresh()->birth_date)->toBeNull();
+});
+
+it('keeps the fields absent from the changes and refuses unknown keys', function () {
+    $situation = crmItem(ReferenceList::ProfessionalSituation, 'Salarié');
+    $person = makePerson('Partiel', ['birth_date' => '1990-01-01', 'professional_situation_id' => $situation->id, 'education_level_id' => levelId('niveau-3-cap-bep')]);
+    $trainees = app(Trainees::class);
+
+    $trainees->updateProfile($person->id, ['education_level_id' => levelId('niveau-7-bac-5')]);
+    $fresh = $person->fresh();
+    expect($fresh->education_level_id)->toBe(levelId('niveau-7-bac-5'))->and($fresh->professional_situation_id)->toBe($situation->id)
+        ->and($fresh->birth_date->toDateString())->toBe('1990-01-01');
+
+    $trainees->updateProfile($person->id, ['birth_date' => null]);
+    expect($person->fresh()->birth_date)->toBeNull()->and($person->fresh()->professional_situation_id)->toBe($situation->id);
+
+    expect(fn () => $trainees->updateProfile($person->id, ['last_name' => 'X']))->toThrow(InvalidArgumentException::class);
+    expect($person->fresh()->last_name)->toBe('Partiel');
 });
 
 it('refuses an invalid profile in French', function () {
     $person = makePerson('Durand');
     $trainees = app(Trainees::class);
 
-    $bad = fn (?string $level, ?string $situation, ?string $birth) => fn () => $trainees->updateProfile($person->id, $level, $situation, $birth);
+    $bad = fn (?string $level, ?string $situation, ?string $birth) => fn () => $trainees->updateProfile($person->id, ['education_level_id' => $level, 'professional_situation_id' => $situation, 'birth_date' => $birth]);
 
     expect($bad('pas-un-uuid', null, null))->toThrow(ValidationException::class);
     expect($bad(crmItem(ReferenceList::ProfessionalSituation, 'Salarié')->id, null, null))->toThrow(ValidationException::class);
@@ -83,9 +100,9 @@ it('refuses an invalid profile in French', function () {
 
     // An inactive value is refused, except the one already stored.
     $level = ReferenceItem::query()->findOrFail(levelId('niveau-3-cap-bep'));
-    $trainees->updateProfile($person->id, $level->id, null, null);
+    $trainees->updateProfile($person->id, ['education_level_id' => $level->id]);
     $level->update(['is_active' => false]);
-    $trainees->updateProfile($person->id, $level->id, null, null);
+    $trainees->updateProfile($person->id, ['education_level_id' => $level->id]);
     expect($person->fresh()->education_level_id)->toBe($level->id);
     $other = ReferenceItem::query()->findOrFail(levelId('niveau-4-baccalaureat'));
     $other->update(['is_active' => false]);
@@ -97,9 +114,9 @@ it('does not touch an anonymised or unknown person', function () {
     Person::query()->whereKey($person->id)->update(['anonymised_at' => now()]);
     $trainees = app(Trainees::class);
 
-    expect(fn () => $trainees->updateProfile($person->id, null, null, null))->toThrow(ModelNotFoundException::class);
-    expect(fn () => $trainees->updateProfile('00000000-0000-7000-8000-000000000000', null, null, null))->toThrow(ModelNotFoundException::class);
-    expect(fn () => $trainees->updateProfile('nope', null, null, null))->toThrow(ModelNotFoundException::class);
+    expect(fn () => $trainees->updateProfile($person->id, []))->toThrow(ModelNotFoundException::class);
+    expect(fn () => $trainees->updateProfile('00000000-0000-7000-8000-000000000000', []))->toThrow(ModelNotFoundException::class);
+    expect(fn () => $trainees->updateProfile('nope', []))->toThrow(ModelNotFoundException::class);
 });
 
 it('does not return an anonymised person from the fiches service', function () {

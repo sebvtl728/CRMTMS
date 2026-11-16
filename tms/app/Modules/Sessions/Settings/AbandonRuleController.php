@@ -4,6 +4,7 @@ namespace App\Modules\Sessions\Settings;
 
 use App\Http\Controllers\Controller;
 use App\Modules\Core\Audit\AuditRecorder;
+use App\Modules\Core\Tenancy\Tenant;
 use App\Modules\Core\Tenancy\TenantContext;
 use App\Modules\Sessions\AbandonRule;
 use Illuminate\Http\RedirectResponse;
@@ -32,10 +33,10 @@ class AbandonRuleController extends Controller
     {
         $validated = $request->validate([
             'mode' => ['required', Rule::in(AbandonRule::MODES)],
-            'dedit_percent' => [
-                Rule::requiredIf(fn () => $request->input('mode') === AbandonRule::PRORATA_DEDIT),
-                'nullable', 'integer', 'between:'.AbandonRule::MIN_PERCENT.','.AbandonRule::MAX_PERCENT,
-            ],
+            // Only checked in dédit mode: in prorata mode the percentage is ignored.
+            'dedit_percent' => $request->input('mode') === AbandonRule::PRORATA_DEDIT
+                ? ['required', 'integer', 'between:'.AbandonRule::MIN_PERCENT.','.AbandonRule::MAX_PERCENT]
+                : ['nullable'],
         ], [
             'mode.required' => 'Choisissez la règle applicable en cas d\'abandon.',
             'mode.in' => 'Choisissez « Prorata seulement » ou « Prorata et dédit ».',
@@ -49,7 +50,8 @@ class AbandonRuleController extends Controller
             : ['mode' => AbandonRule::PRORATA, 'dedit_percent' => null];
 
         DB::transaction(function () use ($new): void {
-            $tenant = $this->tenants->current();
+            // Row lock: two administrators saving at once do not overwrite each other's settings.
+            $tenant = Tenant::query()->lockForUpdate()->findOrFail($this->tenants->id());
             $old = AbandonRule::forTenant($tenant);
 
             if ($old === $new) {

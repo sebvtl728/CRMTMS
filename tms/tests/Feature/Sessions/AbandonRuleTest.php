@@ -49,6 +49,9 @@ it('saves the dédit rule, keeps the other settings and audits the change', func
     $this->put('/admin/abandon-rule', ['mode' => 'prorata', 'dedit_percent' => 40])->assertRedirect();
     expect(AbandonRule::forTenant(tenant()->fresh()))->toBe(['mode' => 'prorata', 'dedit_percent' => null]);
 
+    // In prorata mode a meaningless percentage is not validated.
+    $this->put('/admin/abandon-rule', ['mode' => 'prorata', 'dedit_percent' => 999])->assertRedirect()->assertSessionHasNoErrors();
+
     // Unchanged: nothing more is audited.
     $this->put('/admin/abandon-rule', ['mode' => 'prorata'])->assertRedirect();
     expect(AuditLog::query()->where('event', 'settings.abandon_rule_changed')->count())->toBe(2);
