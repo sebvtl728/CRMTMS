@@ -80,7 +80,7 @@ Une configuration par `(organisme, connecteur, société)`. `company_id` vide = 
 
 `SmtpConnector` (clé `smtp`, type envoi). Paramètres : `host`, `port`, `encryption` (`tls`, `ssl`, `none`), `from_address`, `from_name` ; secrets : `username`, `password`.
 
-`TenantMailer::for(?Company $company)` renvoie le mailer à utiliser : configuration active de la société, sinon de l'organisme, sinon mailer par défaut de l'instance (`MAIL_*`). 
+`TenantMailer::for(?Company $company)` renvoie le mailer à utiliser, par priorité : SMTP propre à la société, puis **Microsoft 365 (envoi des e-mails)** de l'organisme, puis SMTP de l'organisme, puis mailer par défaut de l'instance (`MAIL_*`). 
 ### Politique réseau des hôtes SMTP (`SmtpHostPolicy` → `Core\HostPolicy`)
 
 La politique est généralisée dans `App\Modules\Connectors\Core\HostPolicy` (résolution A/AAAA, classification, `violation($ips, strict: false)`) ; `SmtpHostPolicy` n'en est plus qu'une façade (comportement SMTP inchangé). Avec `strict: true`, les réglages `allow_*` sont ignorés : seules les adresses publiques passent (utilisé par Sirene).
@@ -93,6 +93,43 @@ Appliquée à l'enregistrement (règle `SmtpHost`, qui résout l'hôte en A/AAAA
 - Un nom qui ne résout pas est accepté à l'enregistrement mais refusé au test et à l'envoi (message français).
 - Les messages d'erreur du test sont toujours rédigés par l'application ; le texte brut du serveur (qui peut contenir l'identifiant) n'est jamais relayé.
 - « DNS rebinding » (un nom qui change d'adresse entre la vérification et la connexion) : la connexion se fait sur l'**adresse vérifiée** (le nom n'est pas résolu une seconde fois) ; avec TLS, le certificat reste vérifié par rapport au nom du serveur (`peer_name`, SNI).
+
+## Connecteur Microsoft 365 (envoi des e-mails)
+
+`Mail365\Microsoft365MailConnector` (clé `microsoft365_mail`, type envoi). Tous les e-mails du TMS (devis, plaquettes, invitations, récapitulatifs) partent par **Microsoft Graph**, depuis **une seule boîte** Microsoft 365, avec une application Azure autorisée en **application** (`Mail.Send`, flux « client credentials », sans mot de passe de boîte). Pas de configuration par société (interface `OrganismeWide`) : une seule configuration pour l'organisme.
+
+Paramètres : `tenant` (annuaire précis : son ID ou un de ses domaines, par ex. `capformation.net`, `xxx.onmicrosoft.com` ; `common`, `organizations` et `consumers` sont refusés), `client_id`, `from_address` (la boîte d'expédition), `from_name` (facultatif). Secret : `client_secret`. Changer `tenant` ou `client_id` oblige à ressaisir le secret.
+
+### Procédure pour l'administrateur Microsoft 365
+
+1. Portail Azure › **Microsoft Entra ID** › **Inscriptions d'applications** › **Nouvelle inscription**. Nom : « TMS – envoi des e-mails ». Types de comptes : « Comptes dans cet annuaire organisationnel uniquement ». Aucune URI de redirection. Notez l'**ID d'application (client)** et l'**ID de l'annuaire (locataire)**.
+2. **Autorisations des API** › Ajouter une autorisation › Microsoft Graph › **Autorisations de l'application** (et non « déléguées ») › `Mail.Send`.
+3. **Accorder le consentement administrateur** pour l'annuaire (le bouton doit afficher une coche verte « Accordé »).
+4. **Certificats et secrets** › Nouveau secret client. Copiez la **Valeur** (pas l'ID du secret) et **notez sa date d'expiration** : passé cette date, les envois échouent (« secret expiré ? ») jusqu'au remplacement du secret dans le TMS.
+5. **Restreindre l'application à la seule boîte d'expédition.** Par défaut, `Mail.Send` en application permet d'envoyer au nom de **toutes** les boîtes de l'annuaire : limitez-la dans Exchange Online PowerShell, avec une stratégie d'accès d'application (ou, équivalent récent, RBAC pour les applications) :
+
+   ```powershell
+   # Groupe de sécurité à extension messagerie (ou boîte) contenant la seule boîte d'expédition
+   New-ApplicationAccessPolicy -AccessRight RestrictAccess -AppId <ID d'application> `
+     -PolicyScopeGroupId envoi-tms@capformation.net -Description "TMS : envoi depuis la boîte d'expédition uniquement"
+
+   # Vérification : AccessCheckResult doit être « Granted » pour la boîte d'expédition, « Denied » pour une autre
+   Test-ApplicationAccessPolicy -Identity envoi@capformation.net -AppId <ID d'application>
+   Test-ApplicationAccessPolicy -Identity autre.personne@capformation.net -AppId <ID d'application>
+   ```
+
+   La stratégie peut mettre une heure à s'appliquer.
+6. Dans le TMS : `/admin/connectors` › **Microsoft 365 (envoi des e-mails)** : annuaire (domaine ou ID), ID d'application, secret client, adresse d'expédition (la boîte), nom d'expéditeur. Enregistrez, activez, puis **Tester la connexion** : le TMS obtient un jeton puis envoie un e-mail de test à **votre** adresse (« E-mail de test envoyé à … »). En cas de refus, vérifiez la permission `Mail.Send`, le consentement et la stratégie d'accès.
+7. Avant l'expiration du secret : créez-en un nouveau dans Azure et remplacez-le dans le TMS.
+
+### À savoir
+
+- **Domaine** : publiez SPF, **DKIM** (activé pour le domaine dans Microsoft 365) et **DMARC** pour le domaine de la boîte d'expédition, sinon les devis risquent le dossier des indésirables.
+- **Expéditeur** : le message part toujours depuis la boîte configurée (Graph l'impose). Le nom affiché est `from_name`, à défaut celui du message ; l'adresse de réponse (`Reply-To`) est conservée. Les e-mails apparaissent dans les **éléments envoyés** de la boîte.
+- **Priorité** : SMTP de la société > Microsoft 365 de l'organisme > SMTP de l'organisme > messagerie de l'instance. Désactiver le connecteur rétablit le SMTP de l'organisme.
+- **Gros e-mails** : jusqu'à 3 Mo (encodé), le message part en un appel (`/sendMail`, MIME). Au-delà (plaquettes jointes, jusqu'à 20 Mo), le TMS crée un brouillon (corps en texte, destinataires), ajoute les pièces jointes (celles de 3 Mo et plus par **sessions d'envoi**, morceaux de 3,75 Mo) puis l'envoie ; en cas d'échec le brouillon est supprimé.
+- **Erreurs** : refus (401/403) = échec définitif du devis ou de la plaquette (« Échec », message français fixe, sans texte de Microsoft) ; limitation (429), indisponibilité (5xx) ou délai dépassé = nouvelle tentative du job. Un délai dépassé *après* acceptation par Microsoft peut, rarement, produire un doublon à la nouvelle tentative (même limite qu'en SMTP).
+- **Sécurité** : le secret est chiffré, jamais réaffiché ni journalisé ; le jeton d'application est mis en cache chiffré (clé préfixée par l'organisme et l'id de la configuration), jamais en base ; seuls `login.microsoftonline.com`, `graph.microsoft.com` et les adresses de dépôt Outlook sont appelés, en https, sans redirection (`HostPolicy` strict).
 
 ## Connecteur Sirene (préremplissage par SIRET)
 

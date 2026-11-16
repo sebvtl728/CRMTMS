@@ -9,7 +9,12 @@ use App\Modules\Connectors\Core\Connector;
 use App\Modules\Connectors\Core\ConnectorConfig;
 use App\Modules\Connectors\Core\ConnectorKind;
 use App\Modules\Connectors\Core\HasFormLabels;
+use App\Modules\Connectors\Core\OrganismeWide;
+use App\Modules\Core\Users\User;
 use Closure;
+use Illuminate\Support\Facades\Auth;
+use Symfony\Component\Mime\Address;
+use Symfony\Component\Mime\Email;
 use Throwable;
 
 /**
@@ -20,7 +25,7 @@ use Throwable;
  * precise directory), client_id, from_address, from_name; secret
  * client_secret. See docs/connectors.md.
  */
-class Microsoft365MailConnector implements Connector, HasFormLabels
+class Microsoft365MailConnector implements Connector, HasFormLabels, OrganismeWide
 {
     private const MULTI_TENANT = ['common', 'organizations', 'consumers'];
 
@@ -104,7 +109,20 @@ class Microsoft365MailConnector implements Connector, HasFormLabels
         try {
             $this->client->token($c, fresh: true);
 
-            return new ConnectionTestResult(true, 'Application reconnue par Microsoft.');
+            $user = Auth::user();
+            $recipient = $user instanceof User ? $user->email : null;
+            if ($recipient === null) {
+                return new ConnectionTestResult(false, 'Aucun utilisateur connecté pour recevoir l\'e-mail de test.');
+            }
+
+            // The real path: the same transport as every e-mail of the organisme.
+            (new GraphTransport($this->client, $c))->send((new Email)
+                ->from(new Address(GraphMailClient::mailbox($c), (string) ($c->settings['from_name'] ?? '')))
+                ->to($recipient)
+                ->subject('Test de l\'envoi par Microsoft 365')
+                ->text('Ceci est un e-mail de test envoyé depuis votre TMS. Si vous le lisez, l\'envoi par Microsoft 365 fonctionne.'));
+
+            return new ConnectionTestResult(true, "E-mail de test envoyé à {$recipient}.");
         } catch (GraphRetryLater) {
             return new ConnectionTestResult(false, 'Microsoft est injoignable pour le moment. Réessayez plus tard.');
         } catch (GraphMailFailed $e) {

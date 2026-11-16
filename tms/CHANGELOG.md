@@ -5,6 +5,10 @@ Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) ; ve
 
 ## [Non publié]
 
+### Ajouté
+
+- **Connecteur Microsoft 365 (envoi des e-mails)** : devis, plaquettes et invitations partent par Microsoft Graph depuis une boîte Microsoft 365 (permission d'application `Mail.Send`, secret chiffré, jeton en cache), y compris les e-mails volumineux (brouillon et sessions d'envoi), avec e-mail de test et procédure d'installation dans `docs/connectors.md`.
+
 ## [0.5.2] - 2026-11-15
 
 Plaquettes (PDF) de l'organisme : bibliothèque, pièces jointes des devis, envoi depuis une fiche.

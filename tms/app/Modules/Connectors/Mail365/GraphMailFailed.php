@@ -18,6 +18,8 @@ final class GraphMailFailed extends RuntimeException
 
     public const APP_REFUSED = 'Microsoft 365 a refusé l\'application : vérifiez l\'identifiant et le secret client (secret expiré ?).';
 
+    public const UNKNOWN_UPLOAD = 'Microsoft 365 a proposé une adresse de dépôt non reconnue. Réessayez plus tard ou contactez le support.';
+
     public const INCOMPLETE = 'La configuration Microsoft 365 (envoi des e-mails) est incomplète.';
 
     public function __construct(string $message, public readonly int $status = 0)

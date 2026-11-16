@@ -335,13 +335,15 @@ it('names its transport microsoft-graph', function () {
     expect((string) new GraphTransport(app(GraphMailClient::class), mail365Config()))->toBe('microsoft-graph');
 });
 
-it('tests the connection by obtaining a token, and reports failures in French', function () {
+it('tests the connection by sending a test e-mail, and reports failures in French', function () {
     $connector = app(ConnectorRegistry::class)->make('microsoft365_mail');
     $config = mail365Config();
+    $user = admin(twoFactor: true);
+    $this->actingAs($user);
 
-    mail365Http();
+    mail365Http([MAIL365_GRAPH.'/sendMail' => Http::response('', 202)]);
     $result = $connector->test($config);
-    expect($result->ok)->toBeTrue()->and($result->message)->toBe('Application reconnue par Microsoft.');
+    expect($result->ok)->toBeTrue()->and($result->message)->toBe("E-mail de test envoyé à {$user->email}.");
 
     Http::swap((new Factory)->preventStrayRequests());
     Http::fake(['login.microsoftonline.com/*' => Http::response(['error_description' => MAIL365_MS_TEXT], 401)]);

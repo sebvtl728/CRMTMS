@@ -21,8 +21,8 @@ use RuntimeException;
  */
 class ConnectorController extends Controller
 {
-    /** Settings that designate the remote server or how it is reached (a downgrade of the encryption would send the password in clear): changing one requires the secrets again. */
-    private const SERVER_SETTINGS = ['host', 'port', 'encryption'];
+    /** Settings that designate the remote server, directory or application, or how it is reached (a downgrade of the encryption would send the password in clear): changing one requires the secrets again. */
+    private const SERVER_SETTINGS = ['host', 'port', 'encryption', 'tenant', 'client_id'];
 
     public function __construct(private readonly ConnectorRegistry $registry) {}
 
@@ -57,7 +57,7 @@ class ConnectorController extends Controller
     public function edit(Request $request, string $key): Response
     {
         $connector = $this->connector($key);
-        $companyId = $this->scopeFromQuery($request);
+        $companyId = $this->scopeFromQuery($request, $connector);
         $config = $this->find($key, $companyId);
 
         return Inertia::render('admin/connectors/edit', [
@@ -66,6 +66,7 @@ class ConnectorController extends Controller
                 'key' => $key,
                 'label' => $connector::label(),
                 'kind' => $connector::kind()->label(),
+                'organisme_wide' => $connector instanceof OrganismeWide,
                 'settings' => array_keys($connector->settingsRules()),
                 'secrets' => $connector->secretKeys(),
                 'labels' => $connector instanceof HasFormLabels ? $connector->labels() : [],
@@ -100,6 +101,9 @@ class ConnectorController extends Controller
         ], ['settings.required' => 'Les paramètres sont obligatoires.']);
 
         $companyId = $data['company_id'] ?? null;
+        if ($companyId !== null && $connector instanceof OrganismeWide) {
+            throw ValidationException::withMessages(['company_id' => 'Ce connecteur s\'applique à tout l\'organisme, pas à une société.']);
+        }
         $config = $this->find($key, $companyId) ?? new ConnectorConfig(['connector_key' => $key, 'company_id' => $companyId]);
 
         $this->requireSecretsWhenServerMoves($connector, $config, $data);
@@ -165,7 +169,7 @@ class ConnectorController extends Controller
         $connector = $this->connector($key);
         abort_unless(in_array($secret, $connector->secretKeys(), true), 404);
 
-        $companyId = $this->scopeFromQuery($request);
+        $companyId = $this->scopeFromQuery($request, $connector);
         $config = $this->find($key, $companyId) ?? abort(404);
 
         $secrets = $config->secrets ?? [];
@@ -178,7 +182,7 @@ class ConnectorController extends Controller
     public function test(Request $request, string $key): JsonResponse
     {
         $connector = $this->connector($key);
-        $config = $this->find($key, $this->scopeFromQuery($request));
+        $config = $this->find($key, $this->scopeFromQuery($request, $connector));
 
         if ($config === null) {
             return response()->json(['ok' => false, 'message' => 'Enregistrez d\'abord la configuration avant de la tester.'], 422);
@@ -230,8 +234,11 @@ class ConnectorController extends Controller
         return $this->registry->has($key) ? $this->registry->make($key) : abort(404);
     }
 
-    private function scopeFromQuery(Request $request): ?string
+    private function scopeFromQuery(Request $request, Connector $connector): ?string
     {
+        if ($connector instanceof OrganismeWide) {
+            return null;
+        }
         $company = $request->query('company');
         if (! is_string($company) || $company === '') {
             return null;

@@ -233,6 +233,10 @@ class GraphMailClient
         if (! $response->successful() || ! is_string($uploadUrl)) {
             throw GraphMailFailed::rejected($response->status());
         }
+        $uploadHost = parse_url($uploadUrl, PHP_URL_HOST);
+        if (! is_string($uploadHost) || ! in_array(strtolower($uploadHost), self::UPLOAD_HOSTS, true) || parse_url($uploadUrl, PHP_URL_SCHEME) !== 'https') {
+            throw new GraphMailFailed(GraphMailFailed::UNKNOWN_UPLOAD);
+        }
 
         $total = strlen($bytes);
         for ($offset = 0; $offset < $total; $offset += self::CHUNK_BYTES) {
