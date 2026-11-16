@@ -7,13 +7,16 @@ use App\Modules\Core\Users\User;
 use App\Modules\Crm\Public\Fiches;
 use Carbon\CarbonImmutable;
 use Closure;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
 /**
- * The trainers of the organisme: a person of the CRM (reached through
- * Crm\Public\Fiches) declared trainer once, salaried or freelance, active or
- * not, optionally linked to one user account; their unavailabilities.
+ * The trainers of the organisme: a user account of the TMS (picked, or
+ * given the Formateur role) or a trainer without account (name, e-mail),
+ * each backed by a person of the CRM created or reused behind the scenes
+ * (Crm\Public\Fiches::personForTrainer, never a search of the CRM);
+ * salaried or freelance, active or not; their unavailabilities.
  * A trainer used somewhere (séances, task 3, declared with registerUsage) is
  * never deleted: it is deactivated.
  */
@@ -24,6 +27,8 @@ final class Trainers
     public const UNKNOWN_PERSON = "Cette personne n'existe pas.";
 
     public const USER_TAKEN = 'Ce compte est déjà lié à un autre formateur.';
+
+    public const EMAIL_TAKEN = 'Un formateur a déjà cet e-mail.';
 
     public const IN_USE = 'Ce formateur a des séances : désactivez-le plutôt que de le supprimer.';
 
@@ -78,6 +83,118 @@ final class Trainers
         });
     }
 
+    /**
+     * A trainer without account: the person is reused when exactly one has
+     * the e-mail, created otherwise; refused (person.email) when a trainer
+     * already has that e-mail. A later invitation with the e-mail links him.
+     *
+     * @throws ValidationException
+     */
+    public static function declarePerson(string $lastName, ?string $firstName, ?string $email, TrainerStatus $status): Trainer
+    {
+        return DB::transaction(function () use ($lastName, $firstName, $email, $status): Trainer {
+            if ($email !== null && trim($email) !== '' && self::withEmail($email)->isNotEmpty()) {
+                throw ValidationException::withMessages(['person.email' => self::EMAIL_TAKEN]);
+            }
+            $personId = app(Fiches::class)->personForTrainer($lastName, $firstName, $email);
+            try {
+                return self::declare($personId, $status);
+            } catch (ValidationException) {
+                throw ValidationException::withMessages(['person.email' => self::EMAIL_TAKEN]);
+            }
+        });
+    }
+
+    /**
+     * Makes the account trainer (« Ajouter un formateur »): refused (user_id)
+     * when it already has one; otherwise as ensureForUser, with $status.
+     *
+     * @throws ValidationException
+     */
+    public static function declareUser(User $user, TrainerStatus $status): Trainer
+    {
+        return DB::transaction(function () use ($user, $status): Trainer {
+            DB::select('select pg_advisory_xact_lock(hashtext(?))', ['trainer-user:'.$user->getKey()]);
+            if (self::forUser($user) !== null) {
+                throw ValidationException::withMessages(['user_id' => self::USER_TAKEN]);
+            }
+            $trainer = self::ensureForUser($user, $status);
+            if ($trainer === null) {
+                throw ValidationException::withMessages(['user_id' => self::EMAIL_TAKEN]);
+            }
+            if ($trainer->status !== $status->value) {
+                $trainer->update(['status' => $status->value]);
+            }
+
+            return $trainer;
+        });
+    }
+
+    /**
+     * The trainer of an account, created when missing (role Formateur given,
+     * « Ajouter un formateur »): the one trainer having its e-mail and no
+     * account is linked; none: a trainer is created on the person having
+     * the e-mail (exactly one) or a new person named after the account;
+     * several trainers with the e-mail, or one linked to another account:
+     * nothing (a manager links by hand), null.
+     */
+    public static function ensureForUser(User $user, TrainerStatus $status = TrainerStatus::Employee): ?Trainer
+    {
+        return DB::transaction(function () use ($user, $status): ?Trainer {
+            $existing = self::forUser($user);
+            if ($existing !== null) {
+                return $existing;
+            }
+            $same = self::withEmail($user->email);
+            if ($same->count() > 1) {
+                return null;
+            }
+            if ($same->count() === 1) {
+                $trainer = $same->firstOrFail();
+                if ($trainer->user_id !== null) {
+                    return null;
+                }
+                self::link($trainer, $user);
+
+                return $trainer;
+            }
+            [$first, $last] = self::splitName($user->name);
+            $trainer = self::declare(app(Fiches::class)->personForTrainer($last, $first, $user->email), $status);
+            self::link($trainer, $user);
+
+            return $trainer->refresh();
+        });
+    }
+
+    /**
+     * Trainers (out of the trash) whose person has this primary e-mail.
+     *
+     * @return Collection<int, Trainer>
+     */
+    private static function withEmail(string $email): Collection
+    {
+        $people = app(Fiches::class)->peopleWithEmail($email);
+
+        return $people === [] ? collect() : Trainer::query()->whereIn('person_id', $people)->get();
+    }
+
+    /**
+     * « Léa Marie Durand » → first name « Léa Marie », last name « Durand »;
+     * a single word is the last name.
+     *
+     * @return array{0: string|null, 1: string}
+     */
+    private static function splitName(string $name): array
+    {
+        $words = preg_split('/\s+/u', trim($name), -1, PREG_SPLIT_NO_EMPTY) ?: [];
+        if (count($words) <= 1) {
+            return [null, $words[0] ?? $name];
+        }
+        $last = array_pop($words);
+
+        return [implode(' ', $words), $last];
+    }
+
     public static function update(Trainer $trainer, TrainerStatus $status, bool $active): void
     {
         DB::transaction(fn () => $trainer->update(['status' => $status->value, 'active' => $active]));
@@ -125,11 +242,10 @@ final class Trainers
      */
     public static function linkInvited(User $user): void
     {
-        $people = app(Fiches::class)->peopleWithEmail($user->email);
-        if ($people === [] || self::forUser($user) !== null) {
+        if (self::forUser($user) !== null) {
             return;
         }
-        $trainers = Trainer::query()->whereIn('person_id', $people)->get();
+        $trainers = self::withEmail($user->email);
         if ($trainers->count() !== 1 || $trainers->first()?->user_id !== null) {
             return;
         }

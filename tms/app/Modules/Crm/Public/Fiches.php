@@ -4,13 +4,15 @@ namespace App\Modules\Crm\Public;
 
 use App\Modules\Core\Users\User;
 use App\Modules\Crm\Organisations\Organisation;
+use App\Modules\Crm\Organisations\OrganisationStatus;
 use App\Modules\Crm\People\Person;
 use App\Modules\Crm\Permissions;
 use App\Modules\Crm\Visibility\CrmVisibility;
 use Illuminate\Support\Str;
 
 /**
- * Public read façade of the fiches for the other modules: the minimal
+ * Public façade of the fiches for the other modules (and personForTrainer(),
+ * its one writer: the person behind a trainer). Reads give the minimal
  * identity of an entreprise or a person of the organisme (fiches out of the
  * trash, people not anonymised), whatever the CRM visibility of the user. The caller decides who
  * may see it (a dossier's contractant, a session's entreprise...).
@@ -119,6 +121,31 @@ final class Fiches
 
         return Person::query()->whereNull('people.anonymised_at')->whereRaw('lower(people.email) = ?', [$email])
             ->orderBy('people.id')->pluck('people.id')->map(fn ($id) => (string) $id)->all();
+    }
+
+    /**
+     * The person behind a trainer of the Sessions module: the one person of
+     * the organisme (out of the trash, not anonymised) whose primary e-mail
+     * is $email, when exactly one has it; otherwise a new ordinary person
+     * (journaled as any creation), with that e-mail.
+     *
+     * @return string the person's id
+     */
+    public function personForTrainer(string $lastName, ?string $firstName, ?string $email): string
+    {
+        $email = $email === null || trim($email) === '' ? null : mb_strtolower(trim($email));
+        if ($email !== null) {
+            $matches = $this->peopleWithEmail($email);
+            if (count($matches) === 1) {
+                return $matches[0];
+            }
+        }
+        $firstName = $firstName === null || trim($firstName) === '' ? null : trim($firstName);
+
+        return (string) Person::query()->create([
+            'last_name' => trim($lastName), 'first_name' => $firstName, 'email' => $email,
+            'country' => 'FR', 'status' => OrganisationStatus::Prospect->value,
+        ])->getKey();
     }
 
     /**

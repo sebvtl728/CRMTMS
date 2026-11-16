@@ -137,9 +137,10 @@ Un stagiaire est une personne du CRM :
 
 ### Formateurs
 
-Menu **Formation › Formateurs** (droit « Gérer les formateurs »). Un formateur est une **personne du CRM** déclarée formateur, une seule fois par organisme :
+Menu **Formation › Formateurs** (droit « Gérer les formateurs »). Un formateur est un utilisateur du TMS ou un formateur sans compte ; une fiche Personne du CRM le porte en interne (lien discret depuis sa page pour qui peut la consulter) :
 
-- **Ajouter un formateur** : cherchez une personne existante (nom, prénom ou e-mail, dans tout l'organisme) ou créez-en une nouvelle (nom, prénom, e-mail, téléphone) ; une personne semblable déjà présente est signalée : choisissez-la, ou cochez « Créer quand même ». Choisissez le statut **Salarié** ou **Indépendant**. Une personne déjà formateur est refusée ; un formateur supprimé revient si on déclare de nouveau la personne.
+- **Ajouter un formateur** : choisissez un **utilisateur du TMS** (actifs, ceux qui ont le rôle Formateur en tête), ou saisissez un **formateur sans compte** (nom, prénom, e-mail), puis le statut **Salarié** ou **Indépendant**. Aucune recherche dans le CRM : la fiche Personne qui porte le formateur est reprise si une seule personne a cet e-mail, créée sinon. Un compte déjà formateur, ou un e-mail déjà porté par un formateur, est refusé ; un formateur supprimé revient si on le déclare de nouveau.
+- **Automatiquement** : un utilisateur qui reçoit le rôle **Formateur** (à l'acceptation de son invitation ou par un changement de rôle) obtient sa fiche formateur, liée à son compte (statut Salarié, modifiable) ; s'il existait déjà un formateur sans compte avec son e-mail (un seul), c'est celui-ci qui est lié.
 - **Page du formateur** : statut, **actif** (seuls les formateurs actifs seront proposés au planning), **compte TMS lié**, **indisponibilités** (du … au …, en heure de Paris, motif facultatif), suppression (impossible s'il a des séances : désactivez-le). La personne reste dans le CRM.
 - **Fiche Personne** : un bloc « Formateur » (statut, compte, indisponibilités à venir) apparaît pour qui gère les formateurs.
 

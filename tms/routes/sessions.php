@@ -87,11 +87,10 @@ Route::middleware(['auth', 'can:sessions.rooms.manage'])->prefix('admin/sessions
     Route::delete('closures/{closurePeriod}', [ResourceSettingsController::class, 'destroyClosure'])->name('closures.destroy');
 });
 
-// « Formateurs » (sessions.trainers.manage). People searched in the whole organisme: limiter sessions-trainees.
+// « Formateurs » (sessions.trainers.manage): TMS users or trainers without account.
 Route::middleware(['auth', 'can:sessions.trainers.manage'])->prefix('trainers')->name('trainers.')->group(function () {
     Route::get('/', [TrainerController::class, 'index'])->name('index');
-    Route::get('people', [TrainerController::class, 'people'])->middleware('throttle:sessions-trainees')->name('people');
-    Route::post('/', [TrainerController::class, 'store'])->middleware('throttle:sessions-trainees')->name('store');
+    Route::post('/', [TrainerController::class, 'store'])->name('store');
     Route::get('{trainer}', [TrainerController::class, 'show'])->name('show');
     Route::put('{trainer}', [TrainerController::class, 'update'])->name('update');
     Route::delete('{trainer}', [TrainerController::class, 'destroy'])->name('destroy');

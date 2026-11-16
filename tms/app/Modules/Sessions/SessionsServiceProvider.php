@@ -3,7 +3,9 @@
 namespace App\Modules\Sessions;
 
 use App\Modules\Catalogue\TrainingUsage;
+use App\Modules\Core\Access\AccessScope;
 use App\Modules\Core\Access\Permissions as CorePermissions;
+use App\Modules\Core\Access\PrimaryRoleChanged;
 use App\Modules\Core\Access\Role;
 use App\Modules\Core\Access\Scopes;
 use App\Modules\Core\Audit\MorphAliases;
@@ -96,6 +98,12 @@ class SessionsServiceProvider extends ServiceProvider
 
         // An invited account is linked to the one trainer having its e-mail (else by hand).
         Event::listen(InvitationAccepted::class, fn (InvitationAccepted $event) => Trainers::linkInvited($event->user));
+        // A user whose séances right becomes « Ses séances » (role Formateur) gets his trainer record.
+        Event::listen(PrimaryRoleChanged::class, function (PrimaryRoleChanged $event): void {
+            if (Scopes::of($event->user, Permissions::SEANCES_VIEW) === AccessScope::Trainer) {
+                Trainers::ensureForUser($event->user);
+            }
+        });
 
         // Rooms, closure periods, trainers and their unavailabilities: malformed
         // or of another organisme (RLS) is a 404.

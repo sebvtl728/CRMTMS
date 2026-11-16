@@ -2,6 +2,8 @@
 
 namespace App\Modules\Sessions\Trainers;
 
+use App\Modules\Core\Access\AccessScope;
+use App\Modules\Core\Access\Scopes;
 use App\Modules\Core\Users\User;
 use App\Modules\Crm\Public\Fiches;
 use App\Modules\Sessions\Permissions;
@@ -35,6 +37,28 @@ final class TrainerRows
             'active' => $t->active,
             'user' => $t->user_id !== null && $users->has($t->user_id) ? ['name' => $users[$t->user_id]->name, 'email' => $users[$t->user_id]->email] : null,
         ])->sortBy(fn (array $row) => Str::lower(Str::ascii($row['label'])).' '.$row['id'])->values()->all();
+    }
+
+    /**
+     * Accounts « Ajouter un formateur » offers: active users of the
+     * organisme not linked to a trainer, those whose séances right is on
+     * « Ses séances » (the Formateur role, or any role like it) first.
+     *
+     * @return list<array{value: string, label: string, trainer_role: bool}>
+     */
+    public static function userOptions(): array
+    {
+        $linked = Trainer::query()->whereNotNull('user_id')->pluck('user_id')->all();
+
+        return User::query()->whereNotIn('id', $linked)->orderBy('name')->get()
+            ->filter(fn (User $u) => $u->isActive())
+            ->map(fn (User $u): array => [
+                'value' => $u->id,
+                'label' => "{$u->name} ({$u->email})",
+                'trainer_role' => Scopes::of($u, Permissions::SEANCES_VIEW) === AccessScope::Trainer,
+            ])
+            ->sortBy(fn (array $o) => ($o['trainer_role'] ? '0' : '1').Str::lower(Str::ascii($o['label'])))
+            ->values()->all();
     }
 
     /**

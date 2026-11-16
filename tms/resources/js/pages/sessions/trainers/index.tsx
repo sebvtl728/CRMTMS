@@ -1,13 +1,11 @@
 import Heading from '@/components/heading';
 import InputError from '@/components/input-error';
-import { FichePicker, type Picked } from '@/components/sessions/fiche-picker';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Checkbox } from '@/components/ui/checkbox';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from '@/components/ui/select';
 import AppLayout from '@/layouts/app-layout';
 import { type Option } from '@/lib/crm';
 import { type BreadcrumbItem } from '@/types';
@@ -28,33 +26,39 @@ interface TrainerRow {
 interface Props {
     trainers: TrainerRow[];
     statusOptions: Option[];
+    userOptions: UserOption[];
     status?: string;
 }
 
 const breadcrumbs: BreadcrumbItem[] = [{ title: 'Formateurs', href: '/trainers' }];
 
+interface UserOption extends Option {
+    /** Holds the Formateur role (séances on « Ses séances »). */
+    trainer_role: boolean;
+}
+
 type NewTrainer = {
     status: string;
-    person_id: string;
-    person: { last_name: string; first_name: string; email: string; phone: string } | null;
-    confirm_duplicate: boolean;
+    user_id: string;
+    person: { last_name: string; first_name: string; email: string };
 };
 
-function AddTrainerDialog({ statusOptions, onClose }: { statusOptions: Option[]; onClose: () => void }) {
-    const [mode, setMode] = useState<'existing' | 'new'>('existing');
-    const [picked, setPicked] = useState<Picked | null>(null);
+const NONE = '__none__';
+
+function AddTrainerDialog({ statusOptions, userOptions, onClose }: { statusOptions: Option[]; userOptions: UserOption[]; onClose: () => void }) {
+    const [mode, setMode] = useState<'user' | 'person'>('user');
     const { data, setData, post, processing, errors, transform } = useForm<NewTrainer>({
         status: 'employee',
-        person_id: '',
-        person: { last_name: '', first_name: '', email: '', phone: '' },
-        confirm_duplicate: false,
+        user_id: '',
+        person: { last_name: '', first_name: '', email: '' },
     });
     const err = errors as Record<string, string | undefined>;
-    const person = data.person ?? { last_name: '', first_name: '', email: '', phone: '' };
+    const trainers = userOptions.filter((u) => u.trainer_role);
+    const others = userOptions.filter((u) => !u.trainer_role);
 
     const submit: FormEventHandler = (e) => {
         e.preventDefault();
-        transform((d) => (mode === 'existing' ? { status: d.status, person_id: picked?.id ?? '' } : { ...d, person_id: '' }));
+        transform((d) => (mode === 'user' ? { status: d.status, user_id: d.user_id } : { status: d.status, person: d.person }));
         post(route('trainers.store'), { preserveScroll: true });
     };
 
@@ -64,63 +68,90 @@ function AddTrainerDialog({ statusOptions, onClose }: { statusOptions: Option[];
                 <form onSubmit={submit} className="grid gap-4">
                     <DialogHeader>
                         <DialogTitle>Ajouter un formateur</DialogTitle>
-                        <DialogDescription>Un formateur est une personne du CRM : choisissez-la, ou créez-la si elle n'existe pas encore.</DialogDescription>
+                        <DialogDescription>
+                            Choisissez un utilisateur du TMS, ou saisissez un formateur qui n'a pas encore de compte : une invitation avec son e-mail le
+                            liera ensuite automatiquement.
+                        </DialogDescription>
                     </DialogHeader>
-                    <div className="flex gap-4 text-sm" role="radiogroup" aria-label="Personne">
+                    <div className="flex flex-wrap gap-4 text-sm" role="radiogroup" aria-label="Formateur">
                         <label className="flex items-center gap-2">
-                            <input type="radio" name="trainer_mode" checked={mode === 'existing'} onChange={() => setMode('existing')} />
-                            Personne existante
+                            <input type="radio" name="trainer_mode" checked={mode === 'user'} onChange={() => setMode('user')} />
+                            Utilisateur du TMS
                         </label>
                         <label className="flex items-center gap-2">
-                            <input type="radio" name="trainer_mode" checked={mode === 'new'} onChange={() => setMode('new')} />
-                            Nouvelle personne
+                            <input type="radio" name="trainer_mode" checked={mode === 'person'} onChange={() => setMode('person')} />
+                            Formateur sans compte
                         </label>
                     </div>
-                    {mode === 'existing' ? (
+                    {mode === 'user' ? (
                         <div className="grid gap-2">
-                            <Label htmlFor="trainer_person">Personne *</Label>
-                            <FichePicker
-                                id="trainer_person"
-                                kind="person"
-                                value={picked}
-                                onPick={setPicked}
-                                placeholder="Nom, prénom ou e-mail…"
-                                endpoint={route('trainers.people')}
-                            />
-                            <InputError message={err.person_id} />
+                            <Label htmlFor="trainer_user">Utilisateur *</Label>
+                            <Select value={data.user_id || NONE} onValueChange={(v) => setData('user_id', v === NONE ? '' : v)}>
+                                <SelectTrigger id="trainer_user">
+                                    <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value={NONE}>Choisir un utilisateur…</SelectItem>
+                                    {trainers.length > 0 && (
+                                        <SelectGroup>
+                                            <SelectLabel>Rôle Formateur</SelectLabel>
+                                            {trainers.map((o) => (
+                                                <SelectItem key={o.value} value={o.value}>
+                                                    {o.label}
+                                                </SelectItem>
+                                            ))}
+                                        </SelectGroup>
+                                    )}
+                                    {others.length > 0 && (
+                                        <SelectGroup>
+                                            <SelectLabel>Autres utilisateurs</SelectLabel>
+                                            {others.map((o) => (
+                                                <SelectItem key={o.value} value={o.value}>
+                                                    {o.label}
+                                                </SelectItem>
+                                            ))}
+                                        </SelectGroup>
+                                    )}
+                                </SelectContent>
+                            </Select>
+                            {userOptions.length === 0 && <p className="text-muted-foreground text-sm">Tous les utilisateurs sont déjà formateurs.</p>}
+                            <InputError message={err.user_id} />
                         </div>
                     ) : (
                         <div className="grid gap-3">
                             <div className="grid gap-3 sm:grid-cols-2">
                                 <div className="grid gap-2">
                                     <Label htmlFor="trainer_last_name">Nom *</Label>
-                                    <Input id="trainer_last_name" value={person.last_name} onChange={(e) => setData('person', { ...person, last_name: e.target.value })} />
+                                    <Input
+                                        id="trainer_last_name"
+                                        maxLength={100}
+                                        value={data.person.last_name}
+                                        onChange={(e) => setData('person', { ...data.person, last_name: e.target.value })}
+                                    />
                                     <InputError message={err['person.last_name']} />
                                 </div>
                                 <div className="grid gap-2">
                                     <Label htmlFor="trainer_first_name">Prénom</Label>
-                                    <Input id="trainer_first_name" value={person.first_name} onChange={(e) => setData('person', { ...person, first_name: e.target.value })} />
+                                    <Input
+                                        id="trainer_first_name"
+                                        maxLength={100}
+                                        value={data.person.first_name}
+                                        onChange={(e) => setData('person', { ...data.person, first_name: e.target.value })}
+                                    />
                                     <InputError message={err['person.first_name']} />
                                 </div>
                             </div>
-                            <div className="grid gap-3 sm:grid-cols-2">
-                                <div className="grid gap-2">
-                                    <Label htmlFor="trainer_email">E-mail</Label>
-                                    <Input id="trainer_email" type="email" value={person.email} onChange={(e) => setData('person', { ...person, email: e.target.value })} />
-                                    <InputError message={err['person.email']} />
-                                </div>
-                                <div className="grid gap-2">
-                                    <Label htmlFor="trainer_phone">Téléphone</Label>
-                                    <Input id="trainer_phone" value={person.phone} onChange={(e) => setData('person', { ...person, phone: e.target.value })} />
-                                    <InputError message={err['person.phone']} />
-                                </div>
+                            <div className="grid gap-2">
+                                <Label htmlFor="trainer_email">E-mail</Label>
+                                <Input
+                                    id="trainer_email"
+                                    type="email"
+                                    value={data.person.email}
+                                    onChange={(e) => setData('person', { ...data.person, email: e.target.value })}
+                                />
+                                <p className="text-muted-foreground text-sm">Pour lui envoyer son planning et l'inviter plus tard à se connecter.</p>
+                                <InputError message={err['person.email']} />
                             </div>
-                            {err['person.last_name']?.startsWith('Une personne semblable') && (
-                                <label className="flex items-center gap-2 text-sm">
-                                    <Checkbox checked={data.confirm_duplicate} onCheckedChange={(c) => setData('confirm_duplicate', c === true)} />
-                                    Créer quand même cette personne
-                                </label>
-                            )}
                         </div>
                     )}
                     <div className="grid gap-2">
@@ -153,7 +184,7 @@ function AddTrainerDialog({ statusOptions, onClose }: { statusOptions: Option[];
     );
 }
 
-export default function Trainers({ trainers, statusOptions, status }: Props) {
+export default function Trainers({ trainers, statusOptions, userOptions, status }: Props) {
     const [adding, setAdding] = useState(false);
 
     return (
@@ -204,7 +235,7 @@ export default function Trainers({ trainers, statusOptions, status }: Props) {
                 )}
             </div>
 
-            {adding && <AddTrainerDialog statusOptions={statusOptions} onClose={() => setAdding(false)} />}
+            {adding && <AddTrainerDialog statusOptions={statusOptions} userOptions={userOptions} onClose={() => setAdding(false)} />}
         </AppLayout>
     );
 }

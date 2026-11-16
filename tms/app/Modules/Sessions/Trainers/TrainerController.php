@@ -6,13 +6,9 @@ use App\Http\Controllers\Controller;
 use App\Modules\Core\Access\Permissions as CorePermissions;
 use App\Modules\Core\Access\Role;
 use App\Modules\Core\Users\User;
-use App\Modules\Crm\Public\DuplicateTrainee;
 use App\Modules\Crm\Public\Fiches;
-use App\Modules\Crm\Public\Trainees;
-use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
@@ -20,7 +16,8 @@ use Inertia\Response;
 
 /**
  * « Formateurs » (sessions.trainers.manage): the trainers of the organisme,
- * declared from an existing person of the CRM or a new one (Crm\Public),
+ * TMS users or trainers without account (the CRM person behind them is
+ * internal: Trainers, Crm\Public\Fiches),
  * their status, account, unavailabilities. {trainer} is a trainer of the
  * organisme out of the trash (RLS), 404 otherwise.
  */
@@ -31,47 +28,55 @@ class TrainerController extends Controller
         return Inertia::render('sessions/trainers/index', [
             'trainers' => TrainerRows::list(),
             'statusOptions' => TrainerStatus::options(),
+            'userOptions' => TrainerRows::userOptions(),
             'status' => $request->session()->get('status'),
         ]);
     }
 
     /**
-     * People of the whole organisme (identity only) to declare trainer.
+     * « Ajouter un formateur »: a TMS user (user_id), or a trainer without
+     * account (person: last name, first name, e-mail). The person of the CRM
+     * behind him is created or reused by e-mail, never searched here.
      */
-    public function people(Request $request, Trainees $trainees): JsonResponse
-    {
-        $q = $request->query('q');
-
-        return response()->json(['personnes' => is_string($q) && mb_strlen(trim($q)) >= 2 ? $trainees->search(mb_substr($q, 0, 100)) : []])
-            ->header('Cache-Control', 'no-store, private');
-    }
-
-    public function store(Request $request, Trainees $trainees): RedirectResponse
+    public function store(Request $request): RedirectResponse
     {
         $data = $request->validate([
             'status' => ['required', Rule::enum(TrainerStatus::class)],
-            'person_id' => ['required_without:person', 'nullable', 'string'],
+            'user_id' => ['required_without:person', 'nullable', 'uuid'],
             'person' => ['nullable', 'array'],
+            'person.last_name' => ['required_with:person', 'nullable', 'string', 'max:100'],
+            'person.first_name' => ['nullable', 'string', 'max:100'],
+            'person.email' => ['nullable', 'string', 'email', 'max:254'],
         ], [
-            'person_id.required_without' => 'Choisissez une personne ou créez-en une.',
             'status.required' => 'Choisissez « Salarié » ou « Indépendant ».',
             'status.enum' => 'Choisissez « Salarié » ou « Indépendant ».',
-            'person.array' => 'Indiquez la nouvelle personne.',
+            'user_id.required_without' => 'Choisissez un utilisateur ou saisissez un formateur sans compte.',
+            'user_id.uuid' => "Ce compte n'existe pas.",
+            'person.array' => 'Indiquez le formateur.',
+            'person.last_name.required_with' => 'Indiquez le nom du formateur.',
+            'person.last_name.string' => 'Indiquez le nom du formateur.',
+            'person.last_name.max' => 'Le nom ne doit pas dépasser 100 caractères.',
+            'person.first_name.string' => 'Le prénom doit être un texte.',
+            'person.first_name.max' => 'Le prénom ne doit pas dépasser 100 caractères.',
+            'person.email.string' => 'Indiquez une adresse e-mail valide.',
+            'person.email.email' => 'Indiquez une adresse e-mail valide.',
+            'person.email.max' => "L'adresse e-mail ne doit pas dépasser 254 caractères.",
         ]);
         $status = TrainerStatus::from((string) $data['status']);
-        $personId = $data['person_id'] ?? null;
-        $person = $data['person'] ?? null;
-        if (! is_string($personId) && ! is_array($person)) {
-            throw ValidationException::withMessages(['person_id' => 'Choisissez une personne ou créez-en une.']);
-        }
 
-        $trainer = DB::transaction(function () use ($personId, $person, $status, $trainees, $request): Trainer {
-            if (is_array($person)) {
-                $personId = $this->newPerson($trainees, $person, $request->boolean('confirm_duplicate'));
+        if (isset($data['user_id'])) {
+            $user = User::query()->find($data['user_id']);
+            if ($user === null || ! $user->isActive()) {
+                throw ValidationException::withMessages(['user_id' => "Ce compte n'existe pas."]);
             }
-
-            return Trainers::declare((string) $personId, $status);
-        });
+            $trainer = Trainers::declareUser($user, $status);
+        } else {
+            $person = $data['person'] ?? [];
+            if (! is_string($person['last_name'] ?? null) || trim($person['last_name']) === '') {
+                throw ValidationException::withMessages(['person.last_name' => 'Indiquez le nom du formateur.']);
+            }
+            $trainer = Trainers::declarePerson($person['last_name'], $person['first_name'] ?? null, $person['email'] ?? null, $status);
+        }
 
         return to_route('trainers.show', $trainer->id)->with('status', 'Formateur ajouté.');
     }
@@ -161,28 +166,5 @@ class TrainerController extends Controller
         Trainers::removeUnavailability($unavailability);
 
         return back()->with('status', 'Indisponibilité supprimée.');
-    }
-
-    /**
-     * Creates the person in the CRM (Crm\Public\Trainees); errors on the
-     * fields of « person.* », similar people as an error on its name.
-     *
-     * @param  array<mixed>  $person
-     */
-    private function newPerson(Trainees $trainees, array $person, bool $confirmDuplicate): string
-    {
-        $fields = array_intersect_key($person, array_flip(['civility', 'first_name', 'last_name', 'email', 'phone', 'mobile']));
-        try {
-            return $trainees->create([...$fields, 'confirm_duplicate' => $confirmDuplicate]);
-        } catch (DuplicateTrainee $e) {
-            $names = implode(', ', array_map(fn (array $c) => trim(($c['first_name'] ?? '').' '.$c['last_name']), $e->candidates));
-            throw ValidationException::withMessages(['person.last_name' => "Une personne semblable existe déjà ({$names}) : choisissez-la dans la recherche, ou confirmez la création."]);
-        } catch (ValidationException $e) {
-            $errors = [];
-            foreach ($e->errors() as $field => $messages) {
-                $errors["person.{$field}"] = $messages;
-            }
-            throw ValidationException::withMessages($errors);
-        }
     }
 }

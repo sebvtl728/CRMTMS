@@ -35,42 +35,99 @@ function makeTrainer(?Person $person = null, array $attributes = []): Trainer
 
 // ---------------------------------------------------------------- trainers
 
-it('declares an existing person trainer, once per organisme', function () {
-    $person = makePerson('Durand', ['first_name' => 'Léa', 'email' => 'lea@example.test']);
-    $user = trainersManager();
+it('makes a TMS user trainer, the person of the CRM created behind the scenes', function () {
+    $account = userIn(tenant(), ['name' => 'Léa Durand', 'email' => 'lea.durand@example.test']);
+    $manager = trainersManager();
 
-    $this->actingAs($user)->post('/trainers', ['person_id' => $person->id, 'status' => 'freelance'])->assertRedirect();
+    $this->actingAs($manager)->post('/trainers', ['user_id' => $account->id, 'status' => 'freelance'])->assertRedirect()->assertSessionHasNoErrors();
     $trainer = Trainer::query()->sole();
-    expect($trainer->person_id)->toBe($person->id)->and($trainer->status)->toBe('freelance')->and($trainer->active)->toBeTrue();
+    $person = Person::query()->findOrFail($trainer->person_id);
+    expect($trainer->user_id)->toBe($account->id)->and($trainer->status)->toBe('freelance')->and($trainer->active)->toBeTrue()
+        ->and([$person->first_name, $person->last_name, $person->email])->toBe(['Léa', 'Durand', 'lea.durand@example.test']);
 
-    $this->actingAs($user)->post('/trainers', ['person_id' => $person->id, 'status' => 'employee'])
-        ->assertSessionHasErrors(['person_id' => 'Cette personne est déjà formateur.']);
+    // The same account twice: refused.
+    $this->actingAs($manager)->post('/trainers', ['user_id' => $account->id, 'status' => 'employee'])
+        ->assertSessionHasErrors(['user_id' => 'Ce compte est déjà lié à un autre formateur.']);
     expect(Trainer::query()->count())->toBe(1);
 });
 
-it('declares a new person trainer, created in the CRM, and warns of a similar person', function () {
-    makePerson('Bernard', ['first_name' => 'Anne', 'email' => 'anne.bernard@example.test']);
-    $user = trainersManager();
+it('reuses the one person of the CRM having the e-mail of the account', function () {
+    $person = makePerson('Martin', ['first_name' => 'Paul', 'email' => 'Paul.Martin@example.test']);
+    $account = userIn(tenant(), ['name' => 'Paul Martin', 'email' => 'paul.martin@example.test']);
 
-    $this->actingAs($user)->post('/trainers', ['person' => ['last_name' => 'Bernard', 'first_name' => 'Anne', 'email' => 'anne.bernard@example.test'], 'status' => 'employee'])
-        ->assertSessionHasErrors(['person.last_name']);
-    expect(Trainer::query()->count())->toBe(0);
+    $this->actingAs(trainersManager())->post('/trainers', ['user_id' => $account->id, 'status' => 'employee'])->assertRedirect();
 
-    $this->actingAs($user)->post('/trainers', ['person' => ['last_name' => 'Petit', 'first_name' => 'Marc', 'email' => 'marc.petit@example.test', 'phone' => ''], 'status' => 'employee'])
+    expect(Trainer::query()->sole()->person_id)->toBe($person->id)
+        ->and(Person::query()->where('email', 'ilike', '%martin%')->count())->toBe(1);
+});
+
+it('creates a new person when several people of the CRM have the e-mail', function () {
+    makePerson('Martin', ['email' => 'paul@example.test']);
+    makePerson('Martin bis', ['email' => 'paul@example.test']);
+    $account = userIn(tenant(), ['name' => 'Paul', 'email' => 'paul@example.test']);
+
+    $this->actingAs(trainersManager())->post('/trainers', ['user_id' => $account->id, 'status' => 'employee'])->assertRedirect();
+
+    expect(Person::query()->find(Trainer::query()->sole()->person_id)?->last_name)->toBe('Paul')
+        ->and(Person::query()->where('email', 'paul@example.test')->count())->toBe(3);
+});
+
+it('records a trainer without account from his name and e-mail; a later invitation links him', function () {
+    $manager = trainersManager();
+
+    $this->actingAs($manager)->post('/trainers', ['person' => ['last_name' => 'Petit', 'first_name' => 'Marc', 'email' => 'Marc.Petit@example.test'], 'status' => 'freelance'])
         ->assertRedirect()->assertSessionHasNoErrors();
     $trainer = Trainer::query()->sole();
-    expect(Person::query()->find($trainer->person_id)?->email)->toBe('marc.petit@example.test');
+    $person = Person::query()->findOrFail($trainer->person_id);
+    expect($trainer->user_id)->toBeNull()->and($trainer->status)->toBe('freelance')
+        ->and([$person->first_name, $person->last_name, $person->email])->toBe(['Marc', 'Petit', 'marc.petit@example.test']);
 
-    $this->actingAs($user)->post('/trainers', ['person' => ['last_name' => 'Bernard', 'first_name' => 'Anne', 'email' => 'anne.bernard@example.test'], 'confirm_duplicate' => true, 'status' => 'employee'])
-        ->assertRedirect()->assertSessionHasNoErrors();
-    expect(Trainer::query()->count())->toBe(2);
+    // The same person again: refused.
+    $this->actingAs($manager)->post('/trainers', ['person' => ['last_name' => 'Petit', 'first_name' => 'Marc', 'email' => 'marc.petit@example.test'], 'status' => 'employee'])
+        ->assertSessionHasErrors(['person.email' => 'Un formateur a déjà cet e-mail.']);
+
+    $invitation = Invitation::issue('marc.petit@example.test', 'Marc Petit', RoleModel::forSystem(Role::Formateur));
+    $this->post("/activation/{$invitation->plainToken}", ['password' => 'un-mot-de-passe-solide', 'password_confirmation' => 'un-mot-de-passe-solide'])->assertRedirect('/login');
+
+    expect(Trainer::query()->count())->toBe(1)
+        ->and($trainer->refresh()->user_id)->toBe(User::query()->where('email', 'marc.petit@example.test')->sole()->id);
 });
 
 it('validates a trainer in French', function () {
     $this->actingAs(trainersManager())->post('/trainers', ['status' => 'intérimaire'])
-        ->assertSessionHasErrors(['status' => 'Choisissez « Salarié » ou « Indépendant ».', 'person_id' => 'Choisissez une personne ou créez-en une.']);
-    $this->actingAs(trainersManager())->post('/trainers', ['person_id' => '0190a0a0-0000-7000-8000-000000000000', 'status' => 'employee'])
-        ->assertSessionHasErrors(['person_id' => "Cette personne n'existe pas."]);
+        ->assertSessionHasErrors(['status' => 'Choisissez « Salarié » ou « Indépendant ».', 'user_id' => 'Choisissez un utilisateur ou saisissez un formateur sans compte.']);
+    $this->actingAs(trainersManager())->post('/trainers', ['user_id' => '0190a0a0-0000-7000-8000-000000000000', 'status' => 'employee'])
+        ->assertSessionHasErrors(['user_id' => "Ce compte n'existe pas."]);
+    $this->actingAs(trainersManager())->post('/trainers', ['person' => ['last_name' => '', 'first_name' => str_repeat('a', 101), 'email' => 'pas-un-email'], 'status' => 'employee'])
+        ->assertSessionHasErrors([
+            'person.last_name' => 'Indiquez le nom du formateur.',
+            'person.first_name' => 'Le prénom ne doit pas dépasser 100 caractères.',
+            'person.email' => 'Indiquez une adresse e-mail valide.',
+        ]);
+    expect(Trainer::query()->count())->toBe(0);
+});
+
+it('offers the active users of the organisme, Formateur role first, without those already trainers', function () {
+    $manager = trainersManager();
+    $zoe = userIn(tenant(), ['name' => 'Zoé Formatrice']);
+    $zoe->assignPrimaryRole(Role::Formateur);
+    Trainer::query()->where('user_id', $zoe->id)->delete();
+    Trainer::withTrashed()->where('user_id', $zoe->id)->update(['user_id' => null]);
+    $anne = userIn(tenant(), ['name' => 'Anne Commerciale']);
+    $gone = userIn(tenant(), ['name' => 'Ancien']);
+    $gone->deactivate();
+    $linked = userIn(tenant(), ['name' => 'Déjà lié']);
+    makeTrainer(null, ['user_id' => $linked->id]);
+
+    $this->actingAs($manager)->get('/trainers')->assertInertia(fn (Assert $page) => $page
+        ->where('userOptions', function ($options) use ($zoe, $anne, $gone, $linked, $manager): bool {
+            $ids = collect($options)->pluck('value')->all();
+
+            return $ids[0] === $zoe->id && $options[0]['trainer_role'] === true
+                && in_array($anne->id, $ids, true) && in_array($manager->id, $ids, true)
+                && ! in_array($gone->id, $ids, true) && ! in_array($linked->id, $ids, true);
+        }));
+    $this->actingAs($manager)->get('/trainers/people?q=mar')->assertNotFound();
 });
 
 it('lists, shows and changes the trainers', function () {
@@ -101,7 +158,7 @@ it('refuses the trainers to whoever lacks sessions.trainers.manage', function ()
 
     $this->actingAs($user)->get('/trainers')->assertForbidden();
     $this->actingAs($user)->get("/trainers/{$trainer->id}")->assertForbidden();
-    $this->actingAs($user)->post('/trainers', ['person_id' => makePerson('X')->id, 'status' => 'employee'])->assertForbidden();
+    $this->actingAs($user)->post('/trainers', ['person' => ['last_name' => 'X'], 'status' => 'employee'])->assertForbidden();
     $this->actingAs($user)->post("/trainers/{$trainer->id}/unavailabilities", ['starts_at' => '2027-01-04T09:00', 'ends_at' => '2027-01-04T12:00'])->assertForbidden();
 });
 
@@ -120,20 +177,13 @@ it('deletes an unused trainer, never one in use', function () {
 });
 
 it('restores a deleted trainer when the person is declared again', function () {
-    $person = makePerson('Revenant');
+    $person = makePerson('Revenant', ['email' => 'revenant@example.test']);
     $old = makeTrainer($person, ['status' => 'freelance']);
     $old->delete();
 
-    $this->actingAs(trainersManager())->post('/trainers', ['person_id' => $person->id, 'status' => 'employee'])->assertRedirect();
+    $this->actingAs(trainersManager())->post('/trainers', ['person' => ['last_name' => 'Revenant', 'first_name' => '', 'email' => 'revenant@example.test'], 'status' => 'employee'])->assertRedirect();
 
     expect(Trainer::query()->sole()->id)->toBe($old->id)->and($old->refresh()->status)->toBe('employee');
-});
-
-it('searches the people of the organisme to declare a trainer', function () {
-    makePerson('Lemoine', ['first_name' => 'Sophie']);
-
-    $this->actingAs(trainersManager())->getJson('/trainers/people?q=lemo')->assertOk()
-        ->assertJsonPath('personnes.0.last_name', 'Lemoine');
 });
 
 // ---------------------------------------------------------------- unavailabilities
@@ -201,28 +251,49 @@ it('links a trainer to a user of the organisme by hand, one trainer per user', f
 
 it('links the account to the trainer on invitation acceptance when exactly one trainer has the e-mail', function () {
     $trainer = makeTrainer(makePerson('Solo', ['email' => 'Solo@Example.test']));
-    $invitation = Invitation::issue('solo@example.test', 'Solo', RoleModel::forSystem(Role::Formateur));
+    $invitation = Invitation::issue('solo@example.test', 'Solo', RoleModel::forSystem(Role::Commercial));
 
     $this->post("/activation/{$invitation->plainToken}", ['password' => 'un-mot-de-passe-solide', 'password_confirmation' => 'un-mot-de-passe-solide'])
         ->assertRedirect('/login');
 
-    $user = User::query()->where('email', 'solo@example.test')->sole();
-    expect($trainer->refresh()->user_id)->toBe($user->id)
-        ->and($user->role()?->systemRole())->toBe(Role::Formateur);
+    expect($trainer->refresh()->user_id)->toBe(User::query()->where('email', 'solo@example.test')->sole()->id)
+        ->and(Trainer::query()->count())->toBe(1);
 });
 
-it('links nothing when several trainers, or none, have the e-mail', function () {
+it('creates the trainer of a user invited as Formateur, linked to him', function () {
+    $invitation = Invitation::issue('nouveau@example.test', 'Jean Nouveau', RoleModel::forSystem(Role::Formateur));
+
+    $this->post("/activation/{$invitation->plainToken}", ['password' => 'un-mot-de-passe-solide', 'password_confirmation' => 'un-mot-de-passe-solide'])
+        ->assertRedirect('/login');
+
+    $user = User::query()->where('email', 'nouveau@example.test')->sole();
+    $trainer = Trainer::query()->sole();
+    expect($trainer->user_id)->toBe($user->id)->and($trainer->status)->toBe('employee')
+        ->and(Person::query()->find($trainer->person_id)?->last_name)->toBe('Nouveau');
+});
+
+it('creates the trainer of a user whose role becomes Formateur, once', function () {
+    $user = userIn(tenant(), ['name' => 'Claire Change', 'email' => 'claire@example.test']);
+    $user->assignPrimaryRole(Role::Commercial);
+    expect(Trainer::query()->count())->toBe(0);
+
+    $user->assignPrimaryRole(Role::Formateur);
+    expect(Trainer::query()->sole()->user_id)->toBe($user->id);
+
+    $user->assignPrimaryRole(Role::Commercial);
+    $user->assignPrimaryRole(Role::Formateur);
+    expect(Trainer::query()->count())->toBe(1);
+});
+
+it('links nothing when several trainers have the e-mail', function () {
     $a = makeTrainer(makePerson('Double', ['email' => 'double@example.test']));
     $b = makeTrainer(makePerson('Double bis', ['email' => 'double@example.test']));
     $invitation = Invitation::issue('double@example.test', 'Double', RoleModel::forSystem(Role::Formateur));
-    $none = Invitation::issue('personne@example.test', 'Personne', RoleModel::forSystem(Role::Formateur));
 
-    foreach ([$invitation, $none] as $i) {
-        $this->post("/activation/{$i->plainToken}", ['password' => 'un-mot-de-passe-solide', 'password_confirmation' => 'un-mot-de-passe-solide'])->assertRedirect('/login');
-    }
+    $this->post("/activation/{$invitation->plainToken}", ['password' => 'un-mot-de-passe-solide', 'password_confirmation' => 'un-mot-de-passe-solide'])->assertRedirect('/login');
 
     expect($a->refresh()->user_id)->toBeNull()->and($b->refresh()->user_id)->toBeNull()
-        ->and(Trainer::query()->whereNotNull('user_id')->count())->toBe(0);
+        ->and(Trainer::query()->count())->toBe(2);
 });
 
 it('offers to invite a trainer without account, the invitation page prefilled', function () {
@@ -240,8 +311,9 @@ it('offers to invite a trainer without account, the invitation page prefilled', 
 // ---------------------------------------------------------------- « Mon planning » (the trainer himself)
 
 it('lets a linked trainer record and remove his own unavailabilities, never another one', function () {
+    // The Formateur role gave him his trainer record.
     $account = userWithRole(Role::Formateur);
-    $mine = makeTrainer(null, ['user_id' => $account->id]);
+    $mine = Trainers::forUser($account) ?? throw new RuntimeException('Formateur sans fiche.');
     $other = makeTrainer(makePerson('Autre'));
     $foreign = TrainerUnavailability::query()->create(['trainer_id' => $other->id, 'starts_at' => '2027-01-04 09:00', 'ends_at' => '2027-01-04 12:00']);
 
@@ -258,6 +330,8 @@ it('lets a linked trainer record and remove his own unavailabilities, never anot
 
 it('refuses « Mon planning » unavailabilities to a user linked to no trainer', function () {
     $account = userWithRole(Role::Formateur);
+    // Unlinked by a manager afterwards.
+    Trainers::link(Trainers::forUser($account) ?? throw new RuntimeException('Formateur sans fiche.'), null);
 
     $this->actingAs($account)->get('/mon-planning')->assertOk()->assertInertia(fn (Assert $page) => $page->where('trainer', null));
     $this->actingAs($account)->post('/mon-planning/unavailabilities', ['starts_at' => '2027-01-05T08:00', 'ends_at' => '2027-01-05T18:00'])->assertNotFound();
