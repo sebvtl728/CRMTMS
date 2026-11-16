@@ -236,3 +236,31 @@ it('keeps the DAS of the trainers of each organisme apart (RLS)', function () {
     $foreignDas = app(TenantContext::class)->run($other, fn () => ReferenceItem::query()->where('label', 'Ailleurs DAS')->firstOrFail());
     $this->actingAs(tdUser(null))->put("/trainers/{$trainer->id}/das", ['das_ids' => [$foreignDas->id]])->assertSessionHasErrors('das_ids.0');
 });
+
+it('lets a DAS-scoped manager attach and detach only the DAS he follows, the others stay untouched', function () {
+    $trainer = tdTrainer('Martin', [TD_HOTEL, TD_SUPPORT]);
+    $user = tdUser(AccessScope::Das, [TD_HOTEL]);
+    $hotel = tdDas(TD_HOTEL)->id;
+    $support = tdDas(TD_SUPPORT)->id;
+    $transverse = tdDas('Compétences transversales')->id;
+
+    $this->actingAs($user)->get("/trainers/{$trainer->id}")->assertInertia(fn (Assert $page) => $page
+        ->where('dasEditable', [$hotel]));
+
+    // Attaching a DAS he does not follow: refused in French.
+    $this->actingAs($user)->put("/trainers/{$trainer->id}/das", ['das_ids' => [$hotel, $support, $transverse]])
+        ->assertSessionHasErrors(['das_ids.2' => 'Vous ne pouvez gérer que les DAS que vous suivez.']);
+
+    // Detaching his DAS keeps the one he does not follow (the trainer stays his to see until then).
+    $this->actingAs($user)->put("/trainers/{$trainer->id}/das", ['das_ids' => [$support]])->assertRedirect()->assertSessionHasNoErrors();
+    expect(TrainerDas::query()->where('trainer_id', $trainer->id)->pluck('das_id')->all())->toBe([$support]);
+
+    // Dropping a DAS he does not follow is refused too (it would not be in the sent list).
+    $other = tdTrainer('Aubert', [TD_HOTEL, TD_SUPPORT]);
+    $this->actingAs($user)->put("/trainers/{$other->id}/das", ['das_ids' => [$hotel]])->assertSessionHasErrors('das_ids');
+    expect(TrainerDas::query()->where('trainer_id', $other->id)->count())->toBe(2);
+
+    // The whole-organisme scope is unrestricted.
+    $this->actingAs(tdUser(null))->put("/trainers/{$other->id}/das", ['das_ids' => [$transverse]])->assertRedirect();
+    expect(TrainerDas::query()->where('trainer_id', $other->id)->pluck('das_id')->all())->toBe([$transverse]);
+});

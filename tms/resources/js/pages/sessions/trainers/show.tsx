@@ -27,6 +27,7 @@ interface Props {
     unavailabilities: UnavailabilityRow[];
     statusOptions: Option[];
     dasOptions: Option[];
+    dasEditable: string[] | null;
     userOptions: Option[];
     invite_url: string | null;
     status?: string;
@@ -34,7 +35,7 @@ interface Props {
 
 const NONE = '__none__';
 
-export default function TrainerShow({ trainer, unavailabilities, statusOptions, dasOptions, userOptions, invite_url, status }: Props) {
+export default function TrainerShow({ trainer, unavailabilities, statusOptions, dasOptions, dasEditable, userOptions, invite_url, status }: Props) {
     const breadcrumbs: BreadcrumbItem[] = [
         { title: 'Formateurs', href: '/trainers' },
         { title: trainer.label, href: `/trainers/${trainer.id}` },
@@ -127,7 +128,10 @@ export default function TrainerShow({ trainer, unavailabilities, statusOptions, 
                         <div className="flex flex-wrap gap-x-6 gap-y-2">
                             {dasOptions.map((o) => (
                                 <label key={o.value} className="flex items-center gap-2 text-sm">
-                                    <Checkbox checked={das.data.das_ids.includes(o.value)} onCheckedChange={(c) => toggleDas(o.value, c === true)} />
+                                    <Checkbox
+                                        checked={das.data.das_ids.includes(o.value)}
+                                        disabled={dasEditable !== null && !dasEditable.includes(o.value)}
+                                        onCheckedChange={(c) => toggleDas(o.value, c === true)} />
                                     {o.label}
                                 </label>
                             ))}

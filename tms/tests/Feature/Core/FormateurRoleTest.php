@@ -91,10 +91,11 @@ it('grants the planning rights per role', function () {
         ->and($only(Role::Commercial))->toEqualCanonicalizing($managers)
         ->and($only(Role::ChargeRelations))->toEqualCanonicalizing($managers)
         ->and($only(Role::Assistant))->toEqualCanonicalizing($managers)
-        ->and($only(Role::ResponsableDas))->toBe([Permissions::SEANCES_VIEW])
+        ->and($only(Role::ResponsableDas))->toEqualCanonicalizing([Permissions::SEANCES_VIEW, Permissions::TRAINERS_MANAGE])
         ->and($only(Role::Formateur))->toEqualCanonicalizing([Permissions::SEANCES_VIEW, Permissions::ATTENDANCE_MANAGE]);
 
     expect(Scopes::of(userWithRole(Role::ResponsableDas), Permissions::SEANCES_VIEW))->toBe(AccessScope::Das)
+        ->and(Scopes::of(userWithRole(Role::ResponsableDas), Permissions::TRAINERS_MANAGE))->toBe(AccessScope::Das)
         ->and(Scopes::of(userWithRole(Role::Assistant), Permissions::SEANCES_MANAGE))->toBe(AccessScope::All);
 });
 

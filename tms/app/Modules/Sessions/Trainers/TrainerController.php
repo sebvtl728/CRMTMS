@@ -3,12 +3,16 @@
 namespace App\Modules\Sessions\Trainers;
 
 use App\Http\Controllers\Controller;
+use App\Modules\Core\Access\AccessScope;
 use App\Modules\Core\Access\Permissions as CorePermissions;
 use App\Modules\Core\Access\Role;
+use App\Modules\Core\Access\Scopes;
 use App\Modules\Core\References\ReferenceItem;
 use App\Modules\Core\References\ReferenceList;
 use App\Modules\Core\Users\User;
 use App\Modules\Crm\Public\Fiches;
+use App\Modules\Crm\Public\UserDas;
+use App\Modules\Sessions\Permissions;
 use App\Modules\Sessions\Sessions\SessionListQuery;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -27,6 +31,8 @@ use Inertia\Response;
  */
 class TrainerController extends Controller
 {
+    private const NOT_FOLLOWED = 'Vous ne pouvez gérer que les DAS que vous suivez.';
+
     public function index(Request $request): Response
     {
         // ?das=: the trainers attached to that DAS (an unknown value: no filter).
@@ -117,6 +123,8 @@ class TrainerController extends Controller
             'unavailabilities' => UnavailabilityInput::rows($trainer->unavailabilities()->orderByDesc('starts_at')->get()),
             'statusOptions' => TrainerStatus::options(),
             'dasOptions' => SessionListQuery::reference(ReferenceList::Das, $trainer->das()->pluck('das_id')->all()),
+            // DAS he may attach or detach (null scope « Ses DAS »: those he follows only).
+            'dasEditable' => Scopes::of($viewer, Permissions::TRAINERS_MANAGE) === AccessScope::Das ? UserDas::ids($viewer) : null,
             // Accounts of the organisme not linked to another trainer.
             'userOptions' => User::query()->whereNotIn('id', $linked)->orderBy('name')->get(['id', 'name', 'email'])
                 ->map(fn (User $u): array => ['value' => $u->id, 'label' => "{$u->name} ({$u->email})"])->values()->all(),
@@ -168,6 +176,20 @@ class TrainerController extends Controller
         foreach (array_values($data['das_ids']) as $i => $id) {
             if (! in_array($id, $valid, true)) {
                 $errors["das_ids.$i"] = "Ce DAS n'existe pas ou n'est plus actif.";
+            }
+        }
+        // « Ses DAS »: only the DAS he follows may be attached or detached.
+        $viewer = $request->user();
+        assert($viewer instanceof User);
+        if (Scopes::of($viewer, Permissions::TRAINERS_MANAGE) === AccessScope::Das) {
+            $followed = UserDas::ids($viewer);
+            foreach (array_values($data['das_ids']) as $i => $id) {
+                if (! in_array($id, $followed, true) && ! in_array($id, $kept, true)) {
+                    $errors["das_ids.$i"] = self::NOT_FOLLOWED;
+                }
+            }
+            if ($errors === [] && array_diff(array_diff($kept, $followed), $ids) !== []) {
+                $errors['das_ids'] = self::NOT_FOLLOWED;
             }
         }
         if ($errors !== []) {

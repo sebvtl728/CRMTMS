@@ -122,8 +122,8 @@ final class Permissions
         return match ($role) {
             Role::AdminOrganisme => self::all(),
             Role::Direction => [...$views, ...$planning],
-            // He sees the sessions of his DAS: their séances too.
-            Role::ResponsableDas => [...$views, self::SEANCES_VIEW],
+            // He sees the sessions of his DAS: their séances too, and manages the trainers of his DAS.
+            Role::ResponsableDas => [...$views, self::SEANCES_VIEW, self::TRAINERS_MANAGE],
             // Who manages the sessions plans them (closing a month: direction and administrator).
             Role::Commercial, Role::ChargeRelations, Role::Assistant => [...$views, self::DOSSIERS_UPDATE, self::SESSIONS_UPDATE, ...array_values(array_diff($planning, [self::ATTENDANCE_CLOSE]))],
             Role::Formateur => self::TRAINER_SCOPED,

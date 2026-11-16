@@ -108,8 +108,8 @@ it('offers the Sessions rights and their scopes to the roles of an existing orga
 
     $synced = sessionsMatrix($tenant);
     expect($synced)->toBe($fresh)
-        ->and($synced['rights']['responsable_das'])->toBe(['sessions.dossiers.view', 'sessions.seances.view', 'sessions.sessions.view'])
-        ->and($synced['scopes'])->toContain('responsable_das sessions.dossiers.view das', 'responsable_das sessions.sessions.view das');
+        ->and($synced['rights']['responsable_das'])->toBe(['sessions.dossiers.view', 'sessions.seances.view', 'sessions.sessions.view', 'sessions.trainers.manage'])
+        ->and($synced['scopes'])->toContain('responsable_das sessions.dossiers.view das', 'responsable_das sessions.sessions.view das', 'responsable_das sessions.trainers.manage das');
 
     // Twice: nothing changes.
     $applied = app(TenantContext::class)->run($tenant, fn () => DB::table(PermissionSync::TABLE)->count());
