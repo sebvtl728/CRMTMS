@@ -170,6 +170,30 @@ it('lists her enrolments and her dossiers in the RGPD export, complete', functio
         ]);
 });
 
+it('adds to the RGPD export her BPF category, her share of the price, her fundings and the lines of her own dossiers', function () {
+    $lea = makePerson('Durand', ['first_name' => 'Léa', 'is_individual' => true]);
+    $own = l2Dossier($lea);
+    l2Enrol($own, l2Session(), $lea, ['bpf_category_id' => crmItem(ReferenceList::BpfCategory, 'Particuliers')->id]);
+    l2Funding($own, [
+        'funder_organisation_id' => null, 'funder_person_id' => $lea->id, 'funding_type_id' => crmItem(ReferenceList::FundingType, 'Personnel')->id,
+        'amount' => '400,00', 'status' => 'agreed', 'agreement_number' => 'ACC-42', 'agreed_on' => '2026-11-10', 'notes' => 'Paie en 2 fois',
+    ]);
+    // A funding by an entreprise is not hers.
+    l2Funding($own, ['amount' => '100,00']);
+
+    $export = PersonDataExport::for($lea->refresh());
+
+    expect($export['inscriptions'][0])->toMatchArray(['categorie_bpf' => 'Particuliers', 'part_du_prix' => '1000.00'])
+        ->and($export['financements'])->toBe([[
+            'dossier' => $own->number, 'type' => 'Personnel', 'montant' => '400.00', 'etat' => 'Accordé',
+            'numero_accord' => 'ACC-42', 'date_accord' => '2026-11-10', 'notes' => 'Paie en 2 fois',
+        ]])
+        ->and($export['dossiers'][0])->toMatchArray(['numero' => $own->number, 'montant_ht' => '1000.00'])
+        ->and($export['dossiers'][0]['lignes'])->toBe([[
+            'libelle' => 'HACCP 3 jours', 'quantite' => '1.00', 'unite' => 'forfait', 'prix_unitaire' => '1000.00', 'remise_pourcent' => '0.00', 'total_ht' => '1000.00',
+        ]]);
+});
+
 it('keeps the export to users who see the whole organisme in the dossiers and sessions too', function () {
     $crmAll = [CrmPermissions::GDPR => null];
     foreach (CrmPermissions::views() as $view) {
