@@ -1,5 +1,6 @@
 <?php
 
+use App\Modules\Sessions\Attendance\AttendanceController;
 use App\Modules\Sessions\Dossiers\DossierController;
 use App\Modules\Sessions\Dossiers\DossierFromQuoteController;
 use App\Modules\Sessions\Enrolments\EnrolmentController;
@@ -63,6 +64,20 @@ Route::middleware(['auth'])->prefix('sessions')->name('sessions.')->group(functi
         Route::put('{trainingSession}/placements/{placementPeriod}/hosts/{enrolment}', [PlacementController::class, 'host'])->name('placements.hosts.update');
         Route::delete('{trainingSession}/placements/{placementPeriod}/hosts/{enrolment}', [PlacementController::class, 'removeHost'])->name('placements.hosts.destroy');
     });
+    // « Présences » tab: sessions.attendance.manage or .close on the session (JSON).
+    Route::get('{trainingSession}/attendance', [AttendanceController::class, 'session'])->name('attendance');
+    Route::post('{trainingSession}/monthly-hours', [AttendanceController::class, 'monthly'])->middleware('can:sessions.attendance.manage')->name('monthly-hours');
+    Route::post('{trainingSession}/closures', [AttendanceController::class, 'close'])->middleware('can:sessions.attendance.close')->name('closures.store');
+    Route::post('{trainingSession}/closures/reopen', [AttendanceController::class, 'reopen'])->middleware('can:sessions.attendance.close')->name('closures.reopen');
+});
+
+// Attendance of a séance (JSON): sessions.attendance.manage within its scope
+// on the séance (« Ses séances » for a trainer), else 404.
+Route::middleware(['auth', 'can:sessions.attendance.manage'])->prefix('seances/{seance}/attendance')->name('seances.attendance.')->group(function () {
+    Route::get('/', [AttendanceController::class, 'grid'])->name('show');
+    Route::post('/', [AttendanceController::class, 'record'])->name('store');
+    Route::post('all-present', [AttendanceController::class, 'allPresent'])->name('all-present');
+    Route::delete('{enrolmentId}', [AttendanceController::class, 'clear'])->name('destroy');
 });
 
 // An enrolment: sessions.sessions.update on its session (EnrolmentPolicy).

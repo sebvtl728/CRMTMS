@@ -188,6 +188,21 @@ final class Seances
     }
 
     /**
+     * Whether the month of $date is open for the séances of the session
+     * (the guard does not refuse it).
+     */
+    public static function isMonthOpen(TrainingSession $session, string $date): bool
+    {
+        try {
+            self::assertMonthOpen($session, $date);
+        } catch (UserFacingHttpException) {
+            return false;
+        }
+
+        return true;
+    }
+
+    /**
      * @param  (Closure(TrainingSession, string): void)|null  $guard  throws to refuse
      */
     public static function guardMonthsWith(?Closure $guard): void

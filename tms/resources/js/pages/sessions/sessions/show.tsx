@@ -3,6 +3,7 @@ import InputError from '@/components/input-error';
 import { EnrolDialog, type EnrolDossierOption } from '@/components/sessions/enrolment-dialog';
 import { EnrolmentList, type EnrolmentReferences, type EnrolmentRow } from '@/components/sessions/enrolment-list';
 import { SessionModules, type SessionPlanning } from '@/components/sessions/session-modules';
+import { SessionAttendance } from '@/components/sessions/session-attendance';
 import { SessionPlanningSeances } from '@/components/sessions/session-planning';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -36,12 +37,14 @@ interface ShowProps {
     enrol: { dossiers: EnrolDossierOption[] } | null;
     enrolment_references: EnrolmentReferences | null;
     planning: SessionPlanning;
+    /** The « Présences » tab: attendance managed or closed on the session. */
+    attendance_tab: boolean;
     status?: string;
     /** Trainees planned above the new hours of the session (their enrolments unchanged). */
     warning?: string | null;
 }
 
-const TABS = ['Session', 'Planning'] as const;
+const TABS = ['Session', 'Planning', 'Présences'] as const;
 
 function CancelDialog({ sessionId, reasons, open, onClose }: { sessionId: string; reasons: Option[]; open: boolean; onClose: () => void }) {
     const { data, setData, post, processing, errors, reset } = useForm({ cancel_reason_id: '' });
@@ -105,6 +108,7 @@ export default function SessionShow({
     enrol,
     enrolment_references,
     planning,
+    attendance_tab,
     status,
     warning,
 }: ShowProps) {
@@ -189,7 +193,7 @@ export default function SessionShow({
                 )}
 
                 <div role="tablist" aria-label="Sections de la session" className="flex gap-1 overflow-x-auto border-b">
-                    {TABS.map((t) => (
+                    {TABS.filter((t) => t !== 'Présences' || attendance_tab).map((t) => (
                         <button
                             key={t}
                             role="tab"
@@ -212,6 +216,11 @@ export default function SessionShow({
                     </div>
                 )}
 
+                {tab === 'Présences' && attendance_tab && (
+                    <div role="tabpanel" id="panel-Présences" aria-labelledby="tab-Présences" className="grid gap-6">
+                        <SessionAttendance sessionId={session.id} />
+                    </div>
+                )}
                 {tab === 'Session' && (
                     <div role="tabpanel" id="panel-Session" aria-labelledby="tab-Session" className="grid gap-6">
                         <section aria-label="Informations" className="rounded-xl border p-4">

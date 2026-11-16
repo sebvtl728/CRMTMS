@@ -130,8 +130,8 @@ export interface JsonAnswer<T> {
     message: string | null;
 }
 
-/** GET or POST JSON to the application (session cookie and XSRF token). */
-export async function sendJson<T>(method: 'GET' | 'POST', url: string, body?: unknown): Promise<JsonAnswer<T>> {
+/** GET, POST or DELETE JSON to the application (session cookie and XSRF token). */
+export async function sendJson<T>(method: 'GET' | 'POST' | 'DELETE', url: string, body?: unknown): Promise<JsonAnswer<T>> {
     const response = await fetch(url, {
         method,
         headers: {

@@ -17,6 +17,11 @@ use App\Modules\Core\Users\User;
 use App\Modules\Crm\Public\FicheBlocks;
 use App\Modules\Crm\Public\FicheLinks;
 use App\Modules\Crm\Public\QuoteLinks;
+use App\Modules\Sessions\Attendance\Attendance;
+use App\Modules\Sessions\Attendance\AttendanceClosure;
+use App\Modules\Sessions\Attendance\Attendances;
+use App\Modules\Sessions\Attendance\Closures;
+use App\Modules\Sessions\Attendance\MonthlyHour;
 use App\Modules\Sessions\Dossiers\Dossier;
 use App\Modules\Sessions\Dossiers\DossierFromQuote;
 use App\Modules\Sessions\Dossiers\DossierLine;
@@ -32,9 +37,11 @@ use App\Modules\Sessions\Gdpr\PersonSessionsExport;
 use App\Modules\Sessions\Gdpr\RetentionHolds;
 use App\Modules\Sessions\History\SessionsHistory;
 use App\Modules\Sessions\Modules\SessionModule;
+use App\Modules\Sessions\Planning\Events\SeanceChanged;
 use App\Modules\Sessions\Planning\PlacementPeriod;
 use App\Modules\Sessions\Planning\PlacementPeriodHost;
 use App\Modules\Sessions\Planning\Seance;
+use App\Modules\Sessions\Planning\Seances;
 use App\Modules\Sessions\Resources\ClosurePeriod;
 use App\Modules\Sessions\Resources\Room;
 use App\Modules\Sessions\Resources\Rooms;
@@ -95,6 +102,9 @@ class SessionsServiceProvider extends ServiceProvider
             Seance::MORPH_ALIAS => Seance::class,
             PlacementPeriod::MORPH_ALIAS => PlacementPeriod::class,
             PlacementPeriodHost::MORPH_ALIAS => PlacementPeriodHost::class,
+            Attendance::MORPH_ALIAS => Attendance::class,
+            MonthlyHour::MORPH_ALIAS => MonthlyHour::class,
+            AttendanceClosure::MORPH_ALIAS => AttendanceClosure::class,
         ]);
     }
 
@@ -105,6 +115,7 @@ class SessionsServiceProvider extends ServiceProvider
         self::registerFicheBlocks();
         self::registerFicheLinks();
         self::registerPlanningUsage();
+        self::registerAttendance();
         SessionsHistory::registerOnFiches();
         // « Créer le dossier » / « Voir le dossier » on an accepted quote.
         QuoteLinks::register('sessions.dossier', fn (string $quoteId, User $viewer) => app(DossierFromQuote::class)->link($quoteId, $viewer));
@@ -245,6 +256,19 @@ class SessionsServiceProvider extends ServiceProvider
     {
         Rooms::registerUsage('sessions.seances', fn (string $roomId): bool => Seance::query()->where('room_id', $roomId)->exists());
         Trainers::registerUsage('sessions.seances', fn (string $trainerId): bool => Seance::query()->where('trainer_id', $trainerId)->exists());
+    }
+
+    /**
+     * The attendance and the séances (spec § 4 bis 5, 6): a séance with
+     * attendance is never deleted; a closed month refuses its séances
+     * (created, moved, cancelled, deleted; 409); a séance moved or
+     * cancelled reviews its attendance (after commit).
+     */
+    public static function registerAttendance(): void
+    {
+        Seances::registerAttendance('sessions.attendance', fn (string $seanceId): bool => Attendance::query()->where('seance_id', $seanceId)->exists());
+        Seances::guardMonthsWith(fn (TrainingSession $session, string $date) => Closures::assertOpen($session->id, $date));
+        Event::listen(SeanceChanged::class, fn (SeanceChanged $event) => Attendances::onSeanceChanged($event));
     }
 
     /**

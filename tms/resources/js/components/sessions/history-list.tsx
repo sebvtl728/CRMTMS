@@ -1,11 +1,11 @@
 import { Button } from '@/components/ui/button';
 import { formatDateTime } from '@/lib/crm';
-import { CircleDollarSign, FolderOpen, History, UserRound } from 'lucide-react';
+import { CircleDollarSign, ClipboardCheck, FolderOpen, History, Lock, UserRound } from 'lucide-react';
 import { useState } from 'react';
 
 /** One line of the « Historique » of a dossier (SessionsHistory::dossierPage, read from the journal). */
 export interface HistoryEntry {
-    type: 'dossier' | 'enrolment' | 'funding' | string;
+    type: 'dossier' | 'enrolment' | 'funding' | 'attendance' | 'monthly_hours' | 'closure' | string;
     at: string;
     title: string;
     body: string | null;
@@ -19,6 +19,8 @@ function EntryIcon({ type }: { type: string }) {
     if (type === 'dossier') return <FolderOpen className={cls} aria-hidden />;
     if (type === 'enrolment') return <UserRound className={cls} aria-hidden />;
     if (type === 'funding') return <CircleDollarSign className={cls} aria-hidden />;
+    if (type === 'attendance' || type === 'monthly_hours') return <ClipboardCheck className={cls} aria-hidden />;
+    if (type === 'closure') return <Lock className={cls} aria-hidden />;
 
     return <History className={cls} aria-hidden />;
 }

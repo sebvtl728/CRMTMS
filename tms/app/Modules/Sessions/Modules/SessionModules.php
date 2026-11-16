@@ -7,6 +7,7 @@ use App\Modules\Catalogue\Trainings;
 use App\Modules\Core\References\ReferenceItem;
 use App\Modules\Core\References\ReferenceList;
 use App\Modules\Core\Tenancy\TenantContext;
+use App\Modules\Sessions\Attendance\MonthlyHour;
 use App\Modules\Sessions\Enrolments\Enrolment;
 use App\Modules\Sessions\Enrolments\EnrolmentStatus;
 use App\Modules\Sessions\Planning\Seance;
@@ -219,6 +220,27 @@ final class SessionModules
     }
 
     /**
+     * The modules among $ids with activity (SessionModule::hasActivity()):
+     * séances (cancelled ones included, out of the trash), attendance at one
+     * of their séances (trashed ones included) or monthly hours. One query.
+     *
+     * @param  list<string>  $ids
+     * @return list<string>
+     */
+    public static function activeIds(array $ids): array
+    {
+        if ($ids === []) {
+            return [];
+        }
+
+        return Seance::query()->whereIn('session_module_id', $ids)->select('session_module_id')
+            ->union(Seance::withTrashed()->join('attendances', 'attendances.seance_id', '=', 'seances.id')
+                ->whereIn('seances.session_module_id', $ids)->select('seances.session_module_id'))
+            ->union(MonthlyHour::query()->whereIn('session_module_id', $ids)->select('session_module_id'))
+            ->toBase()->pluck('session_module_id')->map(fn ($id) => (string) $id)->unique()->values()->all();
+    }
+
+    /**
      * planned_hours of the (locked) session = Σ of its modules' minutes
      * (null when none has hours), saved (journaled) when it changes.
      */
@@ -241,8 +263,7 @@ final class SessionModules
         $modules = SessionModule::query()->where('training_session_id', $session->id)->orderBy('position')->orderBy('id')->get();
         $modalities = ReferenceItem::query()->whereIn('id', $modules->pluck('modality_id')->filter()->unique()->values())->pluck('label', 'id');
         $scheduled = self::scheduledMinutes($session);
-        // Modules with activity, in one query (SessionModule::hasActivity()'s rule).
-        $active = array_flip(Seance::query()->whereIn('session_module_id', $modules->pluck('id')->all())->distinct()->pluck('session_module_id')->all());
+        $active = array_flip(self::activeIds($modules->pluck('id')->all()));
 
         return $modules->map(fn (SessionModule $m) => [
             'id' => $m->id,

@@ -51,6 +51,21 @@ Toujours dans l'onglet **Planning**, droit **Planifier les séances** (`sessions
 - **Stages en entreprise** : une période (intitulé, dates communes dans celles de la session) ; pour chaque stagiaire, une **entreprise d'accueil** (fiche du CRM) et, au besoin, ses **propres dates**, qui remplacent les dates communes pour lui. Les dates communes sont exclues par l'assistant ; une séance pendant le stage individuel d'un stagiaire donne une alerte (il n'y est pas attendu), pas une exclusion. Les stages ne comptent dans aucune heure. Une entreprise d'accueil mise à la corbeille reste affichée « (supprimée) ».
 - Une salle ou un formateur utilisé par une séance ne se supprime plus : désactivez-le.
 
+### Présences, heures du mois et clôture (0.8.0)
+
+Les **heures réalisées** font foi pour la facturation au réalisé (0.9) : elles se comptent en **minutes entières**, par jour et par mois de **Paris**, et chaque saisie, modification ou suppression est **journalisée** (identifiants et minutes seulement, jamais un motif ni un nom) et apparaît dans l'**historique du dossier** du stagiaire.
+
+Onglet **Présences** de la session (droit **Saisir les présences** `sessions.attendance.manage` ou **Clôturer les présences** `sessions.attendance.close`, avec son périmètre sur la session), un **mois** à la fois :
+
+- **Séances du mois** : présences saisies / stagiaires attendus, « à revoir ». Le bouton **Présences** ouvre la feuille de la séance : **Tous présents** marque présents les stagiaires attendus qui n'ont pas encore de présence, puis on note les exceptions — **Présent** (la durée de la séance), **Partiel** (des minutes, plus de 0 et moins que la durée), **Absent** ou **Absence justifiée** (0 minute), un **motif** facultatif (300 caractères). Une présence se corrige ou s'efface tant que le mois est ouvert.
+- **Stagiaires attendus** : inscrits, confirmés, ou sortis en cours de formation, à partir de leur **date d'entrée** (inscription tardive) et jusqu'à leur **date de sortie** (abandon) ; jamais avant ni après. Liste d'attente et inscriptions annulées : aucune présence.
+- **Séance modifiée après présences** : si son jour ou ses horaires changent, ses présences passent « **à revoir** » ; « présent » prend la nouvelle durée, un « partiel » au-delà est ramené à la durée. **Annuler** une séance passe ses présences à 0 minute (gardées, journalisées). Une séance avec présences (même absentes) ne se **supprime** pas : annulez-la, ou effacez d'abord ses présences.
+- **Heures du mois** (modules en **intervalle**, sans séances) : pour chaque stagiaire et chaque module, les heures réalisées dans le mois (format 12:30 ; une case vidée efface ses heures), seulement dans les mois du module, à partir du mois d'entrée et jusqu'au mois de sortie du stagiaire. Saisie par les gestionnaires (pas par un formateur).
+- **Heures réalisées** : par stagiaire, les heures réalisées du mois (séances + heures du mois) et les heures prévues de la session (somme des modules ; un module sans heures prévues compte 0).
+- **Clôturer le mois** (droit **Clôturer les présences**) : ensuite plus aucune modification du mois — présences, heures du mois, et **création, suppression, annulation ou changement d'horaires des séances** de ce mois (l'assistant saute ce mois : « Mois clôturé ») — sans **réouverture**. **Rouvrir le mois** exige un **motif** ; la réouverture est journalisée et la dernière (qui, quand, motif) reste affichée. Changer le formateur, la salle ou la note d'une séance reste possible.
+
+**Le formateur** (rôle Formateur, « Ses séances ») saisit les présences de **ses** séances seulement (la feuille d'une séance d'un autre formateur répond « introuvable ») ; il n'y voit que les noms des stagiaires, jamais leurs besoins d'adaptation, notes, financements ni prix. Une séance sans formateur est saisie par les gestionnaires.
+
 La **page d'une session** (onglet **Session**) montre ses informations, les **places restantes** d'une session inter, les inscrits regroupés par dossier et la liste d'attente dans son ordre. Les noms des inscrits de tous les dossiers sont visibles ; le prix, les financements et le contractant d'un dossier ne le sont qu'avec le droit de consulter ce dossier.
 
 ## 2. Les dossiers

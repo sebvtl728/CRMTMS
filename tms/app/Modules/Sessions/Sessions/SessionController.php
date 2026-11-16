@@ -165,6 +165,9 @@ class SessionController extends Controller
             // Choices of the enrolment dialogs (abandon, details) for who may change them.
             'enrolment_references' => $user->can('update', $session) ? EnrolmentOptions::references() : null,
             'planning' => self::planning($session, ! $session->isCancelled() && $user->can('update', $session), $user),
+            // « Présences » tab (loaded as JSON): attendance managed or closed on the session.
+            'attendance_tab' => SessionsVisibility::allows($user, Permissions::ATTENDANCE_MANAGE, $session)
+                || SessionsVisibility::allows($user, Permissions::ATTENDANCE_CLOSE, $session),
             'status' => $request->session()->get('status'),
             'warning' => $request->session()->get('warning'),
         ]);

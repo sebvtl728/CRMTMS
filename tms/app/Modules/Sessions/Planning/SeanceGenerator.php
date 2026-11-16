@@ -59,6 +59,12 @@ final class SeanceGenerator
             return false;
         };
 
+        // A closed month of the session (attendance closure) takes no new séance.
+        $open = [];
+        $monthOpen = function (string $date) use (&$open, $session): bool {
+            return $open[substr($date, 0, 7)] ??= Seances::isMonthOpen($session, $date);
+        };
+
         $rows = [];
         for ($day = WorkingDays::day($request->from); $day->toDateString() <= $request->to; $day = $day->addDay()) {
             if (! in_array($day->isoWeekday(), $request->weekdays, true)) {
@@ -67,6 +73,7 @@ final class SeanceGenerator
             $date = $day->toDateString();
             foreach ($request->slots as $slot) {
                 $reason = match (true) {
+                    ! $monthOpen($date) => 'Mois clôturé',
                     isset($holidays[$date]) => "Férié : {$holidays[$date]}",
                     isset($closed[$date]) => "Fermeture : {$closed[$date]}",
                     isset($placement[$date]) => "Stage : {$placement[$date]}",

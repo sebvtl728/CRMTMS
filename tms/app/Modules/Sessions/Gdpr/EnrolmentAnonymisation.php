@@ -13,7 +13,9 @@ use Illuminate\Support\Facades\DB;
  *  - the fundings she pays (funder), that target one of her enrolments, or
  *    of her dossiers as particulier: notes (amounts, states and agreement
  *    numbers stay);
- *  - her dossiers as particulier: notes.
+ *  - her dossiers as particulier: notes;
+ *  - her attendance (0.8.0): the reasons of an absence or a partial
+ *    attendance (status and minutes stay: realised hours, invoicing).
  * Dossiers of an entreprise she is the contact of keep their notes (they
  * are the entreprise's). Written in SQL: the journal never held the values.
  */
@@ -32,6 +34,9 @@ final class EnrolmentAnonymisation
         $enrolments = DB::table('enrolments')->whereIn('person_id', $personIds);
         $enrolments->clone()->where(fn ($q) => $q->whereNotNull('adaptation_needs')->orWhereNotNull('notes'))
             ->update(['adaptation_needs' => null, 'notes' => null, 'updated_at' => $now]);
+
+        DB::table('attendances')->whereNotNull('reason')->whereIn('enrolment_id', $enrolments->clone()->select('id'))
+            ->update(['reason' => null, 'updated_at' => $now]);
 
         $ownDossiers = DB::table('dossiers')->whereIn('account_person_id', $personIds);
         DB::table('fundings')->whereNotNull('notes')
