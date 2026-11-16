@@ -6,8 +6,8 @@ use App\Modules\Crm\Activities\CalendarEvent;
 
 /**
  * The Microsoft Graph event of a CRM meeting or call: type and fiche,
- * opportunity, place and the link to the fiche. Never the report nor the
- * subject (CalendarEvent carries neither). Local Paris times with their
+ * purpose (« Motif »), opportunity, place and the link to the fiche. Never
+ * the report, the next steps nor the subject (CalendarEvent carries none). Local Paris times with their
  * time zone; the end is the start plus the exact duration (right across a
  * DST change).
  */
@@ -33,6 +33,7 @@ final class OutlookEvent
 
         $lines = array_filter([
             $event->fiche !== '' ? 'Fiche : '.$event->fiche : null,
+            $event->purpose !== null && trim($event->purpose) !== '' ? 'Motif : '.$event->purpose : null,
             $event->opportunity !== null ? 'Opportunité : '.$event->opportunity : null,
             $event->location !== null && trim($event->location) !== '' ? 'Lieu : '.$event->location : null,
             'Ouvrir dans le CRM : '.$event->url,

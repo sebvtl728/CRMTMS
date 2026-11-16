@@ -10,7 +10,9 @@ export interface ActivityRow {
     id: string;
     type: string | null;
     subject: string;
+    purpose: string | null;
     report: string | null;
+    next_steps: string | null;
     location: string | null;
     due_at: string | null;
     done_at: string | null;
@@ -58,7 +60,19 @@ export function ActivityList({ activities }: { activities: ActivityRow[] }) {
                             {a.responsible && ` · ${a.responsible}`}
                             {a.location && ` · ${a.location}`}
                         </p>
+                        {a.purpose && (
+                            <p className="mt-1 text-sm break-words whitespace-pre-line">
+                                <span className="text-muted-foreground">Motif : </span>
+                                {a.purpose}
+                            </p>
+                        )}
                         {a.report && <p className="mt-1 text-sm break-words whitespace-pre-line">{a.report}</p>}
+                        {a.next_steps && (
+                            <p className="mt-1 text-sm break-words whitespace-pre-line">
+                                <span className="text-muted-foreground">Suite à donner : </span>
+                                {a.next_steps}
+                            </p>
+                        )}
                     </div>
                     {a.can_update && (
                         <div className="flex flex-wrap gap-2">

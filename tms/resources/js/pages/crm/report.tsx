@@ -26,6 +26,7 @@ interface OpportunityChoice {
 interface Meeting {
     id: string;
     subject: string;
+    purpose: string | null;
     type: string | null;
     time: string;
     location: string | null;
@@ -79,7 +80,9 @@ export default function Report({ meetings, selected, fiche, types, results, stag
         person_id: '',
         type_id: defaultType,
         result_id: '',
+        purpose: meetings.find((m) => m.id === initialMeeting)?.purpose ?? '',
         report: '',
+        next_steps: '',
         opportunity_id: '',
         stage_id: '',
         loss_reason_id: '',
@@ -105,7 +108,17 @@ export default function Report({ meetings, selected, fiche, types, results, stag
 
     const chooseMeeting = (id: string) => {
         clearErrors();
-        setData((d) => ({ ...d, activity_id: d.activity_id === id ? '' : id, organisation_id: '', person_id: '' }));
+        setData((d) => {
+            const activityId = d.activity_id === id ? '' : id;
+
+            return {
+                ...d,
+                activity_id: activityId,
+                organisation_id: '',
+                person_id: '',
+                purpose: meetings.find((m) => m.id === activityId)?.purpose ?? '',
+            };
+        });
     };
 
     const pickFiche = (kind: 'organisation' | 'person', picked: Fiche) => {
@@ -134,7 +147,9 @@ export default function Report({ meetings, selected, fiche, types, results, stag
                     organisation_id: '',
                     person_id: '',
                     result_id: '',
+                    purpose: '',
                     report: '',
+                    next_steps: '',
                     next_type_id: '',
                     next_due_at: '',
                 }));
@@ -252,6 +267,20 @@ export default function Report({ meetings, selected, fiche, types, results, stag
                 </fieldset>
 
                 <div className="grid gap-2">
+                    <Label htmlFor="report-purpose">Motif</Label>
+                    <textarea
+                        id="report-purpose"
+                        rows={2}
+                        maxLength={2000}
+                        disabled={!hasSubject}
+                        value={data.purpose}
+                        onChange={(e) => setData('purpose', e.target.value)}
+                        className={textareaClass}
+                    />
+                    <InputError message={errors.purpose} />
+                </div>
+
+                <div className="grid gap-2">
                     <Label htmlFor="report-text">Compte rendu</Label>
                     <textarea
                         id="report-text"
@@ -263,6 +292,20 @@ export default function Report({ meetings, selected, fiche, types, results, stag
                         className={textareaClass}
                     />
                     <InputError message={errors.report} />
+                </div>
+
+                <div className="grid gap-2">
+                    <Label htmlFor="report-next-steps">Suite à donner</Label>
+                    <textarea
+                        id="report-next-steps"
+                        rows={2}
+                        maxLength={2000}
+                        disabled={!hasSubject}
+                        value={data.next_steps}
+                        onChange={(e) => setData('next_steps', e.target.value)}
+                        className={textareaClass}
+                    />
+                    <InputError message={errors.next_steps} />
                 </div>
 
                 {opportunities.length > 0 && (

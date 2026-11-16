@@ -89,6 +89,7 @@ final class CalendarEvents
             url: self::url($activity),
             updatedAt: CarbonImmutable::instance($activity->updated_at ?? $activity->created_at ?? now()),
             responsibleUserId: $activity->responsible_user_id,
+            purpose: $activity->purpose,
         );
     }
 

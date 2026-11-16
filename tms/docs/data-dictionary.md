@@ -265,7 +265,9 @@ Index : (`tenant_id`, `stage_id`), (`tenant_id`, `das_id`), (`tenant_id`, `respo
 | `id`, `tenant_id` | uuid | |
 | `type_id`, `result_id` | uuid (FK `reference_items` : `action_type`, `action_result`) | Type ; résultat (null) |
 | `subject` | string 200 | Objet (« Appel – Hôtel du Lac » par défaut) ; masqué au journal, remis au libellé du type à l'anonymisation |
+| `purpose` | text, null | Motif (≤ 2 000 caractères, validé par l'application) ; masqué au journal, effacé à l'anonymisation ; seul texte libre repris dans l'évènement Outlook |
 | `report` | text, null | Compte rendu ; masqué au journal, effacé à l'anonymisation |
+| `next_steps` | text, null | Suite à donner (≤ 2 000 caractères) ; masquée au journal, effacée à l'anonymisation ; jamais envoyée à Outlook ni au flux iCal |
 | `location` | string 255, null | Lieu ; masqué au journal, effacé à l'anonymisation |
 | `organisation_id`, `person_id`, `opportunity_id` | uuid, null (FK, cascade) | Au moins un (CHECK `activities_subject_check`) |
 | `due_at` | timestamptz(6), null | Échéance (action à faire) |

@@ -31,7 +31,7 @@ class QuickReportController extends Controller
 
         $meetings = QuickReport::meetingsOfToday($user, CarbonImmutable::now())->map(function (Activity $a) use ($user): array {
             $row = ActivityRows::row($a);
-            unset($row['report']);
+            unset($row['report'], $row['next_steps']);
             $at = CarbonImmutable::instance($a->due_at ?? CarbonImmutable::now())->setTimezone((string) config('app.timezone'));
 
             return [

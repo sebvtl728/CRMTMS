@@ -5,8 +5,9 @@ namespace App\Modules\Crm\Activities;
 use Carbon\CarbonImmutable;
 
 /**
- * A meeting or a call as published outside the CRM (iCal feed): never its
- * report, which stays in the tool.
+ * A meeting or a call as published outside the CRM (iCal feed, Outlook):
+ * never its report nor its next steps, which stay in the tool. Its purpose
+ * (« Motif ») is shown by Outlook only.
  */
 final readonly class CalendarEvent
 {
@@ -26,5 +27,6 @@ final readonly class CalendarEvent
         public string $url,
         public CarbonImmutable $updatedAt,
         public ?string $responsibleUserId = null,
+        public ?string $purpose = null,
     ) {}
 }

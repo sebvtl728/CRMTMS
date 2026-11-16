@@ -27,14 +27,17 @@ use Illuminate\Support\Facades\DB;
  * fiches (a person's active entreprises too, the fiche of its opportunity)
  * moves forward, and goes back when it is removed or dated earlier.
  *
- * Subject (« Appel – Jean Dupont »), report and place may describe a
- * person: journaled without value, cleared by the anonymisation.
+ * Subject (« Appel – Jean Dupont »), purpose (« Motif »), report, next
+ * steps (« Suite à donner ») and place may describe a person: journaled
+ * without value, cleared by the anonymisation.
  *
  * @property string $id
  * @property string $tenant_id
  * @property string $type_id
  * @property string $subject
+ * @property string|null $purpose
  * @property string|null $report
+ * @property string|null $next_steps
  * @property string|null $organisation_id
  * @property string|null $person_id
  * @property string|null $opportunity_id
@@ -60,11 +63,11 @@ class Activity extends Model
     ];
 
     /** @var list<string> */
-    protected array $auditPersonal = ['subject', 'report', 'location'];
+    protected array $auditPersonal = ['subject', 'purpose', 'report', 'next_steps', 'location'];
 
     /** What a calendar shows of an action (CalendarEvents): a change is announced (ActivityChanged). */
     public const CALENDAR_FIELDS = [
-        'type_id', 'due_at', 'duration_minutes', 'location', 'responsible_user_id',
+        'type_id', 'due_at', 'duration_minutes', 'location', 'purpose', 'responsible_user_id',
         'organisation_id', 'person_id', 'opportunity_id', 'deleted_at',
     ];
 
@@ -73,7 +76,7 @@ class Activity extends Model
 
     /** @var list<string> */
     protected $fillable = [
-        'type_id', 'subject', 'report', 'organisation_id', 'person_id', 'opportunity_id',
+        'type_id', 'subject', 'purpose', 'report', 'next_steps', 'organisation_id', 'person_id', 'opportunity_id',
         'due_at', 'done_at', 'duration_minutes', 'result_id', 'responsible_user_id', 'location',
     ];
 

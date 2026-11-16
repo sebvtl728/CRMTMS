@@ -5,6 +5,12 @@ Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) ; ve
 
 ## [Non publié]
 
+## [0.6.2] - 2026-11-16
+
+### Ajouté
+
+- Motif et suite à donner sur les actions.
+
 ## [0.6.1] - 2026-11-16
 
 ### Corrigé
@@ -352,7 +358,8 @@ Lot 1a : socle de l'application.
   mise à jour avec retour arrière automatique.
 - Publication : image multi-architecture signée (cosign), archive de version, sommes de contrôle.
 
-[Non publié]: https://github.com/sebvtl728/CRMTMS/compare/v0.6.1...HEAD
+[Non publié]: https://github.com/sebvtl728/CRMTMS/compare/v0.6.2...HEAD
+[0.6.2]: https://github.com/sebvtl728/CRMTMS/compare/v0.6.1...v0.6.2
 [0.6.1]: https://github.com/sebvtl728/CRMTMS/compare/v0.6.0...v0.6.1
 [0.6.0]: https://github.com/sebvtl728/CRMTMS/compare/v0.5.3...v0.6.0
 [0.5.3]: https://github.com/sebvtl728/CRMTMS/compare/v0.5.2...v0.5.3

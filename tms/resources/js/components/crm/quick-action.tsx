@@ -185,11 +185,13 @@ type CreateFields = {
     person_id: string;
     opportunity_id: string;
     subject: string;
+    purpose: string;
     done: boolean;
     done_at: string;
     due_at: string;
     result_id: string;
     report: string;
+    next_steps: string;
     location: string;
     next_type_id: string;
     next_due_at: string;
@@ -210,11 +212,13 @@ function CreateForm({ context, onDone }: { context: QuickActionContext; onDone: 
         person_id: '',
         opportunity_id: '',
         subject: '',
+        purpose: '',
         done: true,
         done_at: '',
         due_at: '',
         result_id: '',
         report: '',
+        next_steps: '',
         location: '',
         next_type_id: '',
         next_due_at: '',
@@ -366,6 +370,8 @@ function CreateForm({ context, onDone }: { context: QuickActionContext; onDone: 
                 <InputError message={errors.subject} />
             </div>
 
+            <PurposeField value={data.purpose} onChange={(v) => setData('purpose', v)} error={errors.purpose} />
+
             <div className="flex items-center gap-2">
                 <Checkbox id="qa-done" checked={data.done} onCheckedChange={(c) => setData('done', c === true)} />
                 <Label htmlFor="qa-done">Fait maintenant</Label>
@@ -420,6 +426,8 @@ function CreateForm({ context, onDone }: { context: QuickActionContext; onDone: 
                 </div>
             )}
 
+            <NextStepsField value={data.next_steps} onChange={(v) => setData('next_steps', v)} error={errors.next_steps} />
+
             {data.done && (
                 <NextFollowUp
                     types={choices.types}
@@ -452,7 +460,9 @@ interface ActivityData {
     done_at: string | null;
     duration_minutes: number | null;
     location: string | null;
+    purpose: string | null;
     report: string | null;
+    next_steps: string | null;
     result_id: string | null;
     responsible_user_id: string | null;
     organisation: Fiche | null;
@@ -462,19 +472,23 @@ interface ActivityData {
 
 type CompleteFields = {
     result_id: string;
+    purpose: string;
     report: string;
+    next_steps: string;
     done_at: string;
     next_type_id: string;
     next_due_at: string;
 };
 
-/** « Fait » on an action to do: result, report, next follow-up. */
+/** « Fait » on an action to do: result, purpose, report, next steps, next follow-up. */
 function CompleteForm({ activityId, onDone }: { activityId: string; onDone: () => void }) {
     const [loaded, setLoaded] = useState<(Choices & { activity: ActivityData }) | null>(null);
     const [failed, setFailed] = useState(false);
     const { data, setData, post, processing, errors } = useForm<CompleteFields>({
         result_id: '',
+        purpose: '',
         report: '',
+        next_steps: '',
         done_at: '',
         next_type_id: '',
         next_due_at: '',
@@ -484,7 +498,13 @@ function CompleteForm({ activityId, onDone }: { activityId: string; onDone: () =
         getJson<Choices & { activity: ActivityData }>(route('crm.activities.show', activityId))
             .then((json) => {
                 setLoaded(json);
-                setData((current) => ({ ...current, report: json.activity.report ?? '', result_id: json.activity.result_id ?? '' }));
+                setData((current) => ({
+                    ...current,
+                    purpose: json.activity.purpose ?? '',
+                    report: json.activity.report ?? '',
+                    next_steps: json.activity.next_steps ?? '',
+                    result_id: json.activity.result_id ?? '',
+                }));
             })
             .catch(() => setFailed(true));
         // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -552,7 +572,9 @@ function CompleteForm({ activityId, onDone }: { activityId: string; onDone: () =
                     <InputError message={errors.done_at} />
                 </div>
             </div>
+            <PurposeField value={data.purpose} onChange={(v) => setData('purpose', v)} error={errors.purpose} />
             <ReportField value={data.report} onChange={(v) => setData('report', v)} error={errors.report} />
+            <NextStepsField value={data.next_steps} onChange={(v) => setData('next_steps', v)} error={errors.next_steps} />
             <NextFollowUp
                 types={loaded.types}
                 typeId={data.next_type_id}
@@ -581,13 +603,15 @@ type EditFields = {
     duration_minutes: string;
     location: string;
     responsible_user_id: string;
+    purpose: string;
     result_id: string;
     report: string;
+    next_steps: string;
 };
 
 /**
- * « Modifier » an action: type, subject, due date (or date done, result
- * and report once done), duration, place and responsible. The fiches it
+ * « Modifier » an action: type, subject, purpose, due date (or date done,
+ * result and report once done), next steps, duration, place and responsible. The fiches it
  * concerns are not changed (read-only).
  */
 function EditForm({ activityId, onDone }: { activityId: string; onDone: () => void }) {
@@ -603,8 +627,10 @@ function EditForm({ activityId, onDone }: { activityId: string; onDone: () => vo
         duration_minutes: '',
         location: '',
         responsible_user_id: '',
+        purpose: '',
         result_id: '',
         report: '',
+        next_steps: '',
     });
 
     useEffect(() => {
@@ -621,8 +647,10 @@ function EditForm({ activityId, onDone }: { activityId: string; onDone: () => vo
                     duration_minutes: a.duration_minutes === null ? '' : String(a.duration_minutes),
                     location: a.location ?? '',
                     responsible_user_id: a.responsible_user_id ?? '',
+                    purpose: a.purpose ?? '',
                     result_id: a.result_id ?? '',
                     report: a.report ?? '',
+                    next_steps: a.next_steps ?? '',
                 });
             })
             .catch(() => setFailed(true));
@@ -650,6 +678,8 @@ function EditForm({ activityId, onDone }: { activityId: string; onDone: () => vo
                 subject: d.subject,
                 duration_minutes: d.duration_minutes,
                 location: d.location,
+                purpose: d.purpose,
+                next_steps: d.next_steps,
                 ...(d.responsible_user_id ? { responsible_user_id: d.responsible_user_id } : {}),
             };
 
@@ -745,6 +775,8 @@ function EditForm({ activityId, onDone }: { activityId: string; onDone: () => vo
                 <InputError message={errors.subject} />
             </div>
 
+            <PurposeField value={data.purpose} onChange={(v) => setData('purpose', v)} error={errors.purpose} />
+
             <div className="grid gap-4 sm:grid-cols-2">
                 {done ? (
                     <div className="grid gap-2">
@@ -808,6 +840,8 @@ function EditForm({ activityId, onDone }: { activityId: string; onDone: () => vo
                 </>
             )}
 
+            <NextStepsField value={data.next_steps} onChange={(v) => setData('next_steps', v)} error={errors.next_steps} />
+
             <DialogFooter>
                 <Button type="button" variant="outline" onClick={onDone}>
                     Annuler
@@ -818,6 +852,45 @@ function EditForm({ activityId, onDone }: { activityId: string; onDone: () => vo
                 </Button>
             </DialogFooter>
         </form>
+    );
+}
+
+/** « Motif »: why the call or meeting (shown in À faire, sent to Outlook). */
+function PurposeField({ value, onChange, error }: { value: string; onChange: (v: string) => void; error?: string }) {
+    return <NoteField id="qa-purpose" label="Motif" value={value} onChange={onChange} error={error} />;
+}
+
+/** « Suite à donner »: what comes next (stays in the CRM). */
+function NextStepsField({ value, onChange, error }: { value: string; onChange: (v: string) => void; error?: string }) {
+    return <NoteField id="qa-next-steps" label="Suite à donner" value={value} onChange={onChange} error={error} />;
+}
+
+function NoteField({
+    id,
+    label,
+    value,
+    onChange,
+    error,
+}: {
+    id: string;
+    label: string;
+    value: string;
+    onChange: (v: string) => void;
+    error?: string;
+}) {
+    return (
+        <div className="grid gap-2">
+            <Label htmlFor={id}>{label}</Label>
+            <textarea
+                id={id}
+                rows={2}
+                maxLength={2000}
+                value={value}
+                onChange={(e) => onChange(e.target.value)}
+                className="border-input bg-background focus:ring-ring w-full rounded-md border px-3 py-2 text-sm focus:ring-2 focus:outline-hidden"
+            />
+            <InputError message={error} />
+        </div>
     );
 }
 

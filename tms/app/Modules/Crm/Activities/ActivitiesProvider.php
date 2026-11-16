@@ -19,7 +19,7 @@ use Illuminate\Support\Facades\Auth;
 /**
  * « Historique » of an entreprise or a person: the actions on the fiche or
  * on one of its opportunities, at their done date (their due date while to
- * do), with type, status, result and report. Only the actions the viewer
+ * do), with type, status, result, purpose, report and next steps. Only the actions the viewer
  * sees (CrmVisibility), each with his rights on it (can_update,
  * can_delete); none without a signed-in viewer.
  */
@@ -72,13 +72,15 @@ final class ActivitiesProvider implements TimelineProvider
     }
 
     /**
-     * The report, preceded by the place of a meeting.
+     * The place of a meeting, the purpose, the report, then the next steps.
      */
     private function body(Activity $activity): ?string
     {
         $parts = array_filter([
             $activity->location === null ? null : 'Lieu : '.$activity->location,
+            $activity->purpose === null ? null : 'Motif : '.$activity->purpose,
             $activity->report,
+            $activity->next_steps === null ? null : 'Suite à donner : '.$activity->next_steps,
         ], fn (?string $p) => $p !== null && $p !== '');
 
         return $parts === [] ? null : implode("\n\n", $parts);

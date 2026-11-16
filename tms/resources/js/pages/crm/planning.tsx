@@ -22,6 +22,7 @@ interface PlanningItem {
     kind: 'meeting' | 'call';
     type: string | null;
     subject: string;
+    purpose: string | null;
     time: string;
     duration_minutes: number | null;
     location: string | null;
@@ -119,6 +120,12 @@ function Item({ item, canReport, today, day }: { item: PlanningItem; canReport: 
                 {item.type}
                 {item.opportunity && fiche !== item.opportunity.name && ` · ${item.opportunity.name}`}
             </span>
+            {item.purpose && (
+                <span className="line-clamp-2 text-xs break-words" title={item.purpose}>
+                    <span className="text-muted-foreground">Motif : </span>
+                    {item.purpose}
+                </span>
+            )}
             {item.location && (
                 <span className="text-muted-foreground flex items-center gap-1 text-xs break-words">
                     <MapPin className="h-3 w-3 shrink-0" aria-hidden />

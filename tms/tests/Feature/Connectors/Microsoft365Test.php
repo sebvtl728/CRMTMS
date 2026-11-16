@@ -690,3 +690,28 @@ it('links the outlook event to the organisme address, not APP_URL', function () 
     expect($post->data()['body']['content'])->toContain('https://cap.example.test/crm/organisations/'.$meeting->organisation_id)
         ->not->toContain('worker.invalid');
 });
+
+it('puts the purpose of the action in the outlook event, never its next steps nor its report', function () {
+    $this->travelTo(m365At('2026-11-18 10:00:00'));
+    m365Config();
+    $user = commercial();
+    m365Link($user);
+    m365Http(graphCreated());
+
+    $meeting = m365Meeting($user, ['purpose' => 'Présenter la formation HACCP', 'next_steps' => 'Suite confidentielle']);
+
+    [$post] = graphRequests();
+    expect($post->data()['body']['content'])->toContain('Motif : Présenter la formation HACCP')
+        ->and(json_encode($post->data(), JSON_UNESCAPED_UNICODE))->not->toContain('confidentiel');
+
+    // A new purpose updates the event; new next steps alone send nothing.
+    m365Http([GRAPH_EVENTS.'/AAMkEvent1' => Http::response(['id' => 'AAMkEvent1'])]);
+    $meeting->update(['next_steps' => 'Autre suite confidentielle']);
+    expect(graphRequests())->toBe([]);
+    $meeting->update(['purpose' => 'Signer la convention']);
+    [$patch] = graphRequests();
+    expect($patch->method())->toBe('PATCH')
+        ->and($patch->data()['body']['content'])->toContain('Motif : Signer la convention')
+        ->and(json_encode($patch->data(), JSON_UNESCAPED_UNICODE))->not->toContain('confidentiel');
+    expect(ConnectorRun::query()->get()->toJson())->not->toContain('Signer')->not->toContain('HACCP');
+});
