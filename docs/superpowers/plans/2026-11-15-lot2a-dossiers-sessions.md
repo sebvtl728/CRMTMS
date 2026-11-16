@@ -151,6 +151,19 @@ Demande de l'utilisateur (2026-11-16) : un type « individuel » et une modalit�
 - [ ] **Step 2–4:** RED → implement → verts.
 - [ ] **Step 5: Commit** `feat(sessions): individual sessions and training modality`
 
+### Task 6c: Intitulé de session, inscription groupée, heures par stagiaire
+
+Demande de l'utilisateur (2026-11-16) : nommer une session (« Commis de cuisine – entrée du 30 novembre 2026 »), ajouter et retirer des stagiaires dans un parcours de groupe, intégrer des stagiaires arrivés plus tard.
+
+**Règles :**
+- `training_sessions.title` facultatif (≤ 150 caractères) ; affiché partout où une session apparaît (liste, calendrier, page, fiches, dossiers, assistant, recherche, export) ; vide → « <formation> (S-…) » comme aujourd'hui ; recherche de la liste sur l'intitulé.
+- Inscription groupée depuis la page session et la page dossier : choix de plusieurs personnes (salariés du contractant proposés en premier, recherche, création sur place comme l'assistant avec `ref` sans doublon), date d'entrée commune modifiable par personne ; une seule transaction ; mêmes règles que `Enrolments::enrol` (capacité, liste d'attente, individuel, intra) ; erreurs par personne en français.
+- Heures prévues par inscription modifiables (`enrolments.planned_hours`, défaut = heures de la session, 0 < h ≤ heures de la session) ; affichées sur la ligne de l'inscription ; journalisées.
+
+- [ ] Step 1: Failing tests — intitulé enregistré, affiché et cherché ; inscription groupée de 4 stagiaires dont 1 créé ; deuxième vague de 2 stagiaires avec date d'entrée une semaine après ; capacité inter respectée (le 5e en attente) ; heures prévues modifiées et bornées.
+- [ ] Step 2–4: RED → implement → verts (suite, front, e2e).
+- [ ] Step 5: Commit `feat(sessions): session title, group enrolment, hours per trainee`
+
 ### Task 7: Créer le dossier depuis un devis accepté
 
 **Files:**
