@@ -45,7 +45,8 @@ final class AiEndpoint
     /**
      * French reason why a server on the local network at $host ($ips) may
      * not be used, or null: the platform must allow it; the TMS's own stack
-     * (STACK_HOSTS, their addresses, loopback) is refused; addresses must
+     * (STACK_HOSTS by name, their addresses compared as canonical bytes
+     * whatever the spelling, loopback) is refused; addresses must
      * be private or public, never internal; with http, private only.
      *
      * @param  list<string>  $ips
@@ -55,16 +56,59 @@ final class AiEndpoint
         if (! self::localAllowed()) {
             return self::LOCAL_NOT_ALLOWED;
         }
-        $host = strtolower($host);
-        if (in_array($host, self::STACK_HOSTS, true) || in_array(explode('.', $host)[0], self::STACK_HOSTS, true)) {
+        if (self::isStackName($host)) {
             return 'Cet hôte fait partie du TMS lui-même : le serveur d\'IA doit être une autre machine.';
         }
-        if (array_intersect($ips, self::stackAddresses()) !== []) {
-            return 'Cette adresse est celle d\'un service du TMS : le serveur d\'IA doit être une autre machine.';
+        $stack = array_filter(array_map(self::canonical(...), self::stackAddresses()));
+        foreach ([$host, ...$ips] as $address) {
+            $bytes = self::canonical($address);
+            if ($bytes !== null && in_array($bytes, $stack, true)) {
+                return 'Cette adresse est celle d\'un service du TMS : le serveur d\'IA doit être une autre machine.';
+            }
         }
         $reason = HostPolicy::localNetworkViolation($ips, privateOnly: $scheme === 'http');
 
         return $reason === null ? null : "Cet hôte pointe vers {$reason} : adresse non autorisée.";
+    }
+
+    /**
+     * A stack service by name: the bare name (« postgres ») or that name
+     * under a private suffix (« postgres.local », « app.internal »). A
+     * public name whose first label happens to match (« app.example.com »)
+     * is not one.
+     */
+    private static function isStackName(string $host): bool
+    {
+        $host = rtrim(strtolower($host), '.');
+        if (in_array($host, self::STACK_HOSTS, true)) {
+            return true;
+        }
+        $labels = explode('.', $host);
+
+        return count($labels) === 2 && in_array($labels[0], self::STACK_HOSTS, true) && in_array($labels[1], ['local', 'internal'], true);
+    }
+
+    /**
+     * The binary form of an IP address, IPv4-mapped (::ffff:a.b.c.d) and
+     * IPv4-compatible (::a.b.c.d) IPv6 reduced to the 4-byte IPv4, so that
+     * every spelling of one address compares equal; null for a name.
+     */
+    private static function canonical(string $address): ?string
+    {
+        $bytes = @inet_pton(trim($address, '[]'));
+        if ($bytes === false) {
+            return null;
+        }
+        if (strlen($bytes) === 16) {
+            $prefix = substr($bytes, 0, 12);
+            $v4 = substr($bytes, 12);
+            if ($prefix === str_repeat("\0", 10)."\xff\xff"
+                || ($prefix === str_repeat("\0", 12) && $v4 !== "\0\0\0\0" && $v4 !== "\0\0\0\1")) {
+                return $v4;
+            }
+        }
+
+        return $bytes;
     }
 
     /**

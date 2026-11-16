@@ -31,7 +31,9 @@ beforeEach(function () {
         'public.example.com' => ['203.0.113.50'],
         'app', 'caddy', 'worker', 'scheduler', 'vite' => ['172.18.0.2'],
         'postgres' => ['172.18.0.3'],
-        'redis' => ['172.18.0.4'],
+        'redis' => ['172.18.0.4', 'fd00::4'],
+        'mapped.lan' => ['::ffff:172.18.0.5'],
+        'app.example.com' => ['192.168.1.40'],
         'gotenberg' => ['172.18.0.5'],
         default => ['203.0.113.40'],
     });
@@ -346,7 +348,22 @@ it('refuses the TMS\'s own stack, even with the box checked: the AI must be anot
     'service name' => ['http://postgres:5432/v1'],
     'service address' => ['http://172.18.0.3:5432/v1'],
     'gotenberg' => ['http://gotenberg:3000/v1'],
+    'v4-mapped literal' => ['http://[::ffff:172.18.0.3]:5432/v1'],
+    'v4-mapped hex literal' => ['http://[::ffff:ac12:3]:5432/v1'],
+    'v4-compatible literal' => ['http://[::172.18.0.3]:5432/v1'],
+    'expanded ipv6 literal' => ['http://[fd00:0:0:0:0:0:0:4]:6379/v1'],
+    'zero-padded ipv6 literal' => ['http://[fd00:0000:0000:0000:0000:0000:0000:0004]:6379/v1'],
+    'name resolving to a v4-mapped stack address' => ['http://mapped.lan:3000/v1'],
+    'service.local' => ['http://app.local:8000/v1'],
+    'service.internal' => ['http://postgres.internal:5432/v1'],
 ]);
+
+it('does not refuse a public-looking name whose first label is a service name', function () {
+    aiLocalConfig(baseUrl: 'http://app.example.com:11434/v1');
+    aiHttp(['*' => Http::response(openAiAnswer('{"title":"Excel","hours":14}'))]);
+
+    expect(aiCall())->toBe(['title' => 'Excel', 'hours' => 14]);
+});
 
 it('allows http with the box checked only towards private addresses', function () {
     aiLocalConfig(baseUrl: 'http://public.example.com/v1');
@@ -525,6 +542,7 @@ it('validates the configuration', function (array $settings, string $field) {
     'private without the box' => [['provider' => 'openai_compatible', 'model' => 'm', 'base_url' => 'http://192.168.1.20:11434/v1'], 'base_url'],
     'loopback without the box' => [['provider' => 'openai_compatible', 'model' => 'm', 'base_url' => 'https://localhost/v1'], 'base_url'],
     'link-local even with the box' => [['provider' => 'openai_compatible', 'model' => 'm', 'base_url' => 'http://169.254.169.254/v1', 'local_network' => true], 'base_url'],
+    'own stack v4-mapped even with the box' => [['provider' => 'openai_compatible', 'model' => 'm', 'base_url' => 'http://[::ffff:ac12:4]:6379/v1', 'local_network' => true], 'base_url'],
     'own stack even with the box' => [['provider' => 'openai_compatible', 'model' => 'm', 'base_url' => 'http://redis:6379/v1', 'local_network' => true], 'base_url'],
     'loopback even with the box' => [['provider' => 'openai_compatible', 'model' => 'm', 'base_url' => 'http://127.0.0.1:11434/v1', 'local_network' => true], 'base_url'],
     'http public with the box' => [['provider' => 'openai_compatible', 'model' => 'm', 'base_url' => 'http://public.example.com/v1', 'local_network' => true], 'base_url'],
