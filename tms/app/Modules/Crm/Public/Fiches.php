@@ -87,6 +87,41 @@ final class Fiches
     }
 
     /**
+     * Primary e-mail of these people keyed by id (null when none), trashed
+     * ones included, anonymised ones without e-mail. Unknown ids are left out.
+     *
+     * @param  list<string>  $ids
+     * @return array<string, string|null>
+     */
+    public function personEmails(array $ids): array
+    {
+        $ids = array_values(array_unique(array_filter($ids, fn (string $id) => Str::isUuid($id))));
+        if ($ids === []) {
+            return [];
+        }
+
+        return Person::withTrashed()->whereKey($ids)->get(['id', 'email', 'anonymised_at'])
+            ->mapWithKeys(fn (Person $p) => [$p->id => $p->anonymised_at === null ? $p->email : null])->all();
+    }
+
+    /**
+     * Ids of the people of the organisme (out of the trash, not anonymised)
+     * whose primary e-mail is $email, case-insensitive.
+     *
+     * @return list<string>
+     */
+    public function peopleWithEmail(string $email): array
+    {
+        $email = mb_strtolower(trim($email));
+        if ($email === '') {
+            return [];
+        }
+
+        return Person::query()->whereNull('people.anonymised_at')->whereRaw('lower(people.email) = ?', [$email])
+            ->orderBy('people.id')->pluck('people.id')->map(fn ($id) => (string) $id)->all();
+    }
+
+    /**
      * Ids among $ids of the fiches (type organisation or person) that $user
      * can open in the CRM: crm.fiches.view and its scope, a trashed fiche
      * only with crm.fiches.delete, never a merged one. The other modules

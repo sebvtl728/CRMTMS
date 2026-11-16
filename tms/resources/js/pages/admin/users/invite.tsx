@@ -26,11 +26,12 @@ const breadcrumbs: BreadcrumbItem[] = [
     { title: 'Inviter', href: '/admin/users/invite' },
 ];
 
-export default function InviteUser({ roles }: { roles: RoleOption[] }) {
+export default function InviteUser({ roles, defaults }: { roles: RoleOption[]; defaults?: InviteForm }) {
     const { data, setData, post, processing, errors } = useForm<InviteForm>({
-        email: '',
-        name: '',
-        role: '',
+        email: defaults?.email ?? '',
+        name: defaults?.name ?? '',
+        // Prefilled from another page (a trainer): only a role that exists.
+        role: roles.some((r) => r.value === defaults?.role) ? (defaults?.role ?? '') : '',
     });
 
     const submit: FormEventHandler = (e) => {

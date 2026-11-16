@@ -10,7 +10,7 @@ export interface Picked {
 
 /**
  * Search in the CRM (identity only, whole organisme): entreprises or people,
- * via the dossier endpoints. The text typed is only a search: a result must
+ * via the dossier endpoints (or `endpoint`, answering the same shape). The text typed is only a search: a result must
  * be clicked (or Enter on the result of that name, or the only one).
  */
 export function FichePicker({
@@ -20,6 +20,7 @@ export function FichePicker({
     value,
     onPick,
     placeholder,
+    endpoint,
 }: {
     id: string;
     kind: 'organisation' | 'person';
@@ -27,6 +28,7 @@ export function FichePicker({
     value: Picked | null;
     onPick: (p: Picked | null) => void;
     placeholder: string;
+    endpoint?: string;
 }) {
     const [term, setTerm] = useState('');
     const [hits, setHits] = useState<Picked[]>([]);
@@ -42,7 +44,7 @@ export function FichePicker({
         const timer = setTimeout(() => {
             const params: Record<string, string> = { q: term };
             if (organisationId) params.organisation = organisationId;
-            fetch(`${route(kind === 'organisation' ? 'dossiers.organisations' : 'dossiers.people')}?${new URLSearchParams(params)}`, {
+            fetch(`${endpoint ?? route(kind === 'organisation' ? 'dossiers.organisations' : 'dossiers.people')}?${new URLSearchParams(params)}`, {
                 headers: { Accept: 'application/json' },
                 signal: controller.signal,
             })
@@ -73,7 +75,7 @@ export function FichePicker({
             clearTimeout(timer);
             controller.abort();
         };
-    }, [term, kind, organisationId]);
+    }, [term, kind, organisationId, endpoint]);
 
     if (value) {
         return (

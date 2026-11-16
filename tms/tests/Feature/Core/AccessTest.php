@@ -21,9 +21,9 @@ use Illuminate\Support\Facades\Gate;
 
 // ---------------------------------------------------------------- catalogue
 
-it('defines the six roles with French labels and the 2FA requirement', function () {
+it('defines the seven roles with French labels and the 2FA requirement', function () {
     expect(array_map(fn (Role $r) => $r->value, Role::cases()))->toBe([
-        'admin_organisme', 'direction', 'commercial', 'charge_relations', 'assistant', 'responsable_das',
+        'admin_organisme', 'direction', 'commercial', 'charge_relations', 'assistant', 'responsable_das', 'formateur',
     ])
         ->and(Role::AdminOrganisme->label())->toBe('Administrateur de l\'organisme')
         ->and(Role::ChargeRelations->label())->toBe('Chargé de relations')
@@ -51,7 +51,7 @@ it('seeds the roles and the default matrix for a tenant', function () {
 
     app(TenantContext::class)->run($tenant, function () {
         expect(RoleModel::query()->orderBy('name')->pluck('name')->all())->toBe([
-            'admin_organisme', 'assistant', 'charge_relations', 'commercial', 'direction', 'responsable_das',
+            'admin_organisme', 'assistant', 'charge_relations', 'commercial', 'direction', 'formateur', 'responsable_das',
         ]);
 
         // Core permissions only (the modules' defaults are tested with PermissionSync).
@@ -76,7 +76,8 @@ it('does not overwrite the matrix of an existing role when seeding again', funct
     expect(RoleModel::findByName('direction')->permissions->pluck('name')->all())
         ->toEqualCanonicalizing(['audit.view', 'crm.fiches.view', 'crm.opportunities.view', 'crm.quotes.view', 'crm.activities.view', 'crm.activities.team',
             'crm.revenue.view', 'crm.revenue.manage', 'crm.export', 'crm.gdpr', 'catalogue.view', 'catalogue.manage', 'catalogue.delete',
-            'sessions.dossiers.view', 'sessions.sessions.view']);
+            'sessions.dossiers.view', 'sessions.sessions.view', 'sessions.seances.view', 'sessions.seances.manage', 'sessions.attendance.manage',
+            'sessions.attendance.close', 'sessions.trainers.manage', 'sessions.rooms.manage']);
 });
 
 // ---------------------------------------------------------------- authorization
@@ -171,7 +172,7 @@ it('roles are isolated per tenant', function () {
 
     $context->run($b, function () use ($a, $adminA, $commercialB, $adminB) {
         // …but nothing of A is visible from B: roles, assignments, matrix.
-        expect(RoleModel::withoutGlobalScopes()->count())->toBe(6)
+        expect(RoleModel::withoutGlobalScopes()->count())->toBe(count(Role::cases()))
             ->and(RoleModel::withoutGlobalScopes()->where('tenant_id', $a->id)->count())->toBe(0)
             ->and(DB::table('model_has_roles')->where('model_id', $adminA->id)->count())->toBe(0)
             ->and(DB::table('model_has_roles')->count())->toBe(2)

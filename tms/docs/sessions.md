@@ -132,3 +132,21 @@ Un stagiaire est une personne du CRM :
 - **fusion** : sessions, dossiers, inscriptions et financements suivent la fiche conservée ; deux personnes inscrites chacune sur la même session ne se fusionnent pas tant que l'une des deux inscriptions n'est pas annulée ; cas rare : si l'une des deux est inscrite sur la session de l'autre pendant la fusion elle-même (deux utilisateurs au même instant), la base refuse le doublon et la fusion est annulée sans rien écrire, avec un message d'erreur générique ; relancez-la : le refus habituel s'affiche alors. De même, **Annuler la session** peut répondre « Une inscription vient d'être ajoutée : réessayez. » si un stagiaire est inscrit au même instant ;
 - **annulation d'un import** : une entreprise ou une personne qui porte une session, un dossier, une inscription ou un financement est conservée ;
 - **RGPD** : l'export des données d'une personne liste ses inscriptions (avec catégorie BPF et part du prix), ses dossiers (lignes et prix de ceux dont elle est la contractante particulier) et les financements qu'elle paie (type, montant, état, n° et date d'accord, notes) ; une personne inscrite, contractante, contact ou financeur dans la durée de conservation n'est jamais proposée à l'anonymisation (`admin.md` § 11) ; l'anonymisation efface ses besoins d'adaptation, les notes de ses inscriptions, des financements qui la concernent et de ses dossiers de particulier (voir `crm.md` § 13).
+
+## 9. Formateurs, salles et fermetures (0.8.0)
+
+### Formateurs
+
+Menu **Formation › Formateurs** (droit « Gérer les formateurs »). Un formateur est une **personne du CRM** déclarée formateur, une seule fois par organisme :
+
+- **Ajouter un formateur** : cherchez une personne existante (nom, prénom ou e-mail, dans tout l'organisme) ou créez-en une nouvelle (nom, prénom, e-mail, téléphone) ; une personne semblable déjà présente est signalée : choisissez-la, ou cochez « Créer quand même ». Choisissez le statut **Salarié** ou **Indépendant**. Une personne déjà formateur est refusée ; un formateur supprimé revient si on déclare de nouveau la personne.
+- **Page du formateur** : statut, **actif** (seuls les formateurs actifs seront proposés au planning), **compte TMS lié**, **indisponibilités** (du … au …, en heure de Paris, motif facultatif), suppression (impossible s'il a des séances : désactivez-le). La personne reste dans le CRM.
+- **Fiche Personne** : un bloc « Formateur » (statut, compte, indisponibilités à venir) apparaît pour qui gère les formateurs.
+
+### Le formateur lui-même
+
+Avec le rôle **Formateur**, il ne voit que **Mon planning** : ses séances (à venir avec les pages de planning) et ses indisponibilités, qu'il saisit et supprime lui-même. Il n'a accès à aucune fiche du CRM, aucun devis, dossier, financement, catalogue ni export ; une session ou une inscription qui ne porte pas une de ses séances est introuvable. Un compte non encore lié à une fiche formateur voit un message l'invitant à demander le lien.
+
+### Salles et fermetures
+
+Administration › **Salles et fermetures** (droit « Gérer les salles et fermetures ») : les salles (nom, capacité, adresse, active) et les périodes de fermeture de l'organisme (voir `admin.md` § 16).

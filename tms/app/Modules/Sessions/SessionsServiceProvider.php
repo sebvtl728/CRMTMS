@@ -9,6 +9,7 @@ use App\Modules\Core\Access\Scopes;
 use App\Modules\Core\Audit\MorphAliases;
 use App\Modules\Core\References\ReferenceList;
 use App\Modules\Core\References\ReferenceUsage;
+use App\Modules\Core\Users\InvitationAccepted;
 use App\Modules\Core\Users\User;
 use App\Modules\Crm\Public\FicheBlocks;
 use App\Modules\Crm\Public\FicheLinks;
@@ -28,10 +29,18 @@ use App\Modules\Sessions\Gdpr\PersonSessionsExport;
 use App\Modules\Sessions\Gdpr\RetentionHolds;
 use App\Modules\Sessions\History\SessionsHistory;
 use App\Modules\Sessions\Modules\SessionModule;
+use App\Modules\Sessions\Resources\ClosurePeriod;
+use App\Modules\Sessions\Resources\Room;
 use App\Modules\Sessions\Sessions\SessionPolicy;
 use App\Modules\Sessions\Sessions\TrainingSession;
+use App\Modules\Sessions\Trainers\Trainer;
+use App\Modules\Sessions\Trainers\TrainerRows;
+use App\Modules\Sessions\Trainers\Trainers;
+use App\Modules\Sessions\Trainers\TrainerUnavailability;
 use Carbon\CarbonImmutable;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
+use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\ServiceProvider;
@@ -57,6 +66,7 @@ class SessionsServiceProvider extends ServiceProvider
                 $group,
                 array_values(array_intersect(Permissions::scoped(), $permissions)),
                 fn (Role $role): array => array_intersect_key(Permissions::defaultScopesFor($role), array_flip($permissions)),
+                array_intersect_key(Permissions::extraScopes(), array_flip($permissions)),
             );
         }
 
@@ -67,6 +77,10 @@ class SessionsServiceProvider extends ServiceProvider
             Enrolment::MORPH_ALIAS => Enrolment::class,
             Funding::MORPH_ALIAS => Funding::class,
             SessionModule::MORPH_ALIAS => SessionModule::class,
+            Room::MORPH_ALIAS => Room::class,
+            ClosurePeriod::MORPH_ALIAS => ClosurePeriod::class,
+            Trainer::MORPH_ALIAS => Trainer::class,
+            TrainerUnavailability::MORPH_ALIAS => TrainerUnavailability::class,
         ]);
     }
 
@@ -79,6 +93,16 @@ class SessionsServiceProvider extends ServiceProvider
         SessionsHistory::registerOnFiches();
         // « Créer le dossier » / « Voir le dossier » on an accepted quote.
         QuoteLinks::register('sessions.dossier', fn (string $quoteId, User $viewer) => app(DossierFromQuote::class)->link($quoteId, $viewer));
+
+        // An invited account is linked to the one trainer having its e-mail (else by hand).
+        Event::listen(InvitationAccepted::class, fn (InvitationAccepted $event) => Trainers::linkInvited($event->user));
+
+        // Rooms, closure periods, trainers and their unavailabilities: malformed
+        // or of another organisme (RLS) is a 404.
+        self::bindUuid('room', Room::class);
+        self::bindUuid('closurePeriod', ClosurePeriod::class);
+        self::bindUuid('trainer', Trainer::class);
+        self::bindUuid('unavailability', TrainerUnavailability::class);
 
         Gate::policy(TrainingSession::class, SessionPolicy::class);
         Gate::policy(Dossier::class, DossierPolicy::class);
@@ -151,13 +175,28 @@ class SessionsServiceProvider extends ServiceProvider
     }
 
     /**
+     * @param  class-string<Model>  $class
+     */
+    private static function bindUuid(string $key, string $class): void
+    {
+        Route::bind($key, function (string $value) use ($class): Model {
+            if (! Str::isUuid($value)) {
+                throw (new ModelNotFoundException)->setModel($class, [$value]);
+            }
+
+            return $class::query()->findOrFail($value);
+        });
+    }
+
+    /**
      * Blocks of the CRM fiches (Crm\Public\FicheBlocks): « Formations
      * suivies » of a person (sessions.sessions.view and its scope),
      * « Dossiers » of an entreprise or a particulier (sessions.dossiers.view
-     * and its scope).
+     * and its scope), « Formateur » of a trainer (sessions.trainers.manage).
      */
     public static function registerFicheBlocks(): void
     {
+        FicheBlocks::register('person', 'sessions.trainer', fn (string $id, User $viewer) => TrainerRows::personBlock($id, $viewer));
         FicheBlocks::register('person', 'sessions.enrolments', fn (string $id, User $viewer) => EnrolmentRows::personBlock($id, $viewer));
         FicheBlocks::register('person', 'sessions.dossiers', fn (string $id, User $viewer) => DossierRows::personBlock($id, $viewer));
         FicheBlocks::register('organisation', 'sessions.dossiers', fn (string $id, User $viewer) => DossierRows::organisationBlock($id, $viewer));
@@ -178,6 +217,7 @@ class SessionsServiceProvider extends ServiceProvider
         FicheLinks::registerLinked('sessions.references', fn (string $type, string $id): bool => FicheReferences::linked($type, $id));
         FicheLinks::registerMerge('sessions.references', fn (string $type, string $keepId, string $dropId) => FicheReferences::merge($type, $keepId, $dropId));
         FicheLinks::registerAnonymisation('sessions.enrolments', fn (array $personIds) => EnrolmentAnonymisation::scrub($personIds));
+        FicheLinks::registerAnonymisation('sessions.trainers', fn (array $personIds) => Trainers::anonymise($personIds));
         FicheLinks::registerRetentionHold('sessions.enrolments', fn (CarbonImmutable $threshold) => RetentionHolds::enrolments($threshold));
         FicheLinks::registerRetentionHold('sessions.dossiers', fn (CarbonImmutable $threshold) => RetentionHolds::dossiers($threshold));
         FicheLinks::registerRetentionHold('sessions.fundings', fn (CarbonImmutable $threshold) => RetentionHolds::fundings($threshold));

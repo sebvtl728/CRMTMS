@@ -11,11 +11,13 @@ use Illuminate\Validation\ValidationException;
  *  - an entreprise: entreprise of a session (intra / individuel),
  *    contractant of a dossier, funder;
  *  - a person: trainee (enrolments), contractant (particulier) or contact of
- *    a dossier, funder.
+ *    a dossier, funder, trainer.
  * Trashed sessions and dossiers count: they can come back.
  */
 final class FicheReferences
 {
+    public const TWO_TRAINERS = 'Ces deux personnes sont formateurs : supprimez l\'une des deux fiches formateur avant de les fusionner.';
+
     public const SAME_SESSION = 'Ces deux personnes sont inscrites à la même session (:session) : annulez l\'une des deux inscriptions avant de les fusionner.';
 
     /**
@@ -31,6 +33,7 @@ final class FicheReferences
             'enrolments' => ['person_id'],
             'dossiers' => ['account_person_id', 'contact_person_id'],
             'fundings' => ['funder_person_id'],
+            'trainers' => ['person_id'],
         ],
     ];
 
@@ -73,6 +76,11 @@ final class FicheReferences
                 ->value('s.number');
             if (is_string($twice)) {
                 throw ValidationException::withMessages(['drop' => str_replace(':session', $twice, self::SAME_SESSION)]);
+            }
+            // A person is trainer once (trainers out of the trash).
+            if (DB::table('trainers')->whereNull('deleted_at')->where('person_id', $dropId)->exists()
+                && DB::table('trainers')->whereNull('deleted_at')->where('person_id', $keepId)->exists()) {
+                throw ValidationException::withMessages(['drop' => self::TWO_TRAINERS]);
             }
         }
 

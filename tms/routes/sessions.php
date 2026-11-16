@@ -5,8 +5,11 @@ use App\Modules\Sessions\Dossiers\DossierFromQuoteController;
 use App\Modules\Sessions\Enrolments\EnrolmentController;
 use App\Modules\Sessions\Fundings\FundingController;
 use App\Modules\Sessions\Modules\SessionModuleController;
+use App\Modules\Sessions\Resources\ResourceSettingsController;
 use App\Modules\Sessions\Sessions\SessionController;
 use App\Modules\Sessions\Settings\AbandonRuleController;
+use App\Modules\Sessions\Trainers\MyPlanningController;
+use App\Modules\Sessions\Trainers\TrainerController;
 use Illuminate\Support\Facades\Route;
 
 Route::middleware(['auth', 'can:settings.manage'])->prefix('admin/abandon-rule')->name('admin.abandon-rule.')->group(function () {
@@ -71,4 +74,35 @@ Route::middleware(['auth'])->prefix('dossiers')->name('dossiers.')->group(functi
     Route::post('{dossier}/fundings', [FundingController::class, 'store'])->middleware('can:sessions.dossiers.update')->name('fundings.store');
     Route::put('{dossier}/fundings/{funding}', [FundingController::class, 'update'])->middleware('can:sessions.dossiers.update')->name('fundings.update');
     Route::delete('{dossier}/fundings/{funding}', [FundingController::class, 'destroy'])->middleware('can:sessions.dossiers.update')->name('fundings.destroy');
+});
+
+// « Salles et fermetures » of the organisme (sessions.rooms.manage).
+Route::middleware(['auth', 'can:sessions.rooms.manage'])->prefix('admin/sessions-settings')->name('admin.sessions-settings.')->group(function () {
+    Route::get('/', [ResourceSettingsController::class, 'index'])->name('index');
+    Route::post('rooms', [ResourceSettingsController::class, 'storeRoom'])->name('rooms.store');
+    Route::put('rooms/{room}', [ResourceSettingsController::class, 'updateRoom'])->name('rooms.update');
+    Route::delete('rooms/{room}', [ResourceSettingsController::class, 'destroyRoom'])->name('rooms.destroy');
+    Route::post('closures', [ResourceSettingsController::class, 'storeClosure'])->name('closures.store');
+    Route::put('closures/{closurePeriod}', [ResourceSettingsController::class, 'updateClosure'])->name('closures.update');
+    Route::delete('closures/{closurePeriod}', [ResourceSettingsController::class, 'destroyClosure'])->name('closures.destroy');
+});
+
+// « Formateurs » (sessions.trainers.manage). People searched in the whole organisme: limiter sessions-trainees.
+Route::middleware(['auth', 'can:sessions.trainers.manage'])->prefix('trainers')->name('trainers.')->group(function () {
+    Route::get('/', [TrainerController::class, 'index'])->name('index');
+    Route::get('people', [TrainerController::class, 'people'])->middleware('throttle:sessions-trainees')->name('people');
+    Route::post('/', [TrainerController::class, 'store'])->middleware('throttle:sessions-trainees')->name('store');
+    Route::get('{trainer}', [TrainerController::class, 'show'])->name('show');
+    Route::put('{trainer}', [TrainerController::class, 'update'])->name('update');
+    Route::delete('{trainer}', [TrainerController::class, 'destroy'])->name('destroy');
+    Route::put('{trainer}/user', [TrainerController::class, 'link'])->name('user');
+    Route::post('{trainer}/unavailabilities', [TrainerController::class, 'storeUnavailability'])->name('unavailabilities.store');
+    Route::delete('{trainer}/unavailabilities/{unavailability}', [TrainerController::class, 'destroyUnavailability'])->name('unavailabilities.destroy');
+});
+
+// « Mon planning »: the trainer linked to the account (his own unavailabilities).
+Route::middleware(['auth'])->prefix('mon-planning')->name('my-planning.')->group(function () {
+    Route::get('/', [MyPlanningController::class, 'show'])->name('show');
+    Route::post('unavailabilities', [MyPlanningController::class, 'storeUnavailability'])->name('unavailabilities.store');
+    Route::delete('unavailabilities/{unavailability}', [MyPlanningController::class, 'destroyUnavailability'])->name('unavailabilities.destroy');
 });

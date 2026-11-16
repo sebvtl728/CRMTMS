@@ -182,6 +182,8 @@ final class Permissions
             // Removing an action was part of « Modifier » before 0.5.0.
             Role::Assistant => [...$views, ...$updates, self::ACTIVITIES_DELETE],
             Role::ResponsableDas => [...$views, self::REVENUE_VIEW, self::EXPORT],
+            // A trainer reaches his séances only, never the CRM.
+            Role::Formateur => [],
         };
     }
 

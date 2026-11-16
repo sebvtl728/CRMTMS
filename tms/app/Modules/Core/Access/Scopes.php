@@ -52,6 +52,26 @@ final class Scopes
         return false;
     }
 
+    /**
+     * The user holds rights, all of them on « Ses séances » only (a trainer
+     * and nothing else): the menu shows « Mon planning » alone.
+     */
+    public static function trainerOnly(User $user): bool
+    {
+        $held = 0;
+        foreach (Permissions::all() as $permission) {
+            if (! $user->can($permission)) {
+                continue;
+            }
+            if (self::of($user, $permission) !== AccessScope::Trainer) {
+                return false;
+            }
+            $held++;
+        }
+
+        return $held > 0;
+    }
+
     public static function forget(): void
     {
         self::$memo = [];
@@ -76,6 +96,11 @@ final class Scopes
         $widest = null;
         foreach ($rows as $value) {
             $scope = AccessScope::tryFrom((string) $value) ?? AccessScope::All;
+            // A scope never offered for this right (« Ses séances » on a CRM
+            // right…) is never applied: the narrowest ordinary one instead.
+            if ($scope === AccessScope::Trainer && ! Permissions::allowsScope($permission, $scope)) {
+                $scope = AccessScope::Own;
+            }
             if ($widest === null || $scope->rank() > $widest->rank()) {
                 $widest = $scope;
             }

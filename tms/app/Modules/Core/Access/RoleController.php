@@ -31,6 +31,8 @@ class RoleController extends Controller
                 'label' => $label['label'],
                 'description' => $label['description'],
                 'scoped' => Permissions::isScoped($permission),
+                // The scopes offered for this right (« Ses séances » for the séances and attendance only).
+                'scope_options' => array_map(fn (AccessScope $scope) => $scope->value, Permissions::scopesFor($permission)),
                 'locked' => in_array($permission, Permissions::LOCKED, true),
                 'warning' => Permissions::WARNINGS[$permission] ?? null,
             ];

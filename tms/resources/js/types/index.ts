@@ -4,6 +4,10 @@ export interface Auth {
     user: User;
     /** Permission names held by the user (e.g. "users.manage"). */
     permissions: string[];
+    /** Every right on « Ses séances » only (a trainer): the menu is « Mon planning » alone. */
+    trainer_only: boolean;
+    /** Linked to a trainer: « Mon planning » in the menu. */
+    my_planning: boolean;
 }
 
 export interface BreadcrumbItem {
