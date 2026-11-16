@@ -110,8 +110,8 @@ it('lists the actions of a person in her data export', function () {
     $data = PersonDataExport::for($person->refresh());
 
     expect($data['actions'])->toBe([
-        ['date' => '2026-11-10T10:00:00+01:00', 'type' => 'Appel', 'objet' => 'Appel – Claire Durand', 'statut' => 'Faite', 'resultat' => 'Réussi', 'compte_rendu' => 'Rappeler lundi', 'lieu' => null, 'supprimee' => false],
-        ['date' => '2026-11-20T09:00:00+01:00', 'type' => 'Rappel', 'objet' => 'Rappel – Claire Durand', 'statut' => 'À faire', 'resultat' => null, 'compte_rendu' => null, 'lieu' => null, 'supprimee' => false],
+        ['date' => '2026-11-10T10:00:00+01:00', 'type' => 'Appel', 'objet' => 'Appel – Claire Durand', 'statut' => 'Faite', 'resultat' => 'Réussi', 'motif' => null, 'compte_rendu' => 'Rappeler lundi', 'suite_a_donner' => null, 'lieu' => null, 'supprimee' => false],
+        ['date' => '2026-11-20T09:00:00+01:00', 'type' => 'Rappel', 'objet' => 'Rappel – Claire Durand', 'statut' => 'À faire', 'resultat' => null, 'motif' => null, 'compte_rendu' => null, 'suite_a_donner' => null, 'lieu' => null, 'supprimee' => false],
     ]);
 
     // The file is always complete: a Responsable DAS (who would not see them) cannot run it.

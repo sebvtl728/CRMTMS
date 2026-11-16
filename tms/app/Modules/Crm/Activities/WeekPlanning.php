@@ -90,7 +90,7 @@ final class WeekPlanning
         foreach ($rows as $activity) {
             $at = CarbonImmutable::instance($activity->due_at ?? $activity->done_at)->setTimezone(self::tz());
             $row = [...ActivityRows::row($activity), ...$rights[(string) $activity->id]];
-            unset($row['report']); // a list: the report stays on the fiche
+            unset($row['report'], $row['next_steps']); // a list: the report and next steps stay on the fiche
             $byDay[$at->toDateString()][] = [
                 ...$row,
                 'kind' => $types[$activity->type_id] ?? self::MEETING,

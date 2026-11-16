@@ -1,3 +1,4 @@
+import { ActivityNotes } from '@/components/crm/activity-notes';
 import { completeActivity, editActivity, shiftDay } from '@/components/crm/quick-action';
 import Heading from '@/components/heading';
 import { Badge } from '@/components/ui/badge';
@@ -21,6 +22,8 @@ interface TodoRow {
     id: string;
     type: string | null;
     subject: string;
+    purpose: string | null;
+    next_steps: string | null;
     due_at: string | null;
     responsible: string | null;
     status: 'todo' | 'overdue' | 'done';
@@ -139,6 +142,7 @@ function TodoItem({ row, canEdit, team }: { row: TodoRow; canEdit: boolean; team
                     {fiches.length > 0 && ` · ${fiches.map((f) => f.name).join(' · ')}`}
                     {team && row.responsible && ` · ${row.responsible}`}
                 </p>
+                <ActivityNotes purpose={row.purpose} nextSteps={row.next_steps} />
             </div>
             <div className="flex flex-wrap items-center gap-2">
                 {canEdit && row.can_update && (

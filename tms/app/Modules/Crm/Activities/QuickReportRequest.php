@@ -37,7 +37,7 @@ class QuickReportRequest extends FormRequest
     protected function prepareForValidation(): void
     {
         $clean = [];
-        foreach (['activity_id', 'organisation_id', 'person_id', 'type_id', 'result_id', 'report', 'duration_minutes', 'done_at',
+        foreach (['activity_id', 'organisation_id', 'person_id', 'type_id', 'result_id', 'purpose', 'report', 'next_steps', 'duration_minutes', 'done_at',
             'opportunity_id', 'stage_id', 'loss_reason_id', 'loss_comment', 'next_type_id', 'next_due_at'] as $key) {
             if ($this->has($key)) {
                 $value = $this->input($key);
@@ -61,6 +61,7 @@ class QuickReportRequest extends FormRequest
             'type_id' => ['nullable', ...ReferenceRules::item(ReferenceList::ActionType)],
             'result_id' => ['nullable', ...ReferenceRules::item(ReferenceList::ActionResult)],
             'report' => ['nullable', 'string', 'max:'.ActivityRequest::MAX_REPORT],
+            ...ActivityRequest::noteRules(),
             'duration_minutes' => ['nullable', 'integer', 'between:1,1440'],
             'done_at' => ['nullable', ActivityRequest::instantRule(false), ActivityRequest::notFuture()],
             'opportunity_id' => ['nullable', 'uuid'],
@@ -203,7 +204,7 @@ class QuickReportRequest extends FormRequest
      */
     public function values(): array
     {
-        $data = $this->safe()->only(['result_id', 'report', 'duration_minutes']);
+        $data = $this->safe()->only(['result_id', 'purpose', 'report', 'next_steps', 'duration_minutes']);
         $data['done_at'] = ActivityRequest::instant($this->validated('done_at'), false) ?? CarbonImmutable::now((string) config('app.timezone'));
 
         if ($this->meeting === null) {

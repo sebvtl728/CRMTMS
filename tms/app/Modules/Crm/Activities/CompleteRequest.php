@@ -10,7 +10,7 @@ use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Validator;
 
 /**
- * « Fait » on an action to do: result, report, when (now by default, never
+ * « Fait » on an action to do: result, report, purpose and next steps, when (now by default, never
  * in the future), duration, and the optional next follow-up.
  */
 class CompleteRequest extends FormRequest
@@ -25,7 +25,7 @@ class CompleteRequest extends FormRequest
     protected function prepareForValidation(): void
     {
         $clean = [];
-        foreach (['report', 'done_at', 'next_due_at', 'next_type_id', 'result_id', 'duration_minutes'] as $key) {
+        foreach (['purpose', 'report', 'next_steps', 'done_at', 'next_due_at', 'next_type_id', 'result_id', 'duration_minutes'] as $key) {
             if ($this->has($key)) {
                 $value = $this->input($key);
                 $value = is_string($value) ? trim($value) : $value;
@@ -52,6 +52,7 @@ class CompleteRequest extends FormRequest
         return [
             'result_id' => ['nullable', ...ReferenceRules::item(ReferenceList::ActionResult)],
             'report' => ['nullable', 'string', 'max:'.ActivityRequest::MAX_REPORT],
+            ...ActivityRequest::noteRules(),
             'done_at' => ['nullable', ActivityRequest::instantRule(false), ActivityRequest::notFuture()],
             'duration_minutes' => ['nullable', 'integer', 'between:1,1440'],
             ...ActivityRequest::nextRules(),
@@ -75,7 +76,7 @@ class CompleteRequest extends FormRequest
      */
     public function values(): array
     {
-        $data = $this->safe()->only(['result_id', 'report', 'duration_minutes']);
+        $data = $this->safe()->only(['result_id', 'purpose', 'report', 'next_steps', 'duration_minutes']);
         $data['done_at'] = ActivityRequest::instant($this->validated('done_at'), false) ?? CarbonImmutable::now((string) config('app.timezone'));
 
         return $data;
