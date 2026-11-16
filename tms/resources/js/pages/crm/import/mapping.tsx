@@ -1,4 +1,4 @@
-import { WizardPage, selectClass, type BatchSummary } from '@/components/crm/import-wizard';
+import { AbandonButton, WizardPage, selectClass, type BatchSummary } from '@/components/crm/import-wizard';
 import InputError from '@/components/input-error';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
@@ -224,6 +224,7 @@ export default function ImportMapping({
                     <Button asChild variant="ghost">
                         <Link href={route('crm.import.create')}>Choisir un autre fichier</Link>
                     </Button>
+                    <AbandonButton batchId={batch.id} />
                     {missing.length > 0 && (
                         <span className="text-sm text-red-600 dark:text-red-400">
                             Associez d&apos;abord : {missing.map((f) => f.label).join(', ')}.

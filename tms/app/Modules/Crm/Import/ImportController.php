@@ -75,6 +75,7 @@ class ImportController extends Controller
                 'skipped' => $b->skipped,
                 'errors' => $b->errors,
                 'canUndo' => $this->canUndo($b),
+                'canAbandon' => $b->canAbandon(),
             ]);
 
         return Inertia::render('crm/import/index', [
@@ -417,6 +418,15 @@ class ImportController extends Controller
         }
 
         return to_route('crm.import.show', $batch->id)->with('status', 'L\'import est marqué comme échoué. Vous pouvez annuler ce qu\'il a créé.');
+    }
+
+    // ------------------------------------------------------------ the abandon
+
+    public function destroy(Request $request, string $batch): RedirectResponse
+    {
+        ImportAbandon::run($this->find($request, $batch));
+
+        return to_route('crm.import.index')->with('status', 'L\'import a été abandonné.');
     }
 
     // --------------------------------------------------------------- the undo

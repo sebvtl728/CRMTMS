@@ -1,4 +1,4 @@
-import { WizardPage, selectClass, type BatchSummary } from '@/components/crm/import-wizard';
+import { AbandonButton, WizardPage, selectClass, type BatchSummary } from '@/components/crm/import-wizard';
 import InputError from '@/components/input-error';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -141,6 +141,7 @@ export default function ImportValues({ batch, blocks, profileName }: ValuesProps
                     <Button asChild variant="ghost">
                         <Link href={route('crm.import.mapping', batch.id)}>Retour aux colonnes</Link>
                     </Button>
+                    <AbandonButton batchId={batch.id} />
                     {open > 0 && (
                         <span className="text-muted-foreground text-sm">{open} valeur(s) sans choix : les lignes concernées seront refusées.</span>
                     )}

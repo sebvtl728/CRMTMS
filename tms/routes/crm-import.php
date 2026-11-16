@@ -14,6 +14,7 @@ Route::middleware(['auth', 'can:crm.import'])->prefix('crm/import')->name('crm.i
         Route::get('/', [ImportController::class, 'show'])->name('show');
         // Polled by the progress page: generous but bounded.
         Route::get('status', [ImportController::class, 'status'])->middleware('throttle:import-status')->name('status');
+        Route::delete('/', [ImportController::class, 'destroy'])->name('destroy');
         Route::get('mapping', [ImportController::class, 'mapping'])->name('mapping');
         Route::put('mapping', [ImportController::class, 'saveMapping'])->name('mapping.save');
         Route::get('values', [ImportController::class, 'values'])->name('values');

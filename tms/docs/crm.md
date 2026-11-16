@@ -362,6 +362,10 @@ L'import ne modifie que les fiches que vous pouvez vous-même modifier (votre p�
 
 Le **Rapport d'import** donne les totaux (fiches créées, mises à jour, ignorées, lignes en erreur) et un fichier **Télécharger le rapport (Excel)** avec le sort de chaque ligne et la raison des erreurs. Corrigez les lignes en erreur dans votre fichier et réimportez-le : les fiches déjà créées ne sont pas dupliquées.
 
+### Abandonner un import
+
+Tant qu'un import **n'a pas été lancé** (fichier déposé, simulation en cours ou import prêt), le bouton **Abandonner** (dans **Imports** et sur les écrans Colonnes, Valeurs et Simulation) le supprime **définitivement** après confirmation : fichier, correspondance et lignes disparaissent, l'import n'apparaît plus dans la liste, et aucune fiche n'est touchée. Seul l'auteur de l'import (ou qui voit tous les imports) peut l'abandonner. Une fois l'import lancé, il n'y a plus d'abandon : utilisez **Annuler l'import** ci-dessous. L'abandon est inscrit au journal d'audit (type de données, jamais le contenu du fichier).
+
 ### Annuler un import
 
 Dans **Imports**, **Annuler l'import** ouvre une confirmation qui annonce combien de fiches seront supprimées. L'annulation :

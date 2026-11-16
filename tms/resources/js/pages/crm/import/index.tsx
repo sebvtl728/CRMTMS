@@ -1,4 +1,4 @@
-import { StatusBadge, UndoDialog, type BatchStatus } from '@/components/crm/import-wizard';
+import { AbandonButton, StatusBadge, UndoDialog, type BatchStatus } from '@/components/crm/import-wizard';
 import Heading from '@/components/heading';
 import { Button } from '@/components/ui/button';
 import AppLayout from '@/layouts/app-layout';
@@ -22,6 +22,7 @@ interface Row {
     skipped: number;
     errors: number;
     canUndo: boolean;
+    canAbandon: boolean;
 }
 
 interface IndexProps {
@@ -122,6 +123,7 @@ export default function ImportIndex({ batches, seesAll, flash }: IndexProps) {
                                                         Annuler l&apos;import
                                                     </Button>
                                                 )}
+                                                {b.canAbandon && <AbandonButton batchId={b.id} size="sm" />}
                                             </td>
                                         </tr>
                                     ))}
