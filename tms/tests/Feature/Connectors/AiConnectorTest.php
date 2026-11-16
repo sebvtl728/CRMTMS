@@ -1,6 +1,7 @@
 <?php
 
 use App\Modules\Connectors\Ai\Ai;
+use App\Modules\Connectors\Ai\AiClient;
 use App\Modules\Connectors\Ai\AiConnector;
 use App\Modules\Connectors\Ai\AiEndpoint;
 use App\Modules\Connectors\Ai\AiInvalidResponse;
@@ -27,8 +28,14 @@ beforeEach(function () {
         'other.lan' => ['192.168.1.30'],
         'metadata.lan' => ['169.254.169.254'],
         'localhost' => ['127.0.0.1'],
+        'public.example.com' => ['203.0.113.50'],
+        'app', 'caddy', 'worker', 'scheduler', 'vite' => ['172.18.0.2'],
+        'postgres' => ['172.18.0.3'],
+        'redis' => ['172.18.0.4'],
+        'gotenberg' => ['172.18.0.5'],
         default => ['203.0.113.40'],
     });
+    config(['tms.connectors.allow_local_ai' => true]);
 });
 afterEach(fn () => HostPolicy::resolveUsing(null));
 
@@ -327,11 +334,74 @@ it('does not follow a redirect, from the local server or from a public provider'
     Http::assertSentCount(1);
 });
 
-it('allows a loopback server only with the box checked (local AI on the same machine)', function () {
-    aiLocalConfig(baseUrl: 'http://127.0.0.1:11434/v1');
+it('refuses the TMS\'s own stack, even with the box checked: the AI must be another machine', function (string $baseUrl) {
+    aiLocalConfig(baseUrl: $baseUrl);
     aiHttp(['*' => Http::response(openAiAnswer('{"title":"Excel","hours":14}'))]);
 
+    expect(fn () => aiCall())->toThrow(AiUnavailable::class, AiUnavailable::HOST_REFUSED);
+    Http::assertNothingSent();
+})->with([
+    'loopback' => ['http://127.0.0.1:11434/v1'],
+    'localhost' => ['http://localhost:11434/v1'],
+    'service name' => ['http://postgres:5432/v1'],
+    'service address' => ['http://172.18.0.3:5432/v1'],
+    'gotenberg' => ['http://gotenberg:3000/v1'],
+]);
+
+it('allows http with the box checked only towards private addresses', function () {
+    aiLocalConfig(baseUrl: 'http://public.example.com/v1');
+    aiHttp(['*' => Http::response(openAiAnswer('{"title":"Excel","hours":14}'))]);
+    expect(fn () => aiCall())->toThrow(AiUnavailable::class, AiUnavailable::HOST_REFUSED);
+    Http::assertNothingSent();
+
+    ConnectorConfig::query()->delete();
+    aiLocalConfig(baseUrl: 'https://public.example.com/v1');
     expect(aiCall())->toBe(['title' => 'Excel', 'hours' => 14]);
+});
+
+it('refuses a local server at call time when the platform does not allow it (multi mode)', function () {
+    aiLocalConfig();
+    config(['tms.connectors.allow_local_ai' => false]);
+    aiHttp(['*' => Http::response(openAiAnswer('{"title":"Excel","hours":14}'))]);
+
+    expect(fn () => aiCall())->toThrow(AiUnavailable::class, AiUnavailable::HOST_REFUSED);
+    Http::assertNothingSent();
+});
+
+it('refuses a response bigger than 2 MB', function () {
+    aiConfig();
+    aiHttp(['*' => Http::response(anthropicAnswer('{"title":"'.str_repeat('x', AiClient::MAX_RESPONSE_BYTES).'","hours":7}'))]);
+    expect(fn () => aiCall())->toThrow(AiInvalidResponse::class);
+
+    $progress = null;
+    aiHttp(['*' => function (Request $r, array $options) use (&$progress) {
+        $progress = $options['progress'] ?? null;
+
+        return Http::response(anthropicAnswer('{"title":"Excel","hours":7}'));
+    }]);
+    aiCall();
+    expect($progress)->toBeCallable();
+    $progress(0, 1024, 0, 0); // under the limit: goes on
+    expect(fn () => $progress(0, AiClient::MAX_RESPONSE_BYTES + 1, 0, 0))->toThrow(RuntimeException::class)
+        ->and(fn () => $progress(AiClient::MAX_RESPONSE_BYTES + 1, 0, 0, 0))->toThrow(RuntimeException::class);
+});
+
+it('asks Anthropic for a low effort extraction with room for thinking', function () {
+    aiConfig();
+    aiHttp(['*' => Http::response(anthropicAnswer('{"title":"Excel","hours":7}'))]);
+
+    aiCall();
+
+    Http::assertSent(fn (Request $r) => $r->data()['output_config']['effort'] === 'low' && $r->data()['max_tokens'] === 32000);
+});
+
+it('accepts an integral float where the schema asks for an integer', function () {
+    aiConfig();
+    $schema = ['type' => 'object', 'properties' => ['count' => ['type' => 'integer', 'maximum' => 30]], 'required' => ['count'], 'additionalProperties' => false];
+    aiHttp(['*' => Http::sequence()->push(anthropicAnswer('{"count":7.0}'))->push(anthropicAnswer('{"count":7.5}'))]);
+
+    expect(app(Ai::class)->structured('s', 'u', $schema, 'test'))->toBe(['count' => 7]);
+    expect(fn () => app(Ai::class)->structured('s', 'u', $schema, 'test'))->toThrow(AiInvalidResponse::class);
 });
 
 // --- Service, journal, limiter -----------------------------------------------
@@ -455,7 +525,29 @@ it('validates the configuration', function (array $settings, string $field) {
     'private without the box' => [['provider' => 'openai_compatible', 'model' => 'm', 'base_url' => 'http://192.168.1.20:11434/v1'], 'base_url'],
     'loopback without the box' => [['provider' => 'openai_compatible', 'model' => 'm', 'base_url' => 'https://localhost/v1'], 'base_url'],
     'link-local even with the box' => [['provider' => 'openai_compatible', 'model' => 'm', 'base_url' => 'http://169.254.169.254/v1', 'local_network' => true], 'base_url'],
+    'own stack even with the box' => [['provider' => 'openai_compatible', 'model' => 'm', 'base_url' => 'http://redis:6379/v1', 'local_network' => true], 'base_url'],
+    'loopback even with the box' => [['provider' => 'openai_compatible', 'model' => 'm', 'base_url' => 'http://127.0.0.1:11434/v1', 'local_network' => true], 'base_url'],
+    'http public with the box' => [['provider' => 'openai_compatible', 'model' => 'm', 'base_url' => 'http://public.example.com/v1', 'local_network' => true], 'base_url'],
 ]);
+
+it('neither validates nor stores the address fields for Anthropic', function () {
+    $this->actingAs(admin(twoFactor: true));
+
+    $this->putJson('/admin/connectors/ai', aiPayload(['base_url' => 'ftp://junk', 'local_network' => 'peut-être'], key: 'sk-ant-x123'))->assertRedirect();
+
+    expect(ConnectorConfig::query()->where('connector_key', 'ai')->sole()->settings)->toEqual(['provider' => 'anthropic', 'model' => null]);
+});
+
+it('refuses and hides the local network box when the platform does not allow it', function () {
+    config(['tms.connectors.allow_local_ai' => false]);
+    $this->actingAs(admin(twoFactor: true));
+
+    $this->putJson('/admin/connectors/ai', aiPayload(['provider' => 'openai_compatible', 'model' => 'm', 'base_url' => 'http://192.168.1.20:11434/v1', 'local_network' => true]))
+        ->assertStatus(422)->assertJsonValidationErrors(['settings.base_url' => 'Les serveurs d\'IA sur le réseau local ne sont pas autorisés sur cette plateforme.']);
+
+    $props = $this->get('/admin/connectors/ai')->assertOk()->viewData('page')['props'];
+    expect($props['connector']['fields']['local_network']['hidden'])->toBeTrue();
+});
 
 it('accepts a local server when the box is checked', function () {
     $this->actingAs(admin(twoFactor: true));

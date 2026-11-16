@@ -13,9 +13,10 @@ use Illuminate\Contracts\Validation\ValidationRule;
  *
  *  - box « Serveur sur le réseau local » unchecked: https only, and the host
  *    must resolve to public addresses only (HostPolicy::violation strict);
- *  - box checked: http is allowed and the host may be private or loopback,
- *    never link-local (cloud metadata) nor reserved
- *    (HostPolicy::localNetworkViolation).
+ *  - box checked (only when the platform allows it, tms.connectors
+ *    .allow_local_ai): the host may be private, never the TMS's own stack,
+ *    loopback, link-local (cloud metadata) nor reserved; http only towards
+ *    private addresses (AiEndpoint::localViolation).
  *
  * A name that does not resolve yet is accepted: every call checks again.
  */
@@ -83,6 +84,11 @@ final class AiBaseUrl implements DataAwareRule, ValidationRule
         }
 
         $local = self::isLocal($this->data['settings']['local_network'] ?? false);
+        if ($local && ! AiEndpoint::localAllowed()) {
+            $fail(AiEndpoint::LOCAL_NOT_ALLOWED);
+
+            return;
+        }
         if ($parsed['scheme'] !== 'https' && ! $local) {
             $fail('L\'adresse doit commencer par https:// (http n\'est permis que pour un serveur sur le réseau local).');
 
@@ -90,11 +96,15 @@ final class AiBaseUrl implements DataAwareRule, ValidationRule
         }
 
         $ips = HostPolicy::resolve($parsed['host']);
-        $reason = $local ? HostPolicy::localNetworkViolation($ips) : HostPolicy::violation($ips, strict: true);
-        if ($reason !== null) {
-            $fail($local
-                ? "Cet hôte pointe vers {$reason} : adresse non autorisée."
-                : "Cet hôte pointe vers {$reason} : cochez « Serveur sur le réseau local » pour un serveur interne, ou indiquez une adresse publique.");
+        if ($local) {
+            if (($reason = AiEndpoint::localViolation($parsed['host'], $parsed['scheme'], $ips)) !== null) {
+                $fail($reason);
+            }
+
+            return;
+        }
+        if (($reason = HostPolicy::violation($ips, strict: true)) !== null) {
+            $fail("Cet hôte pointe vers {$reason} : cochez « Serveur sur le réseau local » pour un serveur interne, ou indiquez une adresse publique.");
         }
     }
 }

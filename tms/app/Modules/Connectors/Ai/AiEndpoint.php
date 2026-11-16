@@ -11,15 +11,24 @@ use App\Modules\Connectors\Core\HostPolicy;
  *
  *  - only the registered scheme, host and port: any other URL is refused,
  *    whatever its address (redirects are never followed either);
- *  - « Serveur sur le réseau local » checked: that host:port may be private
- *    or loopback (HostPolicy::localNetworkViolation), in http or https.
- *    This exception is scoped to this endpoint object: no global switch;
+ *  - « Serveur sur le réseau local » checked AND allowed by the platform
+ *    (tms.connectors.allow_local_ai, refused in multi mode): that host:port
+ *    may be private (localViolation()). This exception is scoped to this
+ *    endpoint object: no global switch;
  *  - otherwise: https and public addresses only (HostPolicy strict).
  *
  * The returned addresses are pinned for the connection (DNS rebinding).
  */
 final class AiEndpoint
 {
+    /**
+     * Hosts of the TMS's own stack (docker compose services): never an AI
+     * server, whatever the box says (the AI must run on another machine).
+     */
+    public const STACK_HOSTS = ['localhost', 'app', 'caddy', 'postgres', 'redis', 'gotenberg', 'worker', 'scheduler', 'vite'];
+
+    public const LOCAL_NOT_ALLOWED = 'Les serveurs d\'IA sur le réseau local ne sont pas autorisés sur cette plateforme.';
+
     private function __construct(
         public readonly string $baseUrl,
         private readonly string $scheme,
@@ -27,6 +36,51 @@ final class AiEndpoint
         private readonly int $port,
         public readonly bool $localNetwork,
     ) {}
+
+    public static function localAllowed(): bool
+    {
+        return (bool) config('tms.connectors.allow_local_ai');
+    }
+
+    /**
+     * French reason why a server on the local network at $host ($ips) may
+     * not be used, or null: the platform must allow it; the TMS's own stack
+     * (STACK_HOSTS, their addresses, loopback) is refused; addresses must
+     * be private or public, never internal; with http, private only.
+     *
+     * @param  list<string>  $ips
+     */
+    public static function localViolation(string $host, string $scheme, array $ips): ?string
+    {
+        if (! self::localAllowed()) {
+            return self::LOCAL_NOT_ALLOWED;
+        }
+        $host = strtolower($host);
+        if (in_array($host, self::STACK_HOSTS, true) || in_array(explode('.', $host)[0], self::STACK_HOSTS, true)) {
+            return 'Cet hôte fait partie du TMS lui-même : le serveur d\'IA doit être une autre machine.';
+        }
+        if (array_intersect($ips, self::stackAddresses()) !== []) {
+            return 'Cette adresse est celle d\'un service du TMS : le serveur d\'IA doit être une autre machine.';
+        }
+        $reason = HostPolicy::localNetworkViolation($ips, privateOnly: $scheme === 'http');
+
+        return $reason === null ? null : "Cet hôte pointe vers {$reason} : adresse non autorisée.";
+    }
+
+    /**
+     * Addresses of the stack's services, as this machine resolves them.
+     *
+     * @return list<string>
+     */
+    private static function stackAddresses(): array
+    {
+        $ips = [];
+        foreach (self::STACK_HOSTS as $name) {
+            $ips = [...$ips, ...HostPolicy::resolve($name)];
+        }
+
+        return array_values(array_unique($ips));
+    }
 
     /**
      * @throws AiUnavailable when the configuration has no usable address
@@ -74,7 +128,7 @@ final class AiEndpoint
             throw AiUnavailable::unreachable();
         }
         $reason = $this->localNetwork
-            ? HostPolicy::localNetworkViolation($ips)
+            ? self::localViolation($this->host, $this->scheme, $ips)
             : ($this->scheme === 'https' ? HostPolicy::violation($ips, strict: true) : 'http');
         if ($reason !== null) {
             throw AiUnavailable::hostRefused();

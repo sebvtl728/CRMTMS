@@ -45,6 +45,13 @@ it('honours an explicit TMS_ALLOW_PRIVATE_SMTP_HOSTS', function () {
         ->and(tmsConfigWith(['TMS_MODE' => 'multi', 'TMS_ALLOW_PRIVATE_SMTP_HOSTS' => 'true'])['connectors']['allow_private_hosts'])->toBeTrue();
 });
 
+it('offers a local AI server on a self-hosted install only, unless TMS_ALLOW_LOCAL_AI says otherwise', function () {
+    expect(tmsConfigWith(['TMS_MODE' => 'single', 'TMS_ALLOW_LOCAL_AI' => ''])['connectors']['allow_local_ai'])->toBeTrue()
+        ->and(tmsConfigWith(['TMS_MODE' => 'multi', 'TMS_ALLOW_LOCAL_AI' => ''])['connectors']['allow_local_ai'])->toBeFalse()
+        ->and(tmsConfigWith(['TMS_MODE' => 'single', 'TMS_ALLOW_LOCAL_AI' => 'false'])['connectors']['allow_local_ai'])->toBeFalse()
+        ->and(tmsConfigWith(['TMS_MODE' => 'multi', 'TMS_ALLOW_LOCAL_AI' => 'true'])['connectors']['allow_local_ai'])->toBeTrue();
+});
+
 it('treats empty booleans and mode as their defaults', function () {
     $config = tmsConfigWith(['TMS_MODE' => '', 'TMS_VITE_HOT' => '', 'TMS_ALLOW_INTERNAL_SMTP_HOSTS' => '']);
 

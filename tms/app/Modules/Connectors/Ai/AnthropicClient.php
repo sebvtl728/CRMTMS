@@ -12,7 +12,8 @@ use App\Modules\Connectors\Core\ConnectorConfig;
  * (tool_choice "tool") is not used: the current models refuse it (400).
  * A refusal or a truncated answer (stop_reason refusal / max_tokens) is
  * an AiInvalidResponse. No sampling parameter is sent (refused by the API
- * version used).
+ * version used). Effort « low » (output_config.effort): the suggested
+ * models accept it; a model typed by the administrator must too.
  */
 class AnthropicClient extends AiClient
 {
@@ -25,6 +26,15 @@ class AnthropicClient extends AiClient
 
     /** Models proposed on the configuration screen (editable list). */
     public const SUGGESTED_MODELS = ['claude-opus-5-5', 'claude-sonnet-5-5', 'claude-haiku-5-5'];
+
+    /**
+     * Ceiling of the answer, thinking included (thinking cannot be turned off
+     * on the current models): higher than the other providers' bound.
+     */
+    public const MAX_OUTPUT_TOKENS = 32000;
+
+    /** Structured extraction needs little reasoning: faster, cheaper, within the 120 s. */
+    public const EFFORT = 'low';
 
     public function model(ConnectorConfig $config): string
     {
@@ -45,7 +55,7 @@ class AnthropicClient extends AiClient
             'max_tokens' => self::MAX_OUTPUT_TOKENS,
             'system' => $system,
             'messages' => [['role' => 'user', 'content' => $user]],
-            'output_config' => ['format' => ['type' => 'json_schema', 'schema' => AiSchema::sendable($schema)]],
+            'output_config' => ['effort' => self::EFFORT, 'format' => ['type' => 'json_schema', 'schema' => AiSchema::sendable($schema)]],
         ]);
 
         if (! $response->successful()) {

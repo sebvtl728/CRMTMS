@@ -49,6 +49,11 @@ final class AiSchema
     public static function conform(mixed $value, array $schema): mixed
     {
         $types = (array) ($schema['type'] ?? []);
+        // 7.0 is an integer for JSON Schema: some models write integers that way.
+        if (is_float($value) && in_array('integer', $types, true) && ! in_array('number', $types, true)
+            && is_finite($value) && floor($value) === $value && abs($value) < 2 ** 53) {
+            $value = (int) $value;
+        }
         if ($types !== [] && ! self::anyType($value, $types)) {
             throw new AiInvalidResponse;
         }

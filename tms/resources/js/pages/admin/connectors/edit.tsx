@@ -29,6 +29,7 @@ interface FieldMeta {
     suggestions?: string[];
     help?: string;
     warning?: string;
+    hidden?: boolean;
     visible_when?: Record<string, string[]>;
 }
 
@@ -74,7 +75,7 @@ export default function EditConnector({ connector, companyId, companies, config,
     const label = (key: string) => connector.labels[key] ?? key;
     const field = (key: string): FieldMeta | undefined => connector.fields[key];
 
-    const { data, setData, put, processing, errors } = useForm<{
+    const { data, setData, put, processing, errors, transform } = useForm<{
         company_id: string | null;
         enabled: boolean;
         settings: Record<string, SettingValue>;
@@ -100,11 +101,14 @@ export default function EditConnector({ connector, companyId, companies, config,
 
     // A field may only make sense for some values of another setting (e.g. the address of an OpenAI-compatible server).
     const visible = (key: string) =>
+        !field(key)?.hidden &&
         Object.entries(field(key)?.visible_when ?? {}).every(([other, values]) => values.includes(String(data.settings[other] ?? '')));
     const setSetting = (key: string, value: SettingValue) => setData('settings', { ...data.settings, [key]: value });
 
     const submit: FormEventHandler = (e) => {
         e.preventDefault();
+        // Hidden fields are neither validated nor stored (e.g. the address for Anthropic).
+        transform((current) => ({ ...current, settings: Object.fromEntries(Object.entries(current.settings).filter(([key]) => visible(key))) }));
         put(route('admin.connectors.update', connector.key), {
             preserveScroll: true,
             onSuccess: () => setData('secrets', Object.fromEntries(connector.secrets.map((key) => [key, '']))),

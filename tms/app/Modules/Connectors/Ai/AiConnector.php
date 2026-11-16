@@ -66,8 +66,9 @@ class AiConnector implements Connector, HasFormFields, HasFormLabels, OrganismeW
         return [
             'provider' => ['required', 'string', Rule::enum(AiProvider::class)],
             'model' => ['nullable', 'string', 'max:200', 'regex:/^[A-Za-z0-9._:\/@+-]+$/', 'required_if:settings.provider,'.AiProvider::OpenAiCompatible->value],
-            'base_url' => ['nullable', 'string', 'max:255', 'required_if:settings.provider,'.AiProvider::OpenAiCompatible->value, new AiBaseUrl],
-            'local_network' => ['nullable', 'boolean'],
+            // Anthropic has a fixed address: these are neither validated nor stored for it.
+            'base_url' => ['exclude_unless:settings.provider,'.AiProvider::OpenAiCompatible->value, 'nullable', 'string', 'max:255', 'required', new AiBaseUrl],
+            'local_network' => ['exclude_unless:settings.provider,'.AiProvider::OpenAiCompatible->value, 'nullable', 'boolean'],
         ];
     }
 
@@ -109,8 +110,10 @@ class AiConnector implements Connector, HasFormFields, HasFormLabels, OrganismeW
             ],
             'local_network' => [
                 'type' => 'checkbox',
+                // Refused on a shared platform (multi mode): the box is not offered.
+                'hidden' => ! AiEndpoint::localAllowed(),
                 'default' => false,
-                'warning' => 'À cocher seulement pour une IA installée sur le réseau local de l\'organisme (adresse privée ou cette machine). Le TMS pourra alors joindre cette adresse et ce port précis, en http si besoin : vérifiez qu\'il s\'agit bien de votre serveur d\'IA. Les contenus envoyés à l\'IA (programmes de formation) y transitent.',
+                'warning' => 'À cocher seulement pour une IA installée sur le réseau local de l\'organisme (adresse privée d\'une autre machine que le TMS). Le TMS pourra alors joindre cette adresse et ce port précis, en http si besoin : vérifiez qu\'il s\'agit bien de votre serveur d\'IA. Les contenus envoyés à l\'IA (programmes de formation) y transitent.',
                 'visible_when' => $openAi,
             ],
             'api_key' => [

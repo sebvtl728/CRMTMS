@@ -5,7 +5,8 @@ namespace App\Modules\Connectors\Core;
 /**
  * Optional capability: how the generic configuration form shows some
  * settings (a list of choices, a checkbox with a warning, suggestions, a
- * field shown only for one value of another setting). Settings without an
+ * field shown only for one value of another setting, a field not offered
+ * at all: hidden, neither shown nor submitted). Settings without an
  * entry are plain text fields.
  */
 interface HasFormFields
@@ -18,6 +19,7 @@ interface HasFormFields
      *     suggestions?: list<string>,
      *     help?: string,
      *     warning?: string,
+     *     hidden?: bool,
      *     visible_when?: array<string, list<string>>
      * }>
      */

@@ -4,15 +4,17 @@ namespace App\Modules\Connectors\Ai;
 
 use App\Modules\Connectors\Core\ConnectorConfig;
 use App\Modules\Connectors\Core\HostPolicy;
-use Illuminate\Http\Client\ConnectionException;
+use Closure;
 use Illuminate\Http\Client\Response;
 use Illuminate\Support\Facades\Http;
+use RuntimeException;
+use Throwable;
 
 /**
  * One AI provider's protocol. Every call: the endpoint's network policy
  * (AiEndpoint::guard, connection pinned to the checked addresses),
  * TIMEOUT_SECONDS at most, redirects never followed, output bounded by
- * MAX_OUTPUT_TOKENS. Failures become AiUnavailable / AiInvalidResponse with
+ * MAX_OUTPUT_TOKENS, response body by MAX_RESPONSE_BYTES. Failures become AiUnavailable / AiInvalidResponse with
  * fixed French messages: the provider's text never leaves this class.
  */
 abstract class AiClient
@@ -24,6 +26,9 @@ abstract class AiClient
 
     /** Upper bound of the answer (a training sheet with 30 modules fits). */
     public const MAX_OUTPUT_TOKENS = 16000;
+
+    /** Largest response body read; a bigger one is cut off and refused. */
+    public const MAX_RESPONSE_BYTES = 2 * 1024 * 1024;
 
     /**
      * The decoded JSON object answered for $schema (not yet checked against
@@ -48,18 +53,23 @@ abstract class AiClient
     protected function post(AiEndpoint $endpoint, string $url, array $headers, array $body): Response
     {
         $ips = $endpoint->guard($url);
+        $tooLarge = false;
 
         try {
             $response = Http::acceptJson()
                 ->asJson()
                 ->withHeaders($headers)
-                ->withOptions(HostPolicy::pinned($url, $ips))
+                ->withOptions([...HostPolicy::pinned($url, $ips), 'progress' => self::sizeLimit($tooLarge)])
                 ->timeout(self::TIMEOUT_SECONDS)
                 ->connectTimeout(self::CONNECT_TIMEOUT_SECONDS)
                 ->withoutRedirecting()
                 ->post($url, $body);
-        } catch (ConnectionException) {
-            throw AiUnavailable::unreachable();
+        } catch (Throwable) {
+            // A body cut off by sizeLimit() surfaces as a transfer error.
+            throw $tooLarge ? new AiInvalidResponse : AiUnavailable::unreachable();
+        }
+        if (strlen($response->body()) > self::MAX_RESPONSE_BYTES) {
+            throw new AiInvalidResponse;
         }
 
         if ($response->redirect()) {
@@ -67,6 +77,23 @@ abstract class AiClient
         }
 
         return $response;
+    }
+
+    /**
+     * Guzzle progress callback aborting the transfer past MAX_RESPONSE_BYTES
+     * (a misbehaving server must not fill the worker's memory).
+     *
+     * @return Closure(int, int, int, int): void
+     */
+    public static function sizeLimit(bool &$tooLarge): Closure
+    {
+        return function (int $downloadTotal, int $downloaded) use (&$tooLarge): void {
+            if ($downloadTotal > self::MAX_RESPONSE_BYTES || $downloaded > self::MAX_RESPONSE_BYTES) {
+                $tooLarge = true;
+
+                throw new RuntimeException('AI response too large.');
+            }
+        };
     }
 
     /** The exception for an unsuccessful answer. */

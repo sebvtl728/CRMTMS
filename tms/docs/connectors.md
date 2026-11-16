@@ -219,7 +219,7 @@ Paramètres : `tenant` (annuaire Azure : son ID, un de ses domaines `xxx.onmicro
 |---|---|---|
 | Fournisseur (`provider`) | `anthropic` | `openai_compatible` (OpenAI, Mistral, serveur local Ollama / vLLM / LM Studio…) |
 | Modèle (`model`) | facultatif : vide = `claude-opus-5-5` (`AnthropicClient::DEFAULT_MODEL`) ; liste proposée modifiable (`SUGGESTED_MODELS`) | **obligatoire** (ex. `gpt-4.1`, `mistral-large-latest`, `llama3.1:8b`) |
-| Adresse (`base_url`) | — (`https://api.anthropic.com`, fixe) | **obligatoire**, `…/v1` (ex. `https://api.openai.com/v1`) |
+| Adresse (`base_url`) | — (`https://api.anthropic.com`, fixe ; adresse et case réseau local ni affichées, ni validées, ni enregistrées) | **obligatoire**, `…/v1` (ex. `https://api.openai.com/v1`) |
 | Clé d'API (secret `api_key`) | obligatoire | facultative |
 | « Serveur sur le réseau local » (`local_network`) | — | voir ci-dessous |
 
@@ -230,7 +230,7 @@ Les identifiants de modèle évoluent : l'administrateur peut saisir tout identi
 Les modules métier n'utilisent **que** ce service :
 
 - `configured(): bool` : connecteur activé et complet (Anthropic : une clé ; compatible OpenAI : adresse valide et modèle).
-- `structured(string $system, string $user, array $jsonSchema, string $purpose): array` : une requête dont la réponse doit être un objet JSON conforme au schéma. Le schéma complet est vérifié sur la réponse (`AiSchema::conform` : types, champs obligatoires, `enum`, longueurs, bornes, nombre d'éléments) et les clés non déclarées sont retirées ; les contraintes que les fournisseurs n'acceptent pas toutes (`maxLength`, `minimum`, `maxItems`…) ne sont pas envoyées (`AiSchema::sendable`) mais vérifiées ici. `$purpose` est un nom court (`[a-z0-9_.-]`, ex. `training.from_pdf`), journalisé.
+- `structured(string $system, string $user, array $jsonSchema, string $purpose): array` : une requête dont la réponse doit être un objet JSON conforme au schéma. Le schéma complet est vérifié sur la réponse (`AiSchema::conform` : types — un nombre entier écrit `7.0` vaut l'entier `7` —, champs obligatoires, `enum`, longueurs, bornes, nombre d'éléments) et les clés non déclarées sont retirées ; les contraintes que les fournisseurs n'acceptent pas toutes (`maxLength`, `minimum`, `maxItems`…) ne sont pas envoyées (`AiSchema::sendable`) mais vérifiées ici. `$purpose` est un nom court (`[a-z0-9_.-]`, ex. `training.from_pdf`), journalisé.
 - Erreurs (messages **fixes en français**, jamais le texte du fournisseur, affichables tels quels : `UserFacingHttpException`) :
   - `AiUnavailable` (503) : non configuré, clé refusée (401/403), demande refusée (autre 4xx : modèle inconnu…), adresse refusée, saturée (429), injoignable ou trop lente (5xx, 529, délai dépassé) ; `->retryable` vrai pour 429, 5xx et délai ;
   - `AiInvalidResponse` (502) : JSON cassé, pas un objet, non conforme au schéma, réponse tronquée (`max_tokens`, `length`) ou refusée (`refusal`). Rien n'est alors proposé.
@@ -240,13 +240,15 @@ Les modules métier n'utilisent **que** ce service :
 
 - **Anthropic** : `POST https://api.anthropic.com/v1/messages`, en-têtes `x-api-key` et `anthropic-version: 2026-10-21` ; sortie structurée par `output_config.format` (`json_schema`), lue dans les blocs `text`. Un appel d'outil forcé (`tool_choice`) n'est pas utilisé : les modèles actuels le refusent. Aucun paramètre d'échantillonnage (`temperature`…) n'est envoyé.
 - **Compatible OpenAI** : `POST {base_url}/chat/completions`, `Authorization: Bearer` seulement si une clé est enregistrée ; `response_format` `json_schema` (`strict`) ; si le serveur le refuse (400/422), une seconde demande en `json_object`, le schéma étant alors donné dans le message système. Le contenu du message est décodé en JSON (bloc Markdown « ```json » toléré).
-- Délai : **120 s** au plus (`AiClient::TIMEOUT_SECONDS`, une IA locale peut être lente), connexion 10 s ; réponse bornée à `MAX_OUTPUT_TOKENS` (16 000).
+- Délai : **120 s** au plus (`AiClient::TIMEOUT_SECONDS`, une IA locale peut être lente), connexion 10 s ; réponse bornée à `MAX_OUTPUT_TOKENS` (16 000 ; Anthropic 32 000, raisonnement compris, avec `output_config.effort` = `low` : extraction structurée, plus rapide et moins coûteuse — un modèle saisi par l'administrateur doit accepter `effort`, comme les modèles proposés).
 
 ### Réseau : « Serveur sur le réseau local »
 
+- **Réglage de la plateforme** `tms.connectors.allow_local_ai` (variable `TMS_ALLOW_LOCAL_AI`) : vrai par défaut en mode `single` (installation propre à un organisme), **faux en mode `multi`** (plateforme partagée : un administrateur d'organisme ne doit pas atteindre le réseau interne de l'hébergeur). Faux : la case n'est pas proposée, son enregistrement est refusé (« Les serveurs d'IA sur le réseau local ne sont pas autorisés sur cette plateforme. ») et un appel vers une configuration déjà cochée est refusé.
 - **Case décochée** (par défaut) : `https://` obligatoire et l'hôte doit résoudre vers des adresses **publiques** uniquement (`HostPolicy` strict), à l'enregistrement et à chaque appel.
-- **Case cochée** (avertissement affiché) : l'adresse peut être privée (RFC 1918, ULA) ou locale (`127.0.0.1`, `::1`, `localhost`), en `http` ou `https` — **seulement** l'hôte et le port enregistrés (`AiEndpoint::guard` : tout autre hôte, port ou schéma est refusé), pour ce connecteur seulement (aucun réglage global). Les adresses lien-local (dont `169.254.169.254`, métadonnées du cloud), non spécifiées, multicast et réservées restent toujours refusées (`HostPolicy::localNetworkViolation`).
-- Dans tous les cas : redirections **non suivies** (une redirection = « adresse non autorisée »), connexion épinglée sur les adresses vérifiées (`HostPolicy::pinned`).
+- **Case cochée** (avertissement affiché, plateforme qui l'autorise) : l'adresse peut être **privée** (RFC 1918, ULA) — **seulement** l'hôte et le port enregistrés (`AiEndpoint::guard` : tout autre hôte, port ou schéma est refusé), pour ce connecteur seulement (aucun réglage global). `http` n'est permis que si **toutes** les adresses de l'hôte sont privées (`https` vers une adresse publique reste possible).
+- **Jamais**, même case cochée (`AiEndpoint::localViolation`) : le TMS lui-même — le serveur d'IA doit être une **autre machine** : `localhost`, boucle locale (`127.0.0.0/8`, `::1`), les services de la pile (`app`, `caddy`, `postgres`, `redis`, `gotenberg`, `worker`, `scheduler`, `vite`, `AiEndpoint::STACK_HOSTS`) par leur nom **et** par leurs adresses ; ni les adresses lien-local (dont `169.254.169.254`, métadonnées du cloud), non spécifiées, multicast et réservées (`HostPolicy::localNetworkViolation`).
+- Dans tous les cas : redirections **non suivies** (une redirection = « adresse non autorisée »), connexion épinglée sur les adresses vérifiées (`HostPolicy::pinned`), réponse limitée à **2 Mo** (`AiClient::MAX_RESPONSE_BYTES` : transfert interrompu au-delà, `AiInvalidResponse`).
 
 ### Test et journal
 
