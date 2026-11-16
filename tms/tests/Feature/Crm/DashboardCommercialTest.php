@@ -122,10 +122,11 @@ it('keeps a responsable das to his das', function () {
 
     $commercial = dashCommercial($responsable);
 
-    expect($commercial['follow_ups'])->toBe(['overdue' => 1, 'today' => 0])
+    // His own actions count even on a fiche out of his DAS (« Confier à… », 0.7.1).
+    expect($commercial['follow_ups'])->toBe(['overdue' => 2, 'today' => 0])
         ->and($commercial['pipeline']['weighted_amount'])->toBe('100.00')
         ->and($commercial['pipeline']['count'])->toBe(1)
-        ->and(collect($commercial['meetings'])->pluck('organisation.name')->all())->toBe(['Visible']);
+        ->and(collect($commercial['meetings'])->pluck('organisation.name')->all())->toBe(['Visible', 'Cachée']);
 
     // Everyone else sees the whole organisme.
     expect(dashCommercial(direction(twoFactor: true))['pipeline']['weighted_amount'])->toBe('600.00');

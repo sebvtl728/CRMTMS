@@ -95,7 +95,9 @@ it('lists only my actions to do, never done, trashed or without due date', funct
     expect(todoSubjects(TodoQuery::for($user, CarbonImmutable::now()))['today'])->toBe(['À moi']);
 });
 
-it('todo respects das visibility', function () {
+// The responsible always sees his own actions, even on a fiche or an
+// opportunity out of his DAS (« Confier à… », 0.7.1).
+it('todo shows a responsable das his own actions, even out of his das', function () {
     $this->travelTo(todoAt('2026-11-16 10:00:00'));
     $mine = crmItem(ReferenceList::Das, 'Hôtellerie-restauration');
     $other = crmItem(ReferenceList::Das, 'Métiers supports');
@@ -112,11 +114,14 @@ it('todo respects das visibility', function () {
     $foreign = makeOpportunity($visible, ['title' => 'Autre DAS', 'das_id' => $other->id]);
     todoAction($responsable, '2026-11-16 13:00:00', ['subject' => 'Opportunité autre DAS', 'organisation_id' => $visible->id, 'opportunity_id' => $foreign->id]);
 
-    expect(todoSubjects(TodoQuery::for($responsable, CarbonImmutable::now()))['today'])->toBe(['Sur fiche visible'])
-        ->and(TodoQuery::badge($responsable))->toBe(1);
+    expect(todoSubjects(TodoQuery::for($responsable, CarbonImmutable::now()))['today'])->toBe(['Sur fiche visible', 'Sur fiche cachée', 'Opportunité autre DAS'])
+        ->and(TodoQuery::badge($responsable))->toBe(3);
 
     $this->get('/crm/todo?team=1')->assertOk()
-        ->assertInertia(fn ($p) => $p->where('team', false)->where('can_team', false)->has('sections.today', 1));
+        ->assertInertia(fn ($p) => $p->where('team', false)->where('can_team', false)->has('sections.today', 3)
+            ->where('sections.today.0.fiche_visible', true)
+            ->where('sections.today.1.fiche_visible', false)
+            ->where('sections.today.2.fiche_visible', false));
 });
 
 it('lets direction and admin see the actions of the team', function () {

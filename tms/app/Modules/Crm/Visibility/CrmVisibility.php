@@ -338,7 +338,8 @@ final class CrmVisibility
      * An action of an opportunity follows that opportunity (the fiche of the
      * opportunity is stamped on every such action); an action without
      * opportunity follows its entreprise or its person. Own: also the
-     * actions he is responsible for or created.
+     * actions he is responsible for or created; Das: also those he is
+     * responsible for.
      *
      * @template TModel of \Illuminate\Database\Eloquent\Model
      *
@@ -361,8 +362,12 @@ final class CrmVisibility
                     ->whereIn($model->qualifyColumn('organisation_id'), self::organisationsIn(Organisation::withTrashed(), $user, $scope)->select('organisations.id'))
                     ->orWhereIn($model->qualifyColumn('person_id'), self::peopleIn(Person::withTrashed(), $user, $scope)->select('people.id'))));
 
+        // The responsible always sees (and, with the right, does) his action,
+        // even on a fiche he may not open (« Confier à… »).
         return $scope === AccessScope::Das
-            ? $query->where($hangsOn)
+            ? $query->where(fn (Builder $q) => $q
+                ->where($model->qualifyColumn('responsible_user_id'), $user->getKey())
+                ->orWhere($hangsOn))
             : $query->where(fn (Builder $q) => $q
                 ->where($model->qualifyColumn('responsible_user_id'), $user->getKey())
                 ->orWhere($model->qualifyColumn('created_by'), $user->getKey())

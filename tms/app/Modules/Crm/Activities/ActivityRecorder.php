@@ -2,15 +2,22 @@
 
 namespace App\Modules\Crm\Activities;
 
+use App\Modules\Core\Audit\AuditRecorder;
 use App\Modules\Core\References\ReferenceItem;
 use Carbon\CarbonImmutable;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 
 /**
  * Writes actions: quick entry, « Fait » on an action to do, and the next
  * follow-up (an action to do on the same fiches and opportunity, for the
- * same responsible). The contact date of the fiches follows the model
- * events (Activity::booted).
+ * same responsible), « Modifier » and « Confier à… ». The contact date of
+ * the fiches follows the model events (Activity::booted).
+ *
+ * An action handed to someone else than the user who acts (creation, edit
+ * or « Confier à… ») is journaled (crm.activity_assigned, user ids only: the
+ * « Action confiée à X par Y » of the history) and, while to do, announced
+ * once committed (ActivityAssigned: e-mail to the new responsible).
  */
 final class ActivityRecorder
 {
@@ -28,9 +35,54 @@ final class ActivityRecorder
                 $activity->subject = $this->defaultSubject($activity->type_id, $activity);
             }
             $activity->save();
+            $this->announceAssignment($activity, null);
 
             return [$activity, $next === null || $activity->done_at === null ? null : $this->followUp($activity, $next['type_id'], $next['due_at'])];
         });
+    }
+
+    /**
+     * « Modifier »: validated values (ActivityRequest::values).
+     *
+     * @param  array<string, mixed>  $attributes
+     */
+    public function update(Activity $activity, array $attributes): void
+    {
+        DB::transaction(function () use ($activity, $attributes): void {
+            $before = $activity->responsible_user_id;
+            $activity->fill($attributes)->save();
+            $this->announceAssignment($activity, $before);
+        });
+    }
+
+    /**
+     * « Confier à… »: a new responsible, with an optional message for him.
+     */
+    public function assign(Activity $activity, string $userId, ?string $message = null): void
+    {
+        DB::transaction(function () use ($activity, $userId, $message): void {
+            $before = $activity->responsible_user_id;
+            $activity->forceFill(['responsible_user_id' => $userId])->save();
+            $this->announceAssignment($activity, $before, $message);
+        });
+    }
+
+    /**
+     * Journals and announces a responsible that changed to someone else
+     * than the acting user; nothing otherwise (given to oneself, unchanged).
+     */
+    private function announceAssignment(Activity $activity, ?string $before, ?string $message = null): void
+    {
+        $after = $activity->responsible_user_id;
+        $by = Auth::id();
+        if (! is_string($by) || $after === null || $after === $before || $after === $by) {
+            return;
+        }
+
+        app(AuditRecorder::class)->record('crm.activity_assigned', $activity, ['responsible_user_id' => $before], ['responsible_user_id' => $after]);
+        if ($activity->done_at === null) {
+            ActivityAssigned::dispatch($activity->id, $by, $message);
+        }
     }
 
     /**

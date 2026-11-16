@@ -8,7 +8,8 @@ use App\Modules\Core\Mail\MailTemplateRegistry;
 /**
  * The CRM's editable e-mails (« Modèles d'e-mails »): sending and reminder
  * of a quote (prefilled in the window, still editable case by case), the
- * brochures sent from a fiche and the daily digest (its list of actions stays generated).
+ * brochures sent from a fiche, the daily digest (its list of actions stays
+ * generated) and the action handed to another user (« Confier à… »).
  */
 final class CrmMailTemplates
 {
@@ -19,6 +20,8 @@ final class CrmMailTemplates
     public const BROCHURE = 'brochure';
 
     public const DAILY_DIGEST = 'crm.daily_digest';
+
+    public const ACTIVITY_ASSIGNED = 'activity_assigned';
 
     public static function register(): void
     {
@@ -74,6 +77,23 @@ final class CrmMailTemplates
                 'actions' => ['la liste des actions y est insérée', '[liste des actions en retard et du jour]'],
             ],
             required: ['actions'],
+        ));
+        MailTemplateRegistry::register(new MailTemplateDefinition(
+            key: self::ACTIVITY_ASSIGNED,
+            label: 'Action confiée',
+            description: "Envoyé à l'utilisateur à qui une action est confiée (« Attribuer à » à la création, « Confier à… » ou « Modifier »), jamais à celui qui la confie. Le compte rendu et la suite à donner n'y figurent jamais.",
+            subject: 'Action confiée : {objet}',
+            body: "Bonjour,\n\n{auteur} vous a confié une action.\n\nType : {type}\nObjet : {objet}\nÉchéance : {echeance}\nMotif : {motif}\n\n{message}\n\nRetrouvez-la dans « À faire » : {lien}\n\nCordialement,",
+            variables: [
+                'auteur' => ["prénom et nom de l'utilisateur qui confie l'action", 'Camille Commercial'],
+                'type' => ["type de l'action", 'Appel'],
+                'objet' => ["objet de l'action", 'Appel – Hôtel du Lac'],
+                'echeance' => ['échéance (« 20/11/2026 à 09:00 »)', '20/11/2026 à 09:00'],
+                'motif' => ["motif de l'action (« — » s'il est vide)", 'Présenter la formation HACCP'],
+                'message' => ['message facultatif de la personne qui confie (vide sinon)', 'Peux-tu le rappeler cette semaine ?'],
+                'lien' => ["lien vers l'action dans « À faire »", 'https://tms.example.fr/crm/todo'],
+            ],
+            required: ['lien'],
         ));
     }
 }

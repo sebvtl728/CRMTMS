@@ -242,7 +242,8 @@ it('refuses meetings and opportunities the user may not touch', function () {
     $responsable = userWithRole(Role::ResponsableDas);
     followDas($responsable, $mine);
     $responsable->givePermissionTo(['crm.activities.update', 'crm.opportunities.update']); // what a Responsable DAS may be granted
-    $hiddenRdv = meeting($responsable, '2026-11-18 14:00:00', ['organisation_id' => $hidden->id]);
+    // A colleague's meeting out of his DAS (his own would stay his: « Confier à… », 0.7.1).
+    $hiddenRdv = meeting(commercial(), '2026-11-18 14:00:00', ['organisation_id' => $hidden->id]);
     $rdv = meeting($responsable, '2026-11-18 15:00:00', ['organisation_id' => $visible->id]);
     $done = meeting($responsable, '2026-11-18 10:00:00', ['organisation_id' => $visible->id, 'done_at' => reportAt('2026-11-18 11:00:00')]);
 
