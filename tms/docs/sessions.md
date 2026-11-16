@@ -6,12 +6,12 @@ Le menu de gauche, section **Formation**, donne accès à **Dossiers** (droit «
 
 ## 1. Les sessions
 
-Une **session** est une formation du catalogue donnée à des dates précises. Écran **Sessions** : la liste (recherche par numéro, intitulé, lieu ou formation, filtres par état, type, modalité, DAS, formation, responsable et dates) et **Calendrier**, une vue par mois où chaque session s'étend de sa date de début à sa date de fin.
+Une **session** est une formation du catalogue donnée à des dates précises. Écran **Sessions** : la liste (recherche par numéro, intitulé, lieu ou formation, filtres par état, type, modalité, DAS, formation, responsable et dates) et **Calendrier**, une vue par mois : une session qui a des **séances** n'apparaît que les jours de ses séances ; sinon (modules en intervalle) elle apparaît les **jours ouvrés** de ses dates, du lundi au vendredi hors jours fériés et périodes de fermeture. Les week-ends, jours fériés (« Férié : … ») et fermetures (« Fermeture : … ») sont grisés et nommés.
 
 **Nouvelle session** :
 
 - **Intitulé** (facultatif, 150 caractères au plus) : un nom pour la session, par exemple « Commis de cuisine – entrée du 30 novembre 2026 ». Il est affiché partout où la session apparaît (liste, calendrier, page, fiches, dossiers, assistant, accueil, historique, export RGPD) et la recherche de la liste le trouve ; sans intitulé, la session se lit « <formation> (S-2026-0001) » ;
-- **Formation** du catalogue : son DAS devient celui de la session et ses **modules** sont copiés sur la session (voir « Modules et onglet Planning ») ; **Heures prévues** (reprises de la formation, modifiables à la création) ne sert qu'à une formation sans module ;
+- **Formation** du catalogue : son DAS devient celui de la session et ses **modules** sont copiés sur la session (voir « Modules et onglet Planning ») ; **Heures prévues** (reprises de la formation, modifiables à la création) ne sert qu'à une formation sans module : pour une formation qui a des modules, le champ est grisé et indique leur somme, qui devient les heures de la session (d'autres heures saisies sont refusées, jamais remplacées en silence ; de même pour une session créée depuis un devis accepté) ;
 - **Type** :
   - **Intra (une entreprise)** : la session est réservée à une **entreprise** (obligatoire) ; seuls les dossiers dont elle est le contractant y inscrivent des stagiaires ; pas de nombre de places ;
   - **Inter (plusieurs entreprises ou particuliers)** : ouverte à plusieurs dossiers ; **Places** obligatoire ; au-delà, les inscriptions vont sur la **liste d'attente** ;
@@ -36,6 +36,20 @@ Dès qu'une session a des inscriptions, sa formation, son type et son entreprise
 - Si les dates de la session changent ensuite, un module en intervalle qui en sort est **signalé** (« Hors des dates de la session »), jamais déplacé.
 - Changer la formation d'une session (possible tant qu'elle n'a pas d'inscrits) remplace ses modules par ceux de la nouvelle formation.
 - Les sessions créées avant la 0.8.0 ont reçu un module unique en intervalle : intitulé de la formation, heures et dates de la session.
+- **Reprendre les modules de la formation** : remplace les modules de la session par ceux de la fiche formation du catalogue, après un aperçu (modules actuels et modules de la formation) et une confirmation ; refusé dès qu'un module a des séances ou des heures saisies.
+- Un module **sans heures prévues** (venu du catalogue sans durée) est affiché « à définir », compte pour 0 dans les totaux et fait l'objet d'un avertissement. La colonne **Planifiées** donne la durée de ses séances (séances annulées exclues) ; un écart avec les heures prévues est signalé, jamais bloqué.
+
+### Séances, assistant et stages (0.8.0)
+
+Toujours dans l'onglet **Planning**, droit **Planifier les séances** (`sessions.seances.manage`, avec son périmètre sur la session) :
+
+- **Calendrier de la session** (vue mois ou semaine) : les séances (heure, module, formateur ; barrées si annulées ; ⚠ s'il y a des alertes), les modules en intervalle sur leurs jours ouvrés, les stages, et en grisé les week-ends, jours fériés et fermetures. Un clic sur une séance l'ouvre. La liste des séances suit.
+- **Ajouter une séance** : module (en mode « Séances »), date (dans celles de la session), début, fin, pause en minutes, formateur, salle (ou lieu libre hors centre / distanciel), note interne. La **durée** = fin − début − pause, en minutes, en **heure de Paris** : une séance de 9 h à 17 h reste 9 h–17 h au changement d'heure. Une seule séance par module, jour et heure de début.
+- **Générer les séances** : jours de la semaine, un ou plusieurs créneaux (par défaut 9 h–12 h 30 et 13 h 30–17 h), période (par défaut celle du module, sinon de la session), formateur, salle, lieu. **Aperçu** d'abord : nombre de séances, total d'heures comparé aux heures prévues du module, créneaux exclus (jours **fériés** — les 11 fériés nationaux, lundi de Pentecôte compris —, **fermetures**, dates communes des **stages**, séances **déjà planifiées**) et alertes ; puis **Créer**. Relancé sur une période qui chevauche, l'assistant n'ajoute que les créneaux manquants : il ne recrée ni ne modifie jamais une séance existante. Un rythme qui change en cours de formation se génère période par période.
+- **Modifier**, **Annuler** (motif obligatoire : la séance reste visible, barrée) ou **Supprimer** une séance. Une séance qui a des présences saisies ne se supprime pas : annulez-la.
+- **Alertes** (elles préviennent, ne bloquent jamais) : formateur déjà sur une autre séance qui chevauche, formateur indisponible, salle déjà occupée, salle trop petite pour les inscrits, séance un jour férié, pendant une fermeture ou un stage, stagiaire inscrit à une autre séance qui chevauche. Elles s'affichent dans le formulaire pendant la saisie, dans l'aperçu de l'assistant, sur le calendrier et dans la liste.
+- **Stages en entreprise** : une période (intitulé, dates communes dans celles de la session) ; pour chaque stagiaire, une **entreprise d'accueil** (fiche du CRM) et, au besoin, ses **propres dates**, qui remplacent les dates communes pour lui. Les dates communes sont exclues par l'assistant ; une séance pendant le stage individuel d'un stagiaire donne une alerte (il n'y est pas attendu), pas une exclusion. Les stages ne comptent dans aucune heure. Une entreprise d'accueil mise à la corbeille reste affichée « (supprimée) ».
+- Une salle ou un formateur utilisé par une séance ne se supprime plus : désactivez-le.
 
 La **page d'une session** (onglet **Session**) montre ses informations, les **places restantes** d'une session inter, les inscrits regroupés par dossier et la liste d'attente dans son ordre. Les noms des inscrits de tous les dossiers sont visibles ; le prix, les financements et le contractant d'un dossier ne le sont qu'avec le droit de consulter ce dossier.
 

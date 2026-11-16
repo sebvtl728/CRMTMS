@@ -40,7 +40,8 @@ interface FormProps {
     } | null;
     defaults: { kind: Kind; organisation: Entreprise | null; responsible_user_id: string } | null;
     options: {
-        training: (Option & { hours: string | null })[];
+        /** modules_hours: the training has modules, the session's hours are their sum (« 10 h 30 », « à définir »). */
+        training: (Option & { hours: string | null; modules_hours: string | null })[];
         kind: Option[];
         modality: Option[];
         default_modality: string | null;
@@ -188,9 +189,14 @@ export default function SessionFormPage({ session, defaults, options }: FormProp
         }
     };
 
+    const fromModules = editing ? null : (options.training.find((t) => t.value === data.training_id)?.modules_hours ?? null);
+
     const pickTraining = (id: string) => {
         setData((d) => {
-            const hours = options.training.find((t) => t.value === id)?.hours;
+            const picked = options.training.find((t) => t.value === id);
+            // A training with modules: the hours are their sum, nothing to type.
+            if (picked?.modules_hours) return { ...d, training_id: id, planned_hours: '' };
+            const hours = picked?.hours;
             // The hours follow the training until typed.
             const typed = d.planned_hours !== '' && d.planned_hours !== hoursInput(options.training.find((t) => t.value === d.training_id)?.hours);
 
@@ -332,13 +338,15 @@ export default function SessionFormPage({ session, defaults, options }: FormProp
                                 value={data.planned_hours}
                                 onChange={(e) => setData('planned_hours', e.target.value)}
                                 placeholder="Durée de la formation"
-                                disabled={editing}
+                                disabled={editing || fromModules !== null}
                                 aria-describedby="planned_hours_help"
                             />
                             <p id="planned_hours_help" className="text-muted-foreground text-xs">
                                 {editing
                                     ? "Somme des modules : modifiez-les dans l'onglet Planning de la session."
-                                    : 'Les modules de la formation sont copiés ; sans module, un module unique reçoit ces heures.'}
+                                    : fromModules !== null
+                                      ? `Cette formation a des modules : les heures de la session sont leur somme (${fromModules}), modifiables ensuite dans l'onglet Planning.`
+                                      : 'Formation sans module : un module unique reçoit ces heures.'}
                             </p>
                             <InputError message={errors.planned_hours} />
                         </div>

@@ -499,6 +499,15 @@ Module `Sessions` (`Trainers\Trainer`, écrite par `Trainers\Trainers`) ; la per
 ### `trainer_unavailabilities` — indisponibilités des formateurs (0.8.0)
 `id`, `tenant_id` · `trainer_id` (FK `trainers`, cascade) · `starts_at`, `ends_at` timestamptz (CHECK `ends_at > starts_at`, saisis en heure de Paris) · `reason` string(200), null (donnée personnelle : journalisée sans valeur, effacée par l'anonymisation de la personne) · `created_by`, horodatages ; index (`trainer_id`, `starts_at`). `Trainers::available($id, $from, $to)` : aucune indisponibilité ne chevauche [début, fin[.
 
+### `seances` — séances des modules (0.8.0)
+Module `Sessions` (`Planning\Seance`, écrite par `Planning\Seances` et `Planning\SeanceGenerator`). `id`, `tenant_id` · `training_session_id` (FK `training_sessions`, cascade) · `session_module_id` (FK `session_modules`, cascade ; module en mode `seances`) · `date` date (jour de Paris) · `starts_at`, `ends_at` time sans fuseau (heure murale de Paris, CHECK `ends_at > starts_at`) · `break_minutes` int (CHECK ≥ 0) · `duration_minutes` int **générée** (`ends_at − starts_at − break_minutes`, CHECK > 0) · `trainer_id` (FK `trainers`, null) · `room_id` (FK `rooms`, null) · `place_text` string(300), null · `status` `planned` | `cancelled` (CHECK) · `cancel_reason` string(300), null (seulement annulée) · `note` string(1000), null · `created_by`, `updated_by`, horodatages, `deleted_at`. Index unique partiel `seances_module_slot_unique` (`session_module_id`, `date`, `starts_at`) hors corbeille ; index (`training_session_id`, `date`), (`trainer_id`, `date`), (`room_id`, `date`). Journalisée (`seance`) sans `note` ni `cancel_reason` en clair. Une séance rend son module « actif » (`SessionModule::hasActivity()`), sa salle et son formateur « utilisés ». Évènement `Planning\Events\SeanceChanged` (après commit) quand ses horaires changent ou qu'elle est annulée.
+
+### `placement_periods` — périodes de stage (0.8.0)
+`id`, `tenant_id` · `training_session_id` (FK, cascade) · `starts_on`, `ends_on` date (dates communes, dans celles de la session, CHECK) · `label` string(120) · `created_by`, `updated_by`, horodatages. Suppression définitive. Journalisée (`placement_period`).
+
+### `placement_period_hosts` — stage d'un stagiaire (0.8.0)
+`id`, `tenant_id` · `placement_period_id` (FK, cascade) · `enrolment_id` (FK `enrolments`, cascade), unique avec la période · `organisation_id` (FK `organisations`, null : entreprise d'accueil, lue par `Crm\Public\Fiches`, repointée à la fusion, gardée par l'annulation d'un import) · `starts_on`, `ends_on` date, null (dates propres, les deux ou aucune, CHECK) · `created_by`, `updated_by`, horodatages. `PlacementPeriods::datesFor()` : dates propres, sinon communes. Journalisée (`placement_period_host`).
+
 ### `session_sequences` — compteurs de numérotation des sessions
 `tenant_id` (FK `tenants`, cascade) · `year` smallint (année civile de Paris à la création, CHECK 2000–2999) · `last_number` int (CHECK > 0) · `created_at`, `updated_at`. PK (`tenant_id`, `year`). Même mécanique que `quote_sequences` (incrément atomique dans la transaction de création, numéro rendu en cas d'échec).
 

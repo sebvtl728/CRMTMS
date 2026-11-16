@@ -7,6 +7,7 @@ use App\Modules\Core\Access\Scopes;
 use App\Modules\Core\Users\User;
 use App\Modules\Crm\Public\UserDas;
 use App\Modules\Sessions\Dossiers\Dossier;
+use App\Modules\Sessions\Planning\Seance;
 use App\Modules\Sessions\Sessions\TrainingSession;
 use App\Modules\Sessions\Trainers\Trainers;
 use Illuminate\Database\Eloquent\Builder;
@@ -55,7 +56,7 @@ final class SessionsVisibility
      * Séances reached by $permission (sessions.seances.* or
      * sessions.attendance.*): « Ses séances », those whose trainer_id is the
      * trainer linked to the user; otherwise those of the sessions the same
-     * scope reaches. (Query on the seances table, created by task 3.)
+     * scope reaches.
      *
      * @template TModel of \Illuminate\Database\Eloquent\Model
      *
@@ -81,10 +82,8 @@ final class SessionsVisibility
     }
 
     /**
-     * « Ses séances » on sessions: the sessions holding a séance of the
-     * trainer linked to the user. No séance exists before task 3 (table
-     * seances): nothing yet. Task 3 completes this hook with
-     * whereIn(id, seances where trainer_id = the linked trainer).
+     * « Ses séances » on sessions: the sessions holding a séance (out of
+     * the trash, cancelled ones included) of the trainer linked to the user.
      *
      * @template TModel of \Illuminate\Database\Eloquent\Model
      *
@@ -93,7 +92,12 @@ final class SessionsVisibility
      */
     public static function sessionsOfTrainer(Builder $query, User $user): Builder
     {
-        return $query->whereRaw('false');
+        $trainer = Trainers::forUser($user);
+        if ($trainer === null) {
+            return $query->whereRaw('false');
+        }
+
+        return $query->whereIn($query->getModel()->qualifyColumn('id'), Seance::query()->where('trainer_id', $trainer->id)->select('training_session_id'));
     }
 
     /**

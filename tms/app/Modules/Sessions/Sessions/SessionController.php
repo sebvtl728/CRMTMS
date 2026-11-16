@@ -14,6 +14,12 @@ use App\Modules\Sessions\Enrolments\Enrolments;
 use App\Modules\Sessions\Modules\DatingMode;
 use App\Modules\Sessions\Modules\SessionModules;
 use App\Modules\Sessions\Permissions;
+use App\Modules\Sessions\Planning\PlacementPeriods;
+use App\Modules\Sessions\Planning\PublicHolidays;
+use App\Modules\Sessions\Planning\SeanceRows;
+use App\Modules\Sessions\Planning\SessionDays;
+use App\Modules\Sessions\Planning\WorkingDays;
+use App\Modules\Sessions\Resources\ClosurePeriods;
 use App\Modules\Sessions\SessionsVisibility;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\JsonResponse;
@@ -69,13 +75,22 @@ class SessionController extends Controller
             'das' => SessionListQuery::filters(['das' => $request->query('das')])['das'],
         ];
 
+        // The weeks of the grid (Monday to Sunday): a session shows on its séance days or on working days only.
+        $gridFrom = $first->startOfWeek(CarbonImmutable::MONDAY)->toDateString();
+        $gridTo = $first->endOfMonth()->endOfWeek(CarbonImmutable::SUNDAY)->toDateString();
+        $sessions = SessionListQuery::month($first, $user, $filters)->get();
+        $closures = ClosurePeriods::between(WorkingDays::day($gridFrom), WorkingDays::day($gridTo));
+        $days = SessionDays::for($sessions, $gridFrom, $gridTo, $closures);
+
         return Inertia::render('sessions/sessions/calendar', [
             'month' => $first->format('Y-m'),
             'label' => self::MONTHS[$first->month].' '.$first->year,
             'prev' => $first->subMonth()->format('Y-m'),
             'next' => $first->addMonth()->format('Y-m'),
             'today' => TrainingSession::today()->toDateString(),
-            'sessions' => SessionRows::rows(SessionListQuery::month($first, $user, $filters)->get(), TrainingSession::today()),
+            'sessions' => array_map(fn (array $row) => [...$row, 'days' => $days[$row['id']] ?? []], SessionRows::rows($sessions, TrainingSession::today())),
+            'holidays' => PublicHolidays::between($gridFrom, $gridTo),
+            'closures' => SeanceRows::closures($closures),
             'filters' => $filters,
             'options' => ['kind' => SessionKind::options(), 'modality' => SessionListQuery::reference(ReferenceList::TrainingModality), 'das' => SessionListQuery::reference(ReferenceList::Das)],
             'can' => ['create' => $user->can(Permissions::SESSIONS_UPDATE)],
@@ -149,7 +164,7 @@ class SessionController extends Controller
             'enrol' => $enrol ? ['dossiers' => EnrolmentOptions::dossiersFor($session, $user)] : null,
             // Choices of the enrolment dialogs (abandon, details) for who may change them.
             'enrolment_references' => $user->can('update', $session) ? EnrolmentOptions::references() : null,
-            'planning' => self::planning($session, $manage = ! $session->isCancelled() && $user->can('update', $session)),
+            'planning' => self::planning($session, ! $session->isCancelled() && $user->can('update', $session), $user),
             'status' => $request->session()->get('status'),
             'warning' => $request->session()->get('warning'),
         ]);
@@ -227,24 +242,35 @@ class SessionController extends Controller
     }
 
     /**
-     * The « Planning » tab: modules (mode, planned hours, dates), their
-     * total, the warnings, and the choices of the module form for who may
-     * change them.
+     * The « Planning » tab: modules (planned and planned-in-séances
+     * minutes), their total, the warnings, the séances the viewer's
+     * sessions.seances.view scope reaches (with their alerts), the
+     * placements, what the calendar shades, and the choices of the forms
+     * for who may change modules (sessions.sessions.update) or plan séances
+     * (sessions.seances.manage and its scope).
      *
      * @return array<string, mixed>
      */
-    private static function planning(TrainingSession $session, bool $manage): array
+    private static function planning(TrainingSession $session, bool $manage, User $user): array
     {
         $modules = SessionModules::rows($session);
+        $seances = ! $session->isCancelled() && SessionsVisibility::allows($user, Permissions::SEANCES_MANAGE, $session);
 
         return [
             'modules' => $modules,
             'total' => SessionModules::totalLabel($session),
             'warnings' => SessionModules::warnings($session),
             'can_manage' => $manage,
-            'options' => $manage ? [
+            'can_seances' => $seances,
+            'seances' => SeanceRows::forSession($session, $user),
+            'seance_modules' => array_values(array_map(fn (array $m) => ['value' => $m['id'], 'label' => $m['title']],
+                array_filter($modules, fn (array $m) => $m['dating_mode'] === DatingMode::Seances->value))),
+            'placements' => PlacementPeriods::rows($session),
+            'calendar' => SeanceRows::calendar($session),
+            'options' => $manage || $seances ? [
                 'modality' => SessionListQuery::reference(ReferenceList::TrainingModality, array_column($modules, 'modality_id')),
                 'dating_mode' => DatingMode::options(),
+                ...($seances ? SeanceRows::options($session) : []),
             ] : null,
         ];
     }
@@ -279,11 +305,18 @@ class SessionController extends Controller
     private static function formOptions(?TrainingSession $current): array
     {
         $trainings = app(Trainings::class)->options();
-        $options = array_map(fn ($t) => ['value' => $t->id, 'label' => $t->code === null ? $t->title : "{$t->title} ({$t->code})", 'hours' => $t->duration_hours], $trainings);
+        $durations = app(Trainings::class)->moduleDurations(array_map(fn ($t) => $t->id, $trainings));
+        $options = array_map(fn ($t) => [
+            'value' => $t->id,
+            'label' => $t->code === null ? $t->title : "{$t->title} ({$t->code})",
+            'hours' => $t->duration_hours,
+            // A training with modules gives the session their sum (null: none).
+            'modules_hours' => self::modulesHours($durations[$t->id] ?? []),
+        ], $trainings);
         if ($current !== null && ! in_array($current->training_id, array_column($options, 'value'), true)) {
             $kept = app(Trainings::class)->find($current->training_id);
             if ($kept !== null) {
-                $options[] = ['value' => $kept->id, 'label' => $kept->title.' (désactivée)', 'hours' => $kept->duration_hours];
+                $options[] = ['value' => $kept->id, 'label' => $kept->title.' (désactivée)', 'hours' => $kept->duration_hours, 'modules_hours' => null];
             }
         }
 
@@ -296,6 +329,22 @@ class SessionController extends Controller
             'status' => array_map(fn (SessionStatus $s) => $s->toOption(), SessionStatus::SETTABLE),
             'responsible' => SessionListQuery::responsible($current?->responsible_user_id),
         ];
+    }
+
+    /**
+     * « 10 h 30 », « à définir » (modules without hours), null without module.
+     *
+     * @param  list<?string>  $durations
+     */
+    private static function modulesHours(array $durations): ?string
+    {
+        $sum = SessionWriter::modulesSum(array_map(fn (?string $h) => ['duration_hours' => $h], $durations));
+
+        return match (true) {
+            $sum === false => null,
+            $sum === null => SessionModules::UNDEFINED,
+            default => SessionModules::label($sum),
+        };
     }
 
     private function user(Request $request): User

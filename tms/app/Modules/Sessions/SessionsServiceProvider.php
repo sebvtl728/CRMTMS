@@ -32,8 +32,12 @@ use App\Modules\Sessions\Gdpr\PersonSessionsExport;
 use App\Modules\Sessions\Gdpr\RetentionHolds;
 use App\Modules\Sessions\History\SessionsHistory;
 use App\Modules\Sessions\Modules\SessionModule;
+use App\Modules\Sessions\Planning\PlacementPeriod;
+use App\Modules\Sessions\Planning\PlacementPeriodHost;
+use App\Modules\Sessions\Planning\Seance;
 use App\Modules\Sessions\Resources\ClosurePeriod;
 use App\Modules\Sessions\Resources\Room;
+use App\Modules\Sessions\Resources\Rooms;
 use App\Modules\Sessions\Sessions\SessionPolicy;
 use App\Modules\Sessions\Sessions\TrainingSession;
 use App\Modules\Sessions\Trainers\Trainer;
@@ -85,6 +89,9 @@ class SessionsServiceProvider extends ServiceProvider
             ClosurePeriod::MORPH_ALIAS => ClosurePeriod::class,
             Trainer::MORPH_ALIAS => Trainer::class,
             TrainerUnavailability::MORPH_ALIAS => TrainerUnavailability::class,
+            Seance::MORPH_ALIAS => Seance::class,
+            PlacementPeriod::MORPH_ALIAS => PlacementPeriod::class,
+            PlacementPeriodHost::MORPH_ALIAS => PlacementPeriodHost::class,
         ]);
     }
 
@@ -94,6 +101,7 @@ class SessionsServiceProvider extends ServiceProvider
         self::registerTrainingUsage();
         self::registerFicheBlocks();
         self::registerFicheLinks();
+        self::registerPlanningUsage();
         SessionsHistory::registerOnFiches();
         // « Créer le dossier » / « Voir le dossier » on an accepted quote.
         QuoteLinks::register('sessions.dossier', fn (string $quoteId, User $viewer) => app(DossierFromQuote::class)->link($quoteId, $viewer));
@@ -118,6 +126,18 @@ class SessionsServiceProvider extends ServiceProvider
         self::bindUuid('closurePeriod', ClosurePeriod::class);
         self::bindUuid('trainer', Trainer::class);
         self::bindUuid('unavailability', TrainerUnavailability::class);
+        self::bindUuid('placementPeriod', PlacementPeriod::class);
+
+        // A séance: within the user's sessions.seances.view scope, else 404
+        // (malformed, of another organisme, in the trash).
+        Route::bind('seance', function (string $value): Seance {
+            if (! Str::isUuid($value)) {
+                throw (new ModelNotFoundException)->setModel(Seance::class, [$value]);
+            }
+            $user = request()->user();
+
+            return ($user instanceof User ? SessionsVisibility::seances(Seance::query(), $user) : Seance::query())->findOrFail($value);
+        });
 
         Gate::policy(TrainingSession::class, SessionPolicy::class);
         Gate::policy(Dossier::class, DossierPolicy::class);
@@ -201,6 +221,16 @@ class SessionsServiceProvider extends ServiceProvider
 
             return $class::query()->findOrFail($value);
         });
+    }
+
+    /**
+     * A room or a trainer named by a séance (out of the trash) is never
+     * deleted: deactivated instead.
+     */
+    public static function registerPlanningUsage(): void
+    {
+        Rooms::registerUsage('sessions.seances', fn (string $roomId): bool => Seance::query()->where('room_id', $roomId)->exists());
+        Trainers::registerUsage('sessions.seances', fn (string $trainerId): bool => Seance::query()->where('trainer_id', $trainerId)->exists());
     }
 
     /**

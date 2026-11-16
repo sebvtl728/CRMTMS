@@ -6,17 +6,22 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { formatDay, type Option } from '@/lib/crm';
+import { sendJson, type ClosureRow } from '@/lib/sessions';
 import { router, useForm } from '@inertiajs/react';
-import { LoaderCircle, Pencil, Plus, Trash2 } from 'lucide-react';
-import { FormEventHandler, useState } from 'react';
+import { LoaderCircle, Pencil, Plus, RefreshCw, Trash2 } from 'lucide-react';
+import { FormEventHandler, useEffect, useState } from 'react';
 
 export interface SessionModuleRow {
     id: string;
     position: number;
     title: string;
     planned_minutes: number | null;
-    /** « 24 h 30 » */
-    planned: string | null;
+    /** « 24 h 30 », « à définir » without hours (counted 0). */
+    planned: string;
+    /** Minutes of its planned séances (cancelled ones aside). */
+    scheduled_minutes: number;
+    /** « 21 h » */
+    scheduled: string;
     /** As typed in the form (« 3,5 »). */
     planned_hours: string;
     modality_id: string | null;
@@ -35,8 +40,62 @@ export interface SessionPlanning {
     modules: SessionModuleRow[];
     total: string | null;
     warnings: string[];
+    /** sessions.sessions.update on the session: modules. */
     can_manage: boolean;
-    options: { modality: Option[]; dating_mode: Option[] } | null;
+    /** sessions.seances.manage and its scope on the session: séances, assistant, placements. */
+    can_seances: boolean;
+    seances: SeanceRow[];
+    seance_modules: Option[];
+    placements: PlacementRow[];
+    calendar: { holidays: Record<string, string>; closures: ClosureRow[]; interval_days: Record<string, string[]> };
+    options:
+        | ({ modality: Option[]; dating_mode: Option[] } & Partial<{
+              trainers: Option[];
+              rooms: Option[];
+              slots: { start: string; end: string; break_minutes: number }[];
+              weekdays: number[];
+          }>)
+        | null;
+}
+
+export interface Alert {
+    type: string;
+    message: string;
+    date: string | null;
+}
+
+export interface SeanceRow {
+    id: string;
+    module_id: string;
+    module: string;
+    date: string;
+    start: string;
+    end: string;
+    break_minutes: number;
+    minutes: number;
+    duration: string;
+    trainer: { id: string; label: string } | null;
+    room: { id: string; name: string } | null;
+    place_text: string | null;
+    status: 'planned' | 'cancelled';
+    cancel_reason: string | null;
+    note: string | null;
+    alerts: Alert[];
+}
+
+export interface PlacementRow {
+    id: string;
+    label: string;
+    starts_on: string;
+    ends_on: string;
+    trainees: {
+        enrolment_id: string;
+        trainee: string;
+        host: { id: string; label: string; trashed: boolean } | null;
+        from: string;
+        to: string;
+        own_dates: boolean;
+    }[];
 }
 
 const NONE = '__none__';
@@ -180,6 +239,88 @@ function ModuleDialog({
     );
 }
 
+interface CatalogueComparison {
+    modules: { title: string; planned: string }[];
+    total: string;
+    current: { title: string; planned: string }[];
+    locked: boolean;
+}
+
+/** « Reprendre les modules de la formation »: preview, then confirm. */
+function CatalogueDialog({ sessionId, onClose }: { sessionId: string; onClose: () => void }) {
+    const [comparison, setComparison] = useState<CatalogueComparison | null>(null);
+    const [error, setError] = useState<string | null>(null);
+    const [processing, setProcessing] = useState(false);
+
+    useEffect(() => {
+        sendJson<CatalogueComparison>('GET', route('sessions.modules.catalogue', sessionId)).then((answer) =>
+            answer.ok ? setComparison(answer.data) : setError(answer.message),
+        );
+    }, [sessionId]);
+
+    const confirm = () => {
+        setProcessing(true);
+        router.post(
+            route('sessions.modules.from-catalogue', sessionId),
+            {},
+            { preserveScroll: true, onSuccess: onClose, onFinish: () => setProcessing(false) },
+        );
+    };
+
+    const list = (rows: { title: string; planned: string }[]) => (
+        <ul className="grid gap-1 text-sm">
+            {rows.map((r, i) => (
+                <li key={i} className="flex justify-between gap-2">
+                    <span>{r.title}</span>
+                    <span className="text-muted-foreground whitespace-nowrap">{r.planned}</span>
+                </li>
+            ))}
+        </ul>
+    );
+
+    return (
+        <Dialog open onOpenChange={(v) => !v && onClose()}>
+            <DialogContent>
+                <DialogHeader>
+                    <DialogTitle>Reprendre les modules de la formation</DialogTitle>
+                    <DialogDescription>
+                        Les modules de la session sont remplacés par ceux de la fiche formation du catalogue ; ses heures prévues deviennent leur
+                        somme.
+                    </DialogDescription>
+                </DialogHeader>
+                {error && <p className="text-destructive text-sm">{error}</p>}
+                {!comparison && !error && <LoaderCircle className="h-4 w-4 animate-spin" />}
+                {comparison && (
+                    <div className="grid gap-4 sm:grid-cols-2">
+                        <div className="grid gap-2">
+                            <h3 className="text-sm font-semibold">Modules actuels</h3>
+                            {list(comparison.current)}
+                        </div>
+                        <div className="grid gap-2">
+                            <h3 className="text-sm font-semibold">Modules de la formation · {comparison.total}</h3>
+                            {list(comparison.modules)}
+                        </div>
+                    </div>
+                )}
+                {comparison?.locked && (
+                    <p className="text-destructive text-sm">
+                        Des séances ou des heures sont saisies sur les modules de cette session : ils ne peuvent plus être remplacés.
+                    </p>
+                )}
+                <DialogFooter>
+                    <Button type="button" variant="outline" onClick={onClose}>
+                        Retour
+                    </Button>
+                    <Button type="button" disabled={!comparison || comparison.locked || processing} onClick={confirm}>
+                        {processing && <LoaderCircle className="h-4 w-4 animate-spin" />}
+                        Remplacer les modules
+                    </Button>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
+    );
+}
+
 /** « Modules » section of the « Planning » tab of a session. */
 export function SessionModules({
     sessionId,
@@ -191,6 +332,7 @@ export function SessionModules({
     planning: SessionPlanning;
 }) {
     const [editing, setEditing] = useState<SessionModuleRow | 'new' | null>(null);
+    const [catalogue, setCatalogue] = useState(false);
     const visit = { preserveScroll: true, preserveState: true };
 
     const destroy = (m: SessionModuleRow) => {
@@ -215,10 +357,16 @@ export function SessionModules({
                     <span className="text-muted-foreground font-normal"> · total {planning.total ?? '—'}</span>
                 </h2>
                 {planning.can_manage && planning.options && (
-                    <Button type="button" size="sm" onClick={() => setEditing('new')}>
-                        <Plus className="h-4 w-4" />
-                        Ajouter un module
-                    </Button>
+                    <div className="flex flex-wrap gap-2">
+                        <Button type="button" size="sm" variant="outline" onClick={() => setCatalogue(true)}>
+                            <RefreshCw className="h-4 w-4" />
+                            Reprendre les modules de la formation
+                        </Button>
+                        <Button type="button" size="sm" onClick={() => setEditing('new')}>
+                            <Plus className="h-4 w-4" />
+                            Ajouter un module
+                        </Button>
+                    </div>
                 )}
             </div>
 
@@ -240,6 +388,7 @@ export function SessionModules({
                                 <th className="px-3 py-2 font-medium">Module</th>
                                 <th className="px-3 py-2 font-medium">Mode</th>
                                 <th className="px-3 py-2 font-medium">Heures prévues</th>
+                                <th className="px-3 py-2 font-medium">Planifiées</th>
                                 <th className="px-3 py-2 font-medium">Dates</th>
                                 <th className="px-3 py-2 font-medium">Modalité</th>
                                 {planning.can_manage && <th className="px-3 py-2 font-medium">Actions</th>}
@@ -250,7 +399,8 @@ export function SessionModules({
                                 <tr key={m.id} className="border-t">
                                     <td className="px-3 py-2">{m.title}</td>
                                     <td className="px-3 py-2">{m.dating_mode_label}</td>
-                                    <td className="px-3 py-2 whitespace-nowrap">{m.planned ?? '—'}</td>
+                                    <td className="px-3 py-2 whitespace-nowrap">{m.planned}</td>
+                                    <td className="px-3 py-2 whitespace-nowrap">{m.dating_mode === 'seances' ? m.scheduled : '—'}</td>
                                     <td className="px-3 py-2 whitespace-nowrap">
                                         {m.starts_on ? `${formatDay(m.starts_on)} → ${formatDay(m.ends_on)}` : '—'}
                                         {m.out_of_range && (
@@ -302,6 +452,7 @@ export function SessionModules({
                 </div>
             )}
 
+            {catalogue && <CatalogueDialog sessionId={sessionId} onClose={() => setCatalogue(false)} />}
             {editing !== null && planning.options && (
                 <ModuleDialog
                     sessionId={sessionId}

@@ -3,6 +3,7 @@ import InputError from '@/components/input-error';
 import { EnrolDialog, type EnrolDossierOption } from '@/components/sessions/enrolment-dialog';
 import { EnrolmentList, type EnrolmentReferences, type EnrolmentRow } from '@/components/sessions/enrolment-list';
 import { SessionModules, type SessionPlanning } from '@/components/sessions/session-modules';
+import { SessionPlanningSeances } from '@/components/sessions/session-planning';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -207,6 +208,7 @@ export default function SessionShow({
                 {tab === 'Planning' && (
                     <div role="tabpanel" id="panel-Planning" aria-labelledby="tab-Planning" className="grid gap-6">
                         <SessionModules sessionId={session.id} session={session} planning={planning} />
+                        <SessionPlanningSeances session={session} planning={planning} />
                     </div>
                 )}
 

@@ -9,6 +9,7 @@ use App\Modules\Core\References\ReferenceList;
 use App\Modules\Core\Tenancy\TenantContext;
 use App\Modules\Sessions\Enrolments\Enrolment;
 use App\Modules\Sessions\Enrolments\EnrolmentStatus;
+use App\Modules\Sessions\Planning\Seance;
 use App\Modules\Sessions\Sessions\SessionRows;
 use App\Modules\Sessions\Sessions\SessionWriter;
 use App\Modules\Sessions\Sessions\TrainingSession;
@@ -36,6 +37,9 @@ final class SessionModules
     public const MODE_LOCKED = 'Ce module a des séances ou des heures saisies : son mode de datation ne change plus.';
 
     public const TRAINING_LOCKED = 'Des séances ou des heures sont saisies sur les modules de cette session : sa formation ne change plus.';
+
+    /** Shown for a module without planned hours (counted 0 in sums). */
+    public const UNDEFINED = 'à définir';
 
     /** planned_hours is numeric(6,2): 9 999,99 h at most. */
     public const MAX_MINUTES = 599_999;
@@ -87,6 +91,41 @@ final class SessionModules
         }
         $modules->each(fn (SessionModule $m) => $m->delete());
         $this->copyFromTraining($session);
+    }
+
+    /**
+     * « Reprendre les modules de la formation » (preview): the modules the
+     * training would give against the session's, and whether one of them
+     * has séances or hours entered (then locked).
+     *
+     * @return array{modules: list<array{title: string, planned: string}>, total: string, current: list<array{title: string, planned: string}>, locked: bool}
+     */
+    public function catalogueComparison(TrainingSession $session): array
+    {
+        $catalogue = $this->trainings->modules($session->training_id);
+        $modules = $catalogue === []
+            ? [['title' => $this->trainings->find($session->training_id)->title ?? $session->number, 'minutes' => self::minutesOf($session->planned_hours)]]
+            : array_map(fn (array $m) => ['title' => $m['title'], 'minutes' => self::minutesOf($m['duration_hours'])], $catalogue);
+        $current = SessionModule::query()->where('training_session_id', $session->id)->orderBy('position')->orderBy('id')->get();
+        $plannedLabel = fn (?int $minutes): string => $minutes === null ? self::UNDEFINED : self::label($minutes);
+
+        return [
+            'modules' => array_map(fn (array $m) => ['title' => $m['title'], 'planned' => $plannedLabel($m['minutes'])], $modules),
+            'total' => self::label((int) array_sum(array_column($modules, 'minutes'))),
+            'current' => $current->map(fn (SessionModule $m) => ['title' => $m->title, 'planned' => $plannedLabel($m->planned_minutes)])->values()->all(),
+            'locked' => $current->contains(fn (SessionModule $m) => $m->hasActivity()),
+        ];
+    }
+
+    /**
+     * Replaces the modules of the session by its training's (409 once a
+     * module has séances or hours entered, or the session is cancelled).
+     */
+    public function resetFromTraining(TrainingSession $session): void
+    {
+        DB::transaction(function () use ($session): void {
+            $this->replaceFromTraining(self::lockSession($session));
+        });
     }
 
     /**
@@ -201,13 +240,16 @@ final class SessionModules
     {
         $modules = SessionModule::query()->where('training_session_id', $session->id)->orderBy('position')->orderBy('id')->get();
         $modalities = ReferenceItem::query()->whereIn('id', $modules->pluck('modality_id')->filter()->unique()->values())->pluck('label', 'id');
+        $scheduled = self::scheduledMinutes($session);
 
         return $modules->map(fn (SessionModule $m) => [
             'id' => $m->id,
             'position' => $m->position,
             'title' => $m->title,
             'planned_minutes' => $m->planned_minutes,
-            'planned' => $m->planned_minutes === null ? null : self::label($m->planned_minutes),
+            'planned' => $m->planned_minutes === null ? self::UNDEFINED : self::label($m->planned_minutes),
+            'scheduled_minutes' => $scheduled[$m->id] ?? 0,
+            'scheduled' => self::label($scheduled[$m->id] ?? 0),
             'planned_hours' => $m->planned_minutes === null ? '' : self::input($m->planned_minutes),
             'modality_id' => $m->modality_id,
             'modality' => $m->modality_id === null ? null : ($modalities[$m->modality_id] ?? null),
@@ -229,13 +271,19 @@ final class SessionModules
     public static function warnings(TrainingSession $session): array
     {
         $warnings = [];
+        $scheduled = self::scheduledMinutes($session);
         if (($enrolments = self::enrolmentWarning($session)) !== null) {
             $warnings[] = $enrolments;
         }
         SessionModule::query()->where('training_session_id', $session->id)->orderBy('position')->orderBy('id')->get()
-            ->each(function (SessionModule $m) use ($session, &$warnings): void {
+            ->each(function (SessionModule $m) use ($session, $scheduled, &$warnings): void {
                 if ($m->outOfRange($session)) {
                     $warnings[] = "Le module « {$m->title} » sort des dates de la session.";
+                }
+                if ($m->planned_minutes === null) {
+                    $warnings[] = "Le module « {$m->title} » n'a pas d'heures prévues.";
+                } elseif (($minutes = $scheduled[$m->id] ?? 0) > 0 && $minutes !== $m->planned_minutes) {
+                    $warnings[] = "Le module « {$m->title} » : ".self::label($minutes).' planifiées pour '.self::label($m->planned_minutes).' prévues.';
                 }
             });
 
@@ -260,6 +308,18 @@ final class SessionModules
             $count === 1 => "1 stagiaire a des heures prévues supérieures à celles de la session ({$hours} h) : vérifiez son inscription.",
             default => "{$count} stagiaires ont des heures prévues supérieures à celles de la session ({$hours} h) : vérifiez leurs inscriptions.",
         };
+    }
+
+    /**
+     * Minutes of the planned séances (cancelled ones aside) per module of the session.
+     *
+     * @return array<string, int>
+     */
+    public static function scheduledMinutes(TrainingSession $session): array
+    {
+        return Seance::query()->where('training_session_id', $session->id)->where('status', Seance::PLANNED)
+            ->groupBy('session_module_id')->selectRaw('session_module_id, sum(duration_minutes) as minutes')
+            ->pluck('minutes', 'session_module_id')->map(fn ($m) => (int) $m)->all();
     }
 
     /** Σ of the modules' minutes as a label (« 24 h 30 »), null when none has hours. */

@@ -4,6 +4,7 @@ namespace App\Modules\Sessions\Modules;
 
 use App\Http\Controllers\Controller;
 use App\Modules\Sessions\Sessions\TrainingSession;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
@@ -55,6 +56,31 @@ class SessionModuleController extends Controller
         $this->modules->switchMode($sessionModule, is_string($mode) ? $mode : '');
 
         return $this->back($trainingSession, 'Mode de datation modifié.');
+    }
+
+    /**
+     * « Reprendre les modules de la formation »: what the session would get
+     * (the training's modules) against what it has; locked once a module
+     * has séances or hours entered.
+     */
+    public function catalogue(TrainingSession $trainingSession): JsonResponse
+    {
+        Gate::authorize('update', $trainingSession);
+
+        return response()->json($this->modules->catalogueComparison($trainingSession));
+    }
+
+    /**
+     * Replaces the modules of the session by those of its training (409
+     * once a module has séances or hours entered).
+     */
+    public function fromCatalogue(TrainingSession $trainingSession): RedirectResponse
+    {
+        Gate::authorize('update', $trainingSession);
+
+        $this->modules->resetFromTraining($trainingSession);
+
+        return $this->back($trainingSession->refresh(), 'Modules de la formation repris.');
     }
 
     private static function assertOf(TrainingSession $session, SessionModule $module): void

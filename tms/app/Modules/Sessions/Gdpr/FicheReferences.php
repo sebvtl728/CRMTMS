@@ -9,7 +9,7 @@ use Illuminate\Validation\ValidationException;
  * The fiches of the CRM the module points to (ids only, never their
  * tables), declared to the CRM through Crm\Public\FicheLinks:
  *  - an entreprise: entreprise of a session (intra / individuel),
- *    contractant of a dossier, funder;
+ *    contractant of a dossier, funder, host of a trainee's placement;
  *  - a person: trainee (enrolments), contractant (particulier) or contact of
  *    a dossier, funder, trainer.
  * Trashed sessions and dossiers count: they can come back.
@@ -28,6 +28,7 @@ final class FicheReferences
             'training_sessions' => ['organisation_id'],
             'dossiers' => ['account_organisation_id'],
             'fundings' => ['funder_organisation_id'],
+            'placement_period_hosts' => ['organisation_id'],
         ],
         'person' => [
             'enrolments' => ['person_id'],

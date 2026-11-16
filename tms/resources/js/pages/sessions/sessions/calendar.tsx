@@ -3,7 +3,7 @@ import Heading from '@/components/heading';
 import { Button } from '@/components/ui/button';
 import AppLayout from '@/layouts/app-layout';
 import { type Option } from '@/lib/crm';
-import { sessionDates, type SessionRow } from '@/lib/sessions';
+import { dayShade, monthGrid, sessionDates, WEEKDAYS_SHORT, type ClosureRow, type SessionRow } from '@/lib/sessions';
 import { type BreadcrumbItem } from '@/types';
 import { Head, Link, router } from '@inertiajs/react';
 import { ChevronLeft, ChevronRight, List, Plus } from 'lucide-react';
@@ -17,42 +17,20 @@ interface CalendarProps {
     next: string;
     /** Paris day, YYYY-MM-DD */
     today: string;
+    /** Each with its days: séance days, else working days (never a weekend, holiday or closure). */
     sessions: SessionRow[];
+    /** Public holidays of the weeks shown: day => label. */
+    holidays: Record<string, string>;
+    closures: ClosureRow[];
     filters: { kind: string | null; modality: string | null; das: string | null };
     options: { kind: Option[]; modality: Option[]; das: Option[] };
     can: { create: boolean };
 }
 
-const WEEKDAYS = ['Lun.', 'Mar.', 'Mer.', 'Jeu.', 'Ven.', 'Sam.', 'Dim.'];
-
 const breadcrumbs: BreadcrumbItem[] = [
     { title: 'Sessions', href: '/sessions' },
     { title: 'Calendrier', href: '/sessions/calendar' },
 ];
-
-const pad = (n: number) => String(n).padStart(2, '0');
-
-/**
- * Days of the weeks covering the month (Monday first), as YYYY-MM-DD strings
- * computed without time zone (a calendar day, not an instant).
- */
-function monthGrid(month: string): { day: string; inMonth: boolean }[][] {
-    const [y, m] = month.split('-').map(Number);
-    const daysInMonth = new Date(Date.UTC(y, m, 0)).getUTCDate();
-    const firstWeekday = (new Date(Date.UTC(y, m - 1, 1)).getUTCDay() + 6) % 7;
-    const cells: { day: string; inMonth: boolean }[] = [];
-    for (let i = -firstWeekday; cells.length < Math.ceil((firstWeekday + daysInMonth) / 7) * 7; i++) {
-        const date = new Date(Date.UTC(y, m - 1, 1 + i));
-        cells.push({
-            day: `${date.getUTCFullYear()}-${pad(date.getUTCMonth() + 1)}-${pad(date.getUTCDate())}`,
-            inMonth: i >= 0 && i < daysInMonth,
-        });
-    }
-    const weeks: { day: string; inMonth: boolean }[][] = [];
-    for (let i = 0; i < cells.length; i += 7) weeks.push(cells.slice(i, i + 7));
-
-    return weeks;
-}
 
 const statusClass: Record<SessionRow['status'], string> = {
     planned: 'border-l-slate-400',
@@ -62,7 +40,7 @@ const statusClass: Record<SessionRow['status'], string> = {
     cancelled: 'border-l-red-500 line-through opacity-60',
 };
 
-export default function SessionsCalendar({ month, label, prev, next, today, sessions, filters, options, can }: CalendarProps) {
+export default function SessionsCalendar({ month, label, prev, next, today, sessions, holidays, closures, filters, options, can }: CalendarProps) {
     const visit = (changes: Partial<{ month: string; kind: string | null; modality: string | null; das: string | null }>) => {
         const query: Record<string, string> = {};
         const all = { month, ...filters, ...changes };
@@ -73,7 +51,7 @@ export default function SessionsCalendar({ month, label, prev, next, today, sess
     };
 
     const weeks = monthGrid(month);
-    const onDay = (day: string) => sessions.filter((s) => s.starts_on <= day && s.ends_on >= day);
+    const onDay = (day: string) => sessions.filter((s) => (s.days ?? []).includes(day));
     const thisMonth = today.slice(0, 7);
 
     return (
@@ -82,7 +60,10 @@ export default function SessionsCalendar({ month, label, prev, next, today, sess
 
             <div className="flex flex-col gap-4 p-4">
                 <div className="flex flex-wrap items-start justify-between gap-4">
-                    <Heading title="Calendrier des sessions" description="Sessions du mois, par dates" />
+                    <Heading
+                        title="Calendrier des sessions"
+                        description="Jours de séance, sinon jours ouvrés (hors week-ends, jours fériés et fermetures)"
+                    />
                     <div className="flex flex-wrap gap-2">
                         <Button asChild variant="outline">
                             <Link href={route('sessions.index')}>
@@ -127,7 +108,7 @@ export default function SessionsCalendar({ month, label, prev, next, today, sess
                     <table className="w-full table-fixed text-sm">
                         <thead className="bg-muted/50">
                             <tr>
-                                {WEEKDAYS.map((d) => (
+                                {WEEKDAYS_SHORT.map((d) => (
                                     <th key={d} className="px-2 py-1 text-left font-medium">
                                         {d}
                                     </th>
@@ -137,31 +118,44 @@ export default function SessionsCalendar({ month, label, prev, next, today, sess
                         <tbody>
                             {weeks.map((week) => (
                                 <tr key={week[0].day} className="border-t align-top">
-                                    {week.map(({ day, inMonth }) => (
-                                        <td
-                                            key={day}
-                                            className={`h-28 border-l p-1 first:border-l-0 ${inMonth ? '' : 'bg-muted/30 text-muted-foreground'}`}
-                                        >
-                                            <div
-                                                className={`mb-1 text-xs ${day === today ? 'bg-primary text-primary-foreground inline-block rounded px-1' : ''}`}
+                                    {week.map(({ day, inMonth }) => {
+                                        const shade = dayShade(day, holidays, closures);
+
+                                        return (
+                                            <td
+                                                key={day}
+                                                className={`h-28 border-l p-1 first:border-l-0 ${inMonth ? '' : 'text-muted-foreground'} ${shade.off || !inMonth ? 'bg-muted/40' : ''}`}
                                             >
-                                                {Number(day.slice(8))}
-                                            </div>
-                                            <ul className="grid gap-1">
-                                                {onDay(day).map((s) => (
-                                                    <li key={s.id}>
-                                                        <Link
-                                                            href={route('sessions.show', s.id)}
-                                                            title={`${s.label} · ${sessionDates(s)} · ${s.status_label}`}
-                                                            className={`bg-muted hover:bg-muted/70 block truncate rounded border-l-4 px-1 text-xs ${statusClass[s.status]}`}
-                                                        >
-                                                            {s.title ?? s.training?.title ?? s.number}
-                                                        </Link>
-                                                    </li>
-                                                ))}
-                                            </ul>
-                                        </td>
-                                    ))}
+                                                <div className="mb-1 flex items-start justify-between gap-1 text-xs">
+                                                    <span
+                                                        className={
+                                                            day === today ? 'bg-primary text-primary-foreground inline-block rounded px-1' : ''
+                                                        }
+                                                    >
+                                                        {Number(day.slice(8))}
+                                                    </span>
+                                                    {shade.label && (
+                                                        <span className="text-muted-foreground truncate text-[10px] italic" title={shade.label}>
+                                                            {shade.label}
+                                                        </span>
+                                                    )}
+                                                </div>
+                                                <ul className="grid gap-1">
+                                                    {onDay(day).map((s) => (
+                                                        <li key={s.id}>
+                                                            <Link
+                                                                href={route('sessions.show', s.id)}
+                                                                title={`${s.label} · ${sessionDates(s)} · ${s.status_label}`}
+                                                                className={`bg-muted hover:bg-muted/70 block truncate rounded border-l-4 px-1 text-xs ${statusClass[s.status]}`}
+                                                            >
+                                                                {s.title ?? s.training?.title ?? s.number}
+                                                            </Link>
+                                                        </li>
+                                                    ))}
+                                                </ul>
+                                            </td>
+                                        );
+                                    })}
                                 </tr>
                             ))}
                         </tbody>

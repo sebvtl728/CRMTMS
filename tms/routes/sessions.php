@@ -5,6 +5,8 @@ use App\Modules\Sessions\Dossiers\DossierFromQuoteController;
 use App\Modules\Sessions\Enrolments\EnrolmentController;
 use App\Modules\Sessions\Fundings\FundingController;
 use App\Modules\Sessions\Modules\SessionModuleController;
+use App\Modules\Sessions\Planning\PlacementController;
+use App\Modules\Sessions\Planning\SeanceController;
 use App\Modules\Sessions\Resources\ResourceSettingsController;
 use App\Modules\Sessions\Sessions\SessionController;
 use App\Modules\Sessions\Settings\AbandonRuleController;
@@ -41,7 +43,26 @@ Route::middleware(['auth'])->prefix('sessions')->name('sessions.')->group(functi
     Route::post('{trainingSession}/modules', [SessionModuleController::class, 'store'])->middleware('can:sessions.sessions.update')->name('modules.store');
     Route::put('{trainingSession}/modules/{sessionModule}', [SessionModuleController::class, 'update'])->middleware('can:sessions.sessions.update')->name('modules.update');
     Route::delete('{trainingSession}/modules/{sessionModule}', [SessionModuleController::class, 'destroy'])->middleware('can:sessions.sessions.update')->name('modules.destroy');
+    // « Reprendre les modules de la formation »: preview, then replace (409 once a module has activity).
+    Route::get('{trainingSession}/modules/catalogue', [SessionModuleController::class, 'catalogue'])->middleware('can:sessions.sessions.update')->name('modules.catalogue');
+    Route::post('{trainingSession}/modules/catalogue', [SessionModuleController::class, 'fromCatalogue'])->middleware('can:sessions.sessions.update')->name('modules.from-catalogue');
     Route::post('{trainingSession}/modules/{sessionModule}/mode', [SessionModuleController::class, 'mode'])->middleware('can:sessions.sessions.update')->name('modules.mode');
+    // Séances, the generation assistant and placements: sessions.seances.manage and its scope on the session.
+    Route::middleware('can:sessions.seances.manage')->group(function () {
+        Route::post('{trainingSession}/seances', [SeanceController::class, 'store'])->name('seances.store');
+        Route::post('{trainingSession}/seances/check', [SeanceController::class, 'check'])->name('seances.check');
+        Route::put('{trainingSession}/seances/{seance}', [SeanceController::class, 'update'])->name('seances.update');
+        Route::post('{trainingSession}/seances/{seance}/cancel', [SeanceController::class, 'cancel'])->name('seances.cancel');
+        Route::delete('{trainingSession}/seances/{seance}', [SeanceController::class, 'destroy'])->name('seances.destroy');
+        Route::post('{trainingSession}/modules/{sessionModule}/seances/preview', [SeanceController::class, 'preview'])->name('seances.preview');
+        Route::post('{trainingSession}/modules/{sessionModule}/seances/generate', [SeanceController::class, 'generate'])->name('seances.generate');
+        Route::get('{trainingSession}/placements/organisations', [PlacementController::class, 'organisations'])->middleware('throttle:sessions-trainees')->name('placements.organisations');
+        Route::post('{trainingSession}/placements', [PlacementController::class, 'store'])->name('placements.store');
+        Route::put('{trainingSession}/placements/{placementPeriod}', [PlacementController::class, 'update'])->name('placements.update');
+        Route::delete('{trainingSession}/placements/{placementPeriod}', [PlacementController::class, 'destroy'])->name('placements.destroy');
+        Route::put('{trainingSession}/placements/{placementPeriod}/hosts/{enrolment}', [PlacementController::class, 'host'])->name('placements.hosts.update');
+        Route::delete('{trainingSession}/placements/{placementPeriod}/hosts/{enrolment}', [PlacementController::class, 'removeHost'])->name('placements.hosts.destroy');
+    });
 });
 
 // An enrolment: sessions.sessions.update on its session (EnrolmentPolicy).

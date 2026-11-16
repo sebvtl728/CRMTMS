@@ -104,6 +104,27 @@ final class Trainings
             ])->values()->all();
     }
 
+    /**
+     * Durations of the modules of these trainings, keyed by training (one
+     * query; trainings without module are left out). Stored decimals.
+     *
+     * @param  list<string>  $trainingIds
+     * @return array<string, list<?string>>
+     */
+    public function moduleDurations(array $trainingIds): array
+    {
+        $ids = array_values(array_filter($trainingIds, fn (string $id) => Str::isUuid($id)));
+        if ($ids === []) {
+            return [];
+        }
+        $out = [];
+        foreach (TrainingModule::query()->whereIn('training_id', $ids)->orderBy('position')->orderBy('id')->get(['training_id', 'duration_hours']) as $m) {
+            $out[$m->training_id][] = $m->duration_hours;
+        }
+
+        return $out;
+    }
+
     // ------------------------------------------------------------ import
 
     /**

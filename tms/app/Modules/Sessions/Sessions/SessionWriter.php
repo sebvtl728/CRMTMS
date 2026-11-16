@@ -243,6 +243,13 @@ final class SessionWriter
             } elseif (! $training->is_active && $training->id !== $current?->training_id) {
                 $v->errors()->add('training_id', 'Cette formation est désactivée.');
             }
+            // A new session of a training with modules: its hours are their sum, never other typed hours.
+            if ($training !== null && $current === null && ! $v->errors()->has('planned_hours') && is_string($data['planned_hours'] ?? null)
+                && ($sum = self::modulesSum($this->trainings->modules($training->id))) !== false
+                && SessionModules::minutesOf($data['planned_hours']) !== $sum) {
+                $v->errors()->add('planned_hours', 'Cette formation a des modules : les heures de la session sont leur somme ('
+                    .($sum === null ? SessionModules::UNDEFINED : SessionModules::label($sum)).'). Laissez ce champ vide.');
+            }
             if (in_array($data['kind'] ?? null, [SessionKind::Intra->value, SessionKind::Individual->value], true) && is_string($data['organisation_id'] ?? null)
                 && ! $v->errors()->has('organisation_id') && $this->fiches->organisation($data['organisation_id']) === null) {
                 $v->errors()->add('organisation_id', 'Entreprise introuvable.');
@@ -274,6 +281,22 @@ final class SessionWriter
             'status' => $data['status'],
             'notes' => $data['notes'] ?? null,
         ];
+    }
+
+    /**
+     * Σ of the minutes of a training's modules: false without module, null
+     * when none has hours (« à définir »).
+     *
+     * @param  list<array{duration_hours: ?string}>  $modules
+     */
+    public static function modulesSum(array $modules): int|false|null
+    {
+        if ($modules === []) {
+            return false;
+        }
+        $minutes = array_filter(array_map(fn (array $m) => SessionModules::minutesOf($m['duration_hours']), $modules), fn (?int $m) => $m !== null);
+
+        return $minutes === [] ? null : (int) array_sum($minutes);
     }
 
     /**

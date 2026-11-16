@@ -4,6 +4,7 @@ namespace App\Modules\Sessions\Modules;
 
 use App\Modules\Core\Audit\Auditable;
 use App\Modules\Core\Tenancy\BelongsToTenant;
+use App\Modules\Sessions\Planning\Seance;
 use App\Modules\Sessions\Sessions\TrainingSession;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
@@ -76,13 +77,14 @@ class SessionModule extends Model
     }
 
     /**
-     * Séances, attendances or monthly hours hang on the module: it is then
-     * neither deleted nor switched to the other dating mode. Nothing yet:
-     * the séances (task 3) and the realised hours (task 4) add their tables.
+     * Séances (cancelled ones included, out of the trash), attendances or
+     * monthly hours hang on the module: it is then neither deleted nor
+     * switched to the other dating mode. The realised hours (task 4) add
+     * their tables here.
      */
     public function hasActivity(): bool
     {
-        return false;
+        return Seance::query()->where('session_module_id', $this->id)->exists();
     }
 
     /**
