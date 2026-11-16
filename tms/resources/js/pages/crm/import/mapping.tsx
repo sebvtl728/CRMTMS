@@ -194,7 +194,7 @@ export default function ImportMapping({
                             className="max-w-sm"
                         />
                         <p className="text-muted-foreground text-xs">
-                            Une colonne d&apos;identifiant est associée : indiquez de quel logiciel elle vient. En réimportant plus tard, les fiches
+                            Une colonne d&apos;identifiant est associée : si elle est remplie dans votre fichier, indiquez de quel logiciel elle vient. En réimportant plus tard, les fiches
                             déjà importées seront mises à jour au lieu d&apos;être dupliquées.
                         </p>
                         <InputError message={form.errors.source_system} />

@@ -275,6 +275,28 @@ class ImportBatch extends Model
         return true;
     }
 
+    /**
+     * Does the file fill, on at least one row, a column mapped to a source
+     * identifier? (A template left empty there needs no source software.)
+     * Stops at the first filled cell.
+     */
+    public function identifiersFilled(FieldMap $map): bool
+    {
+        $columns = array_values(array_filter(array_map(fn (string $f) => $map->columnFor($f), $this->target->identifierFields())));
+        if ($columns === []) {
+            return false;
+        }
+        foreach ($this->reader()->rows() as $row) {
+            foreach ($columns as $column) {
+                if (trim($row[$column] ?? '') !== '') {
+                    return true;
+                }
+            }
+        }
+
+        return false;
+    }
+
     public function canRun(): bool
     {
         return $this->status === self::SIMULATED;

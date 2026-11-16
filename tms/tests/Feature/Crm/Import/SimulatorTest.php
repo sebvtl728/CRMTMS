@@ -148,3 +148,23 @@ it('blocks a file whose identifiers have no source system or whose required colu
         ])
         ->and($batch->refresh()->status)->toBe(ImportBatch::UPLOADED);
 });
+
+it('asks for a source system only when a source identifier is filled in the file', function () {
+    $empty = uploadImport("Raison sociale;Identifiant source\nGarage Martin;\nCafé des Arts; \n", ImportTarget::Organisations);
+    $filled = uploadImport("Raison sociale;Identifiant source\nGarage Martin;\nCafé des Arts;C2\n", ImportTarget::Organisations);
+
+    $withoutValue = simulateImport($empty);
+    $withValue = simulateImport($filled);
+
+    expect($withoutValue->blocking)->toBe([])->and($withoutValue->canRun())->toBeTrue()
+        ->and($withValue->blocking)->toBe(['Indiquez le logiciel d\'origine des identifiants (ex. : Formevol) pour pouvoir réimporter sans doublon.']);
+});
+
+it('does not ask for a source system on the columns step when the identifier column is empty', function () {
+    $batch = uploadImport("Raison sociale;Identifiant source\nGarage Martin;\n", ImportTarget::Organisations);
+    $filled = uploadImport("Raison sociale;Identifiant source\nGarage Martin;C1\n", ImportTarget::Organisations);
+    $map = ['map' => ['Raison sociale' => 'name', 'Identifiant source' => 'source_id']];
+
+    $this->put("/crm/import/{$batch->id}/mapping", $map)->assertSessionHasNoErrors();
+    $this->put("/crm/import/{$filled->id}/mapping", $map)->assertSessionHasErrors('source_system');
+});

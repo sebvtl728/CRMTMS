@@ -261,11 +261,13 @@ enum ImportTarget: string
     /**
      * What stops an import with this mapping (French messages): a required
      * field without column, notes without a way to find the fiche,
-     * identifiers without their source software.
+     * identifiers without their source software (only when the file really
+     * fills an identifier column: a closure, as the answer needs a pass over the file).
      *
+     * @param  (callable(): bool)|null  $identifiersFilled  null: assumed filled
      * @return list<string>
      */
-    public function blockingProblems(FieldMap $map, ?string $sourceSystem): array
+    public function blockingProblems(FieldMap $map, ?string $sourceSystem, ?callable $identifiersFilled = null): array
     {
         $errors = [];
         foreach ($this->requiredFields() as $field) {
@@ -276,7 +278,8 @@ enum ImportTarget: string
         if ($this === self::Notes && ! array_filter(['subject_siret', 'subject_email', 'subject_source_id'], fn ($f) => $map->has($f))) {
             $errors[] = 'Associez une colonne permettant de retrouver la fiche : SIRET, e-mail ou identifiant source.';
         }
-        if (array_filter($this->identifierFields(), fn ($f) => $map->has($f)) !== [] && $sourceSystem === null) {
+        if (array_filter($this->identifierFields(), fn ($f) => $map->has($f)) !== [] && $sourceSystem === null
+            && ($identifiersFilled === null || $identifiersFilled())) {
             $errors[] = 'Indiquez le logiciel d\'origine des identifiants (ex. : Formevol) pour pouvoir réimporter sans doublon.';
         }
 

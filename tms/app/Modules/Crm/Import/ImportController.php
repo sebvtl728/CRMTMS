@@ -234,7 +234,7 @@ class ImportController extends Controller
         }
 
         $source = trim((string) ($input['source_system'] ?? ''));
-        foreach ($batch->target->blockingProblems($map, $source === '' ? null : mb_substr($source, 0, 50)) as $problem) {
+        foreach ($batch->target->blockingProblems($map, $source === '' ? null : mb_substr($source, 0, 50), fn () => $batch->identifiersFilled($map)) as $problem) {
             throw ValidationException::withMessages([str_contains($problem, 'logiciel d\'origine') ? 'source_system' : 'map' => $problem]);
         }
 
