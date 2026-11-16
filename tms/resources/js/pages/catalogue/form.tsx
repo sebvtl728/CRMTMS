@@ -43,7 +43,7 @@ interface FormProps {
     can?: { brochures: boolean };
 }
 
-type ModuleForm = { id?: string; title: string; duration_hours: string; modality_id: string; content: string };
+type ModuleForm = { uid: string; id?: string; title: string; duration_hours: string; modality_id: string; content: string };
 
 type SheetText = 'description' | 'methods' | 'evaluation' | 'sanction' | 'accessibility' | 'access_terms' | 'results';
 
@@ -82,7 +82,7 @@ const textareaClass = 'border-input bg-background focus:ring-ring w-full rounded
 export default function TrainingFormPage({ training, options, brochures = [], can }: FormProps) {
     const editing = training !== null;
 
-    const { data, setData, post, put, processing, errors } = useForm<TrainingForm>({
+    const { data, setData, post, put, processing, errors, isDirty } = useForm<TrainingForm>({
         code: training?.code ?? '',
         title: training?.title ?? '',
         das_id: training?.das_id ?? '',
@@ -102,6 +102,7 @@ export default function TrainingFormPage({ training, options, brochures = [], ca
         access_terms: training?.access_terms ?? '',
         results: training?.results ?? '',
         modules: (training?.modules ?? []).map((m) => ({
+            uid: m.id,
             id: m.id,
             title: m.title,
             duration_hours: decimalInput(m.duration_hours),
@@ -171,7 +172,10 @@ export default function TrainingFormPage({ training, options, brochures = [], ca
     const toHours = (v: string) => Number.parseFloat(v.replace(/\s/g, '').replace(',', '.'));
     const modulesSum = data.modules.reduce((sum, m) => sum + (Number.isFinite(toHours(m.duration_hours)) ? toHours(m.duration_hours) : 0), 0);
     const duration = toHours(data.duration_hours);
-    const gap = data.modules.length > 0 && Number.isFinite(duration) && Math.abs(modulesSum - duration) > 0.004;
+    // As loaded: the server's verdict; once the form is edited: the live sum.
+    const gap = isDirty
+        ? data.modules.length > 0 && Number.isFinite(duration) && Math.abs(modulesSum - duration) > 0.004
+        : (training?.modules_gap ?? false);
     const hoursText = (n: number) => String(Math.round(n * 100) / 100).replace('.', ',');
     const nested = (key: string): string | undefined => (errors as Record<string, string | undefined>)[key];
 
@@ -316,7 +320,7 @@ export default function TrainingFormPage({ training, options, brochures = [], ca
                     <fieldset className="grid gap-4 rounded-xl border p-4" aria-label="Modules">
                         <legend className="px-2 text-sm font-semibold">Modules</legend>
                         {data.modules.map((m, i) => (
-                            <div key={m.id ?? i} className="grid gap-2 rounded-lg border p-3 md:grid-cols-[1fr_8rem_12rem]">
+                            <div key={m.uid} className="grid gap-2 rounded-lg border p-3 md:grid-cols-[1fr_8rem_12rem]">
                                 <div className="grid gap-1">
                                     <Label htmlFor={`module-title-${i}`}>Module {i + 1} : intitulé *</Label>
                                     <Input
@@ -423,7 +427,12 @@ export default function TrainingFormPage({ training, options, brochures = [], ca
                                 variant="outline"
                                 size="sm"
                                 disabled={data.modules.length >= 30}
-                                onClick={() => setData('modules', [...data.modules, { title: '', duration_hours: '', modality_id: '', content: '' }])}
+                                onClick={() =>
+                                    setData('modules', [
+                                        ...data.modules,
+                                        { uid: crypto.randomUUID(), title: '', duration_hours: '', modality_id: '', content: '' },
+                                    ])
+                                }
                             >
                                 <Plus className="h-4 w-4" /> Ajouter un module
                             </Button>

@@ -109,8 +109,11 @@ it('creates, reorders, edits and removes modules with a modality', function () {
     $this->put("/catalogue/{$t->id}/edit", sheetPayload())->assertRedirect('/catalogue');
     expect(TrainingModule::query()->count())->toBe(1);
 
-    // An empty list clears them.
+    // An empty list (or null) clears them.
     $this->put("/catalogue/{$t->id}/edit", sheetPayload(['modules' => []]))->assertRedirect('/catalogue');
+    expect(TrainingModule::query()->count())->toBe(0);
+    $this->put("/catalogue/{$t->id}/edit", sheetPayload(['modules' => [['title' => 'Z']]]));
+    $this->put("/catalogue/{$t->id}/edit", sheetPayload(['modules' => null]))->assertRedirect('/catalogue');
     expect(TrainingModule::query()->count())->toBe(0);
 });
 
@@ -126,7 +129,14 @@ it('validates modules: title, duration, modality, count, foreign ids', function 
     $this->post('/catalogue/create', sheetPayload(['modules' => array_fill(0, 31, ['title' => 'M'])]))
         ->assertSessionHasErrors('modules');
 
+    // Crafted ids: not a uuid, or an id on creation, are refused (422), not a 500.
+    $this->post('/catalogue/create', sheetPayload(['modules' => [['id' => 'abc', 'title' => 'M']]]))->assertSessionHasErrors('modules.0.id');
+    $this->post('/catalogue/create', sheetPayload(['modules' => [['id' => $foreign->id, 'title' => 'M']]]))->assertSessionHasErrors('modules.0.id');
+    expect(Training::query()->count())->toBe(1);
+
     $t = Training::query()->create(['title' => 'T', 'das_id' => $other->das_id]);
+    $this->put("/catalogue/{$t->id}/edit", sheetPayload(['modules' => [['id' => 'abc', 'title' => 'M']]]))->assertSessionHasErrors('modules.0.id');
+    $this->put("/catalogue/{$t->id}/edit", sheetPayload(['modules' => [['id' => $foreign->id, 'title' => 'a'], ['id' => $foreign->id, 'title' => 'b']]]))->assertSessionHasErrors('modules.0.id');
     $this->put("/catalogue/{$t->id}/edit", sheetPayload(['modules' => [['id' => $foreign->id, 'title' => 'Volé']]]))
         ->assertSessionHasErrors('modules.0.id');
     expect($foreign->refresh()->title)->toBe('M');
@@ -158,7 +168,8 @@ it('journals the sheet changes without the module content', function () {
     $this->actingAs(admin(twoFactor: true));
     $this->post('/catalogue/create', sheetPayload(['modules' => [['title' => 'Bases', 'duration_hours' => '7', 'content' => 'secret contenu']]]));
 
-    expect(AuditLog::query()->where('auditable_type', 'training_module')->where('event', 'created')->count())->toBe(1);
+    expect(AuditLog::query()->where('auditable_type', 'training_module')->where('event', 'created')->count())->toBe(1)
+        ->and(json_encode(AuditLog::query()->get()->toArray()))->not->toContain('secret contenu');
     $t = Training::query()->sole();
     $this->put("/catalogue/{$t->id}/edit", sheetPayload(['methods' => 'Autre']));
     expect(AuditLog::query()->where('auditable_type', 'training')->where('event', 'updated')->count())->toBe(1);

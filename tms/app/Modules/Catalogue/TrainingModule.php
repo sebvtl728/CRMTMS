@@ -29,9 +29,13 @@ class TrainingModule extends Model
 {
     use Auditable, BelongsToTenant, HasUuids;
 
-    /** The journal records which module changed, never its (long) content. */
-    /** @var list<string> */
-    protected array $auditIgnore = ['content'];
+    /**
+     * The journal records which module changed, never its (long) content
+     * (recorded as « [masqué] »).
+     *
+     * @var list<string>
+     */
+    protected array $auditExclude = ['content'];
 
     /** @var list<string> */
     protected $fillable = ['training_id', 'position', 'title', 'duration_hours', 'modality_id', 'content'];

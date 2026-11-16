@@ -116,8 +116,10 @@ class TrainingRequest extends FormRequest
         return [
             ...self::fieldRules($current),
             'modules' => ['sometimes', 'nullable', 'array', 'max:'.self::MAX_MODULES],
-            'modules.*.id' => ['nullable', 'uuid', Rule::exists('training_modules', 'id')
-                ->where('tenant_id', app(TenantContext::class)->id())->where('training_id', $current === null ? '' : $current->id)],
+            'modules.*.id' => $current === null
+                ? ['prohibited']
+                : ['bail', 'nullable', 'uuid', 'distinct', Rule::exists('training_modules', 'id')
+                    ->where('tenant_id', app(TenantContext::class)->id())->where('training_id', $current->id)],
             'modules.*.title' => ['required', 'string', 'max:200'],
             'modules.*.duration_hours' => ['nullable', 'numeric', 'decimal:0,2', 'min:0', 'max:9999.99'],
             'modules.*.modality_id' => ['nullable', ...self::reference(ReferenceList::TrainingModality, $this->currentModalities($current))],
@@ -199,6 +201,7 @@ class TrainingRequest extends FormRequest
             'string' => 'Cette valeur n\'est pas valide.',
             'array' => 'Cette valeur n\'est pas valide.',
             'distinct' => 'Cette valeur est en double.',
+            'prohibited' => 'Cette valeur n\'existe pas ou n\'est plus disponible.',
             'uuid' => 'Cette valeur n\'existe pas ou n\'est plus disponible.',
             'exists' => 'Cette valeur n\'existe pas ou n\'est plus disponible.',
             'code.unique' => 'Ce code est déjà utilisé par une autre formation.',
