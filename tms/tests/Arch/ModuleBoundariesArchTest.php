@@ -33,6 +33,11 @@ it('keeps Catalogue free of any import of the Crm module', function () {
     expect(moduleFilesMatching('Catalogue', '/^\s*use\s+App\\\\Modules\\\\Crm\\\\/m'))->toBe([]);
 });
 
+it('lets Catalogue reach the connectors through the public AI service only', function () {
+    // Ai (configured, structured) and its two exceptions (fixed French messages).
+    expect(moduleFilesMatching('Catalogue', '/App\\\\Modules\\\\Connectors\\\\(?!Ai\\\\(?:Ai|AiUnavailable|AiInvalidResponse)\b)/'))->toBe([]);
+});
+
 it('lets Crm reach the catalogue through its public service only', function () {
     // Trainings (reads, import writes), TrainingData (its result), TrainingUsage (delete guard), Brochures (brochure library).
     expect(moduleFilesMatching('Crm', '/^\s*use\s+App\\\\Modules\\\\Catalogue\\\\(?!(Trainings|TrainingData|TrainingUsage|Brochures);)/m'))->toBe([])

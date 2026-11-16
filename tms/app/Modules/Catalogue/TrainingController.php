@@ -3,6 +3,7 @@
 namespace App\Modules\Catalogue;
 
 use App\Http\Controllers\Controller;
+use App\Modules\Catalogue\Assistant\TrainingAssistant;
 use App\Modules\Core\Audit\AuditRecorder;
 use App\Modules\Core\Exports\ExportCell;
 use App\Modules\Core\Exports\XlsxExporter;
@@ -51,6 +52,7 @@ class TrainingController extends Controller
         return Inertia::render('catalogue/form', [
             'training' => null,
             'options' => self::formOptions(null),
+            'assistant' => self::assistant(),
         ]);
     }
 
@@ -107,6 +109,7 @@ class TrainingController extends Controller
                 'funding_mode_ids' => $training->fundingModes()->pluck('reference_items.id')->all(),
             ],
             'options' => self::formOptions($training),
+            'assistant' => self::assistant(),
             'brochures' => app(Brochures::class)->forTrainingPage($training),
             'can' => ['brochures' => $this->user($request)->can(Permissions::VIEW), 'manage' => $this->user($request)->can(Permissions::MANAGE)],
             'status' => $request->session()->get('status'),
@@ -253,6 +256,16 @@ class TrainingController extends Controller
             'funding_mode' => TrainingListQuery::reference(ReferenceList::FundingMode, $current?->fundingModes()->pluck('reference_items.id')->all() ?? []),
             'modality' => TrainingListQuery::reference(ReferenceList::TrainingModality, $current?->modules()->whereNotNull('modality_id')->pluck('modality_id')->all() ?? []),
         ];
+    }
+
+    /**
+     * The AI assistant of the form: usable when the organisme's AI connector is active.
+     *
+     * @return array{configured: bool}
+     */
+    private static function assistant(): array
+    {
+        return ['configured' => app(TrainingAssistant::class)->configured()];
     }
 
     private function user(Request $request): User

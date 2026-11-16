@@ -75,6 +75,10 @@ return [
         // organisme's network). Allowed by default on a self-hosted install (single mode), refused in multi
         // mode (an organisme's admin must not reach the shared platform's internal network).
         'allow_local_ai' => $bool('TMS_ALLOW_LOCAL_AI', $mode === 'single'),
+
+        // End-to-end stack only (compose.e2e.yaml): an offline AI answering a fixed training sheet
+        // (tests/Support/E2eAiClient). Ignored in production. Never set it on an installation.
+        'e2e_fake_ai' => $bool('TMS_E2E_FAKE_AI', false),
     ],
 
 ];

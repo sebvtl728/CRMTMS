@@ -1,3 +1,4 @@
+import TrainingAssistant, { type AssistantPatch } from '@/components/catalogue/training-assistant';
 import Heading from '@/components/heading';
 import InputError from '@/components/input-error';
 import { Button } from '@/components/ui/button';
@@ -39,6 +40,7 @@ interface FormProps {
         funding_mode_ids: string[];
     } | null;
     options: { das: Option[]; funding_mode: Option[]; modality: Option[] };
+    assistant?: { configured: boolean };
     brochures?: { id: string; title: string; original_name: string; size: number; source: 'training' | 'das' }[];
     can?: { brochures: boolean; manage?: boolean };
     status?: string | null;
@@ -83,7 +85,7 @@ let newModuleCount = 0;
 
 const textareaClass = 'border-input bg-background focus:ring-ring w-full rounded-md border px-3 py-2 text-sm focus:ring-2 focus:outline-hidden';
 
-export default function TrainingFormPage({ training, options, brochures = [], can, status }: FormProps) {
+export default function TrainingFormPage({ training, options, assistant, brochures = [], can, status }: FormProps) {
     const editing = training !== null;
 
     const { data, setData, post, put, processing, errors, isDirty } = useForm<TrainingForm>({
@@ -183,6 +185,30 @@ export default function TrainingFormPage({ training, options, brochures = [], ca
     const hoursText = (n: number) => String(Math.round(n * 100) / 100).replace('.', ',');
     const nested = (key: string): string | undefined => (errors as Record<string, string | undefined>)[key];
 
+    // The AI proposal kept by the user fills the form; nothing is saved until « Enregistrer ».
+    const applyProposal = (patch: AssistantPatch) => {
+        const modules = [...data.modules];
+        for (const { at, module } of patch.modules) {
+            const values = {
+                title: module.title,
+                duration_hours: module.duration_hours ?? '',
+                modality_id: module.modality_id ?? '',
+                content: module.content ?? '',
+            };
+            if (at !== null && modules[at]) {
+                modules[at] = { ...modules[at], ...values };
+            } else if (modules.length < 30) {
+                modules.push({ uid: `new-${++newModuleCount}`, ...values });
+            }
+        }
+        setData((previous) => ({
+            ...previous,
+            ...patch.values,
+            ...(patch.objectives ? { objectives: patch.objectives } : {}),
+            modules,
+        }));
+    };
+
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title={title} />
@@ -198,6 +224,13 @@ export default function TrainingFormPage({ training, options, brochures = [], ca
                         {status}
                     </p>
                 )}
+
+                <TrainingAssistant
+                    configured={assistant?.configured ?? false}
+                    current={data}
+                    options={{ das: options.das, modality: options.modality }}
+                    onApply={applyProposal}
+                />
 
                 <form onSubmit={submit} className="flex flex-col gap-6" noValidate>
                     <fieldset className="grid gap-4 rounded-xl border p-4 md:grid-cols-2">
