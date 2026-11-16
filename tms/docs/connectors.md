@@ -96,9 +96,9 @@ Appliquée à l'enregistrement (règle `SmtpHost`, qui résout l'hôte en A/AAAA
 
 ## Connecteur Microsoft 365 (envoi des e-mails)
 
-`Mail365\Microsoft365MailConnector` (clé `microsoft365_mail`, type envoi). Tous les e-mails du TMS (devis, plaquettes, invitations, récapitulatifs) partent par **Microsoft Graph**, depuis **une seule boîte** Microsoft 365, avec une application Azure autorisée en **application** (`Mail.Send`, flux « client credentials », sans mot de passe de boîte). Pas de configuration par société (interface `OrganismeWide`) : une seule configuration pour l'organisme.
+`Mail365\Microsoft365MailConnector` (clé `microsoft365_mail`, type envoi). Les e-mails du TMS envoyés par l'application (devis, plaquettes, invitations, récapitulatifs, e-mails de test) partent par **Microsoft Graph**, depuis **une seule boîte** Microsoft 365, avec une application Azure autorisée en **application** (`Mail.Send`, flux « client credentials », sans mot de passe de boîte). Pas de configuration par société (interface `OrganismeWide`) : une seule configuration pour l'organisme. Restent sur la messagerie de l'instance (`MAIL_*` du `.env`) : la réinitialisation du mot de passe et l'alerte d'exploitation `tms:alert`.
 
-Paramètres : `tenant` (annuaire précis : son ID ou un de ses domaines, par ex. `capformation.net`, `xxx.onmicrosoft.com` ; `common`, `organizations` et `consumers` sont refusés), `client_id`, `from_address` (la boîte d'expédition), `from_name` (facultatif). Secret : `client_secret`. Changer `tenant` ou `client_id` oblige à ressaisir le secret.
+Paramètres : `tenant` (annuaire précis : son ID ou un de ses domaines, par ex. `organisme.fr`, `organisme.onmicrosoft.com` ; `common`, `organizations` et `consumers` sont refusés), `client_id`, `from_address` (la boîte d'expédition), `from_name` (facultatif). Secret : `client_secret`. Changer `tenant` ou `client_id` oblige à ressaisir le secret.
 
 ### Procédure pour l'administrateur Microsoft 365
 
@@ -111,11 +111,11 @@ Paramètres : `tenant` (annuaire précis : son ID ou un de ses domaines, par ex.
    ```powershell
    # Groupe de sécurité à extension messagerie (ou boîte) contenant la seule boîte d'expédition
    New-ApplicationAccessPolicy -AccessRight RestrictAccess -AppId <ID d'application> `
-     -PolicyScopeGroupId envoi-tms@capformation.net -Description "TMS : envoi depuis la boîte d'expédition uniquement"
+     -PolicyScopeGroupId envoi-tms@organisme.fr -Description "TMS : envoi depuis la boîte d'expédition uniquement"
 
    # Vérification : AccessCheckResult doit être « Granted » pour la boîte d'expédition, « Denied » pour une autre
-   Test-ApplicationAccessPolicy -Identity envoi@capformation.net -AppId <ID d'application>
-   Test-ApplicationAccessPolicy -Identity autre.personne@capformation.net -AppId <ID d'application>
+   Test-ApplicationAccessPolicy -Identity envoi@organisme.fr -AppId <ID d'application>
+   Test-ApplicationAccessPolicy -Identity autre.personne@organisme.fr -AppId <ID d'application>
    ```
 
    La stratégie peut mettre une heure à s'appliquer.
@@ -127,8 +127,8 @@ Paramètres : `tenant` (annuaire précis : son ID ou un de ses domaines, par ex.
 - **Domaine** : publiez SPF, **DKIM** (activé pour le domaine dans Microsoft 365) et **DMARC** pour le domaine de la boîte d'expédition, sinon les devis risquent le dossier des indésirables.
 - **Expéditeur** : le message part toujours depuis la boîte configurée (Graph l'impose). Le nom affiché est `from_name`, à défaut celui du message ; l'adresse de réponse (`Reply-To`) est conservée. Les e-mails apparaissent dans les **éléments envoyés** de la boîte.
 - **Priorité** : SMTP de la société > Microsoft 365 de l'organisme > SMTP de l'organisme > messagerie de l'instance. Désactiver le connecteur rétablit le SMTP de l'organisme.
-- **Gros e-mails** : jusqu'à 3 Mo (encodé), le message part en un appel (`/sendMail`, MIME). Au-delà (plaquettes jointes, jusqu'à 20 Mo), le TMS crée un brouillon (corps en texte, destinataires), ajoute les pièces jointes (celles de 3 Mo et plus par **sessions d'envoi**, morceaux de 3,75 Mo) puis l'envoie ; en cas d'échec le brouillon est supprimé.
-- **Erreurs** : refus (401/403) = échec définitif du devis ou de la plaquette (« Échec », message français fixe, sans texte de Microsoft) ; limitation (429), indisponibilité (5xx) ou délai dépassé = nouvelle tentative du job. Un délai dépassé *après* acceptation par Microsoft peut, rarement, produire un doublon à la nouvelle tentative (même limite qu'en SMTP).
+- **Gros e-mails** : jusqu'à 3 Mo (encodé), le message part en un appel (`/sendMail`, MIME). Au-delà (plaquettes jointes, jusqu'à 20 Mo), le TMS crée un brouillon (corps HTML conservé ; la partie texte brut est abandonnée ; destinataires), ajoute les pièces jointes (celles d'au moins 3 000 000 octets par **sessions d'envoi**, morceaux de 3,75 Mo) puis l'envoie ; en cas d'échec le brouillon est supprimé.
+- **Erreurs** : refus (401/403), ressource introuvable (404) et toute autre erreur 4xx = échec définitif du devis ou de la plaquette (« Échec », message français fixe, sans texte de Microsoft) ; limitation (429), indisponibilité (5xx) ou délai dépassé = nouvelle tentative du job. Un délai dépassé *après* acceptation par Microsoft peut, rarement, produire un doublon à la nouvelle tentative (même limite qu'en SMTP).
 - **Sécurité** : le secret est chiffré, jamais réaffiché ni journalisé ; le jeton d'application est mis en cache chiffré (clé préfixée par l'organisme et l'id de la configuration), jamais en base ; seuls `login.microsoftonline.com`, `graph.microsoft.com` et les adresses de dépôt Outlook sont appelés, en https, sans redirection (`HostPolicy` strict).
 
 ## Connecteur Sirene (préremplissage par SIRET)
@@ -166,7 +166,7 @@ Paramètres : `tenant` (annuaire Azure : son ID, un de ses domaines `xxx.onmicro
 1. Portail Azure › **Microsoft Entra ID** › **Inscriptions d'applications** › **Nouvelle inscription**.
    - Nom : « TMS – agenda ».
    - Types de comptes : « Comptes dans cet annuaire organisationnel uniquement » (recommandé ; renseignez alors `tenant` avec l'ID de l'annuaire).
-   - **URI de redirection** : plateforme **Web**, `https://<adresse de l'organisme>/settings/calendar/outlook/callback`. Exemple : `https://tms.capformation.fr/settings/calendar/outlook/callback`. Ajoutez une URI par adresse si l'organisme en a plusieurs.
+   - **URI de redirection** : plateforme **Web**, `https://<adresse de l'organisme>/settings/calendar/outlook/callback`. Exemple : `https://tms.example.fr/settings/calendar/outlook/callback`. Ajoutez une URI par adresse si l'organisme en a plusieurs.
 2. **Autorisations des API** › Ajouter › Microsoft Graph › **Autorisations déléguées** : `Calendars.ReadWrite` et `offline_access`. Ne choisissez pas d'autorisation « Application ». Facultatif : « Accorder le consentement administrateur » évite à chaque utilisateur de consentir lui-même.
 3. **Certificats et secrets** › Nouveau secret client. Copiez la **Valeur** (et non l'ID du secret) et notez sa date d'expiration.
 4. Dans le TMS : `/admin/connectors` › Microsoft 365. Renseignez :
@@ -175,7 +175,7 @@ Paramètres : `tenant` (annuaire Azure : son ID, un de ses domaines `xxx.onmicro
    - `client_secret` : la valeur copiée.
 
    Activez puis lancez **Tester**. Avec un annuaire précis, le test vérifie l'identifiant et le secret auprès de Microsoft. Avec `common`, il vérifie seulement que Microsoft est joignable.
-5. Avant l'expiration du secret : créez-en un nouveau dans Azure et remplacez-le dans le TMS.
+5. Avant l'expiration du secret : créez-en un nouveau dans Azure et remplacez-le dans le TMS. Changer `tenant` ou `client_id` oblige à ressaisir le secret.
 
 ### Côté utilisateur
 
