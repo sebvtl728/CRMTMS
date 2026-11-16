@@ -13,7 +13,8 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
  * labels of the target's fields, so that every column is proposed at once,
  * and one made-up example row) and sheet « Listes » (the active values of the
  * organisme's reference lists the file may use). The example row is marked in
- * its first cell and ignored by the import if it is left in the file.
+ * its first cell (any cell is recognised: columns may have moved), leaves every
+ * source identifier blank, and is ignored by the import if left in the file.
  */
 final class ImportTemplate
 {
@@ -29,7 +30,7 @@ final class ImportTemplate
         'last_name' => 'Nom', 'is_individual' => 'Non', 'is_referent' => 'Oui', 'started_on' => '01/01/2026', 'date' => '01/01/2026',
         'work_email' => 'pro@exemple.test', 'work_phone' => '01 23 45 67 89', 'job_title' => 'Responsable formation',
         'duration_hours' => '14', 'duration_days' => '2', 'price_company' => '1200', 'price_individual' => '900', 'is_active' => 'Oui',
-        'body' => 'Compte rendu de l\'échange', 'source_id' => 'EXEMPLE-1',
+        'body' => 'Compte rendu de l\'échange',
     ];
 
     public static function filename(ImportTarget $target): string
@@ -38,15 +39,20 @@ final class ImportTemplate
     }
 
     /**
-     * True for the example row of a template left in the file (first cell = the marker).
+     * True for the example row of a template left in the file: one of its
+     * cells is the marker (the user may have moved the columns).
      *
-     * @param  array<string, string>  $row
+     * @param  array<string, string|null>  $row
      */
     public static function isExample(array $row): bool
     {
-        $first = $row === [] ? '' : (string) reset($row);
+        foreach ($row as $cell) {
+            if (trim((string) $cell) === self::EXAMPLE_MARKER) {
+                return true;
+            }
+        }
 
-        return trim($first) === self::EXAMPLE_MARKER;
+        return false;
     }
 
     public static function download(ImportTarget $target): StreamedResponse
@@ -101,8 +107,10 @@ final class ImportTemplate
     private static function example(ImportTarget $target, array $lists): array
     {
         $cells = [];
+        $identifiers = $target->identifierFields();
         foreach ($target->fields() as $field => $label) {
-            $cells[] = self::EXAMPLES[$field] ?? self::EXAMPLES[str_replace('organisation.', '', $field)] ?? ($lists[$label][0] ?? '');
+            // No identifier: a template reimported as is must not call for a source software.
+            $cells[] = in_array($field, $identifiers, true) ? '' : self::EXAMPLES[$field] ?? self::EXAMPLES[str_replace('organisation.', '', $field)] ?? ($lists[$label][0] ?? '');
         }
         $cells[0] = self::EXAMPLE_MARKER;
 

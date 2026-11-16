@@ -61,6 +61,9 @@ final class ActivityRecorder
     public function assign(Activity $activity, string $userId, ?string $message = null): void
     {
         DB::transaction(function () use ($activity, $userId, $message): void {
+            // Locked, then read: concurrent « Confier à… » journal and mail each real change once.
+            Activity::query()->whereKey($activity->id)->lockForUpdate()->first();
+            $activity->refresh();
             $before = $activity->responsible_user_id;
             $activity->forceFill(['responsible_user_id' => $userId])->save();
             $this->announceAssignment($activity, $before, $message);

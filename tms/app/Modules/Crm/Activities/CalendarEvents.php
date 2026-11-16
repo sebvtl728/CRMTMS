@@ -5,6 +5,7 @@ namespace App\Modules\Crm\Activities;
 use App\Modules\Core\Users\User;
 use App\Modules\Crm\Visibility\CrmVisibility;
 use Carbon\CarbonImmutable;
+use Illuminate\Database\Eloquent\Collection;
 
 /**
  * Public read service of the CRM for calendars (Connectors\Calendar): the
@@ -16,6 +17,13 @@ final class CalendarEvents
 {
     /** Events of one feed, at most. */
     public const LIMIT = 2000;
+
+    /**
+     * Rows and the fiche of their opportunity with its name (ficheName()),
+     * loaded before ActivityRows::rights() so that its id-only loads do not
+     * replace them.
+     */
+    private const WITH = [...ActivityRows::WITH, 'opportunity.organisation:id,name,deleted_at', 'opportunity.person:id,first_name,last_name,deleted_at'];
 
     /**
      * @return list<CalendarEvent>
@@ -32,14 +40,15 @@ final class CalendarEvents
             ->where('responsible_user_id', $user->id)
             ->whereIn('type_id', array_keys($types))
             ->whereRaw('due_at >= ?::timestamptz and due_at < ?::timestamptz', [$format($from), $format($to)])
-            ->with(ActivityRows::WITH)
+            ->with(self::WITH)
             ->orderBy('due_at')->orderBy('id')
             ->limit(self::LIMIT)
             ->get();
 
+        $rights = ActivityRows::rights($activities, $user);
         $events = [];
         foreach ($activities as $activity) {
-            $events[] = self::event($activity, $types);
+            $events[] = self::event($activity, $types, $rights[(string) $activity->id]['fiche_visible']);
         }
 
         return $events;
@@ -64,15 +73,20 @@ final class CalendarEvents
         }
 
         $visible = TodoQuery::onLiveFiches(CrmVisibility::activities(Activity::query(), $responsible))
-            ->whereKey($activity->id)->with(ActivityRows::WITH)->first();
+            ->whereKey($activity->id)->with(self::WITH)->first();
 
-        return $visible === null ? null : self::event($visible, $types);
+        if ($visible === null) {
+            return null;
+        }
+        $rights = ActivityRows::rights(new Collection([$visible]), $responsible);
+
+        return self::event($visible, $types, $rights[(string) $visible->id]['fiche_visible']);
     }
 
     /**
      * @param  array<string, string>  $types
      */
-    private static function event(Activity $activity, array $types): CalendarEvent
+    private static function event(Activity $activity, array $types, bool $ficheVisible): CalendarEvent
     {
         $kind = $types[$activity->type_id] === WeekPlanning::CALL ? WeekPlanning::CALL : WeekPlanning::MEETING;
 
@@ -86,19 +100,25 @@ final class CalendarEvents
             location: $activity->location,
             start: CarbonImmutable::instance($activity->due_at),
             durationMinutes: $activity->duration_minutes,
-            url: self::url($activity),
+            url: self::url($activity, $ficheVisible),
             updatedAt: CarbonImmutable::instance($activity->updated_at ?? $activity->created_at ?? now()),
             responsibleUserId: $activity->responsible_user_id,
             purpose: $activity->purpose,
         );
     }
 
-    private static function url(Activity $activity): string
+    /**
+     * The page the responsible may open (ActivityRows::rights: its
+     * opportunity, else its person, else its entreprise); for an action
+     * handed to him on a fiche out of his scope, the action in « À faire ».
+     */
+    private static function url(Activity $activity, bool $ficheVisible): string
     {
         return match (true) {
+            ! $ficheVisible => route('crm.todo', ['action' => $activity->id]),
+            $activity->opportunity_id !== null => route('crm.opportunities.show', $activity->opportunity_id),
             $activity->person_id !== null => route('crm.people.show', $activity->person_id),
-            $activity->organisation_id !== null => route('crm.organisations.show', $activity->organisation_id),
-            default => route('crm.opportunities.show', (string) $activity->opportunity_id),
+            default => route('crm.organisations.show', (string) $activity->organisation_id),
         };
     }
 }

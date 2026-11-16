@@ -122,3 +122,35 @@ it('ignores the example row left in a filled template', function () {
         ->and($batch->skipped)->toBe(1)
         ->and($batch->rows()->where('status', ImportRow::SKIPPED)->sole()->messages[0]['text'])->toBe("Ligne d'exemple du modèle ignorée.");
 });
+
+it('leaves every identifier blank in the example row', function (ImportTarget $target) {
+    [$headers, $example] = sheetsOf(downloadedTemplate($target))['Données'];
+    $cells = array_combine($headers, array_pad($example, count($headers), ''));
+
+    foreach ($target->identifierFields() as $field) {
+        expect($cells[$target->fields()[$field]])->toBe('');
+    }
+})->with([ImportTarget::Organisations, ImportTarget::People, ImportTarget::Affiliations, ImportTarget::Notes]);
+
+it('asks no source system for a template kept with its example row and empty identifiers', function () {
+    $marker = ImportTemplate::EXAMPLE_MARKER;
+    // A template of an earlier version: its example row filled the identifier.
+    $batch = uploadImport("Raison sociale;Identifiant source\n{$marker};EXEMPLE-1\nGarage Martin;\nCafé des Arts;\n", ImportTarget::Organisations);
+
+    expect($batch->identifiersFilled(FieldMap::fromArray(ImportTarget::Organisations, ['Raison sociale' => 'name', 'Identifiant source' => 'source_id'])))->toBeFalse();
+    $this->put("/crm/import/{$batch->id}/mapping", ['map' => ['Raison sociale' => 'name', 'Identifiant source' => 'source_id']])->assertSessionHasNoErrors();
+
+    $report = simulateImport($batch, ['Identifiant source' => 'source_id']);
+    expect($report->blocking)->toBe([]);
+    RunImport::dispatch($batch->id);
+
+    expect($batch->refresh()->status)->toBe(ImportBatch::DONE)
+        ->and(Organisation::query()->orderBy('name')->pluck('name')->all())->toBe(['Café des Arts', 'Garage Martin']);
+});
+
+it('recognises the example row whatever the column of its marker', function () {
+    expect(ImportTemplate::isExample(['Raison sociale' => 'Garage', 'Ville' => ImportTemplate::EXAMPLE_MARKER]))->toBeTrue()
+        ->and(ImportTemplate::isExample(['Raison sociale' => ' '.ImportTemplate::EXAMPLE_MARKER.' ']))->toBeTrue()
+        ->and(ImportTemplate::isExample(['Raison sociale' => 'Garage', 'Ville' => 'Paris']))->toBeFalse()
+        ->and(ImportTemplate::isExample([]))->toBeFalse();
+});

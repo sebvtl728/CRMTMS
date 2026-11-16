@@ -190,7 +190,7 @@ Les droits d'**administration** (`users.manage`, `roles.manage`, `companies.mana
 Les droits **Consulter**, **Créer et modifier**, **Supprimer** des quatre domaines, ainsi que « Consulter le chiffre d'affaires », ont un **périmètre**, réglé par une liste à côté de la case :
 
 - **Ses fiches** : uniquement ce dont l'utilisateur est le **responsable** ou le **créateur** (fiche, opportunité ou action). Un devis est « à soi » quand son opportunité l'est ou qu'il en est le créateur. Une fiche sans responsable créée par un collègue n'est pas visible ; celle qu'il vient de créer lui-même l'est.
-- **Ses DAS** : ce qui touche les DAS qu'il suit (**DAS suivis** de la page Utilisateurs). Sans DAS suivi, rien n'est visible.
+- **Ses DAS** : ce qui touche les DAS qu'il suit (**DAS suivis** de la page Utilisateurs). Sans DAS suivi, rien n'est visible. Pour les actions, « Ses DAS » couvre aussi celles dont il est le **responsable** (consulter et modifier, jamais supprimer), même sur une fiche hors de ses DAS.
 - **Tout l'organisme** : tout.
 
 Le périmètre d'un droit sans réglage enregistré vaut « Tout l'organisme ». Les périmètres de consultation et de modification sont indépendants : avec « Consulter : Ses DAS » et « Modifier : Tout l'organisme », une fiche hors de ses DAS reste introuvable (404), même par son adresse directe. Créer un devis (ou une nouvelle version) exige de voir son opportunité ; modifier ou supprimer un devis existant suit les périmètres des droits « Devis » eux-mêmes. Un droit détenu par une permission accordée directement à un utilisateur (hors rôle, sans écran pour le faire) vaut « Tout l'organisme ».

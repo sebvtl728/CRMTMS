@@ -277,8 +277,8 @@ class ImportBatch extends Model
 
     /**
      * Does the file fill, on at least one row, a column mapped to a source
-     * identifier? (A template left empty there needs no source software.)
-     * Stops at the first filled cell.
+     * identifier? (A template left empty there needs no source software;
+     * its example row, if kept, is not looked at.) Stops at the first filled cell.
      */
     public function identifiersFilled(FieldMap $map): bool
     {
@@ -287,6 +287,9 @@ class ImportBatch extends Model
             return false;
         }
         foreach ($this->reader()->rows() as $row) {
+            if (ImportTemplate::isExample($row)) {
+                continue;
+            }
             foreach ($columns as $column) {
                 if (trim($row[$column] ?? '') !== '') {
                     return true;

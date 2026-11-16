@@ -267,7 +267,7 @@ it('creates, updates and deletes the outlook event of a meeting, never with its 
         ->and($body['start'])->toBe(['dateTime' => '2026-11-19T09:00:00', 'timeZone' => 'Europe/Paris'])
         ->and($body['end'])->toBe(['dateTime' => '2026-11-19T10:00:00', 'timeZone' => 'Europe/Paris'])
         ->and($body['location'])->toBe(['displayName' => 'Annecy'])
-        ->and($body['body']['content'])->toContain('Formation HACCP')->toContain(url('/crm/organisations/'.$meeting->organisation_id))
+        ->and($body['body']['content'])->toContain('Formation HACCP')->toContain(url('/crm/opportunities/'.$opportunity->id))
         ->and($body['transactionId'])->toBeString();
     expect(json_encode($body))->not->toContain('confidentiel');
     expect(CalendarLinkEvent::query()->sole()->outlook_event_id)->toBe('AAMkEvent1');

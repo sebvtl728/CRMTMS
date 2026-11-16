@@ -9,6 +9,8 @@ use App\Modules\Core\Tenancy\Tenant;
 use App\Modules\Core\Users\User;
 use App\Modules\Crm\Activities\Activity;
 use App\Modules\Crm\Activities\ActivityAssignedMail;
+use App\Modules\Crm\Activities\ActivityRecorder;
+use App\Modules\Crm\Activities\CalendarEvents;
 use App\Modules\Crm\Activities\Events\ActivityChanged;
 use App\Modules\Crm\Activities\TodoQuery;
 use App\Modules\Crm\CrmServiceProvider;
@@ -314,4 +316,31 @@ it('lists the activity_assigned template in « Modèles d’e-mails », editable
     $this->put("/crm/activities/{$todo->id}/assign", ['responsible_user_id' => $colleague->id])->assertSessionHasNoErrors();
 
     Mail::assertSent(ActivityAssignedMail::class, fn (ActivityAssignedMail $m) => $m->render() !== '' && str_contains($m->render(), "{$me->name} te confie Rappeler le directeur."));
+});
+
+it('reads the responsible under a lock: a stale copy assigned again writes no second change', function () {
+    $me = commercial();
+    $colleague = commercial();
+    $this->actingAs($me);
+    $todo = asTodo(['responsible_user_id' => $me->id]);
+    $stale = Activity::query()->findOrFail($todo->id);
+
+    app(ActivityRecorder::class)->assign($todo, $colleague->id);
+    app(ActivityRecorder::class)->assign($stale, $colleague->id);
+
+    expect(AuditLog::query()->where('event', 'crm.activity_assigned')->where('auditable_id', $todo->id)->count())->toBe(1);
+    Mail::assertSent(ActivityAssignedMail::class, 1);
+});
+
+it('links the calendar event of an action handed out of his das to « À faire », not to the hidden fiche', function () {
+    $me = commercial();
+    $him = asScoped([Permissions::FICHES_VIEW => AccessScope::Das, Permissions::OPPORTUNITIES_VIEW => AccessScope::Das, Permissions::ACTIVITIES_VIEW => AccessScope::Das]);
+    $this->actingAs($me);
+    $meeting = asTodo(['type_id' => asType('Rendez-vous physique'), 'responsible_user_id' => $him->id]);
+    $mine = asTodo(['type_id' => asType('Rendez-vous physique'), 'responsible_user_id' => $me->id]);
+
+    expect(CalendarEvents::find($meeting->id)?->url)->toBe(route('crm.todo', ['action' => $meeting->id]))
+        ->and(CalendarEvents::find($mine->id)?->url)->toBe(route('crm.organisations.show', $mine->organisation_id))
+        ->and(collect(CalendarEvents::for($him, CarbonImmutable::now()->startOfDay(), CarbonImmutable::now()->addDays(2)))->pluck('url')->all())
+        ->toBe([route('crm.todo', ['action' => $meeting->id])]);
 });
