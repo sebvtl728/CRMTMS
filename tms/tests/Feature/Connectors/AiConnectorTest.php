@@ -276,6 +276,41 @@ it('answers fixed French messages for OpenAI-compatible errors', function () {
     expect(fn () => aiCall())->toThrow(AiUnavailable::class, AiUnavailable::REJECTED);
 });
 
+it('names the model when the server refuses it, never the provider text', function (array $body, int $status) {
+    aiLocalConfig();
+    aiHttp(['*' => Http::response($body, $status)]);
+
+    try {
+        aiCall();
+        $this->fail('AiUnavailable expected');
+    } catch (AiUnavailable $e) {
+        expect($e->getMessage())->toBe(AiUnavailable::modelRefused('llama3.1:8b')->getMessage())
+            ->and($e->getMessage())->toContain('« llama3.1:8b »')
+            ->and($e->getMessage())->not->toContain(AI_PROVIDER_TEXT)
+            ->and($e->retryable)->toBeFalse();
+    }
+})->with([
+    'LiteLLM key not allowed' => [['error' => ['message' => AI_PROVIDER_TEXT, 'type' => 'key_model_access_denied', 'param' => 'model', 'code' => '403']], 403],
+    'OpenAI unknown model' => [['error' => ['message' => AI_PROVIDER_TEXT, 'type' => 'invalid_request_error', 'code' => 'model_not_found']], 404],
+    'param model' => [['error' => ['message' => AI_PROVIDER_TEXT, 'param' => 'model']], 400],
+]);
+
+it('names the model when Anthropic does not know it', function () {
+    aiConfig(['model' => 'claude-inconnu']);
+    aiHttp(['*' => Http::response(['type' => 'error', 'error' => ['type' => 'not_found_error', 'message' => 'model: claude-inconnu']], 404)]);
+
+    expect(fn () => aiCall())->toThrow(AiUnavailable::class, AiUnavailable::modelRefused('claude-inconnu')->getMessage());
+});
+
+it('shows the refused model in the connection test', function () {
+    $this->actingAs(admin(twoFactor: true));
+    aiLocalConfig();
+    aiHttp(['*' => Http::response(['error' => ['message' => AI_PROVIDER_TEXT, 'type' => 'key_model_access_denied', 'param' => 'model']], 403)]);
+
+    $message = AiUnavailable::modelRefused('llama3.1:8b')->getMessage();
+    $this->postJson('/admin/connectors/ai/test')->assertOk()->assertJson(['ok' => false, 'message' => $message]);
+});
+
 // --- Network policy (Review Focus 3) ----------------------------------------
 
 it('refuses a server on the local network when the box is not checked, without any request', function (string $baseUrl) {

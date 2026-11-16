@@ -59,7 +59,7 @@ class AnthropicClient extends AiClient
         ]);
 
         if (! $response->successful()) {
-            throw $this->failure($response);
+            throw $this->failure($response, $this->model($config));
         }
         if ($response->json('stop_reason') !== 'end_turn') {
             throw new AiInvalidResponse;

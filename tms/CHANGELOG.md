@@ -21,7 +21,8 @@ intelligence artificielle qui propose sans jamais enregistrer.
 - **Connecteur « Intelligence artificielle »** (Administration › Connecteurs, organisme entier) : Anthropic ou serveur
   compatible OpenAI (OpenAI, Mistral, IA locale Ollama / vLLM…) ; clés chiffrées ; « Serveur sur le réseau local »
   limité à l'hôte et au port enregistrés (jamais le TMS lui-même ni une adresse lien-local, aucune redirection
-  suivie) ; délai de 120 s ; bouton « Tester la connexion » ; messages d'erreur fixes en français ; journal sans
+  suivie) ; délai de 120 s ; bouton « Tester la connexion » ; messages d'erreur fixes en français (un modèle refusé par le
+  serveur est nommé : vérifier son nom, majuscules comprises) ; journal sans
   contenu.
 - **Assistant IA de la fiche formation** (Nouvelle formation et Modifier) : « Depuis un PDF » (programme de 10 Mo au
   plus, texte lu sur le serveur et coupé à 60 000 caractères, fichier non conservé) ou « Depuis une demande »

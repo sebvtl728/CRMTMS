@@ -48,7 +48,7 @@ class OpenAiCompatibleClient extends AiClient
         }
 
         if (! $response->successful()) {
-            throw $this->failure($response);
+            throw $this->failure($response, $this->model($config));
         }
 
         $content = $response->json('choices.0.message.content');

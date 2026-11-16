@@ -97,14 +97,40 @@ abstract class AiClient
     }
 
     /** The exception for an unsuccessful answer. */
-    protected function failure(Response $response): AiUnavailable
+    protected function failure(Response $response, string $model): AiUnavailable
     {
         return match (true) {
+            self::refusesModel($response) => AiUnavailable::modelRefused($model),
             in_array($response->status(), [401, 403], true) => AiUnavailable::credentials(),
             $response->status() === 429 => AiUnavailable::busy(),
             $response->status() === 408, $response->serverError() => AiUnavailable::unreachable(),
             default => AiUnavailable::rejected(),
         };
+    }
+
+    /**
+     * Whether a 4xx answer says the model itself is refused: OpenAI
+     * `model_not_found`, LiteLLM `key_model_access_denied`, an error on the
+     * `model` parameter, or Anthropic's `not_found_error` on the model. The
+     * provider's text is only inspected here, never shown.
+     */
+    private static function refusesModel(Response $response): bool
+    {
+        if (! $response->clientError()) {
+            return false;
+        }
+        $error = $response->json('error');
+        if (! is_array($error)) {
+            return false;
+        }
+        $type = is_string($error['type'] ?? null) ? $error['type'] : '';
+        $code = is_string($error['code'] ?? null) ? $error['code'] : '';
+        $message = is_string($error['message'] ?? null) ? $error['message'] : '';
+
+        return in_array($code, ['model_not_found', 'key_model_access_denied'], true)
+            || $type === 'key_model_access_denied'
+            || ($error['param'] ?? null) === 'model'
+            || ($type === 'not_found_error' && str_starts_with($message, 'model:'));
     }
 
     /**

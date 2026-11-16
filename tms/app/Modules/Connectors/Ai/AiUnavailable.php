@@ -44,6 +44,20 @@ final class AiUnavailable extends UserFacingHttpException
         return new self(self::REJECTED, false);
     }
 
+    /**
+     * The server refuses the configured model (unknown name, or not allowed
+     * for this key). The model name comes from the connector settings, never
+     * from the provider's answer.
+     */
+    public static function modelRefused(string $model): self
+    {
+        $name = mb_substr(trim((string) preg_replace('/[\x00-\x1F\x7F]/u', '', $model)), 0, 100);
+
+        return new self('Le modèle « '.$name.' » n\'est pas disponible sur le serveur d\'intelligence artificielle '
+            .'(nom incorrect, majuscules comprises, ou modèle non autorisé pour cette clé). '
+            .'Demandez à l\'administrateur de vérifier le nom du modèle dans le connecteur.', false);
+    }
+
     public static function hostRefused(): self
     {
         return new self(self::HOST_REFUSED, false);
