@@ -6,6 +6,8 @@ use App\Modules\Core\Tenancy\Tenant;
 use App\Modules\Core\Tenancy\TenantContext;
 use App\Modules\Crm\Organisations\OrganisationStatus;
 use App\Modules\Crm\People\Person;
+use App\Modules\Crm\Public\FicheLinks;
+use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\DB;
 
@@ -33,28 +35,36 @@ final class RetentionPolicy
      * contact (or creation) older than N years, no contractual relation (not
      * a client themselves, no active link to a client entreprise), not
      * anonymised, not merged into another fiche, not kept on purpose (until
-     * the end of the « Conserver » period). Trashed fiches count: their data
-     * is still held.
+     * the end of the « Conserver » period), not held by another module (an
+     * enrolment, a dossier or a funding within the period: FicheLinks
+     * retention holds). Trashed fiches count: their data is still held.
      *
      * @return Builder<Person>
      */
     public static function expiredPeople(): Builder
     {
         $years = self::for(app(TenantContext::class)->current());
+        $threshold = CarbonImmutable::now()->subYears($years);
 
-        return Person::withTrashed()
+        $query = Person::withTrashed()
             ->whereNull('people.anonymised_at')
             ->whereNull('people.merged_into_id')
             // A particulier client has a contractual relation himself; an
             // interlocuteur's status is copied from his entreprise at creation
             // and never re-synced: only his active links to a client count.
             ->where(fn ($q) => $q->where('people.is_individual', false)->orWhere('people.status', '!=', OrganisationStatus::Client->value))
-            ->whereRaw('coalesce(people.last_contact_at, people.created_at) < ?', [now()->subYears($years)])
+            ->whereRaw('coalesce(people.last_contact_at, people.created_at) < ?', [$threshold])
             ->where(fn ($q) => $q->whereNull('people.gdpr_kept_until')->orWhere('people.gdpr_kept_until', '<=', now()))
             ->whereNotExists(fn ($s) => $s->select(DB::raw(1))->from('affiliations')
                 ->join('organisations', 'organisations.id', '=', 'affiliations.organisation_id')
                 ->whereColumn('affiliations.person_id', 'people.id')
                 ->whereNull('affiliations.ended_on')->whereNull('affiliations.deleted_at')
                 ->where('organisations.status', OrganisationStatus::Client->value)->whereNull('organisations.deleted_at'));
+
+        foreach (FicheLinks::retentionHolds($threshold) as $held) {
+            $query->whereNotExists(fn ($s) => $s->select(DB::raw(1))->fromSub($held, 'held')->whereColumn('held.person_id', 'people.id'));
+        }
+
+        return $query;
     }
 }

@@ -9,6 +9,7 @@ use App\Modules\Crm\People\Person;
 use App\Modules\Crm\Permissions;
 use App\Modules\Crm\Search\RecentViews;
 use App\Modules\Crm\Visibility\CrmVisibility;
+use App\Modules\Sessions\Sessions\StartingSoon;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -17,7 +18,7 @@ use Inertia\Response;
 /**
  * « Accueil »: shortcuts, counters, the commercial summary (« Mes relances »,
  * weighted pipeline and quotes of the month, next meetings) and the last fiches the
- * user opened. Everything follows what the user may see (Responsable DAS:
+ * user opened, the sessions starting within 7 days. Everything follows what the user may see (Responsable DAS:
  * his DAS only); nothing CRM without one « Consulter » right of a domain.
  */
 class DashboardController extends Controller
@@ -35,6 +36,8 @@ class DashboardController extends Controller
                 'people' => CrmVisibility::people(Person::query(), $user)->count(),
             ] : null,
             'commercial' => $crm ? CommercialSummary::for($user, CarbonImmutable::now()) : null,
+            // « Sessions qui démarrent dans les 7 jours » (sessions.sessions.view and its scope).
+            'sessions_starting' => StartingSoon::for($user, CarbonImmutable::now('Europe/Paris')),
         ]);
     }
 }

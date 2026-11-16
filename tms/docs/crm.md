@@ -15,6 +15,7 @@ Le menu de gauche, section **Commercial**, donne accès, dans cet ordre, à **Pi
 - **Pipeline pondéré** du mois : la somme des montants pondérés de vos opportunités **en cours** (ni gagnées, ni perdues) dont la **clôture prévue** tombe dans le mois en cours ; un clic ouvre la liste **Opportunités** filtrée sur ce mois ;
 - **Devis** du mois : le **taux de réussite** des devis envoyés dans le mois en cours (heure de Paris), avec le nombre d'envoyés et d'acceptés (« — » si aucun devis n'est parti) ; un clic ouvre la liste **Devis** ;
 - **Prochains rendez-vous** : vos 5 prochains rendez-vous à faire, avec le jour, l'heure et le lieu ; un clic ouvre la fiche ;
+- **Sessions qui démarrent dans les 7 jours** (avec le droit « Consulter les sessions ») : les sessions de formation qui commencent d'aujourd'hui à dans 7 jours (jours de Paris), ni annulées ni à la corbeille, avec leurs dates, leur type et les places prises d'une session inter ; un clic ouvre la session (voir `sessions.md`) ;
 - **Dernières fiches consultées** : les 5 dernières fiches que vous avez ouvertes, les plus récentes en premier. Cette liste est personnelle ; elle ne garde que le fait que vous avez ouvert la fiche, pas son contenu. Une fiche supprimée, fusionnée ou hors de votre périmètre n'y figure plus.
 
 Tous ces chiffres respectent votre périmètre : un Responsable de DAS n'y compte que ses DAS.
@@ -52,7 +53,7 @@ Sur l'onglet **Informations** d'une entreprise ou d'une personne, le bloc **Form
 
 ### Historique, notes et pièces jointes
 
-L'onglet **Historique** d'une fiche liste, du plus récent au plus ancien, les **notes**, les **pièces jointes**, les **actions** (appels, rendez-vous… voir plus bas), les **étapes de ses opportunités**, les **devis** (« Devis CF-2026-0001 créé / envoyé / relancé / accepté / refusé / expiré ») et les **modifications** de la fiche (qui a changé quoi et quand ; les données personnelles modifiées sont signalées sans afficher leur valeur).
+L'onglet **Historique** d'une fiche liste, du plus récent au plus ancien, les **notes**, les **pièces jointes**, les **actions** (appels, rendez-vous… voir plus bas), les **étapes de ses opportunités**, les **devis** (« Devis CF-2026-0001 créé / envoyé / relancé / accepté / refusé / expiré »), les **dossiers de formation** dont l'entreprise ou la personne est contractante (ou contact) — création et étapes, avec le motif d'une annulation — et, sur une personne, ses **inscriptions** (inscription, liste d'attente, confirmation, abandon avec la date de sortie et le motif, annulation), chacun selon vos droits sur les dossiers et les sessions (voir `sessions.md`), et les **modifications** de la fiche (qui a changé quoi et quand ; les données personnelles modifiées sont signalées sans afficher leur valeur).
 
 - **Ajouter une note** : écrivez dans la zone « Ajouter une note » (appel, rendez-vous, information utile), puis **Ajouter la note**. Une note met à jour la date de **dernier contact** de la fiche.
 - **Joindre un fichier** : PDF, images, Word, Excel, OpenDocument, texte, CSV, 20 Mo maximum.
@@ -153,6 +154,8 @@ Les boutons **Accepté** et **Refusé** apparaissent sur un devis envoyé ou rel
 - **Refusé** (date et motif facultatif) : le TMS propose de **passer l'opportunité en « Perdu »**, motif de perte obligatoire.
 - Rien n'est proposé si l'opportunité est déjà gagnée ou perdue.
 - **Devis signé** : la fenêtre **Accepté** permet de joindre, si vous l'avez, l'exemplaire signé renvoyé par le client (PDF, JPEG ou PNG, 10 Mo au maximum ; un fichier renommé ou un SVG est refusé). Sur un devis accepté, **Joindre le devis signé** (ou **Remplacer le devis signé**) l'ajoute plus tard ; le nouveau fichier remplace l'ancien. Il s'ouvre depuis la ligne **Devis signé** du devis. L'historique indique « Devis signé ajouté (CF-2026-0001) », sans le nom du fichier. L'anonymisation du particulier ou de l'interlocuteur destinataire supprime l'exemplaire signé ; son export de données indique pour chaque devis s'il y en a un.
+
+- **Créer le dossier** : sur un devis accepté, ce bouton ouvre l'assistant du dossier de formation (une seule fois par devis ; ensuite **Voir le dossier**). Un dossier mis à la corbeille bloque toujours la création d'un nouveau dossier pour ce devis : restaurez-le.
 
 ### Expiration
 
@@ -260,6 +263,7 @@ Les doublons ne sont jamais cherchés dans les données d'un autre organisme.
 L'écran **Fusionner deux fiches** montre la **fiche conservée** et la **fiche absorbée**. Pour chaque champ qui diffère, choisissez la valeur à garder. Les champs identiques sont regroupés. Au clic sur **Fusionner**, une confirmation rappelle que **la fusion est définitive** :
 
 - l'historique, les notes, les pièces jointes, les rattachements, les **opportunités** et les **actions** de la fiche absorbée passent sur la fiche conservée ; si les deux fiches avaient le même rattachement, il n'en reste qu'un ;
+- ses **sessions** (entreprise d'une session intra), **dossiers** (contractant, contact), **inscriptions** et **financements** passent aussi sur la fiche conservée. Deux personnes inscrites chacune sur la **même session** ne peuvent pas être fusionnées : annulez d'abord l'une des deux inscriptions (le message nomme la session) ;
 - les DAS et les **formations d'intérêt** sont réunis (une formation présente sur les deux fiches n'apparaît qu'une fois) ;
 - l'adresse de la fiche absorbée renvoie vers la fiche conservée ;
 - la fiche absorbée ne peut pas être restaurée et ses données personnelles sont effacées.
@@ -342,8 +346,8 @@ La section **RGPD** de la fiche affiche :
 - la **Base légale** du traitement (intérêt légitime par défaut ; consentement, contrat ou obligation légale) ;
 - les **Consentements** par canal (e-mail, SMS, téléphone, prospection) : **Enregistrer un consentement** ajoute un choix daté (**Accordé** ou **Refusé ou retiré**) avec sa source. L'historique est conservé : un nouveau choix s'ajoute sans effacer les précédents ;
 - **Opposition à la prospection** : enregistre que la personne ne veut plus être sollicitée ; une mention **Opposé à la prospection** apparaît sur la fiche, dans les listes et la recherche ;
-- **Exporter ses données** : fichier contenant toutes les données que le TMS détient sur la personne, y compris ses opportunités, ses actions, ses devis, les **plaquettes** envoyées (date, plaquettes, état, adresse, objet, message) et ses **formations d'intérêt** (droit d'accès) ;
-- **Anonymiser maintenant** : efface définitivement les données personnelles de la fiche (nom, coordonnées, notes, pièces jointes, formations d'intérêt, comptes rendus et lieux des actions, commentaire de perte des opportunités, destinataire et PDF archivé des devis, adresse, objet et message des plaquettes envoyées…). Pour confirmer, tapez le nom de la personne. Seules des données statistiques (statut, DAS, rattachements, montants et étapes des opportunités, types et dates des actions) restent. **Cette opération est irréversible.**
+- **Exporter ses données** : fichier contenant toutes les données que le TMS détient sur la personne, y compris ses opportunités, ses actions, ses devis, les **plaquettes** envoyées (date, plaquettes, état, adresse, objet, message) et ses **formations d'intérêt**, ses **inscriptions** (session, formation, dates, état, motif d'abandon, besoins d'adaptation) et les **dossiers** dont elle est contractante ou contact (droit d'accès). L'export étant toujours complet, il est réservé aux personnes qui voient tout l'organisme, y compris les dossiers et les sessions ;
+- **Anonymiser maintenant** : efface définitivement les données personnelles de la fiche (nom, coordonnées, notes, pièces jointes, formations d'intérêt, comptes rendus et lieux des actions, commentaire de perte des opportunités, destinataire et PDF archivé des devis, adresse, objet et message des plaquettes envoyées, besoins d'adaptation et notes de ses inscriptions, notes des financements qui la concernent et de ses dossiers de particulier…). Ses inscriptions et ses dossiers restent (dates, états, montants : statistiques, bilan pédagogique et financier). Pour confirmer, tapez le nom de la personne. Seules des données statistiques (statut, DAS, rattachements, montants et étapes des opportunités, types et dates des actions) restent. **Cette opération est irréversible.**
 
 > **Objet des opportunités d'un particulier** : il est **conservé** après l'anonymisation, pour les statistiques. S'il contient le nom de la personne, ce nom reste : ne mettez jamais de nom dans l'objet d'une opportunité.
 

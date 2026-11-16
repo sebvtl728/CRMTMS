@@ -105,3 +105,110 @@ it('detects a use of the catalogue tables, the import target line apart', functi
         expect(namesCatalogueTables($code))->toBeFalse($code);
     }
 });
+
+// ---------------------------------------------------------------- Sessions (lot 2a)
+
+/**
+ * Any mention of a CRM table, same shapes as CATALOGUE_TABLES: Sessions
+ * reaches the CRM through Crm\Public only. « notes » is left out: it is also
+ * a column of the dossiers, sessions and enrolments.
+ */
+const CRM_TABLES_LIST = 'organisations|organisation_das|people|person_das|affiliations|opportunities|opportunity_stage_changes|opportunity_trainings'
+    .'|opportunity_contacts|quotes|quote_lines|quote_sequences|activities|attachments|consents|fiche_trainings|gdpr_pending|import_batches|import_rows|import_stamps|import_profiles'
+    .'|saved_filters|recent_views|revenue_targets|user_das';
+
+const CRM_TABLES = '/[\'"`](?:public\.)?(?:'.CRM_TABLES_LIST.')(?:[\'"`.]|\s+as\b)'
+    .'|\b(?:exists|unique):(?:public\.)?(?:'.CRM_TABLES_LIST.')\b'
+    .'|\b(?:from|join|into|update)\s+(?:public\.)?["`]?(?:'.CRM_TABLES_LIST.')\b/i';
+
+function namesCrmTables(string $code): bool
+{
+    foreach (preg_split('/\R/', $code) ?: [] as $line) {
+        if (preg_match(CRM_TABLES, $line) === 1) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+/**
+ * A reference to the Crm other than its Public namespace: a use line, a
+ * grouped use (`use App\Modules\Crm\{...}`, `use App\Modules\{Crm\...}`) or a
+ * fully qualified name inline (`\App\Modules\Crm\People\Person::class`).
+ */
+const SESSIONS_CRM_REFERENCE = '/App\\\\Modules\\\\Crm\\\\(?!Public\b)|App\\\\Modules\\\\\{[^}]*\bCrm\\\\(?!Public\b)/';
+
+/** Same for the catalogue: only Trainings, TrainingData and TrainingUsage. */
+const SESSIONS_CATALOGUE_REFERENCE = '/App\\\\Modules\\\\Catalogue\\\\(?!(?:Trainings|TrainingData|TrainingUsage)\b)|App\\\\Modules\\\\\{[^}]*\bCatalogue\\\\(?!(?:Trainings|TrainingData|TrainingUsage)\b)/';
+
+it('lets Sessions reach the CRM and the catalogue through their public services only', function () {
+    expect(moduleFilesMatching('Sessions', SESSIONS_CRM_REFERENCE))->toBe([])
+        ->and(moduleFilesMatching('Sessions', SESSIONS_CATALOGUE_REFERENCE))->toBe([]);
+
+    $offenders = [];
+    foreach (new RecursiveIteratorIterator(new RecursiveDirectoryIterator(app_path('Modules/Sessions'))) as $file) {
+        if ($file->getExtension() !== 'php') {
+            continue;
+        }
+        $code = (string) file_get_contents($file->getPathname());
+        if (namesCrmTables($code) || namesCatalogueTables($code)) {
+            $offenders[] = $file->getPathname();
+        }
+    }
+    expect($offenders)->toBe([]);
+});
+
+it('detects every way of reaching the Crm or the catalogue beyond their public services', function () {
+    foreach ([
+        'use App\Modules\Crm\People\Person;',
+        'use App\Modules\Crm\{Public\Trainees, People\Person};',
+        'use App\Modules\{Crm\People\Person, Core\Access\Role};',
+        '$p = new \App\Modules\Crm\People\Person();',
+        'Person::class === \App\Modules\Crm\Organisations\Organisation::class',
+    ] as $code) {
+        expect(preg_match(SESSIONS_CRM_REFERENCE, $code), $code)->toBe(1);
+    }
+    foreach ([
+        'use App\Modules\Crm\Public\Trainees;',
+        'use App\Modules\Crm\Public\{Trainees, Fiches};',
+        'app(\App\Modules\Crm\Public\Fiches::class)',
+        'use App\Modules\Core\References\ReferenceList;',
+    ] as $code) {
+        expect(preg_match(SESSIONS_CRM_REFERENCE, $code), $code)->toBe(0);
+    }
+
+    foreach ([
+        'use App\Modules\Catalogue\Training;',
+        'use App\Modules\Catalogue\{Trainings, Training};',
+        'use App\Modules\{Catalogue\Training, Crm\Public\Fiches};',
+        '$t = \App\Modules\Catalogue\Brochures\Brochures::class;',
+    ] as $code) {
+        expect(preg_match(SESSIONS_CATALOGUE_REFERENCE, $code), $code)->toBe(1);
+    }
+    foreach ([
+        'use App\Modules\Catalogue\Trainings;',
+        'use App\Modules\Catalogue\TrainingData;',
+        'use App\Modules\Catalogue\TrainingUsage;',
+        'app(\App\Modules\Catalogue\Trainings::class)',
+    ] as $code) {
+        expect(preg_match(SESSIONS_CATALOGUE_REFERENCE, $code), $code)->toBe(0);
+    }
+});
+
+it('keeps Crm, Catalogue and Core free of any import of the Sessions module', function () {
+    foreach (['Crm', 'Catalogue', 'Core', 'Connectors'] as $module) {
+        expect(moduleFilesMatching($module, '/^\s*use\s+App\\\\Modules\\\\Sessions\\\\/m'), $module)->toBe([]);
+    }
+});
+
+it('detects a use of the CRM tables', function () {
+    foreach (["DB::table('people')", "->join('organisations as o', 'x', 'y')", "Rule::exists('people', 'id')", "->where('quotes.status', 'accepted')",
+        'select 1 from quote_lines', "'person_id' => 'exists:people,id'", "->leftJoin('affiliations', 'a', 'b')", 'update opportunities set'] as $code) {
+        expect(namesCrmTables($code))->toBeTrue($code);
+    }
+    foreach (["'session_people'", "DB::table('dossier_lines')", "'quote_id' => \$id", "'organisation_id'", '// the people of the session',
+        "'enrolments'", "DB::table('training_sessions')", "'notes' => \$data['notes']"] as $code) {
+        expect(namesCrmTables($code))->toBeFalse($code);
+    }
+});

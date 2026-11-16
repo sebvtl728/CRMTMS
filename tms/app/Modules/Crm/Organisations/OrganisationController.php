@@ -15,6 +15,7 @@ use App\Modules\Crm\Interests\FicheTrainings;
 use App\Modules\Crm\Opportunities\OpportunityRows;
 use App\Modules\Crm\Opportunities\OpportunityTrainings;
 use App\Modules\Crm\Permissions;
+use App\Modules\Crm\Public\FicheBlocks;
 use App\Modules\Crm\Quotes\QuoteRows;
 use App\Modules\Crm\Search\CrmResource;
 use App\Modules\Crm\Search\ListExtras;
@@ -170,6 +171,8 @@ class OrganisationController extends Controller
             'ficheDasIds' => $organisation->das->pluck('id')->values()->all(),
             'opportunities' => OpportunityRows::forFiche($organisation, $user),
             'quotes' => QuoteRows::forFiche($organisation, $user),
+            // Blocks of the other modules (Sessions: « Formations suivies », « Dossiers »).
+            'blocks' => FicheBlocks::for('organisation', $organisation->id, $user),
             'brochure_send' => BrochureSendProps::for($organisation, $user),
             'similar' => $user->can(Permissions::MERGE) ? $this->duplicates->similarTo($organisation, $user) : [],
             'can' => [

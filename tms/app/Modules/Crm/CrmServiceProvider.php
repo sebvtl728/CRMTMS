@@ -49,6 +49,7 @@ use App\Modules\Crm\Timeline\Attachment;
 use App\Modules\Crm\Timeline\AttachmentsProvider;
 use App\Modules\Crm\Timeline\AuditProvider;
 use App\Modules\Crm\Timeline\LastContact;
+use App\Modules\Crm\Timeline\ModuleHistoryProvider;
 use App\Modules\Crm\Timeline\Note;
 use App\Modules\Crm\Timeline\NotesProvider;
 use App\Modules\Crm\Timeline\Timeline;
@@ -120,7 +121,7 @@ class CrmServiceProvider extends ServiceProvider
         ]);
 
         // Sources of the « Historique »; later increments tag their own.
-        $this->app->tag([NotesProvider::class, AttachmentsProvider::class, AuditProvider::class, OpportunitiesProvider::class, ActivitiesProvider::class, QuotesProvider::class, BrochureSendingsProvider::class], Timeline::TAG);
+        $this->app->tag([NotesProvider::class, AttachmentsProvider::class, AuditProvider::class, OpportunitiesProvider::class, ActivitiesProvider::class, QuotesProvider::class, BrochureSendingsProvider::class, ModuleHistoryProvider::class], Timeline::TAG);
     }
 
     public function boot(): void
@@ -539,6 +540,7 @@ class CrmServiceProvider extends ServiceProvider
         ReferenceUsage::register(ReferenceList::Das, 'organisation_das', 'das_id');
         ReferenceUsage::register(ReferenceList::Das, 'user_das', 'das_id');
         ReferenceUsage::register(ReferenceList::ProfessionalSituation, 'people', 'professional_situation_id');
+        ReferenceUsage::register(ReferenceList::EducationLevel, 'people', 'education_level_id');
         ReferenceUsage::register(ReferenceList::FundingMode, 'people', 'funding_mode_id');
         ReferenceUsage::register(ReferenceList::ContactOrigin, 'people', 'origin_id');
         ReferenceUsage::register(ReferenceList::Das, 'person_das', 'das_id');

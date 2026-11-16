@@ -8,6 +8,7 @@ use App\Modules\Core\Mail\MailServiceProvider;
 use App\Modules\Core\Tenancy\TenancyServiceProvider;
 use App\Modules\Core\Users\UsersServiceProvider;
 use App\Modules\Crm\CrmServiceProvider;
+use App\Modules\Sessions\SessionsServiceProvider;
 use App\Providers\AppServiceProvider;
 use App\Providers\HorizonServiceProvider;
 use App\Providers\RateLimitServiceProvider;
@@ -24,4 +25,5 @@ return [
     ConnectorsServiceProvider::class,
     CrmServiceProvider::class,
     CatalogueServiceProvider::class,
+    SessionsServiceProvider::class,
 ];

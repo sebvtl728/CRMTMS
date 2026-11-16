@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { formatDateTime } from '@/lib/crm';
 import { Link, router } from '@inertiajs/react';
-import { Check, ClipboardCheck, FileText, Handshake, History, LoaderCircle, Paperclip, StickyNote, Trash2 } from 'lucide-react';
+import { Check, ClipboardCheck, FileText, FolderOpen, GraduationCap, Handshake, History, LoaderCircle, Paperclip, StickyNote, Trash2 } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 const MAX_NOTE = 10000;
@@ -45,6 +45,8 @@ function EntryIcon({ type }: { type: string }) {
     if (type === 'activity') return <ClipboardCheck className={cls} aria-hidden />;
     if (type === 'quote') return <FileText className={cls} aria-hidden />;
     if (type === 'brochure_sending') return <Paperclip className={cls} aria-hidden />;
+    if (type === 'dossier') return <FolderOpen className={cls} aria-hidden />;
+    if (type === 'enrolment') return <GraduationCap className={cls} aria-hidden />;
 
     return <History className={cls} aria-hidden />;
 }
@@ -275,6 +277,11 @@ export function Timeline({ kind, subjectId, canEdit }: Props) {
                                         </Link>
                                     ) : entry.type === 'quote' && typeof entry.meta.quote_id === 'string' ? (
                                         <Link href={route('crm.quotes.show', entry.meta.quote_id)} className="text-sm font-medium hover:underline">
+                                            {entry.title}
+                                        </Link>
+                                    ) : typeof entry.meta.href === 'string' ? (
+                                        // Entries of other modules (dossiers, inscriptions) carry their own link.
+                                        <Link href={entry.meta.href} className="text-sm font-medium hover:underline">
                                             {entry.title}
                                         </Link>
                                     ) : (

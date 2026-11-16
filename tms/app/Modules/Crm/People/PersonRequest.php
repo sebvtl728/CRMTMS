@@ -103,6 +103,7 @@ class PersonRequest extends FormRequest
             ...self::fieldRules(),
             'legal_basis' => ['sometimes', 'nullable', Rule::enum(LegalBasis::class)],
             'professional_situation_id' => ['nullable', ...ReferenceRules::item(ReferenceList::ProfessionalSituation, $current?->professional_situation_id)],
+            'education_level_id' => ['nullable', ...ReferenceRules::item(ReferenceList::EducationLevel, $current?->education_level_id)],
             'funding_mode_id' => ['nullable', ...ReferenceRules::item(ReferenceList::FundingMode, $current?->funding_mode_id)],
             'origin_id' => ['nullable', ...ReferenceRules::item(ReferenceList::ContactOrigin, $current?->origin_id)],
             'responsible_user_id' => ['nullable', ...ReferenceRules::responsible($current?->responsible_user_id)],

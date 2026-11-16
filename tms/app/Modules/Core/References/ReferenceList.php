@@ -22,6 +22,12 @@ enum ReferenceList: string
     case ProfessionalSituation = 'professional_situation';
     case LegalFormOrg = 'legal_form_org';
     case DecisionRole = 'decision_role';
+    case FundingType = 'funding_type';
+    case AbandonReason = 'abandon_reason';
+    case CancelReason = 'cancel_reason';
+    case BpfCategory = 'bpf_category';
+    case EducationLevel = 'education_level';
+    case TrainingModality = 'training_modality';
 
     public function label(): string
     {
@@ -40,6 +46,12 @@ enum ReferenceList: string
             self::ProfessionalSituation => 'Situations professionnelles',
             self::LegalFormOrg => 'Formes juridiques (organisations clientes)',
             self::DecisionRole => 'Rôles dans la décision',
+            self::FundingType => 'Types de financeur (dossiers)',
+            self::AbandonReason => 'Motifs d\'abandon',
+            self::CancelReason => 'Motifs d\'annulation (dossiers et sessions)',
+            self::BpfCategory => 'Catégories de stagiaires (BPF)',
+            self::EducationLevel => 'Niveaux de diplôme',
+            self::TrainingModality => 'Modalités de formation',
         };
     }
 
@@ -67,5 +79,25 @@ enum ReferenceList: string
     public function hasQuoteStage(): bool
     {
         return $this === self::PipelineStage;
+    }
+
+    /**
+     * Abandon reasons carry a « force majeure » flag (meta.force_majeure):
+     * a force majeure abandon never costs a dédit (spec lot 2a § 5.6).
+     */
+    public function hasForceMajeure(): bool
+    {
+        return $this === self::AbandonReason;
+    }
+
+    /**
+     * Funding types carry the kind of contractant they fund by default
+     * (meta.default_for: organisation|person): the initial funding of a
+     * dossier created from a quote. One item per kind at most; none: no
+     * initial funding.
+     */
+    public function hasDefaultFor(): bool
+    {
+        return $this === self::FundingType;
     }
 }

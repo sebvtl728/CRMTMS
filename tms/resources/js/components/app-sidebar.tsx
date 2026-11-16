@@ -7,8 +7,10 @@ import {
     BookOpen,
     Building2,
     CalendarCheck,
+    CalendarDays,
     CalendarRange,
     ClipboardPen,
+    ClipboardList,
     Columns3,
     Contact,
     Euro,
@@ -24,6 +26,7 @@ import {
     ShieldAlert,
     ShieldCheck,
     Upload,
+    UserMinus,
     Users,
 } from 'lucide-react';
 import AppLogo from './app-logo';
@@ -46,6 +49,12 @@ const commercialNavItems: (NavItem & { permission: string })[] = [
     { title: 'RGPD', url: '/crm/gdpr', icon: ShieldAlert, permission: 'crm.gdpr' },
 ];
 
+// « Formation »: the operational side (dossiers, sessions, then enrolments).
+const trainingNavItems: (NavItem & { permission: string })[] = [
+    { title: 'Dossiers', url: '/dossiers', icon: ClipboardList, permission: 'sessions.dossiers.view' },
+    { title: 'Sessions', url: '/sessions', icon: CalendarDays, permission: 'sessions.sessions.view' },
+];
+
 // Each entry is shown only when the user holds the permission (the server stays the authority).
 const adminNavItems: (NavItem & { permission: string })[] = [
     { title: 'Sociétés', url: '/admin/companies', icon: Building2, permission: 'companies.manage' },
@@ -55,6 +64,7 @@ const adminNavItems: (NavItem & { permission: string })[] = [
     { title: 'Connecteurs', url: '/admin/connectors', icon: Plug, permission: 'connectors.manage' },
     { title: "Journal d'audit", url: '/admin/audit', icon: History, permission: 'audit.view' },
     { title: 'Sécurité', url: '/admin/security', icon: ShieldCheck, permission: 'settings.manage' },
+    { title: "Règle d'abandon", url: '/admin/abandon-rule', icon: UserMinus, permission: 'settings.manage' },
     { title: "Modèles d'e-mails", url: '/admin/mail-templates', icon: Mail, permission: 'settings.manage' },
 ];
 
@@ -63,6 +73,7 @@ export function AppSidebar() {
     const commercialItems = commercialNavItems
         .filter((item) => auth.permissions.includes(item.permission))
         .map((item) => (item.url === '/crm/todo' ? { ...item, badge: todo_count } : item));
+    const trainingItems = trainingNavItems.filter((item) => auth.permissions.includes(item.permission));
     const adminItems = adminNavItems.filter((item) => auth.permissions.includes(item.permission));
 
     return (
@@ -82,6 +93,7 @@ export function AppSidebar() {
             <SidebarContent>
                 <NavMain items={homeNavItems} label="Navigation" />
                 {commercialItems.length > 0 && <NavMain items={commercialItems} label="Commercial" />}
+                {trainingItems.length > 0 && <NavMain items={trainingItems} label="Formation" />}
                 {adminItems.length > 0 && <NavMain items={adminItems} label="Administration" />}
             </SidebarContent>
 

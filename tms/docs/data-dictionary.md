@@ -193,6 +193,7 @@ Conventions communes : UUID v7, `tenant_id`, suppression logique (`deleted_at`) 
 | `is_individual` | bool | Particulier (peut être aussi interlocuteur) |
 | `project` | text, null | Projet de formation |
 | `professional_situation_id`, `funding_mode_id`, `origin_id` | uuid, null | FK `reference_items` |
+| `education_level_id` | uuid, null | FK `reference_items` (liste `education_level`, lot 2a) |
 | `status` | string | `prospect`, `client`, `inactif` (CHECK) |
 | `responsible_user_id` | uuid, null | FK `users` |
 | `last_contact_at` | timestamptz, null | Dernier contact (base de la conservation RGPD) |
@@ -431,6 +432,122 @@ Unique (`tenant_id`, `das_id`, `period_type`, `period_start`) : l'objectif d'un 
 
 ### `brochures`, `brochure_versions`, `brochure_trainings`, `brochure_das` — bibliothèque de plaquettes (0.5.2, Catalogue)
 `brochures` : `id`, `tenant_id`, `title` (200) · `current_version_id` (FK `brochure_versions`, null à la suppression) · `created_by`, `updated_by` (FK `users`) · `created_at`, `updated_at`, `deleted_at` (corbeille). Journalisée (`brochure`, titre seulement). `brochure_versions` : `id`, `tenant_id`, `brochure_id` (FK cascade), `path` (disque privé `tenants/<tenant_id>/brochures/<plaquette>/<version>.pdf`, nom généré), `original_name` (affichage), `size`, `sha256`, `uploaded_by`, `created_at` ; jamais modifiée ni effacée (une version envoyée reste lisible) ; l'ajout est journalisé (`brochure.version_added` : version, taille, SHA-256, jamais le nom). `brochure_trainings` (`brochure_id`, `training_id`, FK cascade ; la suppression d'une formation détache ses plaquettes) et `brochure_das` (`brochure_id`, `das_id` FK `reference_items`, déclaré à `ReferenceUsage`) : tables d'association, `tenant_id` + RLS. Lues par les autres modules par `Catalogue\Brochures` uniquement. Une version présente dans `quote_brochures` ou `brochure_sending_versions` reste téléchargeable même si sa plaquette est à la corbeille (`Brochures::registerSentCheck`, déclaré par le Crm).
+
+## Sessions : sessions de formation (lot 2a, RLS)
+
+### `training_sessions` — sessions de formation
+Nommée ainsi pour ne pas se confondre avec la table `sessions` (sessions web). Module `Sessions` (`TrainingSession`, écrite par `SessionWriter`) ; il lit la formation par `Catalogue\Trainings` et l'entreprise par `Crm\Public\Fiches`, jamais par leurs tables.
+
+| Colonne | Type | Rôle |
+|---|---|---|
+| `id`, `tenant_id` | uuid | |
+| `number` | string(20) | `S-<AAAA>-<NNNN>` ; unique (`tenant_id`, `number`) |
+| `title` | string(150), null | Intitulé facultatif (« Commis de cuisine – entrée du 30 novembre 2026 ») ; sans intitulé, la session se lit « <formation> (S-…) » |
+| `training_id` | uuid (FK `trainings`) | Formation du catalogue |
+| `das_id` | uuid (FK `reference_items`, DAS) | DAS de la formation, recopié à chaque enregistrement (périmètre « Ses DAS ») |
+| `kind` | string(10) | `intra` / `inter` / `individual` « Individuel » (CHECK) |
+| `modality_id` | uuid (FK `reference_items`, liste `training_modality`) | Modalité : Présentiel, Distanciel (classe virtuelle), FOAD / e-learning, Mixte (paramétrable) ; obligatoire |
+| `organisation_id` | uuid, null (FK `organisations`) | Entreprise d'une session intra (obligatoire en intra, vide en inter, facultative en individuel : CHECK) |
+| `starts_on`, `ends_on` | date | Jours de Paris ; CHECK `ends_on >= starts_on` |
+| `planned_hours` | numeric(6,2), null | Heures prévues, reprises de la formation sauf saisie |
+| `location_kind` | string(10) | `address` (adresse obligatoire), `client` (chez le client), `remote` (distanciel) |
+| `location_text` | string(500), null | Adresse, précision ou lien |
+| `capacity` | int, null | Places d'une session inter (≥ 1, vide en intra et en individuel : CHECK). Une session individuelle n'accueille qu'un stagiaire (inscription non annulée), sans liste d'attente |
+| `responsible_user_id` | uuid, null (FK `users`) | Responsable (créateur par défaut) |
+| `status` | string(20) | `planned`, `confirmed`, `running`, `done`, `cancelled` (CHECK). « En cours » et « Terminée » se calculent à la lecture d'après les dates tant que l'état posé est `planned` ou `confirmed` |
+| `cancel_reason_id`, `cancelled_on` | uuid (FK `reference_items`, motifs d'annulation), date | Renseignés ensemble si et seulement si `status = cancelled` (CHECK) |
+| `notes` | text, null | Journalisé sans valeur (`$auditPersonal`) |
+| `created_by`, `updated_by`, `created_at`, `updated_at`, `deleted_at` | | Suppression logique (corbeille) |
+
+Une formation utilisée par une session (corbeille comprise) ne se supprime pas du catalogue (`TrainingUsage` « sessions »).
+
+### `session_sequences` — compteurs de numérotation des sessions
+`tenant_id` (FK `tenants`, cascade) · `year` smallint (année civile de Paris à la création, CHECK 2000–2999) · `last_number` int (CHECK > 0) · `created_at`, `updated_at`. PK (`tenant_id`, `year`). Même mécanique que `quote_sequences` (incrément atomique dans la transaction de création, numéro rendu en cas d'échec).
+
+### `dossiers` — dossiers de formation
+Module `Sessions` (`Dossier`, écrit par `DossierWriter`, états par `DossierTransitions`) ; contractant et contact lus par `Crm\Public\Fiches`, jamais par les tables du CRM.
+
+| Colonne | Type | Rôle |
+|---|---|---|
+| `id`, `tenant_id` | uuid | |
+| `number` | string(20) | `D-<AAAA>-<NNNN>` ; unique (`tenant_id`, `number`) |
+| `company_id` | uuid (FK `companies`) | Société émettrice (par défaut celle de l'organisme) |
+| `account_organisation_id` / `account_person_id` | uuid, null (FK `organisations` / `people`) | Contractant : une entreprise **ou** un particulier (exactement un : CHECK) |
+| `contact_person_id` | uuid, null (FK `people`) | Contact du dossier |
+| `responsible_user_id` | uuid, null (FK `users`) | Responsable (créateur par défaut) |
+| `quote_id` | uuid, null (FK `quotes`), **unique** | Devis accepté d'origine (un seul dossier par devis) |
+| `opportunity_id` | uuid, null (FK `opportunities`) | Opportunité d'origine |
+| `das_id` | uuid (FK `reference_items`, DAS) | DAS principal, obligatoire (périmètre « Ses DAS ») |
+| `status` | string(20) | `created`, `convention_sent`, `convention_signed`, `convocations_sent`, `running`, `done`, `cancelled` ; `invoiced`, `settled` réservés au lot 3 (CHECK). « En cours » / « Réalisé » se calculent d'après les sessions des inscriptions tant qu'une étape antérieure est posée ; posés à la main, ils ne sont plus recalculés |
+| `convention_sent_on`, `convention_signed_on`, `convocations_sent_on` | date, null | Jours des étapes manuelles (chacune pas avant la précédente) |
+| `cancelled_reason_id`, `cancelled_on` | uuid (FK `reference_items`, motifs d'annulation), date | Renseignés ensemble si et seulement si `status = cancelled` (CHECK) ; annulation refusée après « Réalisé » |
+| `abandon_mode`, `abandon_dedit_percent` | string(20), smallint, null | Surcharge de la règle d'abandon de l'organisme (`prorata` ; `prorata_dedit` avec 1 à 100 % : CHECK) ; vides : règle de l'organisme (`AbandonRule::forDossier`) |
+| `notes` | text, null | Journalisé sans valeur (`$auditPersonal`) |
+| `created_by`, `updated_by`, `created_at`, `updated_at`, `deleted_at` | | Suppression logique (corbeille) |
+
+Prix du dossier = somme des `total_ht` de ses lignes (`Dossier::priceCents()`, centimes entiers).
+
+### `dossier_lines` — lignes d'un dossier
+`id`, `tenant_id` · `dossier_id` (FK, cascade) · `position` smallint · `kind` (`training` : formation du catalogue, `training_id` obligatoire, `pricing_mode` `per_trainee` ou `group` ; `fee` : frais sans formation ni mode de prix — CHECK) · `training_id` (FK `trainings`, null) · `das_id` (FK `reference_items`, null : DAS de la formation, ou du dossier pour des frais) · `label` string(255) · `quantity` numeric(8,2) > 0 · `unit` (`stagiaire`, `jour`, `heure`, `forfait`, `session`) · `unit_price` numeric(12,2) · `discount_percent` numeric(5,2) 0–100 · `total_ht` numeric(12,2) = arrondi au demi supérieur de quantité × prix × (1 − remise), en centimes entiers · `created_at`, `updated_at`. Mode de prix proposé d'après l'unité (« stagiaire » → par stagiaire, sinon de groupe). Une formation utilisée par une ligne (dossier à la corbeille compris) ne se supprime pas du catalogue.
+
+### `dossier_sequences` — compteurs de numérotation des dossiers
+Même forme et même mécanique que `session_sequences`.
+
+### `enrolments` — inscriptions des stagiaires
+Module `Sessions` (`Enrolment`, écrit par `Enrolments` et `PriceShares` seulement) ; le stagiaire est une personne du CRM, lue par `Crm\Public\Fiches` / `Trainees`.
+
+| Colonne | Type | Rôle |
+|---|---|---|
+| `id`, `tenant_id` | uuid | |
+| `person_id` | uuid (FK `people`) | Stagiaire ; une seule inscription non annulée par session (index unique partiel `training_session_id, person_id where status <> 'cancelled'`) |
+| `training_session_id` | uuid (FK `training_sessions`) | Session (sa formation est celle de la ligne ; une session intra ne prend que les dossiers de son entreprise) |
+| `dossier_id`, `dossier_line_id` | uuid (FK `dossiers`, `dossier_lines`) | Dossier et ligne de formation ; une ligne avec des inscriptions non annulées ne se supprime pas et ne change pas de formation |
+| `status` | string(20) | `enrolled` (Inscrit), `waitlisted` (En attente), `confirmed` (Confirmé), `abandoned` (Abandon), `cancelled` (Annulé) — CHECK. Une session inter complète (inscrits + confirmés ≥ places) met l'inscription suivante en attente ; une annulation ne promeut personne (promotion à la main) |
+| `waitlist_position` | integer, null | Ordre d'arrivée sur la liste d'attente ; renseigné si et seulement si `waitlisted` (CHECK) |
+| `entered_on`, `left_on` | date, null | Entrée (début de la session par défaut) et sortie ; sortie ≥ entrée (CHECK) |
+| `abandon_reason_id` | uuid, null (FK `reference_items`, motifs d'abandon) | Obligatoire avec la date de sortie pour un abandon (CHECK) ; gardé si l'abandon est ensuite annulé |
+| `planned_hours` | numeric(6,2), null | Heures prévues du stagiaire : celles de la session à l'inscription, modifiables (0 < h ≤ heures de la session) ; journalisées |
+| `price_share` | numeric(12,2), null | Part d'une ligne « prix par stagiaire » (`PriceShares` : total réparti au centime entre inscrits, confirmés et abandons, reste aux premières inscriptions par `created_at, id`) ; null en prix de groupe, en attente ou annulée |
+| `bpf_category_id` | uuid, null (FK `reference_items`, catégories BPF) | Catégorie de stagiaire (lot 3) |
+| `adaptation_needs`, `notes` | text, null | Situation de handicap / besoins d'adaptation et notes : données personnelles, journalisées sans valeur (`$auditPersonal`) |
+| `created_at`, `updated_at` | | |
+
+Une session avec des inscriptions non annulées garde sa formation, son type et son entreprise et ne va pas à la corbeille. « En cours » / « Réalisé » d'un dossier se calculent d'après la première date de début et la dernière date de fin des sessions de ses inscriptions non annulées (sessions annulées ou à la corbeille exclues : `DossierSchedule`).
+
+### `fundings` — financements d'un dossier
+Module `Sessions` (`Funding`, écrit par `FundingWriter` seulement, sous le verrou du dossier) ; le financeur est lu par `Crm\Public\Fiches`. Droits : ceux du dossier (`sessions.dossiers.update` et son périmètre) ; affichés sur la page du dossier seulement, jamais sur une session.
+
+| Colonne | Type | Rôle |
+|---|---|---|
+| `id`, `tenant_id` | uuid | |
+| `dossier_id` | uuid (FK `dossiers`) | Dossier financé |
+| `funder_organisation_id` / `funder_person_id` | uuid, null (FK `organisations` / `people`) | Financeur : une entreprise (OPCO, l'entreprise elle-même, France Travail…) **ou** une personne (stagiaire qui paie lui-même, CPF) — exactement un (CHECK) |
+| `funding_type_id` | uuid (FK `reference_items`, « Types de financeur ») | Type de financement (référentiel ; une valeur utilisée ne se supprime pas) |
+| `dossier_line_id` / `enrolment_id` | uuid, null (FK `dossier_lines` / `enrolments`) | Cible facultative : une ligne du dossier **ou** une inscription du dossier (pas les deux : CHECK ; une cible d'un autre dossier : 422). Une inscription visée relève d'une ligne au prix par stagiaire (sa part `price_share`), ni annulée ni en liste d'attente ; une ligne visée, directement ou par une de ses inscriptions, ne se supprime pas, et ne change pas de mode de prix si ses inscriptions sont visées ; une inscription visée annulée garde son financement, signalé « Inscription annulée » (« Financement à reporter ») |
+| `amount` | numeric(12,2) ≥ 0 (CHECK) | Montant HT, saisi au format français, calculé en centimes entiers |
+| `status` | string(20) | `to_request` (À demander, défaut), `requested` (Demandé), `agreed` (Accordé), `refused` (Refusé) — CHECK. Un financement refusé ne compte plus dans le financé ; aucun report automatique |
+| `agreement_number` | string(100), null | N° de prise en charge |
+| `agreed_on` | date, null | Date d'accord |
+| `notes` | text, null | Journalisé sans valeur (`$auditPersonal`) |
+| `created_at`, `updated_at` | | |
+
+Reste à financer (`FundingBalance`, centimes entiers) = prix du dossier − somme des financements non refusés ; de même par ligne visée (son total HT, contre les financements de la ligne et de ses inscriptions) et par inscription visée (sa part). Négatif : « Financements supérieurs au prix ». La liste des dossiers affiche le reste à financer du dossier, lu pour toute la page en une requête (`FundingBalance::fundedOf`).
+
+### Liens avec les fiches du CRM, historique, RGPD (lot 2a)
+
+Le module ne lit aucune table du CRM ; il se déclare par `Crm\Public\FicheLinks` et `Crm\Public\FicheHistory` (`SessionsServiceProvider`) :
+
+| Mécanisme | Colonnes concernées | Effet |
+|---|---|---|
+| Données liées (annulation d'un import) | `training_sessions.organisation_id`, `dossiers.account_organisation_id` / `account_person_id` / `contact_person_id`, `enrolments.person_id`, `fundings.funder_organisation_id` / `funder_person_id` (corbeille comprise) | La fiche nommée est conservée (« Liée à des données ajoutées depuis l'import, conservée. ») |
+| Fusion de deux fiches | mêmes colonnes | Repointées vers la fiche conservée, dans la transaction de la fusion ; fusion refusée (rien n'est écrit) si les deux personnes ont chacune une inscription non annulée sur la même session |
+| Corbeille d'une personne | `enrolments.person_id` | Autorisée : les inscriptions restent (badge « Fiche à la corbeille »), restauration possible ; une personne à la corbeille ne peut pas être inscrite |
+| Anonymisation (`Sessions\Gdpr\EnrolmentAnonymisation`) | `enrolments.adaptation_needs`, `enrolments.notes` ; `fundings.notes` (financements qu'elle paie, qui visent ses inscriptions ou ses dossiers de particulier) ; `dossiers.notes` (ses dossiers de particulier) | Valeurs effacées ; inscriptions, dossiers et financements gardés (statistiques, BPF, facturation) |
+| Export RGPD (`Sessions\Gdpr\PersonSessionsExport`) | inscriptions, dossiers dont elle est contractante ou contact | Sections `inscriptions` et `dossiers` ; l'export exige aussi `sessions.dossiers.view` et `sessions.sessions.view` sur « Tout l'organisme » |
+
+**Historique** : aucune table propre ; lu dans `audit_logs` (créations et changements d'état des `dossier`, `enrolment`, `funding`). Fiche d'une entreprise ou d'une personne : ses dossiers (contractant ; contact pour une personne), selon le périmètre de `sessions.dossiers.view` ; inscriptions d'une personne, selon `sessions.sessions.view`. Page d'un dossier : création et états, inscriptions (stagiaire nommé), financements ajoutés, modifiés, supprimés (200 derniers évènements).
+
+**Permissions** : `sessions.dossiers.view|update|delete` et `sessions.sessions.view|update|delete`, à périmètre (`own` : responsable ou créateur ; `das` : DAS du dossier ou de la session).
 
 ## Permissions CRM (catalogue global `permissions`)
 

@@ -244,7 +244,7 @@ it('refuses to delete a training another module uses', function () {
 
     $this->actingAs(admin(twoFactor: true))->from('/catalogue')->delete("/catalogue/{$used->id}")
         ->assertRedirect('/catalogue')
-        ->assertSessionHasErrors(['training' => 'Cette formation est utilisée (opportunités, devis) : désactivez-la plutôt.']);
+        ->assertSessionHasErrors(['training' => 'Cette formation est utilisée (opportunités, devis, sessions) : désactivez-la plutôt.']);
     expect($used->refresh()->trashed())->toBeFalse()
         ->and($seen)->toBe([$used->id]);
 

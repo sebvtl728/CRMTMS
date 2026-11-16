@@ -11,7 +11,7 @@ import AppLayout from '@/layouts/app-layout';
 import { formatAmount, formatDateTime, formatDay } from '@/lib/crm';
 import { type BreadcrumbItem } from '@/types';
 import { Head, Link, router, usePage } from '@inertiajs/react';
-import { BellRing, Check, Copy, FileText, Pencil, RotateCw, Send, Trash2, TriangleAlert, X } from 'lucide-react';
+import { BellRing, Check, Copy, FileText, FolderOpen, Pencil, RotateCw, Send, Trash2, TriangleAlert, X } from 'lucide-react';
 import { useEffect, useState } from 'react';
 
 interface QuoteLineRow {
@@ -68,6 +68,8 @@ interface ShowProps {
     propose: { won: ProposeWon | null; lost: boolean };
     /** False for a sent quote whose archived PDF is gone: no link, no reminder. */
     pdf_available: boolean;
+    /** Actions of other modules on an accepted quote (« Créer le dossier », « Voir le dossier »). */
+    links: { key: string; label: string; href: string }[];
     /** Why this draft cannot be sent as it is (VAT regime changed, validity past). */
     send_blocked: string | null;
     vat_regime_changed: boolean;
@@ -93,6 +95,7 @@ export default function QuoteShow({
     pipeline,
     propose,
     pdf_available: pdfAvailable,
+    links,
     send_blocked: sendBlocked,
     vat_regime_changed: regimeChanged,
     status,
@@ -144,6 +147,14 @@ export default function QuoteShow({
                         </p>
                     </div>
                     <div className="flex flex-wrap gap-2">
+                        {links.map((l) => (
+                            <Button key={l.key} asChild>
+                                <Link href={l.href}>
+                                    <FolderOpen className="h-4 w-4" />
+                                    {l.label}
+                                </Link>
+                            </Button>
+                        ))}
                         {/* A draft is previewed (watermark); a sent quote opens its archived PDF. */}
                         {pdfAvailable ? (
                             <Button asChild variant="outline">

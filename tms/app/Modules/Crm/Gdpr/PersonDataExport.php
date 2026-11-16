@@ -15,6 +15,7 @@ use App\Modules\Crm\Interests\FicheTrainings;
 use App\Modules\Crm\Opportunities\Opportunity;
 use App\Modules\Crm\People\Person;
 use App\Modules\Crm\Permissions;
+use App\Modules\Crm\Public\FicheLinks;
 use App\Modules\Crm\Quotes\Quote;
 use App\Modules\Crm\Timeline\Attachment;
 use App\Modules\Crm\Timeline\Note;
@@ -30,7 +31,8 @@ use Illuminate\Support\Facades\DB;
  * total TTC), brochure sendings (« plaquettes »: made to her or from her
  * fiche: date, brochures, status, address, subject, message), actions (hers or on her opportunities as particulier:
  * type, subject, status, result, report, place), notes, consents, attachments (listed, not their
- * content), trainings of interest (« Formations d'intérêt »), DAS and dates. Trashed items are included (still held), flagged.
+ * content), trainings of interest (« Formations d'intérêt »), the sections
+ * of other modules (FicheLinks: her enrolments and dossiers), DAS and dates. Trashed items are included (still held), flagged.
  * Fiches merged into her are listed by id (their data now lives here).
  * Always complete (RGPD art. 15): nothing is left out for the viewer's
  * scopes; hence reserved to users who see the whole organisme (allowedFor).
@@ -40,12 +42,14 @@ final class PersonDataExport
     public const INCOMPLETE = 'L\'export RGPD doit être complet : il est réservé aux rôles qui voient tout l\'organisme.';
 
     /**
-     * The four domain view rights on « Tout l'organisme »: the complete file
-     * shows nothing the user does not already see.
+     * The four domain view rights on « Tout l'organisme », and those of the
+     * modules that add sections (FicheLinks::registerExport: Dossiers,
+     * Sessions et inscriptions): the complete file shows nothing the user
+     * does not already see.
      */
     public static function allowedFor(User $user): bool
     {
-        foreach (Permissions::views() as $permission) {
+        foreach ([...Permissions::views(), ...FicheLinks::exportPermissions()] as $permission) {
             if (Scopes::of($user, $permission) !== AccessScope::All) {
                 return false;
             }
@@ -188,6 +192,8 @@ final class PersonDataExport
                 'ajoutee_le' => $date($f->created_at),
                 'supprimee' => $f->trashed(),
             ])->all(),
+            // Sections of other modules (Sessions: « inscriptions », « dossiers »).
+            ...FicheLinks::export($person->id),
             'fiches_fusionnees' => Person::withTrashed()->where('merged_into_id', $person->id)->orderBy('id')->pluck('id')->all(),
             'dates' => [
                 'creee_le' => $date($person->created_at),

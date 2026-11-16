@@ -25,7 +25,7 @@ final class AuditProvider implements TimelineProvider
         'address_line1' => 'Adresse', 'address_line2' => "Complément d'adresse", 'postal_code' => 'Code postal', 'city' => 'Ville', 'country' => 'Pays',
         'notes_summary' => 'Notes', 'civility' => 'Civilité', 'first_name' => 'Prénom', 'last_name' => 'Nom',
         'birth_date' => 'Date de naissance', 'is_individual' => 'Particulier', 'project' => 'Projet',
-        'professional_situation_id' => 'Situation professionnelle', 'funding_mode_id' => 'Mode de financement',
+        'professional_situation_id' => 'Situation professionnelle', 'education_level_id' => 'Niveau de diplôme', 'funding_mode_id' => 'Mode de financement',
         'merged_into_id' => 'Fusion', 'source_system' => 'Source', 'source_id' => 'Identifiant source', 'anonymised_at' => 'Anonymisation',
     ];
 

@@ -30,6 +30,7 @@ type PersonForm = {
     country: string;
     birth_date: string;
     professional_situation_id: string;
+    education_level_id: string;
     funding_mode_id: string;
     origin_id: string;
     responsible_user_id: string;
@@ -49,6 +50,7 @@ interface FormProps {
     options: {
         status: Option[];
         professional_situation: Option[];
+        education_level: Option[];
         funding_mode: Option[];
         origin: Option[];
         das: Option[];
@@ -114,6 +116,7 @@ export default function PersonFormPage({ person, options, duplicates, canMerge }
         country: str('country', 'FR'),
         birth_date: str('birth_date'),
         professional_situation_id: str('professional_situation_id'),
+        education_level_id: str('education_level_id'),
         funding_mode_id: str('funding_mode_id'),
         origin_id: str('origin_id'),
         responsible_user_id: str('responsible_user_id'),
@@ -234,6 +237,7 @@ export default function PersonFormPage({ person, options, duplicates, canMerge }
 
                 <Section title="Profil et projet">
                     {pick('professional_situation_id', 'Situation professionnelle', options.professional_situation)}
+                    {pick('education_level_id', 'Niveau de diplôme', options.education_level)}
                     {pick('funding_mode_id', 'Mode de financement', options.funding_mode)}
                     {pick('origin_id', 'Origine', options.origin)}
                     {text('birth_date', 'Date de naissance', { type: 'date', max: new Date().toISOString().slice(0, 10) })}

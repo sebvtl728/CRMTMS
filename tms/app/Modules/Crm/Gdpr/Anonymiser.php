@@ -9,6 +9,7 @@ use App\Modules\Crm\Brochures\BrochureSendingAnonymisation;
 use App\Modules\Crm\Import\ImportBatch;
 use App\Modules\Crm\Interests\FicheTrainings;
 use App\Modules\Crm\People\Person;
+use App\Modules\Crm\Public\FicheLinks;
 use App\Modules\Crm\Quotes\QuoteAnonymisation;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -44,6 +45,10 @@ use Throwable;
  *   the uploaded files of those batches, and of any other batch whose file
  *   names her, are deleted with their simulation lines. Counters, messages,
  *   report and undo information stay: the batch can still be undone;
+ * - what other modules hold on her (Crm\Public\FicheLinks::anonymise;
+ *   Sessions: adaptation needs and notes of her enrolments, notes of the
+ *   fundings she pays or that target her enrolments, notes of her dossiers
+ *   as particulier);
  * - her « À anonymiser » entry.
  * Journal: gdpr.anonymised (reason and counts, no value). The journal holds
  * no personal value of hers (masked from the start).
@@ -167,6 +172,8 @@ class Anonymiser
         $quotes = QuoteAnonymisation::scrub($subjects, $traces->emails);
         $files = [...$files, ...$quotes['files']];
         BrochureSendingAnonymisation::scrub($subjects);
+        // Personal values held by other modules (Sessions: adaptation needs, notes).
+        FicheLinks::anonymise($subjects);
         $activities = DB::table('activities')
             ->where(fn ($q) => $q->whereIn('person_id', $subjects)
                 ->orWhereIn('opportunity_id', DB::table('opportunities')->select('id')->whereIn('person_id', $subjects)))

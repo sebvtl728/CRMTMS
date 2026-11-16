@@ -1,4 +1,5 @@
 import { SimilarFiches, type DuplicateCandidate } from '@/components/crm/duplicate-warning';
+import { FicheBlockPanel, type FicheBlock } from '@/components/crm/fiche-blocks';
 import { InterestTrainings, type InterestTraining, type InterestTrainingOption } from '@/components/crm/interest-trainings';
 import { FicheOpportunities, type OpportunityRow } from '@/components/crm/opportunity-list';
 import { PersonGdpr, type GdprData } from '@/components/crm/person-gdpr';
@@ -54,6 +55,7 @@ interface PersonData {
     project: string | null;
     status: StatusValue;
     professional_situation: Ref | null;
+    education_level: Ref | null;
     funding_mode: Ref | null;
     origin: Ref | null;
     responsible: { id: string; name: string } | null;
@@ -75,6 +77,8 @@ interface ShowProps {
     gdpr: GdprData;
     opportunities: OpportunityRow[];
     quotes: QuoteRow[];
+    /** Tabs added by other modules (« Formations suivies », « Dossiers »). */
+    blocks: FicheBlock[];
     brochure_send: BrochureSendProps | null;
     interestTrainings: InterestTraining[];
     trainingOptions: InterestTrainingOption[];
@@ -124,6 +128,7 @@ export default function PersonShow({
     gdpr,
     opportunities,
     quotes,
+    blocks,
     brochure_send,
     interestTrainings,
     trainingOptions,
@@ -132,7 +137,7 @@ export default function PersonShow({
     status,
 }: ShowProps) {
     const [confirming, setConfirming] = useState(false);
-    const [tab, setTab] = useState<(typeof TABS)[number]>('Informations');
+    const [tab, setTab] = useState<string>('Informations');
 
     const breadcrumbs: BreadcrumbItem[] = [
         { title: 'Personnes', href: '/crm/people' },
@@ -224,7 +229,7 @@ export default function PersonShow({
                 {can.merge && <SimilarFiches type="person" currentId={p.id} similar={similar} />}
 
                 <div role="tablist" aria-label="Sections de la fiche" className="flex gap-1 overflow-x-auto border-b">
-                    {TABS.map((t) => (
+                    {[...TABS.slice(0, -1), ...blocks.map((b) => b.title), 'Historique'].map((t) => (
                         <button
                             key={t}
                             role="tab"
@@ -247,6 +252,7 @@ export default function PersonShow({
                     />
                 )}
                 {tab === 'Devis' && <FicheQuotes rows={quotes} />}
+                {blocks.map((b) => tab === b.title && <FicheBlockPanel key={b.key} block={b} />)}
                 {tab === 'Historique' && <Timeline kind="person" subjectId={p.id} canEdit={can.update} />}
 
                 <div
@@ -272,6 +278,7 @@ export default function PersonShow({
                         <h2 className="mb-3 text-sm font-semibold">Profil</h2>
                         <dl className="grid gap-3 sm:grid-cols-2">
                             <Item label="Situation professionnelle">{p.professional_situation?.label}</Item>
+                            <Item label="Niveau de diplôme">{p.education_level?.label}</Item>
                             <Item label="Mode de financement">{p.funding_mode?.label}</Item>
                             <Item label="Origine">{p.origin?.label}</Item>
                             <Item label="Responsable">{p.responsible?.name}</Item>

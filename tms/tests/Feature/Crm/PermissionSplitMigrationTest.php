@@ -34,13 +34,13 @@ function crmMatrix(): array
 }
 
 /**
- * @return array<string, string> permission => scope of a role
+ * @return array<string, string> CRM permission => scope of a role
  */
 function scopesOfRole(Role $role): array
 {
     $id = RoleModel::query()->where('name', $role->value)->sole()->getKey();
 
-    return DB::table(Scopes::TABLE)->where('role_id', $id)->orderBy('permission')->pluck('scope', 'permission')->all();
+    return DB::table(Scopes::TABLE)->where('role_id', $id)->where('permission', 'like', 'crm.%')->orderBy('permission')->pluck('scope', 'permission')->all();
 }
 
 function backTo042(): Tenant
@@ -64,7 +64,7 @@ const MATRIX_042 = [
 it('migration maps every default role', function () {
     backTo042();
     expect(crmMatrix())->toEqualCanonicalizing(MATRIX_042)
-        ->and(DB::table(Scopes::TABLE)->count())->toBe(0);
+        ->and(DB::table(Scopes::TABLE)->where('permission', 'like', 'crm.%')->count())->toBe(0);
 
     splitMigration()->up();
     Scopes::forget();
