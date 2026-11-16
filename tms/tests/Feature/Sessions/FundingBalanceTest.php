@@ -187,3 +187,40 @@ it('keeps the funding of a cancelled enrolment and flags it', function () {
     expect(Funding::query()->find($funding->id))->not->toBeNull()
         ->and($balance['enrolments'][$enrolment->id])->toBe(['price_cents' => 0, 'funded_cents' => 50000, 'remaining_cents' => -50000, 'cancelled' => true]);
 });
+
+// ---------------------------------------------------------------- review fixes
+
+it('counts for a line the fundings of the line and of its enrolments', function () {
+    $dossier = balDossier([['unit_price' => '3000', 'pricing_mode' => 'per_trainee']]);
+    $line = $dossier->lines->firstOrFail();
+    $session = balSession();
+    $enrolments = [balEnrol($dossier, $session), balEnrol($dossier, $session), balEnrol($dossier, $session)];
+    foreach ($enrolments as $enrolment) {
+        balFund($dossier, '700', 'OPCO', ['enrolment_id' => $enrolment->id]);
+    }
+    balFund($dossier, '900', 'Entreprise', ['dossier_line_id' => $line->id]);
+
+    $balance = FundingBalance::for($dossier->refresh());
+
+    expect($balance['lines'])->toBe([$line->id => ['price_cents' => 300000, 'funded_cents' => 300000, 'remaining_cents' => 0]])
+        ->and($balance['remaining_cents'])->toBe(0)
+        ->and($balance['enrolments'][$enrolments[0]->id])->toBe(['price_cents' => 100000, 'funded_cents' => 70000, 'remaining_cents' => 30000, 'cancelled' => false]);
+});
+
+it('shows a line whose enrolments only are targeted', function () {
+    $dossier = balDossier([['unit_price' => '3000', 'pricing_mode' => 'per_trainee']]);
+    $line = $dossier->lines->firstOrFail();
+    $session = balSession();
+    $enrolment = balEnrol($dossier, $session);
+    balEnrol($dossier, $session);
+    balFund($dossier, '700', 'OPCO', ['enrolment_id' => $enrolment->id]);
+    balFund($dossier, '100', 'OPCO', ['enrolment_id' => $enrolment->id, 'status' => 'refused']);
+
+    expect(FundingBalance::for($dossier->refresh())['lines'])
+        ->toBe([$line->id => ['price_cents' => 300000, 'funded_cents' => 70000, 'remaining_cents' => 230000]]);
+});
+
+it('words the funding of a cancelled enrolment as an amount to move', function () {
+    expect(FundingBalance::message(-50000, true, 50000))->toBe('Financement à reporter : 500,00 €')
+        ->and(FundingBalance::message(-50000))->toBe('Financements supérieurs au prix : 500,00 €');
+});

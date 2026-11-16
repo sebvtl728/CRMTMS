@@ -276,7 +276,8 @@ final class DossierWriter
     /**
      * Under the lock of the dossier (Enrolments and FundingWriter take it
      * too): every line sent still exists (409 otherwise), a line targeted by
-     * a funding, itself or through one of its enrolments, is not deleted, and
+     * a funding, itself or through one of its enrolments, is not deleted (nor
+     * its pricing mode changed when its enrolments are targeted), and
      * a line with trainees enrolled (cancelled enrolments aside) is neither
      * deleted nor given another training.
      *
@@ -310,6 +311,13 @@ final class DossierWriter
             }
             if (in_array($line->id, $fundedEnrolments, true)) {
                 throw ValidationException::withMessages(['lines' => "La ligne « {$line->label} » a un stagiaire visé par un financement : modifiez ou supprimez d'abord ce financement."]);
+            }
+        }
+        // Its trainees' fundings are balanced against their shares: the pricing mode stays.
+        foreach ($existing->only($fundedEnrolments) as $line) {
+            $kept = $sent[$line->id] ?? null;
+            if ($kept !== null && $kept['pricing_mode'] !== $line->pricing_mode) {
+                throw ValidationException::withMessages(['lines' => "La ligne « {$line->label} » a un stagiaire visé par un financement : son mode de prix ne change plus."]);
             }
         }
         foreach ($existing->only($enrolled) as $line) {

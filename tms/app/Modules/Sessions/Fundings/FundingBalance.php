@@ -12,7 +12,9 @@ use App\Modules\Sessions\Enrolments\Enrolment;
  * price of the dossier (Σ of its lines HT) − Σ of its fundings not refused.
  * Per line and per enrolment as well, only for the lines and the enrolments
  * that a funding targets (refused ones included: their target shows what is
- * left): a line against its total HT, an enrolment against its share of a
+ * left; a line also when only its enrolments are targeted): a line against
+ * its total HT and the fundings of the line and of its enrolments, an
+ * enrolment against its share of a
  * line priced per trainee (price_share; a cancelled enrolment has no share
  * any more and is flagged). A negative remainder means the fundings exceed
  * the price.
@@ -34,18 +36,22 @@ final class FundingBalance
         $price = $dossier->priceCents();
         $fundedCents = $funded($counted);
 
+        $enrolmentIds = $fundings->pluck('enrolment_id')->filter()->unique()->values()->all();
+        $targeted = $enrolmentIds === [] ? collect() : Enrolment::query()->whereKey($enrolmentIds)->orderBy('created_at')->orderBy('id')->get(['id', 'dossier_line_id', 'status', 'price_share']);
+        // enrolment id => its line: the fundings of the enrolments count for their line too.
+        $lineOf = $targeted->pluck('dossier_line_id', 'id')->all();
+
         $lines = [];
-        $lineIds = $fundings->pluck('dossier_line_id')->filter()->unique()->values()->all();
+        $lineIds = $fundings->pluck('dossier_line_id')->filter()->merge(array_values($lineOf))->unique()->values()->all();
         foreach ($dossier->lines->only($lineIds) as $line) {
             /** @var DossierLine $line */
             $linePrice = Amounts::cents((string) $line->total_ht);
-            $lineFunded = $funded($counted->where('dossier_line_id', $line->id));
+            $lineFunded = $funded($counted->filter(fn (Funding $f) => $f->dossier_line_id === $line->id
+                || ($f->enrolment_id !== null && ($lineOf[$f->enrolment_id] ?? null) === $line->id)));
             $lines[$line->id] = ['price_cents' => $linePrice, 'funded_cents' => $lineFunded, 'remaining_cents' => $linePrice - $lineFunded];
         }
 
         $enrolments = [];
-        $enrolmentIds = $fundings->pluck('enrolment_id')->filter()->unique()->values()->all();
-        $targeted = $enrolmentIds === [] ? collect() : Enrolment::query()->whereKey($enrolmentIds)->orderBy('created_at')->orderBy('id')->get(['id', 'status', 'price_share']);
         foreach ($targeted as $enrolment) {
             $share = $enrolment->price_share === null ? 0 : Amounts::cents((string) $enrolment->price_share);
             $shareFunded = $funded($counted->where('enrolment_id', $enrolment->id));
@@ -67,10 +73,15 @@ final class FundingBalance
     }
 
     /**
-     * « Reste à financer : 900,00 € » or « Financements supérieurs au prix : 100,00 € ».
+     * « Reste à financer : 900,00 € » or « Financements supérieurs au prix : 100,00 € »;
+     * a cancelled enrolment: « Financement à reporter : 500,00 € » (what it was given).
      */
-    public static function message(int $remainingCents): string
+    public static function message(int $remainingCents, bool $cancelled = false, int $fundedCents = 0): string
     {
+        if ($cancelled) {
+            return 'Financement à reporter : '.Amounts::display($fundedCents);
+        }
+
         return $remainingCents < 0
             ? 'Financements supérieurs au prix : '.Amounts::display(-$remainingCents)
             : 'Reste à financer : '.Amounts::display($remainingCents);

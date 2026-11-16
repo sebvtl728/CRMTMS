@@ -494,7 +494,7 @@ Module `Sessions` (`Funding`, écrit par `FundingWriter` seulement, sous le verr
 | `dossier_id` | uuid (FK `dossiers`) | Dossier financé |
 | `funder_organisation_id` / `funder_person_id` | uuid, null (FK `organisations` / `people`) | Financeur : une entreprise (OPCO, l'entreprise elle-même, France Travail…) **ou** une personne (stagiaire qui paie lui-même, CPF) — exactement un (CHECK) |
 | `funding_type_id` | uuid (FK `reference_items`, « Types de financeur ») | Type de financement (référentiel ; une valeur utilisée ne se supprime pas) |
-| `dossier_line_id` / `enrolment_id` | uuid, null (FK `dossier_lines` / `enrolments`) | Cible facultative : une ligne du dossier **ou** une inscription du dossier (pas les deux : CHECK ; une cible d'un autre dossier : 422). Une inscription visée relève d'une ligne au prix par stagiaire (sa part `price_share`) ; une ligne visée, directement ou par une de ses inscriptions, ne se supprime pas ; une inscription visée annulée garde son financement, signalé « Inscription annulée » |
+| `dossier_line_id` / `enrolment_id` | uuid, null (FK `dossier_lines` / `enrolments`) | Cible facultative : une ligne du dossier **ou** une inscription du dossier (pas les deux : CHECK ; une cible d'un autre dossier : 422). Une inscription visée relève d'une ligne au prix par stagiaire (sa part `price_share`), ni annulée ni en liste d'attente ; une ligne visée, directement ou par une de ses inscriptions, ne se supprime pas, et ne change pas de mode de prix si ses inscriptions sont visées ; une inscription visée annulée garde son financement, signalé « Inscription annulée » (« Financement à reporter ») |
 | `amount` | numeric(12,2) ≥ 0 (CHECK) | Montant HT, saisi au format français, calculé en centimes entiers |
 | `status` | string(20) | `to_request` (À demander, défaut), `requested` (Demandé), `agreed` (Accordé), `refused` (Refusé) — CHECK. Un financement refusé ne compte plus dans le financé ; aucun report automatique |
 | `agreement_number` | string(100), null | N° de prise en charge |
@@ -502,7 +502,7 @@ Module `Sessions` (`Funding`, écrit par `FundingWriter` seulement, sous le verr
 | `notes` | text, null | Journalisé sans valeur (`$auditPersonal`) |
 | `created_at`, `updated_at` | | |
 
-Reste à financer (`FundingBalance`, centimes entiers) = prix du dossier − somme des financements non refusés ; de même par ligne visée (son total HT) et par inscription visée (sa part). Négatif : « Financements supérieurs au prix ».
+Reste à financer (`FundingBalance`, centimes entiers) = prix du dossier − somme des financements non refusés ; de même par ligne visée (son total HT, contre les financements de la ligne et de ses inscriptions) et par inscription visée (sa part). Négatif : « Financements supérieurs au prix ».
 
 ## Permissions CRM (catalogue global `permissions`)
 

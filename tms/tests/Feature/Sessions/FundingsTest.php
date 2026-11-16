@@ -338,6 +338,68 @@ it('refuses to delete a line whose cancelled enrolment a funding targets: the en
     expect(Enrolment::query()->find($enrolment->id))->not->toBeNull();
 });
 
+it('keeps the pricing mode of a line whose enrolment a funding targets', function () {
+    $dossier = funDossier();
+    $enrolment = funEnrol($dossier);
+    $funding = app(FundingWriter::class)->create($dossier, funPayload(['enrolment_id' => $enrolment->id]));
+    $input = funKeepLines($dossier, [$dossier->lines[0]->id]);
+    $input['lines'][0]['pricing_mode'] = 'group';
+
+    expect(fn () => app(DossierWriter::class)->update($dossier, $input))
+        ->toThrow(ValidationException::class, 'La ligne « HACCP » a un stagiaire visé par un financement : son mode de prix ne change plus.');
+
+    // Defence in depth: a target that no longer qualifies stays editable.
+    DB::table('dossier_lines')->where('id', $dossier->lines[0]->id)->update(['pricing_mode' => 'group']);
+    app(FundingWriter::class)->update($funding, ['amount' => '1 000']);
+    expect($funding->refresh()->amount)->toBe('1000.00')->and($funding->enrolment_id)->toBe($enrolment->id);
+});
+
+it('refuses a waitlisted enrolment as target and leaves it out of the options', function () {
+    $dossier = funDossier();
+    $session = app(SessionWriter::class)->create([
+        'training_id' => funTraining()->id, 'kind' => 'inter', 'organisation_id' => null, 'starts_on' => '2026-12-07', 'ends_on' => '2026-12-09',
+        'planned_hours' => '', 'location_kind' => 'remote', 'location_text' => null, 'capacity' => 1, 'responsible_user_id' => null,
+        'status' => 'planned', 'notes' => null,
+    ]);
+    $enrolled = funEnrol($dossier, $session);
+    $waiting = funEnrol($dossier, $session);
+    expect($waiting->status->value)->toBe('waitlisted');
+    $this->actingAs(admin(twoFactor: true));
+
+    $this->post("/dossiers/{$dossier->id}/fundings", funPayload(['target' => 'enrolment', 'enrolment_id' => $waiting->id]))
+        ->assertSessionHasErrors(['enrolment_id' => 'Ce stagiaire est sur liste d\'attente : il n\'a pas encore de part du prix.']);
+    $this->get("/dossiers/{$dossier->id}")->assertInertia(fn (Assert $page) => $page
+        ->has('funding_options.enrolment', 1)->where('funding_options.enrolment.0.value', $enrolled->id));
+});
+
+it('requires the line or the trainee chosen as target', function () {
+    $dossier = funDossier(fee: true);
+    $this->actingAs(admin(twoFactor: true));
+    $url = "/dossiers/{$dossier->id}/fundings";
+
+    $this->post($url, funPayload(['target' => 'line']))->assertSessionHasErrors(['dossier_line_id' => 'Choisissez la ligne financée.']);
+    $this->post($url, funPayload(['target' => 'enrolment']))->assertSessionHasErrors(['enrolment_id' => 'Choisissez le stagiaire financé.']);
+    $this->post($url, funPayload(['target' => 'session']))->assertSessionHasErrors('target');
+    expect(Funding::query()->count())->toBe(0);
+
+    // « Le dossier »: an id left over by the form is dropped.
+    $this->post($url, funPayload(['target' => 'dossier', 'dossier_line_id' => $dossier->lines[1]->id]))->assertSessionHasNoErrors();
+    expect(Funding::query()->sole()->dossier_line_id)->toBeNull();
+});
+
+it('shows the funding of a cancelled enrolment as an amount to move', function () {
+    $dossier = funDossier();
+    $enrolment = funEnrol($dossier);
+    funEnrol($dossier);
+    app(FundingWriter::class)->create($dossier, funPayload(['enrolment_id' => $enrolment->id, 'amount' => '500']));
+    app(Enrolments::class)->cancel($enrolment);
+
+    $this->actingAs(admin(twoFactor: true))->get("/dossiers/{$dossier->id}")->assertInertia(fn (Assert $page) => $page
+        ->where('balance.parts.1.kind', 'enrolment')
+        ->where('balance.parts.1.cancelled', true)
+        ->where('balance.parts.1.message', 'Financement à reporter : 500,00 €'));
+});
+
 /**
  * The input of the dossier keeping only the lines $keep.
  *

@@ -21,6 +21,7 @@ interface FundingInput {
     funding_type_id: string;
     dossier_line_id: string | null;
     enrolment_id: string | null;
+    target: 'dossier' | 'line' | 'enrolment';
     amount: string;
     status: FundingStatus;
     agreement_number: string | null;
@@ -115,7 +116,7 @@ function FundingDialog({
     const [targetKind, setTargetKind] = useState<'none' | 'line' | 'enrolment'>(
         input?.dossier_line_id ? 'line' : input?.enrolment_id ? 'enrolment' : 'none',
     );
-    const { data, setData, transform, post, put, processing, errors } = useForm({
+    const { data, setData, setError, clearErrors, transform, post, put, processing, errors } = useForm({
         funder_organisation_id: input?.funder_organisation_id ?? '',
         funder_person_id: input?.funder_person_id ?? '',
         funding_type_id: input?.funding_type_id ?? '',
@@ -141,8 +142,19 @@ function FundingDialog({
 
     const submit: FormEventHandler = (e) => {
         e.preventDefault();
+        clearErrors('dossier_line_id', 'enrolment_id');
+        // A line or a trainee chosen as target must be picked (the server checks it too).
+        if (targetKind === 'line' && !data.dossier_line_id) {
+            setError('dossier_line_id', 'Choisissez la ligne financée.');
+            return;
+        }
+        if (targetKind === 'enrolment' && !data.enrolment_id) {
+            setError('enrolment_id', 'Choisissez le stagiaire financé.');
+            return;
+        }
         transform((d) => ({
             ...d,
+            target: targetKind === 'none' ? 'dossier' : targetKind,
             dossier_line_id: targetKind === 'line' ? d.dossier_line_id : '',
             enrolment_id: targetKind === 'enrolment' ? d.enrolment_id : '',
         }));

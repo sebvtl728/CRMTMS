@@ -11,6 +11,7 @@ use App\Modules\Sessions\Dossiers\Dossier;
 use App\Modules\Sessions\Dossiers\DossierLine;
 use App\Modules\Sessions\Dossiers\DossierWriter;
 use App\Modules\Sessions\Enrolments\Enrolment;
+use App\Modules\Sessions\Enrolments\EnrolmentStatus;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rule;
@@ -26,8 +27,10 @@ use Illuminate\Validation\ValidationException;
  *  - type: an active item of « Types de financeur » (or the current one);
  *  - target: none, a line of this dossier, or an enrolment of this dossier on
  *    a line priced per trainee (its share is the price it is balanced
- *    against; a group line is targeted itself), not cancelled unless it is
- *    already the target; never both; another dossier's: 422;
+ *    against; a group line is targeted itself), neither cancelled nor
+ *    waitlisted (not checked again for the target already stored); never
+ *    both; another dossier's: 422; a « target »
+ *    sent (dossier, line, enrolment) requires its id;
  *  - amount HT typed in French (« 2 100,50 »), integer cents, never a float.
  *
  * A cancelled dossier no longer changes (409). A refused funding stays: the
@@ -37,6 +40,9 @@ use Illuminate\Validation\ValidationException;
  */
 final class FundingWriter
 {
+    /** What the funding pays, as the form says it (« target »): the ids follow. */
+    public const TARGETS = ['dossier', 'line', 'enrolment'];
+
     public function __construct(private readonly Fiches $fiches) {}
 
     /**
@@ -92,6 +98,7 @@ final class FundingWriter
             'funding_type_id' => $funding->funding_type_id,
             'dossier_line_id' => $funding->dossier_line_id,
             'enrolment_id' => $funding->enrolment_id,
+            'target' => $funding->dossier_line_id !== null ? 'line' : ($funding->enrolment_id !== null ? 'enrolment' : 'dossier'),
             'amount' => str_replace('.', ',', (string) $funding->amount),
             'status' => $funding->status->value,
             'agreement_number' => $funding->agreement_number,
@@ -137,8 +144,9 @@ final class FundingWriter
             'funding_type_id' => ['bail', 'required', 'uuid', Rule::exists('reference_items', 'id')
                 ->where('tenant_id', $tenant)->where('list', ReferenceList::FundingType->value)->whereNull('deleted_at')
                 ->where(fn ($q) => $q->where('is_active', true)->when($current?->funding_type_id, fn ($q2, $id) => $q2->orWhere('id', $id)))],
-            'dossier_line_id' => ['nullable', 'uuid'],
-            'enrolment_id' => ['nullable', 'uuid'],
+            'target' => ['nullable', Rule::in(self::TARGETS)],
+            'dossier_line_id' => ['nullable', 'required_if:target,line', 'uuid'],
+            'enrolment_id' => ['nullable', 'required_if:target,enrolment', 'uuid'],
             'amount' => ['bail', 'required', 'regex:/^\d{1,10}(\.\d{1,2})?$/'],
             'status' => ['required', Rule::enum(FundingStatus::class)],
             'agreement_number' => ['nullable', 'string', 'max:100'],
@@ -212,10 +220,19 @@ final class FundingWriter
         $enrolment = Enrolment::query()->with('line')->where('dossier_id', $dossier->id)->find($enrolmentId);
         if ($enrolment === null) {
             $v->errors()->add('enrolment_id', 'Cette inscription n\'appartient pas à ce dossier.');
-        } elseif ($enrolment->line?->pricing_mode !== DossierLine::PER_TRAINEE) {
+
+            return;
+        }
+        // The target already stored is kept whatever became of it (cancelled, ...).
+        if ($enrolmentId === $current?->enrolment_id) {
+            return;
+        }
+        if ($enrolment->line?->pricing_mode !== DossierLine::PER_TRAINEE) {
             $v->errors()->add('enrolment_id', 'Cette inscription relève d\'une ligne au prix de groupe : visez la ligne.');
-        } elseif ($enrolment->isCancelled() && $enrolmentId !== $current?->enrolment_id) {
+        } elseif ($enrolment->isCancelled()) {
             $v->errors()->add('enrolment_id', 'Cette inscription est annulée.');
+        } elseif ($enrolment->status === EnrolmentStatus::Waitlisted) {
+            $v->errors()->add('enrolment_id', 'Ce stagiaire est sur liste d\'attente : il n\'a pas encore de part du prix.');
         }
     }
 
@@ -228,7 +245,7 @@ final class FundingWriter
      */
     private static function normalise(array $data): array
     {
-        foreach (['funder_organisation_id', 'funder_person_id', 'funding_type_id', 'dossier_line_id', 'enrolment_id', 'amount', 'status', 'agreement_number', 'agreed_on', 'notes'] as $key) {
+        foreach (['target', 'funder_organisation_id', 'funder_person_id', 'funding_type_id', 'dossier_line_id', 'enrolment_id', 'amount', 'status', 'agreement_number', 'agreed_on', 'notes'] as $key) {
             $value = $data[$key] ?? null;
             if (is_string($value)) {
                 $value = trim($value);
@@ -240,6 +257,13 @@ final class FundingWriter
             $data['amount'] = Amounts::normalise($data['amount']) ?? $data['amount'];
         }
         $data['status'] ??= FundingStatus::ToRequest->value;
+        // A target chosen in the form: the id of the other kind is dropped.
+        if ($data['target'] === 'dossier' || $data['target'] === 'enrolment') {
+            $data['dossier_line_id'] = null;
+        }
+        if ($data['target'] === 'dossier' || $data['target'] === 'line') {
+            $data['enrolment_id'] = null;
+        }
 
         return $data;
     }
@@ -254,7 +278,10 @@ final class FundingWriter
             'funder_person_id.*' => 'Personne introuvable.',
             'funding_type_id.required' => 'Choisissez le type de financement.',
             'funding_type_id.*' => 'Type de financement inconnu.',
+            'target.*' => 'Choisissez ce que finance ce financement.',
+            'dossier_line_id.required_if' => 'Choisissez la ligne financée.',
             'dossier_line_id.*' => 'Cette ligne n\'appartient pas à ce dossier.',
+            'enrolment_id.required_if' => 'Choisissez le stagiaire financé.',
             'enrolment_id.*' => 'Cette inscription n\'appartient pas à ce dossier.',
             'amount.required' => 'Indiquez le montant HT.',
             'amount.*' => 'Montant invalide (ex. 2 100,50).',

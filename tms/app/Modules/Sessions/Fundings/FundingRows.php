@@ -85,12 +85,12 @@ final class FundingRows
         $balance = FundingBalance::for($dossier);
         $fundings = $dossier->fundings()->get(['id', 'dossier_line_id', 'enrolment_id']);
         $targets = self::targetLabels($dossier, $fundings);
-        $part = fn (array $p, string $label) => [
+        $part = fn (array $p, string $label, bool $cancelled = false) => [
             'label' => $label,
             'price' => Amounts::display($p['price_cents']),
             'funded' => Amounts::display($p['funded_cents']),
             'remaining_cents' => $p['remaining_cents'],
-            'message' => FundingBalance::message($p['remaining_cents']),
+            'message' => FundingBalance::message($p['remaining_cents'], $cancelled, $p['funded_cents']),
         ];
 
         return [
@@ -101,7 +101,7 @@ final class FundingRows
             'balanced' => $balance['remaining_cents'] === 0,
             'parts' => [
                 ...array_map(fn (string $id, array $p) => ['kind' => 'line', ...$part($p, $targets['lines'][$id] ?? 'Ligne'), 'cancelled' => false], array_keys($balance['lines']), $balance['lines']),
-                ...array_map(fn (string $id, array $p) => ['kind' => 'enrolment', ...$part($p, $targets['enrolments'][$id] ?? 'Inscription'), 'cancelled' => $p['cancelled']], array_keys($balance['enrolments']), $balance['enrolments']),
+                ...array_map(fn (string $id, array $p) => ['kind' => 'enrolment', ...$part($p, $targets['enrolments'][$id] ?? 'Inscription', $p['cancelled']), 'cancelled' => $p['cancelled']], array_keys($balance['enrolments']), $balance['enrolments']),
             ],
         ];
     }
@@ -109,7 +109,7 @@ final class FundingRows
     /**
      * Options of the form: types of funder, states, the lines of the dossier
      * and the enrolments that can be targeted (lines priced per trainee, not
-     * cancelled; those already targeted kept).
+     * cancelled nor waitlisted; those already targeted kept).
      *
      * @return array<string, mixed>
      */
@@ -119,7 +119,8 @@ final class FundingRows
         $kept = $fundings->pluck('enrolment_id')->filter()->all();
         $perTrainee = $dossier->lines->where('pricing_mode', DossierLine::PER_TRAINEE)->pluck('id')->all();
         $enrolments = Enrolment::query()->where('dossier_id', $dossier->id)
-            ->where(fn ($q) => $q->where(fn ($q2) => $q2->whereIn('dossier_line_id', $perTrainee)->where('status', '<>', EnrolmentStatus::Cancelled->value))
+            ->where(fn ($q) => $q->where(fn ($q2) => $q2->whereIn('dossier_line_id', $perTrainee)
+                ->whereNotIn('status', [EnrolmentStatus::Cancelled->value, EnrolmentStatus::Waitlisted->value]))
                 ->orWhereIn('id', $kept))
             ->orderBy('created_at')->orderBy('id')->get();
         $labels = self::enrolmentLabels($enrolments);
