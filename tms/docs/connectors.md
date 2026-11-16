@@ -254,3 +254,18 @@ Les modules métier n'utilisent **que** ce service :
 
 - « Tester la connexion » : petite demande structurée (`{"ok": boolean}`) ; « Intelligence artificielle joignable (modèle …). » ou le message fixe de l'erreur.
 - Journal (`connector_runs`, sens `out`) : une ligne par appel, résumé « objet · fournisseur · modèle · durée en ms · utilisateur <id> », statut succès/échec, erreur = message fixe. **Jamais** le contenu envoyé (texte du programme, demande) ni la réponse.
+
+### Utilisation : assistant de la fiche formation
+
+`Catalogue\Assistant` (le Catalogue n'importe que `Ai`, `AiUnavailable` et `AiInvalidResponse`, vérifié par `ModuleBoundariesArchTest`) :
+
+- Routes `POST /catalogue/assistant/pdf` et `POST /catalogue/assistant/prompt` (`catalogue.manage`, `throttle:ai`), réponse JSON `{proposal, truncated}` ; rien n'est enregistré.
+- Sans connecteur actif : 503 « Configurez l'intelligence artificielle dans Administration → Connecteurs. » (`TrainingAssistant::NOT_CONFIGURED`), avant toute lecture du fichier.
+- `PdfText` : PDF de 10 Mo au plus, vérifié par son contenu (extension, type MIME lu dans les octets, signature `%PDF-`) ; texte lu par **`pdftotext`** (paquet `poppler-utils` de l'image, étape `base` du `docker/app.Dockerfile`, donc en développement comme en production), 300 pages et 30 s au plus ; texte nettoyé puis coupé à **60 000 caractères** (`PdfText::MAX_CHARS`) ; le fichier téléversé est supprimé après lecture, quoi qu'il arrive. Un PDF sans texte (scan) ou illisible est refusé (422, message sur `file`).
+- Demande écrite : 2 000 caractères au plus (`TrainingAssistant::MAX_PROMPT`).
+- `TrainingDraft::schema()` : schéma imposé (textes 5 000 caractères, intitulé 200, objectifs ≤ 20 de 500 caractères, modules ≤ 30, durées 0 < h ≤ 2 000) ; une réponse hors schéma est refusée entière (`AiInvalidResponse`). `TrainingDraft::proposal()` ramène le DAS et les modalités à l'id d'une valeur **active** du référentiel de l'organisme (même libellé aux accents et à la casse près, ou libellé avant la parenthèse), sinon vide. Le texte de l'utilisateur est balisé et présenté comme une donnée, jamais comme des instructions.
+- Objets journalisés : `training.from_pdf`, `training.from_prompt`.
+
+### Tests de bout en bout : IA hors ligne
+
+La pile e2e (`compose.e2e.yaml`) pose `TMS_E2E_FAKE_AI=true` (`tms.connectors.e2e_fake_ai`) : `ConnectorsServiceProvider::e2eAiClient()` remplace alors le client Anthropic par `tests/Support/E2eAiClient` (réponse fixe, aucun appel réseau ; le journal et la vérification du schéma restent ceux du vrai service). Ignoré en production, et la classe n'existe pas dans l'image de production (`tests/` est en `autoload-dev`). Ne jamais poser cette variable sur une installation.

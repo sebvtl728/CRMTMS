@@ -114,6 +114,38 @@ Sur la page d'une opportunité, **Changer d'étape** ouvre la même fenêtre.
 - **Exporter (.xlsx)** (avec le droit d'export) : la liste filtrée, tarifs et durées en vrais nombres.
 - **Importer un catalogue** : menu **Imports**, type **Catalogue de formations** (gestionnaires du catalogue ayant aussi le droit d'import), voir § 11.
 
+### La fiche formation (formation type)
+
+La fiche d'une formation regroupe ce que Qualiopi attend de la présentation d'une offre (indicateur 1), par blocs :
+
+- **Présentation** : intitulé, code, DAS, durées, tarifs, **description courte** ;
+- **Objectifs pédagogiques** : 20 au plus, une phrase chacun (500 caractères), dans l'ordre choisi (flèches pour monter ou descendre) ;
+- **Public et prérequis** ;
+- **Modules** : 30 au plus, chacun avec un **intitulé**, une **durée** en heures, une **modalité** (référentiel « Modalités de formation » de l'organisme : présentiel, distanciel…) et un **contenu** ; flèches pour les réordonner. Le total des modules s'affiche sous la liste ; s'il ne correspond pas à la durée de la formation, un **avertissement** apparaît, mais l'enregistrement reste possible ;
+- **Méthodes et évaluation** : méthodes et moyens pédagogiques, modalités d'évaluation, sanction (attestation, certification…) ;
+- **Accessibilité et accès** : accessibilité aux personnes en situation de handicap, modalités et délais d'accès ;
+- **Résultats** : indicateurs de résultats (satisfaction, réussite…), saisis par l'organisme.
+
+### Dupliquer une formation
+
+**Dupliquer** (page de modification d'une formation, `catalogue.manage`) crée une copie **indépendante** de la formation enregistrée : tous les champs de la fiche, les modules, le DAS, les tarifs et les financements. La copie s'intitule « Copie de … », n'a pas de code, n'est rattachée à aucune plaquette et est **désactivée** : vérifiez-la, puis activez-la. Modifier la copie ne touche jamais l'original (ni ses sessions, devis ou dossiers). Des modifications non enregistrées de la page ne sont pas copiées (une confirmation le rappelle).
+
+### Assistant IA
+
+Sur **Nouvelle formation** et **Modifier**, le bloc **Assistant IA** propose de remplir la fiche :
+
+- **Depuis un PDF** : le programme de la formation (PDF de **10 Mo** au plus, le contenu est vérifié). Seul son **texte** est lu sur le serveur et transmis à l'intelligence artificielle, jamais le fichier, qui n'est pas conservé. Un programme très long est coupé à **60 000 caractères** (l'écran le signale) ; un PDF scanné (sans texte) est refusé : utilisez alors une demande ;
+- **Depuis une demande** : une description libre de la formation souhaitée (**2 000 caractères** au plus).
+
+L'assistant affiche ensuite une **proposition**, champ par champ et module par module, à côté de la **valeur actuelle**. Chaque ligne a une case **« Garder la proposition »** : cochée d'avance quand le champ est vide, **décochée quand il est déjà rempli** — une valeur saisie n'est remplacée que si vous cochez sa case. Un module proposé remplace le module de même rang si vous le cochez, sinon il est ajouté à la suite. Le DAS et les modalités proposés sont ramenés aux valeurs **actives** des référentiels de l'organisme ; une valeur inconnue reste vide.
+
+**Appliquer** remplit le formulaire : **rien n'est enregistré** tant que vous ne cliquez pas sur **Enregistrer**. Relisez toujours la fiche : l'IA peut se tromper.
+
+- Droit : `catalogue.manage`. Limite : **20 demandes par heure** et par utilisateur.
+- Si l'organisme n'a pas d'IA : « Configurez l'intelligence artificielle dans Administration → Connecteurs. » (l'administrateur règle le connecteur « Intelligence artificielle », voir `connectors.md`).
+- IA injoignable, saturée ou réponse inutilisable (trop longue, mal formée) : un message en français s'affiche et rien n'est proposé ; réessayez ou remplissez la fiche à la main.
+- Le journal des connecteurs garde la date, l'utilisateur, le fournisseur, la durée et le résultat de chaque demande, **jamais** le texte du programme ni la demande.
+
 **Plaquettes** (bouton **Plaquettes** du catalogue) : la bibliothèque des plaquettes PDF de l'organisme. Une plaquette a un **titre**, un fichier **PDF de 10 Mo au plus** (le contenu est vérifié : un fichier renommé en .pdf est refusé) et se rattache à des **formations** et/ou à des **DAS** (toutes les formations du DAS). Tout le monde les voit et les télécharge (`catalogue.view`) ; **Nouvelle plaquette** et **Modifier** demandent `catalogue.manage`, **Corbeille** `catalogue.delete`. **Remplacer le fichier** crée une nouvelle **version** : les anciennes restent téléchargeables depuis **Modifier** et les envois déjà faits gardent la version envoyée. Une plaquette à la corbeille n'est plus proposée mais son fichier n'est jamais effacé. La page de modification d'une formation liste ses plaquettes (rattachées directement ou par son DAS) ; supprimer la formation la détache simplement de ses plaquettes.
 
 ## 5. Devis
