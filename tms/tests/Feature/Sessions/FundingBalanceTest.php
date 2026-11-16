@@ -18,6 +18,7 @@ use App\Modules\Sessions\Sessions\SessionWriter;
 use App\Modules\Sessions\Sessions\TrainingSession;
 use App\Modules\Sessions\SessionsServiceProvider;
 use Carbon\CarbonImmutable;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 
 beforeEach(function () {
@@ -223,4 +224,54 @@ it('shows a line whose enrolments only are targeted', function () {
 it('words the funding of a cancelled enrolment as an amount to move', function () {
     expect(FundingBalance::message(-50000, true, 50000))->toBe('Financement à reporter : 500,00 €')
         ->and(FundingBalance::message(-50000))->toBe('Financements supérieurs au prix : 500,00 €');
+});
+
+// ---------------------------------------------------------------- « Reste à financer » column of the list
+
+it('shows the remainder to fund of each dossier on the list, exact, without a query per dossier', function () {
+    $this->actingAs(admin(twoFactor: true));
+    $dossier = balDossier([['unit_price' => '1000']]);
+    $writer = app(FundingWriter::class);
+    $funding = fn (string $amount, string $status) => $writer->create($dossier, [
+        'funder_organisation_id' => Organisation::query()->create(['name' => 'OPCO '.Str::random(4)])->id, 'funder_person_id' => null,
+        'funding_type_id' => crmItem(ReferenceList::FundingType, 'OPCO')->id, 'dossier_line_id' => null, 'enrolment_id' => null,
+        'amount' => $amount, 'status' => $status, 'agreement_number' => null, 'agreed_on' => null, 'notes' => null,
+    ]);
+    $funding('333,33', 'requested');
+    $funding('0,01', 'to_request');
+    $funding('500,00', 'refused'); // not counted
+    $over = balDossier([['unit_price' => '100']]);
+    $writer->create($over, [
+        'funder_organisation_id' => Organisation::query()->create(['name' => 'Région'])->id, 'funder_person_id' => null,
+        'funding_type_id' => crmItem(ReferenceList::FundingType, 'Région')->id, 'dossier_line_id' => null, 'enrolment_id' => null,
+        'amount' => '150,00', 'status' => 'agreed', 'agreement_number' => null, 'agreed_on' => '2026-11-16', 'notes' => null,
+    ]);
+    $none = balDossier([['unit_price' => '250.5']]);
+
+    $rows = collect($this->get('/dossiers')->assertOk()->viewData('page')['props']['dossiers']['data'])->keyBy('id');
+    expect($rows[$dossier->id]['remaining_cents'])->toBe(66666)
+        ->and($rows[$dossier->id]['remaining'])->toBe('666,66 €')
+        ->and($rows[$over->id]['remaining_cents'])->toBe(-5000)
+        ->and($rows[$over->id]['remaining'])->toBe('Financements supérieurs au prix : 50,00 €')
+        ->and($rows[$none->id]['remaining'])->toBe('250,50 €');
+
+    // Same number of queries for 3 dossiers and for 8.
+    $count = function (): int {
+        DB::flushQueryLog();
+        DB::enableQueryLog();
+        $this->get('/dossiers')->assertOk();
+
+        return count(DB::getQueryLog());
+    };
+    $three = $count();
+    foreach (range(1, 5) as $i) {
+        $more = balDossier([['unit_price' => '100']]);
+        $funding2 = $writer->create($more, [
+            'funder_organisation_id' => Organisation::query()->create(['name' => "OPCO {$i}"])->id, 'funder_person_id' => null,
+            'funding_type_id' => crmItem(ReferenceList::FundingType, 'OPCO')->id, 'dossier_line_id' => null, 'enrolment_id' => null,
+            'amount' => '10,00', 'status' => 'requested', 'agreement_number' => null, 'agreed_on' => null, 'notes' => null,
+        ]);
+        expect($funding2->id)->not->toBeNull();
+    }
+    expect($count())->toBe($three);
 });

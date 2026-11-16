@@ -65,6 +65,8 @@ final class EnrolmentRows
                     'id' => $e->person_id,
                     'label' => $people[$e->person_id]['label'] ?? 'Fiche introuvable',
                     'can_open' => isset($openable[$e->person_id]),
+                    // A trainee sent to the trash keeps her enrolments (restorable).
+                    'trashed' => $people[$e->person_id]['trashed'] ?? false,
                 ],
                 'session' => $session === null ? null : [
                     'id' => $session->id,

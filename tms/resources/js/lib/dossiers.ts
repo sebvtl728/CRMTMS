@@ -8,6 +8,9 @@ export interface DossierRow {
     price_cents: number;
     /** « 4 031,92 € » (server, exact to the cent). */
     price: string;
+    /** « Reste à financer » (cents; negative: fundings above the price) and its French cell. */
+    remaining_cents: number;
+    remaining: string;
     responsible: string | null;
     /** Effective state of the Paris day. */
     status: 'created' | 'convention_sent' | 'convention_signed' | 'convocations_sent' | 'running' | 'done' | 'cancelled' | 'invoiced' | 'settled';

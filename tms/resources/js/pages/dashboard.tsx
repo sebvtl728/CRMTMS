@@ -8,7 +8,7 @@ import { canViewCrm } from '@/lib/permissions';
 import { formatCentsWhole, formatRate } from '@/lib/revenue';
 import { type BreadcrumbItem, type SharedData } from '@/types';
 import { Head, Link, usePage } from '@inertiajs/react';
-import { CalendarClock, Contact, Factory, Search, UserPlus } from 'lucide-react';
+import { CalendarClock, Contact, Factory, GraduationCap, Search, UserPlus } from 'lucide-react';
 
 const breadcrumbs: BreadcrumbItem[] = [{ title: 'Accueil', href: '/dashboard' }];
 
@@ -55,10 +55,68 @@ interface Commercial {
     } | null;
 }
 
+interface StartingSession {
+    id: string;
+    number: string;
+    training: string | null;
+    /** « du 16/11/2026 au 18/11/2026 » or « le 23/11/2026 ». */
+    dates: string;
+    kind_label: string;
+    /** « 2 / 8 places » (inter sessions only). */
+    places: string | null;
+    href: string;
+}
+
 interface Props {
     recent_views: RecentView[];
     counters: { organisations: number; people: number } | null;
     commercial: Commercial | null;
+    /** « Sessions qui démarrent dans les 7 jours »: null without sessions.sessions.view. */
+    sessions_starting: { total: number; rows: StartingSession[] } | null;
+}
+
+function SessionsStarting({ sessions }: { sessions: { total: number; rows: StartingSession[] } }) {
+    return (
+        <Card>
+            <CardHeader className="flex flex-row items-center justify-between gap-2">
+                <CardTitle className="text-base">Sessions qui démarrent dans les 7 jours</CardTitle>
+                <Link href={route('sessions.calendar')} className="text-sm underline">
+                    Calendrier
+                </Link>
+            </CardHeader>
+            <CardContent>
+                {sessions.rows.length === 0 ? (
+                    <p className="text-muted-foreground text-sm">Aucune session ne démarre dans les 7 prochains jours.</p>
+                ) : (
+                    <ul className="divide-y">
+                        {sessions.rows.map((session) => (
+                            <li key={session.id}>
+                                <Link href={session.href} className="hover:bg-muted/50 flex items-start gap-3 rounded-md px-2 py-3">
+                                    <GraduationCap className="text-muted-foreground mt-0.5 size-4 shrink-0" aria-hidden />
+                                    <span className="min-w-0 flex-1">
+                                        <span className="block font-medium break-words">{session.training ?? 'Formation introuvable'}</span>
+                                        <span className="text-muted-foreground block text-sm break-words">
+                                            {[session.number, session.kind_label, session.places].filter(Boolean).join(' · ')}
+                                        </span>
+                                    </span>
+                                    <span className="text-muted-foreground shrink-0 text-right text-sm">{session.dates}</span>
+                                </Link>
+                            </li>
+                        ))}
+                    </ul>
+                )}
+                {sessions.total > sessions.rows.length && (
+                    <p className="text-muted-foreground mt-2 text-sm">
+                        {sessions.rows.length} sessions affichées sur {sessions.total} :{' '}
+                        <Link href={route('sessions.calendar')} className="underline">
+                            voir le calendrier
+                        </Link>
+                        .
+                    </p>
+                )}
+            </CardContent>
+        </Card>
+    );
 }
 
 /** The page of the meeting's fiche: the person, else the entreprise, else the opportunity. */
@@ -114,7 +172,7 @@ function NextMeetings({ meetings }: { meetings: Meeting[] }) {
 const numberFormat = new Intl.NumberFormat('fr-FR');
 const percentFormat = new Intl.NumberFormat('fr-FR', { maximumFractionDigits: 1 });
 
-export default function Dashboard({ recent_views, counters, commercial }: Props) {
+export default function Dashboard({ recent_views, counters, commercial, sessions_starting }: Props) {
     const { auth } = usePage<SharedData>().props;
     const can = (permission: string) => auth.permissions.includes(permission);
 
@@ -261,6 +319,8 @@ export default function Dashboard({ recent_views, counters, commercial }: Props)
                 )}
 
                 {commercial !== null && <NextMeetings meetings={commercial.meetings} />}
+
+                {sessions_starting && <SessionsStarting sessions={sessions_starting} />}
 
                 {counters !== null && (
                     <Card>

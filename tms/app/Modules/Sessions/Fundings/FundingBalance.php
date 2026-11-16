@@ -17,7 +17,8 @@ use App\Modules\Sessions\Enrolments\Enrolment;
  * enrolment against its share of a
  * line priced per trainee (price_share; a cancelled enrolment has no share
  * any more and is flagged). A negative remainder means the fundings exceed
- * the price.
+ * the price. The list of the dossiers reads only the dossier remainder,
+ * for a whole page at once (fundedOf).
  *
  * @phpstan-type Part array{price_cents: int, funded_cents: int, remaining_cents: int}
  * @phpstan-type Balance array{price_cents: int, funded_cents: int, remaining_cents: int, lines: array<string, Part>, enrolments: array<string, array{price_cents: int, funded_cents: int, remaining_cents: int, cancelled: bool}>}
@@ -70,6 +71,37 @@ final class FundingBalance
             'lines' => $lines,
             'enrolments' => $enrolments,
         ];
+    }
+
+    /**
+     * Σ of the fundings not refused of each dossier, in cents, read in one
+     * query for a page of the list (dossiers without a funding: 0).
+     *
+     * @param  list<string>  $dossierIds
+     * @return array<string, int> dossier id => funded cents
+     */
+    public static function fundedOf(array $dossierIds): array
+    {
+        $funded = array_fill_keys($dossierIds, 0);
+        if ($dossierIds === []) {
+            return $funded;
+        }
+        $rows = Funding::query()->whereIn('dossier_id', $dossierIds)
+            ->where('status', '<>', FundingStatus::Refused->value)
+            ->get(['dossier_id', 'amount'])->groupBy('dossier_id');
+        foreach ($rows as $dossierId => $fundings) {
+            $funded[(string) $dossierId] = Amounts::sum($fundings->map(fn (Funding $f) => (string) $f->amount));
+        }
+
+        return $funded;
+    }
+
+    /**
+     * The list cell: « 900,00 € » left to fund, or the excess worded.
+     */
+    public static function cell(int $remainingCents): string
+    {
+        return $remainingCents < 0 ? self::message($remainingCents) : Amounts::display($remainingCents);
     }
 
     /**

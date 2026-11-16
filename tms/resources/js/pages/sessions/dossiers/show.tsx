@@ -2,6 +2,7 @@ import Heading from '@/components/heading';
 import InputError from '@/components/input-error';
 import { EnrolDialog, type EnrolSessionOption } from '@/components/sessions/enrolment-dialog';
 import { EnrolmentList, type EnrolmentReferences, type EnrolmentRow } from '@/components/sessions/enrolment-list';
+import { HistoryList, type HistoryEntry } from '@/components/sessions/history-list';
 import { FundingSection, type FundingBalance, type FundingOptions, type FundingRow } from '@/components/sessions/funding-section';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -60,6 +61,8 @@ interface ShowProps {
     balance: FundingBalance;
     /** Null without sessions.dossiers.update on this dossier or on a closed dossier. */
     funding_options: FundingOptions | null;
+    /** Creation, states, enrolments and fundings, most recent first (journal). */
+    history: HistoryEntry[];
     status?: string;
 }
 
@@ -187,6 +190,7 @@ export default function DossierShow({
     fundings,
     balance,
     funding_options,
+    history,
     status,
 }: ShowProps) {
     const [cancelling, setCancelling] = useState(false);
@@ -409,6 +413,8 @@ export default function DossierShow({
                         ))
                     )}
                 </section>
+
+                <HistoryList entries={history} />
             </div>
 
             <StepDialog dossierId={dossier.id} step={dated} today={today} onClose={() => setDated(null)} />

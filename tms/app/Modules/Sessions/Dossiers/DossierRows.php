@@ -7,6 +7,7 @@ use App\Modules\Core\References\ReferenceItem;
 use App\Modules\Core\Users\User;
 use App\Modules\Crm\Public\Fiches;
 use App\Modules\Sessions\Amounts;
+use App\Modules\Sessions\Fundings\FundingBalance;
 use App\Modules\Sessions\Permissions;
 use App\Modules\Sessions\SessionsVisibility;
 use Carbon\CarbonImmutable;
@@ -17,7 +18,8 @@ use Illuminate\Support\Collection;
  * Rows of the dossiers list and the header of the dossier page: the
  * contractant (Crm\Public\Fiches, with whether $viewer may open its fiche:
  * a link then, plain text otherwise), the trainings of the lines
- * (Catalogue\Trainings), the DAS, the price in French, the effective state
+ * (Catalogue\Trainings), the DAS, the price and the remainder to fund in
+ * French, the effective state
  * of $today. One query per source for a page.
  */
 final class DossierRows
@@ -41,11 +43,14 @@ final class DossierRows
         $trainings = app(Trainings::class)->findMany($dossiers->flatMap(fn (Dossier $d) => $d->lines->pluck('training_id'))->filter()->unique()->values()->all());
         $das = ReferenceItem::query()->whereKey($dossiers->pluck('das_id')->unique()->values()->all())->pluck('label', 'id')->all();
         $spans = DossierSchedule::spans($dossiers->pluck('id')->all());
+        $funded = FundingBalance::fundedOf($dossiers->pluck('id')->all());
 
-        return $dossiers->map(function (Dossier $d) use ($organisations, $people, $openable, $trainings, $das, $spans, $today): array {
+        return $dossiers->map(function (Dossier $d) use ($organisations, $people, $openable, $trainings, $das, $spans, $funded, $today): array {
             $type = $d->accountType();
             $identity = ($type === 'organisation' ? $organisations : $people)[$d->accountId()] ?? null;
-            $status = $d->effectiveStatus($today, $spans[$d->id] ?? null);
+            // Spans read for the page: a dossier without one has no session yet (no query of its own).
+            $span = $spans[$d->id] ?? null;
+            $status = $d->status->effective($span['starts_on'] ?? null, $span['ends_on'] ?? null, $today);
             $price = $d->priceCents();
 
             return [
@@ -64,6 +69,9 @@ final class DossierRows
                 'das' => $das[$d->das_id] ?? null,
                 'price_cents' => $price,
                 'price' => Amounts::display($price),
+                // « Reste à financer »: price − fundings not refused (negative: fundings above the price).
+                'remaining_cents' => $price - ($funded[$d->id] ?? 0),
+                'remaining' => FundingBalance::cell($price - ($funded[$d->id] ?? 0)),
                 'responsible' => $d->responsible?->name,
                 'status' => $status->value,
                 'status_label' => $status->label(),

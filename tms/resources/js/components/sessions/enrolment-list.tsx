@@ -14,7 +14,7 @@ import { FormEventHandler, useState } from 'react';
 /** An enrolment as EnrolmentRows sends it. */
 export interface EnrolmentRow {
     id: string;
-    person: { id: string; label: string; can_open: boolean };
+    person: { id: string; label: string; can_open: boolean; trashed?: boolean };
     session: {
         id: string;
         number: string;
@@ -268,6 +268,7 @@ export function EnrolmentList({
                                 ) : (
                                     <span className="font-medium">{row.person.label}</span>
                                 )}
+                                {row.person.trashed && <Badge variant="outline">Fiche à la corbeille</Badge>}
                                 {row.session?.cancelled && <Badge variant="destructive">Session annulée</Badge>}
                                 <Badge variant={enrolmentStatusVariant(row.status)}>
                                     {row.status_label}

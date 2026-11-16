@@ -18,6 +18,7 @@ use App\Modules\Sessions\Amounts;
 use App\Modules\Sessions\Enrolments\EnrolmentOptions;
 use App\Modules\Sessions\Enrolments\EnrolmentRows;
 use App\Modules\Sessions\Fundings\FundingRows;
+use App\Modules\Sessions\History\SessionsHistory;
 use App\Modules\Sessions\Permissions;
 use App\Modules\Sessions\Sessions\SessionListQuery;
 use App\Modules\Sessions\SessionsVisibility;
@@ -190,6 +191,8 @@ class DossierController extends Controller
                     'pricing_mode_label' => $l->pricing_mode === null ? null : DossierLine::PRICING_MODES[$l->pricing_mode],
                 ])->values()->all(),
             ],
+            // « Historique »: creation, states, enrolments and fundings (journal).
+            'history' => SessionsHistory::dossierPage($dossier),
             'can' => [
                 'update' => $update,
                 'steps' => [

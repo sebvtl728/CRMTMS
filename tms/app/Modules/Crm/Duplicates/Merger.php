@@ -11,6 +11,7 @@ use App\Modules\Crm\Interests\FicheTrainings;
 use App\Modules\Crm\Opportunities\Opportunity;
 use App\Modules\Crm\Organisations\Organisation;
 use App\Modules\Crm\People\Person;
+use App\Modules\Crm\Public\FicheLinks;
 use App\Modules\Crm\Quotes\Quote;
 use App\Modules\Crm\Timeline\Attachment;
 use App\Modules\Crm\Timeline\Note;
@@ -30,7 +31,8 @@ use InvalidArgumentException;
  * link per pair: the oldest survives, completed by the other), notes and
  * attachments moved, opportunities and opportunity contacts moved (a
  * person holding opportunities stays a particulier), quotes moved (account
- * and recipient; the frozen recipient copy is kept), brochure sendings moved, actions moved, DAS
+ * and recipient; the frozen recipient copy is kept), brochure sendings moved, actions moved,
+ * references of other modules repointed (Crm\Public\FicheLinks::merge), DAS
  * and trainings of interest united, source identifiers kept in merged_sources, $drop trashed for
  * good with merged_into_id, journal crm.merged (ids only).
  */
@@ -172,6 +174,8 @@ class Merger
             $this->moveQuotes($k, $d);
             $this->moveBrochureSendings($k, $d);
             $this->moveActivities($k, $d);
+            // References held by other modules (Sessions: sessions, dossiers, inscriptions, financements).
+            FicheLinks::merge($isPerson ? 'person' : 'organisation', $k->id, $d->id);
             $this->uniteDas($k, $d, $isPerson);
             $this->interests->merge($k, $d);
             // Calendars (Outlook) now show the kept fiche (moves above are raw SQL).

@@ -11,6 +11,7 @@ use App\Modules\Core\References\ReferenceList;
 use App\Modules\Core\References\ReferenceUsage;
 use App\Modules\Core\Users\User;
 use App\Modules\Crm\Public\FicheBlocks;
+use App\Modules\Crm\Public\FicheLinks;
 use App\Modules\Crm\Public\QuoteLinks;
 use App\Modules\Sessions\Dossiers\Dossier;
 use App\Modules\Sessions\Dossiers\DossierFromQuote;
@@ -21,6 +22,10 @@ use App\Modules\Sessions\Enrolments\Enrolment;
 use App\Modules\Sessions\Enrolments\EnrolmentPolicy;
 use App\Modules\Sessions\Enrolments\EnrolmentRows;
 use App\Modules\Sessions\Fundings\Funding;
+use App\Modules\Sessions\Gdpr\EnrolmentAnonymisation;
+use App\Modules\Sessions\Gdpr\FicheReferences;
+use App\Modules\Sessions\Gdpr\PersonSessionsExport;
+use App\Modules\Sessions\History\SessionsHistory;
 use App\Modules\Sessions\Sessions\SessionPolicy;
 use App\Modules\Sessions\Sessions\TrainingSession;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
@@ -66,6 +71,8 @@ class SessionsServiceProvider extends ServiceProvider
         self::registerReferenceUsage();
         self::registerTrainingUsage();
         self::registerFicheBlocks();
+        self::registerFicheLinks();
+        SessionsHistory::registerOnFiches();
         // « Créer le dossier » / « Voir le dossier » on an accepted quote.
         QuoteLinks::register('sessions.dossier', fn (string $quoteId, User $viewer) => app(DossierFromQuote::class)->link($quoteId, $viewer));
 
@@ -138,6 +145,22 @@ class SessionsServiceProvider extends ServiceProvider
     {
         FicheBlocks::register('person', 'sessions.enrolments', fn (string $id, User $viewer) => EnrolmentRows::personBlock($id, $viewer));
         FicheBlocks::register('organisation', 'sessions.dossiers', fn (string $id, User $viewer) => DossierRows::organisationBlock($id, $viewer));
+    }
+
+    /**
+     * What the module keeps on the CRM fiches (Crm\Public\FicheLinks):
+     * an import undo keeps a fiche a session, a dossier, an enrolment or a
+     * funding names; a merge repoints them (refused for two people enrolled
+     * on the same session); the anonymisation clears adaptation needs and
+     * notes; the RGPD export lists her enrolments and dossiers (downloadable
+     * with both view rights of the module on « Tout l'organisme »).
+     */
+    public static function registerFicheLinks(): void
+    {
+        FicheLinks::registerLinked('sessions.references', fn (string $type, string $id): bool => FicheReferences::linked($type, $id));
+        FicheLinks::registerMerge('sessions.references', fn (string $type, string $keepId, string $dropId) => FicheReferences::merge($type, $keepId, $dropId));
+        FicheLinks::registerAnonymisation('sessions.enrolments', fn (array $personIds) => EnrolmentAnonymisation::scrub($personIds));
+        FicheLinks::registerExport('sessions', fn (string $personId): array => PersonSessionsExport::for($personId), [Permissions::DOSSIERS_VIEW, Permissions::SESSIONS_VIEW]);
     }
 
     /**

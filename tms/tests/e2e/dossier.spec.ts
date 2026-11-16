@@ -121,7 +121,17 @@ test('dossier from an accepted quote: summary, new intra session, trainees found
     await expect(fundings.getByRole('link', { name: CLIENT })).toBeVisible();
     await expect(fundings.getByText('À demander')).toBeVisible();
     await expect(fundings.getByText(/Reste à financer : 0,00\s€/)).toBeVisible();
+    // Its history: creation, the two enrolments, the initial funding.
+    const history = page.getByRole('region', { name: 'Historique' });
+    await expect(history.getByText('Dossier créé')).toBeVisible();
+    await expect(history.getByText(new RegExp(`^${EMPLOYEE.first_name} ${EMPLOYEE.last_name} — Inscription à la session S-`))).toBeVisible();
+    await expect(history.getByText(new RegExp(`^Financement ajouté : ${CLIENT} \\(Entreprise\\)`))).toBeVisible();
     const dossierUrl = page.url();
+
+    // The list shows what is left to fund (nothing: the entreprise funds the whole price).
+    await page.goto(`${new URL(dossierUrl).origin}/dossiers`);
+    await expect(page.getByRole('columnheader', { name: 'Reste à financer' })).toBeVisible();
+    await page.goto(dossierUrl);
 
     // Once only: the quote now links to its dossier, the assistant says it exists.
     await page.goto(quoteUrl);
