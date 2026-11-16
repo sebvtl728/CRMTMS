@@ -3,6 +3,7 @@
 namespace App\Modules\Sessions;
 
 use App\Modules\Catalogue\TrainingUsage;
+use App\Modules\Connectors\Calendar\CalendarSources;
 use App\Modules\Core\Access\AccessScope;
 use App\Modules\Core\Access\Permissions as CorePermissions;
 use App\Modules\Core\Access\PrimaryRoleChanged;
@@ -40,6 +41,7 @@ use App\Modules\Sessions\Modules\SessionModule;
 use App\Modules\Sessions\Planning\PlacementPeriod;
 use App\Modules\Sessions\Planning\PlacementPeriodHost;
 use App\Modules\Sessions\Planning\Seance;
+use App\Modules\Sessions\Planning\SeanceCalendar;
 use App\Modules\Sessions\Planning\Seances;
 use App\Modules\Sessions\Resources\ClosurePeriod;
 use App\Modules\Sessions\Resources\Room;
@@ -116,6 +118,8 @@ class SessionsServiceProvider extends ServiceProvider
         self::registerPlanningUsage();
         self::registerAttendance();
         SessionsHistory::registerOnFiches();
+        // The iCal feed (Connectors): séances of the linked trainer and of the sessions one is responsible for.
+        CalendarSources::register('sessions.seances', SeanceCalendar::eventsFor(...), SeanceCalendar::serves(...));
         // « Créer le dossier » / « Voir le dossier » on an accepted quote.
         QuoteLinks::register('sessions.dossier', fn (string $quoteId, User $viewer) => app(DossierFromQuote::class)->link($quoteId, $viewer));
 

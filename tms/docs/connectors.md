@@ -156,6 +156,18 @@ Paramètres : `tenant` (annuaire précis : son ID ou un de ses domaines, par ex.
 
 L'effectif est celui de l'établissement (non diffusé ou inconnu : vide). Les adresses sont reprises telles que l'API les donne (majuscules).
 
+## Flux iCal et sources d'agenda (`Connectors\Calendar\CalendarSources`)
+
+Le flux iCal d'un utilisateur (`IcalFeed`, « Mon agenda ») réunit les rendez-vous et appels du CRM (`Crm\Activities\CalendarEvents`, avec `crm.activities.view`) et les évènements des **sources** que d'autres modules déclarent, sans que Connectors les connaisse :
+
+```php
+CalendarSources::register('module.cle', fn (User $u, CarbonImmutable $from, CarbonImmutable $to): array => [/* CalendarEvent */], fn (User $u): bool => /* a-t-il quelque chose ? */);
+```
+
+- `CalendarEvent` (Connectors) : `uid`, `title`, `start` (instant, écrit en heure de Paris avec `TZID`), `minutes` (durée réelle, `DURATION`), `location`, `description`, `url`, `updatedAt`, `cancelled` (`STATUS:CANCELLED`). Le module applique lui-même ses droits et ne publie aucune donnée personnelle qu'il n'afficherait pas.
+- Le second rappel ouvre « Mon agenda » et le flux à un utilisateur sans le CRM (`IcalFeed::allowed`, capacité `calendar.subscribe`) ; « Connecter Outlook » reste réservé au CRM (`crm.activities.view`).
+- Sessions déclare `sessions.seances` (`Sessions\Planning\SeanceCalendar`) : séances du formateur lié et des sessions dont l'utilisateur est responsable (`sessions.md` § 10). Envoi des séances vers Outlook : 0.8.1.
+
 ## Connecteur Microsoft 365 (envoi vers l'agenda Outlook)
 
 `Microsoft365Connector` (clé `microsoft365`, type synchronisation). Chaque utilisateur qui le souhaite connecte **son** compte Microsoft 365. Ses rendez-vous et appels datés du CRM sont alors créés dans son agenda Outlook, mis à jour et supprimés avec eux. C'est un envoi : rien n'est relu depuis Outlook. Ce sont les mêmes actions que le flux iCal : types marqués « rendez-vous » ou « appel » (`meta.planning`), action datée, fiche non supprimée, visible de son responsable.

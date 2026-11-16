@@ -7,6 +7,7 @@ use App\Modules\Sessions\Enrolments\EnrolmentController;
 use App\Modules\Sessions\Fundings\FundingController;
 use App\Modules\Sessions\Modules\SessionModuleController;
 use App\Modules\Sessions\Planning\PlacementController;
+use App\Modules\Sessions\Planning\PlanningController;
 use App\Modules\Sessions\Planning\SeanceController;
 use App\Modules\Sessions\Resources\ResourceSettingsController;
 use App\Modules\Sessions\Sessions\SessionController;
@@ -26,6 +27,8 @@ Route::middleware(['auth', 'can:settings.manage'])->prefix('admin/abandon-rule')
 Route::middleware(['auth'])->prefix('sessions')->name('sessions.')->group(function () {
     Route::get('/', [SessionController::class, 'index'])->middleware('can:sessions.sessions.view')->name('index');
     Route::get('calendar', [SessionController::class, 'calendar'])->middleware('can:sessions.sessions.view')->name('calendar');
+    // Sessions → Planning: the séances of the scope of sessions.seances.view, month or week.
+    Route::get('planning', [PlanningController::class, 'index'])->middleware('can:sessions.seances.view')->name('planning');
     Route::get('create', [SessionController::class, 'create'])->middleware('can:sessions.sessions.update')->name('create');
     Route::get('organisations', [SessionController::class, 'organisations'])->middleware(['can:sessions.sessions.update', 'throttle:sessions-trainees'])->name('organisations');
     Route::post('/', [SessionController::class, 'store'])->middleware('can:sessions.sessions.update')->name('store');
@@ -136,7 +139,7 @@ Route::middleware(['auth', 'can:sessions.trainers.manage'])->prefix('trainers')-
     Route::delete('{trainer}/unavailabilities/{unavailability}', [TrainerController::class, 'destroyUnavailability'])->name('unavailabilities.destroy');
 });
 
-// « Mon planning »: the trainer linked to the account (his own unavailabilities).
+// « Mon planning »: the trainer linked to the account (his séances, his own unavailabilities).
 Route::middleware(['auth'])->prefix('mon-planning')->name('my-planning.')->group(function () {
     Route::get('/', [MyPlanningController::class, 'show'])->name('show');
     Route::post('unavailabilities', [MyPlanningController::class, 'storeUnavailability'])->name('unavailabilities.store');

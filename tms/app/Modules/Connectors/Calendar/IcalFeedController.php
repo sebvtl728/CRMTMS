@@ -3,14 +3,14 @@
 namespace App\Modules\Connectors\Calendar;
 
 use App\Http\Controllers\Controller;
-use App\Modules\Crm\Permissions;
 use Illuminate\Http\Response;
 
 /**
  * GET /calendar/{token}.ics, outside any session: the request host gives
  * the organisme (ResolveTenant), the token its user. Unknown, malformed,
- * revoked or other-organisme token, deactivated user or user without the
- * CRM: the same 404, nothing tells them apart.
+ * revoked or other-organisme token, deactivated user or user with nothing
+ * to publish (neither the CRM actions nor a calendar source, IcalFeed::allowed):
+ * the same 404, nothing tells them apart.
  */
 class IcalFeedController extends Controller
 {
@@ -19,7 +19,7 @@ class IcalFeedController extends Controller
         $calendar = CalendarToken::findActive($token);
         $user = $calendar?->user;
 
-        if ($calendar === null || $user === null || ! $user->isActive() || ! $user->can(Permissions::ACTIVITIES_VIEW)) {
+        if ($calendar === null || $user === null || ! $user->isActive() || ! IcalFeed::allowed($user)) {
             abort(404);
         }
 

@@ -64,6 +64,8 @@ class HandleInertiaRequests extends Middleware
                 'trainer_only' => $user !== null && Scopes::trainerOnly($user),
                 // Linked to a trainer: « Mon planning » in the menu.
                 'my_planning' => $user !== null && Trainers::forUser($user) !== null,
+                // « Mon agenda » in the settings: CRM actions or a calendar source (a trainer's séances).
+                'calendar_feed' => $user !== null && $user->can('calendar.subscribe'),
             ],
             // Menu badge of « À faire »: overdue + today, cached 60 s (lazy: skipped by partial reloads).
             'todo_count' => fn () => $user !== null && $user->can(CrmPermissions::ACTIVITIES_VIEW) ? TodoQuery::badge($user) : 0,

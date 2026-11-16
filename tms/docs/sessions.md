@@ -156,7 +156,7 @@ La carte **Sessions qui démarrent dans les 7 jours** de l'**Accueil** liste les
 
 Un stagiaire est une personne du CRM :
 
-- sa fiche montre le bloc **Formations suivies** (ses inscriptions) et, dans l'**Historique**, ses inscriptions et les dossiers dont elle est contractante ou contact ; une entreprise, et un particulier, montrent le bloc **Dossiers** (les dossiers dont ils sont contractants, selon le droit « Consulter » des dossiers et son périmètre) ;
+- sa fiche montre le bloc **Formations suivies** (ses inscriptions, chacune avec **son planning** : ses 10 prochaines séances à partir d'aujourd'hui, entre ses dates d'entrée et de sortie, annulées exclues, puis le nombre des suivantes, et ses stages pas encore terminés, à ses dates propres s'il en a, avec son entreprise d'accueil) et, dans l'**Historique**, ses inscriptions et les dossiers dont elle est contractante ou contact ; une entreprise, et un particulier, montrent le bloc **Dossiers** (les dossiers dont ils sont contractants, selon le droit « Consulter » des dossiers et son périmètre) ;
 - **corbeille** : une personne inscrite peut être mise à la corbeille ; ses inscriptions restent (badge « Fiche à la corbeille ») et reviennent avec elle à la restauration ; elle ne peut plus être inscrite tant qu'elle est à la corbeille ;
 - **fusion** : sessions, dossiers, inscriptions et financements suivent la fiche conservée ; deux personnes inscrites chacune sur la même session ne se fusionnent pas tant que l'une des deux inscriptions n'est pas annulée ; cas rare : si l'une des deux est inscrite sur la session de l'autre pendant la fusion elle-même (deux utilisateurs au même instant), la base refuse le doublon et la fusion est annulée sans rien écrire, avec un message d'erreur générique ; relancez-la : le refus habituel s'affiche alors. De même, **Annuler la session** peut répondre « Une inscription vient d'être ajoutée : réessayez. » si un stagiaire est inscrit au même instant ;
 - **annulation d'un import** : une entreprise ou une personne qui porte une session, un dossier, une inscription ou un financement est conservée ;
@@ -176,8 +176,32 @@ Menu **Formation › Formateurs** (droit « Gérer les formateurs »). Un format
 
 ### Le formateur lui-même
 
-Avec le rôle **Formateur**, il ne voit que **Mon planning** : ses séances (à venir avec les pages de planning) et ses indisponibilités, qu'il saisit et supprime lui-même. Aucun droit particulier n'est nécessaire pour cela : être lié à la fiche formateur suffit. Il n'a accès à aucune fiche du CRM, aucun devis, dossier, financement, catalogue ni export ; une session ou une inscription qui ne porte pas une de ses séances est introuvable. Un compte non encore lié à une fiche formateur voit un message l'invitant à demander le lien.
+Avec le rôle **Formateur**, il ne voit que **Mon planning** : ses séances (voir § 10) et ses indisponibilités, qu'il saisit et supprime lui-même. Aucun droit particulier n'est nécessaire pour cela : être lié à la fiche formateur suffit. Il n'a accès à aucune fiche du CRM, aucun devis, dossier, financement, catalogue ni export ; une session ou une inscription qui ne porte pas une de ses séances est introuvable. Un compte non encore lié à une fiche formateur voit un message l'invitant à demander le lien.
 
 ### Salles et fermetures
 
 Administration › **Salles et fermetures** (droit « Gérer les salles et fermetures », qui couvre aussi les périodes de fermeture : pas de droit séparé) : les salles (nom, capacité, adresse, active) et les périodes de fermeture de l'organisme (voir `admin.md` § 16).
+
+## 10. Plannings et agenda (0.8.0)
+
+### Planning des séances
+
+Menu **Formation › Planning des séances** (`/sessions/planning`, droit « Consulter les séances ») : toutes les séances de votre périmètre (« Ses fiches », « Ses DAS », « Tout l'organisme » ; « Ses séances » : les vôtres) des sessions qui ne sont pas à la corbeille, en vue **Mois** ou **Semaine** (lundi à dimanche). Les week-ends, jours fériés et fermetures sont grisés et nommés ; une séance annulée est barrée.
+
+- **Filtres** : **DAS** (de la session ; la liste des formateurs se limite alors aux formateurs de ce DAS), **Formateur**, **Salle**, **Session** (celles qui ont une séance sur la période).
+- **Une séance** s'ouvre : module, formateur, lieu, alertes (formateur ou salle déjà pris, indisponibilité, férié, fermeture, stage, capacité…), note interne ; **Ouvrir la session** (si vous pouvez la consulter) et **Saisir les présences** (droit « Saisir les présences » sur cette séance).
+- Sur un téléphone, les jours qui ont une séance s'affichent l'un sous l'autre.
+- Un formateur qui l'ouvre n'y voit que ses séances, sans alertes ni note interne (une alerte peut nommer des stagiaires d'autres sessions).
+
+### Mon planning
+
+**Mon planning** (`/mon-planning`) montre au formateur lié à votre compte **ses** séances (celles dont il est le formateur, même si vos droits vont au-delà), en mois ou en semaine. Un clic sur une séance ouvre directement la **saisie des présences** (« Tous présents », puis les exceptions) quand il peut la faire ; sinon (séance annulée) ses détails. **Abonner mon agenda** mène à « Mon agenda ».
+
+### Agenda (iCal)
+
+**Paramètres › Mon agenda** donne un lien d'abonnement privé (voir `crm.md` § 8). Il contient, en plus des rendez-vous et appels du CRM pour qui y a accès :
+
+- les séances dont vous êtes le **formateur** ;
+- avec « Consulter les séances », les séances des sessions dont vous êtes **responsable**.
+
+Chaque séance : « <session> — <module> », de l'heure de début à l'heure de fin en **heure de Paris** (fuseau `Europe/Paris` déclaré : 9 h–17 h reste 9 h–17 h après un changement d'heure), lieu = la salle (et son adresse), sinon le lieu libre, sinon l'adresse de la session. **Jamais** le nom d'un stagiaire, la note interne ni le motif d'annulation. Une séance annulée (ou d'une session annulée) apparaît comme annulée ; une séance ou une session à la corbeille disparaît. Un formateur sans accès au CRM obtient lui aussi « Mon agenda » (sans « Connecter Outlook » : l'envoi vers Outlook des séances viendra en 0.8.1).

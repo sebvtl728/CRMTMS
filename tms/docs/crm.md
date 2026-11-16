@@ -278,7 +278,7 @@ Tout est enregistré ensemble ou rien ne l'est (par exemple si le motif de perte
 
 ## 8. Votre agenda : abonnement iCal et Outlook
 
-**Paramètres › Mon agenda** envoie vos rendez-vous et appels planifiés vers votre agenda habituel.
+**Paramètres › Mon agenda** envoie vos rendez-vous et appels planifiés vers votre agenda habituel (et, pour un formateur ou un responsable de session, ses séances : `sessions.md` § 10).
 
 - **Lien d'abonnement (iCal)** : **Créer mon lien d'abonnement** donne une adresse privée, **affichée une seule fois** (copiez-la). Abonnez-y Outlook (web ou nouvel Outlook : Calendrier › Ajouter un calendrier › S'abonner à partir du web ; Outlook classique : Accueil › Ajouter un calendrier › À partir d'Internet), Google Agenda ou Apple Calendrier (instructions sur la page). L'agenda montre les 30 derniers jours et les 6 prochains mois, sans compte rendu, et se met à jour selon le rythme de votre agenda (souvent plusieurs heures chez Google et Outlook). **Ce lien donne accès à votre agenda sans mot de passe** : ne le partagez pas ; **Créer un nouveau lien** annule l'ancien, **Révoquer le lien** coupe l'accès.
 - **Connecter Outlook** (Microsoft 365, si l'administrateur l'a activé) : vos rendez-vous et appels sont créés, modifiés et supprimés directement dans votre agenda Outlook, en quelques instants. Si Microsoft demande de vous reconnecter, un message l'indique : **Reconnecter Outlook**. **Déconnecter Outlook** arrête l'envoi (les évènements déjà créés restent). Mise en place par l'administrateur : voir `connectors.md` (section Microsoft 365).

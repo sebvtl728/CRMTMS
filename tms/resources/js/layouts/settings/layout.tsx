@@ -28,7 +28,7 @@ const sidebarNavItems: NavItem[] = [
     },
 ];
 
-// The iCal feed lists CRM meetings and calls: for the users of the CRM only.
+// The iCal feed lists CRM meetings and calls, and séances (trainers, session responsibles).
 const calendarNavItem: NavItem = {
     title: 'Mon agenda',
     url: '/settings/calendar',
@@ -38,7 +38,7 @@ const calendarNavItem: NavItem = {
 export default function SettingsLayout({ children }: { children: React.ReactNode }) {
     const currentPath = window.location.pathname;
     const { auth } = usePage<SharedData>().props;
-    const navItems = auth.permissions.includes('crm.activities.view') ? [...sidebarNavItems, calendarNavItem] : sidebarNavItems;
+    const navItems = auth.calendar_feed ? [...sidebarNavItems, calendarNavItem] : sidebarNavItems;
 
     return (
         <div className="px-4 py-6">

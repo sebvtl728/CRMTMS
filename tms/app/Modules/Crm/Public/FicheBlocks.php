@@ -14,12 +14,13 @@ use InvalidArgumentException;
  * may not see it (the module applies its own rights and scopes).
  *
  * A block: title, the text shown when it is empty, and rows (title, optional
- * subtitle, meta, badge and link). The Crm renders them all the same way.
+ * subtitle, meta, badge, link and detail lines). The Crm renders them all
+ * the same way.
  *
  * The registry lives in the application container: a fresh application
  * (each test) starts with only what the providers register.
  *
- * @phpstan-type BlockRow array{id: string, title: string, subtitle?: string|null, meta?: string|null, badge?: string|null, href?: string|null}
+ * @phpstan-type BlockRow array{id: string, title: string, subtitle?: string|null, meta?: string|null, badge?: string|null, href?: string|null, details?: list<string>}
  * @phpstan-type Block array{key: string, title: string, empty: string, rows: list<BlockRow>}
  */
 final class FicheBlocks

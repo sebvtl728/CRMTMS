@@ -302,7 +302,7 @@ Les imports de fichiers (CRM) s'exécutent en arrière-plan.
 
 - **Récapitulatif quotidien** : chaque jour à **7 h 30** (heure de Paris), `tms:crm:daily-digest` envoie à chaque utilisateur qui l'a demandé (**Paramètres › Profil › Recevoir le récapitulatif quotidien**, désactivé par défaut) la liste de ses actions en retard et du jour. Aucun e-mail aux comptes désactivés, sans droit « Consulter les actions » (`crm.activities.view`), ni les jours sans action. L'envoi passe par la messagerie de l'organisme (connecteur SMTP).
 - **Envoi vers Outlook** : file par défaut, en arrière-plan, quelques instants après chaque modification d'une action ; une indisponibilité de Microsoft est retentée pendant 24 h (journal d'exécution du connecteur, sans donnée personnelle).
-- **Lien iCal** : l'adresse est privée (jeton aléatoire dont seule l'empreinte est stockée) et limitée en nombre d'appels ; un utilisateur désactivé ou sans « Consulter les actions » n'obtient plus rien. Révoquer un lien : l'utilisateur le fait lui-même dans **Mon agenda** ; désactiver son compte coupe aussi le flux.
+- **Lien iCal** : l'adresse est privée (jeton aléatoire dont seule l'empreinte est stockée) et limitée en nombre d'appels ; un utilisateur désactivé, ou qui n'a ni « Consulter les actions » ni séance à publier (formateur lié, responsable de session avec « Consulter les séances »), n'obtient plus rien. Révoquer un lien : l'utilisateur le fait lui-même dans **Mon agenda** ; désactiver son compte coupe aussi le flux.
 - Ces traitements reposent, comme les autres, sur le **planificateur** et le *worker* (voir § 11).
 
 ## 14. Devis : envoi, expiration et archives

@@ -8,6 +8,8 @@ export interface Auth {
     trainer_only: boolean;
     /** Linked to a trainer: « Mon planning » in the menu. */
     my_planning: boolean;
+    /** « Mon agenda » (iCal feed): CRM actions or séances to publish. */
+    calendar_feed: boolean;
 }
 
 export interface BreadcrumbItem {

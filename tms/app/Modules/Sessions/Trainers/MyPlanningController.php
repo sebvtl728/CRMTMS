@@ -8,15 +8,22 @@ use App\Modules\Core\Access\Scopes;
 use App\Modules\Core\Users\User;
 use App\Modules\Crm\Public\Fiches;
 use App\Modules\Sessions\Permissions;
+use App\Modules\Sessions\Planning\PlanningController;
+use App\Modules\Sessions\Planning\PlanningPeriod;
+use App\Modules\Sessions\Planning\PlanningRows;
+use App\Modules\Sessions\Planning\Seance;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
 
 /**
- * « Mon planning »: the page of the trainer linked to the account (his
- * unavailabilities, entered by himself; his séances come with the planning
- * pages). Open to a linked trainer, or to a user holding the séances on
+ * « Mon planning »: the page of the trainer linked to the account: his
+ * séances of a month or a week (whatever the scope of his rights: those
+ * whose trainer he is, sessions in the trash left out), each opening its
+ * attendance when he may enter it, and his unavailabilities, entered by
+ * himself. Open to a linked trainer, or to a user holding the séances on
  * « Ses séances » (not linked yet: told so); 403 otherwise.
  */
 class MyPlanningController extends Controller
@@ -28,8 +35,15 @@ class MyPlanningController extends Controller
         // A trainer-scoped user without trainer record gets it now (missed role change, unlinked).
         $trainer = Trainers::forUser($user) ?? ($scoped ? Trainers::ensureForUser($user) : null);
         abort_if($trainer === null && ! $scoped, 403);
+        $period = PlanningPeriod::fromRequest($request);
+        $seances = $trainer === null ? new Collection : PlanningController::inPeriod(Seance::query()->where('trainer_id', $trainer->id), $period)
+            ->orderBy('date')->orderBy('starts_at')->orderBy('id')->limit(PlanningRows::LIMIT)->get();
 
         return Inertia::render('sessions/my-planning', [
+            'period' => $period->toArray(),
+            ...$period->shading(),
+            'seances' => PlanningRows::rows($seances, $user, false),
+            'calendar_feed' => $user->can('calendar.subscribe'),
             'trainer' => $trainer === null ? null : [
                 'id' => $trainer->id,
                 'label' => $fiches->personLabels([$trainer->person_id])[$trainer->person_id]['label'] ?? $user->name,

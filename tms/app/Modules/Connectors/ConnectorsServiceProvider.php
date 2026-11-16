@@ -7,6 +7,7 @@ use App\Modules\Connectors\Ai\AiConnector;
 use App\Modules\Connectors\Ai\AnthropicClient;
 use App\Modules\Connectors\Ai\OpenAiCompatibleClient;
 use App\Modules\Connectors\Calendar\GraphClient;
+use App\Modules\Connectors\Calendar\IcalFeed;
 use App\Modules\Connectors\Calendar\Microsoft365Connector;
 use App\Modules\Connectors\Calendar\QueueOutlookPush;
 use App\Modules\Connectors\Core\ConnectorConfig;
@@ -18,8 +19,10 @@ use App\Modules\Connectors\Sirene\SireneConnector;
 use App\Modules\Connectors\Smtp\SmtpConnector;
 use App\Modules\Connectors\Smtp\SmtpTransportFactory;
 use App\Modules\Core\Audit\MorphAliases;
+use App\Modules\Core\Users\User;
 use App\Modules\Crm\Activities\Events\ActivityChanged;
 use Illuminate\Support\Facades\Event;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\ServiceProvider;
 
 class ConnectorsServiceProvider extends ServiceProvider
@@ -85,5 +88,7 @@ class ConnectorsServiceProvider extends ServiceProvider
     {
         // The CRM announces its actions; Outlook copies follow (Microsoft 365).
         Event::listen(ActivityChanged::class, QueueOutlookPush::class);
+        // « Mon agenda » and its iCal feed: the CRM actions or a registered calendar source.
+        Gate::define('calendar.subscribe', fn (User $user): bool => IcalFeed::allowed($user));
     }
 }

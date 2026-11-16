@@ -10,6 +10,7 @@ use App\Modules\Sessions\Amounts;
 use App\Modules\Sessions\Dossiers\Dossier;
 use App\Modules\Sessions\Dossiers\DossierLine;
 use App\Modules\Sessions\Permissions;
+use App\Modules\Sessions\Planning\TraineePlanning;
 use App\Modules\Sessions\Sessions\SessionRows;
 use App\Modules\Sessions\Sessions\TrainingSession;
 use App\Modules\Sessions\SessionsVisibility;
@@ -142,11 +143,13 @@ final class EnrolmentRows
             ->with('session')->get()
             ->sortByDesc(fn (Enrolment $e) => $e->session?->starts_on->toDateString())->values();
         $trainings = app(Trainings::class)->findMany($enrolments->map(fn (Enrolment $e) => (string) $e->session?->training_id)->unique()->values()->all());
+        // His planning: next séances and placements of each enrolment.
+        $planning = TraineePlanning::details($enrolments, TrainingSession::today());
 
         return [
             'title' => 'Formations suivies',
             'empty' => 'Aucune inscription à une session.',
-            'rows' => $enrolments->map(function (Enrolment $e) use ($trainings): array {
+            'rows' => $enrolments->map(function (Enrolment $e) use ($trainings, $planning): array {
                 $s = $e->session;
 
                 return [
@@ -156,6 +159,7 @@ final class EnrolmentRows
                     'meta' => $e->left_on === null ? null : "Sortie le {$e->left_on->format('d/m/Y')}",
                     'badge' => $s?->isCancelled() ? 'Session annulée' : $e->status->label(),
                     'href' => $s === null ? null : route('sessions.show', $s->id, false),
+                    'details' => $planning[$e->id] ?? [],
                 ];
             })->all(),
         ];
