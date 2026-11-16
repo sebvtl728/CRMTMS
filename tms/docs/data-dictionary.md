@@ -530,7 +530,23 @@ Module `Sessions` (`Funding`, écrit par `FundingWriter` seulement, sous le verr
 | `notes` | text, null | Journalisé sans valeur (`$auditPersonal`) |
 | `created_at`, `updated_at` | | |
 
-Reste à financer (`FundingBalance`, centimes entiers) = prix du dossier − somme des financements non refusés ; de même par ligne visée (son total HT, contre les financements de la ligne et de ses inscriptions) et par inscription visée (sa part). Négatif : « Financements supérieurs au prix ».
+Reste à financer (`FundingBalance`, centimes entiers) = prix du dossier − somme des financements non refusés ; de même par ligne visée (son total HT, contre les financements de la ligne et de ses inscriptions) et par inscription visée (sa part). Négatif : « Financements supérieurs au prix ». La liste des dossiers affiche le reste à financer du dossier, lu pour toute la page en une requête (`FundingBalance::fundedOf`).
+
+### Liens avec les fiches du CRM, historique, RGPD (lot 2a)
+
+Le module ne lit aucune table du CRM ; il se déclare par `Crm\Public\FicheLinks` et `Crm\Public\FicheHistory` (`SessionsServiceProvider`) :
+
+| Mécanisme | Colonnes concernées | Effet |
+|---|---|---|
+| Données liées (annulation d'un import) | `training_sessions.organisation_id`, `dossiers.account_organisation_id` / `account_person_id` / `contact_person_id`, `enrolments.person_id`, `fundings.funder_organisation_id` / `funder_person_id` (corbeille comprise) | La fiche nommée est conservée (« Liée à des données ajoutées depuis l'import, conservée. ») |
+| Fusion de deux fiches | mêmes colonnes | Repointées vers la fiche conservée, dans la transaction de la fusion ; fusion refusée (rien n'est écrit) si les deux personnes ont chacune une inscription non annulée sur la même session |
+| Corbeille d'une personne | `enrolments.person_id` | Autorisée : les inscriptions restent (badge « Fiche à la corbeille »), restauration possible ; une personne à la corbeille ne peut pas être inscrite |
+| Anonymisation (`Sessions\Gdpr\EnrolmentAnonymisation`) | `enrolments.adaptation_needs`, `enrolments.notes` ; `fundings.notes` (financements qu'elle paie, qui visent ses inscriptions ou ses dossiers de particulier) ; `dossiers.notes` (ses dossiers de particulier) | Valeurs effacées ; inscriptions, dossiers et financements gardés (statistiques, BPF, facturation) |
+| Export RGPD (`Sessions\Gdpr\PersonSessionsExport`) | inscriptions, dossiers dont elle est contractante ou contact | Sections `inscriptions` et `dossiers` ; l'export exige aussi `sessions.dossiers.view` et `sessions.sessions.view` sur « Tout l'organisme » |
+
+**Historique** : aucune table propre ; lu dans `audit_logs` (créations et changements d'état des `dossier`, `enrolment`, `funding`). Fiche d'une entreprise ou d'une personne : ses dossiers (contractant ; contact pour une personne), selon le périmètre de `sessions.dossiers.view` ; inscriptions d'une personne, selon `sessions.sessions.view`. Page d'un dossier : création et états, inscriptions (stagiaire nommé), financements ajoutés, modifiés, supprimés (200 derniers évènements).
+
+**Permissions** : `sessions.dossiers.view|update|delete` et `sessions.sessions.view|update|delete`, à périmètre (`own` : responsable ou créateur ; `das` : DAS du dossier ou de la session).
 
 ## Permissions CRM (catalogue global `permissions`)
 

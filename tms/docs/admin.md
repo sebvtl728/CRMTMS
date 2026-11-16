@@ -76,7 +76,7 @@ Autres actions de la liste :
 
 ## 5. Référentiels
 
-Les listes de valeurs (DAS, étapes du pipeline, types et résultats d'action, origines de contact, motifs de perte, types d'établissement, secteurs, tailles d'entreprise, priorités, modes de financement, situations professionnelles, formes juridiques des organisations clientes, rôles dans la décision) sont **propres à votre organisme**. Pour chaque liste vous pouvez ajouter, renommer, réordonner, désactiver / réactiver et supprimer des valeurs.
+Les listes de valeurs (DAS, étapes du pipeline, types et résultats d'action, origines de contact, motifs de perte, types d'établissement, secteurs, tailles d'entreprise, priorités, modes de financement, situations professionnelles, formes juridiques des organisations clientes, rôles dans la décision ; pour les dossiers et sessions : types de financeur, motifs d'abandon, motifs d'annulation, catégories de stagiaires (BPF), niveaux de diplôme, modalités de formation — voir § 15) sont **propres à votre organisme**. Pour chaque liste vous pouvez ajouter, renommer, réordonner, désactiver / réactiver et supprimer des valeurs.
 
 - Les étapes du pipeline portent une **probabilité de closing** (0 à 100), reprise par une opportunité à chaque changement d'étape ; les étapes « gagné » et « perdu » ont une probabilité fixe (100 / 0) et un **motif de perte** est exigé pour « perdu » (liste **Motifs de perte**). Une étape désactivée disparaît des colonnes du pipeline ; les opportunités qui y sont gardent leur étape.
 - Les **types d'action** ont un champ **Planning commercial** : *Rendez-vous* (planning de la semaine, **Compte rendu de RDV**, accueil « Prochains rendez-vous », agenda iCal / Outlook) ou *Appel* (planning et agenda, s'il a une échéance) ; vide, le type n'y apparaît pas. Chez CAP FORMATION : « Prise de rendez-vous » et « Rendez-vous physique » (rendez-vous), « Appel » (appel). Le réglage s'applique aussitôt, y compris aux actions existantes.
@@ -171,6 +171,15 @@ Chaque domaine du CRM a ses droits **Consulter**, **Créer et modifier** (créer
 | `catalogue.manage` (« Modifier le catalogue ») | Créer, modifier, désactiver une formation ; importer un catalogue (avec `crm.import`) ; déposer et modifier des plaquettes |
 | `catalogue.delete` | Supprimer une formation ; mettre une plaquette à la corbeille |
 
+Les dossiers et sessions (lot 2a) ont deux domaines de plus, eux aussi à périmètre, dans les thèmes *Dossiers* et *Sessions et inscriptions* :
+
+| Droit | Ce qu'il permet |
+|---|---|
+| `sessions.dossiers.view` / `.update` / `.delete` | Voir les dossiers de formation, leurs lignes, leur prix et leurs financements ; créer un dossier (depuis un devis accepté ou à la main), modifier ses lignes et ses financements, changer son état ; le mettre à la corbeille et le restaurer |
+| `sessions.sessions.view` / `.update` / `.delete` | Voir les sessions, leur calendrier et leurs inscrits ; planifier et modifier les sessions, inscrire et désinscrire des stagiaires, enregistrer un abandon ; mettre une session à la corbeille |
+
+Inscrire un stagiaire depuis un dossier demande les deux : modifier la session et consulter le dossier. « Ses fiches » = responsable ou créateur du dossier ou de la session ; « Ses DAS » = DAS du dossier, DAS de la formation de la session.
+
 Les droits d'**administration** (`users.manage`, `roles.manage`, `companies.manage`, `references.manage`, `connectors.manage`, `audit.view`, `settings.manage`, `exports.run`) sont inchangés.
 
 ### Périmètres
@@ -197,6 +206,8 @@ Un nouvel organisme reçoit ces droits (identiques au comportement de la version
 | Commercial, Chargé de relations | Consulter, modifier, supprimer, « Tout » | Chiffre d'affaires : consulter « Ses fiches » ; fusion, import, export, consulter le catalogue |
 | Assistant | Consulter, modifier, « Tout » ; supprimer des actions (`crm.activities.delete`) | Consulter le catalogue |
 | Responsable DAS | Consulter, « Ses DAS » | Chiffre d'affaires : consulter « Ses DAS » ; export, consulter le catalogue |
+
+Dossiers et sessions (`tms:permissions:sync` les accorde une fois aux rôles existants lors de la mise à jour) : l'administrateur a tous les droits ; la direction consulte ; le commercial, le chargé de relations et l'assistant consultent, créent et modifient ; le Responsable DAS consulte « Ses DAS ».
 
 Le comportement de la 0.4 est conservé : le Commercial modifie toutes les fiches. Pour qu'il ne modifie que les siennes, réglez le périmètre de « Créer et modifier » sur « Ses fiches ».
 
@@ -250,7 +261,7 @@ Depuis l'écran **RGPD** (permission `crm.gdpr`), le champ **Années après le d
 - chaque nuit à 3 h 30 (heure de Paris), le traitement `tms:crm:gdpr-retention` inscrit les personnes dont le dernier contact (ou, à défaut, la création) dépasse la durée sur la liste **À anonymiser**, puis anonymise celles qui y figurent depuis **30 jours** et restent dépassées. Il envoie aux détenteurs de `crm.gdpr` un e-mail avec le nombre de personnes nouvellement listées (sans noms) ;
 - sont **exclues** : les clients (particuliers clients, interlocuteurs rattachés à une entreprise cliente), les personnes déjà anonymisées ou fusionnées, et celles marquées **Conserver** jusqu'à une date ;
 - une anonymisation est reportée à la nuit suivante si un import est en cours ;
-- l'anonymisation est **irréversible** : elle efface les données personnelles de la fiche, de son historique, des pièces jointes et des lignes d'import ; le journal d'audit ne contenant jamais de valeur personnelle en clair, il n'a rien à effacer. Un import peut encore être annulé pour ses autres lignes.
+- l'anonymisation est **irréversible** : elle efface les données personnelles de la fiche, de son historique, des pièces jointes et des lignes d'import, et, dans les dossiers et sessions, les besoins d'adaptation et notes de ses inscriptions, les notes des financements qui la concernent et de ses dossiers de particulier (inscriptions, dossiers et montants restent) ; le journal d'audit ne contenant jamais de valeur personnelle en clair, il n'a rien à effacer. Un import peut encore être annulé pour ses autres lignes.
 
 Ce traitement repose sur le **planificateur** (service `scheduler` de `compose.prod.yaml`) et sur le *worker* ; vérifiez qu'ils tournent (`docker compose ps`).
 
@@ -282,7 +293,13 @@ Les imports de fichiers (CRM) s'exécutent en arrière-plan.
 - **PDF** : rendus par le service **Gotenberg** de la pile (voir `install.md`). Le PDF d'un devis envoyé est archivé dans le stockage privé (`tenants/<organisme>/quotes/<devis>/<numéro>.pdf`, inclus dans la sauvegarde) et n'est plus jamais régénéré. L'anonymisation d'une personne supprime les PDF de ses devis ; leur page affiche alors « Document supprimé (données anonymisées) ».
 - Comme les autres traitements, l'envoi et l'expiration reposent sur le **planificateur** et le *worker* (voir § 11).
 
-## 15. Dossiers et sessions : listes et règle d'abandon (lot 2a)
+## 15. Dossiers et sessions : listes, droits et règle d'abandon (lot 2a)
 
-- **Référentiels** (Administration > Référentiels) : *Types de financeur*, *Motifs d'abandon*, *Motifs d'annulation*, *Catégories de stagiaires (BPF)* et *Niveaux de diplôme*. Les valeurs par défaut sont créées à la mise à jour pour les organismes existants (migration `seed_sessions_reference_lists`, sans toucher à ce qui existe ni recréer une valeur supprimée) et à l'installation par le jeu de valeurs CAP FORMATION. Un motif d'abandon porte la case **Force majeure** (par défaut : Maladie, Accident) : un abandon pour ce motif n'entraîne jamais de dédit. La situation professionnelle d'un stagiaire réutilise la liste existante *Situations professionnelles*.
+Guide utilisateur : `sessions.md`.
+
+
+- **Référentiels** (Administration > Référentiels) : *Types de financeur*, *Motifs d'abandon*, *Motifs d'annulation*, *Catégories de stagiaires (BPF)*, *Niveaux de diplôme* et *Modalités de formation* (Présentiel, Distanciel (classe virtuelle), FOAD / e-learning, Mixte ; obligatoire sur une session). Les valeurs par défaut sont créées à la mise à jour pour les organismes existants (migration `seed_sessions_reference_lists`, sans toucher à ce qui existe ni recréer une valeur supprimée) et à l'installation par le jeu de valeurs CAP FORMATION. Un motif d'abandon porte la case **Force majeure** (par défaut : Maladie, Accident) : un abandon pour ce motif n'entraîne jamais de dédit. La situation professionnelle d'un stagiaire réutilise la liste existante *Situations professionnelles*.
+- **Droits** : domaines *Dossiers* (`sessions.dossiers.*`) et *Sessions et inscriptions* (`sessions.sessions.*`), voir § 10.
+- **Export RGPD d'une personne** : il contient aussi ses inscriptions et ses dossiers ; toujours complet, il exige désormais, en plus des quatre droits « Consulter » du CRM, « Consulter les dossiers » et « Consulter les sessions » sur « Tout l'organisme ».
+- **Corbeille et fusion** : une personne inscrite peut aller à la corbeille (ses inscriptions restent et reviennent avec elle) ; une fusion déplace sessions, dossiers, inscriptions et financements, et est refusée pour deux personnes inscrites sur la même session. L'annulation d'un import conserve les fiches qu'un dossier, une session, une inscription ou un financement nomme.
 - **Règle d'abandon** (Administration > Règle d'abandon, droit `settings.manage`) : *prorata seulement* (défaut) ou *prorata et dédit* de 1 à 100 %. Réglage `sessions.abandon_rule` de l'organisme (changement journalisé) ; un dossier pourra la remplacer par la sienne. Le lot 2a l'enregistre et l'affiche ; les heures suivies (2d) et la facturation (lot 3) l'appliqueront.

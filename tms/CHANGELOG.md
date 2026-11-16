@@ -5,6 +5,48 @@ Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) ; ve
 
 ## [Non publié]
 
+## [0.6.0] - 2026-11-16
+
+Dossiers de formation, sessions, inscriptions et financements (lot 2a) : le devis signé devient un dossier.
+
+### Ajouté
+
+- **Sessions** (menu Formation › Sessions) : sessions **intra** (une entreprise), **inter** (plusieurs entreprises ou
+  particuliers, nombre de places) et **individuelles** (un stagiaire), modalité (présentiel, distanciel, FOAD, mixte),
+  dates, lieu, heures prévues, responsable, numéro `S-2026-0001`, annulation avec motif ; liste, filtres et
+  **calendrier** mensuel ; « En cours » et « Terminée » d'après les dates.
+- **Dossiers de formation** (menu Formation › Dossiers) : contractant (entreprise ou particulier), contact, société
+  émettrice, DAS, lignes de formation (prix par stagiaire ou de groupe) et de frais, numéro `D-2026-0001`, étapes
+  (convention envoyée, signée, convocations envoyées, en cours, réalisé) et annulation avec motif ; liste avec
+  **reste à financer**, filtres, export Excel ; **historique** du dossier (étapes, inscriptions, financements).
+- **Inscriptions** des stagiaires : recherche dans toutes les personnes de l'organisme (sans doublon) ou création sur
+  place ; **liste d'attente** d'une session inter complète (promotion à la main) ; confirmation, **abandon** (date de
+  sortie, motif, force majeure), désinscription ; part de prix par stagiaire répartie au centime ; besoins
+  d'adaptation (donnée personnelle).
+- **Financements** par financeur (entreprise ou personne, type, montant, état, n° de prise en charge, date d'accord,
+  ligne ou inscription visée) avec l'alerte « Reste à financer » / « Financements supérieurs au prix ».
+- **Créer le dossier** depuis un devis accepté : assistant en trois écrans (récapitulatif, sessions, stagiaires), un
+  seul dossier par devis, financement initial du prix total.
+- **Règle d'abandon** de l'organisme (prorata, ou prorata et dédit de X %), remplaçable par dossier.
+- **Fiches** : blocs « Formations suivies » (personne) et « Dossiers » (entreprise) ; dossiers et inscriptions dans
+  l'historique des fiches, selon les droits.
+- **Accueil** : carte « Sessions qui démarrent dans les 7 jours ».
+- **Droits** : domaines « Dossiers » et « Sessions et inscriptions » (consulter, créer et modifier, supprimer), à
+  périmètre ; accordés une fois aux rôles existants par la mise à jour.
+- **Référentiels** : types de financeur, motifs d'abandon (force majeure), motifs d'annulation, catégories de stagiaires
+  (BPF), niveaux de diplôme, modalités de formation ; niveau de diplôme sur la fiche d'une personne.
+- Guide utilisateur `docs/sessions.md`.
+
+### Modifié
+
+- **RGPD** : l'export des données d'une personne contient ses inscriptions et ses dossiers, et exige aussi les droits
+  « Consulter les dossiers » et « Consulter les sessions » sur « Tout l'organisme » ; l'anonymisation efface les besoins
+  d'adaptation et notes de ses inscriptions et les notes des financements et dossiers qui la concernent.
+- **Fusion** : sessions, dossiers, inscriptions et financements suivent la fiche conservée ; deux personnes inscrites
+  sur la même session ne se fusionnent pas.
+- **Annulation d'un import** : une fiche nommée par une session, un dossier, une inscription ou un financement est
+  conservée.
+
 ## [0.5.2] - 2026-11-15
 
 Plaquettes (PDF) de l'organisme : bibliothèque, pièces jointes des devis, envoi depuis une fiche.
@@ -289,7 +331,8 @@ Lot 1a : socle de l'application.
   mise à jour avec retour arrière automatique.
 - Publication : image multi-architecture signée (cosign), archive de version, sommes de contrôle.
 
-[Non publié]: https://github.com/sebvtl728/CRMTMS/compare/v0.5.2...HEAD
+[Non publié]: https://github.com/sebvtl728/CRMTMS/compare/v0.6.0...HEAD
+[0.6.0]: https://github.com/sebvtl728/CRMTMS/compare/v0.5.2...v0.6.0
 [0.5.2]: https://github.com/sebvtl728/CRMTMS/compare/v0.5.1...v0.5.2
 [0.5.1]: https://github.com/sebvtl728/CRMTMS/compare/v0.5.0...v0.5.1
 [0.5.0]: https://github.com/sebvtl728/CRMTMS/compare/v0.4.2...v0.5.0
