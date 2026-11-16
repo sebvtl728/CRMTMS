@@ -5,6 +5,7 @@ use App\Modules\Connectors\Ai\AiClient;
 use App\Modules\Connectors\Ai\AiConnector;
 use App\Modules\Connectors\Ai\AiEndpoint;
 use App\Modules\Connectors\Ai\AiInvalidResponse;
+use App\Modules\Connectors\Ai\AiSchema;
 use App\Modules\Connectors\Ai\AiUnavailable;
 use App\Modules\Connectors\Ai\AnthropicClient;
 use App\Modules\Connectors\Core\ConnectorConfig;
@@ -612,4 +613,78 @@ it('reports a failed connection test with a fixed French message', function () {
 it('is registered as an organisme-wide connector', function () {
     expect(app(ConnectorRegistry::class)->make('ai'))->toBeInstanceOf(AiConnector::class)
         ->and(AiConnector::label())->toBe('Intelligence artificielle');
+});
+
+// --- Nullable types sent as anyOf ---------------------------------------------
+
+/** @return array<string, mixed> */
+function aiNullableSchema(): array
+{
+    return [
+        'type' => 'object',
+        'properties' => [
+            'title' => ['type' => ['string', 'null'], 'maxLength' => 20],
+            'hours' => ['type' => ['number', 'null'], 'exclusiveMinimum' => 0],
+            'modules' => ['type' => 'array', 'maxItems' => 2, 'items' => [
+                'type' => 'object',
+                'properties' => ['modality' => ['type' => ['string', 'null'], 'maxLength' => 5]],
+                'required' => ['modality'],
+                'additionalProperties' => false,
+            ]],
+        ],
+        'required' => ['title', 'hours', 'modules'],
+        'additionalProperties' => false,
+    ];
+}
+
+/** The schema sent for aiNullableSchema(): nullable types as anyOf, checked keywords dropped. */
+function aiNullableSent(): array
+{
+    return [
+        'type' => 'object',
+        'properties' => [
+            'title' => ['anyOf' => [['type' => 'string'], ['type' => 'null']]],
+            'hours' => ['anyOf' => [['type' => 'number'], ['type' => 'null']]],
+            'modules' => ['type' => 'array', 'items' => [
+                'type' => 'object',
+                'properties' => ['modality' => ['anyOf' => [['type' => 'string'], ['type' => 'null']]]],
+                'required' => ['modality'],
+                'additionalProperties' => false,
+            ]],
+        ],
+        'required' => ['title', 'hours', 'modules'],
+        'additionalProperties' => false,
+    ];
+}
+
+it('sends nullable types to Anthropic as anyOf, recursively, and still checks them here', function () {
+    aiConfig();
+    aiHttp(['api.anthropic.com/*' => Http::sequence()
+        ->push(anthropicAnswer('{"title":null,"hours":7.5,"modules":[{"modality":null}]}'))
+        ->push(anthropicAnswer('{"title":null,"hours":0,"modules":[]}'))
+        ->push(anthropicAnswer('{"title":null,"hours":null,"modules":[{"modality":"Présentiel"}]}'))]);
+    $call = fn () => app(Ai::class)->structured('s', 'u', aiNullableSchema(), 'test.nullable');
+
+    expect($call())->toBe(['title' => null, 'hours' => 7.5, 'modules' => [['modality' => null]]]);
+    Http::assertSent(fn (Request $r) => $r->data()['output_config']['format']['schema'] === aiNullableSent());
+
+    // Validation on the answer is unchanged: bounds and lengths of the non-null value.
+    expect($call)->toThrow(AiInvalidResponse::class);
+    expect($call)->toThrow(AiInvalidResponse::class);
+});
+
+it('sends nullable types to an OpenAI-compatible server as anyOf', function () {
+    aiConfig(['provider' => 'openai_compatible', 'base_url' => 'https://llm.example.com/v1', 'model' => 'mistral-large'], key: 'sk-openai-key-123');
+    aiHttp(['llm.example.com/*' => Http::response(openAiAnswer('{"title":"Excel","hours":null,"modules":[]}'))]);
+
+    expect(app(Ai::class)->structured('s', 'u', aiNullableSchema(), 'test.nullable'))->toBe(['title' => 'Excel', 'hours' => null, 'modules' => []]);
+    Http::assertSent(fn (Request $r) => $r->data()['response_format']['json_schema']['schema'] === aiNullableSent());
+});
+
+it('rewrites a nullable type keeping its other keywords on the non-null branch', function () {
+    expect(AiSchema::sendable(['type' => ['object', 'null'], 'properties' => ['a' => ['type' => 'string']], 'required' => ['a'], 'additionalProperties' => false]))
+        ->toBe(['anyOf' => [['type' => 'object', 'properties' => ['a' => ['type' => 'string']], 'required' => ['a'], 'additionalProperties' => false], ['type' => 'null']]])
+        ->and(AiSchema::sendable(['type' => ['string', 'null'], 'enum' => ['a', null]]))
+        ->toBe(['anyOf' => [['type' => 'string', 'enum' => ['a']], ['type' => 'null']]])
+        ->and(AiSchema::sendable(['type' => ['string']]))->toBe(['type' => ['string']]);
 });

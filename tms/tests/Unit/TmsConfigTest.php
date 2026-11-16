@@ -59,3 +59,21 @@ it('treats empty booleans and mode as their defaults', function () {
         ->and($config['vite_hot'])->toBeTrue()
         ->and($config['connectors']['allow_internal_hosts'])->toBeFalse();
 });
+
+it('passes every production setting of config/tms.php to the production containers', function () {
+    preg_match_all("/'(TMS_[A-Z0-9_]+)'/", (string) file_get_contents(config_path('tms.php')), $m);
+    // Development and end-to-end only: never set on an installation.
+    $settings = array_values(array_diff(array_unique($m[1]), ['TMS_VITE_HOT', 'TMS_E2E_FAKE_AI']));
+    $compose = (string) file_get_contents(base_path('compose.prod.yaml'));
+    $example = (string) file_get_contents(base_path('.env.prod.example'));
+
+    expect($settings)->toContain('TMS_ALLOW_LOCAL_AI');
+    foreach ($settings as $name) {
+        expect($compose)->toMatch('/^\s+'.$name.': /m');
+    }
+    // Operator settings are listed (empty = default) in the example environment.
+    foreach (['TMS_MODE', 'TMS_ALLOW_PRIVATE_SMTP_HOSTS', 'TMS_ALLOW_LOCAL_AI'] as $name) {
+        expect($example)->toMatch('/^'.$name.'=$/m');
+    }
+    expect($compose)->toContain('TMS_ALLOW_LOCAL_AI: ${TMS_ALLOW_LOCAL_AI:-}');
+});

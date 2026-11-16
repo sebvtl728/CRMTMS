@@ -7,7 +7,8 @@ namespace App\Modules\Connectors\Ai;
  *
  *  - sendable(): the schema without the constraints providers do not all
  *    accept in a structured output (lengths, ranges, item counts, pattern):
- *    they are checked here instead, on the answer;
+ *    they are checked here instead, on the answer; nullable types sent as
+ *    anyOf (see nullableAsAnyOf);
  *  - conform(): checks a decoded answer against the full schema (types,
  *    required properties, enum, lengths, ranges, item counts) and drops the
  *    properties the schema does not declare. Supported keywords: type
@@ -38,7 +39,37 @@ final class AiSchema
             };
         }
 
-        return $out;
+        return self::nullableAsAnyOf($out);
+    }
+
+    /**
+     * `type: [X, "null"]` is not documented by every provider for structured
+     * outputs: sent as `anyOf: [{type: X, ...other keywords}, {type: "null"}]`
+     * (null removed from an enum of the non-null branch). The answer is still
+     * checked against the original schema (conform()).
+     *
+     * @param  array<string, mixed>  $schema
+     * @return array<string, mixed>
+     */
+    private static function nullableAsAnyOf(array $schema): array
+    {
+        $types = $schema['type'] ?? null;
+        if (! is_array($types) || ! in_array('null', $types, true)) {
+            return $schema;
+        }
+        $others = array_values(array_filter($types, fn ($t) => $t !== 'null'));
+        if ($others === []) {
+            return $schema;
+        }
+
+        $branch = $schema;
+        $branch['type'] = count($others) === 1 ? $others[0] : $others;
+        if (isset($branch['enum']) && is_array($branch['enum'])) {
+            $branch['enum'] = array_values(array_filter($branch['enum'], fn ($v) => $v !== null));
+        }
+        $branch = ['type' => $branch['type'], ...array_diff_key($branch, ['type' => true])];
+
+        return ['anyOf' => [$branch, ['type' => 'null']]];
     }
 
     /**
