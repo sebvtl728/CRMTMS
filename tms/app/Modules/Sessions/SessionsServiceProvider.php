@@ -141,11 +141,13 @@ class SessionsServiceProvider extends ServiceProvider
     /**
      * Blocks of the CRM fiches (Crm\Public\FicheBlocks): « Formations
      * suivies » of a person (sessions.sessions.view and its scope),
-     * « Dossiers » of an entreprise (sessions.dossiers.view and its scope).
+     * « Dossiers » of an entreprise or a particulier (sessions.dossiers.view
+     * and its scope).
      */
     public static function registerFicheBlocks(): void
     {
         FicheBlocks::register('person', 'sessions.enrolments', fn (string $id, User $viewer) => EnrolmentRows::personBlock($id, $viewer));
+        FicheBlocks::register('person', 'sessions.dossiers', fn (string $id, User $viewer) => DossierRows::personBlock($id, $viewer));
         FicheBlocks::register('organisation', 'sessions.dossiers', fn (string $id, User $viewer) => DossierRows::organisationBlock($id, $viewer));
     }
 

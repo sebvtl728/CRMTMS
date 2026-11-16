@@ -113,7 +113,7 @@ La carte **Sessions qui démarrent dans les 7 jours** de l'**Accueil** liste les
 
 Un stagiaire est une personne du CRM :
 
-- sa fiche montre le bloc **Formations suivies** (ses inscriptions) et, dans l'**Historique**, ses inscriptions et les dossiers dont elle est contractante ou contact ; une entreprise montre le bloc **Dossiers** ;
+- sa fiche montre le bloc **Formations suivies** (ses inscriptions) et, dans l'**Historique**, ses inscriptions et les dossiers dont elle est contractante ou contact ; une entreprise, et un particulier, montrent le bloc **Dossiers** (les dossiers dont ils sont contractants, selon le droit « Consulter » des dossiers et son périmètre) ;
 - **corbeille** : une personne inscrite peut être mise à la corbeille ; ses inscriptions restent (badge « Fiche à la corbeille ») et reviennent avec elle à la restauration ; elle ne peut plus être inscrite tant qu'elle est à la corbeille ;
 - **fusion** : sessions, dossiers, inscriptions et financements suivent la fiche conservée ; deux personnes inscrites chacune sur la même session ne se fusionnent pas tant que l'une des deux inscriptions n'est pas annulée ; cas rare : si l'une des deux est inscrite sur la session de l'autre pendant la fusion elle-même (deux utilisateurs au même instant), la base refuse le doublon et la fusion est annulée sans rien écrire, avec un message d'erreur générique ; relancez-la : le refus habituel s'affiche alors. De même, **Annuler la session** peut répondre « Une inscription vient d'être ajoutée : réessayez. » si un stagiaire est inscrit au même instant ;
 - **annulation d'un import** : une entreprise ou une personne qui porte une session, un dossier, une inscription ou un financement est conservée ;

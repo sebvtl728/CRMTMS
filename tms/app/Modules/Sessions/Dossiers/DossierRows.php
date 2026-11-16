@@ -90,17 +90,46 @@ final class DossierRows
      */
     public static function organisationBlock(string $organisationId, User $viewer): ?array
     {
+        return self::accountBlock('account_organisation_id', $organisationId, $viewer, 'Aucun dossier de formation pour cette entreprise.');
+    }
+
+    /**
+     * Same « Dossiers » on the fiche of a person: the dossiers she is the
+     * contractant (particulier) of. Shown for a particulier, or a person
+     * contractant of a dossier (flag removed since); null otherwise.
+     *
+     * @return array{title: string, empty: string, rows: list<array<string, mixed>>}|null
+     */
+    public static function personBlock(string $personId, User $viewer): ?array
+    {
+        if (! $viewer->can(Permissions::DOSSIERS_VIEW)) {
+            return null;
+        }
+        if (app(Fiches::class)->individual($personId) === null
+            && ! Dossier::withTrashed()->where('account_person_id', $personId)->exists()) {
+            return null;
+        }
+
+        return self::accountBlock('account_person_id', $personId, $viewer, 'Aucun dossier de formation pour ce particulier.');
+    }
+
+    /**
+     * @param  'account_organisation_id'|'account_person_id'  $column
+     * @return array{title: string, empty: string, rows: list<array<string, mixed>>}|null
+     */
+    private static function accountBlock(string $column, string $id, User $viewer, string $empty): ?array
+    {
         if (! $viewer->can(Permissions::DOSSIERS_VIEW)) {
             return null;
         }
         $dossiers = SessionsVisibility::dossiers(Dossier::query(), $viewer)
-            ->where('dossiers.account_organisation_id', $organisationId)
+            ->where("dossiers.{$column}", $id)
             ->orderByDesc('dossiers.created_at')->orderByDesc('dossiers.number')
             ->limit(100)->get();
 
         return [
             'title' => 'Dossiers',
-            'empty' => 'Aucun dossier de formation pour cette entreprise.',
+            'empty' => $empty,
             'rows' => array_map(fn (array $row): array => [
                 'id' => $row['id'],
                 'title' => "Dossier {$row['number']}",

@@ -489,6 +489,29 @@ it('lists on the entreprise fiche its dossiers the user sees', function () {
     $this->actingAs(enrUser(['crm.fiches.view' => null]))->get("/crm/organisations/{$hotel->id}")->assertInertia(fn (Assert $page) => $page->has('blocks', 0));
 });
 
+it('lists on the fiche of a particulier the dossiers she is the contractant of', function () {
+    $lea = Person::query()->create(['last_name' => 'Durand', 'first_name' => 'Léa', 'is_individual' => true]);
+    $training = enrTraining();
+    $dossier = app(DossierWriter::class)->create([
+        'company_id' => Company::query()->where('is_default', true)->value('id') ?? Company::factory()->default()->create()->id,
+        'account_organisation_id' => null, 'account_person_id' => $lea->id, 'das_id' => $training->das_id,
+        'lines' => [['kind' => 'training', 'training_id' => $training->id, 'label' => $training->title, 'quantity' => '1',
+            'unit' => 'forfait', 'unit_price' => '1000', 'discount_percent' => '', 'pricing_mode' => 'per_trainee']],
+    ]);
+    $interlocuteur = Person::query()->create(['last_name' => 'Martin']);
+
+    $block = fn (Assert $page) => $page->where('blocks.1.key', 'sessions.dossiers')->has('blocks.1.rows', 1)
+        ->where('blocks.1.rows.0.title', "Dossier {$dossier->number}")->where('blocks.1.rows.0.href', "/dossiers/{$dossier->id}");
+    $this->actingAs(admin(true))->get("/crm/people/{$lea->id}")->assertInertia($block);
+    // An interlocuteur, contractant of nothing: no « Dossiers » block.
+    $this->get("/crm/people/{$interlocuteur->id}")->assertInertia(fn (Assert $page) => $page->has('blocks', 1)->where('blocks.0.key', 'sessions.enrolments'));
+
+    // Scoped by sessions.dossiers.view; without it, no block.
+    $own = enrUser(['crm.fiches.view' => null, Permissions::DOSSIERS_VIEW => AccessScope::Own]);
+    $this->actingAs($own)->get("/crm/people/{$lea->id}")->assertInertia(fn (Assert $page) => $page->where('blocks.0.key', 'sessions.dossiers')->has('blocks.0.rows', 0));
+    $this->actingAs(enrUser(['crm.fiches.view' => null]))->get("/crm/people/{$lea->id}")->assertInertia(fn (Assert $page) => $page->has('blocks', 0));
+});
+
 // ---------------------------------------------------------------- schedule, list state, export
 
 it('computes the state of a dossier from the sessions of its enrolments, in the list filter too', function () {
