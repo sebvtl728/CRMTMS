@@ -112,7 +112,8 @@ it('creates, reorders, edits and removes modules with a modality', function () {
     // An empty list (or null) clears them.
     $this->put("/catalogue/{$t->id}/edit", sheetPayload(['modules' => []]))->assertRedirect('/catalogue');
     expect(TrainingModule::query()->count())->toBe(0);
-    $this->put("/catalogue/{$t->id}/edit", sheetPayload(['modules' => [['title' => 'Z']]]));
+    $this->put("/catalogue/{$t->id}/edit", sheetPayload(['modules' => [['title' => 'Z']]]))->assertRedirect('/catalogue');
+    expect(TrainingModule::query()->count())->toBe(1);
     $this->put("/catalogue/{$t->id}/edit", sheetPayload(['modules' => null]))->assertRedirect('/catalogue');
     expect(TrainingModule::query()->count())->toBe(0);
 });
@@ -136,7 +137,10 @@ it('validates modules: title, duration, modality, count, foreign ids', function 
 
     $t = Training::query()->create(['title' => 'T', 'das_id' => $other->das_id]);
     $this->put("/catalogue/{$t->id}/edit", sheetPayload(['modules' => [['id' => 'abc', 'title' => 'M']]]))->assertSessionHasErrors('modules.0.id');
-    $this->put("/catalogue/{$t->id}/edit", sheetPayload(['modules' => [['id' => $foreign->id, 'title' => 'a'], ['id' => $foreign->id, 'title' => 'b']]]))->assertSessionHasErrors('modules.0.id');
+    // The same id twice, an id the training owns: only `distinct` can refuse it.
+    $owned = TrainingModule::query()->create(['training_id' => $t->id, 'position' => 0, 'title' => 'Mien']);
+    $this->put("/catalogue/{$t->id}/edit", sheetPayload(['modules' => [['id' => $owned->id, 'title' => 'a'], ['id' => $owned->id, 'title' => 'b']]]))->assertSessionHasErrors('modules.0.id');
+    expect($owned->refresh()->title)->toBe('Mien');
     $this->put("/catalogue/{$t->id}/edit", sheetPayload(['modules' => [['id' => $foreign->id, 'title' => 'Volé']]]))
         ->assertSessionHasErrors('modules.0.id');
     expect($foreign->refresh()->title)->toBe('M');

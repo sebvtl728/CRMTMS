@@ -8,7 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import AppLayout from '@/layouts/app-layout';
 import { amountInput, formatSize, itemError, type Option } from '@/lib/crm';
 import { type BreadcrumbItem } from '@/types';
-import { Head, Link, useForm } from '@inertiajs/react';
+import { Head, Link, router, useForm } from '@inertiajs/react';
 import { ArrowDown, ArrowUp, LoaderCircle, Plus, Trash2 } from 'lucide-react';
 import { FormEventHandler } from 'react';
 
@@ -40,7 +40,8 @@ interface FormProps {
     } | null;
     options: { das: Option[]; funding_mode: Option[]; modality: Option[] };
     brochures?: { id: string; title: string; original_name: string; size: number; source: 'training' | 'das' }[];
-    can?: { brochures: boolean };
+    can?: { brochures: boolean; manage?: boolean };
+    status?: string | null;
 }
 
 type ModuleForm = { uid: string; id?: string; title: string; duration_hours: string; modality_id: string; content: string };
@@ -77,9 +78,12 @@ function decimalInput(value: string | null | undefined): string {
     return value.replace(/\.?0+$/, '').replace('.', ',');
 }
 
+// Local keys of the modules added in the form (crypto.randomUUID is unavailable outside secure contexts).
+let newModuleCount = 0;
+
 const textareaClass = 'border-input bg-background focus:ring-ring w-full rounded-md border px-3 py-2 text-sm focus:ring-2 focus:outline-hidden';
 
-export default function TrainingFormPage({ training, options, brochures = [], can }: FormProps) {
+export default function TrainingFormPage({ training, options, brochures = [], can, status }: FormProps) {
     const editing = training !== null;
 
     const { data, setData, post, put, processing, errors, isDirty } = useForm<TrainingForm>({
@@ -188,6 +192,12 @@ export default function TrainingFormPage({ training, options, brochures = [], ca
                     title={title}
                     description={editing && !training.is_active ? 'Formation désactivée : elle n’est plus proposée.' : undefined}
                 />
+
+                {status && (
+                    <p role="status" className="rounded-md border border-green-600/30 bg-green-50 p-3 text-sm text-green-800 dark:bg-green-950 dark:text-green-200">
+                        {status}
+                    </p>
+                )}
 
                 <form onSubmit={submit} className="flex flex-col gap-6" noValidate>
                     <fieldset className="grid gap-4 rounded-xl border p-4 md:grid-cols-2">
@@ -430,7 +440,7 @@ export default function TrainingFormPage({ training, options, brochures = [], ca
                                 onClick={() =>
                                     setData('modules', [
                                         ...data.modules,
-                                        { uid: crypto.randomUUID(), title: '', duration_hours: '', modality_id: '', content: '' },
+                                        { uid: `new-${++newModuleCount}`, title: '', duration_hours: '', modality_id: '', content: '' },
                                     ])
                                 }
                             >
@@ -509,6 +519,19 @@ export default function TrainingFormPage({ training, options, brochures = [], ca
                         <Button type="button" variant="outline" asChild>
                             <Link href={route('catalogue.index')}>Annuler</Link>
                         </Button>
+                        {editing && training && can?.manage && (
+                            <Button
+                                type="button"
+                                variant="outline"
+                                onClick={() => {
+                                    if (!isDirty || window.confirm('Les modifications non enregistrées seront perdues. Dupliquer la formation enregistrée ?')) {
+                                        router.post(route('catalogue.duplicate', training.id));
+                                    }
+                                }}
+                            >
+                                Dupliquer
+                            </Button>
+                        )}
                     </div>
                 </form>
             </div>

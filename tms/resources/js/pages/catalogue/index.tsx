@@ -102,6 +102,7 @@ export default function CatalogueIndex({ trainings, filters, options, can, statu
     const filtered = Boolean(filters.q || filters.das || filters.status || filters.funding);
 
     const toggle = (row: TrainingRow) => router.post(route('catalogue.toggle', row.id), {}, { preserveScroll: true });
+    const duplicate = (row: TrainingRow) => router.post(route('catalogue.duplicate', row.id));
     const destroy = (row: TrainingRow) => {
         if (window.confirm(`Supprimer la formation « ${row.title} » ?`)) {
             router.delete(route('catalogue.destroy', row.id), { preserveScroll: true });
@@ -116,6 +117,9 @@ export default function CatalogueIndex({ trainings, filters, options, can, statu
                 </Button>
                 <Button type="button" variant="outline" size="sm" onClick={() => toggle(row)}>
                     {row.is_active ? 'Désactiver' : 'Activer'}
+                </Button>
+                <Button type="button" variant="outline" size="sm" onClick={() => duplicate(row)}>
+                    Dupliquer
                 </Button>
                 {can.delete && (
                     <Button type="button" variant="ghost" size="sm" className="text-destructive" onClick={() => destroy(row)}>

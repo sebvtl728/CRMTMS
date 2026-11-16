@@ -108,7 +108,8 @@ class TrainingController extends Controller
             ],
             'options' => self::formOptions($training),
             'brochures' => app(Brochures::class)->forTrainingPage($training),
-            'can' => ['brochures' => $this->user($request)->can(Permissions::VIEW)],
+            'can' => ['brochures' => $this->user($request)->can(Permissions::VIEW), 'manage' => $this->user($request)->can(Permissions::MANAGE)],
+            'status' => $request->session()->get('status'),
         ]);
     }
 
@@ -134,6 +135,19 @@ class TrainingController extends Controller
         });
 
         return to_route('catalogue.index')->with('status', 'Formation enregistrée.');
+    }
+
+    /**
+     * An independent, inactive copy (TrainingDuplicator), opened for
+     * checking before it is activated.
+     */
+    public function duplicate(Training $training, TrainingDuplicator $duplicator): RedirectResponse
+    {
+        Gate::authorize('create', Training::class);
+
+        $copy = $duplicator->duplicate($training);
+
+        return to_route('catalogue.edit', $copy)->with('status', 'Formation dupliquée : vérifiez-la puis activez-la.');
     }
 
     public function toggle(Training $training): RedirectResponse
