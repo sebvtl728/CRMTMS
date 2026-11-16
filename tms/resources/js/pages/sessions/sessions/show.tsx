@@ -96,7 +96,7 @@ export default function SessionShow({ session, can, cancel_reasons, enrolments, 
     const others = enrolments.filter((e) => e.status !== 'waitlisted');
     const breadcrumbs: BreadcrumbItem[] = [
         { title: 'Sessions', href: '/sessions' },
-        { title: session.number, href: '#' },
+        { title: session.label, href: '#' },
     ];
 
     const destroy = () => {
@@ -114,12 +114,19 @@ export default function SessionShow({ session, can, cancel_reasons, enrolments, 
 
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
-            <Head title={`Session ${session.number}`} />
+            <Head title={session.title ?? `Session ${session.number}`} />
 
             <div className="flex flex-col gap-6 p-4">
                 <div className="flex flex-wrap items-start justify-between gap-4">
                     <div className="grid gap-2">
-                        <Heading title={`Session ${session.number}`} description={session.training?.title ?? 'Formation introuvable'} />
+                        <Heading
+                            title={session.title ?? `Session ${session.number}`}
+                            description={
+                                session.title
+                                    ? `${session.training?.title ?? 'Formation introuvable'} · Session ${session.number}`
+                                    : (session.training?.title ?? 'Formation introuvable')
+                            }
+                        />
                         <div className="flex flex-wrap gap-2">
                             <Badge variant={sessionStatusVariant(session.status)}>{session.status_label}</Badge>
                             <Badge variant="outline">{session.kind_label}</Badge>
@@ -216,7 +223,7 @@ export default function SessionShow({ session, can, cancel_reasons, enrolments, 
                         {enrol && (
                             <Button type="button" size="sm" onClick={() => setEnrolling(true)}>
                                 <UserPlus className="h-4 w-4" />
-                                Inscrire un stagiaire
+                                Inscrire des stagiaires
                             </Button>
                         )}
                     </div>
@@ -232,10 +239,15 @@ export default function SessionShow({ session, can, cancel_reasons, enrolments, 
                 )}
             </div>
 
-            {enrolling && enrol && enrolment_references && (
+            {enrolling && enrol && (
                 <EnrolDialog
-                    source={{ from: 'session', sessionId: session.id, dossiers: enrol.dossiers }}
-                    references={enrolment_references}
+                    source={{
+                        from: 'session',
+                        sessionId: session.id,
+                        sessionHours: session.planned_hours,
+                        sessionStart: session.starts_on,
+                        dossiers: enrol.dossiers,
+                    }}
                     onClose={() => setEnrolling(false)}
                 />
             )}

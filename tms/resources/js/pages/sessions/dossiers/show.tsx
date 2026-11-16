@@ -2,8 +2,8 @@ import Heading from '@/components/heading';
 import InputError from '@/components/input-error';
 import { EnrolDialog, type EnrolSessionOption } from '@/components/sessions/enrolment-dialog';
 import { EnrolmentList, type EnrolmentReferences, type EnrolmentRow } from '@/components/sessions/enrolment-list';
-import { HistoryList, type HistoryEntry } from '@/components/sessions/history-list';
 import { FundingSection, type FundingBalance, type FundingOptions, type FundingRow } from '@/components/sessions/funding-section';
+import { HistoryList, type HistoryEntry } from '@/components/sessions/history-list';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -392,7 +392,7 @@ export default function DossierShow({
                         {enrol && trainingLines.length > 0 && (
                             <Button type="button" size="sm" onClick={() => setEnrolling(true)}>
                                 <UserPlus className="h-4 w-4" />
-                                Inscrire un stagiaire
+                                Inscrire des stagiaires
                             </Button>
                         )}
                     </div>
@@ -418,16 +418,16 @@ export default function DossierShow({
             </div>
 
             <StepDialog dossierId={dossier.id} step={dated} today={today} onClose={() => setDated(null)} />
-            {enrolling && enrol && enrolment_references && (
+            {enrolling && enrol && (
                 <EnrolDialog
                     source={{
                         from: 'dossier',
                         dossierId: dossier.id,
                         organisationId: dossier.account.type === 'organisation' ? dossier.account.id : null,
+                        organisationLabel: dossier.account.type === 'organisation' ? dossier.account.label : null,
                         lines: trainingLines.map((l) => ({ id: l.id, label: l.label })),
                         sessions: enrol.sessions,
                     }}
-                    references={enrolment_references}
                     onClose={() => setEnrolling(false)}
                 />
             )}

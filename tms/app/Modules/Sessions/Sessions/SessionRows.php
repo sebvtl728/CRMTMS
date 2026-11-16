@@ -62,6 +62,8 @@ final class SessionRows
         return [
             'id' => $s->id,
             'number' => $s->number,
+            'title' => $s->title,
+            'label' => $s->label($training?->title),
             'training' => $training === null ? null : ['id' => $training->id, 'code' => $training->code, 'title' => $training->title, 'is_active' => $training->is_active],
             'das' => $das[$s->das_id] ?? null,
             'kind' => $s->kind,

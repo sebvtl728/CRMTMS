@@ -16,6 +16,7 @@ use App\Modules\Crm\Public\Trainees;
 use App\Modules\Sessions\Amounts;
 use App\Modules\Sessions\Enrolments\EnrolmentOptions;
 use App\Modules\Sessions\Enrolments\Enrolments;
+use App\Modules\Sessions\Enrolments\GroupEnrolment;
 use App\Modules\Sessions\Fundings\FundingStatus;
 use App\Modules\Sessions\Fundings\FundingWriter;
 use App\Modules\Sessions\Permissions;
@@ -56,7 +57,7 @@ use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
  * Errors are keyed by the plan: lines.<i>.session_id, lines.<i>.new_session.<field>,
  * lines.<i>.trainees.<j>[.<field>].
  *
- * A plan: lines[i] (i = position of the quote line) = {session_id | new_session: {kind,
+ * A plan: lines[i] (i = position of the quote line) = {session_id | new_session: {title, kind,
  * starts_on, ends_on, modality_id, planned_hours, location_kind, location_text, capacity},
  * pricing_mode, trainees: list<person id | {person_id} | {new_person: {first_name,
  * last_name, email, phone, birth_date, employee, confirm_duplicate, ref}}>}: one
@@ -70,7 +71,7 @@ final class DossierFromQuote
 
     private const MAX_TRAINEES = 200;
 
-    private const NEW_SESSION_FIELDS = ['kind', 'starts_on', 'ends_on', 'modality_id', 'planned_hours', 'location_kind', 'location_text', 'capacity'];
+    private const NEW_SESSION_FIELDS = ['title', 'kind', 'starts_on', 'ends_on', 'modality_id', 'planned_hours', 'location_kind', 'location_text', 'capacity'];
 
     private const NEW_PERSON_FIELDS = ['civility', 'first_name', 'last_name', 'email', 'phone', 'mobile', 'birth_date'];
 
@@ -445,8 +446,7 @@ final class DossierFromQuote
 
             return $id;
         } catch (DuplicateTrainee $e) {
-            $names = implode(', ', array_map(fn (array $c) => trim(($c['first_name'] ?? '').' '.$c['last_name']).($c['organisation_label'] ? " ({$c['organisation_label']})" : ''), array_slice($e->candidates, 0, 5)));
-            throw ValidationException::withMessages(["lines.{$i}.trainees.{$j}" => "Des personnes similaires existent déjà : {$names}. Choisissez-la dans la recherche, ou cochez « Créer quand même »."]);
+            throw ValidationException::withMessages(["lines.{$i}.trainees.{$j}" => GroupEnrolment::duplicateMessage($e)]);
         } catch (ValidationException $e) {
             throw self::rekeyed($e, "lines.{$i}.trainees.{$j}.");
         }

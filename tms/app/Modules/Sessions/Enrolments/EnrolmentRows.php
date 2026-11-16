@@ -71,7 +71,10 @@ final class EnrolmentRows
                 'session' => $session === null ? null : [
                     'id' => $session->id,
                     'number' => $session->number,
+                    'title' => $session->title,
+                    'label' => $session->label($trainings[$session->training_id]->title ?? null),
                     'training' => $trainings[$session->training_id]->title ?? null,
+                    'planned_hours' => SessionRows::hours($session->planned_hours),
                     'starts_on' => $session->starts_on->toDateString(),
                     'ends_on' => $session->ends_on->toDateString(),
                     'can_open' => isset($visibleSessions[$session->id]),
@@ -148,7 +151,7 @@ final class EnrolmentRows
 
                 return [
                     'id' => $e->id,
-                    'title' => $s === null ? 'Session introuvable' : ($trainings[$s->training_id]->title ?? 'Formation introuvable'),
+                    'title' => $s === null ? 'Session introuvable' : ($s->title ?? $trainings[$s->training_id]->title ?? 'Formation introuvable'),
                     'subtitle' => $s === null ? null : "Session {$s->number} · du {$s->starts_on->format('d/m/Y')} au {$s->ends_on->format('d/m/Y')}",
                     'meta' => $e->left_on === null ? null : "Sortie le {$e->left_on->format('d/m/Y')}",
                     'badge' => $s?->isCancelled() ? 'Session annulée' : $e->status->label(),

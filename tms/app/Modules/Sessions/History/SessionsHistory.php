@@ -16,6 +16,7 @@ use App\Modules\Sessions\Enrolments\EnrolmentStatus;
 use App\Modules\Sessions\Fundings\Funding;
 use App\Modules\Sessions\Fundings\FundingStatus;
 use App\Modules\Sessions\Permissions;
+use App\Modules\Sessions\Sessions\SessionRows;
 use App\Modules\Sessions\Sessions\TrainingSession;
 use App\Modules\Sessions\SessionsVisibility;
 use Carbon\CarbonImmutable;
@@ -264,7 +265,8 @@ final class SessionsHistory
     {
         return self::logs(Enrolment::MORPH_ALIAS, $ids)
             ->where(fn ($q) => $q->where('event', 'created')
-                ->orWhere(fn ($u) => $u->where('event', 'updated')->whereNotNull('new_values->status')));
+                ->orWhere(fn ($u) => $u->where('event', 'updated')
+                    ->where(fn ($c) => $c->whereNotNull('new_values->status')->orWhereNotNull('new_values->planned_hours'))));
     }
 
     /**
@@ -277,20 +279,24 @@ final class SessionsHistory
     private static function enrolmentDescriber(Collection $logs): Closure
     {
         $sessionOf = Enrolment::query()->whereKey($logs->pluck('auditable_id')->unique()->values()->all())->pluck('training_session_id', 'id');
-        $sessions = TrainingSession::withTrashed()->whereKey($sessionOf->unique()->values()->all())->get(['id', 'number', 'training_id'])->keyBy('id');
+        $sessions = TrainingSession::withTrashed()->whereKey($sessionOf->unique()->values()->all())->get(['id', 'number', 'title', 'training_id'])->keyBy('id');
         $trainings = app(Trainings::class)->findMany($sessions->pluck('training_id')->unique()->values()->all());
         $reasons = self::reasons($logs, 'abandon_reason_id');
 
         return function (AuditLog $log) use ($sessionOf, $sessions, $trainings, $reasons): array {
             $session = $sessions[$sessionOf[$log->auditable_id] ?? ''] ?? null;
-            $where = $session === null ? 'session' : "session {$session->number}"
-                .(isset($trainings[$session->training_id]) ? " ({$trainings[$session->training_id]->title})" : '');
+            // « session S-2026-0001 (<intitulé> or <formation>) ».
+            $name = $session === null ? null : ($session->title ?? $trainings[$session->training_id]->title ?? null);
+            $where = $session === null ? 'session' : "session {$session->number}".($name === null ? '' : " ({$name})");
             $new = $log->new_values ?? [];
             $status = (string) ($new['status'] ?? '');
-            $title = $log->event === 'created'
-                ? ($status === EnrolmentStatus::Waitlisted->value ? 'Inscription en liste d\'attente à la ' : 'Inscription à la ').$where
-                : (self::ENROLMENT_EVENTS[$status] ?? 'Inscription modifiée').' — '.$where;
-            $body = null;
+            $hours = $log->event === 'updated' && $status === '' && array_key_exists('planned_hours', $new);
+            $title = match (true) {
+                $log->event === 'created' => ($status === EnrolmentStatus::Waitlisted->value ? 'Inscription en liste d\'attente à la ' : 'Inscription à la ').$where,
+                $hours => 'Heures prévues modifiées — '.$where,
+                default => (self::ENROLMENT_EVENTS[$status] ?? 'Inscription modifiée').' — '.$where,
+            };
+            $body = $hours ? self::hoursBody($log->old_values['planned_hours'] ?? null, $new['planned_hours'] ?? null) : null;
             if ($log->event === 'updated' && $status === EnrolmentStatus::Abandoned->value) {
                 $parts = [];
                 if (is_string($new['left_on'] ?? null)) {
@@ -311,6 +317,16 @@ final class SessionsHistory
                 'href' => $session === null ? null : route('sessions.show', $session->id, false),
             ];
         };
+    }
+
+    /**
+     * « 35,00 h → 28,00 h » (« — » for no hours).
+     */
+    private static function hoursBody(mixed $old, mixed $new): string
+    {
+        $show = fn (mixed $h): string => is_string($h) || is_int($h) ? SessionRows::hours(Amounts::decimal(Amounts::cents((string) $h))).' h' : '—';
+
+        return $show($old).' → '.$show($new);
     }
 
     private static function dossierState(AuditLog $log): string

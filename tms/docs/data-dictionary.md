@@ -442,6 +442,7 @@ Nommée ainsi pour ne pas se confondre avec la table `sessions` (sessions web). 
 |---|---|---|
 | `id`, `tenant_id` | uuid | |
 | `number` | string(20) | `S-<AAAA>-<NNNN>` ; unique (`tenant_id`, `number`) |
+| `title` | string(150), null | Intitulé facultatif (« Commis de cuisine – entrée du 30 novembre 2026 ») ; sans intitulé, la session se lit « <formation> (S-…) » |
 | `training_id` | uuid (FK `trainings`) | Formation du catalogue |
 | `das_id` | uuid (FK `reference_items`, DAS) | DAS de la formation, recopié à chaque enregistrement (périmètre « Ses DAS ») |
 | `kind` | string(10) | `intra` / `inter` / `individual` « Individuel » (CHECK) |
@@ -505,7 +506,7 @@ Module `Sessions` (`Enrolment`, écrit par `Enrolments` et `PriceShares` seuleme
 | `waitlist_position` | integer, null | Ordre d'arrivée sur la liste d'attente ; renseigné si et seulement si `waitlisted` (CHECK) |
 | `entered_on`, `left_on` | date, null | Entrée (début de la session par défaut) et sortie ; sortie ≥ entrée (CHECK) |
 | `abandon_reason_id` | uuid, null (FK `reference_items`, motifs d'abandon) | Obligatoire avec la date de sortie pour un abandon (CHECK) ; gardé si l'abandon est ensuite annulé |
-| `planned_hours` | numeric(6,2), null | Heures prévues de la session à l'inscription |
+| `planned_hours` | numeric(6,2), null | Heures prévues du stagiaire : celles de la session à l'inscription, modifiables (0 < h ≤ heures de la session) ; journalisées |
 | `price_share` | numeric(12,2), null | Part d'une ligne « prix par stagiaire » (`PriceShares` : total réparti au centime entre inscrits, confirmés et abandons, reste aux premières inscriptions par `created_at, id`) ; null en prix de groupe, en attente ou annulée |
 | `bpf_category_id` | uuid, null (FK `reference_items`, catégories BPF) | Catégorie de stagiaire (lot 3) |
 | `adaptation_needs`, `notes` | text, null | Situation de handicap / besoins d'adaptation et notes : données personnelles, journalisées sans valeur (`$auditPersonal`) |

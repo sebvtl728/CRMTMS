@@ -76,39 +76,35 @@ class EnrolmentController extends Controller
 
     public function store(Request $request, TrainingSession $trainingSession): RedirectResponse
     {
-        $user = $this->user($request);
-        Gate::authorize('update', $trainingSession);
-        $data = Validator::make($request->all(), [
-            'dossier_id' => ['required', 'uuid'],
-            'dossier_line_id' => ['required', 'uuid'],
-            'person_id' => ['required', 'uuid'],
-        ], [
-            'dossier_id.*' => 'Choisissez le dossier.',
-            'dossier_line_id.*' => 'Choisissez la ligne de formation du dossier.',
-            'person_id.*' => 'Choisissez le stagiaire.',
-        ])->validate();
+        $data = Validator::make($request->all(), ['person_id' => ['required', 'uuid']], ['person_id.*' => 'Choisissez le stagiaire.'])->validate();
+        [$dossier, $line] = $this->dossierLine($request, $this->user($request), $trainingSession);
 
-        $dossier = SessionsVisibility::dossiers(Dossier::query(), $user)->find($data['dossier_id']);
-        if (! $dossier instanceof Dossier) {
-            throw ValidationException::withMessages(['dossier_id' => 'Dossier introuvable.']);
-        }
-        $line = DossierLine::query()->where('dossier_id', $dossier->id)->find($data['dossier_line_id']);
-        if (! $line instanceof DossierLine) {
-            throw ValidationException::withMessages(['dossier_line_id' => 'Ligne du dossier introuvable.']);
-        }
-
-        $enrolment = $this->enrolments->enrol($dossier, $line, $trainingSession, $data['person_id'], $request->only(['entered_on', 'bpf_category_id', 'adaptation_needs', 'notes']));
+        $enrolment = $this->enrolments->enrol($dossier, $line, $trainingSession, $data['person_id'], $request->only(['entered_on', 'planned_hours', 'bpf_category_id', 'adaptation_needs', 'notes']));
 
         return back()->with('status', $enrolment->status === EnrolmentStatus::Waitlisted
             ? "Session complète : stagiaire placé en liste d'attente (position {$enrolment->waitlist_position})."
             : 'Stagiaire inscrit.');
     }
 
+    /**
+     * Several trainees of one dossier line at once (a group, a later wave):
+     * one transaction, errors per trainee (GroupEnrolment).
+     */
+    public function storeGroup(Request $request, TrainingSession $trainingSession, GroupEnrolment $group): RedirectResponse
+    {
+        [$dossier, $line] = $this->dossierLine($request, $this->user($request), $trainingSession);
+        $enteredOn = $request->input('entered_on');
+
+        $counts = $group->enrol($dossier, $line, $trainingSession, $request->input('trainees', []), is_string($enteredOn) ? $enteredOn : null);
+
+        return back()->with('status', GroupEnrolment::summary($counts));
+    }
+
     public function update(Request $request, Enrolment $enrolment): RedirectResponse
     {
         Gate::authorize('update', $enrolment);
 
-        $this->enrolments->update($enrolment, $request->only(['entered_on', 'bpf_category_id', 'adaptation_needs', 'notes']));
+        $this->enrolments->update($enrolment, $request->only(['entered_on', 'planned_hours', 'bpf_category_id', 'adaptation_needs', 'notes']));
 
         return back()->with('status', 'Inscription enregistrée.');
     }
@@ -151,6 +147,37 @@ class EnrolmentController extends Controller
         $this->enrolments->abandon($enrolment, $leftOn, $data['abandon_reason_id']);
 
         return back()->with('status', 'Abandon enregistré.');
+    }
+
+    /**
+     * The dossier (one the user sees) and its line named by the request,
+     * after the update right on the session.
+     *
+     * @return array{Dossier, DossierLine}
+     *
+     * @throws ValidationException
+     */
+    private function dossierLine(Request $request, User $user, TrainingSession $session): array
+    {
+        Gate::authorize('update', $session);
+        $data = Validator::make($request->all(), [
+            'dossier_id' => ['required', 'uuid'],
+            'dossier_line_id' => ['required', 'uuid'],
+        ], [
+            'dossier_id.*' => 'Choisissez le dossier.',
+            'dossier_line_id.*' => 'Choisissez la ligne de formation du dossier.',
+        ])->validate();
+
+        $dossier = SessionsVisibility::dossiers(Dossier::query(), $user)->find($data['dossier_id']);
+        if (! $dossier instanceof Dossier) {
+            throw ValidationException::withMessages(['dossier_id' => 'Dossier introuvable.']);
+        }
+        $line = DossierLine::query()->where('dossier_id', $dossier->id)->find($data['dossier_line_id']);
+        if (! $line instanceof DossierLine) {
+            throw ValidationException::withMessages(['dossier_line_id' => 'Ligne du dossier introuvable.']);
+        }
+
+        return [$dossier, $line];
     }
 
     private function user(Request $request): User

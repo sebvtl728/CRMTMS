@@ -11,6 +11,7 @@ use App\Modules\Sessions\Dossiers\DossierStatus;
 use App\Modules\Sessions\Permissions;
 use App\Modules\Sessions\Sessions\SessionKind;
 use App\Modules\Sessions\Sessions\SessionListQuery;
+use App\Modules\Sessions\Sessions\SessionRows;
 use App\Modules\Sessions\Sessions\SessionStatus;
 use App\Modules\Sessions\Sessions\TrainingSession;
 use App\Modules\Sessions\SessionsVisibility;
@@ -55,7 +56,7 @@ final class EnrolmentOptions
      * line id: the training's, not cancelled, in the scope of
      * sessions.sessions.update; intra ones of the contractant only.
      *
-     * @return array<string, list<array{id: string, number: string, starts_on: string, ends_on: string, kind_label: string, capacity: ?int}>>
+     * @return array<string, list<array{id: string, number: string, title: ?string, starts_on: string, ends_on: string, kind_label: string, capacity: ?int, planned_hours: ?string}>>
      */
     public static function sessionsFor(Dossier $dossier, User $user): array
     {
@@ -101,17 +102,19 @@ final class EnrolmentOptions
     }
 
     /**
-     * @return array{id: string, number: string, starts_on: string, ends_on: string, kind_label: string, capacity: ?int}
+     * @return array{id: string, number: string, title: ?string, starts_on: string, ends_on: string, kind_label: string, capacity: ?int, planned_hours: ?string}
      */
     public static function sessionOption(TrainingSession $s): array
     {
         return [
             'id' => $s->id,
             'number' => $s->number,
+            'title' => $s->title,
             'starts_on' => $s->starts_on->toDateString(),
             'ends_on' => $s->ends_on->toDateString(),
             'kind_label' => SessionKind::from($s->kind)->label(),
             'capacity' => $s->capacity,
+            'planned_hours' => SessionRows::hours($s->planned_hours),
         ];
     }
 

@@ -87,6 +87,9 @@ final class SessionWriter
         if (! array_key_exists('modality_id', $data)) {
             $data['modality_id'] = $session->modality_id;
         }
+        if (! array_key_exists('title', $data)) {
+            $data['title'] = $session->title;
+        }
         $values = $this->validated($data, $session);
 
         return DB::transaction(function () use ($session, $values): TrainingSession {
@@ -196,6 +199,7 @@ final class SessionWriter
         $data = self::normalise($data);
 
         $validator = Validator::make($data, [
+            'title' => ['nullable', 'string', 'max:150'],
             'training_id' => ['bail', 'required', 'uuid'],
             'kind' => ['required', Rule::enum(SessionKind::class)],
             'organisation_id' => ['bail', 'nullable', 'required_if:kind,intra', 'uuid'],
@@ -239,6 +243,7 @@ final class SessionWriter
         }
 
         return [
+            'title' => $data['title'] ?? null,
             'training_id' => $training->id,
             'das_id' => $training->das_id,
             'kind' => $data['kind'],
@@ -264,7 +269,7 @@ final class SessionWriter
      */
     private static function normalise(array $data): array
     {
-        foreach (['training_id', 'kind', 'organisation_id', 'modality_id', 'starts_on', 'ends_on', 'planned_hours', 'location_kind', 'location_text', 'capacity', 'responsible_user_id', 'status', 'notes'] as $key) {
+        foreach (['title', 'training_id', 'kind', 'organisation_id', 'modality_id', 'starts_on', 'ends_on', 'planned_hours', 'location_kind', 'location_text', 'capacity', 'responsible_user_id', 'status', 'notes'] as $key) {
             $value = $data[$key] ?? null;
             if (is_string($value)) {
                 $value = trim($value);
@@ -310,6 +315,7 @@ final class SessionWriter
     private static function messages(): array
     {
         return [
+            'title.*' => 'L\'intitulé ne doit pas dépasser 150 caractères.',
             'training_id.required' => 'Choisissez la formation.',
             'training_id.uuid' => 'Formation introuvable.',
             'kind.required' => 'Choisissez le type de session.',

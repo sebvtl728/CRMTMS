@@ -6,9 +6,11 @@ use App\Exceptions\UserFacingHttpException;
 use App\Modules\Core\References\ReferenceList;
 use App\Modules\Core\Tenancy\TenantContext;
 use App\Modules\Crm\Public\Fiches;
+use App\Modules\Sessions\Amounts;
 use App\Modules\Sessions\Dossiers\Dossier;
 use App\Modules\Sessions\Dossiers\DossierLine;
 use App\Modules\Sessions\Sessions\SessionKind;
+use App\Modules\Sessions\Sessions\SessionRows;
 use App\Modules\Sessions\Sessions\SessionWriter;
 use App\Modules\Sessions\Sessions\TrainingSession;
 use Carbon\CarbonImmutable;
@@ -34,7 +36,10 @@ use Illuminate\Validation\ValidationException;
  *    from any contractant, and never has a waiting list;
  *  - promote(): manual, a waitlisted enrolment while a place is free;
  *  - abandon(): a leaving day and a reason, the share kept;
- *  - cancel(): the place freed, nobody promoted automatically.
+ *  - cancel(): the place freed, nobody promoted automatically;
+ *  - planned hours: the session's by default, else 0 < h ≤ the session's
+ *    (any positive value when the session has none); GroupEnrolment enrols
+ *    several trainees in one transaction through enrol().
  */
 final class Enrolments
 {
@@ -59,10 +64,14 @@ final class Enrolments
     /** An enrolment of a dossier not locked arrived between the two locks of lockSession(). */
     public const ENROLMENT_ADDED = 'Une inscription vient d\'être ajoutée : réessayez.';
 
+    public const HOURS_INVALID = 'Heures prévues invalides (ex. 21 ou 17,5).';
+
+    public const HOURS_ZERO = 'Les heures prévues doivent être supérieures à zéro.';
+
     public function __construct(private readonly Fiches $fiches) {}
 
     /**
-     * @param  array<string, mixed>  $extra  entered_on (Y-m-d, default the session start), bpf_category_id, adaptation_needs, notes
+     * @param  array<string, mixed>  $extra  entered_on (Y-m-d, default the session start), planned_hours (default the session's), bpf_category_id, adaptation_needs, notes
      *
      * @throws ValidationException
      */
@@ -101,6 +110,10 @@ final class Enrolments
                 ->where('status', '<>', EnrolmentStatus::Cancelled->value)->exists()) {
                 $errors['person_id'] = 'Ce stagiaire est déjà inscrit à cette session.';
             }
+            $hoursError = self::hoursError($values['planned_hours'], $session);
+            if ($hoursError !== null) {
+                $errors['planned_hours'] = $hoursError;
+            }
             if ($errors !== []) {
                 throw ValidationException::withMessages($errors);
             }
@@ -116,7 +129,7 @@ final class Enrolments
                 'status' => $full ? EnrolmentStatus::Waitlisted : EnrolmentStatus::Enrolled,
                 'waitlist_position' => $full ? $this->nextWaitlistPosition($session) : null,
                 'entered_on' => $values['entered_on'] ?? $session->starts_on->toDateString(),
-                'planned_hours' => $session->planned_hours,
+                'planned_hours' => $values['planned_hours'] ?? $session->planned_hours,
             ]);
             PriceShares::recompute($line);
 
@@ -203,7 +216,8 @@ final class Enrolments
     }
 
     /**
-     * Entry day, BPF category, adaptation needs and notes.
+     * Entry day, planned hours (empty: the session's), BPF category,
+     * adaptation needs and notes.
      *
      * @param  array<string, mixed>  $data
      *
@@ -217,9 +231,16 @@ final class Enrolments
         // Only the keys sent change: the others keep their stored value.
         $values = array_intersect_key($this->validatedExtra($data, $enrolment), $data);
 
-        return $this->locked($enrolment, function (Enrolment $locked) use ($values): void {
+        return $this->locked($enrolment, function (Enrolment $locked, TrainingSession $session) use ($values): void {
             if ($locked->isCancelled()) {
                 throw new UserFacingHttpException(409, self::CANCELLED);
+            }
+            if (array_key_exists('planned_hours', $values)) {
+                $values['planned_hours'] ??= $session->planned_hours;
+                $hoursError = self::hoursError($values['planned_hours'], $session);
+                if ($hoursError !== null) {
+                    throw ValidationException::withMessages(['planned_hours' => $hoursError]);
+                }
             }
             if (array_key_exists('entered_on', $values) && $values['entered_on'] === null) {
                 unset($values['entered_on']);
@@ -343,22 +364,28 @@ final class Enrolments
      */
     private function validatedExtra(array $data, ?Enrolment $current): array
     {
-        foreach (['entered_on', 'bpf_category_id', 'adaptation_needs', 'notes'] as $key) {
+        foreach (['entered_on', 'planned_hours', 'bpf_category_id', 'adaptation_needs', 'notes'] as $key) {
             $value = $data[$key] ?? null;
             if (is_string($value)) {
                 $value = trim($value);
             }
             $data[$key] = $value === '' ? null : $value;
         }
+        if (is_string($data['planned_hours'])) {
+            // French decimals (« 17,5 »).
+            $data['planned_hours'] = str_replace([' ', "\u{00A0}", "\u{202F}", ','], ['', '', '', '.'], $data['planned_hours']);
+        }
 
-        /** @var array{entered_on: ?string, bpf_category_id: ?string, adaptation_needs: ?string, notes: ?string} $validated */
+        /** @var array{entered_on: ?string, planned_hours: ?string, bpf_category_id: ?string, adaptation_needs: ?string, notes: ?string} $validated */
         $validated = Validator::make($data, [
             'entered_on' => ['nullable', 'date_format:Y-m-d'],
+            'planned_hours' => ['nullable', 'regex:/^\d{1,4}(\.\d{1,2})?$/'],
             'bpf_category_id' => ['nullable', 'bail', 'uuid', self::referenceRule(ReferenceList::BpfCategory, $current?->bpf_category_id)],
             'adaptation_needs' => ['nullable', 'string', 'max:2000'],
             'notes' => ['nullable', 'string', 'max:5000'],
         ], [
             'entered_on.*' => 'Date d\'entrée invalide.',
+            'planned_hours.*' => self::HOURS_INVALID,
             'bpf_category_id.*' => 'Catégorie BPF inconnue.',
             'adaptation_needs.*' => 'Les besoins d\'adaptation ne doivent pas dépasser 2 000 caractères.',
             'notes.*' => 'Les notes ne doivent pas dépasser 5 000 caractères.',
@@ -366,10 +393,30 @@ final class Enrolments
 
         return [
             'entered_on' => $validated['entered_on'] ?? null,
+            'planned_hours' => $validated['planned_hours'] ?? null,
             'bpf_category_id' => $validated['bpf_category_id'] ?? null,
             'adaptation_needs' => $validated['adaptation_needs'] ?? null,
             'notes' => $validated['notes'] ?? null,
         ];
+    }
+
+    /**
+     * The planned hours of a trainee (null: the session's) are above zero
+     * and at most the session's, compared in hundredths (never a float).
+     */
+    private static function hoursError(?string $hours, TrainingSession $session): ?string
+    {
+        if ($hours === null) {
+            return null;
+        }
+        if (Amounts::cents($hours) <= 0) {
+            return self::HOURS_ZERO;
+        }
+        if ($session->planned_hours !== null && Amounts::cents($hours) > Amounts::cents($session->planned_hours)) {
+            return 'Les heures prévues ne peuvent pas dépasser celles de la session ('.SessionRows::hours($session->planned_hours).' h).';
+        }
+
+        return null;
     }
 
     /**

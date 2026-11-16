@@ -161,6 +161,7 @@ class SessionController extends Controller
             'session' => [
                 'id' => $s->id,
                 'number' => $s->number,
+                'title' => $s->title,
                 'cancelled' => $s->isCancelled(),
                 'training_id' => $s->training_id,
                 'kind' => $s->kind,

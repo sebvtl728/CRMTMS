@@ -48,6 +48,7 @@ final class PersonSessionsExport
 
                 return [
                     'session' => $session?->number,
+                    'intitule_session' => $session?->title,
                     'formation' => $session === null ? null : ($trainings[$session->training_id]->title ?? null),
                     'debut_session' => $session?->starts_on?->toDateString(),
                     'fin_session' => $session?->ends_on?->toDateString(),

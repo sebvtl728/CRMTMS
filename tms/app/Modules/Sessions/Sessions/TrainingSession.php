@@ -22,6 +22,7 @@ use Illuminate\Support\Facades\Auth;
  * @property string $id
  * @property string $tenant_id
  * @property string $number S-<AAAA>-<NNNN>, unique in the organisme
+ * @property string|null $title « Commis de cuisine – entrée du 30 novembre 2026 » (optional, ≤ 150)
  * @property string $training_id
  * @property string $das_id the training's DAS (« Ses DAS » visibility)
  * @property string $kind intra|inter|individual (SessionKind)
@@ -63,7 +64,7 @@ class TrainingSession extends Model
 
     /** @var list<string> */
     protected $fillable = [
-        'training_id', 'das_id', 'kind', 'modality_id', 'organisation_id', 'starts_on', 'ends_on', 'planned_hours',
+        'title', 'training_id', 'das_id', 'kind', 'modality_id', 'organisation_id', 'starts_on', 'ends_on', 'planned_hours',
         'location_kind', 'location_text', 'capacity', 'responsible_user_id', 'status', 'notes',
     ];
 
@@ -109,6 +110,23 @@ class TrainingSession extends Model
     public function isCancelled(): bool
     {
         return $this->status === SessionStatus::Cancelled;
+    }
+
+    /**
+     * How the session reads wherever it appears: « <intitulé> (S-…) », or
+     * « <formation> (S-…) » without a title ($trainingTitle: the title of its
+     * training, read by the caller through Catalogue\Trainings).
+     */
+    public function label(?string $trainingTitle): string
+    {
+        return self::labelOf($this->title, $trainingTitle, $this->number);
+    }
+
+    public static function labelOf(?string $title, ?string $trainingTitle, string $number): string
+    {
+        $name = $title ?? $trainingTitle;
+
+        return $name === null || $name === '' ? $number : "{$name} ({$number})";
     }
 
     /**

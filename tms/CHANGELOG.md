@@ -14,15 +14,19 @@ Dossiers de formation, sessions, inscriptions et financements (lot 2a) : le devi
 - **Sessions** (menu Formation › Sessions) : sessions **intra** (une entreprise), **inter** (plusieurs entreprises ou
   particuliers, nombre de places) et **individuelles** (un stagiaire), modalité (présentiel, distanciel, FOAD, mixte),
   dates, lieu, heures prévues, responsable, numéro `S-2026-0001`, annulation avec motif ; liste, filtres et
-  **calendrier** mensuel ; « En cours » et « Terminée » d'après les dates.
+  **calendrier** mensuel ; « En cours » et « Terminée » d'après les dates ; **intitulé** facultatif (« Commis de
+  cuisine – entrée du 30 novembre 2026 ») affiché partout où la session apparaît et cherché dans la liste.
 - **Dossiers de formation** (menu Formation › Dossiers) : contractant (entreprise ou particulier), contact, société
   émettrice, DAS, lignes de formation (prix par stagiaire ou de groupe) et de frais, numéro `D-2026-0001`, étapes
   (convention envoyée, signée, convocations envoyées, en cours, réalisé) et annulation avec motif ; liste avec
   **reste à financer**, filtres, export CSV (« Exporter (.csv) ») ; **historique** du dossier (étapes, inscriptions, financements).
 - **Inscriptions** des stagiaires : recherche dans toutes les personnes de l'organisme (sans doublon) ou création sur
-  place ; **liste d'attente** d'une session inter complète (promotion à la main) ; confirmation, **abandon** (date de
-  sortie, motif, force majeure), désinscription ; part de prix par stagiaire répartie au centime ; besoins
-  d'adaptation (donnée personnelle).
+  place ; **inscription groupée** (« Inscrire des stagiaires », depuis la session ou le dossier : plusieurs personnes
+  d'un coup, date d'entrée commune modifiable par stagiaire, vagues suivantes, tout ou rien avec les erreurs par
+  stagiaire) ; **liste d'attente** d'une session inter complète (promotion à la main) ; confirmation, **abandon** (date
+  de sortie, motif, force majeure), désinscription ; **heures prévues par stagiaire** (celles de la session par
+  défaut, jamais au-delà, journalisées) ; part de prix par stagiaire répartie au centime ; besoins d'adaptation
+  (donnée personnelle).
 - **Financements** par financeur (entreprise ou personne, type, montant, état, n° de prise en charge, date d'accord,
   ligne ou inscription visée) avec l'alerte « Reste à financer » / « Financements supérieurs au prix ».
 - **Créer le dossier** depuis un devis accepté : assistant en trois écrans (récapitulatif, sessions, stagiaires), un

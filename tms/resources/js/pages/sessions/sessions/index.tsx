@@ -145,7 +145,7 @@ export default function SessionsIndex({ sessions, filters, options, can, status 
                             type="search"
                             value={search}
                             onChange={(e) => setSearch(e.target.value)}
-                            placeholder="Ex. S-2026-0012 ou HACCP"
+                            placeholder="Ex. S-2026-0012, HACCP ou un intitulé"
                         />
                     </div>
                     <FilterSelect label="État" value={filters.status} options={options.status} onChange={(v) => visit({ status: v })} />
@@ -201,7 +201,7 @@ export default function SessionsIndex({ sessions, filters, options, can, status 
                                 <thead className="bg-muted/50 text-left">
                                     <tr>
                                         {sortHeader('number', 'Numéro')}
-                                        <th className="px-3 py-2 font-medium">Formation</th>
+                                        <th className="px-3 py-2 font-medium">Intitulé, formation</th>
                                         <th className="px-3 py-2 font-medium">Type</th>
                                         <th className="px-3 py-2 font-medium">Modalité</th>
                                         {sortHeader('starts_on', 'Dates')}
@@ -220,6 +220,7 @@ export default function SessionsIndex({ sessions, filters, options, can, status 
                                                 </Link>
                                             </td>
                                             <td className="px-3 py-2">
+                                                {s.title && <div className="font-medium">{s.title}</div>}
                                                 {s.training?.title ?? '—'}
                                                 {s.das && <div className="text-muted-foreground text-xs">{s.das}</div>}
                                             </td>
@@ -248,6 +249,7 @@ export default function SessionsIndex({ sessions, filters, options, can, status 
                                         </Link>
                                         {statusBadge(s)}
                                     </div>
+                                    {s.title && <div className="font-medium">{s.title}</div>}
                                     <div>{s.training?.title ?? '—'}</div>
                                     <div className="text-muted-foreground text-xs">
                                         {[s.kind_label, s.modality, s.organisation?.label, sessionDates(s), places(s)].filter(Boolean).join(' · ')}

@@ -23,6 +23,7 @@ interface FormProps {
     session: {
         id: string;
         number: string;
+        title: string | null;
         training_id: string;
         kind: Kind;
         modality_id: string;
@@ -50,6 +51,7 @@ interface FormProps {
 }
 
 type SessionForm = {
+    title: string;
     training_id: string;
     kind: string;
     modality_id: string;
@@ -155,6 +157,7 @@ export default function SessionFormPage({ session, defaults, options }: FormProp
     const [organisation, setOrganisation] = useState<Entreprise | null>(session?.organisation ?? defaults?.organisation ?? null);
 
     const { data, setData, post, put, processing, errors } = useForm<SessionForm>({
+        title: session?.title ?? '',
         training_id: session?.training_id ?? '',
         kind: session?.kind ?? defaults?.kind ?? 'inter',
         modality_id: session?.modality_id ?? options.default_modality ?? '',
@@ -230,6 +233,20 @@ export default function SessionFormPage({ session, defaults, options }: FormProp
                 <form onSubmit={submit} className="flex flex-col gap-6" noValidate>
                     <fieldset className="grid gap-4 rounded-xl border p-4 md:grid-cols-2">
                         <legend className="px-2 text-sm font-semibold">Formation</legend>
+                        <div className="grid gap-2 md:col-span-2">
+                            <Label htmlFor="title">Intitulé (facultatif)</Label>
+                            <Input
+                                id="title"
+                                maxLength={150}
+                                value={data.title}
+                                onChange={(e) => setData('title', e.target.value)}
+                                placeholder="Ex. Commis de cuisine – entrée du 30 novembre 2026"
+                            />
+                            <p className="text-muted-foreground text-xs">
+                                Affiché partout où la session apparaît ; vide : le titre de la formation et le numéro.
+                            </p>
+                            <InputError message={errors.title} />
+                        </div>
                         <div className="grid gap-2 md:col-span-2">
                             <Label htmlFor="training_id">Formation du catalogue *</Label>
                             <Select value={data.training_id || undefined} onValueChange={pickTraining}>

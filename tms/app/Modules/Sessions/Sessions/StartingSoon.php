@@ -49,7 +49,8 @@ final class StartingSoon
             $rows[] = [
                 'id' => $row['id'],
                 'number' => $row['number'],
-                'training' => $row['training']['title'] ?? null,
+                // The title of the session, else its training.
+                'training' => $row['title'] ?? $row['training']['title'] ?? null,
                 'dates' => $starts->equalTo($ends) ? 'le '.$starts->format('d/m/Y') : 'du '.$starts->format('d/m/Y').' au '.$ends->format('d/m/Y'),
                 'kind_label' => $row['kind_label'],
                 'places' => $row['capacity'] === null ? null : ((int) ($taken[$row['id']] ?? 0)).' / '.$row['capacity'].' places',

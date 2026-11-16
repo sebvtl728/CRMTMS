@@ -15,7 +15,8 @@ use Illuminate\Database\Eloquent\Builder;
  * The « Sessions » list and the monthly calendar: filter reading, filter
  * choices and the one query (view scope of sessions.sessions.view; the
  * trash only with sessions.sessions.delete). The state filter is the
- * effective state of the Paris day (« En cours » / « Terminée » from the dates).
+ * effective state of the Paris day. The search covers the number, the title,
+ * the place and the training. The state filter is the effective state of the Paris day (« En cours » / « Terminée » from the dates).
  *
  * @phpstan-type Filters array{q: string, status: ?string, kind: ?string, modality: ?string, das: ?string, training: ?string, responsible: ?string, from: ?string, to: ?string, trashed: bool, sort: string, dir: string}
  */
@@ -67,6 +68,7 @@ final class SessionListQuery
                 $trainingIds = array_map(fn ($t) => $t->id, app(Trainings::class)->search($q, null, 100));
                 $b->where(fn (Builder $w) => $w
                     ->where('training_sessions.number', 'ilike', $like)
+                    ->orWhere('training_sessions.title', 'ilike', $like)
                     ->orWhere('training_sessions.location_text', 'ilike', $like)
                     ->when($trainingIds !== [], fn (Builder $t) => $t->orWhereIn('training_sessions.training_id', $trainingIds)));
             })

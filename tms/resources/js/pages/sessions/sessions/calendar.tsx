@@ -152,10 +152,10 @@ export default function SessionsCalendar({ month, label, prev, next, today, sess
                                                     <li key={s.id}>
                                                         <Link
                                                             href={route('sessions.show', s.id)}
-                                                            title={`${s.number} · ${s.training?.title ?? ''} · ${sessionDates(s)} · ${s.status_label}`}
+                                                            title={`${s.label} · ${sessionDates(s)} · ${s.status_label}`}
                                                             className={`bg-muted hover:bg-muted/70 block truncate rounded border-l-4 px-1 text-xs ${statusClass[s.status]}`}
                                                         >
-                                                            {s.training?.title ?? s.number}
+                                                            {s.title ?? s.training?.title ?? s.number}
                                                         </Link>
                                                     </li>
                                                 ))}
@@ -175,10 +175,12 @@ export default function SessionsCalendar({ month, label, prev, next, today, sess
                     {sessions.map((s) => (
                         <li key={s.id} className={`rounded-xl border border-l-4 p-3 text-sm ${statusClass[s.status]}`}>
                             <Link href={route('sessions.show', s.id)} className="font-medium hover:underline">
-                                {s.training?.title ?? s.number}
+                                {s.title ?? s.training?.title ?? s.number}
                             </Link>
                             <div className="text-muted-foreground text-xs">
-                                {[s.number, sessionDates(s), s.kind_label, s.modality, s.organisation?.label, s.status_label].filter(Boolean).join(' · ')}
+                                {[s.number, sessionDates(s), s.kind_label, s.modality, s.organisation?.label, s.status_label]
+                                    .filter(Boolean)
+                                    .join(' · ')}
                             </div>
                         </li>
                     ))}

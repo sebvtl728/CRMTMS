@@ -1,5 +1,5 @@
 import InputError from '@/components/input-error';
-import { EnrolmentDetailsFields, type EnrolmentReferences } from '@/components/sessions/enrolment-list';
+import { emptyPerson, NewPersonFields, newPersonLabel, type NewPerson } from '@/components/sessions/new-person-fields';
 import { pickOnEnter, SearchHint } from '@/components/sessions/search-hits';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -8,8 +8,8 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { formatDay } from '@/lib/crm';
 import { sessionDates } from '@/lib/sessions';
-import { useForm } from '@inertiajs/react';
-import { LoaderCircle } from 'lucide-react';
+import { router } from '@inertiajs/react';
+import { LoaderCircle, Plus, X } from 'lucide-react';
 import { FormEventHandler, useEffect, useState } from 'react';
 
 /** A dossier offered on a session page (EnrolmentOptions::dossiersFor). */
@@ -25,13 +25,16 @@ export interface EnrolDossierOption {
 export interface EnrolSessionOption {
     id: string;
     number: string;
+    title: string | null;
     starts_on: string;
     ends_on: string;
     kind_label: string;
     capacity: number | null;
+    /** French decimal (« 35,00 »). */
+    planned_hours: string | null;
 }
 
-interface Trainee {
+interface Found {
     id: string;
     last_name: string;
     first_name: string | null;
@@ -39,41 +42,32 @@ interface Trainee {
     organisation_label: string | null;
 }
 
-const traineeLabel = (t: Trainee) =>
+const foundLabel = (t: Found) =>
     [[t.first_name, t.last_name].filter(Boolean).join(' '), t.birth_date ? `né(e) le ${formatDay(t.birth_date)}` : null, t.organisation_label]
         .filter(Boolean)
         .join(' · ');
 
-function xsrfToken(): string {
-    const match = document.cookie.match(/(?:^|; )XSRF-TOKEN=([^;]+)/);
+/** A trainee of the group: a person of the CRM, or one to create (by its ref); entry day and hours of his own. */
+type Trainee = { key: number; entered_on: string; planned_hours: string } & ({ person: { id: string; label: string } } | { ref: string });
 
-    return match ? decodeURIComponent(match[1]) : '';
-}
+let nextKey = 1;
 
 /**
- * The trainee: search among every person of the organisme (identity only,
- * the employees of the contractant first), or creation on the spot (an
- * ordinary person of the CRM, the similar people offered first).
+ * Search among every person of the organisme (identity only, the employees
+ * of the contractant first): a click adds the person to the group.
  */
-function TraineePicker({
+function TraineeSearch({
     sessionId,
     organisationId,
-    value,
     onPick,
 }: {
     sessionId: string;
     organisationId: string | null;
-    value: { id: string; label: string } | null;
-    onPick: (p: { id: string; label: string } | null) => void;
+    onPick: (p: { id: string; label: string }) => void;
 }) {
     const [term, setTerm] = useState('');
-    const [hits, setHits] = useState<Trainee[]>([]);
+    const [hits, setHits] = useState<Found[]>([]);
     const [searched, setSearched] = useState(false);
-    const [creating, setCreating] = useState(false);
-    const [draft, setDraft] = useState({ last_name: '', first_name: '', birth_date: '', email: '' });
-    const [candidates, setCandidates] = useState<Trainee[]>([]);
-    const [errors, setErrors] = useState<Record<string, string>>({});
-    const [busy, setBusy] = useState(false);
 
     useEffect(() => {
         setSearched(false);
@@ -93,7 +87,7 @@ function TraineePicker({
                 .then((r) => (r.ok ? r.json() : null))
                 .then((json) => {
                     setSearched(true);
-                    setHits((json?.personnes ?? []) as Trainee[]);
+                    setHits((json?.personnes ?? []) as Found[]);
                 })
                 .catch(() => undefined);
         }, 250);
@@ -103,121 +97,11 @@ function TraineePicker({
         };
     }, [term, sessionId, organisationId]);
 
-    const create = async (confirmDuplicate: boolean) => {
-        setBusy(true);
-        setErrors({});
-        try {
-            const response = await fetch(route('sessions.trainees.store', sessionId), {
-                method: 'POST',
-                credentials: 'same-origin',
-                headers: { 'Content-Type': 'application/json', Accept: 'application/json', 'X-XSRF-TOKEN': xsrfToken() },
-                body: JSON.stringify({ ...draft, organisation_id: organisationId, confirm_duplicate: confirmDuplicate }),
-            });
-            const json = (await response.json().catch(() => ({}))) as {
-                personne?: { id: string; label: string };
-                candidates?: Trainee[];
-                errors?: Record<string, string[]>;
-                message?: string;
-            };
-            if (response.status === 201 && json.personne) {
-                onPick(json.personne);
-                setCreating(false);
-                setCandidates([]);
-            } else if (response.status === 409) {
-                setCandidates(json.candidates ?? []);
-            } else if (response.status === 422) {
-                setErrors(Object.fromEntries(Object.entries(json.errors ?? {}).map(([k, v]) => [k, v[0]])));
-            } else {
-                setErrors({ last_name: json.message ?? 'La création a échoué, réessayez.' });
-            }
-        } catch {
-            setErrors({ last_name: 'La création a échoué, réessayez.' });
-        } finally {
-            setBusy(false);
-        }
+    const pick = (h: Found) => {
+        onPick({ id: h.id, label: foundLabel(h) });
+        setTerm('');
+        setHits([]);
     };
-
-    if (value) {
-        return (
-            <div className="flex items-center justify-between gap-2 rounded-md border px-3 py-2 text-sm">
-                <span>{value.label}</span>
-                <Button type="button" variant="ghost" size="sm" onClick={() => onPick(null)}>
-                    Changer
-                </Button>
-            </div>
-        );
-    }
-
-    if (creating) {
-        return (
-            <div className="grid gap-2 rounded-md border p-3">
-                <div className="grid gap-2 sm:grid-cols-2">
-                    <div className="grid gap-1">
-                        <Label htmlFor="trainee_last_name">Nom *</Label>
-                        <Input id="trainee_last_name" value={draft.last_name} onChange={(e) => setDraft({ ...draft, last_name: e.target.value })} />
-                        <InputError message={errors.last_name} />
-                    </div>
-                    <div className="grid gap-1">
-                        <Label htmlFor="trainee_first_name">Prénom</Label>
-                        <Input
-                            id="trainee_first_name"
-                            value={draft.first_name}
-                            onChange={(e) => setDraft({ ...draft, first_name: e.target.value })}
-                        />
-                        <InputError message={errors.first_name} />
-                    </div>
-                    <div className="grid gap-1">
-                        <Label htmlFor="trainee_birth_date">Date de naissance</Label>
-                        <Input
-                            id="trainee_birth_date"
-                            type="date"
-                            value={draft.birth_date}
-                            onChange={(e) => setDraft({ ...draft, birth_date: e.target.value })}
-                        />
-                        <InputError message={errors.birth_date} />
-                    </div>
-                    <div className="grid gap-1">
-                        <Label htmlFor="trainee_email">E-mail</Label>
-                        <Input id="trainee_email" type="email" value={draft.email} onChange={(e) => setDraft({ ...draft, email: e.target.value })} />
-                        <InputError message={errors.email} />
-                    </div>
-                </div>
-                {candidates.length > 0 && (
-                    <div role="alert" className="grid gap-1 rounded-md border border-amber-500/50 p-2 text-sm">
-                        <p>Des personnes similaires existent déjà :</p>
-                        <ul className="grid gap-1">
-                            {candidates.map((c) => (
-                                <li key={c.id}>
-                                    <button
-                                        type="button"
-                                        className="hover:bg-muted w-full rounded px-2 py-1 text-left"
-                                        onClick={() => {
-                                            onPick({ id: c.id, label: traineeLabel(c) });
-                                            setCreating(false);
-                                        }}
-                                    >
-                                        {traineeLabel(c)}
-                                    </button>
-                                </li>
-                            ))}
-                        </ul>
-                        <Button type="button" size="sm" variant="outline" onClick={() => create(true)} disabled={busy}>
-                            Créer quand même
-                        </Button>
-                    </div>
-                )}
-                <div className="flex gap-2">
-                    <Button type="button" size="sm" onClick={() => create(false)} disabled={busy}>
-                        {busy && <LoaderCircle className="h-4 w-4 animate-spin" />}
-                        Créer le stagiaire
-                    </Button>
-                    <Button type="button" size="sm" variant="ghost" onClick={() => setCreating(false)}>
-                        Retour à la recherche
-                    </Button>
-                </div>
-            </div>
-        );
-    }
 
     return (
         <div className="grid gap-1">
@@ -226,89 +110,120 @@ function TraineePicker({
                 type="search"
                 value={term}
                 onChange={(e) => setTerm(e.target.value)}
-                onKeyDown={(e) => pickOnEnter(e, term, hits, traineeLabel, (h) => onPick({ id: h.id, label: traineeLabel(h) }))}
+                onKeyDown={(e) => pickOnEnter(e, term, hits, foundLabel, pick)}
                 placeholder="Nom, prénom ou e-mail (toutes les personnes de l'organisme)"
             />
             {hits.length > 0 && (
                 <ul className="grid gap-1 rounded-md border p-1 text-sm">
                     {hits.map((h) => (
                         <li key={h.id}>
-                            <button
-                                type="button"
-                                className="hover:bg-muted w-full rounded px-2 py-1 text-left"
-                                onClick={() => onPick({ id: h.id, label: traineeLabel(h) })}
-                            >
-                                {traineeLabel(h)}
+                            <button type="button" className="hover:bg-muted w-full rounded px-2 py-1 text-left" onClick={() => pick(h)}>
+                                {foundLabel(h)}
                             </button>
                         </li>
                     ))}
                 </ul>
             )}
             <SearchHint term={term} count={hits.length} searched={searched} />
-            <Button type="button" size="sm" variant="link" className="justify-self-start px-0" onClick={() => setCreating(true)}>
-                Personne introuvable : créer le stagiaire
-            </Button>
         </div>
     );
 }
 
 type Source =
-    | { from: 'session'; sessionId: string; dossiers: EnrolDossierOption[] }
+    | { from: 'session'; sessionId: string; sessionHours: string | null; sessionStart: string; dossiers: EnrolDossierOption[] }
     | {
           from: 'dossier';
           dossierId: string;
           organisationId: string | null;
+          organisationLabel: string | null;
           lines: { id: string; label: string }[];
           sessions: Record<string, EnrolSessionOption[]>;
       };
 
-/**
- * « Inscrire un stagiaire »: from a session (choose the dossier and its
- * line) or from a dossier (choose the line and the session), then the
- * trainee and the details. The server checks everything again (training,
- * intra entreprise, duplicates, waiting list).
- */
-export function EnrolDialog({ source, references, onClose }: { source: Source; references: EnrolmentReferences; onClose: () => void }) {
-    const [trainee, setTrainee] = useState<{ id: string; label: string } | null>(null);
-    const { data, setData, transform, post, processing, errors } = useForm({
-        training_session_id: source.from === 'session' ? source.sessionId : '',
-        dossier_id: source.from === 'dossier' ? source.dossierId : '',
-        dossier_line_id: '',
-        person_id: '',
-        entered_on: '',
-        bpf_category_id: '',
-        adaptation_needs: '',
-        notes: '',
-    });
+const sessionOptionLabel = (s: EnrolSessionOption) =>
+    `${s.title ? `${s.title} · ` : ''}${s.number} · ${sessionDates(s)} · ${s.kind_label}${s.capacity !== null ? ` · ${s.capacity} places` : ''}`;
 
-    const dossier = source.from === 'session' ? source.dossiers.find((d) => d.id === data.dossier_id) : undefined;
+/**
+ * « Inscrire des stagiaires »: from a session (choose the dossier and its
+ * line) or from a dossier (choose the line and the session), then the
+ * group — people of the CRM or created on the spot —, a common entry day
+ * that each trainee may change, and his hours. One request, one
+ * transaction: the server checks every trainee again (places, waiting
+ * list, intra entreprise, duplicates) and answers the errors per trainee.
+ */
+export function EnrolDialog({ source, onClose }: { source: Source; onClose: () => void }) {
+    const [dossierId, setDossierId] = useState(source.from === 'dossier' ? source.dossierId : '');
+    const [lineId, setLineId] = useState('');
+    const [sessionId, setSessionId] = useState(source.from === 'session' ? source.sessionId : '');
+    const [enteredOn, setEnteredOn] = useState('');
+    const [trainees, setTrainees] = useState<Trainee[]>([]);
+    const [newPeople, setNewPeople] = useState<Record<string, NewPerson>>({});
+    const [draft, setDraft] = useState<NewPerson | null>(null);
+    const [errors, setErrors] = useState<Record<string, string>>({});
+    const [processing, setProcessing] = useState(false);
+
+    const dossier = source.from === 'session' ? source.dossiers.find((d) => d.id === dossierId) : undefined;
     const lines = source.from === 'session' ? (dossier?.lines ?? []) : source.lines;
-    const sessions = source.from === 'dossier' && data.dossier_line_id ? (source.sessions[data.dossier_line_id] ?? []) : [];
+    const sessions = source.from === 'dossier' && lineId ? (source.sessions[lineId] ?? []) : [];
+    const chosen = source.from === 'dossier' ? sessions.find((s) => s.id === sessionId) : undefined;
     const organisationId = source.from === 'session' ? (dossier?.account_organisation_id ?? null) : source.organisationId;
+    const employer = source.from === 'session' ? (dossier?.account_organisation_id ? dossier.account : null) : source.organisationLabel;
+    const hours = source.from === 'session' ? source.sessionHours : (chosen?.planned_hours ?? null);
+    const start = source.from === 'session' ? source.sessionStart : (chosen?.starts_on ?? '');
+
+    const label = (t: Trainee) => ('person' in t ? t.person.label : newPersonLabel(newPeople[t.ref]));
+    const change = (key: number, patch: Partial<Pick<Trainee, 'entered_on' | 'planned_hours'>>) =>
+        setTrainees((ts) => ts.map((t) => (t.key === key ? { ...t, ...patch } : t)));
 
     const submit: FormEventHandler = (e) => {
         e.preventDefault();
-        transform((d) => ({ ...d, person_id: trainee?.id ?? '' }));
-        post(route('sessions.enrolments.store', data.training_session_id || 'none'), { preserveScroll: true, onSuccess: onClose });
+        if (!sessionId || trainees.length === 0) {
+            return;
+        }
+        router.post(
+            route('sessions.enrolments.group', sessionId),
+            {
+                dossier_id: dossierId,
+                dossier_line_id: lineId,
+                entered_on: enteredOn,
+                trainees: trainees.map((t) => ({
+                    ...('person' in t ? { person_id: t.person.id } : { new_person: { ...newPeople[t.ref], ref: t.ref } }),
+                    entered_on: t.entered_on,
+                    planned_hours: t.planned_hours,
+                })),
+            },
+            {
+                preserveScroll: true,
+                onStart: () => setProcessing(true),
+                onFinish: () => setProcessing(false),
+                onError: (errs) => setErrors(errs as Record<string, string>),
+                onSuccess: onClose,
+            },
+        );
     };
+
+    const traineeErrors = (j: number) => Object.entries(errors).filter(([k]) => k === `trainees.${j}` || k.startsWith(`trainees.${j}.`));
 
     return (
         <Dialog open onOpenChange={(v) => !v && onClose()}>
-            <DialogContent className="max-h-[90vh] overflow-y-auto">
+            <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-2xl">
                 <form onSubmit={submit} className="grid gap-4">
                     <DialogHeader>
-                        <DialogTitle>Inscrire un stagiaire</DialogTitle>
-                        <DialogDescription>Une session inter complète place le stagiaire en liste d'attente.</DialogDescription>
+                        <DialogTitle>Inscrire des stagiaires</DialogTitle>
+                        <DialogDescription>
+                            Un ou plusieurs stagiaires d'un même dossier. Une session inter complète place les suivants en liste d'attente.
+                        </DialogDescription>
                     </DialogHeader>
 
                     {source.from === 'session' && (
                         <div className="grid gap-2">
                             <Label htmlFor="dossier_id">Dossier *</Label>
                             <Select
-                                value={data.dossier_id || undefined}
+                                value={dossierId || undefined}
                                 onValueChange={(v) => {
-                                    const lines = source.dossiers.find((d) => d.id === v)?.lines ?? [];
-                                    setData((d) => ({ ...d, dossier_id: v, dossier_line_id: lines.length === 1 ? lines[0].id : '' }));
+                                    const ls = source.dossiers.find((d) => d.id === v)?.lines ?? [];
+                                    setDossierId(v);
+                                    setLineId(ls.length === 1 ? ls[0].id : '');
                                 }}
                             >
                                 <SelectTrigger id="dossier_id">
@@ -331,10 +246,11 @@ export function EnrolDialog({ source, references, onClose }: { source: Source; r
                         <div className="grid gap-2">
                             <Label htmlFor="dossier_line_id">Ligne de formation *</Label>
                             <Select
-                                value={data.dossier_line_id || undefined}
-                                onValueChange={(v) =>
-                                    setData((d) => ({ ...d, dossier_line_id: v, ...(source.from === 'dossier' ? { training_session_id: '' } : {}) }))
-                                }
+                                value={lineId || undefined}
+                                onValueChange={(v) => {
+                                    setLineId(v);
+                                    if (source.from === 'dossier') setSessionId('');
+                                }}
                             >
                                 <SelectTrigger id="dossier_line_id">
                                     <SelectValue placeholder="Choisissez" />
@@ -353,18 +269,17 @@ export function EnrolDialog({ source, references, onClose }: { source: Source; r
                         <InputError message={errors.dossier_line_id} />
                     )}
 
-                    {source.from === 'dossier' && data.dossier_line_id && (
+                    {source.from === 'dossier' && lineId && (
                         <div className="grid gap-2">
                             <Label htmlFor="training_session_id">Session *</Label>
-                            <Select value={data.training_session_id || undefined} onValueChange={(v) => setData('training_session_id', v)}>
+                            <Select value={sessionId || undefined} onValueChange={setSessionId}>
                                 <SelectTrigger id="training_session_id">
                                     <SelectValue placeholder={sessions.length === 0 ? 'Aucune session de cette formation' : 'Choisissez'} />
                                 </SelectTrigger>
                                 <SelectContent>
                                     {sessions.map((s) => (
                                         <SelectItem key={s.id} value={s.id}>
-                                            {s.number} · {sessionDates(s)} · {s.kind_label}
-                                            {s.capacity !== null ? ` · ${s.capacity} places` : ''}
+                                            {sessionOptionLabel(s)}
                                         </SelectItem>
                                     ))}
                                 </SelectContent>
@@ -373,28 +288,126 @@ export function EnrolDialog({ source, references, onClose }: { source: Source; r
                     )}
                     <InputError message={errors.training_session_id} />
 
-                    {data.training_session_id && (
-                        <div className="grid gap-2">
-                            <Label htmlFor="trainee_search">Stagiaire *</Label>
-                            <TraineePicker sessionId={data.training_session_id} organisationId={organisationId} value={trainee} onPick={setTrainee} />
-                            <InputError message={errors.person_id} />
-                        </div>
-                    )}
+                    {sessionId && (
+                        <>
+                            <div className="grid gap-2 sm:max-w-xs">
+                                <Label htmlFor="group_entered_on">Date d'entrée commune</Label>
+                                <Input id="group_entered_on" type="date" value={enteredOn} onChange={(e) => setEnteredOn(e.target.value)} />
+                                <p className="text-muted-foreground text-xs">
+                                    {start ? `Vide : début de la session (${formatDay(start)}).` : 'Vide : début de la session.'} Modifiable par
+                                    stagiaire.
+                                </p>
+                                <InputError message={errors.entered_on} />
+                            </div>
 
-                    <EnrolmentDetailsFields
-                        data={data}
-                        setData={(key, value) => setData(key, value)}
-                        errors={errors}
-                        categories={references.bpf_category}
-                    />
+                            <div className="grid gap-2">
+                                <Label htmlFor="trainee_search">Stagiaires *</Label>
+                                {trainees.length > 0 && (
+                                    <ul className="grid gap-2" aria-label="Stagiaires à inscrire">
+                                        {trainees.map((t, j) => (
+                                            <li key={t.key} className="grid gap-2 rounded-md border px-3 py-2 text-sm">
+                                                <div className="flex items-center justify-between gap-2">
+                                                    <span className="font-medium">{label(t)}</span>
+                                                    <Button
+                                                        type="button"
+                                                        variant="ghost"
+                                                        size="sm"
+                                                        aria-label={`Retirer ${label(t)}`}
+                                                        onClick={() => setTrainees((ts) => ts.filter((x) => x.key !== t.key))}
+                                                    >
+                                                        <X className="h-4 w-4" />
+                                                    </Button>
+                                                </div>
+                                                <div className="grid gap-2 sm:grid-cols-2">
+                                                    <div className="grid gap-1">
+                                                        <Label htmlFor={`entered_on_${t.key}`} className="text-xs">
+                                                            Date d'entrée
+                                                        </Label>
+                                                        <Input
+                                                            id={`entered_on_${t.key}`}
+                                                            type="date"
+                                                            value={t.entered_on}
+                                                            onChange={(e) => change(t.key, { entered_on: e.target.value })}
+                                                        />
+                                                    </div>
+                                                    <div className="grid gap-1">
+                                                        <Label htmlFor={`planned_hours_${t.key}`} className="text-xs">
+                                                            Heures prévues
+                                                        </Label>
+                                                        <Input
+                                                            id={`planned_hours_${t.key}`}
+                                                            inputMode="decimal"
+                                                            value={t.planned_hours}
+                                                            placeholder={hours ?? ''}
+                                                            onChange={(e) => change(t.key, { planned_hours: e.target.value })}
+                                                        />
+                                                    </div>
+                                                </div>
+                                                {traineeErrors(j).map(([k, m]) => (
+                                                    <InputError key={k} message={m} />
+                                                ))}
+                                                {'ref' in t && errors[`trainees.${j}`]?.startsWith('Des personnes similaires') && (
+                                                    <label className="flex items-center gap-2 text-xs">
+                                                        <input
+                                                            type="checkbox"
+                                                            checked={newPeople[t.ref]?.confirm_duplicate ?? false}
+                                                            onChange={(e) =>
+                                                                setNewPeople((p) => ({
+                                                                    ...p,
+                                                                    [t.ref]: { ...p[t.ref], confirm_duplicate: e.target.checked },
+                                                                }))
+                                                            }
+                                                        />
+                                                        Créer quand même
+                                                    </label>
+                                                )}
+                                            </li>
+                                        ))}
+                                    </ul>
+                                )}
+                                <InputError message={errors.trainees} />
+                                <TraineeSearch
+                                    sessionId={sessionId}
+                                    organisationId={organisationId}
+                                    onPick={(p) => {
+                                        if (!trainees.some((t) => 'person' in t && t.person.id === p.id)) {
+                                            setTrainees((ts) => [...ts, { key: nextKey++, person: p, entered_on: '', planned_hours: '' }]);
+                                        }
+                                    }}
+                                />
+                                {draft === null ? (
+                                    <div>
+                                        <Button type="button" variant="outline" size="sm" onClick={() => setDraft(emptyPerson())}>
+                                            <Plus className="h-4 w-4" />
+                                            Créer un stagiaire
+                                        </Button>
+                                    </div>
+                                ) : (
+                                    <NewPersonFields
+                                        index={0}
+                                        value={draft}
+                                        employer={employer}
+                                        onChange={(c) => setDraft({ ...draft, ...c })}
+                                        onCancel={() => setDraft(null)}
+                                        onAdd={() => {
+                                            const ref = `n${nextKey++}`;
+                                            setNewPeople((p) => ({ ...p, [ref]: draft }));
+                                            setTrainees((ts) => [...ts, { key: nextKey++, ref, entered_on: '', planned_hours: '' }]);
+                                            setDraft(null);
+                                        }}
+                                    />
+                                )}
+                            </div>
+                        </>
+                    )}
 
                     <DialogFooter>
                         <Button type="button" variant="outline" onClick={onClose}>
                             Retour
                         </Button>
-                        <Button type="submit" disabled={processing || !trainee || !data.training_session_id}>
+                        <Button type="submit" disabled={processing || trainees.length === 0 || !sessionId}>
                             {processing && <LoaderCircle className="h-4 w-4 animate-spin" />}
-                            Inscrire
+                            {trainees.length > 1 ? `Inscrire les ${trainees.length} stagiaires` : 'Inscrire'}
                         </Button>
                     </DialogFooter>
                 </form>

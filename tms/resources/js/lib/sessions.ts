@@ -2,6 +2,10 @@
 export interface SessionRow {
     id: string;
     number: string;
+    /** « Commis de cuisine – entrée du 30 novembre 2026 » (optional). */
+    title: string | null;
+    /** « <intitulé> (S-…) », or « <formation> (S-…) » without a title. */
+    label: string;
     training: { id: string; code: string | null; title: string; is_active: boolean } | null;
     das: string | null;
     kind: 'intra' | 'inter' | 'individual';

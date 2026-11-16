@@ -32,6 +32,7 @@ Route::middleware(['auth'])->prefix('sessions')->name('sessions.')->group(functi
     Route::get('{trainingSession}/trainees', [EnrolmentController::class, 'trainees'])->middleware(['can:sessions.sessions.update', 'throttle:sessions-trainees'])->name('trainees');
     Route::post('{trainingSession}/trainees', [EnrolmentController::class, 'createTrainee'])->middleware(['can:sessions.sessions.update', 'throttle:sessions-trainees'])->name('trainees.store');
     Route::post('{trainingSession}/enrolments', [EnrolmentController::class, 'store'])->middleware('can:sessions.sessions.update')->name('enrolments.store');
+    Route::post('{trainingSession}/enrolments/group', [EnrolmentController::class, 'storeGroup'])->middleware('can:sessions.sessions.update')->name('enrolments.group');
 });
 
 // An enrolment: sessions.sessions.update on its session (EnrolmentPolicy).

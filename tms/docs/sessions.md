@@ -6,10 +6,11 @@ Le menu de gauche, section **Formation**, donne accès à **Dossiers** (droit «
 
 ## 1. Les sessions
 
-Une **session** est une formation du catalogue donnée à des dates précises. Écran **Sessions** : la liste (recherche par numéro ou formation, filtres par état, type, modalité, DAS, formation, responsable et dates) et **Calendrier**, une vue par mois où chaque session s'étend de sa date de début à sa date de fin.
+Une **session** est une formation du catalogue donnée à des dates précises. Écran **Sessions** : la liste (recherche par numéro, intitulé, lieu ou formation, filtres par état, type, modalité, DAS, formation, responsable et dates) et **Calendrier**, une vue par mois où chaque session s'étend de sa date de début à sa date de fin.
 
 **Nouvelle session** :
 
+- **Intitulé** (facultatif, 150 caractères au plus) : un nom pour la session, par exemple « Commis de cuisine – entrée du 30 novembre 2026 ». Il est affiché partout où la session apparaît (liste, calendrier, page, fiches, dossiers, assistant, accueil, historique, export RGPD) et la recherche de la liste le trouve ; sans intitulé, la session se lit « <formation> (S-2026-0001) » ;
 - **Formation** du catalogue : ses heures sont reprises dans **Heures prévues** (modifiables) et son DAS devient celui de la session ;
 - **Type** :
   - **Intra (une entreprise)** : la session est réservée à une **entreprise** (obligatoire) ; seuls les dossiers dont elle est le contractant y inscrivent des stagiaires ; pas de nombre de places ;
@@ -56,15 +57,18 @@ La page du dossier montre l'en-tête (état et actions), les étapes, les lignes
 
 ## 3. Inscrire des stagiaires
 
-**Inscrire un stagiaire** (page du dossier ou de la session ; droit « Créer et modifier les sessions et inscriptions » sur la session et droit de consulter le dossier) :
+**Inscrire des stagiaires** (page du dossier ou de la session ; droit « Créer et modifier les sessions et inscriptions » sur la session et droit de consulter le dossier) inscrit **un ou plusieurs** stagiaires d'un même dossier en une fois — tout un groupe, ou une vague arrivée plus tard :
 
-1. choisissez la ligne de formation et la session (seules les sessions de cette formation ouvertes au dossier sont proposées) ;
-2. **Rechercher une personne** : la recherche porte sur toutes les personnes de l'organisme (nom, prénom, date de naissance, entreprise actuelle), même hors de votre périmètre, pour ne pas créer de doublon ; les salariés du contractant apparaissent en premier ;
-3. sinon, créez la personne sur place : c'est une personne ordinaire du CRM (rattachée au contractant si vous l'indiquez, avec le DAS de la formation). Si des **personnes similaires** existent, le formulaire les montre avant de créer.
+1. choisissez le dossier (depuis la session) ou la ligne de formation et la session (depuis le dossier ; seules les sessions de cette formation ouvertes au dossier sont proposées, avec leur intitulé) ;
+2. **Date d'entrée commune** : vide, le début de la session ; chaque stagiaire peut avoir la sienne (un stagiaire arrivé une semaine après) et ses **heures prévues** ;
+3. ajoutez les stagiaires : **recherchez une personne** — la recherche porte sur toutes les personnes de l'organisme (nom, prénom, date de naissance, entreprise actuelle), même hors de votre périmètre, pour ne pas créer de doublon ; les salariés du contractant apparaissent en premier ; un clic l'ajoute à la liste —, ou **Créer un stagiaire** : une personne ordinaire du CRM, créée à l'enregistrement (salariée du contractant si la case est cochée, avec le DAS de la formation), une seule fois même ajoutée deux fois. Si des **personnes similaires** existent, l'erreur les nomme : choisissez-la dans la recherche ou cochez « Créer quand même » ;
+4. **Inscrire** : tout le groupe est inscrit d'un seul coup, ou **personne** si un stagiaire est refusé (déjà inscrit, date ou heures invalides, personnes similaires) : l'erreur s'affiche sous ce stagiaire, corrigez-le ou retirez-le (✕) et inscrivez de nouveau. Une session inter complète place les suivants en **liste d'attente**, dans l'ordre de la liste ; une session individuelle n'accepte qu'un stagiaire.
+
+Les besoins d'adaptation, la catégorie BPF et les notes se saisissent ensuite sur chaque inscription (**Modifier**).
 
 Une personne n'est inscrite qu'**une fois** sur une même session (sauf inscription annulée). Une session intra refuse un dossier d'un autre contractant.
 
-Sur l'inscription : dates d'entrée (début de la session par défaut) et de sortie, heures prévues (celles de la session), catégorie de stagiaire (BPF), **besoins d'adaptation / situation de handicap** et notes. Ces deux derniers champs sont des **données personnelles** : ils ne sont visibles que de qui peut modifier l'inscription, ne figurent jamais en clair dans le journal et sont effacés par l'anonymisation.
+Sur l'inscription : dates d'entrée (début de la session par défaut) et de sortie, **heures prévues** (celles de la session par défaut ; modifiables par **Modifier**, plus de zéro et jamais au-delà des heures de la session ; vide : celles de la session ; chaque changement figure dans l'historique du dossier, « Heures prévues modifiées », avec l'ancienne et la nouvelle valeur ; elles serviront aux attestations et au prorata, sans effet sur la facturation dans ce lot), catégorie de stagiaire (BPF), **besoins d'adaptation / situation de handicap** et notes. Ces deux derniers champs sont des **données personnelles** : ils ne sont visibles que de qui peut modifier l'inscription, ne figurent jamais en clair dans le journal et sont effacés par l'anonymisation.
 
 ### Liste d'attente
 
@@ -72,7 +76,7 @@ Quand une session inter est complète (inscrits et confirmés au nombre de place
 
 ### États d'une inscription
 
-*Inscrit*, *En attente*, *Confirmé* (**Confirmer**), *Abandon* (**Abandon**), *Annulé* (**Désinscrire** : libère la place, sans promouvoir personne). **Modifier** change les dates, la catégorie BPF, les besoins d'adaptation et les notes.
+*Inscrit*, *En attente*, *Confirmé* (**Confirmer**), *Abandon* (**Abandon**), *Annulé* (**Désinscrire** : retire le stagiaire du groupe et libère la place, sans promouvoir personne). **Modifier** change la date d'entrée, les heures prévues, la catégorie BPF, les besoins d'adaptation et les notes.
 
 ### Prix par stagiaire
 
@@ -100,7 +104,7 @@ L'alerte compare le prix et les financements **non refusés** : « Reste à fina
 Sur un devis **accepté**, **Créer le dossier** (droit « Créer et modifier les dossiers ») ouvre un assistant en trois écrans :
 
 1. **Récapitulatif** : contractant, contact, lignes et montant repris du devis (le devis lui-même n'est jamais modifié) ; le mode de prix de chaque ligne de formation ;
-2. **Sessions** : pour chaque ligne de formation, une **session existante** de cette formation, une **nouvelle** session (intra ou individuelle pré-remplie pour l'entreprise) ou **Plus tard** ;
+2. **Sessions** : pour chaque ligne de formation, une **session existante** de cette formation, une **nouvelle** session (intra ou individuelle pré-remplie pour l'entreprise, avec un intitulé facultatif) ou **Plus tard** ;
 3. **Stagiaires** : cherchés dans le CRM (les salariés du contractant en premier) ou créés sur place, puis inscrits ; une même personne nouvelle n'est créée qu'une fois, même inscrite sur plusieurs lignes.
 
 Tout est créé d'un seul coup : le dossier (DAS de l'opportunité), ses lignes, les sessions nouvelles, les inscriptions et un financement initial du prix total, *À demander*, payé par le contractant, du type de financeur marqué « par défaut » pour une entreprise ou pour un particulier (*Référentiels* › *Types de financeur*, champ **Financement initial d'un dossier** ; « Entreprise » et « Personnel » à l'installation). Si aucun type n'est marqué pour ce cas, le dossier est créé sans financement. Un devis ne donne **qu'un dossier** : ensuite le bouton devient **Voir le dossier** (un double clic ou un second onglet ne crée pas de doublon). Un dossier mis à la corbeille bloque toujours la création d'un nouveau dossier pour ce devis : restaurez-le.

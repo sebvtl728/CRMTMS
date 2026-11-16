@@ -18,7 +18,12 @@ export interface EnrolmentRow {
     session: {
         id: string;
         number: string;
+        title: string | null;
+        /** « <intitulé> (S-…) », or « <formation> (S-…) » without a title. */
+        label: string;
         training: string | null;
+        /** Hours of the session (French decimal), the bound of the trainee's. */
+        planned_hours: string | null;
         starts_on: string;
         ends_on: string;
         can_open: boolean;
@@ -120,6 +125,7 @@ function AbandonDialog({ row, reasons, onClose }: { row: EnrolmentRow; reasons: 
 function EditDialog({ row, categories, onClose }: { row: EnrolmentRow; categories: Option[]; onClose: () => void }) {
     const { data, setData, put, processing, errors } = useForm({
         entered_on: row.entered_on ?? '',
+        planned_hours: row.planned_hours ?? '',
         bpf_category_id: row.bpf_category_id ?? '',
         adaptation_needs: row.adaptation_needs ?? '',
         notes: row.notes ?? '',
@@ -136,9 +142,25 @@ function EditDialog({ row, categories, onClose }: { row: EnrolmentRow; categorie
                 <form onSubmit={submit} className="grid gap-4">
                     <DialogHeader>
                         <DialogTitle>Inscription de {row.person.label}</DialogTitle>
-                        <DialogDescription>Date d'entrée, catégorie BPF, besoins d'adaptation et notes.</DialogDescription>
+                        <DialogDescription>Date d'entrée, heures prévues, catégorie BPF, besoins d'adaptation et notes.</DialogDescription>
                     </DialogHeader>
                     <EnrolmentDetailsFields data={data} setData={setData} errors={errors} categories={categories} withEntry />
+                    <div className="grid gap-2">
+                        <Label htmlFor="enrolment_planned_hours">Heures prévues</Label>
+                        <Input
+                            id="enrolment_planned_hours"
+                            inputMode="decimal"
+                            value={data.planned_hours}
+                            onChange={(e) => setData('planned_hours', e.target.value)}
+                            placeholder={row.session?.planned_hours ?? ''}
+                        />
+                        <p className="text-muted-foreground text-xs">
+                            {row.session?.planned_hours
+                                ? `Au plus les heures de la session (${row.session.planned_hours} h) ; vide : celles de la session.`
+                                : 'Vide : les heures de la session.'}
+                        </p>
+                        <InputError message={errors.planned_hours} />
+                    </div>
                     <DialogFooter>
                         <Button type="button" variant="outline" onClick={onClose}>
                             Retour
@@ -283,9 +305,10 @@ export function EnrolmentList({
                                             ? `Dossier ${row.dossier.number}${row.dossier.account ? ` · ${row.dossier.account}` : ''}`
                                             : 'Dossier non visible'
                                         : row.session
-                                          ? `Session ${row.session.number} · ${sessionDates(row.session)}`
+                                          ? `Session ${row.session.label} · ${sessionDates(row.session)}`
                                           : null,
                                     row.entered_on && `entrée le ${formatDay(row.entered_on)}`,
+                                    row.planned_hours && `${row.planned_hours} h prévues`,
                                     row.left_on && `sortie le ${formatDay(row.left_on)}`,
                                     row.abandon_reason && `motif : ${row.abandon_reason}`,
                                     row.bpf_category && `BPF : ${row.bpf_category}`,

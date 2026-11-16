@@ -1,6 +1,7 @@
 import Heading from '@/components/heading';
 import InputError from '@/components/input-error';
 import { FichePicker } from '@/components/sessions/fiche-picker';
+import { emptyPerson, NewPersonFields, newPersonLabel, type NewPerson } from '@/components/sessions/new-person-fields';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -17,6 +18,7 @@ type Kind = 'intra' | 'inter' | 'individual';
 interface SessionOption {
     id: string;
     number: string;
+    title: string | null;
     starts_on: string;
     ends_on: string;
     kind_label: string;
@@ -57,6 +59,7 @@ interface Props {
 }
 
 interface NewSession {
+    title: string;
     kind: Kind;
     starts_on: string;
     ends_on: string;
@@ -64,15 +67,6 @@ interface NewSession {
     location_kind: string;
     location_text: string;
     capacity: string;
-}
-
-interface NewPerson {
-    first_name: string;
-    last_name: string;
-    email: string;
-    birth_date: string;
-    employee: boolean;
-    confirm_duplicate: boolean;
 }
 
 /** A person of the CRM, or a person to create (by its ref: one person however many lines list it). */
@@ -96,16 +90,10 @@ function xsrfToken(): string {
     return match ? decodeURIComponent(match[1]) : '';
 }
 
-const emptyPerson = (): NewPerson => ({ first_name: '', last_name: '', email: '', birth_date: '', employee: true, confirm_duplicate: false });
-
 function sessionLabel(s: SessionOption): string {
     const dates = s.starts_on === s.ends_on ? formatDay(s.starts_on) : `${formatDay(s.starts_on)} au ${formatDay(s.ends_on)}`;
 
-    return `${s.number} · ${s.kind_label} · ${dates}${s.capacity ? ` · ${s.capacity} places` : ''}`;
-}
-
-function newPersonLabel(p: NewPerson | undefined): string {
-    return `${[p?.first_name, p?.last_name].filter(Boolean).join(' ')} (à créer)`;
+    return `${s.title ? `${s.title} · ` : ''}${s.number} · ${s.kind_label} · ${dates}${s.capacity ? ` · ${s.capacity} places` : ''}`;
 }
 
 function traineeLabel(t: Trainee, people: Record<string, NewPerson>): string {
@@ -148,6 +136,7 @@ export default function DossierFromQuote({ existing, plan, options, can }: Props
             choice: !can.sessions ? 'later' : l.sessions.length > 0 ? 'existing' : 'new',
             session_id: '',
             new_session: {
+                title: '',
                 kind: account?.type === 'organisation' ? 'intra' : 'individual',
                 starts_on: '',
                 ends_on: '',
@@ -221,7 +210,10 @@ export default function DossierFromQuote({ existing, plan, options, can }: Props
             return {
                 pricing_mode: l.pricing_mode,
                 ...session,
-                trainees: l.choice === 'later' ? [] : l.trainees.map((t) => ('person' in t ? t.person.id : { new_person: { ...newPeople[t.ref], ref: t.ref } })),
+                trainees:
+                    l.choice === 'later'
+                        ? []
+                        : l.trainees.map((t) => ('person' in t ? t.person.id : { new_person: { ...newPeople[t.ref], ref: t.ref } })),
             };
         }),
     });
@@ -309,7 +301,9 @@ export default function DossierFromQuote({ existing, plan, options, can }: Props
                     <section className="flex flex-col gap-4" aria-label="Récapitulatif">
                         <dl className="grid gap-4 rounded-xl border p-4 text-sm md:grid-cols-4">
                             <div>
-                                <dt className="text-muted-foreground text-xs">{plan.quote.account.type === 'organisation' ? 'Entreprise' : 'Particulier'}</dt>
+                                <dt className="text-muted-foreground text-xs">
+                                    {plan.quote.account.type === 'organisation' ? 'Entreprise' : 'Particulier'}
+                                </dt>
                                 <dd>{plan.quote.account.label}</dd>
                             </div>
                             <div>
@@ -365,7 +359,8 @@ export default function DossierFromQuote({ existing, plan, options, can }: Props
                         {training.length === 0 && <p className="text-sm">Ce devis n’a aucune ligne de formation : rien à planifier.</p>}
                         {!can.sessions && training.length > 0 && (
                             <p className="text-muted-foreground text-sm">
-                                Vous n’avez pas le droit de planifier des sessions : le dossier est créé sans session, les stagiaires s’inscriront depuis le dossier.
+                                Vous n’avez pas le droit de planifier des sessions : le dossier est créé sans session, les stagiaires s’inscriront
+                                depuis le dossier.
                             </p>
                         )}
                         {plan.lines.map((l, i) =>
@@ -413,7 +408,9 @@ export default function DossierFromQuote({ existing, plan, options, can }: Props
                                                     ))}
                                                 </div>
                                                 {l.sessions.length === 0 && (
-                                                    <p className="text-muted-foreground text-xs">Aucune session de cette formation n’est ouverte à ce dossier.</p>
+                                                    <p className="text-muted-foreground text-xs">
+                                                        Aucune session de cette formation n’est ouverte à ce dossier.
+                                                    </p>
                                                 )}
                                             </fieldset>
                                             {lines[i].choice === 'existing' && (
@@ -484,7 +481,9 @@ export default function DossierFromQuote({ existing, plan, options, can }: Props
                                                         </Button>
                                                     </div>
                                                     {Object.entries(errors)
-                                                        .filter(([k]) => k === `lines.${i}.trainees.${j}` || k.startsWith(`lines.${i}.trainees.${j}.`))
+                                                        .filter(
+                                                            ([k]) => k === `lines.${i}.trainees.${j}` || k.startsWith(`lines.${i}.trainees.${j}.`),
+                                                        )
                                                         .map(([k, m]) => (
                                                             <InputError key={k} message={m} />
                                                         ))}
@@ -521,7 +520,9 @@ export default function DossierFromQuote({ existing, plan, options, can }: Props
                                         />
                                     </div>
                                     {Object.keys(newPeople)
-                                        .filter((ref) => withSession.some((w, k) => w && k !== i && lines[k].trainees.some((t) => 'ref' in t && t.ref === ref)))
+                                        .filter((ref) =>
+                                            withSession.some((w, k) => w && k !== i && lines[k].trainees.some((t) => 'ref' in t && t.ref === ref)),
+                                        )
                                         .filter((ref) => !lines[i].trainees.some((t) => 'ref' in t && t.ref === ref))
                                         .map((ref) => (
                                             <div key={ref}>
@@ -538,7 +539,12 @@ export default function DossierFromQuote({ existing, plan, options, can }: Props
                                         ))}
                                     {draft === null ? (
                                         <div>
-                                            <Button type="button" variant="outline" size="sm" onClick={() => setDrafts((d) => ({ ...d, [i]: emptyPerson() }))}>
+                                            <Button
+                                                type="button"
+                                                variant="outline"
+                                                size="sm"
+                                                onClick={() => setDrafts((d) => ({ ...d, [i]: emptyPerson() }))}
+                                            >
                                                 <Plus className="h-4 w-4" />
                                                 Créer un stagiaire
                                             </Button>
@@ -617,12 +623,28 @@ function NewSessionFields({
 
     return (
         <div className="grid gap-4 md:grid-cols-3">
+            <div className="grid gap-2 md:col-span-3">
+                <Label htmlFor={`session_title_${index}`}>Intitulé (facultatif)</Label>
+                <Input
+                    id={`session_title_${index}`}
+                    maxLength={150}
+                    value={value.title}
+                    onChange={(e) => onChange({ title: e.target.value })}
+                    placeholder="Ex. Commis de cuisine – entrée du 30 novembre 2026"
+                />
+                <InputError message={error('title')} />
+            </div>
             <fieldset className="grid gap-2 md:col-span-3">
                 <legend className="mb-1 text-sm font-medium">Type *</legend>
                 <div className="flex flex-wrap gap-6 text-sm">
                     {kinds.map((k) => (
                         <label key={k.value} className="flex items-center gap-2">
-                            <input type="radio" name={`kind_${index}`} checked={value.kind === k.value} onChange={() => onChange({ kind: k.value as Kind })} />
+                            <input
+                                type="radio"
+                                name={`kind_${index}`}
+                                checked={value.kind === k.value}
+                                onChange={() => onChange({ kind: k.value as Kind })}
+                            />
                             {k.value === 'intra' ? `${k.label} (${accountLabel})` : k.label}
                         </label>
                     ))}
@@ -698,71 +720,5 @@ function NewSessionFields({
                 </div>
             )}
         </div>
-    );
-}
-
-function NewPersonFields({
-    index,
-    value,
-    employer,
-    onChange,
-    onCancel,
-    onAdd,
-}: {
-    index: number;
-    value: NewPerson;
-    employer: string | null;
-    onChange: (change: Partial<NewPerson>) => void;
-    onCancel: () => void;
-    onAdd: () => void;
-}) {
-    const [missing, setMissing] = useState(false);
-
-    return (
-        <fieldset className="grid gap-3 rounded-md border p-3 md:grid-cols-2">
-            <legend className="px-1 text-sm font-medium">Nouveau stagiaire</legend>
-            <div className="grid gap-1">
-                <Label htmlFor={`new_first_name_${index}`}>Prénom</Label>
-                <Input id={`new_first_name_${index}`} value={value.first_name} onChange={(e) => onChange({ first_name: e.target.value })} />
-            </div>
-            <div className="grid gap-1">
-                <Label htmlFor={`new_last_name_${index}`}>Nom *</Label>
-                <Input id={`new_last_name_${index}`} value={value.last_name} onChange={(e) => onChange({ last_name: e.target.value })} />
-                <InputError message={missing ? 'Indiquez le nom.' : undefined} />
-            </div>
-            <div className="grid gap-1">
-                <Label htmlFor={`new_email_${index}`}>E-mail</Label>
-                <Input id={`new_email_${index}`} type="email" value={value.email} onChange={(e) => onChange({ email: e.target.value })} />
-            </div>
-            <div className="grid gap-1">
-                <Label htmlFor={`new_birth_date_${index}`}>Date de naissance</Label>
-                <Input id={`new_birth_date_${index}`} type="date" value={value.birth_date} onChange={(e) => onChange({ birth_date: e.target.value })} />
-            </div>
-            {employer && (
-                <label className="flex items-center gap-2 text-sm md:col-span-2">
-                    <input type="checkbox" checked={value.employee} onChange={(e) => onChange({ employee: e.target.checked })} />
-                    Salarié de {employer}
-                </label>
-            )}
-            <div className="flex gap-2 md:col-span-2">
-                <Button
-                    type="button"
-                    size="sm"
-                    onClick={() => {
-                        if (value.last_name.trim() === '') {
-                            setMissing(true);
-
-                            return;
-                        }
-                        onAdd();
-                    }}
-                >
-                    Ajouter
-                </Button>
-                <Button type="button" variant="ghost" size="sm" onClick={onCancel}>
-                    Annuler
-                </Button>
-            </div>
-        </fieldset>
     );
 }
