@@ -180,13 +180,10 @@ test('phone: meeting report on a fiche without a planned meeting, 375 px wide', 
     await expect(page).toHaveURL(/\/crm\/report$/);
     expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBeLessThanOrEqual(1);
 
-    // Typed again if the page re-rendered under the first keystrokes (sidebar sheet closing on the phone).
-    const hit = page.getByRole('button', { name: new RegExp(`^${ENTREPRISE}`) });
-    await expect(async () => {
-        await page.getByRole('searchbox', { name: 'Rechercher une entreprise ou une personne' }).fill('Traiteur des Alpes');
-        await expect(hit).toBeVisible({ timeout: 2_000 });
-    }).toPass({ timeout: 15_000 });
-    await hit.click();
+    // Let the visit settle (the menu link is prefetched, then visited): text typed earlier was sometimes lost.
+    await page.waitForLoadState('networkidle');
+    await page.getByRole('searchbox', { name: 'Rechercher une entreprise ou une personne' }).fill('Traiteur des Alpes');
+    await page.getByRole('button', { name: new RegExp(`^${ENTREPRISE}`) }).click({ timeout: 15_000 });
     await page.getByRole('button', { name: 'Réussi', exact: true }).click();
     await page.getByLabel('Compte rendu', { exact: true }).fill('Rencontre sur place : le chef veut une session en mars.');
     await page.getByRole('button', { name: 'Enregistrer le compte rendu' }).click();
