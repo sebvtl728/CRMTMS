@@ -18,7 +18,7 @@ Dossiers de formation, sessions, inscriptions et financements (lot 2a) : le devi
 - **Dossiers de formation** (menu Formation › Dossiers) : contractant (entreprise ou particulier), contact, société
   émettrice, DAS, lignes de formation (prix par stagiaire ou de groupe) et de frais, numéro `D-2026-0001`, étapes
   (convention envoyée, signée, convocations envoyées, en cours, réalisé) et annulation avec motif ; liste avec
-  **reste à financer**, filtres, export Excel ; **historique** du dossier (étapes, inscriptions, financements).
+  **reste à financer**, filtres, export CSV (« Exporter (.csv) ») ; **historique** du dossier (étapes, inscriptions, financements).
 - **Inscriptions** des stagiaires : recherche dans toutes les personnes de l'organisme (sans doublon) ou création sur
   place ; **liste d'attente** d'une session inter complète (promotion à la main) ; confirmation, **abandon** (date de
   sortie, motif, force majeure), désinscription ; part de prix par stagiaire répartie au centime ; besoins

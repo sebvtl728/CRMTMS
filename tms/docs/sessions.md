@@ -30,7 +30,7 @@ La **page d'une session** montre ses informations, les **places restantes** d'un
 
 ## 2. Les dossiers
 
-Un **dossier** de formation porte la vente : qui achète, quoi, à quel prix, et qui finance. Écran **Dossiers** : la liste (numéro, contractant, formations, prix HT, **reste à financer**, responsable, état), ses filtres, son export Excel (droit « Exporter »).
+Un **dossier** de formation porte la vente : qui achète, quoi, à quel prix, et qui finance. Écran **Dossiers** : la liste (numéro, contractant, formations, prix HT, **reste à financer**, responsable, état), ses filtres, son export CSV, bouton « Exporter (.csv) » (droit « Exporter »).
 
 La colonne **Reste à financer** donne le prix du dossier moins ses financements non refusés, au centime : en orange s'il reste à financer, en rouge « Financements supérieurs au prix : … » si les financements dépassent le prix.
 

@@ -126,7 +126,7 @@ export default function DossiersIndex({ dossiers, filters, options, can, status 
                             <div className="grid gap-1">
                                 <Button type="button" variant="outline" onClick={download} disabled={checking}>
                                     <Download className="h-4 w-4" />
-                                    Exporter (CSV)
+                                    Exporter (.csv)
                                 </Button>
                                 {exportError && (
                                     <p role="alert" className="text-destructive max-w-xs text-sm">
