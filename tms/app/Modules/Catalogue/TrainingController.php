@@ -62,9 +62,15 @@ class TrainingController extends Controller
         $funding = array_values($validated['funding_mode_ids'] ?? []);
         unset($validated['funding_mode_ids']);
 
-        DB::transaction(function () use ($validated, $funding): void {
+        $modules = array_key_exists('modules', $validated) ? array_values($validated['modules'] ?? []) : null;
+        unset($validated['modules']);
+
+        DB::transaction(function () use ($validated, $funding, $modules): void {
             $training = Training::query()->create($validated);
             $training->syncFundingModes($funding);
+            if ($modules !== null) {
+                TrainingModules::sync($training, $modules);
+            }
         });
 
         return to_route('catalogue.index')->with('status', 'Formation créée.');
@@ -87,6 +93,17 @@ class TrainingController extends Controller
                 'price_company' => $training->price_company,
                 'price_individual' => $training->price_individual,
                 'is_active' => $training->is_active,
+                'description' => $training->description,
+                'objectives' => $training->objectives ?? [],
+                'methods' => $training->methods,
+                'evaluation' => $training->evaluation,
+                'sanction' => $training->sanction,
+                'accessibility' => $training->accessibility,
+                'access_terms' => $training->access_terms,
+                'results' => $training->results,
+                'modules' => app(Trainings::class)->modules($training->id),
+                'modules_hours' => TrainingModules::hours($training),
+                'modules_gap' => TrainingModules::gap($training),
                 'funding_mode_ids' => $training->fundingModes()->pluck('reference_items.id')->all(),
             ],
             'options' => self::formOptions($training),
@@ -103,8 +120,14 @@ class TrainingController extends Controller
         $funding = array_key_exists('funding_mode_ids', $validated) ? array_values($validated['funding_mode_ids'] ?? []) : null;
         unset($validated['funding_mode_ids']);
 
-        DB::transaction(function () use ($training, $validated, $funding): void {
+        $modules = array_key_exists('modules', $validated) ? array_values($validated['modules'] ?? []) : null;
+        unset($validated['modules']);
+
+        DB::transaction(function () use ($training, $validated, $funding, $modules): void {
             $training->update($validated);
+            if ($modules !== null) {
+                TrainingModules::sync($training, $modules);
+            }
             if ($funding !== null) {
                 $training->syncFundingModes($funding);
             }
@@ -214,6 +237,7 @@ class TrainingController extends Controller
         return [
             'das' => TrainingListQuery::reference(ReferenceList::Das, array_filter([$current?->das_id])),
             'funding_mode' => TrainingListQuery::reference(ReferenceList::FundingMode, $current?->fundingModes()->pluck('reference_items.id')->all() ?? []),
+            'modality' => TrainingListQuery::reference(ReferenceList::TrainingModality, $current?->modules()->whereNotNull('modality_id')->pluck('modality_id')->all() ?? []),
         ];
     }
 

@@ -14,6 +14,12 @@ use Illuminate\Validation\Rule;
  */
 class TrainingRequest extends FormRequest
 {
+    public const SHEET_TEXTS = ['description', 'methods', 'evaluation', 'sanction', 'accessibility', 'access_terms', 'results'];
+
+    public const MAX_OBJECTIVES = 20;
+
+    public const MAX_MODULES = 30;
+
     public const DECIMALS = ['duration_hours', 'duration_days', 'price_company', 'price_individual'];
 
     public function authorize(): bool
@@ -24,7 +30,7 @@ class TrainingRequest extends FormRequest
     protected function prepareForValidation(): void
     {
         $clean = [];
-        foreach (['code', 'title', 'audience', 'prerequisites'] as $key) {
+        foreach (['code', 'title', 'audience', 'prerequisites', ...self::SHEET_TEXTS] as $key) {
             if ($this->has($key)) {
                 $value = $this->input($key);
                 $value = is_string($value) ? trim($value) : $value;
@@ -40,7 +46,39 @@ class TrainingRequest extends FormRequest
             }
         }
 
+        if ($this->has('objectives')) {
+            $objectives = $this->input('objectives');
+            $clean['objectives'] = is_array($objectives)
+                ? array_values(array_filter(array_map(fn ($o) => is_string($o) ? trim($o) : $o, $objectives), fn ($o) => $o !== '' && $o !== null))
+                : $objectives;
+            if ($clean['objectives'] === []) {
+                $clean['objectives'] = null;
+            }
+        }
+        if (is_array($this->input('modules'))) {
+            $clean['modules'] = array_map(fn ($m) => is_array($m) ? self::cleanModule($m) : $m, array_values($this->input('modules')));
+        }
+
         $this->merge($clean);
+    }
+
+    /**
+     * @param  array<string, mixed>  $module
+     * @return array<string, mixed>
+     */
+    private static function cleanModule(array $module): array
+    {
+        foreach (['title', 'content', 'modality_id', 'id'] as $key) {
+            if (array_key_exists($key, $module)) {
+                $value = is_string($module[$key]) ? trim($module[$key]) : $module[$key];
+                $module[$key] = $value === '' ? null : $value;
+            }
+        }
+        if (array_key_exists('duration_hours', $module)) {
+            $module['duration_hours'] = self::decimal($module['duration_hours']);
+        }
+
+        return $module;
     }
 
     /**
@@ -73,7 +111,26 @@ class TrainingRequest extends FormRequest
      */
     public function rules(): array
     {
-        return self::fieldRules($this->current());
+        $current = $this->current();
+
+        return [
+            ...self::fieldRules($current),
+            'modules' => ['sometimes', 'nullable', 'array', 'max:'.self::MAX_MODULES],
+            'modules.*.id' => ['nullable', 'uuid', Rule::exists('training_modules', 'id')
+                ->where('tenant_id', app(TenantContext::class)->id())->where('training_id', $current === null ? '' : $current->id)],
+            'modules.*.title' => ['required', 'string', 'max:200'],
+            'modules.*.duration_hours' => ['nullable', 'numeric', 'decimal:0,2', 'min:0', 'max:9999.99'],
+            'modules.*.modality_id' => ['nullable', ...self::reference(ReferenceList::TrainingModality, $this->currentModalities($current))],
+            'modules.*.content' => ['nullable', 'string', 'max:5000'],
+        ];
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function currentModalities(?Training $current): array
+    {
+        return $current === null ? [] : $current->modules()->whereNotNull('modality_id')->pluck('modality_id')->all();
     }
 
     /**
@@ -98,6 +155,10 @@ class TrainingRequest extends FormRequest
             'prerequisites' => ['nullable', 'string', 'max:5000'],
             'price_company' => ['nullable', 'numeric', 'decimal:0,2', 'min:0', 'max:9999999999.99'],
             'price_individual' => ['nullable', 'numeric', 'decimal:0,2', 'min:0', 'max:9999999999.99'],
+            'description' => ['nullable', 'string', 'max:5000'],
+            'objectives' => ['nullable', 'array', 'max:'.self::MAX_OBJECTIVES],
+            'objectives.*' => ['string', 'max:500'],
+            ...array_fill_keys(array_diff(self::SHEET_TEXTS, ['description']), ['nullable', 'string', 'max:5000']),
             'funding_mode_ids' => ['sometimes', 'nullable', 'array'],
             'funding_mode_ids.*' => ['distinct', ...self::reference(ReferenceList::FundingMode, $currentFunding)],
         ];
@@ -110,7 +171,7 @@ class TrainingRequest extends FormRequest
      * @param  list<string>  $keep
      * @return list<mixed>
      */
-    private static function reference(ReferenceList $list, array $keep): array
+    public static function reference(ReferenceList $list, array $keep): array
     {
         return ['bail', 'uuid', Rule::exists('reference_items', 'id')
             ->where('tenant_id', app(TenantContext::class)->id())
@@ -142,10 +203,17 @@ class TrainingRequest extends FormRequest
             'exists' => 'Cette valeur n\'existe pas ou n\'est plus disponible.',
             'code.unique' => 'Ce code est déjà utilisé par une autre formation.',
             'code.max' => 'Le code ne doit pas dépasser 20 caractères.',
+            'objectives.max' => 'Vingt objectifs au plus.',
+            'objectives.*.max' => 'Un objectif ne doit pas dépasser 500 caractères.',
+            'modules.max' => 'Trente modules au plus.',
+            'modules.*.title.required' => 'L\'intitulé du module est obligatoire.',
+            'modules.*.title.max' => 'L\'intitulé ne doit pas dépasser 200 caractères.',
+            'modules.*.content.max' => 'Ce champ est trop long.',
             'title.max' => 'L\'intitulé ne doit pas dépasser 200 caractères.',
             'numeric' => 'Indiquez un nombre, par exemple 1 250,50.',
             'decimal' => 'Indiquez au plus deux décimales.',
             'min' => 'La valeur ne peut pas être négative.',
+            'modules.*.duration_hours.max' => 'La durée est trop longue.',
             'duration_hours.max' => 'La durée est trop longue.',
             'duration_days.max' => 'La durée est trop longue.',
             'price_company.max' => 'Le tarif est trop élevé.',

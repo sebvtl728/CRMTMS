@@ -10,6 +10,7 @@ use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Auth;
@@ -29,6 +30,14 @@ use Illuminate\Support\Facades\Auth;
  * @property string|null $prerequisites
  * @property string|null $price_company numeric(12,2) as a string, HT per trainee
  * @property string|null $price_individual numeric(12,2) as a string, HT per trainee
+ * @property string|null $description
+ * @property list<string>|null $objectives ordered texts
+ * @property string|null $methods
+ * @property string|null $evaluation
+ * @property string|null $sanction
+ * @property string|null $accessibility
+ * @property string|null $access_terms
+ * @property string|null $results
  * @property bool $is_active
  * @property string|null $created_by
  * @property string|null $updated_by
@@ -49,6 +58,7 @@ class Training extends Model
     protected $fillable = [
         'code', 'title', 'das_id', 'duration_hours', 'duration_days', 'audience', 'prerequisites',
         'price_company', 'price_individual', 'is_active',
+        'description', 'objectives', 'methods', 'evaluation', 'sanction', 'accessibility', 'access_terms', 'results',
     ];
 
     /** @var array<string, mixed> */
@@ -83,6 +93,7 @@ class Training extends Model
             'price_company' => 'decimal:2',
             'price_individual' => 'decimal:2',
             'is_active' => 'boolean',
+            'objectives' => 'array',
         ];
     }
 
@@ -109,5 +120,13 @@ class Training extends Model
     public function syncFundingModes(array $ids): void
     {
         $this->fundingModes()->sync(array_fill_keys($ids, ['tenant_id' => $this->tenant_id]));
+    }
+
+    /**
+     * @return HasMany<TrainingModule, $this>
+     */
+    public function modules(): HasMany
+    {
+        return $this->hasMany(TrainingModule::class)->orderBy('position');
     }
 }

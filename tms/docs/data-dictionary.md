@@ -290,6 +290,9 @@ Module `Catalogue` : le Crm ne lit jamais ces tables directement (service `Catal
 | `das_id` | uuid (FK `reference_items`) | DAS (`ReferenceUsage`) |
 | `duration_hours`, `duration_days` | numeric(6,2) / numeric(5,2), null | Durées (CHECK ≥ 0) |
 | `audience`, `prerequisites` | text, null | Public visé, prérequis |
+| `description` | text, null | Présentation courte (0.7) |
+| `objectives` | jsonb, null | Objectifs pédagogiques : liste ordonnée de textes (20 au plus, 500 caractères chacun) |
+| `methods`, `evaluation`, `sanction`, `accessibility`, `access_terms`, `results` | text, null | Méthodes et moyens, évaluation, sanction, accessibilité, modalités et délais d'accès, indicateurs de résultats (texte libre) |
 | `price_company`, `price_individual` | numeric(12,2), null | Tarifs HT par stagiaire, entreprise et particulier (CHECK ≥ 0) |
 | `is_active` | bool, défaut `true` | Désactivée : plus proposée, reste sur les opportunités et devis existants |
 | `source_system`, `source_id` | string(50) / string(255), null | Identifiant d'origine (import) ; unique partiel par organisme (`trainings_source_unique`) |
@@ -300,6 +303,9 @@ Index : (`tenant_id`, `das_id`), (`tenant_id`, `title`). Journalisée (`training
 
 ### `training_funding_modes` — financements possibles d'une formation
 `tenant_id` · `training_id` (FK, cascade) · `funding_mode_id` (FK `reference_items`, `ReferenceUsage`) ; PK (`training_id`, `funding_mode_id`), index `funding_mode_id`.
+
+### `training_modules` — modules d'une formation (0.7)
+`id`, `tenant_id` · `training_id` (FK, cascade) · `position` smallint (ordre, à partir de 0) · `title` string(200) · `duration_hours` numeric(6,2), null · `modality_id` (FK `reference_items`, null ; référentiel `training_modality`, `ReferenceUsage`) · `content` text, null · `created_at`, `updated_at`. Index (`training_id`, `position`), `modality_id`. 30 au plus par formation. Journalisée (`training_module`, sans le contenu). Lue par les autres modules par `Catalogue\Trainings::modules()`. La somme des durées est comparée à celle de la formation : écart signalé, jamais bloquant.
 
 ## CRM : devis (lot 1d, RLS)
 

@@ -9,7 +9,7 @@ import AppLayout from '@/layouts/app-layout';
 import { amountInput, formatSize, itemError, type Option } from '@/lib/crm';
 import { type BreadcrumbItem } from '@/types';
 import { Head, Link, useForm } from '@inertiajs/react';
-import { LoaderCircle } from 'lucide-react';
+import { ArrowDown, ArrowUp, LoaderCircle, Plus, Trash2 } from 'lucide-react';
 import { FormEventHandler } from 'react';
 
 interface FormProps {
@@ -25,14 +25,38 @@ interface FormProps {
         price_company: string | null;
         price_individual: string | null;
         is_active: boolean;
+        description: string | null;
+        objectives: string[];
+        methods: string | null;
+        evaluation: string | null;
+        sanction: string | null;
+        accessibility: string | null;
+        access_terms: string | null;
+        results: string | null;
+        modules: { id: string; title: string; duration_hours: string | null; modality_id: string | null; content: string | null }[];
+        modules_hours: string;
+        modules_gap: boolean;
         funding_mode_ids: string[];
     } | null;
-    options: { das: Option[]; funding_mode: Option[] };
+    options: { das: Option[]; funding_mode: Option[]; modality: Option[] };
     brochures?: { id: string; title: string; original_name: string; size: number; source: 'training' | 'das' }[];
     can?: { brochures: boolean };
 }
 
+type ModuleForm = { id?: string; title: string; duration_hours: string; modality_id: string; content: string };
+
+type SheetText = 'description' | 'methods' | 'evaluation' | 'sanction' | 'accessibility' | 'access_terms' | 'results';
+
 type TrainingForm = {
+    description: string;
+    objectives: string[];
+    methods: string;
+    evaluation: string;
+    sanction: string;
+    accessibility: string;
+    access_terms: string;
+    results: string;
+    modules: ModuleForm[];
     code: string;
     title: string;
     das_id: string;
@@ -69,6 +93,21 @@ export default function TrainingFormPage({ training, options, brochures = [], ca
         price_company: amountInput(training?.price_company),
         price_individual: amountInput(training?.price_individual),
         funding_mode_ids: training?.funding_mode_ids ?? [],
+        description: training?.description ?? '',
+        objectives: training?.objectives ?? [],
+        methods: training?.methods ?? '',
+        evaluation: training?.evaluation ?? '',
+        sanction: training?.sanction ?? '',
+        accessibility: training?.accessibility ?? '',
+        access_terms: training?.access_terms ?? '',
+        results: training?.results ?? '',
+        modules: (training?.modules ?? []).map((m) => ({
+            id: m.id,
+            title: m.title,
+            duration_hours: decimalInput(m.duration_hours),
+            modality_id: m.modality_id ?? '',
+            content: m.content ?? '',
+        })),
     });
 
     const title = editing ? 'Modifier la formation' : 'Nouvelle formation';
@@ -86,7 +125,11 @@ export default function TrainingFormPage({ training, options, brochures = [], ca
         }
     };
 
-    const text = (key: Exclude<keyof TrainingForm, 'funding_mode_ids'>, label: string, props: Record<string, unknown> = {}) => (
+    const text = (
+        key: 'code' | 'duration_hours' | 'duration_days' | 'price_company' | 'price_individual',
+        label: string,
+        props: Record<string, unknown> = {},
+    ) => (
         <div className="grid gap-2">
             <Label htmlFor={key}>{label}</Label>
             <Input id={key} value={data[key]} onChange={(e) => setData(key, e.target.value)} {...props} />
@@ -96,6 +139,41 @@ export default function TrainingFormPage({ training, options, brochures = [], ca
 
     const toggleFunding = (id: string, checked: boolean) =>
         setData('funding_mode_ids', checked ? [...data.funding_mode_ids, id] : data.funding_mode_ids.filter((f) => f !== id));
+
+    const area = (key: SheetText, label: string, rows = 3) => (
+        <div className="grid gap-2 md:col-span-2">
+            <Label htmlFor={key}>{label}</Label>
+            <textarea id={key} rows={rows} value={data[key]} onChange={(e) => setData(key, e.target.value)} className={textareaClass} />
+            <InputError message={errors[key]} />
+        </div>
+    );
+
+    const setObjective = (i: number, value: string) =>
+        setData(
+            'objectives',
+            data.objectives.map((o, j) => (j === i ? value : o)),
+        );
+    const moveItem = <T,>(list: T[], i: number, by: number): T[] => {
+        const j = i + by;
+        if (j < 0 || j >= list.length) return list;
+        const next = [...list];
+        [next[i], next[j]] = [next[j], next[i]];
+
+        return next;
+    };
+    const setModule = (i: number, patch: Partial<ModuleForm>) =>
+        setData(
+            'modules',
+            data.modules.map((m, j) => (j === i ? { ...m, ...patch } : m)),
+        );
+
+    // Sum of the modules (hours typed the French way) against the duration of the training: a warning only.
+    const toHours = (v: string) => Number.parseFloat(v.replace(/\s/g, '').replace(',', '.'));
+    const modulesSum = data.modules.reduce((sum, m) => sum + (Number.isFinite(toHours(m.duration_hours)) ? toHours(m.duration_hours) : 0), 0);
+    const duration = toHours(data.duration_hours);
+    const gap = data.modules.length > 0 && Number.isFinite(duration) && Math.abs(modulesSum - duration) > 0.004;
+    const hoursText = (n: number) => String(Math.round(n * 100) / 100).replace('.', ',');
+    const nested = (key: string): string | undefined => (errors as Record<string, string | undefined>)[key];
 
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
@@ -109,7 +187,7 @@ export default function TrainingFormPage({ training, options, brochures = [], ca
 
                 <form onSubmit={submit} className="flex flex-col gap-6" noValidate>
                     <fieldset className="grid gap-4 rounded-xl border p-4 md:grid-cols-2">
-                        <legend className="px-2 text-sm font-semibold">Formation</legend>
+                        <legend className="px-2 text-sm font-semibold">Présentation</legend>
                         <div className="grid gap-2 md:col-span-2">
                             <Label htmlFor="title">Intitulé *</Label>
                             <Input
@@ -144,6 +222,73 @@ export default function TrainingFormPage({ training, options, brochures = [], ca
                         {text('duration_days', 'Durée (jours)', { inputMode: 'decimal', placeholder: '3' })}
                         {text('price_company', 'Tarif entreprise HT par stagiaire (€)', { inputMode: 'decimal', placeholder: '1 250,00' })}
                         {text('price_individual', 'Tarif particulier HT par stagiaire (€)', { inputMode: 'decimal', placeholder: '990,00' })}
+                        {area('description', 'Description courte')}
+                    </fieldset>
+
+                    <fieldset className="grid gap-4 rounded-xl border p-4" aria-label="Objectifs">
+                        <legend className="px-2 text-sm font-semibold">Objectifs pédagogiques</legend>
+                        {data.objectives.map((o, i) => (
+                            <div key={i} className="grid gap-1">
+                                <div className="flex items-center gap-2">
+                                    <Input
+                                        aria-label={`Objectif ${i + 1}`}
+                                        value={o}
+                                        maxLength={500}
+                                        onChange={(e) => setObjective(i, e.target.value)}
+                                        placeholder="À l’issue de la formation, le stagiaire sait…"
+                                    />
+                                    <Button
+                                        type="button"
+                                        variant="outline"
+                                        size="icon"
+                                        aria-label={`Monter l’objectif ${i + 1}`}
+                                        onClick={() => setData('objectives', moveItem(data.objectives, i, -1))}
+                                    >
+                                        <ArrowUp className="h-4 w-4" />
+                                    </Button>
+                                    <Button
+                                        type="button"
+                                        variant="outline"
+                                        size="icon"
+                                        aria-label={`Descendre l’objectif ${i + 1}`}
+                                        onClick={() => setData('objectives', moveItem(data.objectives, i, 1))}
+                                    >
+                                        <ArrowDown className="h-4 w-4" />
+                                    </Button>
+                                    <Button
+                                        type="button"
+                                        variant="outline"
+                                        size="icon"
+                                        aria-label={`Supprimer l’objectif ${i + 1}`}
+                                        onClick={() =>
+                                            setData(
+                                                'objectives',
+                                                data.objectives.filter((_, j) => j !== i),
+                                            )
+                                        }
+                                    >
+                                        <Trash2 className="h-4 w-4" />
+                                    </Button>
+                                </div>
+                                <InputError message={nested(`objectives.${i}`)} />
+                            </div>
+                        ))}
+                        <InputError message={errors.objectives} />
+                        <div>
+                            <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                disabled={data.objectives.length >= 20}
+                                onClick={() => setData('objectives', [...data.objectives, ''])}
+                            >
+                                <Plus className="h-4 w-4" /> Ajouter un objectif
+                            </Button>
+                        </div>
+                    </fieldset>
+
+                    <fieldset className="grid gap-4 rounded-xl border p-4 md:grid-cols-2" aria-label="Public et prérequis">
+                        <legend className="px-2 text-sm font-semibold">Public et prérequis</legend>
                         <div className="grid gap-2 md:col-span-2">
                             <Label htmlFor="audience">Public visé</Label>
                             <textarea
@@ -166,6 +311,141 @@ export default function TrainingFormPage({ training, options, brochures = [], ca
                             />
                             <InputError message={errors.prerequisites} />
                         </div>
+                    </fieldset>
+
+                    <fieldset className="grid gap-4 rounded-xl border p-4" aria-label="Modules">
+                        <legend className="px-2 text-sm font-semibold">Modules</legend>
+                        {data.modules.map((m, i) => (
+                            <div key={m.id ?? i} className="grid gap-2 rounded-lg border p-3 md:grid-cols-[1fr_8rem_12rem]">
+                                <div className="grid gap-1">
+                                    <Label htmlFor={`module-title-${i}`}>Module {i + 1} : intitulé *</Label>
+                                    <Input
+                                        id={`module-title-${i}`}
+                                        value={m.title}
+                                        maxLength={200}
+                                        onChange={(e) => setModule(i, { title: e.target.value })}
+                                    />
+                                    <InputError message={nested(`modules.${i}.title`)} />
+                                </div>
+                                <div className="grid gap-1">
+                                    <Label htmlFor={`module-hours-${i}`}>Durée (h)</Label>
+                                    <Input
+                                        id={`module-hours-${i}`}
+                                        inputMode="decimal"
+                                        value={m.duration_hours}
+                                        onChange={(e) => setModule(i, { duration_hours: e.target.value })}
+                                    />
+                                    <InputError message={nested(`modules.${i}.duration_hours`)} />
+                                </div>
+                                <div className="grid gap-1">
+                                    <Label htmlFor={`module-modality-${i}`}>Modalité</Label>
+                                    <Select
+                                        value={m.modality_id || '__none'}
+                                        onValueChange={(v) => setModule(i, { modality_id: v === '__none' ? '' : v })}
+                                    >
+                                        <SelectTrigger id={`module-modality-${i}`}>
+                                            <SelectValue />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="__none">Non précisée</SelectItem>
+                                            {options.modality.map((o) => (
+                                                <SelectItem key={o.value} value={o.value}>
+                                                    {o.label}
+                                                </SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
+                                    <InputError message={nested(`modules.${i}.modality_id`)} />
+                                </div>
+                                <div className="grid gap-1 md:col-span-3">
+                                    <Label htmlFor={`module-content-${i}`}>Contenu</Label>
+                                    <textarea
+                                        id={`module-content-${i}`}
+                                        rows={3}
+                                        value={m.content}
+                                        onChange={(e) => setModule(i, { content: e.target.value })}
+                                        className={textareaClass}
+                                    />
+                                    <InputError message={nested(`modules.${i}.content`)} />
+                                </div>
+                                <div className="flex gap-2 md:col-span-3">
+                                    <Button
+                                        type="button"
+                                        variant="outline"
+                                        size="sm"
+                                        aria-label={`Monter le module ${i + 1}`}
+                                        onClick={() => setData('modules', moveItem(data.modules, i, -1))}
+                                    >
+                                        <ArrowUp className="h-4 w-4" />
+                                    </Button>
+                                    <Button
+                                        type="button"
+                                        variant="outline"
+                                        size="sm"
+                                        aria-label={`Descendre le module ${i + 1}`}
+                                        onClick={() => setData('modules', moveItem(data.modules, i, 1))}
+                                    >
+                                        <ArrowDown className="h-4 w-4" />
+                                    </Button>
+                                    <Button
+                                        type="button"
+                                        variant="outline"
+                                        size="sm"
+                                        aria-label={`Supprimer le module ${i + 1}`}
+                                        onClick={() =>
+                                            setData(
+                                                'modules',
+                                                data.modules.filter((_, j) => j !== i),
+                                            )
+                                        }
+                                    >
+                                        <Trash2 className="h-4 w-4" /> Supprimer
+                                    </Button>
+                                </div>
+                            </div>
+                        ))}
+                        <InputError message={errors.modules} />
+                        {data.modules.length > 0 && (
+                            <p className="text-sm">
+                                Total des modules : {hoursText(modulesSum)} h
+                                {Number.isFinite(duration) ? ` (durée de la formation : ${hoursText(duration)} h)` : ''}
+                            </p>
+                        )}
+                        {gap && (
+                            <p role="alert" className="rounded-md border border-amber-500 bg-amber-50 p-2 text-sm text-amber-900">
+                                Attention : la somme des modules ({hoursText(modulesSum)} h) ne correspond pas à la durée de la formation (
+                                {hoursText(duration)} h). Vous pouvez tout de même enregistrer.
+                            </p>
+                        )}
+                        <div>
+                            <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                disabled={data.modules.length >= 30}
+                                onClick={() => setData('modules', [...data.modules, { title: '', duration_hours: '', modality_id: '', content: '' }])}
+                            >
+                                <Plus className="h-4 w-4" /> Ajouter un module
+                            </Button>
+                        </div>
+                    </fieldset>
+
+                    <fieldset className="grid gap-4 rounded-xl border p-4 md:grid-cols-2" aria-label="Méthodes et évaluation">
+                        <legend className="px-2 text-sm font-semibold">Méthodes et évaluation</legend>
+                        {area('methods', 'Méthodes et moyens pédagogiques')}
+                        {area('evaluation', 'Modalités d’évaluation')}
+                        {area('sanction', 'Sanction de la formation (attestation, certification…)')}
+                    </fieldset>
+
+                    <fieldset className="grid gap-4 rounded-xl border p-4 md:grid-cols-2" aria-label="Accessibilité et accès">
+                        <legend className="px-2 text-sm font-semibold">Accessibilité et accès</legend>
+                        {area('accessibility', 'Accessibilité aux personnes en situation de handicap')}
+                        {area('access_terms', 'Modalités et délais d’accès')}
+                    </fieldset>
+
+                    <fieldset className="grid gap-4 rounded-xl border p-4 md:grid-cols-2" aria-label="Résultats">
+                        <legend className="px-2 text-sm font-semibold">Résultats</legend>
+                        {area('results', 'Indicateurs de résultats (satisfaction, réussite…)')}
                     </fieldset>
 
                     <fieldset className="grid gap-2 rounded-xl border p-4 sm:grid-cols-2">
@@ -199,7 +479,8 @@ export default function TrainingFormPage({ training, options, brochures = [], ca
                                                 <span>{b.title}</span>
                                             )}
                                             <span className="text-muted-foreground">
-                                                {b.original_name} · {formatSize(b.size)} · {b.source === 'das' ? 'via le DAS' : 'rattachée à la formation'}
+                                                {b.original_name} · {formatSize(b.size)} ·{' '}
+                                                {b.source === 'das' ? 'via le DAS' : 'rattachée à la formation'}
                                             </span>
                                         </li>
                                     ))}
