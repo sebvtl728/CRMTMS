@@ -229,7 +229,8 @@ class SessionController extends Controller
         Gate::authorize('create', TrainingSession::class);
         $q = $request->query('q');
 
-        return response()->json(['entreprises' => is_string($q) && mb_strlen(trim($q)) >= 2 ? $fiches->searchOrganisations(mb_substr($q, 0, 100)) : []]);
+        return response()->json(['entreprises' => is_string($q) && mb_strlen(trim($q)) >= 2 ? $fiches->searchOrganisations(mb_substr($q, 0, 100)) : []])
+            ->header('Cache-Control', 'no-store, private');
     }
 
     /**

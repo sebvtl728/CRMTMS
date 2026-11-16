@@ -325,7 +325,8 @@ class DossierController extends Controller
         Gate::authorize('create', Dossier::class);
         $q = $request->query('q');
 
-        return response()->json(['entreprises' => is_string($q) && mb_strlen(trim($q)) >= 2 ? $fiches->searchOrganisations(mb_substr($q, 0, 100)) : []]);
+        return response()->json(['entreprises' => is_string($q) && mb_strlen(trim($q)) >= 2 ? $fiches->searchOrganisations(mb_substr($q, 0, 100)) : []])
+            ->header('Cache-Control', 'no-store, private');
     }
 
     /**
@@ -340,7 +341,7 @@ class DossierController extends Controller
 
         return response()->json(['personnes' => is_string($q) && mb_strlen(trim($q)) >= 2
             ? $trainees->search(mb_substr($q, 0, 100), is_string($organisation) ? $organisation : null)
-            : []]);
+            : []])->header('Cache-Control', 'no-store, private');
     }
 
     /**

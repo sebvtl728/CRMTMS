@@ -548,6 +548,16 @@ it('rate-limits the trainee search and creation with a named limiter', function 
     }
 });
 
+it('rate-limits every identity search of the module and keeps its answers out of any cache', function () {
+    foreach (['dossiers.people', 'dossiers.organisations', 'sessions.organisations'] as $name) {
+        expect(Route::getRoutes()->getByName($name)->gatherMiddleware())->toContain('throttle:sessions-trainees');
+    }
+    $this->actingAs(admin(true));
+    foreach (['/dossiers/people?q=du', '/dossiers/organisations?q=du', '/sessions/organisations?q=du'] as $url) {
+        expect($this->getJson($url)->assertOk()->headers->get('Cache-Control'))->toContain('no-store');
+    }
+});
+
 it('cancels the enrolments of a cancelled dossier and refuses to trash a dossier with trainees', function () {
     $session = enrSession();
     $dossier = enrDossier();

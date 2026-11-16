@@ -13,12 +13,14 @@ Route::middleware(['auth', 'can:settings.manage'])->prefix('admin/abandon-rule')
     Route::put('/', [AbandonRuleController::class, 'update'])->name('update');
 });
 
+// Identity searches (people with their birth date, entreprises): the named
+// limiter sessions-trainees, answers never cached (Cache-Control: no-store).
 // Training sessions (intra / inter): scoped rights sessions.sessions.* (SessionPolicy).
 Route::middleware(['auth'])->prefix('sessions')->name('sessions.')->group(function () {
     Route::get('/', [SessionController::class, 'index'])->middleware('can:sessions.sessions.view')->name('index');
     Route::get('calendar', [SessionController::class, 'calendar'])->middleware('can:sessions.sessions.view')->name('calendar');
     Route::get('create', [SessionController::class, 'create'])->middleware('can:sessions.sessions.update')->name('create');
-    Route::get('organisations', [SessionController::class, 'organisations'])->middleware('can:sessions.sessions.update')->name('organisations');
+    Route::get('organisations', [SessionController::class, 'organisations'])->middleware(['can:sessions.sessions.update', 'throttle:sessions-trainees'])->name('organisations');
     Route::post('/', [SessionController::class, 'store'])->middleware('can:sessions.sessions.update')->name('store');
     Route::get('{trainingSession}', [SessionController::class, 'show'])->middleware('can:sessions.sessions.view')->name('show');
     Route::get('{trainingSession}/edit', [SessionController::class, 'edit'])->middleware('can:sessions.sessions.update')->name('edit');
@@ -45,8 +47,8 @@ Route::middleware(['auth'])->prefix('dossiers')->name('dossiers.')->group(functi
     Route::get('export', [DossierController::class, 'export'])->middleware(['can:sessions.dossiers.view', 'can:crm.export', 'throttle:crm-export'])->name('export');
     Route::get('export/check', [DossierController::class, 'exportCheck'])->middleware(['can:sessions.dossiers.view', 'can:crm.export', 'throttle:crm-export'])->name('export.check');
     Route::get('create', [DossierController::class, 'create'])->middleware('can:sessions.dossiers.update')->name('create');
-    Route::get('organisations', [DossierController::class, 'organisations'])->middleware('can:sessions.dossiers.update')->name('organisations');
-    Route::get('people', [DossierController::class, 'people'])->middleware('can:sessions.dossiers.update')->name('people');
+    Route::get('organisations', [DossierController::class, 'organisations'])->middleware(['can:sessions.dossiers.update', 'throttle:sessions-trainees'])->name('organisations');
+    Route::get('people', [DossierController::class, 'people'])->middleware(['can:sessions.dossiers.update', 'throttle:sessions-trainees'])->name('people');
     Route::post('/', [DossierController::class, 'store'])->middleware('can:sessions.dossiers.update')->name('store');
     // « Créer le dossier » of an accepted quote (the quote seen through the CRM, else 404).
     Route::get('from-quote/{quoteId}', [DossierFromQuoteController::class, 'create'])->middleware('can:sessions.dossiers.update')->name('from-quote');
