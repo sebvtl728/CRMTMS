@@ -38,7 +38,7 @@ Tous ces chiffres respectent votre périmètre : un Responsable de DAS n'y compt
 - un **interlocuteur** : personne rattachée à une ou plusieurs entreprises, avec sa fonction et son **rôle dans la décision** ;
 - les deux à la fois.
 
-Seul le **nom** est obligatoire. Pour rattacher quelqu'un à une entreprise, ouvrez la fiche de l'entreprise, onglet **Interlocuteurs**, puis **Ajouter un interlocuteur** : **Nouvelle personne** ou **Personne existante** (recherche par nom, e-mail ou téléphone). Vous pouvez désigner un **référent**. **Mettre fin au rattachement** (avec une date) conserve la trace dans **Anciens rattachements** ; **Supprimer le rattachement** l'efface.
+Seul le **nom** est obligatoire. Pour rattacher quelqu'un à une entreprise, ouvrez la fiche de l'entreprise, onglet **Interlocuteurs**, puis **Ajouter un interlocuteur** : **Nouvelle personne** (nom, prénom, **mobile**, enregistré sur la personne ; pour une personne existante, le mobile se modifie sur sa fiche) ou **Personne existante** (recherche par nom, e-mail ou téléphone). La liste affiche e-mail, téléphone professionnels et mobile, cliquables (le mobile n'apparaît que pour les personnes que vous voyez). Vous pouvez désigner un **référent**. **Mettre fin au rattachement** (avec une date) conserve la trace dans **Anciens rattachements** ; **Supprimer le rattachement** l'efface.
 
 ### Formations d'intérêt
 
