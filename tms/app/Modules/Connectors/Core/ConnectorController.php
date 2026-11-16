@@ -22,7 +22,7 @@ use RuntimeException;
 class ConnectorController extends Controller
 {
     /** Settings that designate the remote server, directory or application, or how it is reached (a downgrade of the encryption would send the password in clear): changing one requires the secrets again. */
-    private const SERVER_SETTINGS = ['host', 'port', 'encryption', 'tenant', 'client_id'];
+    private const SERVER_SETTINGS = ['host', 'port', 'encryption', 'tenant', 'client_id', 'provider', 'base_url'];
 
     public function __construct(private readonly ConnectorRegistry $registry) {}
 
@@ -70,6 +70,7 @@ class ConnectorController extends Controller
                 'settings' => array_keys($connector->settingsRules()),
                 'secrets' => $connector->secretKeys(),
                 'labels' => $connector instanceof HasFormLabels ? $connector->labels() : [],
+                'fields' => $connector instanceof HasFormFields ? $connector->fields() : (object) [],
             ],
             'companyId' => $companyId,
             'companies' => Company::query()->orderByDesc('is_default')->orderBy('name')->get(['id', 'name'])->map(fn (Company $c) => ['id' => $c->id, 'name' => $c->name])->values(),

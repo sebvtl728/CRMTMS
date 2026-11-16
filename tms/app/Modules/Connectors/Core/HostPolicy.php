@@ -102,6 +102,45 @@ final class HostPolicy
     }
 
     /**
+     * French reason why $ips are not allowed for ONE server an administrator
+     * declared on the local network (the AI connector's « Serveur sur le
+     * réseau local »), or null. Public, private (RFC 1918, ULA) and loopback
+     * addresses pass; link-local (cloud metadata), unspecified, multicast,
+     * shared and reserved addresses never do. The caller applies this only
+     * to the registered host and port; every other call keeps violation().
+     *
+     * @param  list<string>  $ips
+     */
+    public static function localNetworkViolation(array $ips): ?string
+    {
+        foreach ($ips as $ip) {
+            if (self::classify($ip) === 'internal' && ! self::isLoopback($ip)) {
+                return 'une adresse locale ou réservée';
+            }
+        }
+
+        return null;
+    }
+
+    /** 127.0.0.0/8, ::1 and their IPv4-mapped forms. */
+    public static function isLoopback(string $ip): bool
+    {
+        $bin = @inet_pton($ip);
+        if ($bin === false) {
+            return false;
+        }
+        if (strlen($bin) === 16) {
+            if ($bin === str_repeat("\0", 15)."\1") {
+                return true;
+            }
+
+            return substr($bin, 0, 12) === str_repeat("\0", 10)."\xff\xff" && ord($bin[12]) === 127;
+        }
+
+        return ord($bin[0]) === 127;
+    }
+
+    /**
      * @return 'internal'|'private'|null
      */
     public static function classify(string $ip): ?string

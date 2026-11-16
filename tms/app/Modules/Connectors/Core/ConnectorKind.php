@@ -8,6 +8,7 @@ enum ConnectorKind: string
     case Export = 'export';
     case Sync = 'sync';
     case Delivery = 'delivery';
+    case Assistant = 'assistant';
 
     public function label(): string
     {
@@ -16,6 +17,7 @@ enum ConnectorKind: string
             self::Export => 'Export',
             self::Sync => 'Synchronisation',
             self::Delivery => 'Envoi',
+            self::Assistant => 'Assistant',
         };
     }
 }

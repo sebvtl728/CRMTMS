@@ -7,12 +7,13 @@ Tout logiciel externe (Formevol, Sage, SoWeSign, Outlook, serveur SMTP…) passe
 | Élément | Rôle |
 |---|---|
 | `Connector` | Contrat à implémenter (clé, libellé, type, règles des paramètres, secrets, test de connexion). |
-| `ConnectorKind` | `import`, `export`, `sync`, `delivery`. |
+| `ConnectorKind` | `import`, `export`, `sync`, `delivery`, `assistant`. |
 | `ConnectorRegistry` | Liste des connecteurs connus (`register`, `all`, `make`). |
 | `ConnectorConfig` | Configuration d'un connecteur pour un organisme, ou une société (`company_id`). Secrets chiffrés. |
 | `ConnectorRun` | Journal d'exécution (`ConnectorRun::track`). |
 | `Retryable` (optionnel) | Le connecteur sait rejouer une exécution en échec. |
 | `HasFormLabels` (optionnel) | Libellés français des champs du formulaire d'administration. |
+| `HasFormFields` (optionnel) | Présentation de certains champs : liste de choix (`select`), case à cocher avec avertissement (`checkbox`), suggestions, aide, champ affiché seulement pour certaines valeurs d'un autre (`visible_when`). |
 
 L'écran d'administration (`/admin/connectors`, permission `connectors.manage`, réservée à l'admin d'organisme) est **générique** : il se construit à partir du connecteur, sans code d'interface à écrire.
 
@@ -209,3 +210,45 @@ Paramètres : `tenant` (annuaire Azure : son ID, un de ses domaines `xxx.onmicro
 - **Réseau.** Seuls `login.microsoftonline.com` et `graph.microsoft.com` sont appelés, en https, sans suivre de redirection. `HostPolicy` strict est revérifié à chaque appel.
 - **Journal.** `connector_runs` (sens `out`) contient « Action <id> : évènement Outlook créé / mis à jour / supprimé » et des erreurs rédigées par l'application (code HTTP). Il ne contient ni titre, ni fiche, ni adresse e-mail, ni texte de Microsoft. Une exécution en échec peut être relancée (`payload_ref` = `activity:<id>`).
 - **Audit.** `calendar.outlook_connected`, `calendar.outlook_disconnected`, `calendar.outlook_reconnect_required`.
+
+## Connecteur « Intelligence artificielle »
+
+`AiConnector` (clé `ai`, type assistant, **organisme entier**, un seul actif). Sert à l'assistant de la fiche formation (proposition depuis un PDF ou une demande écrite) : l'IA **propose**, l'utilisateur relit et enregistre ; rien n'est enregistré par l'IA. Écran réservé à l'administrateur (`connectors.manage`).
+
+| Réglage | Anthropic | Compatible OpenAI |
+|---|---|---|
+| Fournisseur (`provider`) | `anthropic` | `openai_compatible` (OpenAI, Mistral, serveur local Ollama / vLLM / LM Studio…) |
+| Modèle (`model`) | facultatif : vide = `claude-opus-5-5` (`AnthropicClient::DEFAULT_MODEL`) ; liste proposée modifiable (`SUGGESTED_MODELS`) | **obligatoire** (ex. `gpt-4.1`, `mistral-large-latest`, `llama3.1:8b`) |
+| Adresse (`base_url`) | — (`https://api.anthropic.com`, fixe) | **obligatoire**, `…/v1` (ex. `https://api.openai.com/v1`) |
+| Clé d'API (secret `api_key`) | obligatoire | facultative |
+| « Serveur sur le réseau local » (`local_network`) | — | voir ci-dessous |
+
+Les identifiants de modèle évoluent : l'administrateur peut saisir tout identifiant accepté par son fournisseur. Changer de fournisseur ou d'adresse impose de ressaisir la clé (`SERVER_SETTINGS`) : une clé enregistrée n'est jamais envoyée à un autre serveur.
+
+### Service public `Connectors\Ai\Ai`
+
+Les modules métier n'utilisent **que** ce service :
+
+- `configured(): bool` : connecteur activé et complet (Anthropic : une clé ; compatible OpenAI : adresse valide et modèle).
+- `structured(string $system, string $user, array $jsonSchema, string $purpose): array` : une requête dont la réponse doit être un objet JSON conforme au schéma. Le schéma complet est vérifié sur la réponse (`AiSchema::conform` : types, champs obligatoires, `enum`, longueurs, bornes, nombre d'éléments) et les clés non déclarées sont retirées ; les contraintes que les fournisseurs n'acceptent pas toutes (`maxLength`, `minimum`, `maxItems`…) ne sont pas envoyées (`AiSchema::sendable`) mais vérifiées ici. `$purpose` est un nom court (`[a-z0-9_.-]`, ex. `training.from_pdf`), journalisé.
+- Erreurs (messages **fixes en français**, jamais le texte du fournisseur, affichables tels quels : `UserFacingHttpException`) :
+  - `AiUnavailable` (503) : non configuré, clé refusée (401/403), demande refusée (autre 4xx : modèle inconnu…), adresse refusée, saturée (429), injoignable ou trop lente (5xx, 529, délai dépassé) ; `->retryable` vrai pour 429, 5xx et délai ;
+  - `AiInvalidResponse` (502) : JSON cassé, pas un objet, non conforme au schéma, réponse tronquée (`max_tokens`, `length`) ou refusée (`refusal`). Rien n'est alors proposé.
+- Limite : limiteur nommé **`ai`**, 20 demandes par heure, par utilisateur et par organisme (`RateLimitServiceProvider::AI_PER_HOUR`), à poser sur les routes qui appellent l'IA (`throttle:ai`, réponse 429 en JSON français).
+
+### Protocoles
+
+- **Anthropic** : `POST https://api.anthropic.com/v1/messages`, en-têtes `x-api-key` et `anthropic-version: 2026-10-21` ; sortie structurée par `output_config.format` (`json_schema`), lue dans les blocs `text`. Un appel d'outil forcé (`tool_choice`) n'est pas utilisé : les modèles actuels le refusent. Aucun paramètre d'échantillonnage (`temperature`…) n'est envoyé.
+- **Compatible OpenAI** : `POST {base_url}/chat/completions`, `Authorization: Bearer` seulement si une clé est enregistrée ; `response_format` `json_schema` (`strict`) ; si le serveur le refuse (400/422), une seconde demande en `json_object`, le schéma étant alors donné dans le message système. Le contenu du message est décodé en JSON (bloc Markdown « ```json » toléré).
+- Délai : **120 s** au plus (`AiClient::TIMEOUT_SECONDS`, une IA locale peut être lente), connexion 10 s ; réponse bornée à `MAX_OUTPUT_TOKENS` (16 000).
+
+### Réseau : « Serveur sur le réseau local »
+
+- **Case décochée** (par défaut) : `https://` obligatoire et l'hôte doit résoudre vers des adresses **publiques** uniquement (`HostPolicy` strict), à l'enregistrement et à chaque appel.
+- **Case cochée** (avertissement affiché) : l'adresse peut être privée (RFC 1918, ULA) ou locale (`127.0.0.1`, `::1`, `localhost`), en `http` ou `https` — **seulement** l'hôte et le port enregistrés (`AiEndpoint::guard` : tout autre hôte, port ou schéma est refusé), pour ce connecteur seulement (aucun réglage global). Les adresses lien-local (dont `169.254.169.254`, métadonnées du cloud), non spécifiées, multicast et réservées restent toujours refusées (`HostPolicy::localNetworkViolation`).
+- Dans tous les cas : redirections **non suivies** (une redirection = « adresse non autorisée »), connexion épinglée sur les adresses vérifiées (`HostPolicy::pinned`).
+
+### Test et journal
+
+- « Tester la connexion » : petite demande structurée (`{"ok": boolean}`) ; « Intelligence artificielle joignable (modèle …). » ou le message fixe de l'erreur.
+- Journal (`connector_runs`, sens `out`) : une ligne par appel, résumé « objet · fournisseur · modèle · durée en ms · utilisateur <id> », statut succès/échec, erreur = message fixe. **Jamais** le contenu envoyé (texte du programme, demande) ni la réponse.

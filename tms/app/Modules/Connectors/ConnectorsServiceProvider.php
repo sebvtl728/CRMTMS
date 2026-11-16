@@ -2,6 +2,10 @@
 
 namespace App\Modules\Connectors;
 
+use App\Modules\Connectors\Ai\Ai;
+use App\Modules\Connectors\Ai\AiConnector;
+use App\Modules\Connectors\Ai\AnthropicClient;
+use App\Modules\Connectors\Ai\OpenAiCompatibleClient;
 use App\Modules\Connectors\Calendar\GraphClient;
 use App\Modules\Connectors\Calendar\Microsoft365Connector;
 use App\Modules\Connectors\Calendar\QueueOutlookPush;
@@ -31,6 +35,7 @@ class ConnectorsServiceProvider extends ServiceProvider
         SireneConnector::class,
         Microsoft365Connector::class,
         Microsoft365MailConnector::class,
+        AiConnector::class,
     ];
 
     public function register(): void
@@ -41,6 +46,9 @@ class ConnectorsServiceProvider extends ServiceProvider
         $this->app->singleton(SireneClient::class);
         $this->app->singleton(GraphClient::class);
         $this->app->singleton(GraphMailClient::class);
+        $this->app->singleton(AnthropicClient::class);
+        $this->app->singleton(OpenAiCompatibleClient::class);
+        $this->app->singleton(Ai::class);
         $this->app->singleton(ConnectorRegistry::class, function ($app) {
             $registry = new ConnectorRegistry($app);
             foreach (self::CONNECTORS as $class) {
