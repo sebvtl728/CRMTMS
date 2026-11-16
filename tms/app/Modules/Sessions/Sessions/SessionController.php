@@ -11,6 +11,8 @@ use App\Modules\Crm\Public\Fiches;
 use App\Modules\Sessions\Enrolments\EnrolmentOptions;
 use App\Modules\Sessions\Enrolments\EnrolmentRows;
 use App\Modules\Sessions\Enrolments\Enrolments;
+use App\Modules\Sessions\Modules\DatingMode;
+use App\Modules\Sessions\Modules\SessionModules;
 use App\Modules\Sessions\Permissions;
 use App\Modules\Sessions\SessionsVisibility;
 use Carbon\CarbonImmutable;
@@ -147,7 +149,9 @@ class SessionController extends Controller
             'enrol' => $enrol ? ['dossiers' => EnrolmentOptions::dossiersFor($session, $user)] : null,
             // Choices of the enrolment dialogs (abandon, details) for who may change them.
             'enrolment_references' => $user->can('update', $session) ? EnrolmentOptions::references() : null,
+            'planning' => self::planning($session, $manage = ! $session->isCancelled() && $user->can('update', $session)),
             'status' => $request->session()->get('status'),
+            'warning' => $request->session()->get('warning'),
         ]);
     }
 
@@ -220,6 +224,29 @@ class SessionController extends Controller
         $this->writer->restore($trainingSession);
 
         return to_route('sessions.show', $trainingSession)->with('status', 'Session restaurée.');
+    }
+
+    /**
+     * The « Planning » tab: modules (mode, planned hours, dates), their
+     * total, the warnings, and the choices of the module form for who may
+     * change them.
+     *
+     * @return array<string, mixed>
+     */
+    private static function planning(TrainingSession $session, bool $manage): array
+    {
+        $modules = SessionModules::rows($session);
+
+        return [
+            'modules' => $modules,
+            'total' => SessionModules::totalLabel($session),
+            'warnings' => SessionModules::warnings($session),
+            'can_manage' => $manage,
+            'options' => $manage ? [
+                'modality' => SessionListQuery::reference(ReferenceList::TrainingModality, array_column($modules, 'modality_id')),
+                'dating_mode' => DatingMode::options(),
+            ] : null,
+        ];
     }
 
     /**

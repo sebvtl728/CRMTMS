@@ -332,7 +332,14 @@ export default function SessionFormPage({ session, defaults, options }: FormProp
                                 value={data.planned_hours}
                                 onChange={(e) => setData('planned_hours', e.target.value)}
                                 placeholder="Durée de la formation"
+                                disabled={editing}
+                                aria-describedby="planned_hours_help"
                             />
+                            <p id="planned_hours_help" className="text-muted-foreground text-xs">
+                                {editing
+                                    ? "Somme des modules : modifiez-les dans l'onglet Planning de la session."
+                                    : 'Les modules de la formation sont copiés ; sans module, un module unique reçoit ces heures.'}
+                            </p>
                             <InputError message={errors.planned_hours} />
                         </div>
                         {select('modality_id', 'Modalité *', options.modality)}

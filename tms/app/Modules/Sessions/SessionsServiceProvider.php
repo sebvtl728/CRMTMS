@@ -27,6 +27,7 @@ use App\Modules\Sessions\Gdpr\FicheReferences;
 use App\Modules\Sessions\Gdpr\PersonSessionsExport;
 use App\Modules\Sessions\Gdpr\RetentionHolds;
 use App\Modules\Sessions\History\SessionsHistory;
+use App\Modules\Sessions\Modules\SessionModule;
 use App\Modules\Sessions\Sessions\SessionPolicy;
 use App\Modules\Sessions\Sessions\TrainingSession;
 use Carbon\CarbonImmutable;
@@ -65,6 +66,7 @@ class SessionsServiceProvider extends ServiceProvider
             DossierLine::MORPH_ALIAS => DossierLine::class,
             Enrolment::MORPH_ALIAS => Enrolment::class,
             Funding::MORPH_ALIAS => Funding::class,
+            SessionModule::MORPH_ALIAS => SessionModule::class,
         ]);
     }
 
@@ -115,6 +117,16 @@ class SessionsServiceProvider extends ServiceProvider
             }
 
             return SessionsVisibility::dossiers($query, $user)->findOrFail($value);
+        });
+
+        // A module of a session: malformed or of another organisme (RLS) is a
+        // 404; the controller checks it belongs to the session of the route.
+        Route::bind('sessionModule', function (string $value): SessionModule {
+            if (! Str::isUuid($value)) {
+                throw (new ModelNotFoundException)->setModel(SessionModule::class, [$value]);
+            }
+
+            return SessionModule::query()->findOrFail($value);
         });
 
         // An enrolment: its session within the view scope (trashed ones with
@@ -181,6 +193,7 @@ class SessionsServiceProvider extends ServiceProvider
         ReferenceUsage::register(ReferenceList::Das, 'training_sessions', 'das_id');
         ReferenceUsage::register(ReferenceList::CancelReason, 'training_sessions', 'cancel_reason_id');
         ReferenceUsage::register(ReferenceList::TrainingModality, 'training_sessions', 'modality_id');
+        ReferenceUsage::register(ReferenceList::TrainingModality, 'session_modules', 'modality_id');
         ReferenceUsage::register(ReferenceList::Das, 'dossiers', 'das_id');
         ReferenceUsage::register(ReferenceList::Das, 'dossier_lines', 'das_id');
         ReferenceUsage::register(ReferenceList::CancelReason, 'dossiers', 'cancelled_reason_id');

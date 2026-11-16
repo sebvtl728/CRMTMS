@@ -11,7 +11,7 @@ Une **session** est une formation du catalogue donnée à des dates précises. �
 **Nouvelle session** :
 
 - **Intitulé** (facultatif, 150 caractères au plus) : un nom pour la session, par exemple « Commis de cuisine – entrée du 30 novembre 2026 ». Il est affiché partout où la session apparaît (liste, calendrier, page, fiches, dossiers, assistant, accueil, historique, export RGPD) et la recherche de la liste le trouve ; sans intitulé, la session se lit « <formation> (S-2026-0001) » ;
-- **Formation** du catalogue : ses heures sont reprises dans **Heures prévues** (modifiables) et son DAS devient celui de la session ;
+- **Formation** du catalogue : son DAS devient celui de la session et ses **modules** sont copiés sur la session (voir « Modules et onglet Planning ») ; **Heures prévues** (reprises de la formation, modifiables à la création) ne sert qu'à une formation sans module ;
 - **Type** :
   - **Intra (une entreprise)** : la session est réservée à une **entreprise** (obligatoire) ; seuls les dossiers dont elle est le contractant y inscrivent des stagiaires ; pas de nombre de places ;
   - **Inter (plusieurs entreprises ou particuliers)** : ouverte à plusieurs dossiers ; **Places** obligatoire ; au-delà, les inscriptions vont sur la **liste d'attente** ;
@@ -27,7 +27,17 @@ Chaque session reçoit un numéro `S-2026-0001` (séquence par organisme et par 
 
 Dès qu'une session a des inscriptions, sa formation, son type et son entreprise ne changent plus, et elle ne va pas à la corbeille.
 
-La **page d'une session** montre ses informations, les **places restantes** d'une session inter, les inscrits regroupés par dossier et la liste d'attente dans son ordre. Les noms des inscrits de tous les dossiers sont visibles ; le prix, les financements et le contractant d'un dossier ne le sont qu'avec le droit de consulter ce dossier.
+### Modules et onglet Planning (0.8.0)
+
+À sa création, une session reçoit une copie des **modules** de sa formation (intitulé, heures prévues, modalité, ordre) ; une formation sans module donne un module unique portant son intitulé et les heures prévues de la session. Ensuite, les modules de la session se modifient **sans toucher au catalogue**, dans l'onglet **Planning** de la page de la session, section **Modules** (droit « Créer et modifier les sessions et inscriptions » sur la session) : **Ajouter un module**, le **modifier** (intitulé, heures prévues — « 7 » ou « 3,5 », plus de zéro —, modalité, dates), le **supprimer**, **changer de mode**.
+
+- Les heures prévues d'un module sont gardées en **minutes** (« 3,5 » h = 3 h 30) ; les **heures prévues de la session** sont la **somme de ses modules**, recalculées à chaque changement : elles ne se saisissent plus dans le formulaire de modification de la session. Si des stagiaires étaient prévus au-delà de la nouvelle somme, un **avertissement** le signale ; leurs inscriptions ne changent pas (à vous de les revoir).
+- **Mode de datation** : **Intervalle de dates** (début, fin, heures ; sans séances : les dates du module restent dans celles de la session, celles de la session par défaut) ou **Séances** (séances datées). Le mode ne change plus, et le module ne se supprime plus, dès qu'il a des séances ou des heures saisies. Une session peut mélanger les deux modes.
+- Si les dates de la session changent ensuite, un module en intervalle qui en sort est **signalé** (« Hors des dates de la session »), jamais déplacé.
+- Changer la formation d'une session (possible tant qu'elle n'a pas d'inscrits) remplace ses modules par ceux de la nouvelle formation.
+- Les sessions créées avant la 0.8.0 ont reçu un module unique en intervalle : intitulé de la formation, heures et dates de la session.
+
+La **page d'une session** (onglet **Session**) montre ses informations, les **places restantes** d'une session inter, les inscrits regroupés par dossier et la liste d'attente dans son ordre. Les noms des inscrits de tous les dossiers sont visibles ; le prix, les financements et le contractant d'un dossier ne le sont qu'avec le droit de consulter ce dossier.
 
 ## 2. Les dossiers
 
@@ -68,7 +78,7 @@ Les besoins d'adaptation, la catégorie BPF et les notes se saisissent ensuite s
 
 Une personne n'est inscrite qu'**une fois** sur une même session (sauf inscription annulée). Une session intra refuse un dossier d'un autre contractant.
 
-Sur l'inscription : dates d'entrée (début de la session par défaut) et de sortie, **heures prévues** (celles de la session par défaut ; modifiables par **Modifier**, plus de zéro et jamais au-delà des heures de la session — baisser les heures de la session ramène à la nouvelle valeur celles des stagiaires qui la dépassaient, avec une entrée dans le journal ; vide : celles de la session ; chaque changement figure dans l'historique du dossier, « Heures prévues modifiées », avec l'ancienne et la nouvelle valeur ; elles serviront aux attestations et au prorata, sans effet sur la facturation dans ce lot), catégorie de stagiaire (BPF), **besoins d'adaptation / situation de handicap** et notes. Ces deux derniers champs sont des **données personnelles** : ils ne sont visibles que de qui peut modifier l'inscription, ne figurent jamais en clair dans le journal et sont effacés par l'anonymisation.
+Sur l'inscription : dates d'entrée (début de la session par défaut) et de sortie, **heures prévues** (celles de la session par défaut ; modifiables par **Modifier**, plus de zéro et jamais au-delà des heures de la session — si les modules de la session font baisser ses heures sous celles d'un stagiaire, un avertissement le signale sans modifier l'inscription ; vide : celles de la session ; chaque changement figure dans l'historique du dossier, « Heures prévues modifiées », avec l'ancienne et la nouvelle valeur ; elles serviront aux attestations et au prorata, sans effet sur la facturation dans ce lot), catégorie de stagiaire (BPF), **besoins d'adaptation / situation de handicap** et notes. Ces deux derniers champs sont des **données personnelles** : ils ne sont visibles que de qui peut modifier l'inscription, ne figurent jamais en clair dans le journal et sont effacés par l'anonymisation.
 
 ### Liste d'attente
 

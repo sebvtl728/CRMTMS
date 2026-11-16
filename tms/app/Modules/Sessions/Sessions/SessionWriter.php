@@ -8,10 +8,10 @@ use App\Modules\Core\References\ReferenceItem;
 use App\Modules\Core\References\ReferenceList;
 use App\Modules\Core\Tenancy\TenantContext;
 use App\Modules\Crm\Public\Fiches;
-use App\Modules\Sessions\Amounts;
 use App\Modules\Sessions\Enrolments\Enrolment;
 use App\Modules\Sessions\Enrolments\Enrolments;
 use App\Modules\Sessions\Enrolments\EnrolmentStatus;
+use App\Modules\Sessions\Modules\SessionModules;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -31,8 +31,10 @@ use Illuminate\Validation\ValidationException;
  * session comes back only with its entreprise (409). Once trainees are
  * enrolled (cancelled enrolments aside), its training, type and entreprise
  * no longer change and it does not go to the trash (409); cancelling it
- * cancels its enrolments. Lowering its hours lowers those of the trainees
- * planned above them (journaled).
+ * cancels its enrolments. Its modules (SessionModules) are copied from the
+ * training at creation and again when the training changes; its hours are
+ * their sum (typed hours only seed the single module of a training without
+ * modules): an update never changes them nor those of its trainees.
  *
  * @phpstan-type SessionData array<string, mixed>
  */
@@ -52,6 +54,7 @@ final class SessionWriter
         private readonly SessionNumbering $numbering,
         private readonly Trainings $trainings,
         private readonly Fiches $fiches,
+        private readonly SessionModules $modules,
     ) {}
 
     /**
@@ -71,6 +74,7 @@ final class SessionWriter
             $session = new TrainingSession($values);
             $session->number = $this->numbering->next(CarbonImmutable::now());
             $session->save();
+            $this->modules->copyFromTraining($session);
 
             return $session;
         });
@@ -92,6 +96,8 @@ final class SessionWriter
         if (! array_key_exists('title', $data)) {
             $data['title'] = $session->title;
         }
+        // The hours are the sum of the modules: a new training brings its own.
+        $data['planned_hours'] = null;
         $values = $this->validated($data, $session);
 
         return DB::transaction(function () use ($session, $values): TrainingSession {
@@ -105,30 +111,17 @@ final class SessionWriter
             if ($moved && self::hasEnrolments($locked)) {
                 throw new UserFacingHttpException(409, self::LOCKED);
             }
-            $lowered = $values['planned_hours'] !== null && ($locked->planned_hours === null
-                || Amounts::cents((string) $values['planned_hours']) < Amounts::cents($locked->planned_hours));
+            $retrained = $values['training_id'] !== $locked->training_id;
+            if (! $retrained) {
+                $values['planned_hours'] = $locked->planned_hours;
+            }
             $locked->update($values);
-            if ($lowered) {
-                self::clampEnrolmentHours($locked);
+            if ($retrained) {
+                $this->modules->replaceFromTraining($locked);
             }
 
             return $locked;
         });
-    }
-
-    /**
-     * The session's hours went down: the trainees planned above them are
-     * brought down to them, one by one (journaled), under the session lock.
-     */
-    private static function clampEnrolmentHours(TrainingSession $session): void
-    {
-        $hours = (string) $session->planned_hours;
-        Enrolment::query()->where('training_session_id', $session->id)->where('planned_hours', '>', $hours)
-            ->orderBy('id')->lockForUpdate()->get()
-            ->each(function (Enrolment $enrolment) use ($hours): void {
-                $enrolment->planned_hours = $hours;
-                $enrolment->save();
-            });
     }
 
     /**

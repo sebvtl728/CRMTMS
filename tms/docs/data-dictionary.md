@@ -460,7 +460,7 @@ Nommée ainsi pour ne pas se confondre avec la table `sessions` (sessions web). 
 | `modality_id` | uuid (FK `reference_items`, liste `training_modality`) | Modalité : Présentiel, Distanciel (classe virtuelle), FOAD / e-learning, Mixte (paramétrable) ; obligatoire |
 | `organisation_id` | uuid, null (FK `organisations`) | Entreprise d'une session intra (obligatoire en intra, vide en inter, facultative en individuel : CHECK) |
 | `starts_on`, `ends_on` | date | Jours de Paris ; CHECK `ends_on >= starts_on` |
-| `planned_hours` | numeric(6,2), null | Heures prévues, reprises de la formation sauf saisie |
+| `planned_hours` | numeric(6,2), null | Heures prévues = somme des `session_modules.planned_minutes` (0.8.0), recalculée sous verrou de la session à chaque écriture d'un module ; la saisie ne sert qu'au module unique d'une formation sans module |
 | `location_kind` | string(10) | `address` (adresse obligatoire), `client` (chez le client), `remote` (distanciel) |
 | `location_text` | string(500), null | Adresse, précision ou lien |
 | `capacity` | int, null | Places d'une session inter (≥ 1, vide en intra et en individuel : CHECK). Une session individuelle n'accueille qu'un stagiaire (inscription non annulée), sans liste d'attente |
@@ -471,6 +471,21 @@ Nommée ainsi pour ne pas se confondre avec la table `sessions` (sessions web). 
 | `created_by`, `updated_by`, `created_at`, `updated_at`, `deleted_at` | | Suppression logique (corbeille) |
 
 Une formation utilisée par une session (corbeille comprise) ne se supprime pas du catalogue (`TrainingUsage` « sessions »).
+
+### `session_modules` — modules d'une session (0.8.0)
+Module `Sessions` (`Modules\SessionModule`, écrite par `Modules\SessionModules`). Copiés de `Catalogue\Trainings::modules()` à la création de la session (et au changement de formation), puis propres à la session ; la migration `2026_12_17_000002` a donné à chaque session existante un module `interval` (intitulé de la formation, heures et dates de la session).
+
+| Colonne | Type | Rôle |
+|---|---|---|
+| `id`, `tenant_id` | uuid | |
+| `training_session_id` | uuid (FK `training_sessions`, cascade) | Session |
+| `position` | smallint | Ordre (1, 2…) ; un ajout va à la fin |
+| `title` | string(200) | Intitulé |
+| `planned_minutes` | int, null | Heures prévues en minutes entières (CHECK > 0 ; vide quand le catalogue n'en donnait pas). Conversion des heures décimales arrondie à la minute (demi supérieur, `brick/math`) |
+| `modality_id` | uuid, null (FK `reference_items`, liste `training_modality`) | Modalité (`ReferenceUsage` : une valeur utilisée ne se supprime pas) |
+| `dating_mode` | string(10) | `interval` (début, fin, heures ; pas de séances) ou `seances` (CHECK) ; ne change plus dès qu'il y a des séances ou des heures saisies (`SessionModule::hasActivity()`) |
+| `starts_on`, `ends_on` | date, null | Dates d'un module en intervalle, dans celles de la session à l'enregistrement (CHECK `ends_on >= starts_on`) ; hors des dates après un changement de la session : signalé, pas déplacé |
+| `created_by`, `updated_by`, `created_at`, `updated_at`, `deleted_at` | | Suppression logique ; journalisé (`session_module`) |
 
 ### `session_sequences` — compteurs de numérotation des sessions
 `tenant_id` (FK `tenants`, cascade) · `year` smallint (année civile de Paris à la création, CHECK 2000–2999) · `last_number` int (CHECK > 0) · `created_at`, `updated_at`. PK (`tenant_id`, `year`). Même mécanique que `quote_sequences` (incrément atomique dans la transaction de création, numéro rendu en cas d'échec).
