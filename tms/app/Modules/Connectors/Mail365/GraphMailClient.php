@@ -45,7 +45,7 @@ class GraphMailClient
     public const MIME_LIMIT = 3 * 1024 * 1024;
 
     /** Largest attachment added to a draft in one call (bigger: upload session). */
-    public const SMALL_ATTACHMENT = 3 * 1024 * 1024;
+    public const SMALL_ATTACHMENT = 3_000_000;
 
     /** Upload chunk: a multiple of 320 Kio, at most 4 Mo. */
     public const CHUNK_BYTES = 12 * 320 * 1024;

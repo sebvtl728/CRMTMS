@@ -112,8 +112,8 @@ it('requires a precise directory, an application id and a sender address', funct
     expect(array_keys($validator->errors()->toArray()))->toBe($errors);
 })->with([
     'guid' => [[], []],
-    'domain' => [['tenant' => 'capformation.net'], []],
-    'onmicrosoft domain' => [['tenant' => 'capformation.onmicrosoft.com', 'from_name' => 'CAP'], []],
+    'domain' => [['tenant' => 'organisme.fr'], []],
+    'onmicrosoft domain' => [['tenant' => 'organisme.onmicrosoft.com', 'from_name' => 'CAP'], []],
     'common' => [['tenant' => 'common'], ['tenant']],
     'organizations' => [['tenant' => 'organizations'], ['tenant']],
     'consumers' => [['tenant' => 'consumers'], ['tenant']],
@@ -130,7 +130,7 @@ it('refuses the « common » directory when the configuration is saved, in Frenc
         'enabled' => true,
         'settings' => ['tenant' => 'common', 'client_id' => MAIL365_CLIENT, 'from_address' => MAIL365_FROM],
         'secrets' => ['client_secret' => 'test-'.Str::random(32)],
-    ])->assertStatus(422)->assertJsonValidationErrors(['settings.tenant' => 'Indiquez l\'identifiant (GUID) de l\'annuaire Azure ou un de ses domaines (ex. capformation.net) : « common », « organizations » et « consumers » ne permettent pas l\'envoi par l\'application.']);
+    ])->assertStatus(422)->assertJsonValidationErrors(['settings.tenant' => 'Indiquez l\'identifiant (GUID) de l\'annuaire Azure ou un de ses domaines (ex. organisme.fr ou organisme.onmicrosoft.com) : « common », « organizations » et « consumers » ne permettent pas l\'envoi par l\'application.']);
 
     expect(ConnectorConfig::query()->where('connector_key', 'microsoft365_mail')->exists())->toBeFalse();
 });
@@ -175,6 +175,28 @@ it('keeps the sender name of the message when the configuration has none', funct
     $mime = base64_decode(mail365Requests('https://graph.microsoft.com/')[0]->body(), true);
     expect($mime)->toContain('From: =?utf-8?Q?L=C3=A9a?= Commerciale <'.MAIL365_FROM.'>');
 });
+
+it('sends an attachment under 3 000 000 bytes in one call and a larger one by upload session', function (int $size, string $expected) {
+    $draft = MAIL365_GRAPH.'/messages/AAMkDraft';
+    mail365Http([
+        MAIL365_GRAPH.'/messages' => Http::response(['id' => 'AAMkDraft'], 201),
+        $draft.'/attachments/createUploadSession' => Http::response(['uploadUrl' => MAIL365_UPLOAD], 201),
+        $draft.'/attachments' => Http::response(['id' => 'att'], 201),
+        $draft.'/send' => Http::response('', 202),
+        'outlook.office.com/*' => Http::response(['nextExpectedRanges' => []], 200),
+    ]);
+    mail365Config();
+
+    TenantMailer::for()->raw('Plaquette', fn (Message $m) => $m->to('lea.durand@example.test')->subject('Plaquette')
+        ->attachData(str_repeat('a', $size), 'limite.pdf', ['mime' => 'application/pdf']));
+
+    $calls = collect(mail365Requests('https://graph.microsoft.com/'))->map(fn (Request $r) => $r->method().' '.str_replace($draft, '', $r->url()))->all();
+    expect($calls)->toContain($expected)
+        ->and(in_array($expected === 'POST /attachments' ? 'POST /attachments/createUploadSession' : 'POST /attachments', $calls, true))->toBeFalse();
+})->with([
+    'just under' => [2_999_999, 'POST /attachments'],
+    'at the limit' => [3_000_000, 'POST /attachments/createUploadSession'],
+]);
 
 it('sends a 15 Mo message as a draft with upload sessions in chunks of at most 4 Mo, then sends it', function () {
     $draft = MAIL365_GRAPH.'/messages/AAMkDraft';
