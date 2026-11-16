@@ -97,6 +97,10 @@ final class Seances
         $values = self::validated($session, array_replace($current, array_intersect_key($data, $current)), $seance);
 
         return DB::transaction(function () use ($seance, $session, $values): Seance {
+            // Moving to another module: both modules locked, in id order (no deadlock).
+            $ids = array_unique([$seance->session_module_id, $values['session_module_id']]);
+            sort($ids);
+            SessionModule::query()->whereKey($ids)->orderBy('id')->lockForUpdate()->get();
             self::lockModule($values['session_module_id']);
             $locked = Seance::query()->lockForUpdate()->findOrFail($seance->id);
             if ($locked->isCancelled()) {

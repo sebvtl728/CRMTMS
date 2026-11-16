@@ -103,6 +103,18 @@ it('reschedules a séance and tells the attendance (SeanceChanged after commit)'
     Event::assertNotDispatched(SeanceChanged::class);
 });
 
+it('moves a séance to another module of the session', function () {
+    $session = plSession();
+    $module = plModule($session);
+    $other = SessionModule::query()->create(['training_session_id' => $session->id, 'position' => 2, 'title' => 'Pratique', 'planned_minutes' => 600, 'dating_mode' => 'seances']);
+    $seance = plSeance($module, '2026-09-02');
+
+    app(Seances::class)->reschedule($seance, ['session_module_id' => $other->id]);
+
+    expect($seance->refresh()->session_module_id)->toBe($other->id)
+        ->and($module->hasActivity())->toBeFalse()->and($other->hasActivity())->toBeTrue();
+});
+
 it('cancels a séance with a reason, kept visible, and deletes one without attendance', function () {
     Event::fake([SeanceChanged::class]);
     $session = plSession();

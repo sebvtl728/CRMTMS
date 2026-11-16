@@ -8,7 +8,7 @@ use App\Modules\Sessions\Trainers\TrainerUnavailability;
 /**
  * The alerts of séances (stored, or candidates being typed or previewed by
  * the generator), spec § 4.6: trainer on another overlapping séance or
- * unavailable, room taken or too small for the trainees, a public holiday,
+ * unavailable, another séance of the session on an overlapping slot, room taken or too small for the trainees, a public holiday,
  * a closure, a placement (common dates, or own dates of a trainee: an
  * alert, never an exclusion), a trainee on an overlapping séance of
  * another session. Never a refusal. Cancelled séances and those in the
@@ -70,6 +70,12 @@ final class Conflicts
         }
         foreach ($x->placementsOf($c['session'], $date) as $alert) {
             $out[] = new Conflict('placement', $alert, $date);
+        }
+
+        foreach ($x->sessionSeancesOn($c['session'], $date) as $other) {
+            if ($other->id !== $c['id'] && self::overlap($c, $other)) {
+                $out[] = new Conflict('seance_overlap', "Une autre séance de la session a lieu le {$day} de {$other->start()} à {$other->end()} ({$x->moduleTitle($other->session_module_id)}).", $date);
+            }
         }
 
         if ($c['trainer'] !== null) {

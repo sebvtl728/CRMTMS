@@ -6,6 +6,7 @@ use App\Modules\Sessions\Planning\GenerationRequest;
 use App\Modules\Sessions\Planning\PlacementPeriods;
 use App\Modules\Sessions\Planning\Seance;
 use App\Modules\Sessions\Planning\SeanceGenerator;
+use App\Modules\Sessions\Planning\Seances;
 use App\Modules\Sessions\Resources\ClosurePeriod;
 use App\Modules\Sessions\Sessions\TrainingSession;
 use Carbon\CarbonImmutable;
@@ -216,4 +217,27 @@ it('previews through the route as JSON with the alerts, and generates through th
     $this->actingAs($manager)->postJson("/sessions/{$other->id}/modules/{$module->id}/seances/preview", genInput())->assertNotFound();
     $this->actingAs(userWithPermissions([Permissions::SESSIONS_VIEW, Permissions::SEANCES_VIEW]))
         ->postJson("/sessions/{$session->id}/modules/{$module->id}/seances/preview", genInput())->assertForbidden();
+});
+
+it('never creates a séance overlapping a planned séance of the session, whatever its module or slot', function () {
+    $session = plSession('2026-09-01', '2026-09-30');
+    $module = plModule($session);
+    $other = SessionModule::query()->create(['training_session_id' => $session->id, 'position' => 2, 'title' => 'Pratique', 'planned_minutes' => 600, 'dating_mode' => 'seances']);
+    app(SeanceGenerator::class)->generate($module, genRequest($module, genInput('2026-09-01', '2026-09-03', ['slots' => [['start' => '09:00', 'end' => '12:30', 'break_minutes' => 0]]])));
+    // A cancelled séance frees its slot.
+    $cancelled = Seance::query()->where('date', '2026-09-03')->sole();
+    app(Seances::class)->cancel($cancelled, 'Grève');
+
+    $shifted = genInput('2026-09-01', '2026-09-03', ['slots' => [['start' => '09:30', 'end' => '12:00', 'break_minutes' => 0], ['start' => '13:30', 'end' => '17:00', 'break_minutes' => 0]]]);
+    $preview = app(SeanceGenerator::class)->preview($module, genRequest($module, $shifted));
+    expect(collect($preview->seances)->where('start', '09:30')->pluck('skipped_reason', 'date')->all())->toBe([
+        '2026-09-01' => 'Séance déjà planifiée sur ce créneau',
+        '2026-09-02' => 'Séance déjà planifiée sur ce créneau',
+        '2026-09-03' => null,
+    ]);
+
+    // Another module of the same session neither.
+    $created = app(SeanceGenerator::class)->generate($other, genRequest($other, $shifted));
+    expect(collect($created)->map(fn (Seance $s) => $s->date->toDateString().' '.$s->start())->all())
+        ->toBe(['2026-09-01 13:30', '2026-09-02 13:30', '2026-09-03 09:30', '2026-09-03 13:30']);
 });

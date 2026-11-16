@@ -5,6 +5,7 @@ namespace App\Modules\Sessions\Planning;
 use App\Modules\Crm\Public\Fiches;
 use App\Modules\Sessions\Enrolments\Enrolment;
 use App\Modules\Sessions\Enrolments\EnrolmentStatus;
+use App\Modules\Sessions\Modules\SessionModule;
 use App\Modules\Sessions\Resources\ClosurePeriods;
 use App\Modules\Sessions\Resources\Room;
 use App\Modules\Sessions\Sessions\TrainingSession;
@@ -34,6 +35,12 @@ final class ConflictContext
 
     /** @var Collection<int, Seance> planned séances of the trainers and rooms */
     private Collection $seances;
+
+    /** @var Collection<int, Seance> planned séances of the candidate sessions */
+    private Collection $sessionSeances;
+
+    /** @var array<string, string> module id => title */
+    private array $modules = [];
 
     /** @var Collection<int, PlacementPeriod> */
     private Collection $placements;
@@ -75,10 +82,15 @@ final class ConflictContext
             ->where('starts_at', '<', Seance::instant($to, '23:59')->addMinute())->where('ends_at', '>', Seance::instant($from, '00:00'))->get();
         $trainerPeople = $trainerIds === [] ? collect() : Trainer::withTrashed()->whereIn('id', $trainerIds)->pluck('person_id', 'id');
 
-        $this->placements = PlacementPeriod::query()->with('hosts')->whereIn('training_session_id', $sessions)
-            ->where('starts_on', '<=', $to)->get()
-            ->filter(fn (PlacementPeriod $p) => $p->ends_on->toDateString() >= $from || $p->hosts->contains(fn (PlacementPeriodHost $h) => $h->ends_on !== null && $h->ends_on->toDateString() >= $from))
+        // Common dates or a trainee's own dates (anywhere) overlapping the range.
+        $this->placements = PlacementPeriod::query()->with('hosts')->whereIn('training_session_id', $sessions)->get()
+            ->filter(fn (PlacementPeriod $p) => ($p->starts_on->toDateString() <= $to && $p->ends_on->toDateString() >= $from)
+                || $p->hosts->contains(fn (PlacementPeriodHost $h) => $h->starts_on !== null && $h->ends_on !== null
+                    && $h->starts_on->toDateString() <= $to && $h->ends_on->toDateString() >= $from))
             ->values();
+        $this->sessionSeances = Seance::query()->whereIn('training_session_id', $sessions)->where('status', Seance::PLANNED)
+            ->whereBetween('date', [$from, $to])->orderBy('date')->orderBy('starts_at')->get();
+        $this->modules = SessionModule::withTrashed()->whereIn('id', $this->sessionSeances->pluck('session_module_id')->unique()->all())->pluck('title', 'id')->all();
         $this->enrolments = Enrolment::query()->whereIn('training_session_id', $sessions)
             ->whereIn('status', EnrolmentStatus::values(self::traineeStates()))->get(['id', 'person_id', 'training_session_id']);
 
@@ -136,6 +148,21 @@ final class ConflictContext
     public function seancesOn(string $column, string $id, string $date): Collection
     {
         return $this->seances->filter(fn (Seance $s) => $s->{$column} === $id && $s->date->toDateString() === $date)->values();
+    }
+
+    /**
+     * Planned séances of the session that day, in order.
+     *
+     * @return Collection<int, Seance>
+     */
+    public function sessionSeancesOn(string $sessionId, string $date): Collection
+    {
+        return $this->sessionSeances->filter(fn (Seance $s) => $s->training_session_id === $sessionId && $s->date->toDateString() === $date)->values();
+    }
+
+    public function moduleTitle(string $moduleId): string
+    {
+        return $this->modules[$moduleId] ?? 'autre module';
     }
 
     public function traineeCount(string $sessionId): int

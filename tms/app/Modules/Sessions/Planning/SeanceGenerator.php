@@ -17,7 +17,8 @@ use Illuminate\Support\Facades\DB;
  * dates of a trainee: an alert only). Run again on another or an
  * overlapping period, it adds séances and never touches existing ones: a
  * séance of the same module, day and start (cancelled ones included) is
- * not created again (Review Focus 1). Hours are wall clock in Paris.
+ * not created again, nor a slot overlapping a planned séance of the
+ * session, whatever its module (Review Focus 1). Hours are wall clock in Paris.
  */
 final class SeanceGenerator
 {
@@ -42,6 +43,21 @@ final class SeanceGenerator
         foreach (Seance::query()->where('session_module_id', $module->id)->whereBetween('date', [$request->from, $request->to])->get(['date', 'starts_at']) as $s) {
             $existing[$s->date->toDateString().' '.$s->start()] = true;
         }
+        // Planned séances of the session, whatever their module: a new slot never overlaps one.
+        $taken = [];
+        foreach (Seance::query()->where('training_session_id', $session->id)->where('status', Seance::PLANNED)
+            ->whereBetween('date', [$request->from, $request->to])->get(['date', 'starts_at', 'ends_at']) as $s) {
+            $taken[$s->date->toDateString()][] = [$s->start(), $s->end()];
+        }
+        $overlaps = function (string $date, array $slot) use ($taken): bool {
+            foreach ($taken[$date] ?? [] as [$start, $end]) {
+                if ($slot['start'] < $end && $slot['end'] > $start) {
+                    return true;
+                }
+            }
+
+            return false;
+        };
 
         $rows = [];
         for ($day = WorkingDays::day($request->from); $day->toDateString() <= $request->to; $day = $day->addDay()) {
@@ -55,6 +71,7 @@ final class SeanceGenerator
                     isset($closed[$date]) => "Fermeture : {$closed[$date]}",
                     isset($placement[$date]) => "Stage : {$placement[$date]}",
                     isset($existing["{$date} {$slot['start']}"]) => 'Séance déjà planifiée',
+                    $overlaps($date, $slot) => 'Séance déjà planifiée sur ce créneau',
                     default => null,
                 };
                 $rows[] = [
@@ -98,6 +115,9 @@ final class SeanceGenerator
         Seances::assertSessionOpen($session);
 
         return DB::transaction(function () use ($module, $request, $session): array {
+            // The session first (as SessionModules does), then the module: two
+            // generations on modules of one session never interleave.
+            TrainingSession::withTrashed()->lockForUpdate()->findOrFail($session->id);
             $locked = Seances::lockModule($module->id);
             $created = [];
             foreach ($this->preview($locked, $request)->kept() as $row) {

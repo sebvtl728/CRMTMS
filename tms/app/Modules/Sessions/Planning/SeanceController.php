@@ -13,6 +13,7 @@ use App\Modules\Sessions\SessionsVisibility;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Str;
 
 /**
  * Séances of the « Planning » tab of a session: add, change, cancel,
@@ -72,13 +73,18 @@ class SeanceController extends Controller
     public function check(Request $request, TrainingSession $trainingSession): JsonResponse
     {
         self::authorizeManage($request, $trainingSession);
-        $values = Seances::validated($trainingSession, $request->all(), null);
         $seanceId = $request->input('seance_id');
+        // The séance being changed (of this session): its current trainer and room stay accepted.
+        $current = is_string($seanceId) && Str::isUuid($seanceId)
+            ? Seance::query()->where('training_session_id', $trainingSession->id)->find($seanceId)
+            : null;
+        $values = Seances::validated($trainingSession, $request->all(), $current);
+        $seanceId = $current?->id;
 
         return response()->json(['alerts' => array_map(fn (Conflict $c) => $c->toArray(), Conflicts::for([
             ...$values,
             'training_session_id' => $trainingSession->id,
-            'seance_id' => is_string($seanceId) ? $seanceId : null,
+            'seance_id' => $seanceId,
         ]))]);
     }
 

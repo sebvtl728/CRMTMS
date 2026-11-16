@@ -63,6 +63,7 @@ final class PlacementPeriods
 
     public static function delete(PlacementPeriod $period): void
     {
+        self::assertOpen($period);
         DB::transaction(function () use ($period): void {
             $period->hosts()->get()->each(fn (PlacementPeriodHost $h) => $h->delete());
             $period->delete();
@@ -79,6 +80,7 @@ final class PlacementPeriods
      */
     public static function setHost(PlacementPeriod $period, Enrolment $enrolment, array $data): PlacementPeriodHost
     {
+        self::assertOpen($period);
         $data = self::trimmed($data, ['organisation_id', 'starts_on', 'ends_on']);
         $current = PlacementPeriodHost::query()->where('placement_period_id', $period->id)->where('enrolment_id', $enrolment->id)->first();
         $validator = Validator::make($data, [
@@ -113,6 +115,7 @@ final class PlacementPeriods
 
     public static function removeHost(PlacementPeriod $period, Enrolment $enrolment): void
     {
+        self::assertOpen($period);
         DB::transaction(fn () => PlacementPeriodHost::query()->where('placement_period_id', $period->id)
             ->where('enrolment_id', $enrolment->id)->get()->each(fn (PlacementPeriodHost $h) => $h->delete()));
     }
@@ -177,6 +180,12 @@ final class PlacementPeriods
                 ];
             })->sortBy('trainee')->values()->all(),
         ])->values()->all();
+    }
+
+    /** A placement of a cancelled session no longer changes (409). */
+    private static function assertOpen(PlacementPeriod $period): void
+    {
+        Seances::assertSessionOpen(TrainingSession::withTrashed()->findOrFail($period->training_session_id));
     }
 
     /**

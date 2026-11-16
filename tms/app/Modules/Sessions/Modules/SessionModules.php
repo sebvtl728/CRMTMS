@@ -241,6 +241,8 @@ final class SessionModules
         $modules = SessionModule::query()->where('training_session_id', $session->id)->orderBy('position')->orderBy('id')->get();
         $modalities = ReferenceItem::query()->whereIn('id', $modules->pluck('modality_id')->filter()->unique()->values())->pluck('label', 'id');
         $scheduled = self::scheduledMinutes($session);
+        // Modules with activity, in one query (SessionModule::hasActivity()'s rule).
+        $active = array_flip(Seance::query()->whereIn('session_module_id', $modules->pluck('id')->all())->distinct()->pluck('session_module_id')->all());
 
         return $modules->map(fn (SessionModule $m) => [
             'id' => $m->id,
@@ -258,7 +260,7 @@ final class SessionModules
             'starts_on' => $m->starts_on?->toDateString(),
             'ends_on' => $m->ends_on?->toDateString(),
             'out_of_range' => $m->outOfRange($session),
-            'has_activity' => $m->hasActivity(),
+            'has_activity' => isset($active[$m->id]),
         ])->values()->all();
     }
 

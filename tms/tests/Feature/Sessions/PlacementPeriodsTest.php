@@ -1,6 +1,9 @@
 <?php
 
+use App\Exceptions\UserFacingHttpException;
 use App\Modules\Core\Access\AccessScope;
+use App\Modules\Core\References\ReferenceItem;
+use App\Modules\Core\References\ReferenceList;
 use App\Modules\Core\Tenancy\Tenant;
 use App\Modules\Core\Tenancy\TenantContext;
 use App\Modules\Crm\Organisations\Organisation;
@@ -9,6 +12,7 @@ use App\Modules\Sessions\Permissions;
 use App\Modules\Sessions\Planning\PlacementPeriod;
 use App\Modules\Sessions\Planning\PlacementPeriodHost;
 use App\Modules\Sessions\Planning\PlacementPeriods;
+use App\Modules\Sessions\Sessions\SessionWriter;
 use Inertia\Testing\AssertableInertia as Assert;
 
 require_once __DIR__.'/Support/lot2a.php';
@@ -153,4 +157,18 @@ it('searches the host entreprises for who plans the session (identity only, neve
         ->assertJsonPath('entreprises.0.label', 'Brasserie du Port');
     $this->actingAs(userWithPermissions([Permissions::SESSIONS_VIEW, Permissions::SEANCES_VIEW]))
         ->getJson("/sessions/{$session->id}/placements/organisations?q=brass")->assertForbidden();
+});
+
+it('changes no placement of a cancelled session (409)', function () {
+    $session = plSession();
+    $durand = l2Enrol(l2Dossier(), $session, makePerson('Durand'));
+    $period = PlacementPeriods::save($session, ['starts_on' => '2026-09-21', 'ends_on' => '2026-09-25', 'label' => 'Stage']);
+    PlacementPeriods::setHost($period, $durand, ['organisation_id' => null, 'starts_on' => null, 'ends_on' => null]);
+    $reason = ReferenceItem::query()->where('list', ReferenceList::CancelReason)->value('id');
+    app(SessionWriter::class)->cancel($session, $reason);
+
+    expect(fn () => PlacementPeriods::setHost($period, $durand, ['starts_on' => '2026-09-22', 'ends_on' => '2026-09-23']))->toThrow(UserFacingHttpException::class)
+        ->and(fn () => PlacementPeriods::removeHost($period, $durand))->toThrow(UserFacingHttpException::class)
+        ->and(fn () => PlacementPeriods::delete($period))->toThrow(UserFacingHttpException::class);
+    expect(PlacementPeriod::query()->count())->toBe(1)->and(PlacementPeriodHost::query()->count())->toBe(1);
 });
