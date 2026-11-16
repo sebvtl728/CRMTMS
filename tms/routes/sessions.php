@@ -2,6 +2,7 @@
 
 use App\Modules\Sessions\Dossiers\DossierController;
 use App\Modules\Sessions\Enrolments\EnrolmentController;
+use App\Modules\Sessions\Fundings\FundingController;
 use App\Modules\Sessions\Sessions\SessionController;
 use App\Modules\Sessions\Settings\AbandonRuleController;
 use Illuminate\Support\Facades\Route;
@@ -53,4 +54,8 @@ Route::middleware(['auth'])->prefix('dossiers')->name('dossiers.')->group(functi
     Route::post('{dossier}/cancel', [DossierController::class, 'cancel'])->middleware('can:sessions.dossiers.update')->name('cancel');
     Route::delete('{dossier}', [DossierController::class, 'destroy'])->middleware('can:sessions.dossiers.delete')->name('destroy');
     Route::post('{dossier}/restore', [DossierController::class, 'restore'])->middleware('can:sessions.dossiers.delete')->name('restore');
+    // Fundings: the rights of the dossier (sessions.dossiers.update and its scope).
+    Route::post('{dossier}/fundings', [FundingController::class, 'store'])->middleware('can:sessions.dossiers.update')->name('fundings.store');
+    Route::put('{dossier}/fundings/{funding}', [FundingController::class, 'update'])->middleware('can:sessions.dossiers.update')->name('fundings.update');
+    Route::delete('{dossier}/fundings/{funding}', [FundingController::class, 'destroy'])->middleware('can:sessions.dossiers.update')->name('fundings.destroy');
 });

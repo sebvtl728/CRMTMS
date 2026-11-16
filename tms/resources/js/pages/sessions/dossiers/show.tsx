@@ -2,6 +2,7 @@ import Heading from '@/components/heading';
 import InputError from '@/components/input-error';
 import { EnrolDialog, type EnrolSessionOption } from '@/components/sessions/enrolment-dialog';
 import { EnrolmentList, type EnrolmentReferences, type EnrolmentRow } from '@/components/sessions/enrolment-list';
+import { FundingSection, type FundingBalance, type FundingOptions, type FundingRow } from '@/components/sessions/funding-section';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -48,13 +49,17 @@ interface ShowProps {
         created_at: string | null;
         lines: Line[];
     };
-    can: { update: boolean; steps: Record<Step, boolean>; cancel: boolean; delete: boolean; restore: boolean };
+    can: { update: boolean; steps: Record<Step, boolean>; cancel: boolean; fund: boolean; delete: boolean; restore: boolean };
     today: string;
     cancel_reasons: Option[];
     enrolments: EnrolmentRow[];
     /** Null without sessions.sessions.update or on a closed dossier. */
     enrol: { sessions: Record<string, EnrolSessionOption[]> } | null;
     enrolment_references: EnrolmentReferences | null;
+    fundings: FundingRow[];
+    balance: FundingBalance;
+    /** Null without sessions.dossiers.update on this dossier or on a closed dossier. */
+    funding_options: FundingOptions | null;
     status?: string;
 }
 
@@ -171,7 +176,19 @@ function CancelDialog({ dossierId, reasons, open, onClose }: { dossierId: string
     );
 }
 
-export default function DossierShow({ dossier, can, today, cancel_reasons, enrolments, enrol, enrolment_references, status }: ShowProps) {
+export default function DossierShow({
+    dossier,
+    can,
+    today,
+    cancel_reasons,
+    enrolments,
+    enrol,
+    enrolment_references,
+    fundings,
+    balance,
+    funding_options,
+    status,
+}: ShowProps) {
     const [cancelling, setCancelling] = useState(false);
     const [enrolling, setEnrolling] = useState(false);
     const trainingLines = dossier.lines.filter((l) => l.kind === 'training');
@@ -362,6 +379,8 @@ export default function DossierShow({ dossier, can, today, cancel_reasons, enrol
                         </table>
                     </div>
                 </section>
+
+                <FundingSection dossierId={dossier.id} fundings={fundings} balance={balance} options={can.fund ? funding_options : null} />
 
                 <section aria-label="Inscriptions" className="grid gap-3">
                     <div className="flex flex-wrap items-center justify-between gap-2">

@@ -485,6 +485,25 @@ Module `Sessions` (`Enrolment`, écrit par `Enrolments` et `PriceShares` seuleme
 
 Une session avec des inscriptions non annulées garde sa formation, son type et son entreprise et ne va pas à la corbeille. « En cours » / « Réalisé » d'un dossier se calculent d'après la première date de début et la dernière date de fin des sessions de ses inscriptions non annulées (sessions annulées ou à la corbeille exclues : `DossierSchedule`).
 
+### `fundings` — financements d'un dossier
+Module `Sessions` (`Funding`, écrit par `FundingWriter` seulement, sous le verrou du dossier) ; le financeur est lu par `Crm\Public\Fiches`. Droits : ceux du dossier (`sessions.dossiers.update` et son périmètre) ; affichés sur la page du dossier seulement, jamais sur une session.
+
+| Colonne | Type | Rôle |
+|---|---|---|
+| `id`, `tenant_id` | uuid | |
+| `dossier_id` | uuid (FK `dossiers`) | Dossier financé |
+| `funder_organisation_id` / `funder_person_id` | uuid, null (FK `organisations` / `people`) | Financeur : une entreprise (OPCO, l'entreprise elle-même, France Travail…) **ou** une personne (stagiaire qui paie lui-même, CPF) — exactement un (CHECK) |
+| `funding_type_id` | uuid (FK `reference_items`, « Types de financeur ») | Type de financement (référentiel ; une valeur utilisée ne se supprime pas) |
+| `dossier_line_id` / `enrolment_id` | uuid, null (FK `dossier_lines` / `enrolments`) | Cible facultative : une ligne du dossier **ou** une inscription du dossier (pas les deux : CHECK ; une cible d'un autre dossier : 422). Une inscription visée relève d'une ligne au prix par stagiaire (sa part `price_share`) ; une ligne visée, directement ou par une de ses inscriptions, ne se supprime pas ; une inscription visée annulée garde son financement, signalé « Inscription annulée » |
+| `amount` | numeric(12,2) ≥ 0 (CHECK) | Montant HT, saisi au format français, calculé en centimes entiers |
+| `status` | string(20) | `to_request` (À demander, défaut), `requested` (Demandé), `agreed` (Accordé), `refused` (Refusé) — CHECK. Un financement refusé ne compte plus dans le financé ; aucun report automatique |
+| `agreement_number` | string(100), null | N° de prise en charge |
+| `agreed_on` | date, null | Date d'accord |
+| `notes` | text, null | Journalisé sans valeur (`$auditPersonal`) |
+| `created_at`, `updated_at` | | |
+
+Reste à financer (`FundingBalance`, centimes entiers) = prix du dossier − somme des financements non refusés ; de même par ligne visée (son total HT) et par inscription visée (sa part). Négatif : « Financements supérieurs au prix ».
+
 ## Permissions CRM (catalogue global `permissions`)
 
 CRM : `crm.fiches.view|update|delete`, `crm.opportunities.view|update|delete`, `crm.quotes.view|update|delete`, `crm.activities.view|update|delete`, `crm.activities.team`, `crm.revenue.view`, `crm.revenue.manage`, `crm.merge`, `crm.import`, `crm.export`, `crm.gdpr` ; catalogue : `catalogue.view`, `catalogue.manage`, `catalogue.delete`. Les anciens `crm.view|create|update|delete` sont supprimés par la migration 0.5.0 (convertis organisme par organisme). La matrice par rôle est dans `admin.md`. `role_permission_defaults_applied` (`tenant_id`, `role`, `permission`) mémorise les droits par défaut déjà accordés à chaque organisme, pour qu'une mise à jour n'ajoute que les nouveaux droits sans rétablir ceux qu'un administrateur a retirés. `role_permission_scopes` (`tenant_id`, `role_id`, `permission`, `scope` = `own`/`das`/`all`) : périmètre d'un rôle pour un droit à périmètre ; sans ligne, le périmètre vaut `all`.

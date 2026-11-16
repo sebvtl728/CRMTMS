@@ -18,6 +18,7 @@ use App\Modules\Sessions\Dossiers\DossierRows;
 use App\Modules\Sessions\Enrolments\Enrolment;
 use App\Modules\Sessions\Enrolments\EnrolmentPolicy;
 use App\Modules\Sessions\Enrolments\EnrolmentRows;
+use App\Modules\Sessions\Fundings\Funding;
 use App\Modules\Sessions\Sessions\SessionPolicy;
 use App\Modules\Sessions\Sessions\TrainingSession;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
@@ -54,6 +55,7 @@ class SessionsServiceProvider extends ServiceProvider
             Dossier::MORPH_ALIAS => Dossier::class,
             DossierLine::MORPH_ALIAS => DossierLine::class,
             Enrolment::MORPH_ALIAS => Enrolment::class,
+            Funding::MORPH_ALIAS => Funding::class,
         ]);
     }
 
@@ -147,6 +149,7 @@ class SessionsServiceProvider extends ServiceProvider
         ReferenceUsage::register(ReferenceList::CancelReason, 'dossiers', 'cancelled_reason_id');
         ReferenceUsage::register(ReferenceList::AbandonReason, 'enrolments', 'abandon_reason_id');
         ReferenceUsage::register(ReferenceList::BpfCategory, 'enrolments', 'bpf_category_id');
+        ReferenceUsage::register(ReferenceList::FundingType, 'fundings', 'funding_type_id');
     }
 
     /**

@@ -17,6 +17,7 @@ use App\Modules\Sessions\AbandonRule;
 use App\Modules\Sessions\Amounts;
 use App\Modules\Sessions\Enrolments\EnrolmentOptions;
 use App\Modules\Sessions\Enrolments\EnrolmentRows;
+use App\Modules\Sessions\Fundings\FundingRows;
 use App\Modules\Sessions\Permissions;
 use App\Modules\Sessions\Sessions\SessionListQuery;
 use App\Modules\Sessions\SessionsVisibility;
@@ -199,12 +200,16 @@ class DossierController extends Controller
                     'done' => $update && ! $dossier->status->isDoneOrAfter(),
                 ],
                 'cancel' => $update && ! $status->isDoneOrAfter(),
+                'fund' => $update,
                 'delete' => $user->can('delete', $dossier),
                 'restore' => $user->can('restore', $dossier),
             ],
             'today' => $today->toDateString(),
             'cancel_reasons' => SessionListQuery::reference(ReferenceList::CancelReason),
             'enrolments' => EnrolmentRows::forDossier($dossier, $user),
+            'fundings' => FundingRows::rows($dossier, $user, $update),
+            'balance' => FundingRows::balance($dossier),
+            'funding_options' => $update ? FundingRows::options($dossier) : null,
             'enrol' => $open && $user->can(Permissions::SESSIONS_UPDATE) ? ['sessions' => EnrolmentOptions::sessionsFor($dossier, $user)] : null,
             'enrolment_references' => $user->can(Permissions::SESSIONS_UPDATE) ? EnrolmentOptions::references() : null,
             'status' => $request->session()->get('status'),

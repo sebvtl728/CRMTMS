@@ -14,6 +14,7 @@ use App\Modules\Sessions\Amounts;
 use App\Modules\Sessions\Enrolments\Enrolment;
 use App\Modules\Sessions\Enrolments\EnrolmentStatus;
 use App\Modules\Sessions\Enrolments\PriceShares;
+use App\Modules\Sessions\Fundings\Funding;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -273,10 +274,11 @@ final class DossierWriter
     }
 
     /**
-     * Under the lock of the dossier (Enrolments takes it too): every line
-     * sent still exists (409 otherwise), and a line with trainees enrolled
-     * (cancelled enrolments aside) is neither deleted nor given another
-     * training.
+     * Under the lock of the dossier (Enrolments and FundingWriter take it
+     * too): every line sent still exists (409 otherwise), a line targeted by
+     * a funding, itself or through one of its enrolments, is not deleted, and
+     * a line with trainees enrolled (cancelled enrolments aside) is neither
+     * deleted nor given another training.
      *
      * @param  list<array<string, mixed>>  $lines
      *
@@ -297,6 +299,19 @@ final class DossierWriter
         $enrolled = Enrolment::query()->where('dossier_id', $dossier->id)
             ->where('status', '<>', EnrolmentStatus::Cancelled->value)
             ->distinct()->pluck('dossier_line_id')->all();
+        // A funding keeps its target: the line, or a (cancelled) enrolment of it.
+        $funded = Funding::query()->where('dossier_id', $dossier->id)->whereNotNull('dossier_line_id')->pluck('dossier_line_id')->all();
+        $fundedEnrolments = Enrolment::query()->where('dossier_id', $dossier->id)
+            ->whereIn('id', Funding::query()->where('dossier_id', $dossier->id)->whereNotNull('enrolment_id')->select('enrolment_id'))
+            ->distinct()->pluck('dossier_line_id')->all();
+        foreach ($existing->except(array_keys($sent)) as $line) {
+            if (in_array($line->id, $funded, true)) {
+                throw ValidationException::withMessages(['lines' => "La ligne « {$line->label} » est visée par un financement : modifiez ou supprimez d'abord ce financement."]);
+            }
+            if (in_array($line->id, $fundedEnrolments, true)) {
+                throw ValidationException::withMessages(['lines' => "La ligne « {$line->label} » a un stagiaire visé par un financement : modifiez ou supprimez d'abord ce financement."]);
+            }
+        }
         foreach ($existing->only($enrolled) as $line) {
             $kept = $sent[$line->id] ?? null;
             if ($kept === null) {
@@ -326,7 +341,8 @@ final class DossierWriter
             PriceShares::recompute($line);
         }
         $existing->except($kept)->each(function (DossierLine $l): void {
-            // Only cancelled enrolments are left on a deleted line (checkLines()).
+            // Only cancelled enrolments are left on a deleted line, none of
+            // them targeted by a funding (checkLines()).
             Enrolment::query()->where('dossier_line_id', $l->id)->get()->each(fn (Enrolment $e) => $e->delete());
             $l->delete();
         });

@@ -7,6 +7,7 @@ use App\Modules\Core\Companies\Company;
 use App\Modules\Core\Tenancy\BelongsToTenant;
 use App\Modules\Core\Users\User;
 use App\Modules\Sessions\Amounts;
+use App\Modules\Sessions\Fundings\Funding;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Model;
@@ -151,6 +152,14 @@ class Dossier extends Model
     public function lines(): HasMany
     {
         return $this->hasMany(DossierLine::class)->orderBy('position');
+    }
+
+    /**
+     * @return HasMany<Funding, $this>
+     */
+    public function fundings(): HasMany
+    {
+        return $this->hasMany(Funding::class)->orderBy('created_at')->orderBy('id');
     }
 
     /**
