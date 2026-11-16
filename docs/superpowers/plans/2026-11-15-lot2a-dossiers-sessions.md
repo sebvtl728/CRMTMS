@@ -136,6 +136,21 @@ Branche : `lot2a-dossiers-sessions` depuis `main` **après publication de la 0.5
 - [ ] **Step 2–4:** RED → implement → verts.
 - [ ] **Step 5: Commit** `feat(sessions): fundings and balance`
 
+### Task 6b: Sessions individuelles et modalité
+
+Demande de l'utilisateur (2026-11-16) : un type « individuel » et une modalité de formation.
+
+**Files:** migration (élargit le CHECK `kind` à `individual`, ajoute `training_sessions.modality_id` → `reference_items`, valeur par défaut Présentiel pour les sessions existantes, par organisme), référentiel `training_modality` (Présentiel, Distanciel (classe virtuelle), FOAD / e-learning, Mixte ; seeder + migration de données par organisme, `ReferenceUsage`), `SessionKind`/`SessionWriter`/`Enrolments`, pages de session. Test: `tests/Feature/Sessions/IndividualSessionsTest.php`.
+
+**Règles :**
+- `kind` : `intra` « Intra », `inter` « Inter », `individual` « Individuel ». Une session individuelle : ni capacité ni entreprise obligatoires (entreprise facultative), une seule inscription non annulée (la deuxième est refusée : « Une session individuelle n'accueille qu'un stagiaire. », pas de liste d'attente) ; tout contractant (entreprise ou particulier) peut y inscrire.
+- `modality_id` obligatoire (défaut : la valeur « Présentiel » du référentiel de l'organisme) ; affichée dans la liste, le calendrier, la page session et l'export des dossiers si pertinent ; filtre de liste.
+- Verrou existant : une session avec inscriptions ne change plus de type.
+
+- [ ] **Step 1: Failing tests** : création individuelle sans capacité ; deuxième inscription refusée ; particulier accepté ; modalité obligatoire, valeur par défaut pour les sessions existantes après migration ; référentiel paramétrable (valeur utilisée non supprimable).
+- [ ] **Step 2–4:** RED → implement → verts.
+- [ ] **Step 5: Commit** `feat(sessions): individual sessions and training modality`
+
 ### Task 7: Créer le dossier depuis un devis accepté
 
 **Files:**
