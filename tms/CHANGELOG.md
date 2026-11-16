@@ -5,9 +5,14 @@ Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) ; ve
 
 ## [Non publié]
 
+## [0.5.3] - 2026-11-16
+
+Envoi des e-mails par Microsoft 365 et mobile des interlocuteurs.
+
 ### Ajouté
 
 - **Connecteur Microsoft 365 (envoi des e-mails)** : devis, plaquettes et invitations partent par Microsoft Graph depuis une boîte Microsoft 365 (permission d'application `Mail.Send`, secret chiffré, jeton en cache), y compris les e-mails volumineux (brouillon et sessions d'envoi), avec e-mail de test et procédure d'installation dans `docs/connectors.md`.
+- **Mobile d'un interlocuteur** : la fenêtre « Ajouter un interlocuteur » d'une nouvelle personne demande aussi son mobile (format français ou international, enregistré sur la personne) ; l'onglet Interlocuteurs affiche e-mail, téléphone professionnels et mobile en liens cliquables, le mobile seulement pour les personnes que vous voyez.
 
 ## [0.5.2] - 2026-11-15
 
@@ -293,7 +298,8 @@ Lot 1a : socle de l'application.
   mise à jour avec retour arrière automatique.
 - Publication : image multi-architecture signée (cosign), archive de version, sommes de contrôle.
 
-[Non publié]: https://github.com/sebvtl728/CRMTMS/compare/v0.5.2...HEAD
+[Non publié]: https://github.com/sebvtl728/CRMTMS/compare/v0.5.3...HEAD
+[0.5.3]: https://github.com/sebvtl728/CRMTMS/compare/v0.5.2...v0.5.3
 [0.5.2]: https://github.com/sebvtl728/CRMTMS/compare/v0.5.1...v0.5.2
 [0.5.1]: https://github.com/sebvtl728/CRMTMS/compare/v0.5.0...v0.5.1
 [0.5.0]: https://github.com/sebvtl728/CRMTMS/compare/v0.4.2...v0.5.0
