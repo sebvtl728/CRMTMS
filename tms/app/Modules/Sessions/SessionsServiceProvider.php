@@ -10,9 +10,14 @@ use App\Modules\Core\Audit\MorphAliases;
 use App\Modules\Core\References\ReferenceList;
 use App\Modules\Core\References\ReferenceUsage;
 use App\Modules\Core\Users\User;
+use App\Modules\Crm\Public\FicheBlocks;
 use App\Modules\Sessions\Dossiers\Dossier;
 use App\Modules\Sessions\Dossiers\DossierLine;
 use App\Modules\Sessions\Dossiers\DossierPolicy;
+use App\Modules\Sessions\Dossiers\DossierRows;
+use App\Modules\Sessions\Enrolments\Enrolment;
+use App\Modules\Sessions\Enrolments\EnrolmentPolicy;
+use App\Modules\Sessions\Enrolments\EnrolmentRows;
 use App\Modules\Sessions\Sessions\SessionPolicy;
 use App\Modules\Sessions\Sessions\TrainingSession;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
@@ -48,6 +53,7 @@ class SessionsServiceProvider extends ServiceProvider
             TrainingSession::MORPH_ALIAS => TrainingSession::class,
             Dossier::MORPH_ALIAS => Dossier::class,
             DossierLine::MORPH_ALIAS => DossierLine::class,
+            Enrolment::MORPH_ALIAS => Enrolment::class,
         ]);
     }
 
@@ -55,9 +61,11 @@ class SessionsServiceProvider extends ServiceProvider
     {
         self::registerReferenceUsage();
         self::registerTrainingUsage();
+        self::registerFicheBlocks();
 
         Gate::policy(TrainingSession::class, SessionPolicy::class);
         Gate::policy(Dossier::class, DossierPolicy::class);
+        Gate::policy(Enrolment::class, EnrolmentPolicy::class);
 
         // A session outside the view scope, of another organisme (RLS) or
         // malformed is a 404; a trashed one only with sessions.sessions.delete.
@@ -93,6 +101,37 @@ class SessionsServiceProvider extends ServiceProvider
 
             return SessionsVisibility::dossiers($query, $user)->findOrFail($value);
         });
+
+        // An enrolment: its session within the view scope (trashed ones with
+        // sessions.sessions.delete), otherwise 404.
+        Route::bind('enrolment', function (string $value): Enrolment {
+            if (! Str::isUuid($value)) {
+                throw (new ModelNotFoundException)->setModel(Enrolment::class, [$value]);
+            }
+            $user = request()->user();
+            if (! $user instanceof User) {
+                return Enrolment::query()->findOrFail($value);
+            }
+            $sessions = TrainingSession::query();
+            if (Scopes::of($user, Permissions::SESSIONS_DELETE) !== null) {
+                $sessions->withTrashed();
+            }
+
+            return Enrolment::query()
+                ->whereIn('training_session_id', SessionsVisibility::sessions($sessions, $user)->select('training_sessions.id'))
+                ->findOrFail($value);
+        });
+    }
+
+    /**
+     * Blocks of the CRM fiches (Crm\Public\FicheBlocks): « Formations
+     * suivies » of a person (sessions.sessions.view and its scope),
+     * « Dossiers » of an entreprise (sessions.dossiers.view and its scope).
+     */
+    public static function registerFicheBlocks(): void
+    {
+        FicheBlocks::register('person', 'sessions.enrolments', fn (string $id, User $viewer) => EnrolmentRows::personBlock($id, $viewer));
+        FicheBlocks::register('organisation', 'sessions.dossiers', fn (string $id, User $viewer) => DossierRows::organisationBlock($id, $viewer));
     }
 
     /**
@@ -106,6 +145,8 @@ class SessionsServiceProvider extends ServiceProvider
         ReferenceUsage::register(ReferenceList::Das, 'dossiers', 'das_id');
         ReferenceUsage::register(ReferenceList::Das, 'dossier_lines', 'das_id');
         ReferenceUsage::register(ReferenceList::CancelReason, 'dossiers', 'cancelled_reason_id');
+        ReferenceUsage::register(ReferenceList::AbandonReason, 'enrolments', 'abandon_reason_id');
+        ReferenceUsage::register(ReferenceList::BpfCategory, 'enrolments', 'bpf_category_id');
     }
 
     /**

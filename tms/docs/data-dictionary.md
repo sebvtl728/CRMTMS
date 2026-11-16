@@ -464,6 +464,27 @@ Prix du dossier = somme des `total_ht` de ses lignes (`Dossier::priceCents()`, c
 ### `dossier_sequences` — compteurs de numérotation des dossiers
 Même forme et même mécanique que `session_sequences`.
 
+### `enrolments` — inscriptions des stagiaires
+Module `Sessions` (`Enrolment`, écrit par `Enrolments` et `PriceShares` seulement) ; le stagiaire est une personne du CRM, lue par `Crm\Public\Fiches` / `Trainees`.
+
+| Colonne | Type | Rôle |
+|---|---|---|
+| `id`, `tenant_id` | uuid | |
+| `person_id` | uuid (FK `people`) | Stagiaire ; une seule inscription non annulée par session (index unique partiel `training_session_id, person_id where status <> 'cancelled'`) |
+| `training_session_id` | uuid (FK `training_sessions`) | Session (sa formation est celle de la ligne ; une session intra ne prend que les dossiers de son entreprise) |
+| `dossier_id`, `dossier_line_id` | uuid (FK `dossiers`, `dossier_lines`) | Dossier et ligne de formation ; une ligne avec des inscriptions non annulées ne se supprime pas et ne change pas de formation |
+| `status` | string(20) | `enrolled` (Inscrit), `waitlisted` (En attente), `confirmed` (Confirmé), `abandoned` (Abandon), `cancelled` (Annulé) — CHECK. Une session inter complète (inscrits + confirmés ≥ places) met l'inscription suivante en attente ; une annulation ne promeut personne (promotion à la main) |
+| `waitlist_position` | integer, null | Ordre d'arrivée sur la liste d'attente ; renseigné si et seulement si `waitlisted` (CHECK) |
+| `entered_on`, `left_on` | date, null | Entrée (début de la session par défaut) et sortie ; sortie ≥ entrée (CHECK) |
+| `abandon_reason_id` | uuid, null (FK `reference_items`, motifs d'abandon) | Obligatoire avec la date de sortie pour un abandon (CHECK) ; gardé si l'abandon est ensuite annulé |
+| `planned_hours` | numeric(6,2), null | Heures prévues de la session à l'inscription |
+| `price_share` | numeric(12,2), null | Part d'une ligne « prix par stagiaire » (`PriceShares` : total réparti au centime entre inscrits, confirmés et abandons, reste aux premières inscriptions par `created_at, id`) ; null en prix de groupe, en attente ou annulée |
+| `bpf_category_id` | uuid, null (FK `reference_items`, catégories BPF) | Catégorie de stagiaire (lot 3) |
+| `adaptation_needs`, `notes` | text, null | Situation de handicap / besoins d'adaptation et notes : données personnelles, journalisées sans valeur (`$auditPersonal`) |
+| `created_at`, `updated_at` | | |
+
+Une session avec des inscriptions non annulées garde sa formation, son type et son entreprise et ne va pas à la corbeille. « En cours » / « Réalisé » d'un dossier se calculent d'après la première date de début et la dernière date de fin des sessions de ses inscriptions non annulées (sessions annulées ou à la corbeille exclues : `DossierSchedule`).
+
 ## Permissions CRM (catalogue global `permissions`)
 
 CRM : `crm.fiches.view|update|delete`, `crm.opportunities.view|update|delete`, `crm.quotes.view|update|delete`, `crm.activities.view|update|delete`, `crm.activities.team`, `crm.revenue.view`, `crm.revenue.manage`, `crm.merge`, `crm.import`, `crm.export`, `crm.gdpr` ; catalogue : `catalogue.view`, `catalogue.manage`, `catalogue.delete`. Les anciens `crm.view|create|update|delete` sont supprimés par la migration 0.5.0 (convertis organisme par organisme). La matrice par rôle est dans `admin.md`. `role_permission_defaults_applied` (`tenant_id`, `role`, `permission`) mémorise les droits par défaut déjà accordés à chaque organisme, pour qu'une mise à jour n'ajoute que les nouveaux droits sans rétablir ceux qu'un administrateur a retirés. `role_permission_scopes` (`tenant_id`, `role_id`, `permission`, `scope` = `own`/`das`/`all`) : périmètre d'un rôle pour un droit à périmètre ; sans ligne, le périmètre vaut `all`.

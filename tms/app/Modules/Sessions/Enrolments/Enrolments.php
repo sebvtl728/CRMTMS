@@ -1,0 +1,305 @@
+<?php
+
+namespace App\Modules\Sessions\Enrolments;
+
+use App\Exceptions\UserFacingHttpException;
+use App\Modules\Core\References\ReferenceList;
+use App\Modules\Core\Tenancy\TenantContext;
+use App\Modules\Crm\Public\Fiches;
+use App\Modules\Sessions\Dossiers\Dossier;
+use App\Modules\Sessions\Dossiers\DossierLine;
+use App\Modules\Sessions\Sessions\SessionKind;
+use App\Modules\Sessions\Sessions\TrainingSession;
+use Carbon\CarbonImmutable;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Validator;
+use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
+
+/**
+ * Enrolments of trainees (spec lot 2a § 5.4, § 5.6): the one writer of
+ * their states. Every change locks the dossier row, then the session row
+ * (the order DossierWriter follows too), so that the places of an inter
+ * session, the waiting list and the shares of the line (PriceShares) are
+ * read and written by one request at a time.
+ *
+ *  - enrol(): a training line of the dossier whose training is the
+ *    session's; an intra session takes the dossiers of its entreprise only;
+ *    a cancelled session or dossier takes nobody; a trainee once per
+ *    session. An inter session full (enrolled + confirmed ≥ places) puts
+ *    the enrolment on the waiting list, in order of arrival;
+ *  - promote(): manual, a waitlisted enrolment while a place is free;
+ *  - abandon(): a leaving day and a reason, the share kept;
+ *  - cancel(): the place freed, nobody promoted automatically.
+ */
+final class Enrolments
+{
+    public const DOSSIER_CLOSED = 'Ce dossier est annulé ou à la corbeille : il ne reçoit plus d\'inscription.';
+
+    public const SESSION_CLOSED = 'Cette session est annulée ou à la corbeille : elle ne reçoit plus d\'inscription.';
+
+    public const NOT_WAITLISTED = 'Seule une inscription en attente peut être promue.';
+
+    public const FULL = 'La session est complète : ajoutez des places ou désinscrivez un stagiaire avant de promouvoir.';
+
+    public const NOT_ENROLLED = 'Seule une inscription « Inscrit » peut être confirmée.';
+
+    public const NOT_ATTENDING = 'Seul un stagiaire inscrit ou confirmé peut abandonner.';
+
+    public const ALREADY_CANCELLED = 'Cette inscription est déjà annulée.';
+
+    public const CANCELLED = 'Une inscription annulée ne se modifie plus.';
+
+    public function __construct(private readonly Fiches $fiches) {}
+
+    /**
+     * @param  array<string, mixed>  $extra  entered_on (Y-m-d, default the session start), bpf_category_id, adaptation_needs, notes
+     *
+     * @throws ValidationException
+     */
+    public function enrol(Dossier $dossier, DossierLine $line, TrainingSession $session, string $personId, array $extra = []): Enrolment
+    {
+        $values = $this->validatedExtra($extra, null);
+
+        return DB::transaction(function () use ($dossier, $line, $session, $personId, $values): Enrolment {
+            $dossier = Dossier::withTrashed()->lockForUpdate()->findOrFail($dossier->id);
+            $session = TrainingSession::withTrashed()->lockForUpdate()->findOrFail($session->id);
+            if ($dossier->isCancelled() || $dossier->trashed()) {
+                throw new UserFacingHttpException(409, self::DOSSIER_CLOSED);
+            }
+            if ($session->isCancelled() || $session->trashed()) {
+                throw new UserFacingHttpException(409, self::SESSION_CLOSED);
+            }
+
+            $line = DossierLine::query()->where('dossier_id', $dossier->id)->find($line->id);
+            $errors = [];
+            if ($line === null) {
+                $errors['dossier_line_id'] = 'Ligne du dossier introuvable.';
+            } elseif (! $line->isTraining()) {
+                $errors['dossier_line_id'] = 'Seule une ligne de formation reçoit des inscriptions.';
+            } elseif ($line->training_id !== $session->training_id) {
+                $errors['training_session_id'] = 'La formation de cette session n\'est pas celle de la ligne du dossier.';
+            }
+            if ($session->kind === SessionKind::Intra->value && $dossier->account_organisation_id !== $session->organisation_id) {
+                $errors['training_session_id'] = 'Cette session intra est réservée à son entreprise : le contractant de ce dossier est différent.';
+            }
+            if ($this->fiches->person($personId) === null) {
+                $errors['person_id'] = 'Stagiaire introuvable.';
+            } elseif (Enrolment::query()->where('training_session_id', $session->id)->where('person_id', $personId)
+                ->where('status', '<>', EnrolmentStatus::Cancelled->value)->exists()) {
+                $errors['person_id'] = 'Ce stagiaire est déjà inscrit à cette session.';
+            }
+            if ($errors !== []) {
+                throw ValidationException::withMessages($errors);
+            }
+            assert($line !== null);
+
+            $full = $session->kind === SessionKind::Inter->value && $this->placesTaken($session) >= (int) $session->capacity;
+            $enrolment = Enrolment::query()->create([
+                ...$values,
+                'person_id' => $personId,
+                'training_session_id' => $session->id,
+                'dossier_id' => $dossier->id,
+                'dossier_line_id' => $line->id,
+                'status' => $full ? EnrolmentStatus::Waitlisted : EnrolmentStatus::Enrolled,
+                'waitlist_position' => $full ? $this->nextWaitlistPosition($session) : null,
+                'entered_on' => $values['entered_on'] ?? $session->starts_on->toDateString(),
+                'planned_hours' => $session->planned_hours,
+            ]);
+            PriceShares::recompute($line);
+
+            return $enrolment->refresh();
+        });
+    }
+
+    /**
+     * A waitlisted enrolment takes a free place (manual promotion).
+     */
+    public function promote(Enrolment $enrolment): Enrolment
+    {
+        return $this->locked($enrolment, function (Enrolment $locked, TrainingSession $session): void {
+            if ($locked->status !== EnrolmentStatus::Waitlisted) {
+                throw new UserFacingHttpException(409, self::NOT_WAITLISTED);
+            }
+            if ($session->isCancelled() || $session->trashed()) {
+                throw new UserFacingHttpException(409, self::SESSION_CLOSED);
+            }
+            if ($session->kind === SessionKind::Inter->value && $this->placesTaken($session) >= (int) $session->capacity) {
+                throw new UserFacingHttpException(409, self::FULL);
+            }
+            $locked->status = EnrolmentStatus::Enrolled;
+            $locked->waitlist_position = null;
+            $locked->save();
+        });
+    }
+
+    public function confirm(Enrolment $enrolment): Enrolment
+    {
+        return $this->locked($enrolment, function (Enrolment $locked): void {
+            if ($locked->status !== EnrolmentStatus::Enrolled) {
+                throw new UserFacingHttpException(409, self::NOT_ENROLLED);
+            }
+            $locked->status = EnrolmentStatus::Confirmed;
+            $locked->save();
+        });
+    }
+
+    /**
+     * The trainee leaves on $leftOn for a reason of « Motifs d'abandon »;
+     * his share of the line stays his.
+     *
+     * @throws ValidationException
+     */
+    public function abandon(Enrolment $enrolment, CarbonImmutable $leftOn, string $reasonId): Enrolment
+    {
+        Validator::make(['abandon_reason_id' => $reasonId], [
+            'abandon_reason_id' => ['bail', 'required', 'uuid', self::referenceRule(ReferenceList::AbandonReason)],
+        ], [
+            'abandon_reason_id.required' => 'Choisissez le motif d\'abandon.',
+            'abandon_reason_id.*' => 'Motif d\'abandon inconnu.',
+        ])->validate();
+
+        return $this->locked($enrolment, function (Enrolment $locked) use ($leftOn, $reasonId): void {
+            if (! in_array($locked->status, EnrolmentStatus::HOLDING_A_PLACE, true)) {
+                throw new UserFacingHttpException(409, self::NOT_ATTENDING);
+            }
+            if ($locked->entered_on !== null && $leftOn->toDateString() < $locked->entered_on->toDateString()) {
+                throw ValidationException::withMessages(['left_on' => 'La date de sortie ne peut pas précéder la date d\'entrée.']);
+            }
+            $locked->status = EnrolmentStatus::Abandoned;
+            $locked->left_on = $leftOn;
+            $locked->abandon_reason_id = $reasonId;
+            $locked->save();
+        });
+    }
+
+    /**
+     * The enrolment is cancelled: its place is freed, nobody is promoted
+     * (the waiting list is promoted by hand), the shares of the line are
+     * computed again.
+     */
+    public function cancel(Enrolment $enrolment): Enrolment
+    {
+        return $this->locked($enrolment, function (Enrolment $locked): void {
+            if ($locked->isCancelled()) {
+                throw new UserFacingHttpException(409, self::ALREADY_CANCELLED);
+            }
+            $locked->status = EnrolmentStatus::Cancelled;
+            $locked->waitlist_position = null;
+            $locked->save();
+        });
+    }
+
+    /**
+     * Entry day, BPF category, adaptation needs and notes.
+     *
+     * @param  array<string, mixed>  $data
+     *
+     * @throws ValidationException
+     */
+    public function update(Enrolment $enrolment, array $data): Enrolment
+    {
+        if ($enrolment->isCancelled()) {
+            throw new UserFacingHttpException(409, self::CANCELLED);
+        }
+        $values = $this->validatedExtra($data, $enrolment);
+
+        return $this->locked($enrolment, function (Enrolment $locked) use ($values): void {
+            if ($locked->isCancelled()) {
+                throw new UserFacingHttpException(409, self::CANCELLED);
+            }
+            $values['entered_on'] ??= $locked->entered_on?->toDateString();
+            if ($locked->left_on !== null && $values['entered_on'] !== null && $values['entered_on'] > $locked->left_on->toDateString()) {
+                throw ValidationException::withMessages(['entered_on' => 'La date d\'entrée ne peut pas suivre la date de sortie.']);
+            }
+            $locked->fill($values)->save();
+        });
+    }
+
+    /**
+     * Places of the session held (enrolled and confirmed).
+     */
+    public function placesTaken(TrainingSession $session): int
+    {
+        return Enrolment::query()->where('training_session_id', $session->id)
+            ->whereIn('status', EnrolmentStatus::values(EnrolmentStatus::HOLDING_A_PLACE))->count();
+    }
+
+    /**
+     * Locks the dossier, then the session, then the enrolment; applies
+     * $change and computes the shares of the line again.
+     *
+     * @param  callable(Enrolment, TrainingSession): void  $change
+     */
+    private function locked(Enrolment $enrolment, callable $change): Enrolment
+    {
+        return DB::transaction(function () use ($enrolment, $change): Enrolment {
+            Dossier::withTrashed()->lockForUpdate()->findOrFail($enrolment->dossier_id);
+            $session = TrainingSession::withTrashed()->lockForUpdate()->findOrFail($enrolment->training_session_id);
+            $locked = Enrolment::query()->lockForUpdate()->findOrFail($enrolment->id);
+            $change($locked, $session);
+            $line = DossierLine::query()->find($locked->dossier_line_id);
+            if ($line !== null) {
+                PriceShares::recompute($line);
+            }
+            $enrolment->setRawAttributes($locked->refresh()->getAttributes(), true);
+
+            return $locked;
+        });
+    }
+
+    private function nextWaitlistPosition(TrainingSession $session): int
+    {
+        return (int) Enrolment::query()->where('training_session_id', $session->id)
+            ->where('status', EnrolmentStatus::Waitlisted->value)->max('waitlist_position') + 1;
+    }
+
+    /**
+     * @param  array<string, mixed>  $data
+     * @return array<string, mixed>
+     *
+     * @throws ValidationException
+     */
+    private function validatedExtra(array $data, ?Enrolment $current): array
+    {
+        foreach (['entered_on', 'bpf_category_id', 'adaptation_needs', 'notes'] as $key) {
+            $value = $data[$key] ?? null;
+            if (is_string($value)) {
+                $value = trim($value);
+            }
+            $data[$key] = $value === '' ? null : $value;
+        }
+
+        /** @var array{entered_on: ?string, bpf_category_id: ?string, adaptation_needs: ?string, notes: ?string} $validated */
+        $validated = Validator::make($data, [
+            'entered_on' => ['nullable', 'date_format:Y-m-d'],
+            'bpf_category_id' => ['nullable', 'bail', 'uuid', self::referenceRule(ReferenceList::BpfCategory, $current?->bpf_category_id)],
+            'adaptation_needs' => ['nullable', 'string', 'max:2000'],
+            'notes' => ['nullable', 'string', 'max:5000'],
+        ], [
+            'entered_on.*' => 'Date d\'entrée invalide.',
+            'bpf_category_id.*' => 'Catégorie BPF inconnue.',
+            'adaptation_needs.*' => 'Les besoins d\'adaptation ne doivent pas dépasser 2 000 caractères.',
+            'notes.*' => 'Les notes ne doivent pas dépasser 5 000 caractères.',
+        ])->validate();
+
+        return [
+            'entered_on' => $validated['entered_on'] ?? null,
+            'bpf_category_id' => $validated['bpf_category_id'] ?? null,
+            'adaptation_needs' => $validated['adaptation_needs'] ?? null,
+            'notes' => $validated['notes'] ?? null,
+        ];
+    }
+
+    /**
+     * An active item of $list in the organisme, or the one already stored.
+     */
+    private static function referenceRule(ReferenceList $list, ?string $keep = null): mixed
+    {
+        return Rule::exists('reference_items', 'id')
+            ->where('tenant_id', app(TenantContext::class)->id())
+            ->where('list', $list->value)
+            ->whereNull('deleted_at')
+            ->where(fn ($q) => $q->where('is_active', true)->when($keep, fn ($q2, $id) => $q2->orWhere('id', $id)));
+    }
+}

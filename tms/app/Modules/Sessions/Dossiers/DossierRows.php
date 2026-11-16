@@ -7,6 +7,8 @@ use App\Modules\Core\References\ReferenceItem;
 use App\Modules\Core\Users\User;
 use App\Modules\Crm\Public\Fiches;
 use App\Modules\Sessions\Amounts;
+use App\Modules\Sessions\Permissions;
+use App\Modules\Sessions\SessionsVisibility;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Collection as EloquentCollection;
 use Illuminate\Support\Collection;
@@ -69,6 +71,37 @@ final class DossierRows
                 'trashed' => $d->trashed(),
             ];
         })->values()->all();
+    }
+
+    /**
+     * « Dossiers » of the fiche of an entreprise: the dossiers it is the
+     * contractant of that the viewer sees (sessions.dossiers.view and its
+     * scope), latest first; null without that right.
+     *
+     * @return array{title: string, empty: string, rows: list<array<string, mixed>>}|null
+     */
+    public static function organisationBlock(string $organisationId, User $viewer): ?array
+    {
+        if (! $viewer->can(Permissions::DOSSIERS_VIEW)) {
+            return null;
+        }
+        $dossiers = SessionsVisibility::dossiers(Dossier::query(), $viewer)
+            ->where('dossiers.account_organisation_id', $organisationId)
+            ->orderByDesc('dossiers.created_at')->orderByDesc('dossiers.number')
+            ->limit(100)->get();
+
+        return [
+            'title' => 'Dossiers',
+            'empty' => 'Aucun dossier de formation pour cette entreprise.',
+            'rows' => array_map(fn (array $row): array => [
+                'id' => $row['id'],
+                'title' => "Dossier {$row['number']}",
+                'subtitle' => $row['training_titles'] === [] ? null : implode(', ', $row['training_titles']),
+                'meta' => "{$row['price']} HT",
+                'badge' => $row['status_label'],
+                'href' => route('dossiers.show', $row['id'], false),
+            ], self::rows($dossiers, $viewer, Dossier::today())),
+        ];
     }
 
     /**

@@ -11,6 +11,9 @@ use App\Modules\Core\Tenancy\TenantContext;
 use App\Modules\Crm\Public\Fiches;
 use App\Modules\Sessions\AbandonRule;
 use App\Modules\Sessions\Amounts;
+use App\Modules\Sessions\Enrolments\Enrolment;
+use App\Modules\Sessions\Enrolments\EnrolmentStatus;
+use App\Modules\Sessions\Enrolments\PriceShares;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -33,9 +36,12 @@ use Illuminate\Validation\ValidationException;
  *    has neither and carries the dossier's DAS;
  *  - abandon rule: the organisme's, or the dossier's own (mode + percent).
  *
- * Existing lines are matched by id (the enrolments of task 5 point to
- * them): a line left out is deleted, a line without id is added. A cancelled
- * dossier no longer changes (409).
+ * Existing lines are matched by id (the enrolments point to them): a line
+ * left out is deleted, a line without id is added; a line with trainees
+ * enrolled is neither deleted nor given another training, and a line that
+ * vanished meanwhile is a 409 (checkLines(), under the lock of the dossier).
+ * The shares of the lines priced per trainee follow (PriceShares). A
+ * cancelled dossier no longer changes (409).
  *
  * @phpstan-type DossierData array<string, mixed>
  */
@@ -44,6 +50,8 @@ final class DossierWriter
     public const CANCELLED = 'Un dossier annulé ne se modifie plus.';
 
     public const MAX_LINES = 100;
+
+    public const LINE_GONE = 'Une ligne de ce dossier a été supprimée entre-temps : rechargez la page.';
 
     public function __construct(
         private readonly DossierNumbering $numbering,
@@ -87,6 +95,7 @@ final class DossierWriter
             if ($locked->isCancelled()) {
                 throw new UserFacingHttpException(409, self::CANCELLED);
             }
+            $this->checkLines($locked, $lines);
             $locked->update($values);
             $this->writeLines($locked, $lines);
 
@@ -247,6 +256,42 @@ final class DossierWriter
     }
 
     /**
+     * Under the lock of the dossier (Enrolments takes it too): every line
+     * sent still exists (409 otherwise), and a line with trainees enrolled
+     * (cancelled enrolments aside) is neither deleted nor given another
+     * training.
+     *
+     * @param  list<array<string, mixed>>  $lines
+     *
+     * @throws ValidationException
+     */
+    private function checkLines(Dossier $dossier, array $lines): void
+    {
+        $existing = $dossier->lines()->get()->keyBy('id');
+        $sent = [];
+        foreach ($lines as $line) {
+            if (is_string($line['id'])) {
+                if (! $existing->has($line['id'])) {
+                    throw new UserFacingHttpException(409, self::LINE_GONE);
+                }
+                $sent[$line['id']] = $line;
+            }
+        }
+        $enrolled = Enrolment::query()->where('dossier_id', $dossier->id)
+            ->where('status', '<>', EnrolmentStatus::Cancelled->value)
+            ->distinct()->pluck('dossier_line_id')->all();
+        foreach ($existing->only($enrolled) as $line) {
+            $kept = $sent[$line->id] ?? null;
+            if ($kept === null) {
+                throw ValidationException::withMessages(['lines' => "La ligne « {$line->label} » a des stagiaires inscrits : désinscrivez-les avant de la supprimer."]);
+            }
+            if ($kept['kind'] !== $line->kind || $kept['training_id'] !== $line->training_id) {
+                throw ValidationException::withMessages(['lines' => "La ligne « {$line->label} » a des stagiaires inscrits : sa formation ne change plus."]);
+            }
+        }
+    }
+
+    /**
      * @param  list<array<string, mixed>>  $lines
      */
     private function writeLines(Dossier $dossier, array $lines): void
@@ -260,8 +305,14 @@ final class DossierWriter
             $line ??= new DossierLine(['dossier_id' => $dossier->id]);
             $line->fill($values)->save();
             $kept[] = $line->id;
+            // Its total or its pricing mode may have changed.
+            PriceShares::recompute($line);
         }
-        $existing->except($kept)->each(fn (DossierLine $l) => $l->delete());
+        $existing->except($kept)->each(function (DossierLine $l): void {
+            // Only cancelled enrolments are left on a deleted line (checkLines()).
+            Enrolment::query()->where('dossier_line_id', $l->id)->get()->each(fn (Enrolment $e) => $e->delete());
+            $l->delete();
+        });
     }
 
     /**

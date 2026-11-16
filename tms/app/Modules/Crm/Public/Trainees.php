@@ -9,6 +9,7 @@ use App\Modules\Crm\Organisations\Organisation;
 use App\Modules\Crm\Organisations\OrganisationStatus;
 use App\Modules\Crm\People\Person;
 use App\Modules\Crm\People\PersonRequest;
+use App\Modules\Crm\Support\DasLinks;
 use App\Modules\Crm\Support\ReferenceRules;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
@@ -67,7 +68,9 @@ final class Trainees
 
     /**
      * Creates an ordinary person of the CRM (journaled), optionally employed
-     * by $data['organisation_id']. Throws DuplicateTrainee when similar
+     * by $data['organisation_id'] and given the DAS $data['das_ids'] (active
+     * DAS of the organisme: those of the training the trainee is enrolled
+     * on, so that a user limited to his DAS keeps seeing her). Throws DuplicateTrainee when similar
      * people exist (same rules as the person form), unless
      * $data['confirm_duplicate'] is true; ValidationException (French
      * messages) on invalid data.
@@ -79,15 +82,19 @@ final class Trainees
     {
         $input = [
             ...PersonRequest::normalise(array_intersect_key($data, array_flip(self::FIELDS))),
-            ...array_intersect_key($data, array_flip(['is_individual', 'organisation_id'])),
+            ...array_intersect_key($data, array_flip(['is_individual', 'organisation_id', 'das_ids'])),
         ];
         $rules = array_intersect_key(PersonRequest::fieldRules(), array_flip(self::FIELDS));
         $rules['organisation_id'] = ['nullable', 'uuid', Rule::exists(Organisation::class, 'id')->whereNull('deleted_at')];
+        $rules['das_ids'] = ['nullable', 'array', 'max:20'];
+        $rules['das_ids.*'] = ['distinct', ...ReferenceRules::item(ReferenceList::Das)];
 
         /** @var array<string, mixed> $validated */
         $validated = Validator::make($input, $rules, PersonRequest::validationMessages())->validate();
         $organisationId = $validated['organisation_id'] ?? null;
-        unset($validated['organisation_id']);
+        /** @var list<string> $dasIds */
+        $dasIds = array_values($validated['das_ids'] ?? []);
+        unset($validated['organisation_id'], $validated['das_ids']);
 
         if (($data['confirm_duplicate'] ?? false) !== true) {
             $found = $this->duplicates->forPerson($validated);
@@ -96,11 +103,12 @@ final class Trainees
             }
         }
 
-        return DB::transaction(function () use ($validated, $organisationId): string {
+        return DB::transaction(function () use ($validated, $organisationId, $dasIds): string {
             $person = Person::query()->create([...$validated, 'country' => 'FR', 'status' => OrganisationStatus::Prospect->value]);
             if (is_string($organisationId)) {
                 Affiliation::query()->create(['person_id' => $person->id, 'organisation_id' => $organisationId]);
             }
+            app(DasLinks::class)->add($person, $dasIds);
 
             return $person->id;
         });

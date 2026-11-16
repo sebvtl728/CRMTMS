@@ -20,6 +20,7 @@ use App\Modules\Crm\Opportunities\OpportunityTrainings;
 use App\Modules\Crm\Organisations\Organisation;
 use App\Modules\Crm\Organisations\OrganisationStatus;
 use App\Modules\Crm\Permissions;
+use App\Modules\Crm\Public\FicheBlocks;
 use App\Modules\Crm\Quotes\QuoteRows;
 use App\Modules\Crm\Search\CrmResource;
 use App\Modules\Crm\Search\ListExtras;
@@ -239,6 +240,8 @@ class PersonController extends Controller
             ...$this->interests($person, $user),
             'opportunities' => OpportunityRows::forFiche($person, $user),
             'quotes' => QuoteRows::forFiche($person, $user),
+            // Blocks of the other modules (Sessions: « Formations suivies », « Dossiers »).
+            'blocks' => FicheBlocks::for('person', $person->id, $user),
             'similar' => $user->can(Permissions::MERGE) ? $this->duplicates->similarTo($person, $user) : [],
             'can' => [
                 'merge' => ! $person->trashed() && $person->anonymised_at === null && $user->can(Permissions::MERGE),

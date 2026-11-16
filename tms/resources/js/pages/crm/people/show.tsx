@@ -1,4 +1,5 @@
 import { SimilarFiches, type DuplicateCandidate } from '@/components/crm/duplicate-warning';
+import { FicheBlockPanel, type FicheBlock } from '@/components/crm/fiche-blocks';
 import { InterestTrainings, type InterestTraining, type InterestTrainingOption } from '@/components/crm/interest-trainings';
 import { FicheOpportunities, type OpportunityRow } from '@/components/crm/opportunity-list';
 import { PersonGdpr, type GdprData } from '@/components/crm/person-gdpr';
@@ -75,6 +76,8 @@ interface ShowProps {
     gdpr: GdprData;
     opportunities: OpportunityRow[];
     quotes: QuoteRow[];
+    /** Tabs added by other modules (« Formations suivies », « Dossiers »). */
+    blocks: FicheBlock[];
     interestTrainings: InterestTraining[];
     trainingOptions: InterestTrainingOption[];
     ficheDasIds: string[];
@@ -123,6 +126,7 @@ export default function PersonShow({
     gdpr,
     opportunities,
     quotes,
+    blocks,
     interestTrainings,
     trainingOptions,
     ficheDasIds,
@@ -130,7 +134,7 @@ export default function PersonShow({
     status,
 }: ShowProps) {
     const [confirming, setConfirming] = useState(false);
-    const [tab, setTab] = useState<(typeof TABS)[number]>('Informations');
+    const [tab, setTab] = useState<string>('Informations');
 
     const breadcrumbs: BreadcrumbItem[] = [
         { title: 'Personnes', href: '/crm/people' },
@@ -221,7 +225,7 @@ export default function PersonShow({
                 {can.merge && <SimilarFiches type="person" currentId={p.id} similar={similar} />}
 
                 <div role="tablist" aria-label="Sections de la fiche" className="flex gap-1 overflow-x-auto border-b">
-                    {TABS.map((t) => (
+                    {[...TABS.slice(0, -1), ...blocks.map((b) => b.title), 'Historique'].map((t) => (
                         <button
                             key={t}
                             role="tab"
@@ -244,6 +248,7 @@ export default function PersonShow({
                     />
                 )}
                 {tab === 'Devis' && <FicheQuotes rows={quotes} />}
+                {blocks.map((b) => tab === b.title && <FicheBlockPanel key={b.key} block={b} />)}
                 {tab === 'Historique' && <Timeline kind="person" subjectId={p.id} canEdit={can.update} />}
 
                 <div

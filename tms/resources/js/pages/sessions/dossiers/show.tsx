@@ -1,5 +1,7 @@
 import Heading from '@/components/heading';
 import InputError from '@/components/input-error';
+import { EnrolDialog, type EnrolSessionOption } from '@/components/sessions/enrolment-dialog';
+import { EnrolmentList, type EnrolmentReferences, type EnrolmentRow } from '@/components/sessions/enrolment-list';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -11,7 +13,7 @@ import { formatDateTime, formatDay, type Option } from '@/lib/crm';
 import { dossierStatusVariant, ficheRoute, type DossierRow } from '@/lib/dossiers';
 import { type BreadcrumbItem } from '@/types';
 import { Head, Link, router, useForm } from '@inertiajs/react';
-import { LoaderCircle, Pencil } from 'lucide-react';
+import { LoaderCircle, Pencil, UserPlus } from 'lucide-react';
 import { FormEventHandler, useState, type ReactNode } from 'react';
 
 type Step = 'convention-sent' | 'convention-signed' | 'convocations-sent' | 'running' | 'done';
@@ -49,6 +51,10 @@ interface ShowProps {
     can: { update: boolean; steps: Record<Step, boolean>; cancel: boolean; delete: boolean; restore: boolean };
     today: string;
     cancel_reasons: Option[];
+    enrolments: EnrolmentRow[];
+    /** Null without sessions.sessions.update or on a closed dossier. */
+    enrol: { sessions: Record<string, EnrolSessionOption[]> } | null;
+    enrolment_references: EnrolmentReferences | null;
     status?: string;
 }
 
@@ -59,7 +65,17 @@ const DATED: { step: Step; label: string; title: string }[] = [
     { step: 'convocations-sent', label: 'Convocations envoyées', title: 'Convocations envoyées le' },
 ];
 
-function StepDialog({ dossierId, step, today, onClose }: { dossierId: string; step: (typeof DATED)[number] | null; today: string; onClose: () => void }) {
+function StepDialog({
+    dossierId,
+    step,
+    today,
+    onClose,
+}: {
+    dossierId: string;
+    step: (typeof DATED)[number] | null;
+    today: string;
+    onClose: () => void;
+}) {
     const { data, setData, post, processing, errors, reset } = useForm({ on: today });
 
     const submit: FormEventHandler = (e) => {
@@ -155,8 +171,10 @@ function CancelDialog({ dossierId, reasons, open, onClose }: { dossierId: string
     );
 }
 
-export default function DossierShow({ dossier, can, today, cancel_reasons, status }: ShowProps) {
+export default function DossierShow({ dossier, can, today, cancel_reasons, enrolments, enrol, enrolment_references, status }: ShowProps) {
     const [cancelling, setCancelling] = useState(false);
+    const [enrolling, setEnrolling] = useState(false);
+    const trainingLines = dossier.lines.filter((l) => l.kind === 'training');
     const [dated, setDated] = useState<(typeof DATED)[number] | null>(null);
     const breadcrumbs: BreadcrumbItem[] = [
         { title: 'Dossiers', href: '/dossiers' },
@@ -274,7 +292,10 @@ export default function DossierShow({ dossier, can, today, cancel_reasons, statu
                             dossier.account.type === 'organisation' ? 'Contractant (entreprise)' : 'Contractant (particulier)',
                             fiche(dossier.account.type, dossier.account.id, dossier.account.label, dossier.account.can_open, dossier.account.trashed),
                         )}
-                        {field('Contact', dossier.contact ? fiche('person', dossier.contact.id, dossier.contact.label, dossier.contact.can_open) : '—')}
+                        {field(
+                            'Contact',
+                            dossier.contact ? fiche('person', dossier.contact.id, dossier.contact.label, dossier.contact.can_open) : '—',
+                        )}
                         {field('Société émettrice', dossier.company ?? '—')}
                         {field('DAS', dossier.das ?? '—')}
                         {field('Responsable', dossier.responsible ?? '—')}
@@ -323,7 +344,9 @@ export default function DossierShow({ dossier, can, today, cancel_reasons, statu
                                             {l.quantity} {l.unit}
                                         </td>
                                         <td className="px-3 py-2 text-right whitespace-nowrap">{l.unit_price}</td>
-                                        <td className="px-3 py-2 text-right whitespace-nowrap">{l.discount_percent === '0,00' ? '—' : `${l.discount_percent} %`}</td>
+                                        <td className="px-3 py-2 text-right whitespace-nowrap">
+                                            {l.discount_percent === '0,00' ? '—' : `${l.discount_percent} %`}
+                                        </td>
                                         <td className="px-3 py-2 text-right whitespace-nowrap">{l.total_ht}</td>
                                     </tr>
                                 ))}
@@ -339,9 +362,50 @@ export default function DossierShow({ dossier, can, today, cancel_reasons, statu
                         </table>
                     </div>
                 </section>
+
+                <section aria-label="Inscriptions" className="grid gap-3">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                        <h2 className="text-sm font-semibold">Inscriptions</h2>
+                        {enrol && trainingLines.length > 0 && (
+                            <Button type="button" size="sm" onClick={() => setEnrolling(true)}>
+                                <UserPlus className="h-4 w-4" />
+                                Inscrire un stagiaire
+                            </Button>
+                        )}
+                    </div>
+                    {trainingLines.length === 0 ? (
+                        <div className="text-muted-foreground rounded-xl border p-6 text-center text-sm">
+                            Ce dossier n'a pas de ligne de formation.
+                        </div>
+                    ) : (
+                        trainingLines.map((l) => (
+                            <div key={l.id} className="grid gap-2">
+                                <h3 className="text-muted-foreground text-xs font-medium">{l.label}</h3>
+                                <EnrolmentList
+                                    rows={enrolments.filter((e) => e.line?.id === l.id)}
+                                    context="dossier"
+                                    references={enrolment_references}
+                                />
+                            </div>
+                        ))
+                    )}
+                </section>
             </div>
 
             <StepDialog dossierId={dossier.id} step={dated} today={today} onClose={() => setDated(null)} />
+            {enrolling && enrol && enrolment_references && (
+                <EnrolDialog
+                    source={{
+                        from: 'dossier',
+                        dossierId: dossier.id,
+                        organisationId: dossier.account.type === 'organisation' ? dossier.account.id : null,
+                        lines: trainingLines.map((l) => ({ id: l.id, label: l.label })),
+                        sessions: enrol.sessions,
+                    }}
+                    references={enrolment_references}
+                    onClose={() => setEnrolling(false)}
+                />
+            )}
             {can.cancel && <CancelDialog dossierId={dossier.id} reasons={cancel_reasons} open={cancelling} onClose={() => setCancelling(false)} />}
         </AppLayout>
     );

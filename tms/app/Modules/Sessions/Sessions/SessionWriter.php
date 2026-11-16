@@ -7,6 +7,8 @@ use App\Modules\Catalogue\Trainings;
 use App\Modules\Core\References\ReferenceList;
 use App\Modules\Core\Tenancy\TenantContext;
 use App\Modules\Crm\Public\Fiches;
+use App\Modules\Sessions\Enrolments\Enrolment;
+use App\Modules\Sessions\Enrolments\EnrolmentStatus;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -21,7 +23,9 @@ use Illuminate\Validation\ValidationException;
  * training's, hours the training's unless typed. Intra: an entreprise of the
  * CRM (Crm\Public\Fiches, not trashed), no places; inter: places ≥ 1, no
  * entreprise. A cancelled session no longer changes (409); a trashed intra
- * session comes back only with its entreprise (409).
+ * session comes back only with its entreprise (409). Once trainees are
+ * enrolled (cancelled enrolments aside), its training, type and entreprise
+ * no longer change and it does not go to the trash (409).
  *
  * @phpstan-type SessionData array<string, mixed>
  */
@@ -32,6 +36,10 @@ final class SessionWriter
     public const ALREADY_CANCELLED = 'Cette session est déjà annulée.';
 
     public const ORGANISATION_GONE = 'L\'entreprise de cette session intra est à la corbeille : restaurez-la d\'abord.';
+
+    public const LOCKED = 'Des stagiaires sont inscrits à cette session : sa formation, son type et son entreprise ne changent plus.';
+
+    public const ENROLLED = 'Des stagiaires sont inscrits à cette session : désinscrivez-les avant de la mettre à la corbeille.';
 
     public function __construct(
         private readonly SessionNumbering $numbering,
@@ -74,10 +82,39 @@ final class SessionWriter
             if ($locked->isCancelled()) {
                 throw new UserFacingHttpException(409, self::CANCELLED);
             }
+            // Under the lock Enrolments takes too: no enrolment slips in meanwhile.
+            $moved = $values['training_id'] !== $locked->training_id || $values['kind'] !== $locked->kind
+                || $values['organisation_id'] !== $locked->organisation_id;
+            if ($moved && self::hasEnrolments($locked)) {
+                throw new UserFacingHttpException(409, self::LOCKED);
+            }
             $locked->update($values);
 
             return $locked;
         });
+    }
+
+    /**
+     * Puts the session in the trash, unless trainees are enrolled on it (409).
+     */
+    public function trash(TrainingSession $session): void
+    {
+        DB::transaction(function () use ($session): void {
+            $locked = TrainingSession::query()->lockForUpdate()->findOrFail($session->id);
+            if (self::hasEnrolments($locked)) {
+                throw new UserFacingHttpException(409, self::ENROLLED);
+            }
+            $locked->delete();
+        });
+    }
+
+    /**
+     * Enrolments other than cancelled ones hang on the session.
+     */
+    public static function hasEnrolments(TrainingSession $session): bool
+    {
+        return Enrolment::query()->where('training_session_id', $session->id)
+            ->where('status', '<>', EnrolmentStatus::Cancelled->value)->exists();
     }
 
     /**

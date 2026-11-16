@@ -1,5 +1,7 @@
 import Heading from '@/components/heading';
 import InputError from '@/components/input-error';
+import { EnrolDialog, type EnrolDossierOption } from '@/components/sessions/enrolment-dialog';
+import { EnrolmentList, type EnrolmentReferences, type EnrolmentRow } from '@/components/sessions/enrolment-list';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -10,7 +12,7 @@ import { formatDateTime, formatDay, type Option } from '@/lib/crm';
 import { sessionDates, sessionLocation, sessionStatusVariant, type SessionRow } from '@/lib/sessions';
 import { type BreadcrumbItem } from '@/types';
 import { Head, Link, router, useForm } from '@inertiajs/react';
-import { LoaderCircle, Pencil } from 'lucide-react';
+import { LoaderCircle, Pencil, UserPlus } from 'lucide-react';
 import { FormEventHandler, useState, type ReactNode } from 'react';
 
 interface ShowProps {
@@ -26,6 +28,11 @@ interface ShowProps {
     };
     can: { update: boolean; cancel: boolean; delete: boolean; restore: boolean };
     cancel_reasons: Option[];
+    enrolments: EnrolmentRow[];
+    places: { capacity: number | null; taken: number; free: number | null };
+    /** Null without sessions.sessions.update on the session, or once cancelled. */
+    enrol: { dossiers: EnrolDossierOption[] } | null;
+    enrolment_references: EnrolmentReferences | null;
     status?: string;
 }
 
@@ -82,8 +89,11 @@ function CancelDialog({ sessionId, reasons, open, onClose }: { sessionId: string
     );
 }
 
-export default function SessionShow({ session, can, cancel_reasons, status }: ShowProps) {
+export default function SessionShow({ session, can, cancel_reasons, enrolments, places, enrol, enrolment_references, status }: ShowProps) {
     const [cancelling, setCancelling] = useState(false);
+    const [enrolling, setEnrolling] = useState(false);
+    const waiting = enrolments.filter((e) => e.status === 'waitlisted');
+    const others = enrolments.filter((e) => e.status !== 'waitlisted');
     const breadcrumbs: BreadcrumbItem[] = [
         { title: 'Sessions', href: '/sessions' },
         { title: session.number, href: '#' },
@@ -195,8 +205,39 @@ export default function SessionShow({ session, can, cancel_reasons, status }: Sh
                         </div>
                     )}
                 </section>
+
+                <section aria-label="Inscrits" className="grid gap-3">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                        <h2 className="text-sm font-semibold">
+                            Inscrits · {places.taken}
+                            {places.capacity !== null && ` / ${places.capacity} places (${places.free} libre${(places.free ?? 0) > 1 ? 's' : ''})`}
+                        </h2>
+                        {enrol && (
+                            <Button type="button" size="sm" onClick={() => setEnrolling(true)}>
+                                <UserPlus className="h-4 w-4" />
+                                Inscrire un stagiaire
+                            </Button>
+                        )}
+                    </div>
+                    <EnrolmentList rows={others} context="session" references={enrolment_references} />
+                </section>
+
+                {waiting.length > 0 && (
+                    <section aria-label="Liste d'attente" className="grid gap-3">
+                        <h2 className="text-sm font-semibold">Liste d'attente · {waiting.length}</h2>
+                        <p className="text-muted-foreground text-sm">Ordre d'arrivée ; une place libérée ne promeut personne automatiquement.</p>
+                        <EnrolmentList rows={waiting} context="session" references={enrolment_references} />
+                    </section>
+                )}
             </div>
 
+            {enrolling && enrol && enrolment_references && (
+                <EnrolDialog
+                    source={{ from: 'session', sessionId: session.id, dossiers: enrol.dossiers }}
+                    references={enrolment_references}
+                    onClose={() => setEnrolling(false)}
+                />
+            )}
             {can.cancel && <CancelDialog sessionId={session.id} reasons={cancel_reasons} open={cancelling} onClose={() => setCancelling(false)} />}
         </AppLayout>
     );

@@ -9,7 +9,7 @@ import AppLayout from '@/layouts/app-layout';
 import { type Option, type Paginated } from '@/lib/crm';
 import { dossierStatusVariant, type DossierRow } from '@/lib/dossiers';
 import { type BreadcrumbItem } from '@/types';
-import { Head, Link, router } from '@inertiajs/react';
+import { Head, Link, router, usePage } from '@inertiajs/react';
 import { ArrowDown, ArrowUp, ChevronLeft, ChevronRight, Download, Plus } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 
@@ -50,6 +50,9 @@ function dossiersQuery(filters: Filters): Record<string, string> {
 
 export default function DossiersIndex({ dossiers, filters, options, can, status }: IndexProps) {
     const [search, setSearch] = useState(filters.q);
+    const [checking, setChecking] = useState(false);
+    const [refusal, setRefusal] = useState<string | null>(null);
+    const errors = usePage().props.errors as Record<string, string | undefined>;
     const first = useRef(true);
 
     const visit = (changes: Partial<Filters>) =>
@@ -79,7 +82,31 @@ export default function DossiersIndex({ dossiers, filters, options, can, status 
     );
 
     const filtered = Boolean(filters.q || filters.status || filters.das || filters.responsible || filters.trashed);
-    const exportUrl = `${route('dossiers.export')}?${new URLSearchParams(dossiersQuery(filters))}`;
+    const query = new URLSearchParams(dossiersQuery(filters));
+    const exportError = refusal ?? errors.export ?? errors.columns ?? null;
+
+    /** A JSON pre-flight first: the export may be refused (too many rows, throttle). */
+    const download = async () => {
+        setRefusal(null);
+        setChecking(true);
+        try {
+            const response = await fetch(`${route('dossiers.export.check')}?${query}`, {
+                headers: { Accept: 'application/json' },
+                credentials: 'same-origin',
+            });
+            const json = (await response.json().catch(() => ({}))) as { allowed?: boolean; message?: string | null };
+            if (!response.ok || json.allowed === false) {
+                setRefusal(json.message ?? 'Export impossible pour le moment.');
+
+                return;
+            }
+            window.location.assign(`${route('dossiers.export')}?${query}`);
+        } catch {
+            setRefusal("L'export a échoué, réessayez.");
+        } finally {
+            setChecking(false);
+        }
+    };
 
     const statusBadge = (row: DossierRow) => (
         <Badge variant={dossierStatusVariant(row.status)} className="whitespace-nowrap">
@@ -96,12 +123,17 @@ export default function DossiersIndex({ dossiers, filters, options, can, status 
                     <Heading title="Dossiers" description="Dossiers de formation : contractant, lignes, prix et état" />
                     <div className="flex flex-wrap items-start gap-2">
                         {can.export && (
-                            <Button asChild variant="outline">
-                                <a href={exportUrl}>
+                            <div className="grid gap-1">
+                                <Button type="button" variant="outline" onClick={download} disabled={checking}>
                                     <Download className="h-4 w-4" />
                                     Exporter (CSV)
-                                </a>
-                            </Button>
+                                </Button>
+                                {exportError && (
+                                    <p role="alert" className="text-destructive max-w-xs text-sm">
+                                        {exportError}
+                                    </p>
+                                )}
+                            </div>
                         )}
                         {can.create && (
                             <Button asChild>
@@ -209,7 +241,9 @@ export default function DossiersIndex({ dossiers, filters, options, can, status 
                                         {statusBadge(d)}
                                     </div>
                                     <div>{d.account.label}</div>
-                                    <div className="text-muted-foreground text-xs">{[d.training_titles.join(', '), d.price].filter(Boolean).join(' · ')}</div>
+                                    <div className="text-muted-foreground text-xs">
+                                        {[d.training_titles.join(', '), d.price].filter(Boolean).join(' · ')}
+                                    </div>
                                 </li>
                             ))}
                         </ul>

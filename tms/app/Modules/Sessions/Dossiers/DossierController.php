@@ -15,6 +15,8 @@ use App\Modules\Crm\Public\Fiches;
 use App\Modules\Crm\Public\Trainees;
 use App\Modules\Sessions\AbandonRule;
 use App\Modules\Sessions\Amounts;
+use App\Modules\Sessions\Enrolments\EnrolmentOptions;
+use App\Modules\Sessions\Enrolments\EnrolmentRows;
 use App\Modules\Sessions\Permissions;
 use App\Modules\Sessions\Sessions\SessionListQuery;
 use App\Modules\Sessions\SessionsVisibility;
@@ -94,6 +96,25 @@ class DossierController extends Controller
         ]);
 
         return $exporter->export($query, $resource, $user, $columns, $resource->fileName().'-'.now()->format('Ymd-Hi').'.csv');
+    }
+
+    /**
+     * Pre-flight of the download (the page calls it first): is the export
+     * allowed, and why not (too many rows). Writes nothing, journals nothing.
+     */
+    public function exportCheck(Request $request, XlsxExporter $counter): JsonResponse
+    {
+        /** @var Builder<Model> $query */
+        $query = DossierListQuery::build(DossierListQuery::filters($request->query()), $this->user($request));
+        $size = $counter->size($query);
+        $allowed = $size['rows'] <= $size['max'];
+
+        return response()->json([
+            'rows' => $size['rows'],
+            'max' => $size['max'],
+            'allowed' => $allowed,
+            'message' => $allowed ? null : XlsxExporter::tooManyRows($size['rows'], $size['max']),
+        ])->header('Cache-Control', 'no-store, private');
     }
 
     public function create(Request $request): Response
@@ -183,6 +204,9 @@ class DossierController extends Controller
             ],
             'today' => $today->toDateString(),
             'cancel_reasons' => SessionListQuery::reference(ReferenceList::CancelReason),
+            'enrolments' => EnrolmentRows::forDossier($dossier, $user),
+            'enrol' => $open && $user->can(Permissions::SESSIONS_UPDATE) ? ['sessions' => EnrolmentOptions::sessionsFor($dossier, $user)] : null,
+            'enrolment_references' => $user->can(Permissions::SESSIONS_UPDATE) ? EnrolmentOptions::references() : null,
             'status' => $request->session()->get('status'),
         ]);
     }

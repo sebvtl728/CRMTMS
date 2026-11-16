@@ -8,13 +8,15 @@ use App\Modules\Core\References\ReferenceItem;
 use App\Modules\Core\References\ReferenceList;
 use App\Modules\Core\Users\User;
 use App\Modules\Crm\Public\Fiches;
+use App\Modules\Sessions\Enrolments\EnrolmentOptions;
+use App\Modules\Sessions\Enrolments\EnrolmentRows;
+use App\Modules\Sessions\Enrolments\Enrolments;
 use App\Modules\Sessions\Permissions;
 use App\Modules\Sessions\SessionsVisibility;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
@@ -112,6 +114,7 @@ class SessionController extends Controller
         $cancelReason = $session->cancel_reason_id === null ? null : ReferenceItem::query()->find($session->cancel_reason_id)?->label;
 
         $row = SessionRows::one($session, TrainingSession::today());
+        $enrol = ! $session->isCancelled() && $user->can('update', $session);
         if (is_array($row['organisation'])) {
             // A link to the fiche only when the user can open it (plain text otherwise).
             $row['organisation']['can_open'] = app(Fiches::class)->openable($user, 'organisation', [(string) $session->organisation_id]) !== [];
@@ -134,6 +137,15 @@ class SessionController extends Controller
                 'restore' => $user->can('restore', $session),
             ],
             'cancel_reasons' => SessionListQuery::reference(ReferenceList::CancelReason),
+            'enrolments' => EnrolmentRows::forSession($session, $user),
+            'places' => [
+                'capacity' => $session->capacity,
+                'taken' => $taken = app(Enrolments::class)->placesTaken($session),
+                'free' => $session->capacity === null ? null : max(0, $session->capacity - $taken),
+            ],
+            'enrol' => $enrol ? ['dossiers' => EnrolmentOptions::dossiersFor($session, $user)] : null,
+            // Choices of the enrolment dialogs (abandon, details) for who may change them.
+            'enrolment_references' => $user->can('update', $session) ? EnrolmentOptions::references() : null,
             'status' => $request->session()->get('status'),
         ]);
     }
@@ -193,7 +205,7 @@ class SessionController extends Controller
     {
         Gate::authorize('delete', $trainingSession);
 
-        DB::transaction(fn () => $trainingSession->delete());
+        $this->writer->trash($trainingSession);
 
         return to_route('sessions.index')->with('status', "Session {$trainingSession->number} mise à la corbeille.");
     }

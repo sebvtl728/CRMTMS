@@ -13,7 +13,8 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
  * typed cell written as French text (ExportCell::display: « 1 234,50 »,
  * « 20/12/2026 »). Text a spreadsheet could read as a formula is
  * neutralised (XlsxExporter::neutralise). Same resources (ExportResource)
- * and row limit (XlsxExporter::count) as the Excel export.
+ * and row limit (XlsxExporter::count) as the Excel export; a resource that
+ * PrefetchesRows reads what a chunk needs before its rows.
  */
 final class CsvExporter
 {
@@ -33,11 +34,18 @@ final class CsvExporter
             fwrite($out, "\xEF\xBB\xBF");
             fputcsv($out, $headers, ';', '"', '', "\r\n");
 
-            foreach ((clone $query)->with($resource->with($user))->lazy(self::CHUNK) as $model) {
-                fputcsv($out, array_map(
-                    fn (string $c) => XlsxExporter::neutralise(ExportCell::display($resource->value($model, $c))) ?? '',
-                    $columns,
-                ), ';', '"', '', "\r\n");
+            foreach ((clone $query)->with($resource->with($user))->lazy(self::CHUNK)->chunk(self::CHUNK) as $chunk) {
+                /** @var list<Model> $models */
+                $models = $chunk->values()->all();
+                if ($resource instanceof PrefetchesRows) {
+                    $resource->prefetch($models);
+                }
+                foreach ($models as $model) {
+                    fputcsv($out, array_map(
+                        fn (string $c) => XlsxExporter::neutralise(ExportCell::display($resource->value($model, $c))) ?? '',
+                        $columns,
+                    ), ';', '"', '', "\r\n");
+                }
             }
 
             fclose($out);
