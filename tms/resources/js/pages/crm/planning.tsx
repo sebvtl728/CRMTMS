@@ -34,6 +34,8 @@ interface PlanningItem {
     opportunity: Fiche | null;
     /** Compte rendu and « Modifier »: scope of crm.activities.update. */
     can_update: boolean;
+    /** The viewer may open the fiche (an action handed to him may hang on a fiche out of his scope). */
+    fiche_visible: boolean;
 }
 
 interface PlanningDay {
@@ -78,7 +80,7 @@ function ficheUrl(item: PlanningItem): string | null {
 }
 
 function Item({ item, canReport, today, day }: { item: PlanningItem; canReport: boolean; today: string; day: string }) {
-    const url = ficheUrl(item);
+    const url = item.fiche_visible ? ficheUrl(item) : null;
     const fiche = item.person?.name ?? item.organisation?.name ?? item.opportunity?.name;
     const duration = formatDuration(item.duration_minutes);
     const Icon = item.kind === 'call' ? Phone : CalendarDays;

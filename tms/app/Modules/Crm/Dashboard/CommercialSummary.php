@@ -8,6 +8,7 @@ use App\Modules\Core\References\ReferenceItem;
 use App\Modules\Core\References\ReferenceList;
 use App\Modules\Core\Users\User;
 use App\Modules\Crm\Activities\Activity;
+use App\Modules\Crm\Activities\ActivityRows;
 use App\Modules\Crm\Activities\TodoQuery;
 use App\Modules\Crm\Activities\WeekPlanning;
 use App\Modules\Crm\Opportunities\OpportunityListQuery;
@@ -137,7 +138,7 @@ final class CommercialSummary
 
         $tz = (string) config('app.timezone');
 
-        return TodoQuery::onLiveFiches(CrmVisibility::activities(Activity::query(), $user))
+        $rows = TodoQuery::onLiveFiches(CrmVisibility::activities(Activity::query(), $user))
             ->where('responsible_user_id', $user->id)
             ->whereIn('type_id', $types)
             ->whereNull('done_at')
@@ -145,21 +146,25 @@ final class CommercialSummary
             ->with(['type', 'organisation:id,name', 'person:id,first_name,last_name', 'opportunity:id,title'])
             ->orderBy('due_at')->orderBy('id')
             ->limit(self::MEETINGS)
-            ->get()
-            ->map(function (Activity $activity) use ($now, $tz): array {
-                $at = CarbonImmutable::instance($activity->due_at ?? $now)->setTimezone($tz);
+            ->get();
+        // An action handed to him may hang on a fiche he may not open.
+        $rights = ActivityRows::rights($rows, $user);
 
-                return [
-                    'id' => $activity->id,
-                    'type' => $activity->type?->label,
-                    'at' => $at->toIso8601String(),
-                    'day' => ucfirst($at->locale('fr')->isoFormat('dddd D MMMM')),
-                    'time' => $at->format('H:i'),
-                    'location' => $activity->location,
-                    'organisation' => $activity->organisation === null ? null : ['id' => $activity->organisation->id, 'name' => $activity->organisation->name],
-                    'person' => $activity->person === null ? null : ['id' => $activity->person->id, 'name' => $activity->person->fullName()],
-                    'opportunity' => $activity->opportunity === null ? null : ['id' => $activity->opportunity->id, 'name' => $activity->opportunity->title],
-                ];
-            })->values()->all();
+        return $rows->map(function (Activity $activity) use ($now, $tz, $rights): array {
+            $at = CarbonImmutable::instance($activity->due_at ?? $now)->setTimezone($tz);
+
+            return [
+                'id' => $activity->id,
+                'type' => $activity->type?->label,
+                'at' => $at->toIso8601String(),
+                'day' => ucfirst($at->locale('fr')->isoFormat('dddd D MMMM')),
+                'time' => $at->format('H:i'),
+                'location' => $activity->location,
+                'organisation' => $activity->organisation === null ? null : ['id' => $activity->organisation->id, 'name' => $activity->organisation->name],
+                'person' => $activity->person === null ? null : ['id' => $activity->person->id, 'name' => $activity->person->fullName()],
+                'opportunity' => $activity->opportunity === null ? null : ['id' => $activity->opportunity->id, 'name' => $activity->opportunity->title],
+                'fiche_visible' => $rights[(string) $activity->id]['fiche_visible'],
+            ];
+        })->values()->all();
     }
 }

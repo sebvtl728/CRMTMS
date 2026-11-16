@@ -185,7 +185,8 @@ it('shows a responsable das his own meetings in the planning, even out of his da
     planAction($responsable, 'Rendez-vous physique', '2026-11-19 10:00:00', ['subject' => 'Caché', 'organisation_id' => $hidden->id]);
 
     $this->actingAs($responsable)->get('/crm/planning')->assertOk()
-        ->assertInertia(fn ($p) => $p->has('days.3.items', 2)->where('days.3.items.0.subject', 'Visible')->where('days.3.items.1.subject', 'Caché'));
+        ->assertInertia(fn ($p) => $p->has('days.3.items', 2)->where('days.3.items.0.subject', 'Visible')->where('days.3.items.1.subject', 'Caché')
+            ->where('days.3.items.0.fiche_visible', true)->where('days.3.items.1.fiche_visible', false));
 });
 
 it('asks guests to sign in', function () {

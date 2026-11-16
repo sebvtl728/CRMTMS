@@ -35,6 +35,8 @@ interface Meeting {
     organisation: Fiche | null;
     person: Fiche | null;
     opportunity: Fiche | null;
+    /** The viewer may open its fiche (an action handed to him may hang on a fiche out of his scope). */
+    fiche_visible: boolean;
 }
 
 interface Commercial {
@@ -119,11 +121,16 @@ function SessionsStarting({ sessions }: { sessions: { total: number; rows: Start
     );
 }
 
-/** The page of the meeting's fiche: the person, else the entreprise, else the opportunity. */
+/**
+ * The page of the meeting: its opportunity, else its person, else its
+ * entreprise (the page fiche_visible is about); the planning when the
+ * viewer may not open it.
+ */
 function meetingUrl(meeting: Meeting): string {
+    if (!meeting.fiche_visible) return route('crm.planning');
+    if (meeting.opportunity) return route('crm.opportunities.show', meeting.opportunity.id);
     if (meeting.person) return route('crm.people.show', meeting.person.id);
     if (meeting.organisation) return route('crm.organisations.show', meeting.organisation.id);
-    if (meeting.opportunity) return route('crm.opportunities.show', meeting.opportunity.id);
 
     return route('crm.planning');
 }

@@ -203,6 +203,27 @@ it('lets the new responsible see and do the action on a fiche out of his scope, 
         ->and($todo->done_at)->not->toBeNull();
 })->with([AccessScope::Das, AccessScope::Own]);
 
+it('lets a das responsible do and edit an action handed to him out of his das, never remove it', function () {
+    $me = commercial();
+    $him = asScoped([
+        Permissions::FICHES_VIEW => AccessScope::Das, Permissions::ACTIVITIES_VIEW => AccessScope::Das,
+        Permissions::ACTIVITIES_UPDATE => AccessScope::Das, Permissions::ACTIVITIES_DELETE => AccessScope::Das,
+    ]);
+    $this->actingAs($me);
+    $todo = asTodo(['responsible_user_id' => $me->id]);
+    $this->put("/crm/activities/{$todo->id}/assign", ['responsible_user_id' => $him->id])->assertSessionHasNoErrors();
+
+    $this->actingAs($him);
+    $this->get('/crm/todo')->assertInertia(fn (Assert $page) => $page
+        ->where('sections.today.0.can_update', true)->where('sections.today.0.can_delete', false));
+    $this->delete("/crm/activities/{$todo->id}")->assertForbidden();
+    expect(Activity::query()->whereKey($todo->id)->exists())->toBeTrue();
+
+    $this->put("/crm/activities/{$todo->id}", ['type_id' => asType(), 'subject' => 'Modifiée par B'])->assertSessionHasNoErrors();
+    $this->post("/crm/activities/{$todo->id}/done", [])->assertSessionHasNoErrors();
+    expect($todo->refresh()->subject)->toBe('Modifiée par B')->and($todo->done_at)->not->toBeNull();
+});
+
 it('marks the fiche as openable in À faire when the viewer may see it', function () {
     $me = commercial();
     $this->actingAs($me);
