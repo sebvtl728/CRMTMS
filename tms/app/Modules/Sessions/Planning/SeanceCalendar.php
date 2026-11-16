@@ -7,8 +7,10 @@ use App\Modules\Core\Users\User;
 use App\Modules\Sessions\Modules\SessionModule;
 use App\Modules\Sessions\Permissions;
 use App\Modules\Sessions\Resources\Room;
+use App\Modules\Sessions\Sessions\SessionKind;
 use App\Modules\Sessions\Sessions\SessionLocation;
 use App\Modules\Sessions\Sessions\TrainingSession;
+use App\Modules\Sessions\SessionsVisibility;
 use App\Modules\Sessions\Trainers\Trainers;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Builder;
@@ -16,12 +18,14 @@ use Illuminate\Database\Eloquent\Builder;
 /**
  * The séances a user's iCal feed carries (Connectors\Calendar\CalendarSources,
  * registered by SessionsServiceProvider): those of the trainer linked to
- * him, and, with sessions.seances.view, those of the sessions he is
- * responsible for; sessions and séances in the trash left out, cancelled
+ * him (whatever his rights: his own work, no personal data), and those of
+ * the sessions he is responsible for within the scope of his
+ * sessions.seances.view; sessions and séances in the trash left out, cancelled
  * ones published as cancelled (so subscribed calendars drop them).
  *
  * An event: « <session> — <module> », the room (and its address), else
- * the free place, else the address of the session; never a trainee, a
+ * the free place, else the address of the session (not of an individual
+ * session: maybe the trainee's home); never a trainee, a
  * note nor a cancellation reason. Paris wall-clock times (Seance::instant);
  * the length is the real time from start to end (the break inside).
  */
@@ -33,7 +37,22 @@ final class SeanceCalendar
     public static function serves(User $user): bool
     {
         return Trainers::forUser($user) !== null
-            || ($user->can(Permissions::SEANCES_VIEW) && TrainingSession::query()->where('responsible_user_id', $user->getKey())->exists());
+            || ($user->can(Permissions::SEANCES_VIEW) && self::responsibleSeances($user)->exists());
+    }
+
+    /**
+     * Séances of the sessions $user is responsible for, within the scope of
+     * his sessions.seances.view (a responsible out of his DAS gets nothing;
+     * on « Ses séances », those he animates only).
+     *
+     * @return Builder<Seance>
+     */
+    private static function responsibleSeances(User $user): Builder
+    {
+        return SessionsVisibility::seances(
+            Seance::query()->whereIn('training_session_id', TrainingSession::query()->where('responsible_user_id', $user->getKey())->select('id')),
+            $user,
+        );
     }
 
     /**
@@ -51,7 +70,7 @@ final class SeanceCalendar
         $seances = Seance::query()
             ->where(fn (Builder $q) => $q
                 ->when($trainer, fn (Builder $q, $t) => $q->orWhere('trainer_id', $t->id))
-                ->when($responsible, fn (Builder $q) => $q->orWhereIn('training_session_id', TrainingSession::query()->where('responsible_user_id', $user->getKey())->select('id'))))
+                ->when($responsible, fn (Builder $q) => $q->orWhereIn('id', self::responsibleSeances($user)->select('seances.id'))))
             ->whereIn('training_session_id', TrainingSession::query()->select('id'))
             ->where('date', '>=', $paris($from))->where('date', '<', $paris($to))
             ->orderBy('date')->orderBy('starts_at')->orderBy('id')
@@ -97,6 +116,9 @@ final class SeanceCalendar
             return $seance->place_text;
         }
 
-        return $session?->location_kind === SessionLocation::Address->value ? $session->location_text : null;
+        // Never the address of an individual session: it may be the trainee's home.
+        return $session !== null && $session->kind !== SessionKind::Individual->value && $session->location_kind === SessionLocation::Address->value
+            ? $session->location_text
+            : null;
     }
 }

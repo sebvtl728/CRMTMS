@@ -166,7 +166,7 @@ CalendarSources::register('module.cle', fn (User $u, CarbonImmutable $from, Carb
 
 - `CalendarEvent` (Connectors) : `uid`, `title`, `start` (instant, écrit en heure de Paris avec `TZID`), `minutes` (durée réelle, `DURATION`), `location`, `description`, `url`, `updatedAt`, `cancelled` (`STATUS:CANCELLED`). Le module applique lui-même ses droits et ne publie aucune donnée personnelle qu'il n'afficherait pas.
 - Le second rappel ouvre « Mon agenda » et le flux à un utilisateur sans le CRM (`IcalFeed::allowed`, capacité `calendar.subscribe`) ; « Connecter Outlook » reste réservé au CRM (`crm.activities.view`).
-- Sessions déclare `sessions.seances` (`Sessions\Planning\SeanceCalendar`) : séances du formateur lié et des sessions dont l'utilisateur est responsable (`sessions.md` § 10). Envoi des séances vers Outlook : 0.8.1.
+- Sessions déclare `sessions.seances` (`Sessions\Planning\SeanceCalendar`) : séances du formateur lié et des sessions dont l'utilisateur est responsable, dans le périmètre de son droit « Consulter les séances » (`sessions.md` § 10). Un utilisateur lié à une fiche formateur garde **ses** séances dans le flux même sans aucun droit Sessions : c'est son propre travail, et un évènement ne porte aucune donnée personnelle (ni stagiaire, ni note, ni motif d'annulation, ni adresse d'une session individuelle). Envoi des séances vers Outlook : 0.8.1.
 
 ## Connecteur Microsoft 365 (envoi vers l'agenda Outlook)
 

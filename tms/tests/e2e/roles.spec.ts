@@ -82,42 +82,42 @@ test('custom role: created from Assistant, « Ses fiches » on the opportunities
     const organisationUrl = await send(context, page, '/crm/organisations', { name: 'E2E Entreprise des rôles' });
     await createOpportunity(page, organisationUrl, ADMIN_OPPORTUNITY);
 
-    // 1. « Formateur », starting from the rights of « Assistant ».
+    // 1. « Formateur externe » (not the system role « Formateur »), starting from the rights of « Assistant ».
     await page.goto('/admin/roles');
     await page.getByRole('button', { name: 'Nouveau rôle' }).click();
     const dialog = page.getByRole('dialog');
-    await dialog.getByLabel('Libellé').fill('Formateur');
+    await dialog.getByLabel('Libellé').fill('Formateur externe');
     await dialog.getByLabel('Partir des droits de').click();
     await expect(page.getByRole('option', { name: 'Aucun droit' })).toBeVisible();
     await page.getByRole('option', { name: 'Assistant', exact: true }).click();
     await dialog.getByRole('checkbox', { name: 'Double authentification obligatoire' }).click(); // not needed for this test account
     await dialog.getByRole('button', { name: 'Créer le rôle' }).click();
-    await expect(page.getByText('Rôle « Formateur » créé.')).toBeVisible();
-    await expect(page.getByRole('columnheader', { name: /^Formateur/ })).toContainText('0 utilisateur');
+    await expect(page.getByText('Rôle « Formateur externe » créé.')).toBeVisible();
+    await expect(page.getByRole('columnheader', { name: /^Formateur externe/ })).toContainText('0 utilisateur');
 
     // 2. The same name is refused, with the server's message.
     await page.getByRole('button', { name: 'Nouveau rôle' }).click();
-    await dialog.getByLabel('Libellé').fill('formateur');
+    await dialog.getByLabel('Libellé').fill('formateur EXTERNE');
     await dialog.getByRole('button', { name: 'Créer le rôle' }).click();
     await expect(dialog.getByRole('alert')).toHaveText('Un rôle porte déjà ce libellé.');
     await dialog.getByRole('button', { name: 'Annuler' }).click();
 
     // 3. « Consulter les opportunités » restricted to « Ses fiches ».
-    const scope = page.getByLabel('Périmètre de Consulter les opportunités — Formateur');
+    const scope = page.getByLabel('Périmètre de Consulter les opportunités — Formateur externe');
     await expect(scope).toHaveText("Tout l'organisme");
     await scope.click();
     await page.getByRole('option', { name: 'Ses fiches', exact: true }).click();
-    await expect(page.getByText('Périmètre de « Consulter les opportunités » pour le rôle Formateur : Ses fiches.')).toBeVisible();
+    await expect(page.getByText('Périmètre de « Consulter les opportunités » pour le rôle Formateur externe : Ses fiches.')).toBeVisible();
     await expect(scope).toHaveText('Ses fiches');
     // A right that is not granted has no usable scope.
-    await expect(page.getByLabel('Périmètre de Supprimer des opportunités — Formateur')).toBeDisabled();
+    await expect(page.getByLabel('Périmètre de Supprimer des opportunités — Formateur externe')).toBeDisabled();
 
     // 4. Invite a user with this role and sign him in.
     await page.goto('/admin/users/invite');
     await page.getByLabel('Nom complet').fill('Fanny Formateur');
     await page.getByLabel('Adresse e-mail').fill(FORMATEUR_EMAIL);
     await page.locator('#role').click();
-    await page.getByRole('option', { name: 'Formateur', exact: true }).click();
+    await page.getByRole('option', { name: 'Formateur externe', exact: true }).click();
     await page.getByRole('button', { name: "Envoyer l'invitation" }).click();
     const link = await page.getByLabel("Lien d'activation").inputValue();
 
@@ -141,12 +141,12 @@ test('custom role: created from Assistant, « Ses fiches » on the opportunities
 
     // 6. The role is held by a user: deletion refused, the server's message is shown.
     await page.goto('/admin/roles');
-    await expect(page.getByRole('columnheader', { name: /^Formateur/ })).toContainText('1 utilisateur');
+    await expect(page.getByRole('columnheader', { name: /^Formateur externe/ })).toContainText('1 utilisateur');
     page.once('dialog', (d) => d.accept());
-    await page.getByRole('button', { name: 'Actions du rôle Formateur' }).click();
+    await page.getByRole('button', { name: 'Actions du rôle Formateur externe' }).click();
     await page.getByRole('menuitem', { name: 'Supprimer' }).click();
     await expect(page.getByRole('alert')).toContainText('Ce rôle est attribué à 1 utilisateur(s) ou invitation(s)');
-    await expect(page.getByRole('columnheader', { name: /^Formateur/ })).toBeVisible();
+    await expect(page.getByRole('columnheader', { name: /^Formateur externe/ })).toBeVisible();
 
     await context.close();
 });

@@ -2,6 +2,7 @@
 
 namespace App\Http\Middleware;
 
+use App\Modules\Connectors\Calendar\CalendarSources;
 use App\Modules\Core\Access\Permissions;
 use App\Modules\Core\Access\Scopes;
 use App\Modules\Core\Companies\Brand;
@@ -43,6 +44,8 @@ class HandleInertiaRequests extends Middleware
     public function share(Request $request): array
     {
         $user = $request->user() instanceof User ? $request->user() : null;
+        // One trainer lookup per request (menu « Mon planning », « Mon agenda »).
+        $trainer = $user === null ? null : Trainers::forUser($user);
 
         return array_merge(parent::share($request), [
             ...parent::share($request),
@@ -63,9 +66,10 @@ class HandleInertiaRequests extends Middleware
                 // Every right on « Ses séances » only: the menu is « Mon planning » alone.
                 'trainer_only' => $user !== null && Scopes::trainerOnly($user),
                 // Linked to a trainer: « Mon planning » in the menu.
-                'my_planning' => $user !== null && Trainers::forUser($user) !== null,
-                // « Mon agenda » in the settings: CRM actions or a calendar source (a trainer's séances).
-                'calendar_feed' => $user !== null && $user->can('calendar.subscribe'),
+                'my_planning' => $trainer !== null,
+                // « Mon agenda » in the settings: CRM actions or a calendar source (a trainer's séances);
+                // the sources are asked only for a user who is neither of the CRM nor a trainer.
+                'calendar_feed' => $user !== null && ($trainer !== null || $user->can(CrmPermissions::ACTIVITIES_VIEW) || CalendarSources::serves($user)),
             ],
             // Menu badge of « À faire »: overdue + today, cached 60 s (lazy: skipped by partial reloads).
             'todo_count' => fn () => $user !== null && $user->can(CrmPermissions::ACTIVITIES_VIEW) ? TodoQuery::badge($user) : 0,
