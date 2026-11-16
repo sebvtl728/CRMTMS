@@ -8,6 +8,7 @@ Route::middleware(['auth', 'can:crm.import'])->prefix('crm/import')->name('crm.i
     Route::get('/', [ImportController::class, 'index'])->name('index');
     Route::get('new', [ImportController::class, 'create'])->name('create');
     Route::post('/', [ImportController::class, 'store'])->middleware('throttle:import-upload')->name('store');
+    Route::get('template/{target}', [ImportController::class, 'template'])->name('template');
 
     Route::prefix('{batch}')->whereUuid('batch')->group(function () {
         Route::get('/', [ImportController::class, 'show'])->name('show');

@@ -24,6 +24,7 @@ use Inertia\Inertia;
 use Inertia\Response;
 use InvalidArgumentException;
 use Symfony\Component\HttpFoundation\Response as HttpResponse;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 /**
  * « Importer » wizard (crm.import): 1 file, 2 columns, 3 values, 4 simulation,
@@ -149,6 +150,15 @@ class ImportController extends Controller
         return to_route('crm.import.mapping', $batch->id);
     }
 
+    /** The Excel template of a target the user may import (404 otherwise). */
+    public function template(Request $request, string $target): StreamedResponse
+    {
+        $target = ImportTarget::tryFrom($target);
+        abort_if($target === null || ! $this->mayImport($this->user($request), $target), 404);
+
+        return ImportTemplate::download($target);
+    }
+
     // ----------------------------------------------------------- 2. columns
 
     public function mapping(Request $request, string $batch): Response|RedirectResponse
@@ -238,7 +248,11 @@ class ImportController extends Controller
         $profileName = trim((string) ($input['profile_name'] ?? ''));
         $this->checkProfileName($batch, $profileName, $this->user($request));
         // Remembered before the simulation starts (the job may run at once).
-        HeaderChoices::remember($batch->target, HeaderChoices::deliberate($this->proposals($batch), $given));
+        try {
+            HeaderChoices::remember($batch->target, HeaderChoices::deliberate($this->proposals($batch), $given));
+        } catch (ImportFileException $e) {
+            return to_route('crm.import.index')->withErrors(['batch' => $e->getMessage()]);
+        }
         $this->startSimulation($batch, $map, $batch->valueMapper());
         if ($profileName !== '') {
             $this->saveProfile($batch, $profileName);
@@ -628,9 +642,6 @@ class ImportController extends Controller
     }
 
     /**
-     * Records the choices and queues the simulation (the caller set the options).
-     */
-    /**
      * The server's proposal for the columns step, from the file's first
      * ColumnGuesser::SAMPLE non-empty rows (read in memory, never kept).
      *
@@ -654,6 +665,9 @@ class ImportController extends Controller
         return ColumnGuesser::guess($batch->target, $reader->headers(), $samples);
     }
 
+    /**
+     * Records the choices and queues the simulation (the caller set the options).
+     */
     private function startSimulation(ImportBatch $batch, FieldMap $map, ValueMapper $values): void
     {
         if (! $batch->startSimulation($map, $values)) {

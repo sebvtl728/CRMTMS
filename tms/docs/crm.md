@@ -310,6 +310,8 @@ L'import (menu **Imports**) charge des fiches depuis un fichier **Excel (.xlsx)*
 
 ### Étape 1 : Déposer le fichier
 
+Une fois le type choisi, **Télécharger le modèle Excel** fournit un classeur prêt à remplir : l'onglet **Données** porte les colonnes attendues (reconnues automatiquement à l'étape suivante) et une **ligne d'exemple fictive** marquée « Exemple — à supprimer » (si vous la laissez, elle est ignorée à l'import, motif « Ligne d'exemple du modèle ignorée ») ; l'onglet **Listes** donne les valeurs actives de vos listes (origines, DAS, secteurs…).
+
 Choisissez ce que contient votre fichier :
 
 - **Entreprises** : une ligne par entreprise ;
