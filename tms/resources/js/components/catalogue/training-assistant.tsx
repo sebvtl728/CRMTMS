@@ -3,7 +3,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 import { type Option } from '@/lib/crm';
 import { LoaderCircle, Sparkles } from 'lucide-react';
-import { type ReactNode, useState } from 'react';
+import { type ReactNode, useEffect, useState } from 'react';
 
 /** Text fields of the sheet the AI may propose (form keys), in the order of the form. */
 export const ASSISTANT_TEXTS = [
@@ -42,6 +42,8 @@ interface Props {
     current: Record<AssistantText, string> & { objectives: string[]; modules: CurrentModule[] };
     options: { das: Option[]; modality: Option[] };
     onApply: (patch: AssistantPatch) => void;
+    /** True while a proposal is shown: the form is then read-only, so the current values and the default boxes stay true. */
+    onReviewChange?: (reviewing: boolean) => void;
 }
 
 const NOT_CONFIGURED = 'Configurez l’intelligence artificielle dans Administration → Connecteurs.';
@@ -69,7 +71,7 @@ async function failure(response: Response): Promise<string> {
 
 const empty = (value: string | null | undefined) => (value ?? '').trim() === '';
 
-export default function TrainingAssistant({ configured, current, options, onApply }: Props) {
+export default function TrainingAssistant({ configured, current, options, onApply, onReviewChange }: Props) {
     const [open, setOpen] = useState(false);
     const [source, setSource] = useState<'pdf' | 'prompt'>('pdf');
     const [file, setFile] = useState<File | null>(null);
@@ -80,6 +82,10 @@ export default function TrainingAssistant({ configured, current, options, onAppl
     const [truncated, setTruncated] = useState(false);
     const [keep, setKeep] = useState<Record<string, boolean>>({});
     const [applied, setApplied] = useState(false);
+
+    useEffect(() => {
+        onReviewChange?.(proposal !== null);
+    }, [proposal, onReviewChange]);
 
     const label = (list: Option[], id: string | null | undefined) => (id ? (list.find((o) => o.value === id)?.label ?? '') : '');
     const shown = (key: AssistantText, value: string | null | undefined) => (key === 'das_id' ? label(options.das, value) : (value ?? ''));
@@ -209,7 +215,10 @@ export default function TrainingAssistant({ configured, current, options, onAppl
             )}
 
             {applied && (
-                <p role="status" className="rounded-md border border-green-600/30 bg-green-50 p-2 text-sm text-green-800 dark:bg-green-950 dark:text-green-200">
+                <p
+                    role="status"
+                    className="rounded-md border border-green-600/30 bg-green-50 p-2 text-sm text-green-800 dark:bg-green-950 dark:text-green-200"
+                >
                     Proposition appliquée : relisez la fiche puis enregistrez.
                 </p>
             )}
@@ -217,7 +226,14 @@ export default function TrainingAssistant({ configured, current, options, onAppl
             {open && !proposal && (
                 <div className="grid gap-3">
                     <div className="flex flex-wrap gap-2" role="radiogroup" aria-label="Source">
-                        <Button type="button" role="radio" aria-checked={source === 'pdf'} variant={source === 'pdf' ? 'default' : 'outline'} size="sm" onClick={() => setSource('pdf')}>
+                        <Button
+                            type="button"
+                            role="radio"
+                            aria-checked={source === 'pdf'}
+                            variant={source === 'pdf' ? 'default' : 'outline'}
+                            size="sm"
+                            onClick={() => setSource('pdf')}
+                        >
                             Depuis un PDF
                         </Button>
                         <Button
@@ -242,7 +258,9 @@ export default function TrainingAssistant({ configured, current, options, onAppl
                                 className="text-sm"
                                 onChange={(e) => setFile(e.target.files?.[0] ?? null)}
                             />
-                            <p className="text-muted-foreground text-xs">Seul le texte du PDF est transmis à l’intelligence artificielle ; le fichier n’est pas conservé.</p>
+                            <p className="text-muted-foreground text-xs">
+                                Seul le texte du PDF est transmis à l’intelligence artificielle ; le fichier n’est pas conservé.
+                            </p>
                         </div>
                     ) : (
                         <div className="grid gap-2">
@@ -287,6 +305,9 @@ export default function TrainingAssistant({ configured, current, options, onAppl
 
             {proposal && (
                 <div className="grid gap-3" role="region" aria-label="Proposition de l’IA">
+                    <p className="text-muted-foreground text-sm">
+                        La fiche est verrouillée pendant la relecture : appliquez ou annulez la proposition.
+                    </p>
                     {truncated && (
                         <p role="note" className="rounded-md border border-amber-500 bg-amber-50 p-2 text-sm text-amber-900">
                             Le programme est long : seul son début a été analysé.
@@ -296,7 +317,9 @@ export default function TrainingAssistant({ configured, current, options, onAppl
                         <p className="text-sm">L’intelligence artificielle n’a rien proposé.</p>
                     )}
 
-                    {fields.map(([key, name]) => row(key, name, shown(key, current[key]), shown(key, proposal[key]), empty(shown(key, current[key]))))}
+                    {fields.map(([key, name]) =>
+                        row(key, name, shown(key, current[key]), shown(key, proposal[key]), empty(shown(key, current[key]))),
+                    )}
 
                     {proposal.objectives.length > 0 &&
                         row(

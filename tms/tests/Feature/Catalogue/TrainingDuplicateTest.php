@@ -4,6 +4,7 @@ use App\Modules\Catalogue\Brochures\Brochure;
 use App\Modules\Catalogue\CatalogueServiceProvider;
 use App\Modules\Catalogue\Permissions;
 use App\Modules\Catalogue\Training;
+use App\Modules\Catalogue\TrainingDuplicator;
 use App\Modules\Catalogue\TrainingModule;
 use App\Modules\Catalogue\TrainingUsage;
 use App\Modules\Core\Audit\AuditLog;
@@ -160,4 +161,19 @@ it('shows the status message on the edit page', function () {
 
     $this->followingRedirects()->post("/catalogue/{$original->id}/duplicate")
         ->assertInertia(fn (Assert $p) => $p->component('catalogue/form')->where('status', 'Formation dupliquée : vérifiez-la puis activez-la.'));
+});
+
+it('journals the copy like any creation: no timestamps, authors nor deleted_at', function () {
+    $this->actingAs(admin(twoFactor: true));
+    $original = duplicableTraining();
+    // A copy whose attributes carry deleted_at (as a model loaded with all its columns does).
+    $original->forceFill(['deleted_at' => null])->saveQuietly();
+
+    $this->post("/catalogue/{$original->fresh()->id}/duplicate")->assertRedirect();
+
+    $copy = Training::query()->where('id', '!=', $original->id)->sole();
+    $log = AuditLog::query()->where('event', 'created')->where('auditable_type', 'training')->where('auditable_id', $copy->id)->sole();
+    expect(array_keys($log->new_values))->not->toContain('deleted_at')->not->toContain('created_at')
+        ->not->toContain('updated_at')->not->toContain('created_by')->not->toContain('updated_by');
+    expect(TrainingDuplicator::AUDIT_IGNORED)->toContain('deleted_at');
 });

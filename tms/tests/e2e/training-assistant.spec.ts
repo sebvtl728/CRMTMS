@@ -38,6 +38,8 @@ test('AI assistant: request → proposal → apply (filled fields kept unless ch
     // 4. The proposal, next to the current values: boxes checked for empty fields, unchecked for filled ones.
     const proposal = page.getByRole('region', { name: 'Proposition de l’IA' });
     await expect(proposal).toBeVisible();
+    // The sheet is read-only while the proposal is reviewed: the current values shown stay true.
+    await expect(page.locator('#title')).toBeDisabled();
     const title = proposal.getByRole('group', { name: 'Intitulé' });
     await expect(title).toContainText(MY_TITLE);
     await expect(title).toContainText(PROPOSED_TITLE);

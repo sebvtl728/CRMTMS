@@ -126,14 +126,17 @@ final class TrainingDraft
         return $value === '' ? null : $value;
     }
 
-    /** 14 → « 14 », 7.5 → « 7,5 » (two decimals at most). */
+    /** 14 → « 14 », 7.5 → « 7,5 » (two decimals at most); below 0,005 → null. */
     private static function decimal(mixed $value): ?string
     {
         if (! is_int($value) && ! is_float($value)) {
             return null;
         }
 
-        return rtrim(rtrim(number_format((float) $value, 2, ',', ''), '0'), ',');
+        $text = rtrim(rtrim(number_format((float) $value, 2, ',', ''), '0'), ',');
+
+        // A positive duration that rounds to 0 would be refused by the form: left empty.
+        return $text === '0' || $text === '' ? null : $text;
     }
 
     /**

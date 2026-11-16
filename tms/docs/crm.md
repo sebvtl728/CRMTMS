@@ -126,6 +126,8 @@ La fiche d'une formation regroupe ce que Qualiopi attend de la présentation d'u
 - **Accessibilité et accès** : accessibilité aux personnes en situation de handicap, modalités et délais d'accès ;
 - **Résultats** : indicateurs de résultats (satisfaction, réussite…), saisis par l'organisme.
 
+Journal d'audit : les textes de la fiche (description, objectifs, public, méthodes…) sont des contenus du catalogue, pas des données personnelles, et sont journalisés en clair à chaque modification ; le **contenu des modules**, souvent long, est masqué (« [masqué] ») — seuls ses intitulé, durée, modalité et ordre apparaissent.
+
 ### Dupliquer une formation
 
 **Dupliquer** (page de modification d'une formation, `catalogue.manage`) crée une copie **indépendante** de la formation enregistrée : tous les champs de la fiche, les modules, le DAS, les tarifs et les financements. La copie s'intitule « Copie de … », n'a pas de code, n'est rattachée à aucune plaquette et est **désactivée** : vérifiez-la, puis activez-la. Modifier la copie ne touche jamais l'original (ni ses sessions, devis ou dossiers). Des modifications non enregistrées de la page ne sont pas copiées (une confirmation le rappelle).

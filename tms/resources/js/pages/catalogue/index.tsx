@@ -102,7 +102,12 @@ export default function CatalogueIndex({ trainings, filters, options, can, statu
     const filtered = Boolean(filters.q || filters.das || filters.status || filters.funding);
 
     const toggle = (row: TrainingRow) => router.post(route('catalogue.toggle', row.id), {}, { preserveScroll: true });
-    const duplicate = (row: TrainingRow) => router.post(route('catalogue.duplicate', row.id));
+    // One copy per click: the buttons stay disabled until the request ends.
+    const [duplicating, setDuplicating] = useState(false);
+    const duplicate = (row: TrainingRow) => {
+        if (duplicating) return;
+        router.post(route('catalogue.duplicate', row.id), {}, { onStart: () => setDuplicating(true), onFinish: () => setDuplicating(false) });
+    };
     const destroy = (row: TrainingRow) => {
         if (window.confirm(`Supprimer la formation « ${row.title} » ?`)) {
             router.delete(route('catalogue.destroy', row.id), { preserveScroll: true });
@@ -118,7 +123,7 @@ export default function CatalogueIndex({ trainings, filters, options, can, statu
                 <Button type="button" variant="outline" size="sm" onClick={() => toggle(row)}>
                     {row.is_active ? 'Désactiver' : 'Activer'}
                 </Button>
-                <Button type="button" variant="outline" size="sm" onClick={() => duplicate(row)}>
+                <Button type="button" variant="outline" size="sm" disabled={duplicating} onClick={() => duplicate(row)}>
                     Dupliquer
                 </Button>
                 {can.delete && (

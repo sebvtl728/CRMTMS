@@ -20,6 +20,9 @@ final class TrainingDuplicator
 
     public const TITLE_MAX = 200;
 
+    /** Left out of the journal entry of the copy, as for any automatic creation entry (Auditable). */
+    public const AUDIT_IGNORED = ['created_at', 'updated_at', 'deleted_at', 'created_by', 'updated_by'];
+
     public function __construct(private readonly AuditRecorder $audit, private readonly TenantContext $tenants) {}
 
     public function duplicate(Training $source): Training
@@ -37,7 +40,7 @@ final class TrainingDuplicator
             // creation is journalled by hand, once, with it.
             Training::withoutEvents(fn () => $copy->save());
             $this->audit->record('created', $copy, [], [
-                ...array_diff_key($copy->getAttributes(), array_flip(['created_at', 'updated_at', 'created_by', 'updated_by'])),
+                ...array_diff_key($copy->getAttributes(), array_flip(self::AUDIT_IGNORED)),
                 'duplicated_from' => $source->id,
             ]);
 

@@ -11,7 +11,7 @@ import { amountInput, formatSize, itemError, type Option } from '@/lib/crm';
 import { type BreadcrumbItem } from '@/types';
 import { Head, Link, router, useForm } from '@inertiajs/react';
 import { ArrowDown, ArrowUp, LoaderCircle, Plus, Trash2 } from 'lucide-react';
-import { FormEventHandler } from 'react';
+import { FormEventHandler, useState } from 'react';
 
 interface FormProps {
     training: {
@@ -87,6 +87,9 @@ const textareaClass = 'border-input bg-background focus:ring-ring w-full rounded
 
 export default function TrainingFormPage({ training, options, assistant, brochures = [], can, status }: FormProps) {
     const editing = training !== null;
+    // One copy per click: « Dupliquer » stays disabled until the request ends.
+    const [duplicating, setDuplicating] = useState(false);
+    const [reviewing, setReviewing] = useState(false);
 
     const { data, setData, post, put, processing, errors, isDirty } = useForm<TrainingForm>({
         code: training?.code ?? '',
@@ -220,7 +223,10 @@ export default function TrainingFormPage({ training, options, assistant, brochur
                 />
 
                 {status && (
-                    <p role="status" className="rounded-md border border-green-600/30 bg-green-50 p-3 text-sm text-green-800 dark:bg-green-950 dark:text-green-200">
+                    <p
+                        role="status"
+                        className="rounded-md border border-green-600/30 bg-green-50 p-3 text-sm text-green-800 dark:bg-green-950 dark:text-green-200"
+                    >
                         {status}
                     </p>
                 )}
@@ -230,342 +236,355 @@ export default function TrainingFormPage({ training, options, assistant, brochur
                     current={data}
                     options={{ das: options.das, modality: options.modality }}
                     onApply={applyProposal}
+                    onReviewChange={setReviewing}
                 />
 
-                <form onSubmit={submit} className="flex flex-col gap-6" noValidate>
-                    <fieldset className="grid gap-4 rounded-xl border p-4 md:grid-cols-2">
-                        <legend className="px-2 text-sm font-semibold">Présentation</legend>
-                        <div className="grid gap-2 md:col-span-2">
-                            <Label htmlFor="title">Intitulé *</Label>
-                            <Input
-                                id="title"
-                                value={data.title}
-                                onChange={(e) => setData('title', e.target.value)}
-                                maxLength={200}
-                                required
-                                autoFocus
-                                placeholder="Ex. HACCP 3 jours"
-                            />
-                            <InputError message={errors.title} />
-                        </div>
-                        {text('code', 'Code', { maxLength: 20, placeholder: 'Ex. HACCP-3J' })}
-                        <div className="grid gap-2">
-                            <Label htmlFor="das_id">DAS *</Label>
-                            <Select value={data.das_id || undefined} onValueChange={(v) => setData('das_id', v)}>
-                                <SelectTrigger id="das_id">
-                                    <SelectValue placeholder="Choisissez" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    {options.das.map((o) => (
-                                        <SelectItem key={o.value} value={o.value}>
-                                            {o.label}
-                                        </SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
-                            <InputError message={errors.das_id} />
-                        </div>
-                        {text('duration_hours', 'Durée (heures)', { inputMode: 'decimal', placeholder: '21' })}
-                        {text('duration_days', 'Durée (jours)', { inputMode: 'decimal', placeholder: '3' })}
-                        {text('price_company', 'Tarif entreprise HT par stagiaire (€)', { inputMode: 'decimal', placeholder: '1 250,00' })}
-                        {text('price_individual', 'Tarif particulier HT par stagiaire (€)', { inputMode: 'decimal', placeholder: '990,00' })}
-                        {area('description', 'Description courte')}
-                    </fieldset>
-
-                    <fieldset className="grid gap-4 rounded-xl border p-4" aria-label="Objectifs">
-                        <legend className="px-2 text-sm font-semibold">Objectifs pédagogiques</legend>
-                        {data.objectives.map((o, i) => (
-                            <div key={i} className="grid gap-1">
-                                <div className="flex items-center gap-2">
-                                    <Input
-                                        aria-label={`Objectif ${i + 1}`}
-                                        value={o}
-                                        maxLength={500}
-                                        onChange={(e) => setObjective(i, e.target.value)}
-                                        placeholder="À l’issue de la formation, le stagiaire sait…"
-                                    />
-                                    <Button
-                                        type="button"
-                                        variant="outline"
-                                        size="icon"
-                                        aria-label={`Monter l’objectif ${i + 1}`}
-                                        onClick={() => setData('objectives', moveItem(data.objectives, i, -1))}
-                                    >
-                                        <ArrowUp className="h-4 w-4" />
-                                    </Button>
-                                    <Button
-                                        type="button"
-                                        variant="outline"
-                                        size="icon"
-                                        aria-label={`Descendre l’objectif ${i + 1}`}
-                                        onClick={() => setData('objectives', moveItem(data.objectives, i, 1))}
-                                    >
-                                        <ArrowDown className="h-4 w-4" />
-                                    </Button>
-                                    <Button
-                                        type="button"
-                                        variant="outline"
-                                        size="icon"
-                                        aria-label={`Supprimer l’objectif ${i + 1}`}
-                                        onClick={() =>
-                                            setData(
-                                                'objectives',
-                                                data.objectives.filter((_, j) => j !== i),
-                                            )
-                                        }
-                                    >
-                                        <Trash2 className="h-4 w-4" />
-                                    </Button>
-                                </div>
-                                <InputError message={nested(`objectives.${i}`)} />
-                            </div>
-                        ))}
-                        <InputError message={errors.objectives} />
-                        <div>
-                            <Button
-                                type="button"
-                                variant="outline"
-                                size="sm"
-                                disabled={data.objectives.length >= 20}
-                                onClick={() => setData('objectives', [...data.objectives, ''])}
-                            >
-                                <Plus className="h-4 w-4" /> Ajouter un objectif
-                            </Button>
-                        </div>
-                    </fieldset>
-
-                    <fieldset className="grid gap-4 rounded-xl border p-4 md:grid-cols-2" aria-label="Public et prérequis">
-                        <legend className="px-2 text-sm font-semibold">Public et prérequis</legend>
-                        <div className="grid gap-2 md:col-span-2">
-                            <Label htmlFor="audience">Public visé</Label>
-                            <textarea
-                                id="audience"
-                                rows={3}
-                                value={data.audience}
-                                onChange={(e) => setData('audience', e.target.value)}
-                                className={textareaClass}
-                            />
-                            <InputError message={errors.audience} />
-                        </div>
-                        <div className="grid gap-2 md:col-span-2">
-                            <Label htmlFor="prerequisites">Prérequis</Label>
-                            <textarea
-                                id="prerequisites"
-                                rows={3}
-                                value={data.prerequisites}
-                                onChange={(e) => setData('prerequisites', e.target.value)}
-                                className={textareaClass}
-                            />
-                            <InputError message={errors.prerequisites} />
-                        </div>
-                    </fieldset>
-
-                    <fieldset className="grid gap-4 rounded-xl border p-4" aria-label="Modules">
-                        <legend className="px-2 text-sm font-semibold">Modules</legend>
-                        {data.modules.map((m, i) => (
-                            <div key={m.uid} className="grid gap-2 rounded-lg border p-3 md:grid-cols-[1fr_8rem_12rem]">
-                                <div className="grid gap-1">
-                                    <Label htmlFor={`module-title-${i}`}>Module {i + 1} : intitulé *</Label>
-                                    <Input
-                                        id={`module-title-${i}`}
-                                        value={m.title}
-                                        maxLength={200}
-                                        onChange={(e) => setModule(i, { title: e.target.value })}
-                                    />
-                                    <InputError message={nested(`modules.${i}.title`)} />
-                                </div>
-                                <div className="grid gap-1">
-                                    <Label htmlFor={`module-hours-${i}`}>Durée (h)</Label>
-                                    <Input
-                                        id={`module-hours-${i}`}
-                                        inputMode="decimal"
-                                        value={m.duration_hours}
-                                        onChange={(e) => setModule(i, { duration_hours: e.target.value })}
-                                    />
-                                    <InputError message={nested(`modules.${i}.duration_hours`)} />
-                                </div>
-                                <div className="grid gap-1">
-                                    <Label htmlFor={`module-modality-${i}`}>Modalité</Label>
-                                    <Select
-                                        value={m.modality_id || '__none'}
-                                        onValueChange={(v) => setModule(i, { modality_id: v === '__none' ? '' : v })}
-                                    >
-                                        <SelectTrigger id={`module-modality-${i}`}>
-                                            <SelectValue />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            <SelectItem value="__none">Non précisée</SelectItem>
-                                            {options.modality.map((o) => (
-                                                <SelectItem key={o.value} value={o.value}>
-                                                    {o.label}
-                                                </SelectItem>
-                                            ))}
-                                        </SelectContent>
-                                    </Select>
-                                    <InputError message={nested(`modules.${i}.modality_id`)} />
-                                </div>
-                                <div className="grid gap-1 md:col-span-3">
-                                    <Label htmlFor={`module-content-${i}`}>Contenu</Label>
-                                    <textarea
-                                        id={`module-content-${i}`}
-                                        rows={3}
-                                        value={m.content}
-                                        onChange={(e) => setModule(i, { content: e.target.value })}
-                                        className={textareaClass}
-                                    />
-                                    <InputError message={nested(`modules.${i}.content`)} />
-                                </div>
-                                <div className="flex gap-2 md:col-span-3">
-                                    <Button
-                                        type="button"
-                                        variant="outline"
-                                        size="sm"
-                                        aria-label={`Monter le module ${i + 1}`}
-                                        onClick={() => setData('modules', moveItem(data.modules, i, -1))}
-                                    >
-                                        <ArrowUp className="h-4 w-4" />
-                                    </Button>
-                                    <Button
-                                        type="button"
-                                        variant="outline"
-                                        size="sm"
-                                        aria-label={`Descendre le module ${i + 1}`}
-                                        onClick={() => setData('modules', moveItem(data.modules, i, 1))}
-                                    >
-                                        <ArrowDown className="h-4 w-4" />
-                                    </Button>
-                                    <Button
-                                        type="button"
-                                        variant="outline"
-                                        size="sm"
-                                        aria-label={`Supprimer le module ${i + 1}`}
-                                        onClick={() =>
-                                            setData(
-                                                'modules',
-                                                data.modules.filter((_, j) => j !== i),
-                                            )
-                                        }
-                                    >
-                                        <Trash2 className="h-4 w-4" /> Supprimer
-                                    </Button>
-                                </div>
-                            </div>
-                        ))}
-                        <InputError message={errors.modules} />
-                        {data.modules.length > 0 && (
-                            <p className="text-sm">
-                                Total des modules : {hoursText(modulesSum)} h
-                                {Number.isFinite(duration) ? ` (durée de la formation : ${hoursText(duration)} h)` : ''}
-                            </p>
-                        )}
-                        {gap && (
-                            <p role="alert" className="rounded-md border border-amber-500 bg-amber-50 p-2 text-sm text-amber-900">
-                                Attention : la somme des modules ({hoursText(modulesSum)} h) ne correspond pas à la durée de la formation (
-                                {hoursText(duration)} h). Vous pouvez tout de même enregistrer.
-                            </p>
-                        )}
-                        <div>
-                            <Button
-                                type="button"
-                                variant="outline"
-                                size="sm"
-                                disabled={data.modules.length >= 30}
-                                onClick={() =>
-                                    setData('modules', [
-                                        ...data.modules,
-                                        { uid: `new-${++newModuleCount}`, title: '', duration_hours: '', modality_id: '', content: '' },
-                                    ])
-                                }
-                            >
-                                <Plus className="h-4 w-4" /> Ajouter un module
-                            </Button>
-                        </div>
-                    </fieldset>
-
-                    <fieldset className="grid gap-4 rounded-xl border p-4 md:grid-cols-2" aria-label="Méthodes et évaluation">
-                        <legend className="px-2 text-sm font-semibold">Méthodes et évaluation</legend>
-                        {area('methods', 'Méthodes et moyens pédagogiques')}
-                        {area('evaluation', 'Modalités d’évaluation')}
-                        {area('sanction', 'Sanction de la formation (attestation, certification…)')}
-                    </fieldset>
-
-                    <fieldset className="grid gap-4 rounded-xl border p-4 md:grid-cols-2" aria-label="Accessibilité et accès">
-                        <legend className="px-2 text-sm font-semibold">Accessibilité et accès</legend>
-                        {area('accessibility', 'Accessibilité aux personnes en situation de handicap')}
-                        {area('access_terms', 'Modalités et délais d’accès')}
-                    </fieldset>
-
-                    <fieldset className="grid gap-4 rounded-xl border p-4 md:grid-cols-2" aria-label="Résultats">
-                        <legend className="px-2 text-sm font-semibold">Résultats</legend>
-                        {area('results', 'Indicateurs de résultats (satisfaction, réussite…)')}
-                    </fieldset>
-
-                    <fieldset className="grid gap-2 rounded-xl border p-4 sm:grid-cols-2">
-                        <legend className="px-2 text-sm font-semibold">Financements possibles</legend>
-                        {options.funding_mode.map((f) => (
-                            <Label key={f.value} className="flex items-center gap-2 font-normal">
-                                <Checkbox
-                                    checked={data.funding_mode_ids.includes(f.value)}
-                                    onCheckedChange={(v) => toggleFunding(f.value, v === true)}
+                <form onSubmit={submit} noValidate>
+                    {/* Read-only while an AI proposal is reviewed: what it shows as current stays current. */}
+                    <fieldset disabled={reviewing} className="flex min-w-0 flex-col gap-6">
+                        <fieldset className="grid gap-4 rounded-xl border p-4 md:grid-cols-2">
+                            <legend className="px-2 text-sm font-semibold">Présentation</legend>
+                            <div className="grid gap-2 md:col-span-2">
+                                <Label htmlFor="title">Intitulé *</Label>
+                                <Input
+                                    id="title"
+                                    value={data.title}
+                                    onChange={(e) => setData('title', e.target.value)}
+                                    maxLength={200}
+                                    required
+                                    autoFocus
+                                    placeholder="Ex. HACCP 3 jours"
                                 />
-                                {f.label}
-                            </Label>
-                        ))}
-                        <InputError message={errors.funding_mode_ids ?? itemError(errors, 'funding_mode_ids')} />
-                    </fieldset>
+                                <InputError message={errors.title} />
+                            </div>
+                            {text('code', 'Code', { maxLength: 20, placeholder: 'Ex. HACCP-3J' })}
+                            <div className="grid gap-2">
+                                <Label htmlFor="das_id">DAS *</Label>
+                                <Select value={data.das_id || undefined} onValueChange={(v) => setData('das_id', v)}>
+                                    <SelectTrigger id="das_id">
+                                        <SelectValue placeholder="Choisissez" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {options.das.map((o) => (
+                                            <SelectItem key={o.value} value={o.value}>
+                                                {o.label}
+                                            </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                                <InputError message={errors.das_id} />
+                            </div>
+                            {text('duration_hours', 'Durée (heures)', { inputMode: 'decimal', placeholder: '21' })}
+                            {text('duration_days', 'Durée (jours)', { inputMode: 'decimal', placeholder: '3' })}
+                            {text('price_company', 'Tarif entreprise HT par stagiaire (€)', { inputMode: 'decimal', placeholder: '1 250,00' })}
+                            {text('price_individual', 'Tarif particulier HT par stagiaire (€)', { inputMode: 'decimal', placeholder: '990,00' })}
+                            {area('description', 'Description courte')}
+                        </fieldset>
 
-                    {editing && (
-                        <section aria-label="Plaquettes" className="grid gap-2 rounded-xl border p-4">
-                            <h2 className="text-sm font-semibold">Plaquettes</h2>
-                            {brochures.length === 0 ? (
-                                <p className="text-muted-foreground text-sm">Aucune plaquette rattachée à cette formation ni à son DAS.</p>
-                            ) : (
-                                <ul className="grid gap-1 text-sm">
-                                    {brochures.map((b) => (
-                                        <li key={b.id} className="flex flex-wrap items-center gap-2">
-                                            {can?.brochures ? (
-                                                <a className="underline" href={route('catalogue.brochures.download', b.id)}>
-                                                    {b.title}
-                                                </a>
-                                            ) : (
-                                                <span>{b.title}</span>
-                                            )}
-                                            <span className="text-muted-foreground">
-                                                {b.original_name} · {formatSize(b.size)} ·{' '}
-                                                {b.source === 'das' ? 'via le DAS' : 'rattachée à la formation'}
-                                            </span>
-                                        </li>
-                                    ))}
-                                </ul>
+                        <fieldset className="grid gap-4 rounded-xl border p-4" aria-label="Objectifs">
+                            <legend className="px-2 text-sm font-semibold">Objectifs pédagogiques</legend>
+                            {data.objectives.map((o, i) => (
+                                <div key={i} className="grid gap-1">
+                                    <div className="flex items-center gap-2">
+                                        <Input
+                                            aria-label={`Objectif ${i + 1}`}
+                                            value={o}
+                                            maxLength={500}
+                                            onChange={(e) => setObjective(i, e.target.value)}
+                                            placeholder="À l’issue de la formation, le stagiaire sait…"
+                                        />
+                                        <Button
+                                            type="button"
+                                            variant="outline"
+                                            size="icon"
+                                            aria-label={`Monter l’objectif ${i + 1}`}
+                                            onClick={() => setData('objectives', moveItem(data.objectives, i, -1))}
+                                        >
+                                            <ArrowUp className="h-4 w-4" />
+                                        </Button>
+                                        <Button
+                                            type="button"
+                                            variant="outline"
+                                            size="icon"
+                                            aria-label={`Descendre l’objectif ${i + 1}`}
+                                            onClick={() => setData('objectives', moveItem(data.objectives, i, 1))}
+                                        >
+                                            <ArrowDown className="h-4 w-4" />
+                                        </Button>
+                                        <Button
+                                            type="button"
+                                            variant="outline"
+                                            size="icon"
+                                            aria-label={`Supprimer l’objectif ${i + 1}`}
+                                            onClick={() =>
+                                                setData(
+                                                    'objectives',
+                                                    data.objectives.filter((_, j) => j !== i),
+                                                )
+                                            }
+                                        >
+                                            <Trash2 className="h-4 w-4" />
+                                        </Button>
+                                    </div>
+                                    <InputError message={nested(`objectives.${i}`)} />
+                                </div>
+                            ))}
+                            <InputError message={errors.objectives} />
+                            <div>
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="sm"
+                                    disabled={data.objectives.length >= 20}
+                                    onClick={() => setData('objectives', [...data.objectives, ''])}
+                                >
+                                    <Plus className="h-4 w-4" /> Ajouter un objectif
+                                </Button>
+                            </div>
+                        </fieldset>
+
+                        <fieldset className="grid gap-4 rounded-xl border p-4 md:grid-cols-2" aria-label="Public et prérequis">
+                            <legend className="px-2 text-sm font-semibold">Public et prérequis</legend>
+                            <div className="grid gap-2 md:col-span-2">
+                                <Label htmlFor="audience">Public visé</Label>
+                                <textarea
+                                    id="audience"
+                                    rows={3}
+                                    value={data.audience}
+                                    onChange={(e) => setData('audience', e.target.value)}
+                                    className={textareaClass}
+                                />
+                                <InputError message={errors.audience} />
+                            </div>
+                            <div className="grid gap-2 md:col-span-2">
+                                <Label htmlFor="prerequisites">Prérequis</Label>
+                                <textarea
+                                    id="prerequisites"
+                                    rows={3}
+                                    value={data.prerequisites}
+                                    onChange={(e) => setData('prerequisites', e.target.value)}
+                                    className={textareaClass}
+                                />
+                                <InputError message={errors.prerequisites} />
+                            </div>
+                        </fieldset>
+
+                        <fieldset className="grid gap-4 rounded-xl border p-4" aria-label="Modules">
+                            <legend className="px-2 text-sm font-semibold">Modules</legend>
+                            {data.modules.map((m, i) => (
+                                <div key={m.uid} className="grid gap-2 rounded-lg border p-3 md:grid-cols-[1fr_8rem_12rem]">
+                                    <div className="grid gap-1">
+                                        <Label htmlFor={`module-title-${i}`}>Module {i + 1} : intitulé *</Label>
+                                        <Input
+                                            id={`module-title-${i}`}
+                                            value={m.title}
+                                            maxLength={200}
+                                            onChange={(e) => setModule(i, { title: e.target.value })}
+                                        />
+                                        <InputError message={nested(`modules.${i}.title`)} />
+                                    </div>
+                                    <div className="grid gap-1">
+                                        <Label htmlFor={`module-hours-${i}`}>Durée (h)</Label>
+                                        <Input
+                                            id={`module-hours-${i}`}
+                                            inputMode="decimal"
+                                            value={m.duration_hours}
+                                            onChange={(e) => setModule(i, { duration_hours: e.target.value })}
+                                        />
+                                        <InputError message={nested(`modules.${i}.duration_hours`)} />
+                                    </div>
+                                    <div className="grid gap-1">
+                                        <Label htmlFor={`module-modality-${i}`}>Modalité</Label>
+                                        <Select
+                                            value={m.modality_id || '__none'}
+                                            onValueChange={(v) => setModule(i, { modality_id: v === '__none' ? '' : v })}
+                                        >
+                                            <SelectTrigger id={`module-modality-${i}`}>
+                                                <SelectValue />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                <SelectItem value="__none">Non précisée</SelectItem>
+                                                {options.modality.map((o) => (
+                                                    <SelectItem key={o.value} value={o.value}>
+                                                        {o.label}
+                                                    </SelectItem>
+                                                ))}
+                                            </SelectContent>
+                                        </Select>
+                                        <InputError message={nested(`modules.${i}.modality_id`)} />
+                                    </div>
+                                    <div className="grid gap-1 md:col-span-3">
+                                        <Label htmlFor={`module-content-${i}`}>Contenu</Label>
+                                        <textarea
+                                            id={`module-content-${i}`}
+                                            rows={3}
+                                            value={m.content}
+                                            onChange={(e) => setModule(i, { content: e.target.value })}
+                                            className={textareaClass}
+                                        />
+                                        <InputError message={nested(`modules.${i}.content`)} />
+                                    </div>
+                                    <div className="flex gap-2 md:col-span-3">
+                                        <Button
+                                            type="button"
+                                            variant="outline"
+                                            size="sm"
+                                            aria-label={`Monter le module ${i + 1}`}
+                                            onClick={() => setData('modules', moveItem(data.modules, i, -1))}
+                                        >
+                                            <ArrowUp className="h-4 w-4" />
+                                        </Button>
+                                        <Button
+                                            type="button"
+                                            variant="outline"
+                                            size="sm"
+                                            aria-label={`Descendre le module ${i + 1}`}
+                                            onClick={() => setData('modules', moveItem(data.modules, i, 1))}
+                                        >
+                                            <ArrowDown className="h-4 w-4" />
+                                        </Button>
+                                        <Button
+                                            type="button"
+                                            variant="outline"
+                                            size="sm"
+                                            aria-label={`Supprimer le module ${i + 1}`}
+                                            onClick={() =>
+                                                setData(
+                                                    'modules',
+                                                    data.modules.filter((_, j) => j !== i),
+                                                )
+                                            }
+                                        >
+                                            <Trash2 className="h-4 w-4" /> Supprimer
+                                        </Button>
+                                    </div>
+                                </div>
+                            ))}
+                            <InputError message={errors.modules} />
+                            {data.modules.length > 0 && (
+                                <p className="text-sm">
+                                    Total des modules : {hoursText(modulesSum)} h
+                                    {Number.isFinite(duration) ? ` (durée de la formation : ${hoursText(duration)} h)` : ''}
+                                </p>
                             )}
-                            <Link className="text-sm underline" href={route('catalogue.brochures.index')}>
-                                Gérer les plaquettes
-                            </Link>
-                        </section>
-                    )}
-
-                    <div className="flex flex-wrap gap-2">
-                        <Button type="submit" disabled={processing}>
-                            {processing && <LoaderCircle className="h-4 w-4 animate-spin" />}
-                            Enregistrer
-                        </Button>
-                        <Button type="button" variant="outline" asChild>
-                            <Link href={route('catalogue.index')}>Annuler</Link>
-                        </Button>
-                        {editing && training && can?.manage && (
-                            <Button
-                                type="button"
-                                variant="outline"
-                                onClick={() => {
-                                    if (!isDirty || window.confirm('Les modifications non enregistrées seront perdues. Dupliquer la formation enregistrée ?')) {
-                                        router.post(route('catalogue.duplicate', training.id));
+                            {gap && (
+                                <p role="alert" className="rounded-md border border-amber-500 bg-amber-50 p-2 text-sm text-amber-900">
+                                    Attention : la somme des modules ({hoursText(modulesSum)} h) ne correspond pas à la durée de la formation (
+                                    {hoursText(duration)} h). Vous pouvez tout de même enregistrer.
+                                </p>
+                            )}
+                            <div>
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="sm"
+                                    disabled={data.modules.length >= 30}
+                                    onClick={() =>
+                                        setData('modules', [
+                                            ...data.modules,
+                                            { uid: `new-${++newModuleCount}`, title: '', duration_hours: '', modality_id: '', content: '' },
+                                        ])
                                     }
-                                }}
-                            >
-                                Dupliquer
-                            </Button>
+                                >
+                                    <Plus className="h-4 w-4" /> Ajouter un module
+                                </Button>
+                            </div>
+                        </fieldset>
+
+                        <fieldset className="grid gap-4 rounded-xl border p-4 md:grid-cols-2" aria-label="Méthodes et évaluation">
+                            <legend className="px-2 text-sm font-semibold">Méthodes et évaluation</legend>
+                            {area('methods', 'Méthodes et moyens pédagogiques')}
+                            {area('evaluation', 'Modalités d’évaluation')}
+                            {area('sanction', 'Sanction de la formation (attestation, certification…)')}
+                        </fieldset>
+
+                        <fieldset className="grid gap-4 rounded-xl border p-4 md:grid-cols-2" aria-label="Accessibilité et accès">
+                            <legend className="px-2 text-sm font-semibold">Accessibilité et accès</legend>
+                            {area('accessibility', 'Accessibilité aux personnes en situation de handicap')}
+                            {area('access_terms', 'Modalités et délais d’accès')}
+                        </fieldset>
+
+                        <fieldset className="grid gap-4 rounded-xl border p-4 md:grid-cols-2" aria-label="Résultats">
+                            <legend className="px-2 text-sm font-semibold">Résultats</legend>
+                            {area('results', 'Indicateurs de résultats (satisfaction, réussite…)')}
+                        </fieldset>
+
+                        <fieldset className="grid gap-2 rounded-xl border p-4 sm:grid-cols-2">
+                            <legend className="px-2 text-sm font-semibold">Financements possibles</legend>
+                            {options.funding_mode.map((f) => (
+                                <Label key={f.value} className="flex items-center gap-2 font-normal">
+                                    <Checkbox
+                                        checked={data.funding_mode_ids.includes(f.value)}
+                                        onCheckedChange={(v) => toggleFunding(f.value, v === true)}
+                                    />
+                                    {f.label}
+                                </Label>
+                            ))}
+                            <InputError message={errors.funding_mode_ids ?? itemError(errors, 'funding_mode_ids')} />
+                        </fieldset>
+
+                        {editing && (
+                            <section aria-label="Plaquettes" className="grid gap-2 rounded-xl border p-4">
+                                <h2 className="text-sm font-semibold">Plaquettes</h2>
+                                {brochures.length === 0 ? (
+                                    <p className="text-muted-foreground text-sm">Aucune plaquette rattachée à cette formation ni à son DAS.</p>
+                                ) : (
+                                    <ul className="grid gap-1 text-sm">
+                                        {brochures.map((b) => (
+                                            <li key={b.id} className="flex flex-wrap items-center gap-2">
+                                                {can?.brochures ? (
+                                                    <a className="underline" href={route('catalogue.brochures.download', b.id)}>
+                                                        {b.title}
+                                                    </a>
+                                                ) : (
+                                                    <span>{b.title}</span>
+                                                )}
+                                                <span className="text-muted-foreground">
+                                                    {b.original_name} · {formatSize(b.size)} ·{' '}
+                                                    {b.source === 'das' ? 'via le DAS' : 'rattachée à la formation'}
+                                                </span>
+                                            </li>
+                                        ))}
+                                    </ul>
+                                )}
+                                <Link className="text-sm underline" href={route('catalogue.brochures.index')}>
+                                    Gérer les plaquettes
+                                </Link>
+                            </section>
                         )}
-                    </div>
+
+                        <div className="flex flex-wrap gap-2">
+                            <Button type="submit" disabled={processing}>
+                                {processing && <LoaderCircle className="h-4 w-4 animate-spin" />}
+                                Enregistrer
+                            </Button>
+                            <Button type="button" variant="outline" asChild>
+                                <Link href={route('catalogue.index')}>Annuler</Link>
+                            </Button>
+                            {editing && training && can?.manage && (
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    disabled={duplicating}
+                                    onClick={() => {
+                                        if (duplicating) return;
+                                        if (
+                                            !isDirty ||
+                                            window.confirm('Les modifications non enregistrées seront perdues. Dupliquer la formation enregistrée ?')
+                                        ) {
+                                            router.post(
+                                                route('catalogue.duplicate', training.id),
+                                                {},
+                                                { onStart: () => setDuplicating(true), onFinish: () => setDuplicating(false) },
+                                            );
+                                        }
+                                    }}
+                                >
+                                    Dupliquer
+                                </Button>
+                            )}
+                        </div>
+                    </fieldset>
                 </form>
             </div>
         </AppLayout>

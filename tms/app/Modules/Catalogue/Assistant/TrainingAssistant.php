@@ -94,10 +94,11 @@ final class TrainingAssistant
                 ? 'Reprends fidèlement le programme ; n\'invente rien : un champ que le programme ne renseigne pas vaut null (liste vide pour les objectifs et les modules).'
                 : 'Propose un contenu réaliste et professionnel à partir de la demande ; laisse null ce que tu ne peux pas raisonnablement proposer.',
             'Ne donne jamais de chiffres de résultats (taux de satisfaction, de réussite) qui ne figurent pas dans la source : « results » vaut alors null.',
+            'Respecte strictement ces limites : une réponse qui en dépasse une est refusée entière.',
             'title : intitulé court (200 caractères au plus).',
-            'duration_hours / duration_days : durée totale en heures / en jours (nombres positifs), null si inconnue.',
+            'duration_hours / duration_days : durée totale en heures (plus de 0 et 2 000 heures au plus) / en jours (365 jours au plus), nombres positifs, null si inconnue.',
             'objectives : objectifs pédagogiques (20 au plus, une phrase chacun, 500 caractères au plus).',
-            'modules : 30 au plus, dans l\'ordre ; pour chacun title, duration_hours (null si inconnue), modality, content (contenu détaillé).',
+            'modules : 30 au plus, dans l\'ordre ; pour chacun title (200 caractères au plus, obligatoire), duration_hours (plus de 0 et 2 000 heures au plus, null si inconnue), modality, content (contenu détaillé, 5 000 caractères au plus).',
             'Autres textes (description, audience = public visé, prerequisites, methods, evaluation, sanction, accessibility, access_terms = modalités et délais d\'accès, results) : 5 000 caractères au plus chacun.',
             'das : exactement l\'un de ces domaines d\'activité de l\'organisme, sinon null : '.$list($choices['das']).'.',
             'modality : exactement l\'une de ces modalités de l\'organisme, sinon null : '.$list($choices['modality']).'.',

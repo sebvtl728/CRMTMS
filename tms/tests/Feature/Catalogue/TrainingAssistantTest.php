@@ -362,6 +362,9 @@ it('lists the organisme\'s active DAS and modalities in the instructions', funct
     /** @var Request $request */
     $request = Http::recorded()->first()[0];
     $system = json_encode($request->data()['system'] ?? '', JSON_UNESCAPED_UNICODE);
+    // The limits checked on the answer are stated to the AI.
+    expect($system)->toContain('20 au plus')->toContain('30 au plus')->toContain('500 caractères')->toContain('5 000 caractères')
+        ->toContain('200 caractères')->toContain('2 000 heures')->toContain('365 jours');
     expect($system)->toContain('Hôtellerie-restauration')->toContain('Présentiel')->not->toContain('Distanciel (classe virtuelle)');
     expect(TrainingDraft::schema()['properties']['modules']['maxItems'])->toBe(30);
     expect(ReferenceItem::query()->where('list', ReferenceList::TrainingModality->value)->count())->toBeGreaterThan(1);
@@ -406,4 +409,19 @@ it('proposes the fixed sheet of the offline AI through the usual checks', functi
     Http::assertNothingSent();
     app()->forgetInstance(AnthropicClient::class);
     app()->forgetInstance(Ai::class);
+});
+
+it('leaves a duration empty when it rounds to zero hours', function () {
+    assistantConnector();
+    fakeAssistantAi(assistantAnswer(['duration_hours' => 0.004, 'duration_days' => 0.001, 'modules' => [
+        ['title' => 'Mot d’accueil', 'duration_hours' => 0.002, 'modality' => null, 'content' => null],
+        ['title' => 'Atelier', 'duration_hours' => 0.005, 'modality' => null, 'content' => null],
+    ]]));
+    $this->actingAs(admin(twoFactor: true));
+
+    $this->postJson('/catalogue/assistant/prompt', ['prompt' => 'Une formation'])->assertOk()
+        ->assertJsonPath('proposal.duration_hours', null)
+        ->assertJsonPath('proposal.duration_days', null)
+        ->assertJsonPath('proposal.modules.0.duration_hours', null)
+        ->assertJsonPath('proposal.modules.1.duration_hours', '0,01');
 });
