@@ -52,6 +52,11 @@ final class DossierWriter
 
     public const MAX_LINES = 100;
 
+    /** « La ligne « X » … »: a line with an enrolment (cancelled included) is never deleted. */
+    public const LINE_ENROLLED_PREFIX = 'La ligne « ';
+
+    public const LINE_ENROLLED_SUFFIX = ' » a des stagiaires inscrits (inscriptions annulées comprises) : elle ne se supprime pas.';
+
     public const LINE_GONE = 'Une ligne de ce dossier a été supprimée entre-temps : rechargez la page.';
 
     public const ENROLLED = 'Désinscrivez d\'abord les stagiaires de ce dossier.';
@@ -323,11 +328,14 @@ final class DossierWriter
                 throw ValidationException::withMessages(['lines' => "La ligne « {$line->label} » a un stagiaire visé par un financement : son mode de prix ne change plus."]);
             }
         }
+        // A line with any enrolment, cancelled ones included, is never deleted
+        // (nor its enrolments: the history of the trainees is kept).
+        $withEnrolments = Enrolment::query()->where('dossier_id', $dossier->id)->distinct()->pluck('dossier_line_id')->all();
+        foreach ($existing->only($withEnrolments)->except(array_keys($sent)) as $line) {
+            throw ValidationException::withMessages(['lines' => self::LINE_ENROLLED_PREFIX.$line->label.self::LINE_ENROLLED_SUFFIX]);
+        }
         foreach ($existing->only($enrolled) as $line) {
-            $kept = $sent[$line->id] ?? null;
-            if ($kept === null) {
-                throw ValidationException::withMessages(['lines' => "La ligne « {$line->label} » a des stagiaires inscrits : désinscrivez-les avant de la supprimer."]);
-            }
+            $kept = $sent[$line->id];
             if ($kept['kind'] !== $line->kind || $kept['training_id'] !== $line->training_id) {
                 throw ValidationException::withMessages(['lines' => "La ligne « {$line->label} » a des stagiaires inscrits : sa formation ne change plus."]);
             }
@@ -351,12 +359,8 @@ final class DossierWriter
             // Its total or its pricing mode may have changed.
             PriceShares::recompute($line);
         }
-        $existing->except($kept)->each(function (DossierLine $l): void {
-            // Only cancelled enrolments are left on a deleted line, none of
-            // them targeted by a funding (checkLines()).
-            Enrolment::query()->where('dossier_line_id', $l->id)->get()->each(fn (Enrolment $e) => $e->delete());
-            $l->delete();
-        });
+        // No enrolment is left on a deleted line (checkLines()).
+        $existing->except($kept)->each(fn (DossierLine $l) => $l->delete());
     }
 
     /**

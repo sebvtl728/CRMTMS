@@ -338,6 +338,16 @@ it('refuses to delete a line whose cancelled enrolment a funding targets: the en
     expect(Enrolment::query()->find($enrolment->id))->not->toBeNull();
 });
 
+it('never deletes a line with an enrolment, even a cancelled one, nor the enrolment', function () {
+    $dossier = funDossier(fee: true);
+    $enrolment = funEnrol($dossier);
+    app(Enrolments::class)->cancel($enrolment);
+
+    expect(fn () => app(DossierWriter::class)->update($dossier, funKeepLines($dossier, [$dossier->lines[1]->id])))
+        ->toThrow(ValidationException::class, DossierWriter::LINE_ENROLLED_PREFIX.'HACCP'.DossierWriter::LINE_ENROLLED_SUFFIX);
+    expect(Enrolment::query()->find($enrolment->id))->not->toBeNull()->and($dossier->lines()->count())->toBe(2);
+});
+
 it('keeps the pricing mode of a line whose enrolment a funding targets', function () {
     $dossier = funDossier();
     $enrolment = funEnrol($dossier);

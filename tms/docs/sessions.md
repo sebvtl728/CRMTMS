@@ -39,7 +39,7 @@ La colonne **Reste à financer** donne le prix du dossier moins ses financements
 - **Société émettrice**, **Contractant** : une entreprise **ou** un particulier, **Contact**, **Responsable** ;
 - **DAS du dossier** : obligatoire, proposé d'après la formation de la première ligne ;
 - **Lignes** : une **formation** du catalogue (libellé, quantité, unité, prix unitaire HT, remise) ou des **frais** (déplacement, repas, forfait) sans formation ni inscription. Le **prix du dossier** est la somme des lignes HT ;
-- **Mode de prix** d'une ligne de formation : *prix par stagiaire* (le montant de la ligne est réparti à parts égales entre les inscrits) ou *prix de groupe* (le prix reste sur la ligne). Il est proposé d'après l'unité (« stagiaire » → par stagiaire ; forfait, jour, heure, session → de groupe) et reste modifiable.
+- **Mode de prix** d'une ligne de formation : *prix par stagiaire* (le montant de la ligne est réparti à parts égales entre les inscrits) ou *prix de groupe* (le prix reste sur la ligne). Il est proposé d'après l'unité (« stagiaire » → par stagiaire ; forfait, jour, heure, session → de groupe) et reste modifiable. Une ligne qui a (ou a eu) des inscriptions, même annulées, ne se supprime pas : les inscriptions et leur historique sont conservés.
 
 Chaque dossier reçoit un numéro `D-2026-0001`.
 
