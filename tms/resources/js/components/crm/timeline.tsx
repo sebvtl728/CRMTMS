@@ -1,12 +1,25 @@
 import { SendingStatus, SentTitles, type SentBrochure } from '@/components/crm/brochure-send';
-import { ACTIVITY_SAVED_EVENT, completeActivity } from '@/components/crm/quick-action';
+import { ACTIVITY_SAVED_EVENT, completeActivity, editActivity } from '@/components/crm/quick-action';
 import InputError from '@/components/input-error';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { formatDateTime } from '@/lib/crm';
 import { Link, router } from '@inertiajs/react';
-import { Check, ClipboardCheck, FileText, FolderOpen, GraduationCap, Handshake, History, LoaderCircle, Paperclip, StickyNote, Trash2 } from 'lucide-react';
+import {
+    Check,
+    ClipboardCheck,
+    FileText,
+    FolderOpen,
+    GraduationCap,
+    Handshake,
+    History,
+    LoaderCircle,
+    Paperclip,
+    Pencil,
+    StickyNote,
+    Trash2,
+} from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 const MAX_NOTE = 10000;
@@ -325,24 +338,39 @@ export function Timeline({ kind, subjectId, canEdit }: Props) {
                                     Fait
                                 </Button>
                             )}
-                            {(entry.type === 'activity' ? entry.meta.can_delete === true : canEdit) && REMOVABLE.includes(entry.type) && entry.meta.id && (
+                            {entry.type === 'activity' && entry.meta.can_update === true && entry.meta.id && (
                                 <Button
                                     type="button"
                                     variant="ghost"
                                     size="icon"
                                     className="h-8 w-8 shrink-0"
-                                    aria-label={
-                                        entry.type === 'note'
-                                            ? 'Supprimer cette note'
-                                            : entry.type === 'activity'
-                                              ? `Supprimer l’action ${entry.title}`
-                                              : `Retirer ${entry.title}`
-                                    }
-                                    onClick={() => setRemoving(entry)}
+                                    aria-label={`Modifier l’action ${entry.title}`}
+                                    title="Modifier"
+                                    onClick={() => editActivity(String(entry.meta.id))}
                                 >
-                                    <Trash2 className="h-4 w-4" />
+                                    <Pencil className="h-4 w-4" />
                                 </Button>
                             )}
+                            {(entry.type === 'activity' ? entry.meta.can_delete === true : canEdit) &&
+                                REMOVABLE.includes(entry.type) &&
+                                entry.meta.id && (
+                                    <Button
+                                        type="button"
+                                        variant="ghost"
+                                        size="icon"
+                                        className="h-8 w-8 shrink-0"
+                                        aria-label={
+                                            entry.type === 'note'
+                                                ? 'Supprimer cette note'
+                                                : entry.type === 'activity'
+                                                  ? `Supprimer l’action ${entry.title}`
+                                                  : `Retirer ${entry.title}`
+                                        }
+                                        onClick={() => setRemoving(entry)}
+                                    >
+                                        <Trash2 className="h-4 w-4" />
+                                    </Button>
+                                )}
                         </li>
                     ))}
                 </ol>

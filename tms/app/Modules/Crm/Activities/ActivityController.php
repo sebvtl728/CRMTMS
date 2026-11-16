@@ -16,7 +16,7 @@ use Illuminate\Support\Facades\Gate;
 
 /**
  * Actions: quick entry (« + Action », from anywhere, prefilled from the
- * page), « Fait » with the next follow-up, edit and removal. Writes answer
+ * page), « Fait » with the next follow-up, « Modifier » and removal. Writes answer
  * with a redirect back (Inertia); the dialog reads its options and an
  * action as JSON.
  */
@@ -57,11 +57,14 @@ class ActivityController extends Controller
      *
      * @return array{types: list<array{value: string, label: string, code: string}>, results: list<array{value: string, label: string}>}
      */
-    private static function choices(?string $currentResultId = null): array
+    private static function choices(?string $currentResultId = null, ?string $currentTypeId = null): array
     {
         return [
-            'types' => ReferenceItem::options(ReferenceList::ActionType)
-                ->map(fn (ReferenceItem $i) => ['value' => $i->id, 'label' => $i->label, 'code' => $i->code])->values()->all(),
+            // Active types, plus the current one of an edited action (« Modifier »).
+            'types' => ReferenceItem::query()->where('list', ReferenceList::ActionType)
+                ->where(fn ($q) => $q->where('is_active', true)->when($currentTypeId, fn ($q2, $id) => $q2->orWhere('id', $id)))
+                ->orderBy('position')->orderBy('label')->get()
+                ->map(fn (ReferenceItem $i) => ['value' => $i->id, 'label' => $i->is_active ? $i->label : $i->label.' (inactif)', 'code' => $i->code])->values()->all(),
             'results' => FormOptions::reference(ReferenceList::ActionResult, $currentResultId),
         ];
     }
@@ -79,10 +82,14 @@ class ActivityController extends Controller
         $user = $request->user();
         assert($user instanceof User);
 
+        $canUpdate = $user->can('update', $activity);
+
         return response()->json([
             'activity' => ActivityRows::row($activity->load(ActivityRows::WITH)),
-            ...self::choices($activity->result_id),
-            'can' => ['update' => $user->can('update', $activity), 'delete' => $user->can('delete', $activity)],
+            ...self::choices($activity->result_id, $activity->type_id),
+            // « Modifier »: active users (the current one kept, even deactivated).
+            'responsibles' => $canUpdate ? FormOptions::responsible($activity->responsible_user_id) : [],
+            'can' => ['update' => $canUpdate, 'delete' => $user->can('delete', $activity)],
         ])->header('Cache-Control', 'no-store, private');
     }
 

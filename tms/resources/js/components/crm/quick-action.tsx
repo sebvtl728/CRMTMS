@@ -19,7 +19,10 @@ export interface QuickActionContext {
     opportunity_id?: string;
 }
 
-type QuickActionRequest = { mode: 'create'; context: QuickActionContext } | { mode: 'complete'; activityId: string };
+type QuickActionRequest =
+    | { mode: 'create'; context: QuickActionContext }
+    | { mode: 'complete'; activityId: string }
+    | { mode: 'edit'; activityId: string };
 
 const OPEN_EVENT = 'crm:quick-action';
 /** Dispatched on window once an action was saved (histories reload). */
@@ -33,6 +36,11 @@ export function openQuickAction(context: QuickActionContext = {}): void {
 /** Opens the « Fait » dialog of an action to do. */
 export function completeActivity(activityId: string): void {
     window.dispatchEvent(new CustomEvent<QuickActionRequest>(OPEN_EVENT, { detail: { mode: 'complete', activityId } }));
+}
+
+/** Opens the « Modifier » dialog of an action (to do or done). */
+export function editActivity(activityId: string): void {
+    window.dispatchEvent(new CustomEvent<QuickActionRequest>(OPEN_EVENT, { detail: { mode: 'edit', activityId } }));
 }
 
 export interface TypeOption extends Option {
@@ -74,6 +82,15 @@ function nowLocal(): string {
     const parts = new Intl.DateTimeFormat('sv-SE', { timeZone: 'Europe/Paris', dateStyle: 'short', timeStyle: 'short' }).format(new Date());
 
     return parts.replace(' ', 'T');
+}
+
+/** An ISO 8601 instant as a datetime-local value in Paris time (« 2026-11-20T09:00 »). */
+export function isoToLocal(iso: string | null): string {
+    if (!iso) return '';
+    const date = new Date(iso);
+    if (Number.isNaN(date.getTime())) return '';
+
+    return new Intl.DateTimeFormat('sv-SE', { timeZone: 'Europe/Paris', dateStyle: 'short', timeStyle: 'short' }).format(date).replace(' ', 'T');
 }
 
 /** Fiche of the page shown, for the header button. */
@@ -145,6 +162,7 @@ export function QuickActionDialog() {
             <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-xl">
                 {request?.mode === 'create' && <CreateForm key={JSON.stringify(request.context)} context={request.context} onDone={close} />}
                 {request?.mode === 'complete' && <CompleteForm key={request.activityId} activityId={request.activityId} onDone={close} />}
+                {request?.mode === 'edit' && <EditForm key={request.activityId} activityId={request.activityId} onDone={close} />}
             </DialogContent>
         </Dialog>
     );
@@ -167,11 +185,13 @@ type CreateFields = {
     person_id: string;
     opportunity_id: string;
     subject: string;
+    purpose: string;
     done: boolean;
     done_at: string;
     due_at: string;
     result_id: string;
     report: string;
+    next_steps: string;
     location: string;
     next_type_id: string;
     next_due_at: string;
@@ -192,11 +212,13 @@ function CreateForm({ context, onDone }: { context: QuickActionContext; onDone: 
         person_id: '',
         opportunity_id: '',
         subject: '',
+        purpose: '',
         done: true,
         done_at: '',
         due_at: '',
         result_id: '',
         report: '',
+        next_steps: '',
         location: '',
         next_type_id: '',
         next_due_at: '',
@@ -348,6 +370,8 @@ function CreateForm({ context, onDone }: { context: QuickActionContext; onDone: 
                 <InputError message={errors.subject} />
             </div>
 
+            <PurposeField value={data.purpose} onChange={(v) => setData('purpose', v)} error={errors.purpose} />
+
             <div className="flex items-center gap-2">
                 <Checkbox id="qa-done" checked={data.done} onCheckedChange={(c) => setData('done', c === true)} />
                 <Label htmlFor="qa-done">Fait maintenant</Label>
@@ -402,6 +426,8 @@ function CreateForm({ context, onDone }: { context: QuickActionContext; onDone: 
                 </div>
             )}
 
+            <NextStepsField value={data.next_steps} onChange={(v) => setData('next_steps', v)} error={errors.next_steps} />
+
             {data.done && (
                 <NextFollowUp
                     types={choices.types}
@@ -428,11 +454,17 @@ function CreateForm({ context, onDone }: { context: QuickActionContext; onDone: 
 interface ActivityData {
     id: string;
     type: string | null;
+    type_id: string;
     subject: string;
     due_at: string | null;
     done_at: string | null;
+    duration_minutes: number | null;
+    location: string | null;
+    purpose: string | null;
     report: string | null;
+    next_steps: string | null;
     result_id: string | null;
+    responsible_user_id: string | null;
     organisation: Fiche | null;
     person: Fiche | null;
     opportunity: Fiche | null;
@@ -440,19 +472,23 @@ interface ActivityData {
 
 type CompleteFields = {
     result_id: string;
+    purpose: string;
     report: string;
+    next_steps: string;
     done_at: string;
     next_type_id: string;
     next_due_at: string;
 };
 
-/** « Fait » on an action to do: result, report, next follow-up. */
+/** « Fait » on an action to do: result, purpose, report, next steps, next follow-up. */
 function CompleteForm({ activityId, onDone }: { activityId: string; onDone: () => void }) {
     const [loaded, setLoaded] = useState<(Choices & { activity: ActivityData }) | null>(null);
     const [failed, setFailed] = useState(false);
     const { data, setData, post, processing, errors } = useForm<CompleteFields>({
         result_id: '',
+        purpose: '',
         report: '',
+        next_steps: '',
         done_at: '',
         next_type_id: '',
         next_due_at: '',
@@ -462,7 +498,13 @@ function CompleteForm({ activityId, onDone }: { activityId: string; onDone: () =
         getJson<Choices & { activity: ActivityData }>(route('crm.activities.show', activityId))
             .then((json) => {
                 setLoaded(json);
-                setData((current) => ({ ...current, report: json.activity.report ?? '', result_id: json.activity.result_id ?? '' }));
+                setData((current) => ({
+                    ...current,
+                    purpose: json.activity.purpose ?? '',
+                    report: json.activity.report ?? '',
+                    next_steps: json.activity.next_steps ?? '',
+                    result_id: json.activity.result_id ?? '',
+                }));
             })
             .catch(() => setFailed(true));
         // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -530,7 +572,9 @@ function CompleteForm({ activityId, onDone }: { activityId: string; onDone: () =
                     <InputError message={errors.done_at} />
                 </div>
             </div>
+            <PurposeField value={data.purpose} onChange={(v) => setData('purpose', v)} error={errors.purpose} />
             <ReportField value={data.report} onChange={(v) => setData('report', v)} error={errors.report} />
+            <NextStepsField value={data.next_steps} onChange={(v) => setData('next_steps', v)} error={errors.next_steps} />
             <NextFollowUp
                 types={loaded.types}
                 typeId={data.next_type_id}
@@ -548,6 +592,305 @@ function CompleteForm({ activityId, onDone }: { activityId: string; onDone: () =
                 </Button>
             </DialogFooter>
         </form>
+    );
+}
+
+type EditFields = {
+    type_id: string;
+    subject: string;
+    due_at: string;
+    done_at: string;
+    duration_minutes: string;
+    location: string;
+    responsible_user_id: string;
+    purpose: string;
+    result_id: string;
+    report: string;
+    next_steps: string;
+};
+
+/**
+ * « Modifier » an action: type, subject, purpose, due date (or date done,
+ * result and report once done), next steps, duration, place and responsible. The fiches it
+ * concerns are not changed (read-only).
+ */
+function EditForm({ activityId, onDone }: { activityId: string; onDone: () => void }) {
+    const [loaded, setLoaded] = useState<(Choices & { activity: ActivityData; responsibles: Option[] }) | null>(null);
+    const [failed, setFailed] = useState(false);
+    // Dates as loaded: sent back only when changed (no minute rounding of an untouched date).
+    const [initialDates, setInitialDates] = useState({ due_at: '', done_at: '' });
+    const { data, setData, put, transform, processing, errors, setError, clearErrors } = useForm<EditFields>({
+        type_id: '',
+        subject: '',
+        due_at: '',
+        done_at: '',
+        duration_minutes: '',
+        location: '',
+        responsible_user_id: '',
+        purpose: '',
+        result_id: '',
+        report: '',
+        next_steps: '',
+    });
+
+    useEffect(() => {
+        getJson<Choices & { activity: ActivityData; responsibles: Option[] }>(route('crm.activities.show', activityId))
+            .then((json) => {
+                setLoaded(json);
+                const a = json.activity;
+                setInitialDates({ due_at: isoToLocal(a.due_at), done_at: isoToLocal(a.done_at) });
+                setData({
+                    type_id: a.type_id,
+                    subject: a.subject,
+                    due_at: isoToLocal(a.due_at),
+                    done_at: isoToLocal(a.done_at),
+                    duration_minutes: a.duration_minutes === null ? '' : String(a.duration_minutes),
+                    location: a.location ?? '',
+                    responsible_user_id: a.responsible_user_id ?? '',
+                    purpose: a.purpose ?? '',
+                    result_id: a.result_id ?? '',
+                    report: a.report ?? '',
+                    next_steps: a.next_steps ?? '',
+                });
+            })
+            .catch(() => setFailed(true));
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [activityId]);
+
+    const done = loaded?.activity.done_at != null;
+
+    const submit: FormEventHandler = (e) => {
+        e.preventDefault();
+        clearErrors();
+        // A done action stays done: its date is required.
+        if (done && data.done_at === '') {
+            setError('done_at', 'Indiquez la date à laquelle l’action a été faite.');
+            return;
+        }
+        if (!done && data.due_at === '') {
+            setError('due_at', 'Indiquez l’échéance de l’action à faire.');
+            return;
+        }
+        // An action to do keeps its report and stays to do; a done one keeps its due date.
+        transform((d) => {
+            const common = {
+                type_id: d.type_id,
+                subject: d.subject,
+                duration_minutes: d.duration_minutes,
+                location: d.location,
+                purpose: d.purpose,
+                next_steps: d.next_steps,
+                ...(d.responsible_user_id ? { responsible_user_id: d.responsible_user_id } : {}),
+            };
+
+            const doneAt = d.done_at !== initialDates.done_at ? { done_at: d.done_at } : {};
+            const dueAt = d.due_at !== initialDates.due_at ? { due_at: d.due_at } : {};
+
+            return done ? { ...common, ...doneAt, result_id: d.result_id, report: d.report } : { ...common, ...dueAt };
+        });
+        put(route('crm.activities.update', activityId), {
+            preserveScroll: true,
+            preserveState: true,
+            onSuccess: () => {
+                saved();
+                onDone();
+            },
+        });
+    };
+
+    if (failed) return <p role="alert">L’action n’a pas pu être chargée.</p>;
+    if (loaded === null) {
+        return (
+            <p role="status" className="text-muted-foreground flex items-center gap-2 text-sm">
+                <LoaderCircle className="h-4 w-4 animate-spin" />
+                Chargement…
+            </p>
+        );
+    }
+
+    const a = loaded.activity;
+    const fiches = (['organisation', 'person', 'opportunity'] as const).filter((kind) => a[kind] !== null);
+
+    return (
+        <form onSubmit={submit} className="grid gap-4" noValidate>
+            <DialogHeader>
+                <DialogTitle>Modifier l’action</DialogTitle>
+                <DialogDescription>{done ? 'Action faite' : 'Action à faire'}</DialogDescription>
+            </DialogHeader>
+
+            {fiches.length > 0 && (
+                <div className="grid gap-2">
+                    <span className="text-sm font-medium">Concerne</span>
+                    <ul className="flex flex-wrap gap-2">
+                        {fiches.map((kind) => (
+                            <li key={kind} className="bg-muted rounded-full px-3 py-1 text-sm">
+                                <span className="text-muted-foreground">
+                                    {kind === 'organisation' ? 'Entreprise' : kind === 'person' ? 'Personne' : 'Opportunité'} :
+                                </span>{' '}
+                                {a[kind]?.name}
+                            </li>
+                        ))}
+                    </ul>
+                </div>
+            )}
+
+            <div className="grid gap-4 sm:grid-cols-2">
+                <div className="grid gap-2">
+                    <Label htmlFor="qa-edit-type">Type *</Label>
+                    <Select value={data.type_id} onValueChange={(v) => setData('type_id', v)}>
+                        <SelectTrigger id="qa-edit-type">
+                            <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                            {loaded.types.map((t) => (
+                                <SelectItem key={t.value} value={t.value}>
+                                    {t.label}
+                                </SelectItem>
+                            ))}
+                        </SelectContent>
+                    </Select>
+                    <InputError message={errors.type_id} />
+                </div>
+                <div className="grid gap-2">
+                    <Label htmlFor="qa-edit-responsible">Responsable</Label>
+                    <Select value={data.responsible_user_id} onValueChange={(v) => setData('responsible_user_id', v)}>
+                        <SelectTrigger id="qa-edit-responsible">
+                            <SelectValue placeholder="—" />
+                        </SelectTrigger>
+                        <SelectContent>
+                            {loaded.responsibles.map((u) => (
+                                <SelectItem key={u.value} value={u.value}>
+                                    {u.label}
+                                </SelectItem>
+                            ))}
+                        </SelectContent>
+                    </Select>
+                    <InputError message={errors.responsible_user_id} />
+                </div>
+            </div>
+
+            <div className="grid gap-2">
+                <Label htmlFor="qa-edit-subject">Objet *</Label>
+                <Input id="qa-edit-subject" value={data.subject} maxLength={200} onChange={(e) => setData('subject', e.target.value)} />
+                <InputError message={errors.subject} />
+            </div>
+
+            <PurposeField value={data.purpose} onChange={(v) => setData('purpose', v)} error={errors.purpose} />
+
+            <div className="grid gap-4 sm:grid-cols-2">
+                {done ? (
+                    <div className="grid gap-2">
+                        <Label htmlFor="qa-edit-done-at">Faite le *</Label>
+                        <Input
+                            id="qa-edit-done-at"
+                            type="datetime-local"
+                            max={nowLocal()}
+                            value={data.done_at}
+                            onChange={(e) => setData('done_at', e.target.value)}
+                        />
+                        <InputError message={errors.done_at ?? errors.due_at} />
+                    </div>
+                ) : (
+                    <div className="grid gap-2">
+                        <Label htmlFor="qa-edit-due-at">À faire le *</Label>
+                        <Input id="qa-edit-due-at" type="datetime-local" value={data.due_at} onChange={(e) => setData('due_at', e.target.value)} />
+                        <InputError message={errors.due_at} />
+                    </div>
+                )}
+                <div className="grid gap-2">
+                    <Label htmlFor="qa-edit-duration">Durée (minutes)</Label>
+                    <Input
+                        id="qa-edit-duration"
+                        type="number"
+                        inputMode="numeric"
+                        min={1}
+                        max={1440}
+                        value={data.duration_minutes}
+                        onChange={(e) => setData('duration_minutes', e.target.value)}
+                    />
+                    <InputError message={errors.duration_minutes} />
+                </div>
+            </div>
+
+            <div className="grid gap-2">
+                <Label htmlFor="qa-edit-location">Lieu</Label>
+                <Input id="qa-edit-location" value={data.location} maxLength={255} onChange={(e) => setData('location', e.target.value)} />
+                <InputError message={errors.location} />
+            </div>
+
+            {done && (
+                <>
+                    <div className="grid gap-2">
+                        <Label htmlFor="qa-result">Résultat</Label>
+                        <Select value={data.result_id} onValueChange={(v) => setData('result_id', v)}>
+                            <SelectTrigger id="qa-result">
+                                <SelectValue placeholder="—" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                {loaded.results.map((r) => (
+                                    <SelectItem key={r.value} value={r.value}>
+                                        {r.label}
+                                    </SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
+                        <InputError message={errors.result_id} />
+                    </div>
+                    <ReportField value={data.report} onChange={(v) => setData('report', v)} error={errors.report} />
+                </>
+            )}
+
+            <NextStepsField value={data.next_steps} onChange={(v) => setData('next_steps', v)} error={errors.next_steps} />
+
+            <DialogFooter>
+                <Button type="button" variant="outline" onClick={onDone}>
+                    Annuler
+                </Button>
+                <Button type="submit" disabled={processing || !data.type_id}>
+                    {processing && <LoaderCircle className="h-4 w-4 animate-spin" />}
+                    Enregistrer
+                </Button>
+            </DialogFooter>
+        </form>
+    );
+}
+
+/** « Motif »: why the call or meeting (shown in À faire, sent to Outlook). */
+function PurposeField({ value, onChange, error }: { value: string; onChange: (v: string) => void; error?: string }) {
+    return <NoteField id="qa-purpose" label="Motif" value={value} onChange={onChange} error={error} />;
+}
+
+/** « Suite à donner »: what comes next (stays in the CRM). */
+function NextStepsField({ value, onChange, error }: { value: string; onChange: (v: string) => void; error?: string }) {
+    return <NoteField id="qa-next-steps" label="Suite à donner" value={value} onChange={onChange} error={error} />;
+}
+
+function NoteField({
+    id,
+    label,
+    value,
+    onChange,
+    error,
+}: {
+    id: string;
+    label: string;
+    value: string;
+    onChange: (v: string) => void;
+    error?: string;
+}) {
+    return (
+        <div className="grid gap-2">
+            <Label htmlFor={id}>{label}</Label>
+            <textarea
+                id={id}
+                rows={2}
+                maxLength={2000}
+                value={value}
+                onChange={(e) => onChange(e.target.value)}
+                className="border-input bg-background focus:ring-ring w-full rounded-md border px-3 py-2 text-sm focus:ring-2 focus:outline-hidden"
+            />
+            <InputError message={error} />
+        </div>
     );
 }
 

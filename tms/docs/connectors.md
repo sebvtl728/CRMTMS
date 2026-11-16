@@ -204,9 +204,9 @@ Paramètres : `tenant` (annuaire Azure : son ID, un de ses domaines `xxx.onmicro
   - 429 / 5xx / délai dépassé : nouvel essai plus tard. Le job respecte `Retry-After` (au plus 1 h), sinon attend 30 s, 2 min, 10 min, 30 min puis 1 h. Il abandonne après 24 h.
 - **Contenu envoyé.**
   - Titre : « type – fiche ».
-  - Corps : fiche, opportunité, lieu et lien vers la fiche.
+  - Corps : fiche, motif de l'action, opportunité, lieu et lien vers la fiche.
   - Heures locales avec `timeZone: Europe/Paris` ; la fin = début + durée exacte (60 min pour un rendez-vous, 15 min pour un appel par défaut).
-  - **Jamais** le compte rendu ni l'objet saisi.
+  - **Jamais** le compte rendu, la suite à donner ni l'objet saisi (le lien d'abonnement iCal ne porte pas non plus le motif).
 - **Réseau.** Seuls `login.microsoftonline.com` et `graph.microsoft.com` sont appelés, en https, sans suivre de redirection. `HostPolicy` strict est revérifié à chaque appel.
 - **Journal.** `connector_runs` (sens `out`) contient « Action <id> : évènement Outlook créé / mis à jour / supprimé » et des erreurs rédigées par l'application (code HTTP). Il ne contient ni titre, ni fiche, ni adresse e-mail, ni texte de Microsoft. Une exécution en échec peut être relancée (`payload_ref` = `activity:<id>`).
 - **Audit.** `calendar.outlook_connected`, `calendar.outlook_disconnected`, `calendar.outlook_reconnect_required`.

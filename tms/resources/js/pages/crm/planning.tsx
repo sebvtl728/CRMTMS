@@ -1,3 +1,4 @@
+import { editActivity } from '@/components/crm/quick-action';
 import Heading from '@/components/heading';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -8,7 +9,7 @@ import { type Option } from '@/lib/crm';
 import { cn } from '@/lib/utils';
 import { type BreadcrumbItem } from '@/types';
 import { Head, Link, router } from '@inertiajs/react';
-import { CalendarDays, ChevronLeft, ChevronRight, ClipboardPen, MapPin, Phone } from 'lucide-react';
+import { CalendarDays, ChevronLeft, ChevronRight, ClipboardPen, MapPin, Pencil, Phone } from 'lucide-react';
 import { useState } from 'react';
 
 interface Fiche {
@@ -21,6 +22,7 @@ interface PlanningItem {
     kind: 'meeting' | 'call';
     type: string | null;
     subject: string;
+    purpose: string | null;
     time: string;
     duration_minutes: number | null;
     location: string | null;
@@ -30,7 +32,7 @@ interface PlanningItem {
     organisation: Fiche | null;
     person: Fiche | null;
     opportunity: Fiche | null;
-    /** Compte rendu: scope of crm.activities.update. */
+    /** Compte rendu and « Modifier »: scope of crm.activities.update. */
     can_update: boolean;
 }
 
@@ -80,7 +82,8 @@ function Item({ item, canReport, today, day }: { item: PlanningItem; canReport: 
     const fiche = item.person?.name ?? item.organisation?.name ?? item.opportunity?.name;
     const duration = formatDuration(item.duration_minutes);
     const Icon = item.kind === 'call' ? Phone : CalendarDays;
-    const reportable = canReport && item.can_update && item.kind === 'meeting' && item.status !== 'done' && day === today;
+    const editable = canReport && item.can_update;
+    const reportable = editable && item.kind === 'meeting' && item.status !== 'done' && day === today;
 
     return (
         <li
@@ -117,19 +120,41 @@ function Item({ item, canReport, today, day }: { item: PlanningItem; canReport: 
                 {item.type}
                 {item.opportunity && fiche !== item.opportunity.name && ` · ${item.opportunity.name}`}
             </span>
+            {item.purpose && (
+                <span className="line-clamp-2 text-xs break-words" title={item.purpose}>
+                    <span className="text-muted-foreground">Motif : </span>
+                    {item.purpose}
+                </span>
+            )}
             {item.location && (
                 <span className="text-muted-foreground flex items-center gap-1 text-xs break-words">
                     <MapPin className="h-3 w-3 shrink-0" aria-hidden />
                     {item.location}
                 </span>
             )}
-            {reportable && (
-                <Button asChild size="sm" className="mt-1 justify-self-start">
-                    <Link href={`${route('crm.report')}?${new URLSearchParams({ activity: item.id })}`}>
-                        <ClipboardPen className="h-4 w-4" />
-                        Compte rendu
-                    </Link>
-                </Button>
+            {(reportable || editable) && (
+                <div className="mt-1 flex flex-wrap gap-1">
+                    {reportable && (
+                        <Button asChild size="sm">
+                            <Link href={`${route('crm.report')}?${new URLSearchParams({ activity: item.id })}`}>
+                                <ClipboardPen className="h-4 w-4" />
+                                Compte rendu
+                            </Link>
+                        </Button>
+                    )}
+                    {editable && (
+                        <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={() => editActivity(item.id)}
+                            aria-label={`Modifier l’action ${item.subject}`}
+                        >
+                            <Pencil className="h-4 w-4" />
+                            Modifier
+                        </Button>
+                    )}
+                </div>
             )}
         </li>
     );

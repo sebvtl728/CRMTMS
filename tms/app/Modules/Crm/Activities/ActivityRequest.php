@@ -27,6 +27,9 @@ class ActivityRequest extends FormRequest
 {
     public const MAX_REPORT = 10000;
 
+    /** « Motif » and « Suite à donner ». */
+    public const MAX_NOTE = 2000;
+
     public function authorize(): bool
     {
         $user = $this->user();
@@ -38,7 +41,7 @@ class ActivityRequest extends FormRequest
     protected function prepareForValidation(): void
     {
         $clean = [];
-        foreach (['subject', 'report', 'location', 'organisation_id', 'person_id', 'opportunity_id', 'due_at', 'done_at', 'next_due_at',
+        foreach (['subject', 'purpose', 'report', 'next_steps', 'location', 'organisation_id', 'person_id', 'opportunity_id', 'due_at', 'done_at', 'next_due_at',
             'next_type_id', 'result_id', 'responsible_user_id', 'duration_minutes'] as $key) {
             if ($this->has($key)) {
                 $value = $this->input($key);
@@ -81,6 +84,7 @@ class ActivityRequest extends FormRequest
         $rules = [
             'type_id' => ['required', ...ReferenceRules::item(ReferenceList::ActionType, $current?->type_id)],
             'subject' => [$current === null ? 'nullable' : 'required', 'string', 'max:200'],
+            ...self::noteRules(),
             'report' => ['nullable', 'string', 'max:'.self::MAX_REPORT],
             'location' => ['nullable', 'string', 'max:255'],
             'due_at' => ['nullable', self::instantRule(true)],
@@ -101,6 +105,19 @@ class ActivityRequest extends FormRequest
         }
 
         return $rules;
+    }
+
+    /**
+     * « Motif » and « Suite à donner »: optional texts.
+     *
+     * @return array<string, list<string>>
+     */
+    public static function noteRules(): array
+    {
+        return [
+            'purpose' => ['nullable', 'string', 'max:'.self::MAX_NOTE],
+            'next_steps' => ['nullable', 'string', 'max:'.self::MAX_NOTE],
+        ];
     }
 
     /**
@@ -129,6 +146,12 @@ class ActivityRequest extends FormRequest
         return [function (Validator $validator): void {
             $current = $this->current();
             if ($current !== null) {
+                // A done action keeps a date done: « Modifier » never reopens it.
+                if ($current->done_at !== null && $this->has('done_at') && $this->input('done_at') === null && ! $validator->errors()->has('done_at')) {
+                    $validator->errors()->add('done_at', 'Indiquez la date à laquelle l\'action a été faite.');
+
+                    return;
+                }
                 $done = $this->has('done_at') ? $this->input('done_at') : $current->done_at;
                 $due = $this->has('due_at') ? $this->input('due_at') : $current->due_at;
                 if ($done === null && $due === null && ! $validator->errors()->hasAny(['done_at', 'due_at'])) {
@@ -307,6 +330,8 @@ class ActivityRequest extends FormRequest
             'subject.required' => 'Indiquez l\'objet de l\'action.',
             'subject.max' => 'L\'objet ne doit pas dépasser 200 caractères.',
             'report.max' => 'Le compte rendu ne peut pas dépasser '.number_format(self::MAX_REPORT, 0, ',', ' ').' caractères.',
+            'purpose.max' => 'Le motif ne peut pas dépasser '.number_format(self::MAX_NOTE, 0, ',', ' ').' caractères.',
+            'next_steps.max' => 'La suite à donner ne peut pas dépasser '.number_format(self::MAX_NOTE, 0, ',', ' ').' caractères.',
             'location.max' => 'Le lieu ne doit pas dépasser 255 caractères.',
             'duration_minutes.integer' => 'Indiquez une durée en minutes.',
             'duration_minutes.between' => 'Indiquez une durée entre 1 et 1 440 minutes.',

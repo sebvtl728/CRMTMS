@@ -1,4 +1,5 @@
-import { completeActivity, shiftDay } from '@/components/crm/quick-action';
+import { ActivityNotes } from '@/components/crm/activity-notes';
+import { completeActivity, editActivity, shiftDay } from '@/components/crm/quick-action';
 import Heading from '@/components/heading';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -9,7 +10,7 @@ import { formatDateTime, todayIso } from '@/lib/crm';
 import { cn } from '@/lib/utils';
 import { type BreadcrumbItem } from '@/types';
 import { Head, Link, router } from '@inertiajs/react';
-import { CalendarClock, Check, ExternalLink, Users } from 'lucide-react';
+import { CalendarClock, Check, ExternalLink, Pencil, Users } from 'lucide-react';
 import { useState } from 'react';
 
 interface Fiche {
@@ -21,6 +22,8 @@ interface TodoRow {
     id: string;
     type: string | null;
     subject: string;
+    purpose: string | null;
+    next_steps: string | null;
     due_at: string | null;
     responsible: string | null;
     status: 'todo' | 'overdue' | 'done';
@@ -28,7 +31,7 @@ interface TodoRow {
     organisation: Fiche | null;
     person: Fiche | null;
     opportunity: Fiche | null;
-    /** « Fait » and « Reporter »: scope of crm.activities.update. */
+    /** « Fait », « Reporter » and « Modifier »: scope of crm.activities.update. */
     can_update: boolean;
 }
 
@@ -139,6 +142,7 @@ function TodoItem({ row, canEdit, team }: { row: TodoRow; canEdit: boolean; team
                     {fiches.length > 0 && ` · ${fiches.map((f) => f.name).join(' · ')}`}
                     {team && row.responsible && ` · ${row.responsible}`}
                 </p>
+                <ActivityNotes purpose={row.purpose} nextSteps={row.next_steps} />
             </div>
             <div className="flex flex-wrap items-center gap-2">
                 {canEdit && row.can_update && (
@@ -148,6 +152,16 @@ function TodoItem({ row, canEdit, team }: { row: TodoRow; canEdit: boolean; team
                             Fait
                         </Button>
                         <Postpone activityId={row.id} />
+                        <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={() => editActivity(row.id)}
+                            aria-label={`Modifier l’action ${row.subject}`}
+                        >
+                            <Pencil className="h-4 w-4" />
+                            Modifier
+                        </Button>
                     </>
                 )}
                 {url && (

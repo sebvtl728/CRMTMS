@@ -180,7 +180,9 @@ class Anonymiser
             ->pluck('responsible_user_id', 'id');
         DB::table('activities')->whereIn('id', $activities->keys()->all())
             ->update([
+                'purpose' => null,
                 'report' => null,
+                'next_steps' => null,
                 'location' => null,
                 'subject' => DB::raw('(select label from reference_items where reference_items.id = activities.type_id)'),
                 'updated_at' => now(),

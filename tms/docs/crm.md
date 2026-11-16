@@ -223,6 +223,7 @@ Le bouton **+ Action** (en haut de chaque écran du CRM, et sur les fiches et op
 
 - choisissez le type en un clic (**Appel**, **RDV**, **E-mail**, **Rappel**, ou **Autre type…**) ;
 - l'**objet** est facultatif (par défaut « Type – fiche ») ;
+- **Motif** (pourquoi l'appel ou le rendez-vous) et **Suite à donner** : deux textes facultatifs (2 000 caractères chacun), modifiables ensuite avec **Modifier**, **Fait** et le **Compte rendu de RDV** ; le motif s'affiche sous l'objet dans **À faire** (sur une ligne, **Voir tout** pour le texte entier) et dans le planning, les deux dans l'historique des fiches et les actions d'une opportunité ; le motif est repris dans l'évènement Outlook, jamais la suite à donner ni le compte rendu. Comme le compte rendu, ils sont masqués dans le journal et effacés par l'anonymisation ;
 - **Fait maintenant** (coché par défaut) enregistre un échange qui vient d'avoir lieu, avec son **résultat** et son **compte rendu** ; décoché, l'action est **à faire** le jour et à l'heure choisis (une date sans heure = 9 h) ;
 - **Prochaine relance** : **Demain**, **Dans 1 semaine**, **Dans 1 mois** ou une date, et un type (Rappel par défaut) : une action à faire est créée sur les mêmes fiches, pour le même responsable.
 
@@ -232,8 +233,9 @@ Une action faite met à jour la date de **dernier contact** de la fiche. Une act
 
 **À faire** liste vos actions à faire, triées par échéance, en trois parties : **En retard** (en rouge : échéance avant aujourd'hui), **Aujourd'hui**, **Cette semaine** (jusqu'à dimanche soir). Les jours sont ceux de l'heure de Paris : une relance prévue aujourd'hui n'est pas en retard avant minuit.
 
-- **Fait** ouvre la fenêtre de compte rendu (résultat, compte rendu, prochaine relance) ;
+- **Fait** ouvre la fenêtre de compte rendu (résultat, motif, compte rendu, suite à donner, prochaine relance) ;
 - **Reporter** : **Demain**, **Dans 1 semaine** ou une date (une date seule = 9 h) ;
+- **Modifier** ouvre la fenêtre de l'action (type, objet, échéance et heure, durée, lieu, responsable ; les fiches concernées ne changent pas) : le même bouton figure dans le planning, l'historique des fiches et les actions d'une opportunité ;
 - **Ouvrir la fiche** ;
 - **Équipe** (direction et administrateur) affiche les actions de toute l'équipe.
 
@@ -256,7 +258,7 @@ Les types d'action qui comptent comme rendez-vous ou comme appels sont réglés 
 **Compte rendu de RDV** (menu, ou bouton **Compte rendu** sur un rendez-vous du jour dans le planning) est un formulaire unique pensé pour le téléphone :
 
 1. choisissez le rendez-vous du jour (présélectionné s'il n'y en a qu'un), ou **Sans rendez-vous prévu : choisir une fiche** ;
-2. le **résultat** et le **compte rendu** ;
+2. le **résultat**, le **motif** (repris du rendez-vous), le **compte rendu** et la **suite à donner** ;
 3. si besoin, l'**étape** de l'opportunité concernée (motif obligatoire pour **Perdu**) ;
 4. la **prochaine relance** ;
 5. **Enregistrer le compte rendu**.
