@@ -7,6 +7,8 @@ use App\Modules\Connectors\Calendar\Microsoft365Connector;
 use App\Modules\Connectors\Calendar\QueueOutlookPush;
 use App\Modules\Connectors\Core\ConnectorConfig;
 use App\Modules\Connectors\Core\ConnectorRegistry;
+use App\Modules\Connectors\Mail365\GraphMailClient;
+use App\Modules\Connectors\Mail365\Microsoft365MailConnector;
 use App\Modules\Connectors\Sirene\SireneClient;
 use App\Modules\Connectors\Sirene\SireneConnector;
 use App\Modules\Connectors\Smtp\SmtpConnector;
@@ -28,6 +30,7 @@ class ConnectorsServiceProvider extends ServiceProvider
         SmtpConnector::class,
         SireneConnector::class,
         Microsoft365Connector::class,
+        Microsoft365MailConnector::class,
     ];
 
     public function register(): void
@@ -37,6 +40,7 @@ class ConnectorsServiceProvider extends ServiceProvider
         $this->app->singleton(SmtpTransportFactory::class);
         $this->app->singleton(SireneClient::class);
         $this->app->singleton(GraphClient::class);
+        $this->app->singleton(GraphMailClient::class);
         $this->app->singleton(ConnectorRegistry::class, function ($app) {
             $registry = new ConnectorRegistry($app);
             foreach (self::CONNECTORS as $class) {

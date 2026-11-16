@@ -3,6 +3,7 @@
 namespace App\Modules\Core\Users;
 
 use App\Http\Controllers\Controller;
+use App\Modules\Connectors\Mail365\GraphMailFailed;
 use App\Modules\Connectors\Smtp\SmtpHostRefused;
 use App\Modules\Connectors\Smtp\TenantMailer;
 use App\Modules\Core\Access\RoleCatalogue;
@@ -155,7 +156,7 @@ class InvitationController extends Controller
             ));
         } catch (Throwable $e) {
             // The server's raw text can echo credentials: only our own summary is kept.
-            $reason = $e instanceof SmtpHostRefused ? $e->getMessage()
+            $reason = $e instanceof SmtpHostRefused || $e instanceof GraphMailFailed ? $e->getMessage()
                 : ($e instanceof TransportExceptionInterface ? 'Le serveur SMTP a refusé la connexion ou l\'envoi.' : 'Erreur inattendue lors de l\'envoi.');
             Log::warning('Invitation e-mail not sent.', ['exception' => $e::class]);
             $this->audit->record('users.invitation_send_failed', $invitation, [], [...$audited, 'reason' => $reason]);
