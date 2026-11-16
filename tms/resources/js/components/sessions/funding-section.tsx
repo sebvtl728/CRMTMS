@@ -142,7 +142,12 @@ function FundingDialog({
 
     const submit: FormEventHandler = (e) => {
         e.preventDefault();
-        clearErrors('dossier_line_id', 'enrolment_id');
+        clearErrors('funder_organisation_id', 'dossier_line_id', 'enrolment_id');
+        // A name typed in the search is not a choice: nothing is sent without a funder picked.
+        if (!data.funder_organisation_id && !data.funder_person_id) {
+            setError('funder_organisation_id', 'Choisissez le financeur : cliquez sur un résultat de la recherche.');
+            return;
+        }
         // A line or a trainee chosen as target must be picked (the server checks it too).
         if (targetKind === 'line' && !data.dossier_line_id) {
             setError('dossier_line_id', 'Choisissez la ligne financée.');

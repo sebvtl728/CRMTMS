@@ -1,5 +1,6 @@
 import InputError from '@/components/input-error';
 import { EnrolmentDetailsFields, type EnrolmentReferences } from '@/components/sessions/enrolment-list';
+import { pickOnEnter, SearchHint } from '@/components/sessions/search-hits';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
@@ -67,6 +68,7 @@ function TraineePicker({
 }) {
     const [term, setTerm] = useState('');
     const [hits, setHits] = useState<Trainee[]>([]);
+    const [searched, setSearched] = useState(false);
     const [creating, setCreating] = useState(false);
     const [draft, setDraft] = useState({ last_name: '', first_name: '', birth_date: '', email: '' });
     const [candidates, setCandidates] = useState<Trainee[]>([]);
@@ -74,6 +76,7 @@ function TraineePicker({
     const [busy, setBusy] = useState(false);
 
     useEffect(() => {
+        setSearched(false);
         if (term.trim().length < 2) {
             setHits([]);
             return;
@@ -88,7 +91,10 @@ function TraineePicker({
                 signal: controller.signal,
             })
                 .then((r) => (r.ok ? r.json() : null))
-                .then((json) => setHits((json?.personnes ?? []) as Trainee[]))
+                .then((json) => {
+                    setSearched(true);
+                    setHits((json?.personnes ?? []) as Trainee[]);
+                })
                 .catch(() => undefined);
         }, 250);
         return () => {
@@ -220,6 +226,7 @@ function TraineePicker({
                 type="search"
                 value={term}
                 onChange={(e) => setTerm(e.target.value)}
+                onKeyDown={(e) => pickOnEnter(e, term, hits, traineeLabel, (h) => onPick({ id: h.id, label: traineeLabel(h) }))}
                 placeholder="Nom, prénom ou e-mail (toutes les personnes de l'organisme)"
             />
             {hits.length > 0 && (
@@ -237,6 +244,7 @@ function TraineePicker({
                     ))}
                 </ul>
             )}
+            <SearchHint term={term} count={hits.length} searched={searched} />
             <Button type="button" size="sm" variant="link" className="justify-self-start px-0" onClick={() => setCreating(true)}>
                 Personne introuvable : créer le stagiaire
             </Button>

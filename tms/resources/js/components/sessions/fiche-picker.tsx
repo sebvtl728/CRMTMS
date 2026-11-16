@@ -1,3 +1,4 @@
+import { pickOnEnter, SearchHint } from '@/components/sessions/search-hits';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useEffect, useState } from 'react';
@@ -9,7 +10,8 @@ export interface Picked {
 
 /**
  * Search in the CRM (identity only, whole organisme): entreprises or people,
- * via the dossier endpoints.
+ * via the dossier endpoints. The text typed is only a search: a result must
+ * be clicked (or Enter on the result of that name, or the only one).
  */
 export function FichePicker({
     id,
@@ -28,8 +30,10 @@ export function FichePicker({
 }) {
     const [term, setTerm] = useState('');
     const [hits, setHits] = useState<Picked[]>([]);
+    const [searched, setSearched] = useState(false);
 
     useEffect(() => {
+        setSearched(false);
         if (term.trim().length < 2) {
             setHits([]);
             return;
@@ -44,6 +48,7 @@ export function FichePicker({
             })
                 .then((r) => (r.ok ? r.json() : null))
                 .then((json) => {
+                    setSearched(true);
                     if (kind === 'organisation') {
                         setHits((json?.entreprises ?? []) as Picked[]);
                     } else {
@@ -83,7 +88,14 @@ export function FichePicker({
 
     return (
         <div className="grid gap-1">
-            <Input id={id} type="search" value={term} onChange={(e) => setTerm(e.target.value)} placeholder={placeholder} />
+            <Input
+                id={id}
+                type="search"
+                value={term}
+                onChange={(e) => setTerm(e.target.value)}
+                onKeyDown={(e) => pickOnEnter(e, term, hits, (h) => h.label, onPick)}
+                placeholder={placeholder}
+            />
             {hits.length > 0 && (
                 <ul className="grid gap-1 rounded-md border p-1 text-sm">
                     {hits.map((h) => (
@@ -95,6 +107,7 @@ export function FichePicker({
                     ))}
                 </ul>
             )}
+            <SearchHint term={term} count={hits.length} searched={searched} />
         </div>
     );
 }
