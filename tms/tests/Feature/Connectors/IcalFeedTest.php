@@ -175,7 +175,8 @@ it('only lists the dated meetings and calls of its owner from 30 days back to 18
         ->and($events[1]['UID'])->toBe($kept->id);
 });
 
-it('keeps the das visibility of its owner', function () {
+// The responsible always sees his own actions, even out of his DAS (« Confier à… », 0.7.1).
+it('lists the own meetings of a responsable das, even out of his das', function () {
     $this->travelTo(icalAt('2026-11-18 10:00:00'));
     $mine = crmItem(ReferenceList::Das, 'Hôtellerie-restauration');
     $other = crmItem(ReferenceList::Das, 'Métiers supports');
@@ -190,7 +191,7 @@ it('keeps the das visibility of its owner', function () {
 
     $events = icalEvents($this->get(feedPath(CalendarToken::issue($responsable)))->assertOk()->getContent());
 
-    expect(array_column($events, 'SUMMARY'))->toBe(['Rendez-vous physique – Visible']);
+    expect(array_column($events, 'SUMMARY'))->toBe(['Rendez-vous physique – Visible', 'Rendez-vous physique – Cachée']);
 });
 
 it('escapes special characters and line breaks (RFC 5545)', function () {

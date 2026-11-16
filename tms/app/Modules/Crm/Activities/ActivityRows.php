@@ -62,22 +62,36 @@ final class ActivityRows
 
     /**
      * Same rule as ActivityPolicy::update / delete: in the scope of the
-     * right, never on a trashed fiche.
+     * right, never on a trashed fiche. fiche_visible: the viewer may open
+     * the page the action leads to (its opportunity, else its person, else
+     * its entreprise); an action handed to him may hang on a fiche he does
+     * not see (« Confier à… »): its name is then shown without a link.
      *
      * @param  Collection<int, Activity>  $activities
-     * @return array<string, array{can_update: bool, can_delete: bool}>
+     * @return array<string, array{can_update: bool, can_delete: bool, fiche_visible: bool}>
      */
     public static function rights(Collection $activities, User $user): array
     {
         $activities->loadMissing(['organisation:id,deleted_at', 'person:id,deleted_at', 'opportunity.organisation:id,deleted_at', 'opportunity.person:id,deleted_at']);
         $update = CrmVisibility::allowedIds($user, Permissions::ACTIVITIES_UPDATE, $activities);
         $delete = CrmVisibility::allowedIds($user, Permissions::ACTIVITIES_DELETE, $activities);
+        $visible = fn (string $permission, string $relation): array => CrmVisibility::allowedIds(
+            $user, $permission, new Collection($activities->map(fn (Activity $a) => $a->getRelation($relation))->filter()->unique('id')->values()->all()));
+        $opportunities = $visible(Permissions::OPPORTUNITIES_VIEW, 'opportunity');
+        $people = $visible(Permissions::FICHES_VIEW, 'person');
+        $organisations = $visible(Permissions::FICHES_VIEW, 'organisation');
 
         $rights = [];
         foreach ($activities as $activity) {
             $id = (string) $activity->id;
             $live = ! $activity->ficheTrashed();
-            $rights[$id] = ['can_update' => $live && isset($update[$id]), 'can_delete' => $live && isset($delete[$id])];
+            $fiche = match (true) {
+                $activity->opportunity_id !== null => isset($opportunities[$activity->opportunity_id]),
+                $activity->person_id !== null => isset($people[$activity->person_id]),
+                $activity->organisation_id !== null => isset($organisations[$activity->organisation_id]),
+                default => false,
+            };
+            $rights[$id] = ['can_update' => $live && isset($update[$id]), 'can_delete' => $live && isset($delete[$id]), 'fiche_visible' => $live && $fiche];
         }
 
         return $rights;

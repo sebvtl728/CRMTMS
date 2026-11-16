@@ -8,11 +8,13 @@ Route::middleware(['auth', 'can:crm.import'])->prefix('crm/import')->name('crm.i
     Route::get('/', [ImportController::class, 'index'])->name('index');
     Route::get('new', [ImportController::class, 'create'])->name('create');
     Route::post('/', [ImportController::class, 'store'])->middleware('throttle:import-upload')->name('store');
+    Route::get('template/{target}', [ImportController::class, 'template'])->name('template');
 
     Route::prefix('{batch}')->whereUuid('batch')->group(function () {
         Route::get('/', [ImportController::class, 'show'])->name('show');
         // Polled by the progress page: generous but bounded.
         Route::get('status', [ImportController::class, 'status'])->middleware('throttle:import-status')->name('status');
+        Route::delete('/', [ImportController::class, 'destroy'])->name('destroy');
         Route::get('mapping', [ImportController::class, 'mapping'])->name('mapping');
         Route::put('mapping', [ImportController::class, 'saveMapping'])->name('mapping.save');
         Route::get('values', [ImportController::class, 'values'])->name('values');

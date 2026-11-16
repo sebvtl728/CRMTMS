@@ -44,6 +44,9 @@ class ActivityController extends Controller
 
         return response()->json([
             ...self::choices(),
+            // « Attribuer à »: active users, the author by default.
+            'responsibles' => FormOptions::responsible(),
+            'responsible_user_id' => $user->id,
             'context' => [
                 'organisation' => $organisation === null ? null : ['id' => $organisation->id, 'name' => $organisation->name],
                 'person' => $person === null ? null : ['id' => $person->id, 'name' => $person->fullName()],
@@ -95,9 +98,23 @@ class ActivityController extends Controller
 
     public function update(ActivityRequest $request, Activity $activity): RedirectResponse
     {
-        DB::transaction(fn () => $activity->fill($request->values())->save());
+        $this->recorder->update($activity, $request->values());
 
         return back()->with('status', 'Action modifiée.');
+    }
+
+    /**
+     * « Confier à… »: another responsible, told by e-mail (not oneself).
+     */
+    public function assign(AssignRequest $request, Activity $activity): JsonResponse|RedirectResponse
+    {
+        $this->recorder->assign($activity, $request->responsibleId(), $request->message());
+        $name = User::query()->whereKey($activity->responsible_user_id)->value('name');
+        $status = 'Action confiée à '.(is_string($name) ? $name : 'un collègue').'.';
+
+        return $request->expectsJson()
+            ? response()->json(['status' => $status])
+            : back()->with('status', $status);
     }
 
     public function postpone(PostponeRequest $request, Activity $activity): RedirectResponse

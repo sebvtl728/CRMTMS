@@ -1,4 +1,4 @@
-import { WizardPage, type BatchSummary } from '@/components/crm/import-wizard';
+import { AbandonButton, WizardPage, type BatchSummary } from '@/components/crm/import-wizard';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -155,6 +155,11 @@ export default function ImportProgress(props: ProgressProps) {
                     {progress.percent !== null ? ` (${progress.percent} %)` : ''}
                 </p>
                 <p className="text-muted-foreground text-xs">{text.hint}</p>
+                {batch.status.value === 'simulating' && (
+                    <div>
+                        <AbandonButton batchId={batch.id} />
+                    </div>
+                )}
             </div>
 
             <Dialog open={confirming} onOpenChange={setConfirming}>

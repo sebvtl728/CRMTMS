@@ -225,7 +225,8 @@ Le bouton **+ Action** (en haut de chaque écran du CRM, et sur les fiches et op
 - l'**objet** est facultatif (par défaut « Type – fiche ») ;
 - **Motif** (pourquoi l'appel ou le rendez-vous) et **Suite à donner** : deux textes facultatifs (2 000 caractères chacun), modifiables ensuite avec **Modifier**, **Fait** et le **Compte rendu de RDV** ; le motif s'affiche sous l'objet dans **À faire** (sur une ligne, **Voir tout** pour le texte entier) et dans le planning, les deux dans l'historique des fiches et les actions d'une opportunité ; le motif est repris dans l'évènement Outlook, jamais la suite à donner ni le compte rendu. Comme le compte rendu, ils sont masqués dans le journal et effacés par l'anonymisation ;
 - **Fait maintenant** (coché par défaut) enregistre un échange qui vient d'avoir lieu, avec son **résultat** et son **compte rendu** ; décoché, l'action est **à faire** le jour et à l'heure choisis (une date sans heure = 9 h) ;
-- **Prochaine relance** : **Demain**, **Dans 1 semaine**, **Dans 1 mois** ou une date, et un type (Rappel par défaut) : une action à faire est créée sur les mêmes fiches, pour le même responsable.
+- **Prochaine relance** : **Demain**, **Dans 1 semaine**, **Dans 1 mois** ou une date, et un type (Rappel par défaut) : une action à faire est créée sur les mêmes fiches, pour le même responsable ;
+- **Attribuer à** : le responsable de l'action, vous par défaut ; choisissez un autre utilisateur actif de l'organisme (quel que soit son rôle) pour la lui confier dès la création (voir « Confier une action » ci-dessous).
 
 Une action faite met à jour la date de **dernier contact** de la fiche. Une action ne peut pas être datée « faite » dans le futur.
 
@@ -236,10 +237,20 @@ Une action faite met à jour la date de **dernier contact** de la fiche. Une act
 - **Fait** ouvre la fenêtre de compte rendu (résultat, motif, compte rendu, suite à donner, prochaine relance) ;
 - **Reporter** : **Demain**, **Dans 1 semaine** ou une date (une date seule = 9 h) ;
 - **Modifier** ouvre la fenêtre de l'action (type, objet, échéance et heure, durée, lieu, responsable ; les fiches concernées ne changent pas) : le même bouton figure dans le planning, l'historique des fiches et les actions d'une opportunité ;
-- **Ouvrir la fiche** ;
+- **Confier à…** (voir ci-dessous) ;
+- **Ouvrir la fiche** (absent si vous n'avez pas accès à la fiche : son nom seul est affiché) ;
 - **Équipe** (direction et administrateur) affiche les actions de toute l'équipe.
 
 Le nombre affiché à côté de **À faire** dans le menu (en retard + aujourd'hui) se met à jour dans la minute.
+
+### Confier une action à un collègue
+
+**Confier à…** (dans **À faire**, l'historique des fiches et les actions d'une opportunité, sur une action à faire) ouvre une petite fenêtre : choisissez l'utilisateur (tout utilisateur actif de l'organisme) et, si vous le souhaitez, un **message** (500 caractères au plus). Il faut le droit de **modifier** l'action (`crm.activities.update` et son périmètre) ; le champ **Responsable** de **Modifier** et **Attribuer à** à la création font de même.
+
+- Le nouveau responsable reçoit un **e-mail** (modèle « Action confiée », paramétrable par l'administrateur) : qui la confie, type, objet, échéance, motif, votre message et un lien qui ouvre l'action dans **À faire**. Jamais le compte rendu ni la suite à donner. Pas d'e-mail quand vous vous confiez l'action à vous-même, quand le responsable ne change pas, ni pour une action déjà faite.
+- Il **voit toujours** l'action (À faire, compteur du menu, planning, agenda) et peut la réaliser ou la modifier, même si la fiche ou l'opportunité est hors de son périmètre : il n'en voit alors que le nom, sans pouvoir l'ouvrir (le lien de son agenda ouvre l'action dans « À faire »). Avec le périmètre « Ses DAS », les actions dont on est responsable sont couvertes pour les consulter et les modifier, pas pour les supprimer.
+- L'action quitte votre **À faire** ; l'historique de la fiche indique « Action confiée à X par Y ».
+- Si l'agenda Outlook est relié, le rendez-vous quitte l'agenda de l'ancien responsable et rejoint celui du nouveau.
 
 ### Récapitulatif quotidien par e-mail
 
@@ -310,6 +321,8 @@ L'import (menu **Imports**) charge des fiches depuis un fichier **Excel (.xlsx)*
 
 ### Étape 1 : Déposer le fichier
 
+Une fois le type choisi, **Télécharger le modèle Excel** fournit un classeur prêt à remplir : l'onglet **Données** porte les colonnes attendues (reconnues automatiquement à l'étape suivante) et une **ligne d'exemple fictive** marquée « Exemple — à supprimer » (si vous la laissez, elle est ignorée à l'import, motif « Ligne d'exemple du modèle ignorée ») ; l'onglet **Listes** donne les valeurs actives de vos listes (origines, DAS, secteurs…).
+
 Choisissez ce que contient votre fichier :
 
 - **Entreprises** : une ligne par entreprise ;
@@ -322,7 +335,13 @@ Déposez le fichier (CSV avec séparateur `;`, `,` ou tabulation, en UTF-8 ou en
 
 ### Étape 2 : Associer les colonnes
 
-Pour chaque colonne du fichier, indiquez le champ du TMS correspondant, ou **Ignorer**. L'écran devine les associations d'après les titres de colonnes ; il indique les **champs obligatoires** manquants et prévient si une colonne est vide dans les 5 premières lignes. Vous pouvez enregistrer l'association sous un nom de **profil** : au prochain fichier du même format, les colonnes seront déjà associées. Puis **Continuer : analyser le fichier**.
+Pour chaque colonne du fichier, indiquez le champ du TMS correspondant, ou **Ignorer**. L'écran propose les associations et indique sous chaque liste pourquoi (le texte disparaît dès que vous changez la valeur) :
+
+- **Proposé : choix précédent** : l'organisme a déjà associé (ou ignoré) une colonne de même titre pour ce type d'import ; seuls les choix délibérés sont mémorisés à la validation (un champ choisi ou changé, une proposition d'après l'en-tête gardée, une proposition remplacée par **Ignorer**), jamais une proposition d'après le contenu laissée telle quelle ni une colonne laissée sur **Ignorer** sans proposition ; ce choix passe avant tout le reste ;
+- **Proposé d'après l'en-tête** : le titre est celui d'un champ ou un synonyme connu, ou il s'en approche (« Tél portable contact » → Mobile, « CP » → Code postal, « Raison sociale client » → Raison sociale ; les abréviations courantes sont comprises, les petits mots comme « de », « client », « contact » ignorés) ;
+- **Proposé d'après le contenu** : au moins 3 cellules remplies parmi les 50 premières lignes non vides, dont 80 % ont la forme attendue (e-mail, mobile ou téléphone français — y compris sans le 0 initial retiré par Excel —, code postal, SIRET valide, date de l'échange pour les notes, site web, civilité). Une colonne de dates n'est jamais proposée comme date de naissance d'après son contenu. Les valeurs ne sont lues que pour cette proposition, jamais conservées.
+
+Chaque champ n'est proposé qu'une fois, à la colonne la plus sûre ; une colonne qui ressemble autant à deux champs reste sur **Ignorer**. Un profil choisi au dépôt, ou une association déjà enregistrée pour ce fichier, est repris tel quel, sans proposition. L'écran indique les **champs obligatoires** manquants et prévient si une colonne est vide dans les 5 premières lignes. Vous pouvez enregistrer l'association sous un nom de **profil** : au prochain fichier du même format, les colonnes seront déjà associées. Puis **Continuer : analyser le fichier**.
 
 ### Étape 3 : Associer les valeurs (si besoin)
 
@@ -353,6 +372,10 @@ L'import ne modifie que les fiches que vous pouvez vous-même modifier (votre p�
 ### Étape 6 : Rapport
 
 Le **Rapport d'import** donne les totaux (fiches créées, mises à jour, ignorées, lignes en erreur) et un fichier **Télécharger le rapport (Excel)** avec le sort de chaque ligne et la raison des erreurs. Corrigez les lignes en erreur dans votre fichier et réimportez-le : les fiches déjà créées ne sont pas dupliquées.
+
+### Abandonner un import
+
+Tant qu'un import **n'a pas été lancé** (fichier déposé, simulation en cours ou import prêt), le bouton **Abandonner** (dans **Imports** et sur les écrans Colonnes, Valeurs et Simulation) le supprime **définitivement** après confirmation : fichier, correspondance et lignes disparaissent, l'import n'apparaît plus dans la liste, et aucune fiche n'est touchée. Seul l'auteur de l'import (ou qui voit tous les imports) peut l'abandonner. Une fois l'import lancé, il n'y a plus d'abandon : utilisez **Annuler l'import** ci-dessous. L'abandon est inscrit au journal d'audit (type de données, jamais le contenu du fichier).
 
 ### Annuler un import
 

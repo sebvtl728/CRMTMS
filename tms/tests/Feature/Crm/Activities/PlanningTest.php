@@ -169,7 +169,8 @@ it('shows the planning of a colleague only to direction and admin', function () 
         ->assertInertia(fn ($p) => $p->where('user', $other->id)->where('days.3.items.0.subject', 'RDV de l\'autre'));
 });
 
-it('keeps the das visibility of the viewer in the planning', function () {
+// The responsible always sees his own actions, even out of his DAS (« Confier à… », 0.7.1).
+it('shows a responsable das his own meetings in the planning, even out of his das', function () {
     $this->travelTo(planAt('2026-11-18 10:00:00'));
     $mine = crmItem(ReferenceList::Das, 'Hôtellerie-restauration');
     $other = crmItem(ReferenceList::Das, 'Métiers supports');
@@ -184,7 +185,8 @@ it('keeps the das visibility of the viewer in the planning', function () {
     planAction($responsable, 'Rendez-vous physique', '2026-11-19 10:00:00', ['subject' => 'Caché', 'organisation_id' => $hidden->id]);
 
     $this->actingAs($responsable)->get('/crm/planning')->assertOk()
-        ->assertInertia(fn ($p) => $p->has('days.3.items', 1)->where('days.3.items.0.subject', 'Visible'));
+        ->assertInertia(fn ($p) => $p->has('days.3.items', 2)->where('days.3.items.0.subject', 'Visible')->where('days.3.items.1.subject', 'Caché')
+            ->where('days.3.items.0.fiche_visible', true)->where('days.3.items.1.fiche_visible', false));
 });
 
 it('asks guests to sign in', function () {

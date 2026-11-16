@@ -125,12 +125,13 @@ Autres garanties (non paramétrables) : mots de passe Argon2id d'au moins 12 car
 
 ### Modèles d'e-mails
 
-Administration › **Modèles d'e-mails** (droit `settings.manage`, celui de l'écran Sécurité : l'administrateur par défaut). Cinq e-mails sont modifiables (objet de 200 caractères au plus, texte brut de 10 000 caractères au plus) :
+Administration › **Modèles d'e-mails** (droit `settings.manage`, celui de l'écran Sécurité : l'administrateur par défaut). Six e-mails sont modifiables (objet de 200 caractères au plus, texte brut de 10 000 caractères au plus) :
 
 - **Envoi d'un devis** et **Relance d'un devis** : proposés dans la fenêtre d'envoi, toujours modifiables au cas par cas avant l'envoi ; le PDF est joint par le système.
 - **Envoi d'une plaquette** (modèle `brochure`) : proposé dans la fenêtre « Envoyer une plaquette » (variables `{destinataire}`, `{commercial}`, `{organisme}`), toujours modifiable avant l'envoi ; les plaquettes choisies sont jointes par le système (20 Mo au plus en tout), le message part en texte simple. Droits : envoyer demande `crm.activities.update`, télécharger une version depuis l'historique `catalogue.view`.
 - **Invitation d'un utilisateur** : votre texte (la première ligne sert de formule d'appel) ; le bouton d'activation, la durée de validité du lien et la mention « Si vous n'attendiez pas cette invitation » sont toujours ajoutés.
 - **Récapitulatif quotidien des relances** : le texte avant `{actions}` sert d'introduction, celui après de signature ; la liste des actions et le lien vers « À faire » restent générés. `{actions}` est obligatoire.
+- **Action confiée** (modèle `activity_assigned`) : envoyé à l'utilisateur à qui une action à faire est confiée (« Attribuer à » à la création, « Confier à… » ou « Modifier »), jamais à celui qui la confie. Variables `{auteur}`, `{type}`, `{objet}`, `{echeance}` (« 20/11/2026 à 09:00 », heure de Paris), `{motif}` (« — » s'il est vide), `{message}` (message facultatif de « Confier à… », vide sinon) et `{lien}` (obligatoire : ouvre l'action dans « À faire »). Le compte rendu et la suite à donner n'y figurent jamais.
 
 Chaque modèle liste ses **variables** (`{numero_devis}`, `{societe}`, `{destinataire}`, `{montant_ttc}`, `{date_validite}`, `{commercial}`, `{organisme}`, `{prenom_utilisateur}`…) : un clic les insère à l'endroit du curseur. Une variable inconnue ou une accolade mal formée est refusée à l'enregistrement. Rien n'est interprété comme du code : chaque `{variable}` est simplement remplacée par sa valeur, en texte (échappée dans les e-mails HTML). **Aperçu** montre le résultat avec des données d'exemple ; **Envoyer un e-mail de test** l'envoie à votre adresse par la messagerie de l'organisme (objet préfixé « [Test] », 10 par minute au plus) ; **Rétablir le modèle par défaut** reprend le texte du TMS. Les e-mails de sécurité (réinitialisation du mot de passe, double authentification, alertes d'exploitation) sont affichés en lecture seule (« modèle système »). Les modèles sont propres à chaque organisme et journalisés.
 
@@ -189,7 +190,7 @@ Les droits d'**administration** (`users.manage`, `roles.manage`, `companies.mana
 Les droits **Consulter**, **Créer et modifier**, **Supprimer** des quatre domaines, ainsi que « Consulter le chiffre d'affaires », ont un **périmètre**, réglé par une liste à côté de la case :
 
 - **Ses fiches** : uniquement ce dont l'utilisateur est le **responsable** ou le **créateur** (fiche, opportunité ou action). Un devis est « à soi » quand son opportunité l'est ou qu'il en est le créateur. Une fiche sans responsable créée par un collègue n'est pas visible ; celle qu'il vient de créer lui-même l'est.
-- **Ses DAS** : ce qui touche les DAS qu'il suit (**DAS suivis** de la page Utilisateurs). Sans DAS suivi, rien n'est visible.
+- **Ses DAS** : ce qui touche les DAS qu'il suit (**DAS suivis** de la page Utilisateurs). Sans DAS suivi, rien n'est visible. Pour les actions, « Ses DAS » couvre aussi celles dont il est le **responsable** (consulter et modifier, jamais supprimer), même sur une fiche hors de ses DAS.
 - **Tout l'organisme** : tout.
 
 Le périmètre d'un droit sans réglage enregistré vaut « Tout l'organisme ». Les périmètres de consultation et de modification sont indépendants : avec « Consulter : Ses DAS » et « Modifier : Tout l'organisme », une fiche hors de ses DAS reste introuvable (404), même par son adresse directe. Créer un devis (ou une nouvelle version) exige de voir son opportunité ; modifier ou supprimer un devis existant suit les périmètres des droits « Devis » eux-mêmes. Un droit détenu par une permission accordée directement à un utilisateur (hors rôle, sans écran pour le faire) vaut « Tout l'organisme ».

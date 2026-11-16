@@ -16,11 +16,15 @@ use App\Modules\Core\References\ReferenceUsage;
 use App\Modules\Core\Users\User;
 use App\Modules\Crm\Activities\ActivitiesProvider;
 use App\Modules\Crm\Activities\Activity;
+use App\Modules\Crm\Activities\ActivityAssigned;
+use App\Modules\Crm\Activities\ActivityAssignmentsProvider;
 use App\Modules\Crm\Activities\ActivityPolicy;
+use App\Modules\Crm\Activities\SendActivityAssigned;
 use App\Modules\Crm\Affiliations\Affiliation;
 use App\Modules\Crm\Brochures\BrochureSending;
 use App\Modules\Crm\Brochures\BrochureSendingsProvider;
 use App\Modules\Crm\Gdpr\Consent;
+use App\Modules\Crm\Import\HeaderChoice;
 use App\Modules\Crm\Import\ImportBatch;
 use App\Modules\Crm\Import\ImportProfile;
 use App\Modules\Crm\Import\ImportRow;
@@ -107,6 +111,7 @@ class CrmServiceProvider extends ServiceProvider
             'import_batch' => ImportBatch::class,
             'import_row' => ImportRow::class,
             'import_stamp' => ImportStamp::class,
+            'import_header_choice' => HeaderChoice::class,
             'consent' => Consent::class,
             'opportunity' => Opportunity::class,
             'opportunity_stage_change' => StageChange::class,
@@ -121,7 +126,7 @@ class CrmServiceProvider extends ServiceProvider
         ]);
 
         // Sources of the « Historique »; later increments tag their own.
-        $this->app->tag([NotesProvider::class, AttachmentsProvider::class, AuditProvider::class, OpportunitiesProvider::class, ActivitiesProvider::class, QuotesProvider::class, BrochureSendingsProvider::class, ModuleHistoryProvider::class], Timeline::TAG);
+        $this->app->tag([NotesProvider::class, AttachmentsProvider::class, AuditProvider::class, OpportunitiesProvider::class, ActivitiesProvider::class, ActivityAssignmentsProvider::class, QuotesProvider::class, BrochureSendingsProvider::class, ModuleHistoryProvider::class], Timeline::TAG);
     }
 
     public function boot(): void
@@ -133,6 +138,8 @@ class CrmServiceProvider extends ServiceProvider
         FollowedDas::registerOnUsersPage();
         Event::listen(PrimaryRoleChanged::class, FollowedDas::onRoleChanged(...));
         Event::listen(RoleScopesChanged::class, FollowedDas::onRoleScopesChanged(...));
+        // « Confier à… »: the new responsible is told by e-mail (queued, after commit).
+        Event::listen(ActivityAssigned::class, fn (ActivityAssigned $e) => SendActivityAssigned::dispatch($e->activityId, $e->byUserId, $e->message));
 
         // Check + download count together: 10 exports a minute per user.
         RateLimiter::for('crm-export', fn (Request $request) => Limit::perMinute(20)->by('crm-export:'.($request->user()?->getAuthIdentifier() ?? $request->ip()))

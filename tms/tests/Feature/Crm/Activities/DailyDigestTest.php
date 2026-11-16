@@ -101,18 +101,19 @@ it('sends nothing when there is nothing to do', function () {
     Mail::assertNothingSent();
 });
 
-it('respects the das visibility of the user', function () {
+// The responsible always sees his own actions, even out of his DAS (« Confier à… », 0.7.1).
+it('lists the own actions of a responsable das, even on a fiche out of his das', function () {
     $user = optIn(\userWithRole(Role::ResponsableDas));
     $mine = crmItem(ReferenceList::Das, 'Hôtellerie-restauration');
     $other = crmItem(ReferenceList::Das, 'Métiers supports');
     followDas($user, $mine);
     $hidden = Organisation::query()->create(['name' => 'Cachée']);
     $hidden->das()->sync([$other->id => ['tenant_id' => tenant()->id]]);
-    digestAction($user, '2026-11-16 14:30:00', ['organisation_id' => $hidden->id]);
+    digestAction($user, '2026-11-16 14:30:00', ['organisation_id' => $hidden->id, 'subject' => 'Action confiée']);
 
     Artisan::call('tms:crm:daily-digest');
 
-    Mail::assertNothingSent();
+    Mail::assertSent(DailyDigestMail::class, fn (DailyDigestMail $m) => $m->hasTo($user->email) && str_contains($m->render(), 'Action confiée'));
 });
 
 it('runs once per organisme with the users of that organisme only', function () {

@@ -22,7 +22,8 @@ export interface QuickActionContext {
 type QuickActionRequest =
     | { mode: 'create'; context: QuickActionContext }
     | { mode: 'complete'; activityId: string }
-    | { mode: 'edit'; activityId: string };
+    | { mode: 'edit'; activityId: string }
+    | { mode: 'assign'; activityId: string };
 
 const OPEN_EVENT = 'crm:quick-action';
 /** Dispatched on window once an action was saved (histories reload). */
@@ -41,6 +42,11 @@ export function completeActivity(activityId: string): void {
 /** Opens the « Modifier » dialog of an action (to do or done). */
 export function editActivity(activityId: string): void {
     window.dispatchEvent(new CustomEvent<QuickActionRequest>(OPEN_EVENT, { detail: { mode: 'edit', activityId } }));
+}
+
+/** Opens the « Confier à… » dialog of an action. */
+export function assignActivity(activityId: string): void {
+    window.dispatchEvent(new CustomEvent<QuickActionRequest>(OPEN_EVENT, { detail: { mode: 'assign', activityId } }));
 }
 
 export interface TypeOption extends Option {
@@ -163,6 +169,7 @@ export function QuickActionDialog() {
                 {request?.mode === 'create' && <CreateForm key={JSON.stringify(request.context)} context={request.context} onDone={close} />}
                 {request?.mode === 'complete' && <CompleteForm key={request.activityId} activityId={request.activityId} onDone={close} />}
                 {request?.mode === 'edit' && <EditForm key={request.activityId} activityId={request.activityId} onDone={close} />}
+                {request?.mode === 'assign' && <AssignForm key={request.activityId} activityId={request.activityId} onDone={close} />}
             </DialogContent>
         </Dialog>
     );
@@ -195,10 +202,11 @@ type CreateFields = {
     location: string;
     next_type_id: string;
     next_due_at: string;
+    responsible_user_id: string;
 };
 
 function CreateForm({ context, onDone }: { context: QuickActionContext; onDone: () => void }) {
-    const [choices, setChoices] = useState<Choices | null>(null);
+    const [choices, setChoices] = useState<(Choices & { responsibles: Option[] }) | null>(null);
     const [failed, setFailed] = useState(false);
     const [fiches, setFiches] = useState<{ organisation: Fiche | null; person: Fiche | null; opportunity: Fiche | null }>({
         organisation: null,
@@ -222,6 +230,7 @@ function CreateForm({ context, onDone }: { context: QuickActionContext; onDone: 
         location: '',
         next_type_id: '',
         next_due_at: '',
+        responsible_user_id: '',
     });
 
     useEffect(() => {
@@ -229,9 +238,11 @@ function CreateForm({ context, onDone }: { context: QuickActionContext; onDone: 
         if (context.organisation_id) params.set('organisation', context.organisation_id);
         if (context.person_id) params.set('person', context.person_id);
         if (context.opportunity_id) params.set('opportunity', context.opportunity_id);
-        getJson<Choices & { context: typeof fiches }>(`${route('crm.activities.options')}?${params}`)
+        getJson<Choices & { context: typeof fiches; responsibles: Option[]; responsible_user_id: string }>(
+            `${route('crm.activities.options')}?${params}`,
+        )
             .then((json) => {
-                setChoices({ types: json.types, results: json.results });
+                setChoices({ types: json.types, results: json.results, responsibles: json.responsibles });
                 setFiches(json.context);
                 const call = json.types.find((t) => t.code === 'appel') ?? json.types[0];
                 setData((current) => ({
@@ -240,6 +251,7 @@ function CreateForm({ context, onDone }: { context: QuickActionContext; onDone: 
                     organisation_id: json.context.organisation?.id ?? '',
                     person_id: json.context.person?.id ?? '',
                     opportunity_id: json.context.opportunity?.id ?? '',
+                    responsible_user_id: json.responsible_user_id,
                 }));
             })
             .catch(() => setFailed(true));
@@ -427,6 +439,23 @@ function CreateForm({ context, onDone }: { context: QuickActionContext; onDone: 
             )}
 
             <NextStepsField value={data.next_steps} onChange={(v) => setData('next_steps', v)} error={errors.next_steps} />
+
+            <div className="grid gap-2">
+                <Label htmlFor="qa-responsible">Attribuer à</Label>
+                <Select value={data.responsible_user_id} onValueChange={(v) => setData('responsible_user_id', v)}>
+                    <SelectTrigger id="qa-responsible">
+                        <SelectValue placeholder="—" />
+                    </SelectTrigger>
+                    <SelectContent>
+                        {choices.responsibles.map((u) => (
+                            <SelectItem key={u.value} value={u.value}>
+                                {u.label}
+                            </SelectItem>
+                        ))}
+                    </SelectContent>
+                </Select>
+                <InputError message={errors.responsible_user_id} />
+            </div>
 
             {data.done && (
                 <NextFollowUp
@@ -849,6 +878,101 @@ function EditForm({ activityId, onDone }: { activityId: string; onDone: () => vo
                 <Button type="submit" disabled={processing || !data.type_id}>
                     {processing && <LoaderCircle className="h-4 w-4 animate-spin" />}
                     Enregistrer
+                </Button>
+            </DialogFooter>
+        </form>
+    );
+}
+
+const MAX_ASSIGN_MESSAGE = 500;
+
+/**
+ * « Confier à… »: another active user of the organisme becomes responsible
+ * for the action and is told by e-mail (not oneself), with an optional message.
+ */
+function AssignForm({ activityId, onDone }: { activityId: string; onDone: () => void }) {
+    const [loaded, setLoaded] = useState<{ activity: ActivityData; responsibles: Option[] } | null>(null);
+    const [failed, setFailed] = useState(false);
+    const { data, setData, put, processing, errors } = useForm({ responsible_user_id: '', message: '' });
+
+    useEffect(() => {
+        getJson<{ activity: ActivityData; responsibles: Option[] }>(route('crm.activities.show', activityId))
+            .then((json) => setLoaded(json))
+            .catch(() => setFailed(true));
+    }, [activityId]);
+
+    const submit: FormEventHandler = (e) => {
+        e.preventDefault();
+        put(route('crm.activities.assign', activityId), {
+            preserveScroll: true,
+            preserveState: true,
+            onSuccess: () => {
+                saved();
+                onDone();
+            },
+        });
+    };
+
+    if (failed) return <p role="alert">L’action n’a pas pu être chargée.</p>;
+    if (loaded === null) {
+        return (
+            <p role="status" className="text-muted-foreground flex items-center gap-2 text-sm">
+                <LoaderCircle className="h-4 w-4 animate-spin" />
+                Chargement…
+            </p>
+        );
+    }
+
+    const others = loaded.responsibles.filter((u) => u.value !== loaded.activity.responsible_user_id);
+
+    return (
+        <form onSubmit={submit} className="grid gap-4" noValidate>
+            <DialogHeader>
+                <DialogTitle>Confier l’action</DialogTitle>
+                <DialogDescription>
+                    {loaded.activity.subject}
+                    {loaded.activity.due_at && ` · prévue le ${formatDateTime(loaded.activity.due_at)}`}
+                </DialogDescription>
+            </DialogHeader>
+            <div className="grid gap-2">
+                <Label htmlFor="qa-assign-user">Confier à *</Label>
+                <Select value={data.responsible_user_id} onValueChange={(v) => setData('responsible_user_id', v)}>
+                    <SelectTrigger id="qa-assign-user">
+                        <SelectValue placeholder="Choisissez un utilisateur" />
+                    </SelectTrigger>
+                    <SelectContent>
+                        {others.map((u) => (
+                            <SelectItem key={u.value} value={u.value}>
+                                {u.label}
+                            </SelectItem>
+                        ))}
+                    </SelectContent>
+                </Select>
+                <InputError message={errors.responsible_user_id} />
+            </div>
+            <div className="grid gap-2">
+                <Label htmlFor="qa-assign-message">Message (facultatif)</Label>
+                <textarea
+                    id="qa-assign-message"
+                    rows={3}
+                    maxLength={MAX_ASSIGN_MESSAGE}
+                    value={data.message}
+                    onChange={(e) => setData('message', e.target.value)}
+                    className="border-input bg-background focus:ring-ring w-full rounded-md border px-3 py-2 text-sm focus:ring-2 focus:outline-hidden"
+                />
+                <p className="text-muted-foreground text-xs">
+                    Envoyé par e-mail avec l’action (type, objet, échéance, motif), jamais le compte rendu. {data.message.length} /{' '}
+                    {MAX_ASSIGN_MESSAGE}
+                </p>
+                <InputError message={errors.message} />
+            </div>
+            <DialogFooter>
+                <Button type="button" variant="outline" onClick={onDone}>
+                    Annuler
+                </Button>
+                <Button type="submit" disabled={processing || data.responsible_user_id === ''}>
+                    {processing && <LoaderCircle className="h-4 w-4 animate-spin" />}
+                    Confier
                 </Button>
             </DialogFooter>
         </form>

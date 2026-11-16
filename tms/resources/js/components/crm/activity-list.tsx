@@ -1,9 +1,9 @@
-import { ACTIVITY_SAVED_EVENT, completeActivity, editActivity } from '@/components/crm/quick-action';
+import { ACTIVITY_SAVED_EVENT, assignActivity, completeActivity, editActivity } from '@/components/crm/quick-action';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { formatDateTime } from '@/lib/crm';
 import { router } from '@inertiajs/react';
-import { Check, Pencil } from 'lucide-react';
+import { Check, Pencil, UserRoundPlus } from 'lucide-react';
 import { useEffect } from 'react';
 
 export interface ActivityRow {
@@ -92,6 +92,18 @@ export function ActivityList({ activities }: { activities: ActivityRow[] }) {
                                 <Pencil className="h-4 w-4" />
                                 Modifier
                             </Button>
+                            {a.status !== 'done' && (
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => assignActivity(a.id)}
+                                    aria-label={`Confier l’action ${a.subject}`}
+                                >
+                                    <UserRoundPlus className="h-4 w-4" />
+                                    Confier à…
+                                </Button>
+                            )}
                         </div>
                     )}
                 </li>

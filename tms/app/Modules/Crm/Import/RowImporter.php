@@ -111,7 +111,7 @@ final class RowImporter
      */
     public function blockingErrors(): array
     {
-        return $this->batch->target->blockingProblems($this->map, $this->sourceSystem);
+        return $this->batch->target->blockingProblems($this->map, $this->sourceSystem, fn () => $this->batch->identifiersFilled($this->map));
     }
 
     /**
@@ -186,6 +186,10 @@ final class RowImporter
      */
     public function import(int $line, array $row, bool $isolated = true): RowOutcome
     {
+        if (ImportTemplate::isExample($row)) {
+            return (new RowOutcome(ImportRow::SKIPPED))->add('info', ImportTemplate::EXAMPLE_SKIPPED);
+        }
+
         [$values, $errors, $warnings] = $this->read($row);
 
         if ($errors !== []) {

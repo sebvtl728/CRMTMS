@@ -1,5 +1,5 @@
 import { ActivityNotes } from '@/components/crm/activity-notes';
-import { completeActivity, editActivity, shiftDay } from '@/components/crm/quick-action';
+import { assignActivity, completeActivity, editActivity, shiftDay } from '@/components/crm/quick-action';
 import Heading from '@/components/heading';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -10,8 +10,8 @@ import { formatDateTime, todayIso } from '@/lib/crm';
 import { cn } from '@/lib/utils';
 import { type BreadcrumbItem } from '@/types';
 import { Head, Link, router } from '@inertiajs/react';
-import { CalendarClock, Check, ExternalLink, Pencil, Users } from 'lucide-react';
-import { useState } from 'react';
+import { CalendarClock, Check, ExternalLink, Pencil, UserRoundPlus, Users } from 'lucide-react';
+import { useEffect, useState } from 'react';
 
 interface Fiche {
     id: string;
@@ -31,8 +31,10 @@ interface TodoRow {
     organisation: Fiche | null;
     person: Fiche | null;
     opportunity: Fiche | null;
-    /** « Fait », « Reporter » and « Modifier »: scope of crm.activities.update. */
+    /** « Fait », « Reporter », « Modifier » and « Confier à… »: scope of crm.activities.update. */
     can_update: boolean;
+    /** The viewer may open the fiche (an action handed to him may hang on a fiche out of his scope). */
+    fiche_visible: boolean;
 }
 
 interface TodoProps {
@@ -124,7 +126,7 @@ function Postpone({ activityId }: { activityId: string }) {
 }
 
 function TodoItem({ row, canEdit, team }: { row: TodoRow; canEdit: boolean; team: boolean }) {
-    const url = ficheUrl(row);
+    const url = row.fiche_visible ? ficheUrl(row) : null;
     const fiches = [row.organisation, row.person, row.opportunity].filter((f): f is Fiche => f !== null);
 
     return (
@@ -162,6 +164,16 @@ function TodoItem({ row, canEdit, team }: { row: TodoRow; canEdit: boolean; team
                             <Pencil className="h-4 w-4" />
                             Modifier
                         </Button>
+                        <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={() => assignActivity(row.id)}
+                            aria-label={`Confier l’action ${row.subject}`}
+                        >
+                            <UserRoundPlus className="h-4 w-4" />
+                            Confier à…
+                        </Button>
                     </>
                 )}
                 {url && (
@@ -180,6 +192,15 @@ function TodoItem({ row, canEdit, team }: { row: TodoRow; canEdit: boolean; team
 export default function Todo({ sections, team, can_team, can_edit, status }: TodoProps) {
     const toggleTeam = () => router.get(route('crm.todo'), team ? {} : { team: 1 }, { preserveState: true, replace: true });
     const total = sections.overdue.length + sections.today.length + sections.week.length;
+
+    // Link of the « Action confiée » e-mail (?action=…): opens the action.
+    useEffect(() => {
+        const id = new URLSearchParams(window.location.search).get('action');
+        if (!id) return;
+        const timer = window.setTimeout(() => editActivity(id), 0);
+
+        return () => window.clearTimeout(timer);
+    }, []);
 
     return (
         <AppLayout breadcrumbs={breadcrumbs}>

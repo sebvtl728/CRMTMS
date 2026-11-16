@@ -1,5 +1,5 @@
 import { SendingStatus, SentTitles, type SentBrochure } from '@/components/crm/brochure-send';
-import { ACTIVITY_SAVED_EVENT, completeActivity, editActivity } from '@/components/crm/quick-action';
+import { ACTIVITY_SAVED_EVENT, assignActivity, completeActivity, editActivity } from '@/components/crm/quick-action';
 import InputError from '@/components/input-error';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -19,6 +19,7 @@ import {
     Pencil,
     StickyNote,
     Trash2,
+    UserRoundPlus,
 } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
@@ -56,6 +57,7 @@ function EntryIcon({ type }: { type: string }) {
     if (type === 'attachment') return <Paperclip className={cls} aria-hidden />;
     if (type === 'opportunity') return <Handshake className={cls} aria-hidden />;
     if (type === 'activity') return <ClipboardCheck className={cls} aria-hidden />;
+    if (type === 'activity_assigned') return <UserRoundPlus className={cls} aria-hidden />;
     if (type === 'quote') return <FileText className={cls} aria-hidden />;
     if (type === 'brochure_sending') return <Paperclip className={cls} aria-hidden />;
     if (type === 'dossier') return <FolderOpen className={cls} aria-hidden />;
@@ -336,6 +338,19 @@ export function Timeline({ kind, subjectId, canEdit }: Props) {
                                 >
                                     <Check className="h-4 w-4" />
                                     Fait
+                                </Button>
+                            )}
+                            {entry.type === 'activity' && entry.meta.can_update === true && entry.meta.status !== 'done' && entry.meta.id && (
+                                <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-8 w-8 shrink-0"
+                                    aria-label={`Confier l’action ${entry.title}`}
+                                    title="Confier à…"
+                                    onClick={() => assignActivity(String(entry.meta.id))}
+                                >
+                                    <UserRoundPlus className="h-4 w-4" />
                                 </Button>
                             )}
                             {entry.type === 'activity' && entry.meta.can_update === true && entry.meta.id && (

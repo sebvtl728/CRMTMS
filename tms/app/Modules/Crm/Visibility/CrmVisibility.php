@@ -90,7 +90,7 @@ final class CrmVisibility
      */
     public static function activities(Builder $query, User $user, string $permission = Permissions::ACTIVITIES_VIEW): Builder
     {
-        return self::activitiesIn($query, $user, Scopes::of($user, $permission));
+        return self::activitiesIn($query, $user, Scopes::of($user, $permission), self::responsibleReaches($permission));
     }
 
     /**
@@ -107,7 +107,7 @@ final class CrmVisibility
             return true;
         }
 
-        return self::scoped($record::class, $user, $scope)->whereKey($record->getKey())->exists();
+        return self::scoped($record::class, $user, $scope, $permission)->whereKey($record->getKey())->exists();
     }
 
     /**
@@ -141,10 +141,19 @@ final class CrmVisibility
         }
         $ids = $records->map(fn (Model $r) => (string) $r->getKey())->all();
         if ($scope !== AccessScope::All) {
-            $ids = self::scoped($first::class, $user, $scope)->whereKey($ids)->pluck($first->getKeyName())->map(fn ($id) => (string) $id)->all();
+            $ids = self::scoped($first::class, $user, $scope, $permission)->whereKey($ids)->pluck($first->getKeyName())->map(fn ($id) => (string) $id)->all();
         }
 
         return array_fill_keys($ids, true);
+    }
+
+    /**
+     * Whether being responsible for an action reaches it under the Das scope
+     * of $permission: view and update (« Confier à… »), not delete.
+     */
+    private static function responsibleReaches(string $permission): bool
+    {
+        return $permission !== Permissions::ACTIVITIES_DELETE;
     }
 
     /**
@@ -180,14 +189,14 @@ final class CrmVisibility
      * @param  class-string<Model>  $class
      * @return Builder<covariant Model>
      */
-    private static function scoped(string $class, User $user, AccessScope $scope): Builder
+    private static function scoped(string $class, User $user, AccessScope $scope, string $permission): Builder
     {
         return match ($class) {
             Organisation::class => self::organisationsIn(Organisation::withTrashed(), $user, $scope),
             Person::class => self::peopleIn(Person::withTrashed(), $user, $scope),
             Opportunity::class => self::opportunitiesIn(Opportunity::withTrashed(), $user, $scope),
             Quote::class => self::quotesIn(Quote::withTrashed(), $user, $scope),
-            Activity::class => self::activitiesIn(Activity::withTrashed(), $user, $scope),
+            Activity::class => self::activitiesIn(Activity::withTrashed(), $user, $scope, self::responsibleReaches($permission)),
             default => throw new InvalidArgumentException("No visibility rule for {$class}."),
         };
     }
@@ -338,14 +347,16 @@ final class CrmVisibility
      * An action of an opportunity follows that opportunity (the fiche of the
      * opportunity is stamped on every such action); an action without
      * opportunity follows its entreprise or its person. Own: also the
-     * actions he is responsible for or created.
+     * actions he is responsible for or created; Das: also those he is
+     * responsible for, to see, do and edit them, never to remove them
+     * (crm.activities.delete stays on his DAS).
      *
      * @template TModel of \Illuminate\Database\Eloquent\Model
      *
      * @param  Builder<TModel>  $query
      * @return Builder<TModel>
      */
-    private static function activitiesIn(Builder $query, User $user, ?AccessScope $scope): Builder
+    private static function activitiesIn(Builder $query, User $user, ?AccessScope $scope, bool $asResponsible = true): Builder
     {
         if ($scope === null || $scope === AccessScope::All) {
             return $scope === null ? $query->whereRaw('false') : $query;
@@ -361,9 +372,18 @@ final class CrmVisibility
                     ->whereIn($model->qualifyColumn('organisation_id'), self::organisationsIn(Organisation::withTrashed(), $user, $scope)->select('organisations.id'))
                     ->orWhereIn($model->qualifyColumn('person_id'), self::peopleIn(Person::withTrashed(), $user, $scope)->select('people.id'))));
 
-        return $scope === AccessScope::Das
-            ? $query->where($hangsOn)
-            : $query->where(fn (Builder $q) => $q
+        // The responsible always sees (and, with the right, does) his action,
+        // even on a fiche he may not open (« Confier à… »).
+        if ($scope === AccessScope::Das) {
+            return $asResponsible
+                ? $query->where(fn (Builder $q) => $q
+                    ->where($model->qualifyColumn('responsible_user_id'), $user->getKey())
+                    ->orWhere($hangsOn))
+                : $query->where($hangsOn);
+        }
+
+        return $query
+            ->where(fn (Builder $q) => $q
                 ->where($model->qualifyColumn('responsible_user_id'), $user->getKey())
                 ->orWhere($model->qualifyColumn('created_by'), $user->getKey())
                 ->orWhere($hangsOn));

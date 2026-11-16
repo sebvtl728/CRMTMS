@@ -5,6 +5,41 @@ Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) ; ve
 
 ## [Non publié]
 
+## [0.7.1] - 2026-11-16
+
+L'import devine mieux les colonnes, se prépare avec un modèle Excel et s'abandonne avant exécution ; une action se
+confie à un collègue, prévenu par e-mail.
+
+### Ajouté
+
+- **Correspondance des colonnes plus intelligente** (import, écran « Associer les colonnes ») : par ordre de priorité,
+  le **choix précédent** de l'organisme pour le même en-tête (table `import_header_choices`, en-têtes seulement,
+  jamais de valeur de cellule), l'**en-tête exact**, un **en-tête approchant** (abréviations « CP », « Tél », « RS »…,
+  mots vides ignorés) puis le **contenu** (50 premières cellules remplies, au moins 80 % reconnues : e-mail, mobile,
+  téléphone, code postal, SIRET / SIREN avec clé de Luhn, date, site web, civilité). Chaque colonne proposée affiche
+  sa raison (« choix précédent », « d'après l'en-tête », « d'après le contenu ») ; une colonne ambiguë reste sur
+  « Ignorer ».
+- **Modèles Excel d'import** : lien « Télécharger le modèle Excel » pour le type choisi ; feuille « Données » aux
+  en-têtes exacts des champs, avec une ligne d'exemple fictive (ignorée si elle est réimportée telle quelle), feuille
+  « Listes » avec les valeurs actives des référentiels de l'organisme.
+- **Abandonner un import** déposé, en simulation ou simulé (avec confirmation) : le lot, ses lignes et son fichier
+  sont supprimés définitivement, l'import disparaît de la liste ; refusé pendant et après l'exécution (409) ; réservé
+  à l'auteur ou à qui voit tous les imports ; journalisé sans contenu.
+- **Confier une action** : champ « Attribuer à » dès la création d'une action, bouton « Confier à… » (À faire,
+  historique des fiches, actions d'une opportunité) avec un message facultatif (500 caractères). Droit : celui de
+  modifier l'action (`crm.activities.update` et son périmètre). Le nouveau responsable reçoit un e-mail (nouveau
+  modèle paramétrable « Action confiée », `activity_assigned` : type, objet, échéance, motif, message, lien ; jamais le
+  compte rendu ni la suite à donner), sauf s'il confie l'action à lui-même ; il voit toujours l'action (À faire,
+  compteur, planning) et peut la réaliser, même sur une fiche hors de son périmètre (dont le nom s'affiche alors sans
+  lien). L'historique de la fiche indique « Action confiée à X par Y » ; Outlook suit le changement de responsable.
+
+### Modifié
+
+- **Périmètre « Ses DAS »** des actions : inclut désormais les actions dont l'utilisateur est responsable.
+- **Système source** d'un import : exigé seulement quand une colonne « Identifiant source » associée contient une
+  valeur.
+- Le lien de l'e-mail « Action confiée » (`/crm/todo?action=…`) ouvre directement l'action dans « À faire ».
+
 ## [0.7.0] - 2026-11-16
 
 La fiche formation devient la **formation type** (complète au sens de Qualiopi), se duplique, et se remplit avec une
@@ -388,7 +423,8 @@ Lot 1a : socle de l'application.
   mise à jour avec retour arrière automatique.
 - Publication : image multi-architecture signée (cosign), archive de version, sommes de contrôle.
 
-[Non publié]: https://github.com/sebvtl728/CRMTMS/compare/v0.7.0...HEAD
+[Non publié]: https://github.com/sebvtl728/CRMTMS/compare/v0.7.1...HEAD
+[0.7.1]: https://github.com/sebvtl728/CRMTMS/compare/v0.7.0...v0.7.1
 [0.7.0]: https://github.com/sebvtl728/CRMTMS/compare/v0.6.2...v0.7.0
 [0.6.2]: https://github.com/sebvtl728/CRMTMS/compare/v0.6.1...v0.6.2
 [0.6.1]: https://github.com/sebvtl728/CRMTMS/compare/v0.6.0...v0.6.1

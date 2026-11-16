@@ -230,6 +230,49 @@ export function UndoDialog({ batchId, open, onOpenChange }: { batchId: string; o
     );
 }
 
+/** « Abandonner » : supprime pour de bon un import qui n'a pas encore été lancé (après confirmation). */
+export function AbandonButton({ batchId, size = 'default' }: { batchId: string; size?: 'default' | 'sm' }) {
+    const [open, setOpen] = useState(false);
+    const [busy, setBusy] = useState(false);
+
+    return (
+        <>
+            <Button type="button" variant="ghost" size={size} onClick={() => setOpen(true)}>
+                Abandonner
+            </Button>
+            <Dialog open={open} onOpenChange={setOpen}>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>Abandonner cet import ?</DialogTitle>
+                        <DialogDescription>
+                            Le fichier déposé et la correspondance des colonnes seront supprimés définitivement. Aucune fiche n&apos;est créée ni
+                            modifiée : cet import n&apos;a pas été lancé.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <DialogFooter>
+                        <Button variant="outline" onClick={() => setOpen(false)}>
+                            Garder l&apos;import
+                        </Button>
+                        <Button
+                            variant="destructive"
+                            disabled={busy}
+                            onClick={() =>
+                                router.delete(route('crm.import.destroy', batchId), {
+                                    onStart: () => setBusy(true),
+                                    onFinish: () => setBusy(false),
+                                    onSuccess: () => setOpen(false),
+                                })
+                            }
+                        >
+                            Abandonner l&apos;import
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+        </>
+    );
+}
+
 /** Lines of a simulation or of a run: line number and French messages. */
 export function LineList({ rows, empty }: { rows: { line: number; messages: string[] }[]; empty?: string }) {
     if (rows.length === 0) {

@@ -180,6 +180,8 @@ test('phone: meeting report on a fiche without a planned meeting, 375 px wide', 
     await expect(page).toHaveURL(/\/crm\/report$/);
     expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBeLessThanOrEqual(1);
 
+    // Let the visit settle (the menu link is prefetched, then visited): text typed earlier was sometimes lost.
+    await page.waitForLoadState('networkidle');
     await page.getByRole('searchbox', { name: 'Rechercher une entreprise ou une personne' }).fill('Traiteur des Alpes');
     await page.getByRole('button', { name: new RegExp(`^${ENTREPRISE}`) }).click({ timeout: 15_000 });
     await page.getByRole('button', { name: 'Réussi', exact: true }).click();

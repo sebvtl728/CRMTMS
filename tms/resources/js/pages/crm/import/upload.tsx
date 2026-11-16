@@ -67,6 +67,15 @@ export default function ImportUpload({ targets, profiles, maxMegabytes }: Upload
                             </label>
                         ))}
                     </div>
+                    {form.data.target !== '' && (
+                        <p className="text-muted-foreground text-sm">
+                            Pas de fichier prêt ?{' '}
+                            <a className="text-primary underline" href={route('crm.import.template', { target: form.data.target })}>
+                                Télécharger le modèle Excel
+                            </a>{' '}
+                            (colonnes reconnues d&apos;office, une ligne d&apos;exemple à supprimer, valeurs possibles dans l&apos;onglet « Listes »).
+                        </p>
+                    )}
                     <InputError message={form.errors.target} />
                 </fieldset>
 

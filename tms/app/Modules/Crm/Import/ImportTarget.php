@@ -61,15 +61,15 @@ enum ImportTarget: string
      * Header synonyms (comparison keys, see Text::key) per field.
      */
     private const SYNONYMS = [
-        'name' => ['raison sociale', 'nom entreprise', 'nom de l entreprise', 'entreprise', 'societe', 'denomination', 'organisation', 'structure', 'etablissement', 'client'],
-        'siret' => ['siret', 'n siret', 'no siret', 'num siret', 'numero siret', 'numero de siret'],
+        'name' => ['raison sociale', 'nom entreprise', 'nom de l entreprise', 'entreprise', 'societe', 'denomination', 'organisation', 'structure', 'etablissement', 'client', 'raison social', 'nom societe', 'nom de la societe', 'nom client', 'nom du client', 'enseigne', 'nom commercial', 'denomination sociale'],
+        'siret' => ['siret', 'n siret', 'no siret', 'num siret', 'numero siret', 'numero de siret', 'n de siret', 'siret etablissement'],
         'naf_code' => ['naf', 'code naf', 'ape', 'code ape', 'naf ape'],
-        'email' => ['mail', 'email', 'e mail', 'courriel', 'adresse mail', 'adresse e mail', 'adresse email'],
+        'email' => ['mail', 'email', 'e mail', 'courriel', 'adresse mail', 'adresse e mail', 'adresse email', 'mel', 'adresse electronique', 'adresse courriel'],
         'email_secondary' => ['email 2', 'e mail 2', 'mail 2', 'autre e mail', 'autre email'],
-        'phone' => ['tel', 'telephone', 'tel fixe', 'telephone fixe', 'fixe', 'standard', 'n tel'],
-        'mobile' => ['portable', 'mobile', 'tel portable', 'telephone portable', 'gsm', 'tel mobile', 'telephone mobile'],
-        'website' => ['site', 'site web', 'site internet', 'url', 'web'],
-        'address_line1' => ['adresse', 'adresse 1', 'adresse ligne 1', 'rue', 'voie'],
+        'phone' => ['tel', 'telephone', 'tel fixe', 'telephone fixe', 'fixe', 'standard', 'n tel', 'ligne fixe', 'numero de telephone', 'n telephone', 'tel bureau', 'telephone bureau'],
+        'mobile' => ['portable', 'mobile', 'tel portable', 'telephone portable', 'gsm', 'tel mobile', 'telephone mobile', 'port', 'cellulaire', 'tel port', 'numero de portable', 'numero de mobile'],
+        'website' => ['site', 'site web', 'site internet', 'url', 'web', 'www', 'adresse web', 'adresse internet'],
+        'address_line1' => ['adresse', 'adresse 1', 'adresse ligne 1', 'rue', 'voie', 'adresse postale', 'numero et rue'],
         'address_line2' => ['adresse 2', 'adresse ligne 2', 'complement', 'complement d adresse', 'complement adresse'],
         'postal_code' => ['cp', 'code postal', 'code postale', 'c p'],
         'city' => ['ville', 'commune', 'localite'],
@@ -84,15 +84,15 @@ enum ImportTarget: string
         'das' => ['das', 'domaine', 'domaines'],
         'notes_summary' => ['notes', 'remarques', 'observations', 'commentaires'],
         'source_id' => ['id', 'identifiant', 'identifiant source', 'reference', 'ref', 'code client', 'id externe', 'numero client'],
-        'civility' => ['civilite', 'titre'],
-        'last_name' => ['nom', 'nom de famille'],
-        'first_name' => ['prenom'],
-        'birth_date' => ['date de naissance', 'naissance', 'ne le', 'nee le'],
+        'civility' => ['civilite', 'titre', 'civ'],
+        'last_name' => ['nom', 'nom de famille', 'nom de naissance', 'nom usuel', 'patronyme', 'nom du contact', 'nom contact'],
+        'first_name' => ['prenom', 'prenoms', 'prenom du contact', 'prenom contact'],
+        'birth_date' => ['date de naissance', 'naissance', 'ne le', 'nee le', 'date naissance', 'ddn'],
         'is_individual' => ['particulier'],
         'project' => ['projet', 'projet de formation'],
         'professional_situation' => ['situation', 'situation professionnelle'],
         'funding_mode' => ['financement', 'mode de financement'],
-        'job_title' => ['fonction', 'poste', 'intitule de poste'],
+        'job_title' => ['fonction', 'poste', 'intitule de poste', 'intitule du poste', 'profession', 'metier'],
         'decision_role' => ['role', 'role dans la decision'],
         'work_email' => ['e mail pro', 'email pro', 'mail pro', 'e mail professionnel', 'email professionnel'],
         'work_phone' => ['tel pro', 'telephone pro', 'telephone professionnel', 'ligne directe'],
@@ -119,6 +119,45 @@ enum ImportTarget: string
         'is_active' => ['active', 'actif', 'en catalogue', 'disponible'],
         'body' => ['note', 'notes', 'commentaire', 'commentaires', 'texte', 'compte rendu', 'echange', 'contenu', 'description', 'observations'],
     ];
+
+    /**
+     * Abbreviations of a header word, written out before a header is compared
+     * loosely (see ColumnGuesser): « Tél » = « téléphone », « CP » = « code postal ».
+     */
+    public const ABBREVIATIONS = [
+        'tel' => 'telephone', 'tph' => 'telephone', 'port' => 'portable', 'mob' => 'mobile', 'mail' => 'email', 'courriel' => 'email',
+        'mel' => 'email', 'cp' => 'code postal', 'rs' => 'raison sociale', 'ste' => 'societe', 'dpt' => 'departement',
+        'dept' => 'departement', 'adr' => 'adresse', 'naiss' => 'naissance', 'ddn' => 'date naissance', 'fct' => 'fonction',
+        'resp' => 'responsable', 'civ' => 'civilite', 'nb' => 'nombre', 'ent' => 'entreprise', 'etab' => 'etablissement',
+        'tels' => 'telephone', 'telephones' => 'telephone', 'emails' => 'email', 'mails' => 'email',
+    ];
+
+    /** Words left out when a header is compared loosely (« Tél portable du contact » = « tel portable »). */
+    public const STOP_WORDS = [
+        'de', 'du', 'des', 'la', 'le', 'les', 'l', 'd', 'a', 'au', 'aux', 'en', 'et', 'ou', 'par', 'pour', 'sur',
+        'client', 'clients', 'contact', 'contacts', 'n', 'no', 'num', 'numero', 'perso', 'personnel', 'personnelle', 'principal', 'principale',
+    ];
+
+    /**
+     * Field proposed for a column whose cells have this shape (see
+     * ValueShapes), when the target has one without ambiguity.
+     */
+    public function shapeField(string $shape): ?string
+    {
+        $fields = match ($this) {
+            self::Organisations => [ValueShapes::EMAIL => 'email', ValueShapes::PHONE => 'phone', ValueShapes::POSTCODE => 'postal_code',
+                ValueShapes::SIRET => 'siret', ValueShapes::WEBSITE => 'website'],
+            self::People => [ValueShapes::EMAIL => 'email', ValueShapes::MOBILE => 'mobile', ValueShapes::PHONE => 'phone',
+                ValueShapes::POSTCODE => 'postal_code', ValueShapes::CIVILITY => 'civility'],
+            // A column of dates is rarely the birth date (creation, last contact...): never proposed from the content.
+            self::Affiliations => [ValueShapes::EMAIL => 'email', ValueShapes::MOBILE => 'mobile', ValueShapes::PHONE => 'phone',
+                ValueShapes::POSTCODE => 'postal_code', ValueShapes::CIVILITY => 'civility', ValueShapes::SIRET => 'organisation.siret'],
+            self::Notes => [ValueShapes::EMAIL => 'subject_email', ValueShapes::SIRET => 'subject_siret', ValueShapes::DATE => 'date'],
+            self::Trainings => [],
+        };
+
+        return $fields[$shape] ?? null;
+    }
 
     public function label(): string
     {
@@ -222,11 +261,13 @@ enum ImportTarget: string
     /**
      * What stops an import with this mapping (French messages): a required
      * field without column, notes without a way to find the fiche,
-     * identifiers without their source software.
+     * identifiers without their source software (only when the file really
+     * fills an identifier column: a closure, as the answer needs a pass over the file).
      *
+     * @param  (callable(): bool)|null  $identifiersFilled  null: assumed filled
      * @return list<string>
      */
-    public function blockingProblems(FieldMap $map, ?string $sourceSystem): array
+    public function blockingProblems(FieldMap $map, ?string $sourceSystem, ?callable $identifiersFilled = null): array
     {
         $errors = [];
         foreach ($this->requiredFields() as $field) {
@@ -237,7 +278,8 @@ enum ImportTarget: string
         if ($this === self::Notes && ! array_filter(['subject_siret', 'subject_email', 'subject_source_id'], fn ($f) => $map->has($f))) {
             $errors[] = 'Associez une colonne permettant de retrouver la fiche : SIRET, e-mail ou identifiant source.';
         }
-        if (array_filter($this->identifierFields(), fn ($f) => $map->has($f)) !== [] && $sourceSystem === null) {
+        if (array_filter($this->identifierFields(), fn ($f) => $map->has($f)) !== [] && $sourceSystem === null
+            && ($identifiersFilled === null || $identifiersFilled())) {
             $errors[] = 'Indiquez le logiciel d\'origine des identifiants (ex. : Formevol) pour pouvoir réimporter sans doublon.';
         }
 

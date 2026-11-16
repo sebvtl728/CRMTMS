@@ -275,6 +275,31 @@ class ImportBatch extends Model
         return true;
     }
 
+    /**
+     * Does the file fill, on at least one row, a column mapped to a source
+     * identifier? (A template left empty there needs no source software;
+     * its example row, if kept, is not looked at.) Stops at the first filled cell.
+     */
+    public function identifiersFilled(FieldMap $map): bool
+    {
+        $columns = array_values(array_filter(array_map(fn (string $f) => $map->columnFor($f), $this->target->identifierFields())));
+        if ($columns === []) {
+            return false;
+        }
+        foreach ($this->reader()->rows() as $row) {
+            if (ImportTemplate::isExample($row)) {
+                continue;
+            }
+            foreach ($columns as $column) {
+                if (trim($row[$column] ?? '') !== '') {
+                    return true;
+                }
+            }
+        }
+
+        return false;
+    }
+
     public function canRun(): bool
     {
         return $this->status === self::SIMULATED;
@@ -283,5 +308,11 @@ class ImportBatch extends Model
     public function canUndo(): bool
     {
         return in_array($this->status, [self::DONE, self::FAILED], true);
+    }
+
+    /** Nothing was imported yet: the batch can be thrown away. */
+    public function canAbandon(): bool
+    {
+        return in_array($this->status, [self::UPLOADED, self::SIMULATING, self::SIMULATED], true);
     }
 }

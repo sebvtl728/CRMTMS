@@ -24,6 +24,7 @@ use Inertia\Inertia;
 use Inertia\Response;
 use InvalidArgumentException;
 use Symfony\Component\HttpFoundation\Response as HttpResponse;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 /**
  * « Importer » wizard (crm.import): 1 file, 2 columns, 3 values, 4 simulation,
@@ -74,6 +75,7 @@ class ImportController extends Controller
                 'skipped' => $b->skipped,
                 'errors' => $b->errors,
                 'canUndo' => $this->canUndo($b),
+                'canAbandon' => $b->canAbandon(),
             ]);
 
         return Inertia::render('crm/import/index', [
@@ -149,6 +151,15 @@ class ImportController extends Controller
         return to_route('crm.import.mapping', $batch->id);
     }
 
+    /** The Excel template of a target the user may import (404 otherwise). */
+    public function template(Request $request, string $target): StreamedResponse
+    {
+        $target = ImportTarget::tryFrom($target);
+        abort_if($target === null || ! $this->mayImport($this->user($request), $target), 404);
+
+        return ImportTemplate::download($target);
+    }
+
     // ----------------------------------------------------------- 2. columns
 
     public function mapping(Request $request, string $batch): Response|RedirectResponse
@@ -168,12 +179,14 @@ class ImportController extends Controller
                     break;
                 }
             }
+            // A mapping already saved (or from a profile) is shown as is.
+            $guess = $batch->field_map === null ? $this->proposals($batch) : [];
         } catch (ImportFileException $e) {
             return to_route('crm.import.index')->withErrors(['batch' => $e->getMessage()]);
         }
 
         $target = $batch->target;
-        $map = $batch->field_map ?? FieldMap::guess($target, $headers)->toArray();
+        $map = $batch->field_map ?? array_map(fn (array $g) => $g['field'], $guess);
 
         return Inertia::render('crm/import/mapping', [
             'batch' => $this->summary($batch),
@@ -184,6 +197,7 @@ class ImportController extends Controller
             'fields' => array_map(fn (string $value, string $label) => ['value' => $value, 'label' => $label, 'required' => in_array($value, $target->requiredFields(), true)],
                 array_keys($target->fields()), array_values($target->fields())),
             'map' => (object) $map,
+            'reasons' => (object) array_map(fn (array $g) => $g['reason'], $guess),
             'identifierFields' => $target->identifierFields(),
             'sourceSystem' => $batch->sourceSystem(),
             'profileName' => $batch->profile_id !== null ? ImportProfile::query()->whereKey($batch->profile_id)->value('name') : null,
@@ -220,7 +234,7 @@ class ImportController extends Controller
         }
 
         $source = trim((string) ($input['source_system'] ?? ''));
-        foreach ($batch->target->blockingProblems($map, $source === '' ? null : mb_substr($source, 0, 50)) as $problem) {
+        foreach ($batch->target->blockingProblems($map, $source === '' ? null : mb_substr($source, 0, 50), fn () => $batch->identifiersFilled($map)) as $problem) {
             throw ValidationException::withMessages([str_contains($problem, 'logiciel d\'origine') ? 'source_system' : 'map' => $problem]);
         }
 
@@ -234,6 +248,12 @@ class ImportController extends Controller
 
         $profileName = trim((string) ($input['profile_name'] ?? ''));
         $this->checkProfileName($batch, $profileName, $this->user($request));
+        // Remembered before the simulation starts (the job may run at once).
+        try {
+            HeaderChoices::remember($batch->target, HeaderChoices::deliberate($this->proposals($batch), $given));
+        } catch (ImportFileException $e) {
+            return to_route('crm.import.index')->withErrors(['batch' => $e->getMessage()]);
+        }
         $this->startSimulation($batch, $map, $batch->valueMapper());
         if ($profileName !== '') {
             $this->saveProfile($batch, $profileName);
@@ -398,6 +418,15 @@ class ImportController extends Controller
         }
 
         return to_route('crm.import.show', $batch->id)->with('status', 'L\'import est marqué comme échoué. Vous pouvez annuler ce qu\'il a créé.');
+    }
+
+    // ------------------------------------------------------------ the abandon
+
+    public function destroy(Request $request, string $batch): RedirectResponse
+    {
+        ImportAbandon::run($this->find($request, $batch));
+
+        return to_route('crm.import.index')->with('status', 'L\'import a été abandonné.');
     }
 
     // --------------------------------------------------------------- the undo
@@ -620,6 +649,30 @@ class ImportController extends Controller
                     ->map(fn (ReferenceItem $i) => ['value' => $i->id, 'label' => $i->label])->all()
                 : [],
         };
+    }
+
+    /**
+     * The server's proposal for the columns step, from the file's first
+     * ColumnGuesser::SAMPLE non-empty rows (read in memory, never kept).
+     *
+     * @return array<string, array{field: string, reason: 'memory'|'header'|'similar'|'content'}>
+     *
+     * @throws ImportFileException
+     */
+    private function proposals(ImportBatch $batch): array
+    {
+        $reader = $batch->reader();
+        $samples = [];
+        foreach ($reader->rows() as $row) {
+            if (implode('', array_map('trim', $row)) !== '') {
+                $samples[] = $row;
+                if (count($samples) === ColumnGuesser::SAMPLE) {
+                    break;
+                }
+            }
+        }
+
+        return ColumnGuesser::guess($batch->target, $reader->headers(), $samples);
     }
 
     /**

@@ -430,6 +430,9 @@ Unique (`tenant_id`, `das_id`, `period_type`, `period_start`) : l'objectif d'un 
 ### `import_stamps` — traces par fiche
 `id` (entier, l'ordre d'insertion fait foi), `tenant_id`, `batch_id` · `subject_type`, `subject_id` · `stamped_at` (date de mise à jour laissée par l'import : détecte une modification ultérieure) · `created` · `batch_undone` · `trashed_by_undo_at`. Colonnes simples et indexées : un `@>` sur du jsonb n'est pas leakproof et ne serait pas utilisé sous RLS. Sert à l'annulation d'un import et à la réimportation.
 
+### `import_header_choices` — choix de colonnes mémorisés (0.7.1)
+`id` (uuid v7), `tenant_id` · `target` (30, type d'import) · `header_key` (200, en-tête normalisé : sans accents, casse ni ponctuation) · `field` (60, champ choisi ; **null = « Ignorer »**) · `uses` (nombre de validations) · `last_used_at` (timestamptz). Unique (`tenant_id`, `target`, `header_key`). Écrit quand l'utilisateur valide l'étape « Colonnes », pour ses seuls choix délibérés (comparés à la proposition recalculée par le serveur) ; relu en premier pour proposer la correspondance du fichier suivant. Aucune valeur de cellule n'y est stockée, seulement des en-têtes et des codes de champ.
+
 ## CRM : RGPD (lot 1b, RLS)
 
 ### `consents` — consentements

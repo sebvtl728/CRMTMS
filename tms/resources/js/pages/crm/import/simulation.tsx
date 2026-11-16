@@ -1,4 +1,4 @@
-import { Counter, LineList, WizardPage, type BatchSummary } from '@/components/crm/import-wizard';
+import { AbandonButton, Counter, LineList, WizardPage, type BatchSummary } from '@/components/crm/import-wizard';
 import InputError from '@/components/input-error';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
@@ -189,6 +189,7 @@ export default function ImportSimulation({ batch, simulation, unknownCount, hasV
                             <Link href={route('crm.import.values', batch.id)}>Revoir les valeurs</Link>
                         </Button>
                     )}
+                    <AbandonButton batchId={batch.id} />
                     {importable === 0 && simulation.blocking.length === 0 && (
                         <span className="text-muted-foreground text-sm">Aucune fiche à créer ou mettre à jour.</span>
                     )}
