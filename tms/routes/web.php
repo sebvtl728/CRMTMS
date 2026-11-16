@@ -29,3 +29,4 @@ require __DIR__.'/crm-pipeline.php';
 require __DIR__.'/crm-quotes.php';
 require __DIR__.'/crm-revenue.php';
 require __DIR__.'/catalogue.php';
+require __DIR__.'/sessions.php';

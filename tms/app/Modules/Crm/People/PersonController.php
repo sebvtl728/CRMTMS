@@ -210,6 +210,7 @@ class PersonController extends Controller
                 'name' => $person->fullName(),
                 'status' => ['value' => $person->status->value, 'label' => $person->status->label()],
                 'professional_situation' => $label($person->professionalSituation),
+                'education_level' => $label($person->educationLevel),
                 'funding_mode' => $label($person->fundingMode),
                 'origin' => $label($person->origin),
                 'responsible' => $person->responsible === null ? null : ['id' => $person->responsible->id, 'name' => $person->responsible->name],
@@ -352,6 +353,7 @@ class PersonController extends Controller
             'is_individual' => $p->is_individual,
             'project' => $p->project,
             'professional_situation_id' => $p->professional_situation_id,
+            'education_level_id' => $p->education_level_id,
             'funding_mode_id' => $p->funding_mode_id,
             'origin_id' => $p->origin_id,
             'responsible_user_id' => $p->responsible_user_id,
@@ -394,6 +396,7 @@ class PersonController extends Controller
         return [
             'status' => OrganisationStatus::options(),
             'professional_situation' => FormOptions::reference(ReferenceList::ProfessionalSituation, $current?->professional_situation_id),
+            'education_level' => FormOptions::reference(ReferenceList::EducationLevel, $current?->education_level_id),
             'funding_mode' => FormOptions::reference(ReferenceList::FundingMode, $current?->funding_mode_id),
             'origin' => FormOptions::reference(ReferenceList::ContactOrigin, $current?->origin_id),
             'das' => FormOptions::reference(ReferenceList::Das, null, $current === null ? [] : $current->das()->pluck('reference_items.id')->all()),

@@ -193,6 +193,7 @@ Conventions communes : UUID v7, `tenant_id`, suppression logique (`deleted_at`) 
 | `is_individual` | bool | Particulier (peut être aussi interlocuteur) |
 | `project` | text, null | Projet de formation |
 | `professional_situation_id`, `funding_mode_id`, `origin_id` | uuid, null | FK `reference_items` |
+| `education_level_id` | uuid, null | FK `reference_items` (liste `education_level`, lot 2a) |
 | `status` | string | `prospect`, `client`, `inactif` (CHECK) |
 | `responsible_user_id` | uuid, null | FK `users` |
 | `last_contact_at` | timestamptz, null | Dernier contact (base de la conservation RGPD) |

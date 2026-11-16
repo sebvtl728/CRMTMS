@@ -18,6 +18,7 @@ type ReferenceMeta = {
     color?: string | null;
     planning?: 'meeting' | 'call' | null;
     quote_stage?: boolean;
+    force_majeure?: boolean;
 };
 
 /** Place of an action type in the CRM planning (meta.planning). */
@@ -40,6 +41,7 @@ interface ReferenceListData {
     has_probability: boolean;
     has_planning: boolean;
     has_quote_stage: boolean;
+    has_force_majeure: boolean;
     items: ReferenceItem[];
 }
 
@@ -55,6 +57,7 @@ interface EditorState {
     color: string; // '' = none
     planning: string; // '' = not in the planning
     quoteStage: boolean;
+    forceMajeure: boolean;
 }
 
 const breadcrumbs: BreadcrumbItem[] = [{ title: 'Référentiels', href: '/admin/references' }];
@@ -93,6 +96,7 @@ export default function ReferencesIndex({ lists, status }: ReferencesIndexProps)
             color: item?.meta.color ?? '',
             planning: item?.meta.planning ?? '',
             quoteStage: item?.meta.quote_stage === true,
+            forceMajeure: item?.meta.force_majeure === true,
         });
 
     const closing = editor?.item?.meta.outcome != null; // won / lost: fixed probability
@@ -105,6 +109,7 @@ export default function ReferencesIndex({ lists, status }: ReferencesIndexProps)
         if (list.has_probability && editor.probability !== '') meta.probability = Number(editor.probability);
         if (list.has_planning) meta.planning = editor.planning === '' ? null : (editor.planning as 'meeting' | 'call');
         if (list.has_quote_stage && !closing) meta.quote_stage = editor.quoteStage;
+        if (list.has_force_majeure) meta.force_majeure = editor.forceMajeure;
         const payload = { label: editor.label, meta };
         const options = {
             preserveScroll: true,
@@ -217,6 +222,7 @@ export default function ReferencesIndex({ lists, status }: ReferencesIndexProps)
                                 {list.has_planning && item.meta.planning && (
                                     <Badge variant="outline">Planning : {PLANNING_KINDS[item.meta.planning]}</Badge>
                                 )}
+                                {list.has_force_majeure && item.meta.force_majeure && <Badge variant="outline">Force majeure</Badge>}
                                 {item.is_system && <Badge variant="secondary">Système</Badge>}
                                 {item.in_use && <Badge variant="secondary">Utilisée</Badge>}
                                 {!item.is_active && (
@@ -351,6 +357,21 @@ export default function ReferencesIndex({ lists, status }: ReferencesIndexProps)
                                     À l'envoi d'un devis, l'opportunité passe à cette étape si elle n'y est pas encore. Une seule étape : la cocher la retire des autres.
                                 </p>
                                 <InputError message={errors['meta.quote_stage']} />
+                            </div>
+                        )}
+
+                        {list.has_force_majeure && (
+                            <div className="grid gap-1">
+                                <label className="flex items-center gap-2 text-sm">
+                                    <input
+                                        type="checkbox"
+                                        checked={editor?.forceMajeure ?? false}
+                                        onChange={(e) => setEditor((s) => s && { ...s, forceMajeure: e.target.checked })}
+                                    />
+                                    Force majeure
+                                </label>
+                                <p className="text-muted-foreground text-xs">Un abandon pour ce motif n'entraîne jamais de dédit.</p>
+                                <InputError message={errors['meta.force_majeure']} />
                             </div>
                         )}
 

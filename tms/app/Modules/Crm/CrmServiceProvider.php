@@ -511,6 +511,7 @@ class CrmServiceProvider extends ServiceProvider
         ReferenceUsage::register(ReferenceList::Das, 'organisation_das', 'das_id');
         ReferenceUsage::register(ReferenceList::Das, 'user_das', 'das_id');
         ReferenceUsage::register(ReferenceList::ProfessionalSituation, 'people', 'professional_situation_id');
+        ReferenceUsage::register(ReferenceList::EducationLevel, 'people', 'education_level_id');
         ReferenceUsage::register(ReferenceList::FundingMode, 'people', 'funding_mode_id');
         ReferenceUsage::register(ReferenceList::ContactOrigin, 'people', 'origin_id');
         ReferenceUsage::register(ReferenceList::Das, 'person_das', 'das_id');

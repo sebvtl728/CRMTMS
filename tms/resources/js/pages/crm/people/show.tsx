@@ -53,6 +53,7 @@ interface PersonData {
     project: string | null;
     status: StatusValue;
     professional_situation: Ref | null;
+    education_level: Ref | null;
     funding_mode: Ref | null;
     origin: Ref | null;
     responsible: { id: string; name: string } | null;
@@ -268,6 +269,7 @@ export default function PersonShow({
                         <h2 className="mb-3 text-sm font-semibold">Profil</h2>
                         <dl className="grid gap-3 sm:grid-cols-2">
                             <Item label="Situation professionnelle">{p.professional_situation?.label}</Item>
+                            <Item label="Niveau de diplôme">{p.education_level?.label}</Item>
                             <Item label="Mode de financement">{p.funding_mode?.label}</Item>
                             <Item label="Origine">{p.origin?.label}</Item>
                             <Item label="Responsable">{p.responsible?.name}</Item>

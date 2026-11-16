@@ -51,7 +51,7 @@ class Merger
         'civility' => 'Civilité', 'last_name' => 'Nom', 'first_name' => 'Prénom', 'status' => 'Statut', 'responsible_user_id' => 'Responsable',
         'is_individual' => 'Particulier', 'email' => 'E-mail', 'email_secondary' => 'E-mail secondaire', 'phone' => 'Téléphone', 'mobile' => 'Mobile',
         'address_line1' => 'Adresse', 'address_line2' => "Complément d'adresse", 'postal_code' => 'Code postal', 'city' => 'Ville', 'country' => 'Pays',
-        'birth_date' => 'Date de naissance', 'professional_situation_id' => 'Situation professionnelle', 'funding_mode_id' => 'Mode de financement',
+        'birth_date' => 'Date de naissance', 'professional_situation_id' => 'Situation professionnelle', 'education_level_id' => 'Niveau de diplôme', 'funding_mode_id' => 'Mode de financement',
         'origin_id' => 'Origine', 'project' => 'Projet',
     ];
 

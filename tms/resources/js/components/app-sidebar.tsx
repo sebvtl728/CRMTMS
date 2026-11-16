@@ -23,6 +23,7 @@ import {
     Plug,
     ShieldAlert,
     ShieldCheck,
+    UserMinus,
     Upload,
     Users,
 } from 'lucide-react';
@@ -55,6 +56,7 @@ const adminNavItems: (NavItem & { permission: string })[] = [
     { title: 'Connecteurs', url: '/admin/connectors', icon: Plug, permission: 'connectors.manage' },
     { title: "Journal d'audit", url: '/admin/audit', icon: History, permission: 'audit.view' },
     { title: 'Sécurité', url: '/admin/security', icon: ShieldCheck, permission: 'settings.manage' },
+    { title: "Règle d'abandon", url: '/admin/abandon-rule', icon: UserMinus, permission: 'settings.manage' },
     { title: "Modèles d'e-mails", url: '/admin/mail-templates', icon: Mail, permission: 'settings.manage' },
 ];
 

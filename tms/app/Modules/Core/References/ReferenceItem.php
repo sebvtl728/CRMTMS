@@ -27,7 +27,7 @@ use Illuminate\Support\Str;
  * @property int $position
  * @property bool $is_system
  * @property bool $is_active
- * @property array{probability?: int, outcome?: string|null, color?: string|null, planning?: string|null, quote_stage?: bool}|null $meta
+ * @property array{probability?: int, outcome?: string|null, color?: string|null, planning?: string|null, quote_stage?: bool, force_majeure?: bool}|null $meta
  * @property Carbon|null $deleted_at
  */
 class ReferenceItem extends Model

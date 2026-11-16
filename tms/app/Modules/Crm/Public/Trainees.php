@@ -2,13 +2,16 @@
 
 namespace App\Modules\Crm\Public;
 
+use App\Modules\Core\References\ReferenceList;
 use App\Modules\Crm\Affiliations\Affiliation;
 use App\Modules\Crm\Duplicates\DuplicateFinder;
 use App\Modules\Crm\Organisations\Organisation;
 use App\Modules\Crm\Organisations\OrganisationStatus;
 use App\Modules\Crm\People\Person;
 use App\Modules\Crm\People\PersonRequest;
+use App\Modules\Crm\Support\ReferenceRules;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
@@ -97,6 +100,38 @@ final class Trainees
 
             return $person->id;
         });
+    }
+
+    /**
+     * Sets the training profile of a person: education level and professional
+     * situation (active values of their reference lists, or the ones already
+     * stored) and birth date (Y-m-d). A null clears the value. Journaled like
+     * any change of the fiche (the birth date as a personal value).
+     * ValidationException (French messages) on invalid data; a missing or
+     * anonymised person is a ModelNotFoundException.
+     */
+    public function updateProfile(string $personId, ?string $educationLevelId, ?string $professionalSituationId, ?string $birthDate): void
+    {
+        $person = Str::isUuid($personId) ? Person::query()->whereNull('people.anonymised_at')->find($personId) : null;
+        if ($person === null) {
+            throw (new ModelNotFoundException)->setModel(Person::class, [$personId]);
+        }
+
+        $rules = [
+            'education_level_id' => ['nullable', ...ReferenceRules::item(ReferenceList::EducationLevel, $person->education_level_id)],
+            'professional_situation_id' => ['nullable', ...ReferenceRules::item(ReferenceList::ProfessionalSituation, $person->professional_situation_id)],
+            'birth_date' => PersonRequest::fieldRules()['birth_date'],
+        ];
+
+        /** @var array{education_level_id: ?string, professional_situation_id: ?string, birth_date: ?string} $validated */
+        $validated = Validator::make(
+            ['education_level_id' => $educationLevelId, 'professional_situation_id' => $professionalSituationId, 'birth_date' => $birthDate],
+            $rules,
+            PersonRequest::validationMessages(),
+            ['education_level_id' => 'niveau de diplôme', 'professional_situation_id' => 'situation professionnelle'],
+        )->validate();
+
+        DB::transaction(fn () => $person->update($validated));
     }
 
     /**

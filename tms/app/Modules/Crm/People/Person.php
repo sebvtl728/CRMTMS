@@ -44,6 +44,7 @@ use Illuminate\Support\Facades\DB;
  * @property bool $is_individual
  * @property string|null $project
  * @property string|null $professional_situation_id
+ * @property string|null $education_level_id
  * @property string|null $funding_mode_id
  * @property string|null $origin_id
  * @property OrganisationStatus $status
@@ -100,7 +101,7 @@ class Person extends Model
     protected $fillable = [
         'civility', 'first_name', 'last_name', 'email', 'email_secondary', 'phone', 'mobile',
         'address_line1', 'address_line2', 'postal_code', 'city', 'country', 'birth_date', 'is_individual', 'project',
-        'professional_situation_id', 'funding_mode_id', 'origin_id', 'status', 'responsible_user_id',
+        'professional_situation_id', 'education_level_id', 'funding_mode_id', 'origin_id', 'status', 'responsible_user_id',
         'last_contact_at', 'source_system', 'source_id', 'legal_basis',
     ];
 
@@ -201,6 +202,14 @@ class Person extends Model
     public function interestTrainings(): HasMany
     {
         return $this->hasMany(FicheTraining::class);
+    }
+
+    /**
+     * @return BelongsTo<ReferenceItem, $this>
+     */
+    public function educationLevel(): BelongsTo
+    {
+        return $this->belongsTo(ReferenceItem::class, 'education_level_id');
     }
 
     /**

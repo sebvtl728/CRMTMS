@@ -32,6 +32,7 @@ class ReferenceController extends Controller
                 'has_probability' => $list->hasProbability(),
                 'has_planning' => $list->hasPlanning(),
                 'has_quote_stage' => $list->hasQuoteStage(),
+                'has_force_majeure' => $list->hasForceMajeure(),
                 'items' => ($items[$list->value] ?? collect())->map(fn (ReferenceItem $i) => [
                     'id' => $i->id,
                     'code' => $i->code,
@@ -156,6 +157,7 @@ class ReferenceController extends Controller
             'meta.color' => ['nullable', 'string', 'regex:/^#[0-9a-fA-F]{6}$/'],
             'meta.planning' => ['nullable', Rule::in(array_keys(ReferenceItem::PLANNING_KINDS))],
             'meta.quote_stage' => ['nullable', 'boolean'],
+            'meta.force_majeure' => ['nullable', 'boolean'],
         ], [
             'label.required' => 'Le libellé est obligatoire.',
             'label.unique' => 'Une valeur portant ce libellé existe déjà dans cette liste.',
@@ -165,6 +167,7 @@ class ReferenceController extends Controller
             'meta.color.regex' => 'La couleur doit être au format #RRGGBB.',
             'meta.planning.in' => 'Choisissez Rendez-vous, Appel ou rien pour le planning.',
             'meta.quote_stage.boolean' => 'Cochez ou décochez la case.',
+            'meta.force_majeure.boolean' => 'Cochez ou décochez la case.',
         ]);
     }
 
@@ -202,6 +205,14 @@ class ReferenceController extends Controller
                 $meta['quote_stage'] = true;
             } else {
                 unset($meta['quote_stage']);
+            }
+        }
+        // Force majeure flag of an abandon reason: kept unless the form sends it.
+        if ($list->hasForceMajeure() && array_key_exists('force_majeure', $input)) {
+            if ((bool) $input['force_majeure']) {
+                $meta['force_majeure'] = true;
+            } else {
+                unset($meta['force_majeure']);
             }
         }
         if (array_key_exists('color', $input)) {

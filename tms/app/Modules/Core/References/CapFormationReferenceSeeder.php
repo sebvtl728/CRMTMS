@@ -30,6 +30,9 @@ final class CapFormationReferenceSeeder
         'Perdu' => [0, 'lost'],
     ];
 
+    /** Abandon reasons that are a force majeure (never a dédit), by code. */
+    private const FORCE_MAJEURE = ['maladie', 'accident'];
+
     /** The stage a sent quote brings its opportunity to (meta.quote_stage). */
     private const QUOTE_STAGE = 'Proposition';
 
@@ -53,6 +56,11 @@ final class CapFormationReferenceSeeder
         'professional_situation' => ['Salarié', "Demandeur d'emploi", 'Indépendant', 'En reconversion', 'Étudiant', 'Autre'],
         'decision_role' => ['Décideur', 'Prescripteur', 'Utilisateur', 'Financeur', 'Autre'],
         'loss_reason' => ['Prix', 'Financement refusé', 'Concurrent', 'Pas de besoin', 'Calendrier', 'Sans réponse', 'Autre'],
+        'funding_type' => ['OPCO', 'Entreprise', 'CPF', 'France Travail', 'Région', 'Personnel'],
+        'abandon_reason' => ['Démission', 'Maladie', 'Accident', 'Licenciement', 'Convenance personnelle', 'Autre'],
+        'cancel_reason' => ['Effectif insuffisant', 'Demande du client', 'Report', 'Formateur indisponible', 'Financement refusé', 'Autre'],
+        'bpf_category' => ["Salariés d'employeurs privés", "Demandeurs d'emploi", 'Particuliers', 'Autres'],
+        'education_level' => ['Sans diplôme', 'Niveau 3 (CAP, BEP)', 'Niveau 4 (baccalauréat)', 'Niveau 5 (bac +2)', 'Niveau 6 (bac +3, bac +4)', 'Niveau 7 (bac +5)', 'Niveau 8 (doctorat)'],
         'sector' => ['Hôtellerie-restauration', 'Commerce', 'Industrie', 'Services', 'Santé-social', 'Collectivité', 'Autre'],
     ];
 
@@ -63,7 +71,11 @@ final class CapFormationReferenceSeeder
                 foreach ($labels as $i => $label) {
                     $code = Str::slug($label);
                     $planning = $list === ReferenceList::ActionType->value ? (self::PLANNING[$code] ?? null) : null;
-                    self::ensure(ReferenceList::from($list), $code, $label, $i + 1, $planning === null ? null : ['planning' => $planning]);
+                    $meta = $planning === null ? null : ['planning' => $planning];
+                    if ($list === ReferenceList::AbandonReason->value && in_array($code, self::FORCE_MAJEURE, true)) {
+                        $meta = ['force_majeure' => true];
+                    }
+                    self::ensure(ReferenceList::from($list), $code, $label, $i + 1, $meta);
                 }
             }
 

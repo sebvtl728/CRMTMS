@@ -131,9 +131,19 @@ function namesCrmTables(string $code): bool
     return false;
 }
 
+/**
+ * A reference to the Crm other than its Public namespace: a use line, a
+ * grouped use (`use App\Modules\Crm\{...}`, `use App\Modules\{Crm\...}`) or a
+ * fully qualified name inline (`\App\Modules\Crm\People\Person::class`).
+ */
+const SESSIONS_CRM_REFERENCE = '/App\\\\Modules\\\\Crm\\\\(?!Public\b)|App\\\\Modules\\\\\{[^}]*\bCrm\\\\(?!Public\b)/';
+
+/** Same for the catalogue: only Trainings, TrainingData and TrainingUsage. */
+const SESSIONS_CATALOGUE_REFERENCE = '/App\\\\Modules\\\\Catalogue\\\\(?!(?:Trainings|TrainingData|TrainingUsage)\b)|App\\\\Modules\\\\\{[^}]*\bCatalogue\\\\(?!(?:Trainings|TrainingData|TrainingUsage)\b)/';
+
 it('lets Sessions reach the CRM and the catalogue through their public services only', function () {
-    expect(moduleFilesMatching('Sessions', '/^\s*use\s+App\\\\Modules\\\\Crm\\\\(?!Public\\\\)/m'))->toBe([])
-        ->and(moduleFilesMatching('Sessions', '/^\s*use\s+App\\\\Modules\\\\Catalogue\\\\(?!(Trainings|TrainingData|TrainingUsage);)/m'))->toBe([]);
+    expect(moduleFilesMatching('Sessions', SESSIONS_CRM_REFERENCE))->toBe([])
+        ->and(moduleFilesMatching('Sessions', SESSIONS_CATALOGUE_REFERENCE))->toBe([]);
 
     $offenders = [];
     foreach (new RecursiveIteratorIterator(new RecursiveDirectoryIterator(app_path('Modules/Sessions'))) as $file) {
@@ -146,6 +156,43 @@ it('lets Sessions reach the CRM and the catalogue through their public services 
         }
     }
     expect($offenders)->toBe([]);
+});
+
+it('detects every way of reaching the Crm or the catalogue beyond their public services', function () {
+    foreach ([
+        'use App\Modules\Crm\People\Person;',
+        'use App\Modules\Crm\{Public\Trainees, People\Person};',
+        'use App\Modules\{Crm\People\Person, Core\Access\Role};',
+        '$p = new \App\Modules\Crm\People\Person();',
+        'Person::class === \App\Modules\Crm\Organisations\Organisation::class',
+    ] as $code) {
+        expect(preg_match(SESSIONS_CRM_REFERENCE, $code), $code)->toBe(1);
+    }
+    foreach ([
+        'use App\Modules\Crm\Public\Trainees;',
+        'use App\Modules\Crm\Public\{Trainees, Fiches};',
+        'app(\App\Modules\Crm\Public\Fiches::class)',
+        'use App\Modules\Core\References\ReferenceList;',
+    ] as $code) {
+        expect(preg_match(SESSIONS_CRM_REFERENCE, $code), $code)->toBe(0);
+    }
+
+    foreach ([
+        'use App\Modules\Catalogue\Training;',
+        'use App\Modules\Catalogue\{Trainings, Training};',
+        'use App\Modules\{Catalogue\Training, Crm\Public\Fiches};',
+        '$t = \App\Modules\Catalogue\Brochures\Brochures::class;',
+    ] as $code) {
+        expect(preg_match(SESSIONS_CATALOGUE_REFERENCE, $code), $code)->toBe(1);
+    }
+    foreach ([
+        'use App\Modules\Catalogue\Trainings;',
+        'use App\Modules\Catalogue\TrainingData;',
+        'use App\Modules\Catalogue\TrainingUsage;',
+        'app(\App\Modules\Catalogue\Trainings::class)',
+    ] as $code) {
+        expect(preg_match(SESSIONS_CATALOGUE_REFERENCE, $code), $code)->toBe(0);
+    }
 });
 
 it('keeps Crm, Catalogue and Core free of any import of the Sessions module', function () {
