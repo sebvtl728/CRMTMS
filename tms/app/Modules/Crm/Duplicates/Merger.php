@@ -30,7 +30,7 @@ use InvalidArgumentException;
  * link per pair: the oldest survives, completed by the other), notes and
  * attachments moved, opportunities and opportunity contacts moved (a
  * person holding opportunities stays a particulier), quotes moved (account
- * and recipient; the frozen recipient copy is kept), actions moved, DAS
+ * and recipient; the frozen recipient copy is kept), brochure sendings moved, actions moved, DAS
  * and trainings of interest united, source identifiers kept in merged_sources, $drop trashed for
  * good with merged_into_id, journal crm.merged (ids only).
  */
@@ -170,6 +170,7 @@ class Merger
             $this->moveTimeline($k, $d);
             $this->moveOpportunities($k, $d);
             $this->moveQuotes($k, $d);
+            $this->moveBrochureSendings($k, $d);
             $this->moveActivities($k, $d);
             $this->uniteDas($k, $d, $isPerson);
             $this->interests->merge($k, $d);
@@ -324,6 +325,18 @@ class Merger
         $columns = $keep instanceof Person ? ['person_id', 'contact_person_id'] : ['organisation_id'];
         foreach ($columns as $column) {
             Quote::withTrashed()->where($column, $drop->id)->toBase()->update([$column => $keep->id, 'updated_at' => now()]);
+        }
+    }
+
+    /**
+     * Brochures sent from the fiche, and for a person those sent to her,
+     * follow the fiche.
+     */
+    private function moveBrochureSendings(Organisation|Person $keep, Organisation|Person $drop): void
+    {
+        $columns = $keep instanceof Person ? ['person_id', 'recipient_person_id'] : ['organisation_id'];
+        foreach ($columns as $column) {
+            DB::table('brochure_sendings')->where($column, $drop->id)->update([$column => $keep->id, 'updated_at' => now()]);
         }
     }
 

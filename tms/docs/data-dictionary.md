@@ -358,6 +358,30 @@ Index : `opportunity_id`, `organisation_id`, `person_id`, `contact_person_id`, (
 
 Index : `quote_id`, `training_id`, `das_id`. Journalisée (`quote_line`). La TVA se calcule **par taux** sur la somme des lignes du même taux, pas ligne par ligne.
 
+### `brochure_sendings` — plaquettes envoyées depuis une fiche
+| Colonne | Type | Rôle |
+|---|---|---|
+| `id`, `tenant_id` | uuid | |
+| `organisation_id` / `person_id` | uuid (FK, cascade) | Fiche d'où part l'envoi (exactement une des deux ; le compte de l'opportunité le cas échéant) |
+| `opportunity_id` | uuid nullable (FK, set null) | Opportunité d'où part l'envoi |
+| `recipient_person_id` | uuid (FK `people`) | Destinataire |
+| `recipient_email`, `subject`, `message` | texte nullable | Copie figée de ce qui est parti (données personnelles : hors journal, effacées par l'anonymisation) |
+| `email_status` | `pending` / `sent` / `failed` | État de l'envoi ; `email_error` : raison fixe en français, jamais le texte du serveur |
+| `sent_at`, `created_by`, `created_at`, `updated_at` | | |
+
+Journalisée (`brochure_sending`). `brochure_sending_versions` (`brochure_sending_id`, `brochure_version_id` FK restrict, `position`) garde les versions exactement envoyées.
+
+### `quote_brochures` — plaquettes jointes à l'e-mail d'un devis
+| Colonne | Type | Rôle |
+|---|---|---|
+| `id`, `tenant_id` | uuid | |
+| `quote_id` | uuid (FK, cascade) | |
+| `brochure_version_id` | uuid (FK `brochure_versions`, restrict) | Version jointe à l'envoi (une version envoyée ne s'efface jamais) ; relance et « Renvoyer » rejoignent exactement ces versions |
+| `position` | smallint | Ordre des pièces jointes |
+| `created_at`, `updated_at` | timestamp | |
+
+Unique (`quote_id`, `brochure_version_id`). Journalisée (`quote_brochure`).
+
 ### `revenue_targets` — objectifs de chiffre d'affaires par DAS
 | Colonne | Type | Rôle |
 |---|---|---|
@@ -405,6 +429,9 @@ Unique (`tenant_id`, `das_id`, `period_type`, `period_start`) : l'objectif d'un 
 
 ### `gdpr_pending` — liste « À anonymiser »
 `person_id` (PK, FK cascade) · `tenant_id` · `listed_at`. Une personne y est inscrite par le traitement de nuit quand sa durée de conservation est dépassée ; elle est anonymisée 30 jours après `listed_at` si elle y est toujours.
+
+### `brochures`, `brochure_versions`, `brochure_trainings`, `brochure_das` — bibliothèque de plaquettes (0.5.2, Catalogue)
+`brochures` : `id`, `tenant_id`, `title` (200) · `current_version_id` (FK `brochure_versions`, null à la suppression) · `created_by`, `updated_by` (FK `users`) · `created_at`, `updated_at`, `deleted_at` (corbeille). Journalisée (`brochure`, titre seulement). `brochure_versions` : `id`, `tenant_id`, `brochure_id` (FK cascade), `path` (disque privé `tenants/<tenant_id>/brochures/<plaquette>/<version>.pdf`, nom généré), `original_name` (affichage), `size`, `sha256`, `uploaded_by`, `created_at` ; jamais modifiée ni effacée (une version envoyée reste lisible) ; l'ajout est journalisé (`brochure.version_added` : version, taille, SHA-256, jamais le nom). `brochure_trainings` (`brochure_id`, `training_id`, FK cascade ; la suppression d'une formation détache ses plaquettes) et `brochure_das` (`brochure_id`, `das_id` FK `reference_items`, déclaré à `ReferenceUsage`) : tables d'association, `tenant_id` + RLS. Lues par les autres modules par `Catalogue\Brochures` uniquement. Une version présente dans `quote_brochures` ou `brochure_sending_versions` reste téléchargeable même si sa plaquette est à la corbeille (`Brochures::registerSentCheck`, déclaré par le Crm).
 
 ## Sessions : sessions de formation (lot 2a, RLS)
 

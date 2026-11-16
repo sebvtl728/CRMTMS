@@ -108,3 +108,12 @@ export function formatDay(value: string | null | undefined): string {
 
     return `${d}/${m}/${y}`;
 }
+
+/** File size in French units (« 1,2 Mo », « 340 Ko »). */
+export function formatSize(bytes: number | null | undefined): string {
+    if (bytes === null || bytes === undefined) return '';
+    if (bytes < 1024) return `${bytes} o`;
+    if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} Ko`;
+
+    return `${(bytes / (1024 * 1024)).toLocaleString('fr-FR', { maximumFractionDigits: 1 })} Mo`;
+}

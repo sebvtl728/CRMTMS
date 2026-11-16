@@ -30,9 +30,9 @@ final class Permissions
     public static function labels(): array
     {
         return [
-            self::VIEW => ['Consulter le catalogue', 'Voir les formations, leurs tarifs et financements.'],
-            self::MANAGE => ['Modifier le catalogue', 'Créer, modifier, désactiver ou importer des formations.'],
-            self::DELETE => ['Supprimer des formations', "Supprimer une formation du catalogue, quand rien ne l'utilise."],
+            self::VIEW => ['Consulter le catalogue', 'Voir les formations, leurs tarifs et financements, et télécharger les plaquettes.'],
+            self::MANAGE => ['Modifier le catalogue', 'Créer, modifier, désactiver ou importer des formations ; déposer et modifier des plaquettes.'],
+            self::DELETE => ['Supprimer des formations', "Supprimer une formation du catalogue, quand rien ne l'utilise ; mettre une plaquette à la corbeille."],
         ];
     }
 

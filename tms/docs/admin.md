@@ -123,9 +123,10 @@ Autres garanties (non paramétrables) : mots de passe Argon2id d'au moins 12 car
 
 ### Modèles d'e-mails
 
-Administration › **Modèles d'e-mails** (droit `settings.manage`, celui de l'écran Sécurité : l'administrateur par défaut). Quatre e-mails sont modifiables (objet de 200 caractères au plus, texte brut de 10 000 caractères au plus) :
+Administration › **Modèles d'e-mails** (droit `settings.manage`, celui de l'écran Sécurité : l'administrateur par défaut). Cinq e-mails sont modifiables (objet de 200 caractères au plus, texte brut de 10 000 caractères au plus) :
 
 - **Envoi d'un devis** et **Relance d'un devis** : proposés dans la fenêtre d'envoi, toujours modifiables au cas par cas avant l'envoi ; le PDF est joint par le système.
+- **Envoi d'une plaquette** (modèle `brochure`) : proposé dans la fenêtre « Envoyer une plaquette » (variables `{destinataire}`, `{commercial}`, `{organisme}`), toujours modifiable avant l'envoi ; les plaquettes choisies sont jointes par le système (20 Mo au plus en tout), le message part en texte simple. Droits : envoyer demande `crm.activities.update`, télécharger une version depuis l'historique `catalogue.view`.
 - **Invitation d'un utilisateur** : votre texte (la première ligne sert de formule d'appel) ; le bouton d'activation, la durée de validité du lien et la mention « Si vous n'attendiez pas cette invitation » sont toujours ajoutés.
 - **Récapitulatif quotidien des relances** : le texte avant `{actions}` sert d'introduction, celui après de signature ; la liste des actions et le lien vers « À faire » restent générés. `{actions}` est obligatoire.
 
@@ -166,9 +167,9 @@ Chaque domaine du CRM a ses droits **Consulter**, **Créer et modifier** (créer
 | `crm.revenue.view` | Consulter le chiffre d'affaires par DAS (à périmètre) |
 | `crm.revenue.manage` | Fixer les objectifs de chiffre d'affaires |
 | `crm.import`, `crm.export`, `crm.gdpr` | Imports ; exports Excel des listes ; écran RGPD, export des données d'une personne, anonymisation, durée de conservation |
-| `catalogue.view` | Menu **Catalogue** : voir les formations (tout le catalogue, quel que soit le DAS) |
-| `catalogue.manage` (« Modifier le catalogue ») | Créer, modifier, désactiver une formation ; importer un catalogue (avec `crm.import`) |
-| `catalogue.delete` | Supprimer une formation |
+| `catalogue.view` | Menu **Catalogue** : voir les formations (tout le catalogue, quel que soit le DAS) ; voir et télécharger les plaquettes |
+| `catalogue.manage` (« Modifier le catalogue ») | Créer, modifier, désactiver une formation ; importer un catalogue (avec `crm.import`) ; déposer et modifier des plaquettes |
+| `catalogue.delete` | Supprimer une formation ; mettre une plaquette à la corbeille |
 
 Les droits d'**administration** (`users.manage`, `roles.manage`, `companies.manage`, `references.manage`, `connectors.manage`, `audit.view`, `settings.manage`, `exports.run`) sont inchangés.
 

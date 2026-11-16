@@ -23,13 +23,20 @@ class QuoteMail extends Mailable
         private readonly string $text,
         private readonly string $pdf,
         private readonly string $fileName,
+        /** @var list<array{bytes: string, name: string}> brochures joined after the quote */
+        private readonly array $brochures = [],
     ) {}
 
     public function build(): self
     {
-        return $this->subject($this->mailSubject)
-            ->text('mail.quote', ['text' => $this->text])
+        $mail = $this->subject($this->mailSubject)
+            ->text('mail.plain-text', ['text' => $this->text])
             ->attachData($this->pdf, $this->fileName, ['mime' => 'application/pdf']);
+        foreach ($this->brochures as $brochure) {
+            $mail->attachData($brochure['bytes'], $brochure['name'], ['mime' => 'application/pdf']);
+        }
+
+        return $mail;
     }
 
     /**

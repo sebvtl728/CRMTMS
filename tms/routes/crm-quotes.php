@@ -10,6 +10,9 @@ use Illuminate\Support\Facades\Route;
 Route::middleware(['auth'])->group(function () {
     Route::get('crm/opportunities/{opportunity}/quotes/create', [QuoteController::class, 'create'])->middleware('can:crm.quotes.update')->name('crm.quotes.create');
 
+    // Brochures offered in the sending window of a quote.
+    Route::get('crm/quote-brochures', [QuoteController::class, 'brochureOptions'])->middleware('can:crm.quotes.update')->name('crm.quotes.brochure-options');
+
     Route::prefix('crm/quotes')->name('crm.quotes.')->group(function () {
         Route::get('/', [QuoteController::class, 'index'])->middleware('can:crm.quotes.view')->name('index');
         Route::get('export', [ExportController::class, 'quotes'])->middleware(['can:crm.quotes.view', 'can:crm.export', 'throttle:crm-export'])->name('export');

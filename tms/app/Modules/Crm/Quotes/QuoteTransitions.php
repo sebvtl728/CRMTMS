@@ -3,7 +3,10 @@
 namespace App\Modules\Crm\Quotes;
 
 use App\Exceptions\UserFacingHttpException;
+use App\Modules\Catalogue\Brochures;
 use App\Modules\Core\Companies\VatRegime;
+use App\Modules\Core\Tenancy\TenantStorage;
+use App\Modules\Crm\Brochures\BrochureAttachments;
 use App\Modules\Crm\Opportunities\Opportunity;
 use App\Modules\Crm\Opportunities\OpportunityStage;
 use App\Modules\Crm\Organisations\Organisation;
@@ -11,6 +14,8 @@ use App\Modules\Crm\People\Person;
 use App\Modules\Crm\Timeline\LastContact;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Validation\ValidationException;
 
 /**
  * Life of a quote after its draft: sending (frozen, archived, e-mailed,
@@ -44,10 +49,18 @@ final class QuoteTransitions
 
     public const NO_ARCHIVE = 'Le PDF archivé de ce devis est introuvable : il ne peut pas être joint au message. Contactez l\'administrateur.';
 
+    /** Bytes: the quote PDF and the brochures of one e-mail. */
+    public const MAX_ATTACHMENTS_BYTES = BrochureAttachments::MAX_BYTES;
+
+    public const ATTACHMENTS_TOO_BIG = BrochureAttachments::TOO_BIG;
+
+    public const BROCHURE_GONE = BrochureAttachments::GONE;
+
     public function __construct(
         private readonly QuoteFreezer $freezer,
         private readonly OpportunityStage $stages,
         private readonly QuotePdf $pdf,
+        private readonly Brochures $brochures,
     ) {}
 
     /**
@@ -78,10 +91,11 @@ final class QuoteTransitions
 
     /**
      * @param  Message  $message
+     * @param  list<string>  $brochureVersionIds  brochure versions joined to the e-mail (and to its reminders)
      */
-    public function send(Quote $quote, array $message): void
+    public function send(Quote $quote, array $message, array $brochureVersionIds = []): void
     {
-        $this->transition($quote, function (Quote $locked) use ($message): void {
+        $this->transition($quote, function (Quote $locked) use ($message, $brochureVersionIds): void {
             if (! $locked->isDraft()) {
                 throw new UserFacingHttpException(409, self::NOT_DRAFT);
             }
@@ -89,7 +103,13 @@ final class QuoteTransitions
             if ($blocker !== null) {
                 throw new UserFacingHttpException(409, $blocker);
             }
+            // Refused before anything is rendered or archived.
+            $versions = $this->brochureVersions($brochureVersionIds);
             $this->freezer->freeze($locked);
+            $this->requireRoom($locked, $versions);
+            foreach ($versions as $position => $version) {
+                QuoteBrochure::query()->create(['quote_id' => $locked->id, 'brochure_version_id' => $version['version_id'], 'position' => $position]);
+            }
 
             $now = CarbonImmutable::now();
             $locked->status = QuoteStatus::Sent;
@@ -220,6 +240,51 @@ final class QuoteTransitions
             });
 
         return $count;
+    }
+
+    /**
+     * The versions chosen, each once, in order; one that no longer exists
+     * (or the total of the brochures alone over the limit) is refused.
+     *
+     * @param  list<string>  $ids
+     * @return list<array{version_id: string, path: string, original_name: string, size: int}>
+     */
+    private function brochureVersions(array $ids): array
+    {
+        $ids = array_values(array_unique($ids));
+        $versions = $this->brochures->versions($ids);
+        if (count($versions) !== count($ids)) {
+            throw new UserFacingHttpException(422, self::BROCHURE_GONE);
+        }
+        if (BrochureAttachments::tooBig(array_sum(array_column($versions, 'size')))) {
+            throw new UserFacingHttpException(422, self::ATTACHMENTS_TOO_BIG);
+        }
+
+        return $versions;
+    }
+
+    /**
+     * The archived PDF and the brochures together stay within the limit of
+     * one e-mail; otherwise the archive just written is deleted from the disk
+     * and a field error on brochure_version_ids is raised (the exception
+     * rolls the transaction back: the quote stays a draft).
+     *
+     * @param  list<array{version_id: string, path: string, original_name: string, size: int}>  $versions
+     *
+     * @throws ValidationException
+     */
+    private function requireRoom(Quote $quote, array $versions): void
+    {
+        if ($versions === []) {
+            return;
+        }
+        $disk = Storage::disk(TenantStorage::DISK);
+        $path = (string) $quote->pdf_path;
+        if (BrochureAttachments::tooBig((int) $disk->size($path) + array_sum(array_column($versions, 'size')))) {
+            $disk->delete($path);
+
+            throw ValidationException::withMessages(['brochure_version_ids' => self::ATTACHMENTS_TOO_BIG]);
+        }
     }
 
     /**

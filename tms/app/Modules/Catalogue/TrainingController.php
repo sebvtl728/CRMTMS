@@ -70,7 +70,7 @@ class TrainingController extends Controller
         return to_route('catalogue.index')->with('status', 'Formation créée.');
     }
 
-    public function edit(Training $training): Response
+    public function edit(Request $request, Training $training): Response
     {
         Gate::authorize('update', $training);
 
@@ -90,6 +90,8 @@ class TrainingController extends Controller
                 'funding_mode_ids' => $training->fundingModes()->pluck('reference_items.id')->all(),
             ],
             'options' => self::formOptions($training),
+            'brochures' => app(Brochures::class)->forTrainingPage($training),
+            'can' => ['brochures' => $this->user($request)->can(Permissions::VIEW)],
         ]);
     }
 

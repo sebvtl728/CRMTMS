@@ -34,8 +34,8 @@ it('keeps Catalogue free of any import of the Crm module', function () {
 });
 
 it('lets Crm reach the catalogue through its public service only', function () {
-    // Trainings (reads, import writes), TrainingData (its result), TrainingUsage (delete guard).
-    expect(moduleFilesMatching('Crm', '/^\s*use\s+App\\\\Modules\\\\Catalogue\\\\(?!(Trainings|TrainingData|TrainingUsage);)/m'))->toBe([])
+    // Trainings (reads, import writes), TrainingData (its result), TrainingUsage (delete guard), Brochures (brochure library).
+    expect(moduleFilesMatching('Crm', '/^\s*use\s+App\\\\Modules\\\\Catalogue\\\\(?!(Trainings|TrainingData|TrainingUsage|Brochures);)/m'))->toBe([])
         ->and(filesNamingCatalogueTables('Crm'))->toBe([]);
 });
 
@@ -46,9 +46,9 @@ it('lets Crm reach the catalogue through its public service only', function () {
  * an SQL keyword. Broad on purpose: Crm names its own data otherwise
  * (training_lines, training_titles, opportunity_trainings).
  */
-const CATALOGUE_TABLES = '/[\'"`](?:public\.)?(?:trainings|training_funding_modes)(?:[\'"`.]|\s+as\b)'
-    .'|\b(?:exists|unique):(?:public\.)?(?:trainings|training_funding_modes)\b'
-    .'|\b(?:from|join|into|update)\s+(?:public\.)?["`]?(?:trainings|training_funding_modes)\b/i';
+const CATALOGUE_TABLES = '/[\'"`](?:public\.)?(?:trainings|training_funding_modes|brochures|brochure_versions|brochure_trainings|brochure_das)(?:[\'"`.]|\s+as\b)'
+    .'|\b(?:exists|unique):(?:public\.)?(?:trainings|training_funding_modes|brochures|brochure_versions|brochure_trainings|brochure_das)\b'
+    .'|\b(?:from|join|into|update)\s+(?:public\.)?["`]?(?:trainings|training_funding_modes|brochures|brochure_versions|brochure_trainings|brochure_das)\b/i';
 
 /**
  * Lines allowed to name « trainings » although they match, each for a reason.
@@ -96,11 +96,12 @@ it('detects a use of the catalogue tables, the import target line apart', functi
         "whereRaw('select 1 from training_funding_modes')", 'insert into public.trainings', "protected \$table = 'trainings';",
         'DB::select(\'select * from "trainings"\')', "\$t = 'trainings'; DB::table(\$t);", "'das_id' => 'exists:trainings,id'",
         "'code' => 'unique:trainings'", "'x' => ['exists:public.training_funding_modes,training_id']", "\$validated['trainings']",
-        "array_key_exists('trainings', \$data)", 'Schema::hasTable("training_funding_modes")'] as $code) {
+        "array_key_exists('trainings', \$data)", 'Schema::hasTable("training_funding_modes")',
+        "DB::table('brochures')", "->join('brochure_versions as v', 'a', 'b')", "'x' => 'exists:brochure_das,brochure_id'", 'select * from brochure_trainings', "'brochures' => []"] as $code) {
         expect(namesCatalogueTables($code))->toBeTrue($code);
     }
     foreach (["    case Trainings = 'trainings';", "'opportunity_trainings.training_id'", "DB::table('opportunity_trainings')",
-        "'training_lines' => []", "'training_titles' => 'Formations'", '// the trainings of the catalogue'] as $code) {
+        "'training_lines' => []", "'training_titles' => 'Formations'", "DB::table('quote_brochures')", '// the trainings of the catalogue'] as $code) {
         expect(namesCatalogueTables($code))->toBeFalse($code);
     }
 });

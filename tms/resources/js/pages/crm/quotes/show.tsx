@@ -1,7 +1,7 @@
 import { decimalInput, rateLabel } from '@/components/crm/quote-lines';
 import { QuoteStatusBadge, type QuoteRow } from '@/components/crm/quote-list';
 import { QuoteAnswerDialog, QuoteOutcomeDialog, type ProposeWon, type QuotePipeline } from '@/components/crm/quote-outcome-dialog';
-import { QuoteSendDialog, type QuoteMessageDefaults } from '@/components/crm/quote-send-dialog';
+import { QuoteSendDialog, type BrochureChoice, type QuoteMessageDefaults, type SentBrochure } from '@/components/crm/quote-send-dialog';
 import { QuoteSignedButton, type SignedCopy } from '@/components/crm/quote-signed';
 import InputError from '@/components/input-error';
 import { Badge } from '@/components/ui/badge';
@@ -60,6 +60,8 @@ interface ShowProps {
         answer: boolean;
         attachSigned: boolean;
     };
+    brochure_choices: BrochureChoice[];
+    brochures_sent: SentBrochure[];
     send: QuoteMessageDefaults | null;
     remind: QuoteMessageDefaults | null;
     pipeline: QuotePipeline;
@@ -88,6 +90,8 @@ export default function QuoteShow({
     can,
     send,
     remind,
+    brochure_choices: brochureChoices,
+    brochures_sent: brochuresSent,
     pipeline,
     propose,
     pdf_available: pdfAvailable,
@@ -372,6 +376,7 @@ export default function QuoteShow({
                     number={q.number}
                     kind="send"
                     defaults={send}
+                    choices={brochureChoices}
                     open={mailing === 'send'}
                     onClose={() => setMailing(null)}
                 />
@@ -382,6 +387,7 @@ export default function QuoteShow({
                     number={q.number}
                     kind="remind"
                     defaults={remind}
+                    sent={brochuresSent}
                     open={mailing === 'remind'}
                     onClose={() => setMailing(null)}
                 />

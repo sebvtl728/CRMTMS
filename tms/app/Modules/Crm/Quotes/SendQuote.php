@@ -2,6 +2,7 @@
 
 namespace App\Modules\Crm\Quotes;
 
+use App\Modules\Catalogue\Brochures;
 use App\Modules\Connectors\Core\ConnectorRun;
 use App\Modules\Connectors\Smtp\SmtpHostRefused;
 use App\Modules\Connectors\Smtp\TenantMailer;
@@ -10,6 +11,7 @@ use App\Modules\Core\Tenancy\Tenant;
 use App\Modules\Core\Tenancy\TenantAwareJob;
 use App\Modules\Core\Tenancy\TenantContext;
 use App\Modules\Core\Tenancy\TenantStorage;
+use App\Modules\Crm\Brochures\BrochureAttachments;
 use Carbon\CarbonImmutable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
@@ -42,6 +44,8 @@ class SendQuote implements ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, TenantAwareJob;
 
+    public const NO_BROCHURE = BrochureAttachments::MISSING;
+
     public const NO_DOCUMENT = 'Le PDF archivé du devis est introuvable : l\'e-mail n\'est pas parti.';
 
     public int $tries = 3;
@@ -59,7 +63,7 @@ class SendQuote implements ShouldQueue
         return [60, 300, 900];
     }
 
-    public function handle(QuotePdf $pdf): void
+    public function handle(QuotePdf $pdf, Brochures $brochures): void
     {
         $quote = Quote::query()->with('company')->find($this->quoteId);
         $message = $quote?->email_message;
@@ -77,15 +81,25 @@ class SendQuote implements ShouldQueue
             return;
         }
 
+        // The versions recorded at sending, whatever became of their brochure since.
+        $versions = $brochures->versions(QuoteBrochure::query()->where('quote_id', $quote->id)->orderBy('position')->pluck('brochure_version_id')->all());
+        $joined = BrochureAttachments::read($versions);
+        if ($joined === null) {
+            Log::warning('Fichier de plaquette introuvable', ['quote_id' => $quote->id]);
+            $this->failed(new QuoteMailFailed(self::NO_BROCHURE));
+
+            return;
+        }
+
         $error = null;
-        $send = function () use ($quote, $message, $archived, &$error): string {
+        $send = function () use ($quote, $message, $archived, $joined, &$error): string {
             try {
                 $bytes = (string) Storage::disk(TenantStorage::DISK)->get($archived);
 
                 TenantMailer::for($quote->company)
                     ->to($message['to'])
                     ->cc($message['cc'] ?? [])
-                    ->send(new QuoteMail($message['subject'], $message['body'], $bytes, QuotePdf::fileName($quote)));
+                    ->send(new QuoteMail($message['subject'], $message['body'], $bytes, QuotePdf::fileName($quote), $joined));
             } catch (Throwable $e) {
                 $error = $e;
 
@@ -165,7 +179,7 @@ class SendQuote implements ShouldQueue
     /**
      * The SMTP reply code (4xx / 5xx) of a transport failure, else 0.
      */
-    private static function smtpCode(Throwable $e): int
+    public static function smtpCode(Throwable $e): int
     {
         if (! $e instanceof TransportExceptionInterface && ! $e instanceof RuntimeException) {
             return 0;

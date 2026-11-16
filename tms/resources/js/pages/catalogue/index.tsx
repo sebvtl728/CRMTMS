@@ -133,6 +133,9 @@ export default function CatalogueIndex({ trainings, filters, options, can, statu
                 <div className="flex flex-wrap items-start justify-between gap-4">
                     <Heading title="Catalogue" description="Formations proposées, par DAS, avec leurs tarifs HT par stagiaire" />
                     <div className="flex flex-wrap items-start gap-2">
+                        <Button asChild variant="outline">
+                            <Link href={route('catalogue.brochures.index')}>Plaquettes</Link>
+                        </Button>
                         {can.export && (
                             <Button asChild variant="outline" className="hidden md:inline-flex">
                                 <a href={route('catalogue.export', catalogueQuery(filters))}>

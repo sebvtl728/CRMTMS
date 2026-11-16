@@ -2,6 +2,7 @@
 
 namespace App\Modules\Crm;
 
+use App\Modules\Catalogue\Brochures;
 use App\Modules\Catalogue\TrainingUsage;
 use App\Modules\Core\Access\AccessScope;
 use App\Modules\Core\Access\Permissions as CorePermissions;
@@ -17,6 +18,8 @@ use App\Modules\Crm\Activities\ActivitiesProvider;
 use App\Modules\Crm\Activities\Activity;
 use App\Modules\Crm\Activities\ActivityPolicy;
 use App\Modules\Crm\Affiliations\Affiliation;
+use App\Modules\Crm\Brochures\BrochureSending;
+use App\Modules\Crm\Brochures\BrochureSendingsProvider;
 use App\Modules\Crm\Gdpr\Consent;
 use App\Modules\Crm\Import\ImportBatch;
 use App\Modules\Crm\Import\ImportProfile;
@@ -34,6 +37,7 @@ use App\Modules\Crm\Organisations\OrganisationPolicy;
 use App\Modules\Crm\People\Person;
 use App\Modules\Crm\People\PersonPolicy;
 use App\Modules\Crm\Quotes\Quote;
+use App\Modules\Crm\Quotes\QuoteBrochure;
 use App\Modules\Crm\Quotes\QuoteLine;
 use App\Modules\Crm\Quotes\QuotePolicy;
 use App\Modules\Crm\Quotes\QuotesProvider;
@@ -110,11 +114,13 @@ class CrmServiceProvider extends ServiceProvider
             'activity' => Activity::class,
             'quote' => Quote::class,
             'quote_line' => QuoteLine::class,
+            'quote_brochure' => QuoteBrochure::class,
+            'brochure_sending' => BrochureSending::class,
             'revenue_target' => RevenueTarget::class,
         ]);
 
         // Sources of the « Historique »; later increments tag their own.
-        $this->app->tag([NotesProvider::class, AttachmentsProvider::class, AuditProvider::class, OpportunitiesProvider::class, ActivitiesProvider::class, QuotesProvider::class], Timeline::TAG);
+        $this->app->tag([NotesProvider::class, AttachmentsProvider::class, AuditProvider::class, OpportunitiesProvider::class, ActivitiesProvider::class, QuotesProvider::class, BrochureSendingsProvider::class], Timeline::TAG);
     }
 
     public function boot(): void
@@ -135,6 +141,8 @@ class CrmServiceProvider extends ServiceProvider
         RateLimiter::for('revenue-targets', fn (Request $request) => Limit::perMinute(60)->by('revenue-targets:'.($request->user()?->getAuthIdentifier() ?? $request->ip())));
         // Quote e-mails (send, reminder, « Renvoyer »): 20 a minute per user.
         RateLimiter::for('quote-mail', fn (Request $request) => Limit::perMinute(20)->by('quote-mail:'.($request->user()?->getAuthIdentifier() ?? $request->ip())));
+        // « Envoyer une plaquette » from a fiche: 20 a minute per user.
+        RateLimiter::for('brochure-mail', fn (Request $request) => Limit::perMinute(20)->by('brochure-mail:'.($request->user()?->getAuthIdentifier() ?? $request->ip())));
         // Signed copy of a quote (upload, download): 30 a minute per user.
         RateLimiter::for('quote-signed', fn (Request $request) => Limit::perMinute(30)->by('quote-signed:'.($request->user()?->getAuthIdentifier() ?? $request->ip())));
         // A draft's PDF is rendered on each request (Gotenberg): 30 a minute per user.
@@ -436,6 +444,11 @@ class CrmServiceProvider extends ServiceProvider
             Quote::withTrashed()->where(fn (Builder $q) => $fiche instanceof Organisation
                 ? $q->where('organisation_id', $fiche->getKey())
                 : $q->where('person_id', $fiche->getKey())->orWhere('contact_person_id', $fiche->getKey())), $ids)->exists());
+        // Brochures sent from the fiche, or to the person.
+        LinkedData::register('crm.brochure_sendings', fn (Organisation|Person $fiche, array $ids): bool => $except(
+            BrochureSending::query()->where(fn (Builder $q) => $fiche instanceof Organisation
+                ? $q->where('organisation_id', $fiche->getKey())
+                : $q->where('person_id', $fiche->getKey())->orWhere('recipient_person_id', $fiche->getKey())), $ids)->exists());
         LinkedData::register('crm.interest_trainings', fn (Organisation|Person $fiche, array $ids): bool => $except(
             FicheTraining::query()->where(FicheTrainings::column($fiche), $fiche->getKey()), $ids)->exists());
         LinkedData::register('crm.consents', fn (Organisation|Person $fiche, array $ids): bool => $fiche instanceof Person
@@ -453,6 +466,9 @@ class CrmServiceProvider extends ServiceProvider
         TrainingUsage::register('fiches', fn (string $trainingId): bool => FicheTrainings::uses($trainingId));
         // Lines of a trashed quote stay too.
         TrainingUsage::register('quotes', fn (string $trainingId): bool => QuoteLine::query()->where('training_id', $trainingId)->exists());
+        // A version sent with a quote or from a fiche stays downloadable from the history, its brochure trashed or not.
+        Brochures::registerSentCheck('crm', fn (string $versionId): bool => DB::table('quote_brochures')->where('brochure_version_id', $versionId)->exists()
+            || DB::table('brochure_sending_versions')->where('brochure_version_id', $versionId)->exists());
     }
 
     /**
@@ -492,6 +508,18 @@ class CrmServiceProvider extends ServiceProvider
 
             $latest = $query->whereNotNull('sent_at')->toBase()
                 ->selectRaw('max(greatest(sent_at, coalesce(reminded_at, sent_at))) as latest')->value('latest');
+
+            return is_string($latest) ? CarbonImmutable::parse($latest) : null;
+        });
+
+        // A brochure sent from a fiche (or one of its opportunities): a contact of that fiche and of its recipient.
+        LastContact::registerSource(function (string $subjectType, array $ids): ?CarbonInterface {
+            $query = match ($subjectType) {
+                (new Organisation)->getMorphClass() => BrochureSending::query()->whereIn('organisation_id', $ids),
+                (new Person)->getMorphClass() => BrochureSending::query()->where(fn (Builder $q) => $q->whereIn('person_id', $ids)->orWhereIn('recipient_person_id', $ids)),
+                default => null,
+            };
+            $latest = $query?->max('created_at');
 
             return is_string($latest) ? CarbonImmutable::parse($latest) : null;
         });

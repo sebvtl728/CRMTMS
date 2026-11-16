@@ -4,6 +4,7 @@ namespace App\Modules\Crm\Quotes;
 
 use App\Exceptions\UserFacingHttpException;
 use App\Http\Controllers\Controller;
+use App\Modules\Catalogue\Brochures;
 use App\Modules\Connectors\Smtp\TenantMailer;
 use App\Modules\Core\Companies\LegalMentions;
 use App\Modules\Core\References\ReferenceList;
@@ -15,6 +16,7 @@ use App\Modules\Crm\Permissions;
 use App\Modules\Crm\Public\QuoteLinks;
 use App\Modules\Crm\Support\FormOptions;
 use Carbon\CarbonImmutable;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -77,7 +79,7 @@ class QuoteController extends Controller
         return to_route('crm.quotes.show', $quote)->with('status', "Devis {$quote->number} créé.");
     }
 
-    public function show(Request $request, Quote $quote, QuotePdf $pdf): Response
+    public function show(Request $request, Quote $quote, QuotePdf $pdf, Brochures $brochures): Response
     {
         $user = $this->user($request);
         Gate::authorize('view', $quote);
@@ -161,6 +163,10 @@ class QuoteController extends Controller
             // A draft that cannot be sent as it is (button disabled, reason shown).
             'send_blocked' => $quote->isDraft() ? QuoteTransitions::sendBlocker($mailQuote) : null,
             'vat_regime_changed' => QuoteTransitions::vatRegimeChanged($mailQuote),
+            // Brochures proposed in the sending window (those of the lines' trainings and their DAS, once each);
+            // for a sent quote, the versions joined to its e-mail.
+            'brochure_choices' => $quote->isDraft() ? $brochures->forTrainings($quote->lines->pluck('training_id')->filter()->unique()->values()->all()) : [],
+            'brochures_sent' => $quote->isDraft() ? [] : $this->sentBrochures($quote, $brochures),
             // Prefilled windows; a warning when nothing would really leave.
             'send' => $quote->isDraft() ? [...QuoteMail::defaults($mailQuote, QuoteMail::KIND_SEND), 'delivers_nowhere' => $nowhere] : null,
             'remind' => $quote->isAwaitingAnswer() ? [...QuoteMail::defaults($mailQuote, QuoteMail::KIND_REMIND), 'delivers_nowhere' => $nowhere] : null,
@@ -178,6 +184,26 @@ class QuoteController extends Controller
             ],
             'status' => $request->session()->get('status'),
         ]);
+    }
+
+    /**
+     * @return list<array{version_id: string, original_name: string, size: int}>
+     */
+    private function sentBrochures(Quote $quote, Brochures $brochures): array
+    {
+        $ids = QuoteBrochure::query()->where('quote_id', $quote->id)->orderBy('position')->pluck('brochure_version_id')->all();
+
+        return array_map(fn (array $v) => ['version_id' => $v['version_id'], 'original_name' => $v['original_name'], 'size' => $v['size']], $brochures->versions($ids));
+    }
+
+    /**
+     * Brochures to add in the sending window (title search, current versions).
+     */
+    public function brochureOptions(Request $request, Brochures $brochures): JsonResponse
+    {
+        $q = $request->query('q');
+
+        return response()->json(['data' => $brochures->options(is_string($q) ? $q : null)]);
     }
 
     public function edit(Quote $quote): Response

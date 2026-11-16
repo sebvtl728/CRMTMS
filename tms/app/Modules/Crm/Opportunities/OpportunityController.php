@@ -8,6 +8,8 @@ use App\Modules\Core\References\ReferenceList;
 use App\Modules\Core\Users\User;
 use App\Modules\Crm\Activities\Activity;
 use App\Modules\Crm\Activities\ActivityRows;
+use App\Modules\Crm\Brochures\BrochureSendingRows;
+use App\Modules\Crm\Brochures\BrochureSendProps;
 use App\Modules\Crm\Interests\FicheTrainings;
 use App\Modules\Crm\Permissions;
 use App\Modules\Crm\Quotes\Quote;
@@ -153,6 +155,8 @@ class OpportunityController extends Controller
                 'estimate' => OpportunityTrainings::proposal($opportunity),
             ],
             'quotes' => QuoteRows::forOpportunity($opportunity, $user),
+            'brochure_send' => BrochureSendProps::for($opportunity, $user),
+            'brochure_sendings' => BrochureSendingRows::forOpportunity($opportunity->id),
             'stages' => OpportunityStage::options($opportunity->stage_id),
             'lossReasons' => FormOptions::reference(ReferenceList::LossReason),
             'can' => [

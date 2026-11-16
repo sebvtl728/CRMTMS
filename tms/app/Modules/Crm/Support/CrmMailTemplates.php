@@ -7,14 +7,16 @@ use App\Modules\Core\Mail\MailTemplateRegistry;
 
 /**
  * The CRM's editable e-mails (« Modèles d'e-mails »): sending and reminder
- * of a quote (prefilled in the window, still editable case by case) and the
- * daily digest (its list of actions stays generated).
+ * of a quote (prefilled in the window, still editable case by case), the
+ * brochures sent from a fiche and the daily digest (its list of actions stays generated).
  */
 final class CrmMailTemplates
 {
     public const QUOTE_SEND = 'quote.send';
 
     public const QUOTE_REMIND = 'quote.remind';
+
+    public const BROCHURE = 'brochure';
 
     public const DAILY_DIGEST = 'crm.daily_digest';
 
@@ -45,6 +47,18 @@ final class CrmMailTemplates
             subject: 'Relance : devis {numero_devis} — {societe}',
             body: "Bonjour,\n\nNous revenons vers vous au sujet de notre devis {numero_devis}, valable jusqu'au {date_validite}, que vous trouverez de nouveau ci-joint.\n\nN'hésitez pas à nous contacter pour toute question.\n\nCordialement,\n{societe}",
             variables: $quote,
+        ));
+        MailTemplateRegistry::register(new MailTemplateDefinition(
+            key: self::BROCHURE,
+            label: "Envoi d'une plaquette",
+            description: 'Proposé dans la fenêtre « Envoyer une plaquette » (fiche ou opportunité), toujours modifiable avant l\'envoi. Les plaquettes choisies sont jointes automatiquement.',
+            subject: 'Nos formations — {organisme}',
+            body: "Bonjour {destinataire},\n\nVeuillez trouver ci-joint la documentation sur nos formations.\n\nNous restons à votre disposition pour toute question.\n\nCordialement,\n{commercial}\n{organisme}",
+            variables: [
+                'destinataire' => ['prénom et nom du destinataire', 'Léa Durand'],
+                'commercial' => ["prénom et nom de l'utilisateur qui envoie", 'Camille Commercial'],
+                'organisme' => ["nom de l'organisme", 'CAP FORMATION'],
+            ],
         ));
         MailTemplateRegistry::register(new MailTemplateDefinition(
             key: self::DAILY_DIGEST,
