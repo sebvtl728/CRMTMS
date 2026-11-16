@@ -37,7 +37,8 @@ it('declares the planning rights of the Sessions module', function () {
         ->and(CorePermissions::scopesFor(Permissions::SEANCES_MANAGE))->toBe([AccessScope::Own, AccessScope::Das, AccessScope::All])
         ->and(CorePermissions::scopesFor(Permissions::SESSIONS_VIEW))->not->toContain(AccessScope::Trainer)
         ->and(CorePermissions::scopesFor('crm.fiches.view'))->not->toContain(AccessScope::Trainer)
-        ->and(CorePermissions::isScoped(Permissions::TRAINERS_MANAGE))->toBeFalse()
+        ->and(CorePermissions::isScoped(Permissions::TRAINERS_MANAGE))->toBeTrue()
+        ->and(CorePermissions::isScoped(Permissions::ROOMS_MANAGE))->toBeFalse()
         ->and(AccessScope::Trainer->value)->toBe('trainer')
         ->and(AccessScope::Trainer->label())->toBe('Ses séances');
 });
@@ -120,7 +121,7 @@ it('offers « Ses séances » on the « Rôles et droits » screen for the two p
 
             return $withTrainer === ['sessions.attendance.manage', 'sessions.seances.view']
                 && $rows['sessions.sessions.view']['scope_options'] === ['own', 'das', 'all']
-                && $rows['sessions.trainers.manage']['scope_options'] === [];
+                && $rows['sessions.trainers.manage']['scope_options'] === ['own', 'das', 'all'] && $rows['sessions.rooms.manage']['scope_options'] === [];
         }));
 
     $assistant = RoleModel::forSystem(Role::Assistant);

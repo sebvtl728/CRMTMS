@@ -4,6 +4,8 @@ namespace App\Modules\Sessions\Trainers;
 
 use App\Modules\Core\Access\AccessScope;
 use App\Modules\Core\Access\Scopes;
+use App\Modules\Core\References\ReferenceItem;
+use App\Modules\Core\References\ReferenceList;
 use App\Modules\Core\Users\User;
 use App\Modules\Crm\Public\Fiches;
 use App\Modules\Sessions\Permissions;
@@ -15,13 +17,16 @@ use Illuminate\Support\Str;
 final class TrainerRows
 {
     /**
-     * Every trainer out of the trash, by name.
+     * The trainers out of the trash the user reaches (scope of
+     * sessions.trainers.manage), those of the DAS $dasId when given, by name.
      *
-     * @return list<array{id: string, label: string, email: string|null, status: string, status_label: string, active: bool, user: array{name: string, email: string}|null}>
+     * @return list<array{id: string, label: string, email: string|null, status: string, status_label: string, active: bool, das: list<string>, user: array{name: string, email: string}|null}>
      */
-    public static function list(): array
+    public static function list(User $viewer, ?string $dasId = null): array
     {
-        $trainers = Trainer::query()->get();
+        $trainers = TrainerVisibility::scoped(Trainers::ofDas($dasId), $viewer)->get();
+        $das = TrainerDas::query()->whereIn('trainer_id', $trainers->pluck('id')->all())->get()->groupBy('trainer_id');
+        $dasLabels = ReferenceItem::query()->where('list', ReferenceList::Das)->pluck('label', 'id');
         $fiches = app(Fiches::class);
         $ids = $trainers->pluck('person_id')->map(fn ($id) => (string) $id)->all();
         $labels = $fiches->personLabels($ids);
@@ -35,6 +40,7 @@ final class TrainerRows
             'status' => $t->status,
             'status_label' => $t->statusLabel(),
             'active' => $t->active,
+            'das' => ($das[$t->id] ?? collect())->map(fn (TrainerDas $d) => (string) ($dasLabels[$d->das_id] ?? ''))->filter()->sort()->values()->all(),
             'user' => $t->user_id !== null && $users->has($t->user_id) ? ['name' => $users[$t->user_id]->name, 'email' => $users[$t->user_id]->email] : null,
         ])->sortBy(fn (array $row) => Str::lower(Str::ascii($row['label'])).' '.$row['id'])->values()->all();
     }
@@ -74,7 +80,7 @@ final class TrainerRows
         if (! $viewer->can(Permissions::TRAINERS_MANAGE)) {
             return null;
         }
-        $trainer = Trainer::query()->where('person_id', $personId)->first();
+        $trainer = TrainerVisibility::scoped(Trainer::query(), $viewer)->where('person_id', $personId)->first();
         if ($trainer === null) {
             return null;
         }

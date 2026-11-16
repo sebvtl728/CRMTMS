@@ -115,6 +115,7 @@ Route::middleware(['auth', 'can:sessions.trainers.manage'])->prefix('trainers')-
     Route::get('{trainer}', [TrainerController::class, 'show'])->name('show');
     Route::put('{trainer}', [TrainerController::class, 'update'])->name('update');
     Route::delete('{trainer}', [TrainerController::class, 'destroy'])->name('destroy');
+    Route::put('{trainer}/das', [TrainerController::class, 'updateDas'])->name('das');
     Route::put('{trainer}/user', [TrainerController::class, 'link'])->name('user');
     Route::post('{trainer}/unavailabilities', [TrainerController::class, 'storeUnavailability'])->name('unavailabilities.store');
     Route::delete('{trainer}/unavailabilities/{unavailability}', [TrainerController::class, 'destroyUnavailability'])->name('unavailabilities.destroy');

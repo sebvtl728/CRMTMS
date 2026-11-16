@@ -26,7 +26,7 @@ it('declares the rights of the Sessions module, scoped but for trainers and room
 
     foreach (Permissions::all() as $permission) {
         $label = CorePermissions::label($permission);
-        expect(CorePermissions::isScoped($permission), $permission)->toBe(! in_array($permission, [Permissions::TRAINERS_MANAGE, Permissions::ROOMS_MANAGE], true))
+        expect(CorePermissions::isScoped($permission), $permission)->toBe($permission !== Permissions::ROOMS_MANAGE)
             ->and($label, $permission)->not->toBeNull()
             ->and($label['label'] ?? '', $permission)->not->toBe('')
             ->and($label['description'] ?? '', $permission)->not->toBe('');

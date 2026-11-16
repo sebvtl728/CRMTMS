@@ -7,7 +7,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { formatDay, type Option } from '@/lib/crm';
 import { addDays, dayShade, isoWeekday, mondayOf, monthGrid, MONTHS, sendJson, WEEKDAYS_SHORT } from '@/lib/sessions';
 import { router, useForm } from '@inertiajs/react';
@@ -48,10 +48,18 @@ function OptionSelect({
 }: {
     id: string;
     value: string;
-    options: Option[];
+    options: (Option & { das_match?: boolean })[];
     onChange: (v: string) => void;
     none?: string;
 }) {
+    // Trainers: those of the DAS of the session first, under their own heading.
+    const grouped = options.some((o) => o.das_match === true);
+    const item = (o: Option) => (
+        <SelectItem key={o.value} value={o.value}>
+            {o.label}
+        </SelectItem>
+    );
+
     return (
         <Select value={value || (none ? NONE : undefined)} onValueChange={(v) => onChange(v === NONE ? '' : v)}>
             <SelectTrigger id={id}>
@@ -59,11 +67,20 @@ function OptionSelect({
             </SelectTrigger>
             <SelectContent>
                 {none && <SelectItem value={NONE}>{none}</SelectItem>}
-                {options.map((o) => (
-                    <SelectItem key={o.value} value={o.value}>
-                        {o.label}
-                    </SelectItem>
-                ))}
+                {grouped ? (
+                    <>
+                        <SelectGroup>
+                            <SelectLabel>Formateurs du DAS de la session</SelectLabel>
+                            {options.filter((o) => o.das_match === true).map(item)}
+                        </SelectGroup>
+                        <SelectGroup>
+                            <SelectLabel>Autres formateurs</SelectLabel>
+                            {options.filter((o) => o.das_match !== true).map(item)}
+                        </SelectGroup>
+                    </>
+                ) : (
+                    options.map(item)
+                )}
             </SelectContent>
         </Select>
     );
@@ -399,7 +416,7 @@ function SeanceDialog({
 }
 
 /** The current value of a select kept among the choices (a deactivated trainer or room). */
-function withCurrent(options: Option[], current: Option | null): Option[] {
+function withCurrent<T extends Option>(options: T[], current: Option | null): (T | Option)[] {
     return current && !options.some((o) => o.value === current.value) ? [...options, current] : options;
 }
 

@@ -20,11 +20,13 @@ interface Props {
         status: string;
         status_label: string;
         active: boolean;
+        das_ids: string[];
         user: { id: string; name: string; email: string; active: boolean } | null;
         fiche_url: string | null;
     };
     unavailabilities: UnavailabilityRow[];
     statusOptions: Option[];
+    dasOptions: Option[];
     userOptions: Option[];
     invite_url: string | null;
     status?: string;
@@ -32,18 +34,25 @@ interface Props {
 
 const NONE = '__none__';
 
-export default function TrainerShow({ trainer, unavailabilities, statusOptions, userOptions, invite_url, status }: Props) {
+export default function TrainerShow({ trainer, unavailabilities, statusOptions, dasOptions, userOptions, invite_url, status }: Props) {
     const breadcrumbs: BreadcrumbItem[] = [
         { title: 'Formateurs', href: '/trainers' },
         { title: trainer.label, href: `/trainers/${trainer.id}` },
     ];
     const details = useForm({ status: trainer.status, active: trainer.active });
+    const das = useForm<{ das_ids: string[] }>({ das_ids: trainer.das_ids });
     const account = useForm<{ user_id: string | null }>({ user_id: trainer.user?.id ?? null });
 
     const saveDetails: FormEventHandler = (e) => {
         e.preventDefault();
         details.put(route('trainers.update', trainer.id), { preserveScroll: true });
     };
+    const saveDas: FormEventHandler = (e) => {
+        e.preventDefault();
+        das.put(route('trainers.das', trainer.id), { preserveScroll: true });
+    };
+    const toggleDas = (id: string, on: boolean) =>
+        das.setData('das_ids', on ? [...das.data.das_ids, id] : das.data.das_ids.filter((d) => d !== id));
     const saveAccount: FormEventHandler = (e) => {
         e.preventDefault();
         account.put(route('trainers.user', trainer.id), { preserveScroll: true });
@@ -104,6 +113,31 @@ export default function TrainerShow({ trainer, unavailabilities, statusOptions, 
                         <Button type="submit" disabled={details.processing}>
                             Enregistrer
                         </Button>
+                    </form>
+                </section>
+
+                <section className="flex max-w-xl flex-col gap-3" aria-labelledby="das_title">
+                    <h2 id="das_title" className="text-lg font-semibold">
+                        DAS
+                    </h2>
+                    <p className="text-muted-foreground text-sm">
+                        Le formateur est proposé en premier pour les sessions de ces DAS. Sans DAS, il reste visible de tous.
+                    </p>
+                    <form onSubmit={saveDas} className="flex flex-col gap-3">
+                        <div className="flex flex-wrap gap-x-6 gap-y-2">
+                            {dasOptions.map((o) => (
+                                <label key={o.value} className="flex items-center gap-2 text-sm">
+                                    <Checkbox checked={das.data.das_ids.includes(o.value)} onCheckedChange={(c) => toggleDas(o.value, c === true)} />
+                                    {o.label}
+                                </label>
+                            ))}
+                        </div>
+                        <InputError message={das.errors.das_ids ?? Object.entries(das.errors).find(([k]) => k.startsWith('das_ids.'))?.[1]} />
+                        <div>
+                            <Button type="submit" disabled={das.processing}>
+                                Enregistrer
+                            </Button>
+                        </div>
                     </form>
                 </section>
 

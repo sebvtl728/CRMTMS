@@ -66,6 +66,14 @@ class Trainer extends Model
     }
 
     /**
+     * @return HasMany<TrainerDas, $this>
+     */
+    public function das(): HasMany
+    {
+        return $this->hasMany(TrainerDas::class);
+    }
+
+    /**
      * @return HasMany<TrainerUnavailability, $this>
      */
     public function unavailabilities(): HasMany

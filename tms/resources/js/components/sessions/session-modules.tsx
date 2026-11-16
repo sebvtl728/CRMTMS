@@ -50,7 +50,7 @@ export interface SessionPlanning {
     calendar: { holidays: Record<string, string>; closures: ClosureRow[]; interval_days: Record<string, string[]> };
     options:
         | ({ modality: Option[]; dating_mode: Option[] } & Partial<{
-              trainers: Option[];
+              trainers: (Option & { das_match?: boolean })[];
               rooms: Option[];
               slots: { start: string; end: string; break_minutes: number }[];
               weekdays: number[];

@@ -12,7 +12,9 @@ use App\Modules\Core\Access\Role;
  * domain. Creating is part of « update »; the rights on dossiers, sessions,
  * séances and attendance carry a scope (own / das / all, AccessScope), the
  * séances and their attendance also « Ses séances » (trainer: those of the
- * trainer linked to the user); trainers and rooms are organisme-wide.
+ * trainer linked to the user); trainers carry own / das / all too (own: created
+ * by or linked to the user; das: attached to a DAS he follows or to none);
+ * rooms are organisme-wide.
  */
 final class Permissions
 {
@@ -76,7 +78,7 @@ final class Permissions
             self::SEANCES_MANAGE => ['Planifier les séances', 'Créer, déplacer, annuler et supprimer des séances, générer les séances d\'un module.'],
             self::ATTENDANCE_MANAGE => ['Saisir les présences', 'Noter les présences des séances et les heures réalisées par mois. « Ses séances » : celles dont il est le formateur.'],
             self::ATTENDANCE_CLOSE => ['Clôturer les présences', 'Clôturer un mois de présences d\'une session et le rouvrir (avec un motif).'],
-            self::TRAINERS_MANAGE => ['Gérer les formateurs', 'Déclarer des formateurs, leur statut, leurs indisponibilités et leur compte.'],
+            self::TRAINERS_MANAGE => ['Gérer les formateurs', 'Déclarer des formateurs, leur statut, leurs DAS, leurs indisponibilités et leur compte. Un formateur sans DAS reste visible de tous.'],
             self::ROOMS_MANAGE => ['Gérer les salles et fermetures', 'Paramétrer les salles de formation et les périodes de fermeture de l\'organisme.'],
         ];
     }
@@ -90,13 +92,13 @@ final class Permissions
     }
 
     /**
-     * The rights of the module that carry a scope: all but trainers and rooms.
+     * The rights of the module that carry a scope: all but rooms.
      *
      * @return list<string>
      */
     public static function scoped(): array
     {
-        return array_values(array_diff(self::all(), [self::TRAINERS_MANAGE, self::ROOMS_MANAGE]));
+        return array_values(array_diff(self::all(), [self::ROOMS_MANAGE]));
     }
 
     /**

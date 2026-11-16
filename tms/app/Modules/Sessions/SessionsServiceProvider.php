@@ -41,9 +41,11 @@ use App\Modules\Sessions\Resources\Rooms;
 use App\Modules\Sessions\Sessions\SessionPolicy;
 use App\Modules\Sessions\Sessions\TrainingSession;
 use App\Modules\Sessions\Trainers\Trainer;
+use App\Modules\Sessions\Trainers\TrainerDas;
 use App\Modules\Sessions\Trainers\TrainerRows;
 use App\Modules\Sessions\Trainers\Trainers;
 use App\Modules\Sessions\Trainers\TrainerUnavailability;
+use App\Modules\Sessions\Trainers\TrainerVisibility;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
@@ -89,6 +91,7 @@ class SessionsServiceProvider extends ServiceProvider
             ClosurePeriod::MORPH_ALIAS => ClosurePeriod::class,
             Trainer::MORPH_ALIAS => Trainer::class,
             TrainerUnavailability::MORPH_ALIAS => TrainerUnavailability::class,
+            TrainerDas::MORPH_ALIAS => TrainerDas::class,
             Seance::MORPH_ALIAS => Seance::class,
             PlacementPeriod::MORPH_ALIAS => PlacementPeriod::class,
             PlacementPeriodHost::MORPH_ALIAS => PlacementPeriodHost::class,
@@ -124,7 +127,18 @@ class SessionsServiceProvider extends ServiceProvider
         // or of another organisme (RLS) is a 404.
         self::bindUuid('room', Room::class);
         self::bindUuid('closurePeriod', ClosurePeriod::class);
-        self::bindUuid('trainer', Trainer::class);
+        // A trainer outside the sessions.trainers.manage scope is a 404.
+        Route::bind('trainer', function (string $value): Trainer {
+            if (! Str::isUuid($value)) {
+                throw (new ModelNotFoundException)->setModel(Trainer::class, [$value]);
+            }
+            $user = request()->user();
+
+            // Without the right the route's `can` middleware answers 403.
+            $scoped = $user instanceof User && Scopes::of($user, Permissions::TRAINERS_MANAGE) !== null;
+
+            return ($scoped ? TrainerVisibility::scoped(Trainer::query(), $user) : Trainer::query())->findOrFail($value);
+        });
         self::bindUuid('unavailability', TrainerUnavailability::class);
         self::bindUuid('placementPeriod', PlacementPeriod::class);
 
@@ -280,6 +294,7 @@ class SessionsServiceProvider extends ServiceProvider
         ReferenceUsage::register(ReferenceList::TrainingModality, 'training_sessions', 'modality_id');
         ReferenceUsage::register(ReferenceList::TrainingModality, 'session_modules', 'modality_id');
         ReferenceUsage::register(ReferenceList::Das, 'dossiers', 'das_id');
+        ReferenceUsage::register(ReferenceList::Das, 'trainer_das', 'das_id');
         ReferenceUsage::register(ReferenceList::Das, 'dossier_lines', 'das_id');
         ReferenceUsage::register(ReferenceList::CancelReason, 'dossiers', 'cancelled_reason_id');
         ReferenceUsage::register(ReferenceList::AbandonReason, 'enrolments', 'abandon_reason_id');

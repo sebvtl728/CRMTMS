@@ -13,6 +13,7 @@ use App\Modules\Sessions\Resources\Rooms;
 use App\Modules\Sessions\Sessions\TrainingSession;
 use App\Modules\Sessions\SessionsVisibility;
 use App\Modules\Sessions\Trainers\Trainer;
+use App\Modules\Sessions\Trainers\TrainerDas;
 use Illuminate\Support\Collection;
 
 /**
@@ -104,11 +105,17 @@ final class SeanceRows
     public static function options(TrainingSession $session): array
     {
         $trainers = Trainer::query()->where('active', true)->get(['id', 'person_id']);
+        $das = TrainerDas::query()->whereIn('trainer_id', $trainers->pluck('id')->all())->get()->groupBy('trainer_id');
         $labels = app(Fiches::class)->personLabels($trainers->pluck('person_id')->map(fn ($id) => (string) $id)->all());
 
         return [
-            'trainers' => $trainers->map(fn (Trainer $t) => ['value' => $t->id, 'label' => $labels[$t->person_id]['label'] ?? 'Formateur'])
-                ->sortBy(fn (array $o) => mb_strtolower($o['label']))->values()->all(),
+            // The trainers of the DAS of the session first, then the others (always
+            // selectable); by name in each group.
+            'trainers' => $trainers->map(fn (Trainer $t) => [
+                'value' => $t->id,
+                'label' => $labels[$t->person_id]['label'] ?? 'Formateur',
+                'das_match' => ($das[$t->id] ?? collect())->contains('das_id', $session->das_id),
+            ])->sortBy(fn (array $o) => ($o['das_match'] ? '0' : '1').mb_strtolower($o['label']).$o['value'])->values()->all(),
             'rooms' => Rooms::active()->map(fn (Room $r) => [
                 'value' => $r->id,
                 'label' => $r->capacity === null ? $r->name : "{$r->name} ({$r->capacity} places)",

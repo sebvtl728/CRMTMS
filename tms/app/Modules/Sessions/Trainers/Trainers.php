@@ -10,6 +10,7 @@ use App\Modules\Crm\Public\Fiches;
 use App\Modules\Sessions\Permissions;
 use Carbon\CarbonImmutable;
 use Closure;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
@@ -44,6 +45,42 @@ final class Trainers
     public static function forUser(User $user): ?Trainer
     {
         return Trainer::query()->where('user_id', $user->getKey())->first();
+    }
+
+    /**
+     * Trainers (out of the trash) attached to the DAS; all of them when
+     * $dasId is null (the filter of the lists and the planning).
+     *
+     * @return Builder<Trainer>
+     */
+    public static function ofDas(?string $dasId): Builder
+    {
+        $query = Trainer::query();
+        if ($dasId !== null) {
+            $query->whereIn('trainers.id', TrainerDas::query()->where('das_id', $dasId)->select('trainer_id'));
+        }
+
+        return $query;
+    }
+
+    /**
+     * Sets the DAS of the trainer to exactly $dasIds (active DAS of the
+     * organisme, validated by the caller): attached ones added, the others
+     * detached.
+     *
+     * @param  list<string>  $dasIds
+     */
+    public static function setDas(Trainer $trainer, array $dasIds): void
+    {
+        $dasIds = array_values(array_unique($dasIds));
+        DB::transaction(function () use ($trainer, $dasIds): void {
+            Trainer::query()->whereKey($trainer->getKey())->lockForUpdate()->firstOrFail();
+            $current = TrainerDas::query()->where('trainer_id', $trainer->getKey())->get();
+            $current->reject(fn (TrainerDas $row) => in_array($row->das_id, $dasIds, true))->each->delete();
+            foreach (array_diff($dasIds, $current->pluck('das_id')->all()) as $dasId) {
+                TrainerDas::query()->create(['trainer_id' => $trainer->getKey(), 'das_id' => $dasId]);
+            }
+        });
     }
 
     /**

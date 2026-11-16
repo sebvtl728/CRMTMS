@@ -9,7 +9,7 @@ import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrig
 import AppLayout from '@/layouts/app-layout';
 import { type Option } from '@/lib/crm';
 import { type BreadcrumbItem } from '@/types';
-import { Head, Link, useForm } from '@inertiajs/react';
+import { Head, Link, router, useForm } from '@inertiajs/react';
 import { Plus } from 'lucide-react';
 import { FormEventHandler, useState } from 'react';
 
@@ -20,17 +20,22 @@ interface TrainerRow {
     status: string;
     status_label: string;
     active: boolean;
+    das: string[];
     user: { name: string; email: string } | null;
 }
 
 interface Props {
     trainers: TrainerRow[];
+    das: string | null;
+    dasOptions: Option[];
     statusOptions: Option[];
     userOptions: UserOption[];
     status?: string;
 }
 
 const breadcrumbs: BreadcrumbItem[] = [{ title: 'Formateurs', href: '/trainers' }];
+
+const ALL = '__all__';
 
 interface UserOption extends Option {
     /** Holds the Formateur role (séances on « Ses séances »). */
@@ -184,7 +189,7 @@ function AddTrainerDialog({ statusOptions, userOptions, onClose }: { statusOptio
     );
 }
 
-export default function Trainers({ trainers, statusOptions, userOptions, status }: Props) {
+export default function Trainers({ trainers, das, dasOptions, statusOptions, userOptions, status }: Props) {
     const [adding, setAdding] = useState(false);
 
     return (
@@ -201,6 +206,26 @@ export default function Trainers({ trainers, statusOptions, userOptions, status 
 
                 {status && <div className="text-sm font-medium text-green-600">{status}</div>}
 
+                <div className="grid max-w-xs gap-2">
+                    <Label htmlFor="trainers_das">DAS</Label>
+                    <Select
+                        value={das ?? ALL}
+                        onValueChange={(v) => router.get(route('trainers.index'), v === ALL ? {} : { das: v }, { preserveState: true, replace: true })}
+                    >
+                        <SelectTrigger id="trainers_das">
+                            <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value={ALL}>Tous les DAS</SelectItem>
+                            {dasOptions.map((o) => (
+                                <SelectItem key={o.value} value={o.value}>
+                                    {o.label}
+                                </SelectItem>
+                            ))}
+                        </SelectContent>
+                    </Select>
+                </div>
+
                 {trainers.length === 0 ? (
                     <p className="text-muted-foreground text-sm">Aucun formateur.</p>
                 ) : (
@@ -211,6 +236,7 @@ export default function Trainers({ trainers, statusOptions, userOptions, status 
                                     <th className="px-3 py-2 font-medium">Formateur</th>
                                     <th className="px-3 py-2 font-medium">E-mail</th>
                                     <th className="px-3 py-2 font-medium">Statut</th>
+                                    <th className="px-3 py-2 font-medium">DAS</th>
                                     <th className="px-3 py-2 font-medium">Compte</th>
                                     <th className="px-3 py-2 font-medium">État</th>
                                 </tr>
@@ -225,6 +251,7 @@ export default function Trainers({ trainers, statusOptions, userOptions, status 
                                         </td>
                                         <td className="px-3 py-2">{t.email ?? '—'}</td>
                                         <td className="px-3 py-2">{t.status_label}</td>
+                                        <td className="px-3 py-2">{t.das.length > 0 ? t.das.join(', ') : <span className="text-muted-foreground">Tous</span>}</td>
                                         <td className="px-3 py-2">{t.user ? t.user.email : <span className="text-muted-foreground">Sans compte</span>}</td>
                                         <td className="px-3 py-2">{t.active ? <Badge variant="secondary">Actif</Badge> : <Badge variant="outline">Inactif</Badge>}</td>
                                     </tr>

@@ -5,10 +5,14 @@ namespace App\Modules\Sessions\Trainers;
 use App\Http\Controllers\Controller;
 use App\Modules\Core\Access\Permissions as CorePermissions;
 use App\Modules\Core\Access\Role;
+use App\Modules\Core\References\ReferenceItem;
+use App\Modules\Core\References\ReferenceList;
 use App\Modules\Core\Users\User;
 use App\Modules\Crm\Public\Fiches;
+use App\Modules\Sessions\Sessions\SessionListQuery;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
@@ -25,8 +29,16 @@ class TrainerController extends Controller
 {
     public function index(Request $request): Response
     {
+        // ?das=: the trainers attached to that DAS (an unknown value: no filter).
+        $das = $request->query('das');
+        $das = is_string($das) && Str::isUuid($das) && ReferenceItem::query()->where('list', ReferenceList::Das)->whereKey($das)->exists() ? $das : null;
+        $viewer = $request->user();
+        assert($viewer instanceof User);
+
         return Inertia::render('sessions/trainers/index', [
-            'trainers' => TrainerRows::list(),
+            'trainers' => TrainerRows::list($viewer, $das),
+            'das' => $das,
+            'dasOptions' => SessionListQuery::reference(ReferenceList::Das, array_filter([$das])),
             'statusOptions' => TrainerStatus::options(),
             'userOptions' => TrainerRows::userOptions(),
             'status' => $request->session()->get('status'),
@@ -98,11 +110,13 @@ class TrainerController extends Controller
                 'status' => $trainer->status,
                 'status_label' => $trainer->statusLabel(),
                 'active' => $trainer->active,
+                'das_ids' => $trainer->das()->pluck('das_id')->map(fn ($id) => (string) $id)->values()->all(),
                 'user' => $account === null ? null : ['id' => $account->id, 'name' => $account->name, 'email' => $account->email, 'active' => $account->isActive()],
                 'fiche_url' => isset($fiches->openable($viewer, 'person', [$trainer->person_id])[$trainer->person_id]) ? "/crm/people/{$trainer->person_id}" : null,
             ],
             'unavailabilities' => UnavailabilityInput::rows($trainer->unavailabilities()->orderByDesc('starts_at')->get()),
             'statusOptions' => TrainerStatus::options(),
+            'dasOptions' => SessionListQuery::reference(ReferenceList::Das, $trainer->das()->pluck('das_id')->all()),
             // Accounts of the organisme not linked to another trainer.
             'userOptions' => User::query()->whereNotIn('id', $linked)->orderBy('name')->get(['id', 'name', 'email'])
                 ->map(fn (User $u): array => ['value' => $u->id, 'label' => "{$u->name} ({$u->email})"])->values()->all(),
@@ -128,6 +142,40 @@ class TrainerController extends Controller
         Trainers::update($trainer, TrainerStatus::from((string) $data['status']), $request->boolean('active'));
 
         return back()->with('status', 'Formateur enregistré.');
+    }
+
+    /**
+     * « DAS » of the trainer: exactly the ticked active DAS of the organisme
+     * (a DAS already attached stays even when deactivated).
+     */
+    public function updateDas(Request $request, Trainer $trainer): RedirectResponse
+    {
+        $data = $request->validate([
+            'das_ids' => ['present', 'array', 'max:50'],
+            'das_ids.*' => ['bail', 'string', 'uuid'],
+        ], [
+            'das_ids.present' => 'Choisissez les DAS du formateur.',
+            'das_ids.array' => 'Choisissez les DAS du formateur.',
+            'das_ids.max' => 'Trop de DAS sont choisis.',
+            'das_ids.*.string' => "Ce DAS n'existe pas.",
+            'das_ids.*.uuid' => "Ce DAS n'existe pas.",
+        ]);
+        $ids = array_values(array_unique(array_map('strval', $data['das_ids'])));
+        $kept = $trainer->das()->pluck('das_id')->map(fn ($id) => (string) $id)->all();
+        $valid = ReferenceItem::query()->where('list', ReferenceList::Das)->whereIn('id', $ids)
+            ->where(fn ($q) => $q->where('is_active', true)->orWhereIn('id', $kept))->pluck('id')->map(fn ($id) => (string) $id)->all();
+        $errors = [];
+        foreach (array_values($data['das_ids']) as $i => $id) {
+            if (! in_array($id, $valid, true)) {
+                $errors["das_ids.$i"] = "Ce DAS n'existe pas ou n'est plus actif.";
+            }
+        }
+        if ($errors !== []) {
+            throw ValidationException::withMessages($errors);
+        }
+        Trainers::setDas($trainer, $ids);
+
+        return back()->with('status', 'DAS du formateur enregistrés.');
     }
 
     public function destroy(Trainer $trainer): RedirectResponse
