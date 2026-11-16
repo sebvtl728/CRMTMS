@@ -5,6 +5,14 @@ Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) ; ve
 
 ## [Non publié]
 
+## [0.6.1] - 2026-11-16
+
+### Corrigé
+
+- Une action se modifie depuis À faire, le planning et les fiches : **Modifier** ouvre la fenêtre de l'action
+  (type, objet, échéance avec l'heure, durée, lieu, responsable ; date, résultat et compte rendu d'une action faite),
+  dans le périmètre du droit « Modifier » des actions.
+
 ## [0.6.0] - 2026-11-16
 
 Dossiers de formation, sessions, inscriptions et financements (lot 2a) : le devis signé devient un dossier.
@@ -344,7 +352,8 @@ Lot 1a : socle de l'application.
   mise à jour avec retour arrière automatique.
 - Publication : image multi-architecture signée (cosign), archive de version, sommes de contrôle.
 
-[Non publié]: https://github.com/sebvtl728/CRMTMS/compare/v0.6.0...HEAD
+[Non publié]: https://github.com/sebvtl728/CRMTMS/compare/v0.6.1...HEAD
+[0.6.1]: https://github.com/sebvtl728/CRMTMS/compare/v0.6.0...v0.6.1
 [0.6.0]: https://github.com/sebvtl728/CRMTMS/compare/v0.5.3...v0.6.0
 [0.5.3]: https://github.com/sebvtl728/CRMTMS/compare/v0.5.2...v0.5.3
 [0.5.2]: https://github.com/sebvtl728/CRMTMS/compare/v0.5.1...v0.5.2

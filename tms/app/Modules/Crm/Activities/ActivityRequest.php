@@ -129,6 +129,12 @@ class ActivityRequest extends FormRequest
         return [function (Validator $validator): void {
             $current = $this->current();
             if ($current !== null) {
+                // A done action keeps a date done: « Modifier » never reopens it.
+                if ($current->done_at !== null && $this->has('done_at') && $this->input('done_at') === null && ! $validator->errors()->has('done_at')) {
+                    $validator->errors()->add('done_at', 'Indiquez la date à laquelle l\'action a été faite.');
+
+                    return;
+                }
                 $done = $this->has('done_at') ? $this->input('done_at') : $current->done_at;
                 $due = $this->has('due_at') ? $this->input('due_at') : $current->due_at;
                 if ($done === null && $due === null && ! $validator->errors()->hasAny(['done_at', 'due_at'])) {

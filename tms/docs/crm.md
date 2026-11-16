@@ -200,6 +200,7 @@ Une action faite met à jour la date de **dernier contact** de la fiche. Une act
 
 - **Fait** ouvre la fenêtre de compte rendu (résultat, compte rendu, prochaine relance) ;
 - **Reporter** : **Demain**, **Dans 1 semaine** ou une date (une date seule = 9 h) ;
+- **Modifier** ouvre la fenêtre de l'action (type, objet, échéance et heure, durée, lieu, responsable ; les fiches concernées ne changent pas) : le même bouton figure dans le planning, l'historique des fiches et les actions d'une opportunité ;
 - **Ouvrir la fiche** ;
 - **Équipe** (direction et administrateur) affiche les actions de toute l'équipe.
 
