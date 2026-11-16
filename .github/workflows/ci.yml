@@ -75,6 +75,9 @@ jobs:
           cache: npm
           cache-dependency-path: tms/package-lock.json
 
+      - name: Install pdftotext (AI assistant reads PDF programmes, as in the image)
+        run: sudo apt-get update && sudo apt-get install -y poppler-utils
+
       - name: Create roles and databases
         run: |
           echo "DB_PASSWORD=$(openssl rand -hex 16)" >> "$GITHUB_ENV"
