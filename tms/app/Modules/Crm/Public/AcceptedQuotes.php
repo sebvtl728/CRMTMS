@@ -15,11 +15,12 @@ use Illuminate\Support\Str;
 /**
  * Public read façade of the accepted quotes (lot 2a: « Créer le dossier »).
  * Only an accepted quote the viewer sees through crm.quotes.view, whose
- * opportunity and account are out of the trash.
+ * opportunity and account are out of the trash. With $lock, the quote row is
+ * locked until the end of the caller's transaction (one dossier per quote).
  */
 final class AcceptedQuotes
 {
-    public function find(string $quoteId, User $viewer): ?AcceptedQuoteData
+    public function find(string $quoteId, User $viewer, bool $lock = false): ?AcceptedQuoteData
     {
         if (! Str::isUuid($quoteId)) {
             return null;
@@ -31,6 +32,7 @@ final class AcceptedQuotes
             ->where('status', QuoteStatus::Accepted->value)
             ->whereHas('opportunity', fn (Builder $q) => $q->whereNull('deleted_at'))
             ->with(['lines', 'opportunity', 'organisation', 'person'])
+            ->when($lock, fn (Builder $q) => $q->lockForUpdate())
             ->first();
 
         $opportunity = $quote?->opportunity;

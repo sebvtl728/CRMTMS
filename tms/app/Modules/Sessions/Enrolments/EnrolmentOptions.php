@@ -24,7 +24,7 @@ use Illuminate\Database\Eloquent\Builder;
  */
 final class EnrolmentOptions
 {
-    private const LIMIT = 100;
+    public const LIMIT = 100;
 
     /**
      * @return list<array{id: string, number: string, account: ?string, account_organisation_id: ?string, lines: list<array{id: string, label: string}>}>
@@ -63,8 +63,30 @@ final class EnrolmentOptions
         if ($lines->isEmpty() || ! $user->can(Permissions::SESSIONS_UPDATE)) {
             return [];
         }
-        $sessions = SessionsVisibility::sessions(TrainingSession::query(), $user, Permissions::SESSIONS_UPDATE)
-            ->whereIn('training_sessions.training_id', $lines->pluck('training_id')->unique()->values()->all())
+        $sessions = self::openSessions($lines->pluck('training_id')->unique()->values()->all(), $dossier->account_organisation_id, $user)
+            ->orderByDesc('training_sessions.starts_on')->limit(self::LIMIT)->get();
+
+        $byLine = [];
+        foreach ($lines as $line) {
+            $byLine[$line->id] = $sessions->where('training_id', $line->training_id)->map(fn (TrainingSession $s) => self::sessionOption($s))->values()->all();
+        }
+
+        return $byLine;
+    }
+
+    /**
+     * Sessions of $trainingIds a dossier of the contractant
+     * $accountOrganisationId (null: a particulier) may enrol on, in the scope
+     * of sessions.sessions.update: not cancelled; inter ones; intra ones of
+     * that entreprise; individual ones still free (any contractant).
+     *
+     * @param  list<string>  $trainingIds
+     * @return Builder<TrainingSession>
+     */
+    public static function openSessions(array $trainingIds, ?string $accountOrganisationId, User $user): Builder
+    {
+        return SessionsVisibility::sessions(TrainingSession::query(), $user, Permissions::SESSIONS_UPDATE)
+            ->whereIn('training_sessions.training_id', $trainingIds)
             ->where('training_sessions.status', '<>', SessionStatus::Cancelled->value)
             ->where(fn (Builder $q) => $q->where('training_sessions.kind', SessionKind::Inter->value)
                 // An individual session still free takes any contractant.
@@ -72,22 +94,25 @@ final class EnrolmentOptions
                     ->whereNotExists(fn ($e) => $e->selectRaw('1')->from('enrolments')
                         ->whereColumn('enrolments.training_session_id', 'training_sessions.id')
                         ->where('enrolments.status', '<>', EnrolmentStatus::Cancelled->value)))
-                ->when($dossier->account_organisation_id !== null, fn (Builder $o) => $o->orWhere('training_sessions.organisation_id', $dossier->account_organisation_id)))
-            ->orderByDesc('training_sessions.starts_on')->limit(self::LIMIT)->get();
+                // An intra session: its entreprise's dossiers only (an individual one of it is above).
+                ->when($accountOrganisationId !== null, fn (Builder $o) => $o->orWhere(fn (Builder $intra) => $intra
+                    ->where('training_sessions.kind', SessionKind::Intra->value)
+                    ->where('training_sessions.organisation_id', $accountOrganisationId))));
+    }
 
-        $byLine = [];
-        foreach ($lines as $line) {
-            $byLine[$line->id] = $sessions->where('training_id', $line->training_id)->map(fn (TrainingSession $s) => [
-                'id' => $s->id,
-                'number' => $s->number,
-                'starts_on' => $s->starts_on->toDateString(),
-                'ends_on' => $s->ends_on->toDateString(),
-                'kind_label' => SessionKind::from($s->kind)->label(),
-                'capacity' => $s->capacity,
-            ])->values()->all();
-        }
-
-        return $byLine;
+    /**
+     * @return array{id: string, number: string, starts_on: string, ends_on: string, kind_label: string, capacity: ?int}
+     */
+    public static function sessionOption(TrainingSession $s): array
+    {
+        return [
+            'id' => $s->id,
+            'number' => $s->number,
+            'starts_on' => $s->starts_on->toDateString(),
+            'ends_on' => $s->ends_on->toDateString(),
+            'kind_label' => SessionKind::from($s->kind)->label(),
+            'capacity' => $s->capacity,
+        ];
     }
 
     /**

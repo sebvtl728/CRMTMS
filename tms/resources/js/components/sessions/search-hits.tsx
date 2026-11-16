@@ -23,12 +23,12 @@ export function pickOnEnter<T>(e: KeyboardEvent<HTMLInputElement>, term: string,
  * is only a search, a result must be clicked.
  */
 export function SearchHint({ term, count, searched }: { term: string; count: number; searched: boolean }) {
-    if (term.trim().length < 2) {
-        return null;
-    }
-    if (count > 0) {
-        return <p className="text-muted-foreground text-xs">Cliquez sur un résultat pour le choisir.</p>;
-    }
+    // Always rendered: a live region announces its text when it changes.
+    const text = term.trim().length < 2 ? '' : count > 0 ? 'Cliquez sur un résultat pour le choisir.' : searched ? 'Aucun résultat.' : '';
 
-    return searched ? <p className="text-muted-foreground text-xs">Aucun résultat.</p> : null;
+    return (
+        <p role="status" aria-live="polite" className="text-muted-foreground text-xs empty:hidden">
+            {text}
+        </p>
+    );
 }

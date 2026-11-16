@@ -12,6 +12,7 @@ use App\Modules\Core\Users\User;
 use App\Modules\Crm\Opportunities\Opportunity;
 use App\Modules\Crm\Opportunities\OpportunityStage;
 use App\Modules\Crm\Permissions;
+use App\Modules\Crm\Public\QuoteLinks;
 use App\Modules\Crm\Support\FormOptions;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\RedirectResponse;
@@ -155,6 +156,8 @@ class QuoteController extends Controller
             ],
             // A sent quote without its archive: no PDF link, no reminder.
             'pdf_available' => $pdfAvailable,
+            // Links of other modules (« Créer le dossier »…), on an accepted quote only.
+            'links' => $quote->status === QuoteStatus::Accepted ? QuoteLinks::for($quote->id, $user) : [],
             // A draft that cannot be sent as it is (button disabled, reason shown).
             'send_blocked' => $quote->isDraft() ? QuoteTransitions::sendBlocker($mailQuote) : null,
             'vat_regime_changed' => QuoteTransitions::vatRegimeChanged($mailQuote),

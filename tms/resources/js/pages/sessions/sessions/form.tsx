@@ -1,5 +1,6 @@
 import Heading from '@/components/heading';
 import InputError from '@/components/input-error';
+import { pickOnEnter, SearchHint } from '@/components/sessions/search-hits';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -85,8 +86,10 @@ function hoursInput(value: string | null | undefined): string {
 function EntreprisePicker({ value, onPick }: { value: Entreprise | null; onPick: (e: Entreprise | null) => void }) {
     const [term, setTerm] = useState('');
     const [hits, setHits] = useState<Entreprise[]>([]);
+    const [searched, setSearched] = useState(false);
 
     useEffect(() => {
+        setSearched(false);
         if (term.trim().length < 2) {
             setHits([]);
             return;
@@ -98,7 +101,10 @@ function EntreprisePicker({ value, onPick }: { value: Entreprise | null; onPick:
                 signal: controller.signal,
             })
                 .then((r) => (r.ok ? r.json() : null))
-                .then((json) => setHits((json?.entreprises ?? []) as Entreprise[]))
+                .then((json) => {
+                    setSearched(true);
+                    setHits((json?.entreprises ?? []) as Entreprise[]);
+                })
                 .catch(() => undefined);
         }, 250);
         return () => {
@@ -125,6 +131,7 @@ function EntreprisePicker({ value, onPick }: { value: Entreprise | null; onPick:
                 type="search"
                 value={term}
                 onChange={(e) => setTerm(e.target.value)}
+                onKeyDown={(e) => pickOnEnter(e, term, hits, (h) => h.label, onPick)}
                 placeholder="Nom, ville ou SIRET (2 lettres au moins)"
             />
             {hits.length > 0 && (
@@ -138,6 +145,7 @@ function EntreprisePicker({ value, onPick }: { value: Entreprise | null; onPick:
                     ))}
                 </ul>
             )}
+            <SearchHint term={term} count={hits.length} searched={searched} />
         </div>
     );
 }

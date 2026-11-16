@@ -11,7 +11,9 @@ use App\Modules\Core\References\ReferenceList;
 use App\Modules\Core\References\ReferenceUsage;
 use App\Modules\Core\Users\User;
 use App\Modules\Crm\Public\FicheBlocks;
+use App\Modules\Crm\Public\QuoteLinks;
 use App\Modules\Sessions\Dossiers\Dossier;
+use App\Modules\Sessions\Dossiers\DossierFromQuote;
 use App\Modules\Sessions\Dossiers\DossierLine;
 use App\Modules\Sessions\Dossiers\DossierPolicy;
 use App\Modules\Sessions\Dossiers\DossierRows;
@@ -64,6 +66,8 @@ class SessionsServiceProvider extends ServiceProvider
         self::registerReferenceUsage();
         self::registerTrainingUsage();
         self::registerFicheBlocks();
+        // « Créer le dossier » / « Voir le dossier » on an accepted quote.
+        QuoteLinks::register('sessions.dossier', fn (string $quoteId, User $viewer) => app(DossierFromQuote::class)->link($quoteId, $viewer));
 
         Gate::policy(TrainingSession::class, SessionPolicy::class);
         Gate::policy(Dossier::class, DossierPolicy::class);

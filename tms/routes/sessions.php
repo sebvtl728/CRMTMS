@@ -1,6 +1,7 @@
 <?php
 
 use App\Modules\Sessions\Dossiers\DossierController;
+use App\Modules\Sessions\Dossiers\DossierFromQuoteController;
 use App\Modules\Sessions\Enrolments\EnrolmentController;
 use App\Modules\Sessions\Fundings\FundingController;
 use App\Modules\Sessions\Sessions\SessionController;
@@ -47,6 +48,9 @@ Route::middleware(['auth'])->prefix('dossiers')->name('dossiers.')->group(functi
     Route::get('organisations', [DossierController::class, 'organisations'])->middleware('can:sessions.dossiers.update')->name('organisations');
     Route::get('people', [DossierController::class, 'people'])->middleware('can:sessions.dossiers.update')->name('people');
     Route::post('/', [DossierController::class, 'store'])->middleware('can:sessions.dossiers.update')->name('store');
+    // « Créer le dossier » of an accepted quote (the quote seen through the CRM, else 404).
+    Route::get('from-quote/{quoteId}', [DossierFromQuoteController::class, 'create'])->middleware('can:sessions.dossiers.update')->name('from-quote');
+    Route::post('from-quote/{quoteId}', [DossierFromQuoteController::class, 'store'])->middleware('can:sessions.dossiers.update')->name('from-quote.store');
     Route::get('{dossier}', [DossierController::class, 'show'])->middleware('can:sessions.dossiers.view')->name('show');
     Route::get('{dossier}/edit', [DossierController::class, 'edit'])->middleware('can:sessions.dossiers.update')->name('edit');
     Route::put('{dossier}', [DossierController::class, 'update'])->middleware('can:sessions.dossiers.update')->name('update');

@@ -88,8 +88,10 @@ test('quotes: training in the catalogue, amount of the opportunity, quote, pdf, 
     await expect(page.getByRole('heading', { name: 'Nouveau devis' })).toBeVisible();
     await choose(page, page.getByLabel('Société émettrice *'), 'CAP FORMATION E2E');
     await page.getByRole('button', { name: 'Enregistrer le brouillon' }).click();
-    const number = `CF-${parisYear()}-0001`;
-    await expect(page.getByRole('heading', { name: `Devis ${number}` })).toBeVisible();
+    // Other specs may have numbered quotes before (dossier.spec.ts): the next number of the year.
+    const heading = page.getByRole('heading', { name: new RegExp(`^Devis CF-${parisYear()}-\\d{4}$`) });
+    await expect(heading).toBeVisible();
+    const number = (await heading.innerText()).replace('Devis ', '');
     await expect(page.getByText(`Devis ${number} créé.`)).toBeVisible();
     await expect(page.getByText('Brouillon', { exact: true })).toBeVisible();
     await expect(page.getByText(TRAINING).first()).toBeVisible();
@@ -143,8 +145,9 @@ test('quotes: training in the catalogue, amount of the opportunity, quote, pdf, 
     await expect(page.getByText('Gagné', { exact: true }).first()).toBeVisible();
     await expect(page.getByText('Proposition → Gagné')).toBeVisible();
 
-    // 7. The list of quotes: the quote, accepted, and a success rate of 100 % this month.
-    await page.goto('/crm/quotes');
+    // 7. The list of quotes of this entreprise (other specs send quotes too): the quote, accepted,
+    // and a success rate of 100 % this month.
+    await page.goto(`/crm/quotes?${new URLSearchParams({ q: ENTREPRISE })}`);
     await expect(page.getByRole('link', { name: number }).first()).toBeVisible();
     const rate = page.getByRole('region', { name: 'Taux de réussite' });
     await expect(rate).toContainText(/Taux de réussite · \S+ \d{4}/);

@@ -64,15 +64,18 @@ final class DossierWriter
 
     /**
      * @param  DossierData  $data
+     * @param  array{quote_id?: string, opportunity_id?: string}  $origin  the accepted quote it comes from (DossierFromQuote), never typed by the user
      *
      * @throws ValidationException
      */
-    public function create(array $data): Dossier
+    public function create(array $data, array $origin = []): Dossier
     {
         [$values, $lines] = $this->validated($data, null);
 
-        return DB::transaction(function () use ($values, $lines): Dossier {
+        return DB::transaction(function () use ($values, $lines, $origin): Dossier {
             $dossier = new Dossier($values);
+            $dossier->quote_id = $origin['quote_id'] ?? null;
+            $dossier->opportunity_id = $origin['opportunity_id'] ?? null;
             $dossier->number = $this->numbering->next(CarbonImmutable::now());
             $dossier->save();
             $this->writeLines($dossier, $lines);
