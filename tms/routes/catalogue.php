@@ -1,5 +1,6 @@
 <?php
 
+use App\Modules\Catalogue\Assistant\TrainingAssistantController;
 use App\Modules\Catalogue\Brochures\BrochureController;
 use App\Modules\Catalogue\TrainingController;
 use Illuminate\Support\Facades\Route;
@@ -19,10 +20,14 @@ Route::middleware(['auth'])->prefix('catalogue')->name('catalogue.')->group(func
         Route::get('{brochure}/download', [BrochureController::class, 'download'])->middleware('can:catalogue.view')->name('download');
         Route::get('{brochure}/versions/{version}', [BrochureController::class, 'downloadVersion'])->middleware('can:catalogue.view')->name('versions.download');
     });
+    // AI assistant of the training form: a proposal (JSON), nothing saved; 20 requests an hour per user.
+    Route::post('assistant/pdf', [TrainingAssistantController::class, 'pdf'])->middleware(['can:catalogue.manage', 'throttle:ai'])->name('assistant.pdf');
+    Route::post('assistant/prompt', [TrainingAssistantController::class, 'prompt'])->middleware(['can:catalogue.manage', 'throttle:ai'])->name('assistant.prompt');
     Route::get('create', [TrainingController::class, 'create'])->middleware('can:catalogue.manage')->name('create');
     Route::post('create', [TrainingController::class, 'store'])->middleware('can:catalogue.manage')->name('store');
     Route::get('{training}/edit', [TrainingController::class, 'edit'])->middleware('can:catalogue.manage')->name('edit');
     Route::put('{training}/edit', [TrainingController::class, 'update'])->middleware('can:catalogue.manage')->name('update');
+    Route::post('{training}/duplicate', [TrainingController::class, 'duplicate'])->middleware('can:catalogue.manage')->name('duplicate');
     Route::post('{training}/toggle', [TrainingController::class, 'toggle'])->middleware('can:catalogue.manage')->name('toggle');
     Route::delete('{training}', [TrainingController::class, 'destroy'])->middleware('can:catalogue.delete')->name('destroy');
 });

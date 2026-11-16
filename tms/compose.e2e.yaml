@@ -24,6 +24,7 @@ services:
       QUEUE_CONNECTION: sync
       MAIL_MAILER: log
       TMS_VITE_HOT: "false" # serve public/build, not the Vite dev server
+      TMS_E2E_FAKE_AI: "true" # offline AI with a fixed answer (tests/Support/E2eAiClient), no network call
 
   caddy-e2e:
     image: caddy:2

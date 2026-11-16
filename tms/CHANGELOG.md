@@ -5,6 +5,36 @@ Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) ; ve
 
 ## [Non publié]
 
+## [0.7.0] - 2026-11-16
+
+La fiche formation devient la **formation type** (complète au sens de Qualiopi), se duplique, et se remplit avec une
+intelligence artificielle qui propose sans jamais enregistrer.
+
+### Ajouté
+
+- **Fiche formation complète** : description courte, objectifs pédagogiques (20 au plus, ordonnés), public et
+  prérequis, **modules** (30 au plus : intitulé, durée, modalité du référentiel « Modalités de formation », contenu,
+  ordonnés) avec le total des modules et un avertissement s'il diffère de la durée de la formation, méthodes et moyens
+  pédagogiques, modalités d'évaluation, sanction, accessibilité, modalités et délais d'accès, indicateurs de résultats.
+- **Dupliquer une formation** : copie indépendante et désactivée (fiche, modules, DAS, tarifs, financements), sans
+  code ni plaquette, journalisée avec la formation d'origine.
+- **Connecteur « Intelligence artificielle »** (Administration › Connecteurs, organisme entier) : Anthropic ou serveur
+  compatible OpenAI (OpenAI, Mistral, IA locale Ollama / vLLM…) ; clés chiffrées ; « Serveur sur le réseau local »
+  limité à l'hôte et au port enregistrés (jamais le TMS lui-même ni une adresse lien-local, aucune redirection
+  suivie) ; délai de 120 s ; bouton « Tester la connexion » ; messages d'erreur fixes en français (un modèle refusé par le
+  serveur est nommé : vérifier son nom, majuscules comprises) ; journal sans
+  contenu.
+- **Assistant IA de la fiche formation** (Nouvelle formation et Modifier) : « Depuis un PDF » (programme de 10 Mo au
+  plus, texte lu sur le serveur et coupé à 60 000 caractères, fichier non conservé) ou « Depuis une demande »
+  (2 000 caractères) ; proposition validée côté serveur (types, longueurs, 20 objectifs, 30 modules, durées), DAS et
+  modalités ramenés aux valeurs de l'organisme ; écran de proposition champ par champ à côté de la valeur actuelle,
+  case « Garder la proposition » décochée pour les champs déjà remplis ; « Appliquer » remplit le formulaire,
+  l'enregistrement reste le bouton habituel. 20 demandes par heure et par utilisateur.
+
+### Modifié
+
+- **Image applicative** : ajout de `poppler-utils` (`pdftotext`) pour lire le texte des programmes PDF.
+
 ## [0.6.2] - 2026-11-16
 
 ### Ajouté
@@ -358,7 +388,8 @@ Lot 1a : socle de l'application.
   mise à jour avec retour arrière automatique.
 - Publication : image multi-architecture signée (cosign), archive de version, sommes de contrôle.
 
-[Non publié]: https://github.com/sebvtl728/CRMTMS/compare/v0.6.2...HEAD
+[Non publié]: https://github.com/sebvtl728/CRMTMS/compare/v0.7.0...HEAD
+[0.7.0]: https://github.com/sebvtl728/CRMTMS/compare/v0.6.2...v0.7.0
 [0.6.2]: https://github.com/sebvtl728/CRMTMS/compare/v0.6.1...v0.6.2
 [0.6.1]: https://github.com/sebvtl728/CRMTMS/compare/v0.6.0...v0.6.1
 [0.6.0]: https://github.com/sebvtl728/CRMTMS/compare/v0.5.3...v0.6.0

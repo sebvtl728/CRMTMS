@@ -7,12 +7,13 @@ Tout logiciel externe (Formevol, Sage, SoWeSign, Outlook, serveur SMTP…) passe
 | Élément | Rôle |
 |---|---|
 | `Connector` | Contrat à implémenter (clé, libellé, type, règles des paramètres, secrets, test de connexion). |
-| `ConnectorKind` | `import`, `export`, `sync`, `delivery`. |
+| `ConnectorKind` | `import`, `export`, `sync`, `delivery`, `assistant`. |
 | `ConnectorRegistry` | Liste des connecteurs connus (`register`, `all`, `make`). |
 | `ConnectorConfig` | Configuration d'un connecteur pour un organisme, ou une société (`company_id`). Secrets chiffrés. |
 | `ConnectorRun` | Journal d'exécution (`ConnectorRun::track`). |
 | `Retryable` (optionnel) | Le connecteur sait rejouer une exécution en échec. |
 | `HasFormLabels` (optionnel) | Libellés français des champs du formulaire d'administration. |
+| `HasFormFields` (optionnel) | Présentation de certains champs : liste de choix (`select`), case à cocher avec avertissement (`checkbox`), suggestions, aide, champ affiché seulement pour certaines valeurs d'un autre (`visible_when`). |
 
 L'écran d'administration (`/admin/connectors`, permission `connectors.manage`, réservée à l'admin d'organisme) est **générique** : il se construit à partir du connecteur, sans code d'interface à écrire.
 
@@ -209,3 +210,62 @@ Paramètres : `tenant` (annuaire Azure : son ID, un de ses domaines `xxx.onmicro
 - **Réseau.** Seuls `login.microsoftonline.com` et `graph.microsoft.com` sont appelés, en https, sans suivre de redirection. `HostPolicy` strict est revérifié à chaque appel.
 - **Journal.** `connector_runs` (sens `out`) contient « Action <id> : évènement Outlook créé / mis à jour / supprimé » et des erreurs rédigées par l'application (code HTTP). Il ne contient ni titre, ni fiche, ni adresse e-mail, ni texte de Microsoft. Une exécution en échec peut être relancée (`payload_ref` = `activity:<id>`).
 - **Audit.** `calendar.outlook_connected`, `calendar.outlook_disconnected`, `calendar.outlook_reconnect_required`.
+
+## Connecteur « Intelligence artificielle »
+
+`AiConnector` (clé `ai`, type assistant, **organisme entier**, un seul actif). Sert à l'assistant de la fiche formation (proposition depuis un PDF ou une demande écrite) : l'IA **propose**, l'utilisateur relit et enregistre ; rien n'est enregistré par l'IA. Écran réservé à l'administrateur (`connectors.manage`).
+
+| Réglage | Anthropic | Compatible OpenAI |
+|---|---|---|
+| Fournisseur (`provider`) | `anthropic` | `openai_compatible` (OpenAI, Mistral, serveur local Ollama / vLLM / LM Studio…) |
+| Modèle (`model`) | facultatif : vide = `claude-opus-5-5` (`AnthropicClient::DEFAULT_MODEL`) ; liste proposée modifiable (`SUGGESTED_MODELS`) | **obligatoire** (ex. `gpt-4.1`, `mistral-large-latest`, `llama3.1:8b`) |
+| Adresse (`base_url`) | — (`https://api.anthropic.com`, fixe ; adresse et case réseau local ni affichées, ni validées, ni enregistrées) | **obligatoire**, `…/v1` (ex. `https://api.openai.com/v1`) |
+| Clé d'API (secret `api_key`) | obligatoire | facultative |
+| « Serveur sur le réseau local » (`local_network`) | — | voir ci-dessous |
+
+Les identifiants de modèle évoluent : l'administrateur peut saisir tout identifiant accepté par son fournisseur. Changer de fournisseur ou d'adresse impose de ressaisir la clé (`SERVER_SETTINGS`) : une clé enregistrée n'est jamais envoyée à un autre serveur.
+
+### Service public `Connectors\Ai\Ai`
+
+Les modules métier n'utilisent **que** ce service :
+
+- `configured(): bool` : connecteur activé et complet (Anthropic : une clé ; compatible OpenAI : adresse valide et modèle).
+- `structured(string $system, string $user, array $jsonSchema, string $purpose): array` : une requête dont la réponse doit être un objet JSON conforme au schéma. Le schéma complet est vérifié sur la réponse (`AiSchema::conform` : types — un nombre entier écrit `7.0` vaut l'entier `7` —, champs obligatoires, `enum`, longueurs, bornes, nombre d'éléments) et les clés non déclarées sont retirées ; les contraintes que les fournisseurs n'acceptent pas toutes (`maxLength`, `minimum`, `maxItems`…) ne sont pas envoyées (`AiSchema::sendable`) mais vérifiées ici ; un type nullable `["string", "null"]` est envoyé sous la forme documentée par les fournisseurs `anyOf: [{type: "string", …}, {type: "null"}]` (récursivement), la vérification restant faite sur le schéma d'origine. `$purpose` est un nom court (`[a-z0-9_.-]`, ex. `training.from_pdf`), journalisé.
+- Erreurs (messages **fixes en français**, jamais le texte du fournisseur, affichables tels quels : `UserFacingHttpException`) :
+  - `AiUnavailable` (503) : non configuré, modèle refusé (`model_not_found`, `key_model_access_denied`, erreur sur le paramètre `model`, `not_found_error` « model: » d'Anthropic : le message nomme le modèle du connecteur, majuscules comprises), clé refusée (401/403), demande refusée (autre 4xx), adresse refusée, saturée (429), injoignable ou trop lente (5xx, 529, délai dépassé) ; `->retryable` vrai pour 429, 5xx et délai ;
+  - `AiInvalidResponse` (502) : JSON cassé, pas un objet, non conforme au schéma, réponse tronquée (`max_tokens`, `length`) ou refusée (`refusal`). Rien n'est alors proposé.
+- Limite : limiteur nommé **`ai`**, 20 demandes par heure, par utilisateur et par organisme (`RateLimitServiceProvider::AI_PER_HOUR`), à poser sur les routes qui appellent l'IA (`throttle:ai`, réponse 429 en JSON français).
+
+### Protocoles
+
+- **Anthropic** : `POST https://api.anthropic.com/v1/messages`, en-têtes `x-api-key` et `anthropic-version: 2026-10-21` ; sortie structurée par `output_config.format` (`json_schema`), lue dans les blocs `text`. Un appel d'outil forcé (`tool_choice`) n'est pas utilisé : les modèles actuels le refusent. Aucun paramètre d'échantillonnage (`temperature`…) n'est envoyé.
+- **Compatible OpenAI** : `POST {base_url}/chat/completions`, `Authorization: Bearer` seulement si une clé est enregistrée ; `response_format` `json_schema` (`strict`) ; si le serveur le refuse (400/422), une seconde demande en `json_object`, le schéma étant alors donné dans le message système. Le contenu du message est décodé en JSON (bloc Markdown « ```json » toléré).
+- Délai : **120 s** au plus (`AiClient::TIMEOUT_SECONDS`, une IA locale peut être lente), connexion 10 s ; réponse bornée à `MAX_OUTPUT_TOKENS` (16 000 ; Anthropic 32 000, raisonnement compris, avec `output_config.effort` = `low` : extraction structurée, plus rapide et moins coûteuse — un modèle saisi par l'administrateur doit accepter `effort`, comme les modèles proposés).
+
+### Réseau : « Serveur sur le réseau local »
+
+- **Réglage de la plateforme** `tms.connectors.allow_local_ai` (variable `TMS_ALLOW_LOCAL_AI`) : vrai par défaut en mode `single` (installation propre à un organisme), **faux en mode `multi`** (plateforme partagée : un administrateur d'organisme ne doit pas atteindre le réseau interne de l'hébergeur). Faux : la case n'est pas proposée, son enregistrement est refusé (« Les serveurs d'IA sur le réseau local ne sont pas autorisés sur cette plateforme. ») et un appel vers une configuration déjà cochée est refusé.
+- **Case décochée** (par défaut) : `https://` obligatoire et l'hôte doit résoudre vers des adresses **publiques** uniquement (`HostPolicy` strict), à l'enregistrement et à chaque appel.
+- **Case cochée** (avertissement affiché, plateforme qui l'autorise) : l'adresse peut être **privée** (RFC 1918, ULA) — **seulement** l'hôte et le port enregistrés (`AiEndpoint::guard` : tout autre hôte, port ou schéma est refusé), pour ce connecteur seulement (aucun réglage global). `http` n'est permis que si **toutes** les adresses de l'hôte sont privées (`https` vers une adresse publique reste possible).
+- **Jamais**, même case cochée (`AiEndpoint::localViolation`) : le TMS lui-même — le serveur d'IA doit être une **autre machine** : `localhost`, boucle locale (`127.0.0.0/8`, `::1`), les services de la pile (`app`, `caddy`, `postgres`, `redis`, `gotenberg`, `worker`, `scheduler`, `vite`, `AiEndpoint::STACK_HOSTS`) par leur nom (seul, ou suivi de `.local` / `.internal` ; `app.exemple.fr` n'est pas concerné) **et** par leurs adresses, comparées octet par octet quelle que soit l'écriture (IPv6 développée, IPv4 encapsulée `::ffff:…` ou `::a.b.c.d`) ; ni les adresses lien-local (dont `169.254.169.254`, métadonnées du cloud), non spécifiées, multicast et réservées (`HostPolicy::localNetworkViolation`).
+- Dans tous les cas : redirections **non suivies** (une redirection = « adresse non autorisée »), connexion épinglée sur les adresses vérifiées (`HostPolicy::pinned`), réponse limitée à **2 Mo** (`AiClient::MAX_RESPONSE_BYTES` : transfert interrompu au-delà, `AiInvalidResponse`).
+
+### Test et journal
+
+- « Tester la connexion » : petite demande structurée (`{"ok": boolean}`) ; « Intelligence artificielle joignable (modèle …). » ou le message fixe de l'erreur.
+- Journal (`connector_runs`, sens `out`) : une ligne par appel, résumé « objet · fournisseur · modèle · durée en ms · utilisateur <id> », statut succès/échec, erreur = message fixe. **Jamais** le contenu envoyé (texte du programme, demande) ni la réponse.
+
+### Utilisation : assistant de la fiche formation
+
+`Catalogue\Assistant` (le Catalogue n'importe que `Ai`, `AiUnavailable` et `AiInvalidResponse`, vérifié par `ModuleBoundariesArchTest`) :
+
+- Routes `POST /catalogue/assistant/pdf` et `POST /catalogue/assistant/prompt` (`catalogue.manage`, `throttle:ai`), réponse JSON `{proposal, truncated}` ; rien n'est enregistré.
+- Sans connecteur actif : 503 « Configurez l'intelligence artificielle dans Administration → Connecteurs. » (`TrainingAssistant::NOT_CONFIGURED`), avant toute lecture du fichier.
+- `PdfText` : PDF de 10 Mo au plus, vérifié par son contenu (extension, type MIME lu dans les octets, signature `%PDF-`) ; texte lu par **`pdftotext`** (paquet `poppler-utils` de l'image, étape `base` du `docker/app.Dockerfile`, donc en développement comme en production), 300 pages et 30 s au plus ; texte nettoyé puis coupé à **60 000 caractères** (`PdfText::MAX_CHARS`) ; le fichier téléversé est supprimé après lecture, quoi qu'il arrive. Un PDF sans texte (scan) ou illisible est refusé (422, message sur `file`).
+- Demande écrite : 2 000 caractères au plus (`TrainingAssistant::MAX_PROMPT`).
+- `TrainingDraft::schema()` : schéma imposé (textes 5 000 caractères, intitulé 200, objectifs ≤ 20 de 500 caractères, modules ≤ 30, durées 0 < h ≤ 2 000) ; une réponse hors schéma est refusée entière (`AiInvalidResponse`). `TrainingDraft::proposal()` ramène le DAS et les modalités à l'id d'une valeur **active** du référentiel de l'organisme (même libellé aux accents et à la casse près, ou libellé avant la parenthèse), sinon vide. Le texte de l'utilisateur est balisé et présenté comme une donnée, jamais comme des instructions.
+- Objets journalisés : `training.from_pdf`, `training.from_prompt`.
+
+### Tests de bout en bout : IA hors ligne
+
+La pile e2e (`compose.e2e.yaml`) pose `TMS_E2E_FAKE_AI=true` (`tms.connectors.e2e_fake_ai`) : `ConnectorsServiceProvider::e2eAiClient()` remplace alors le client Anthropic par `tests/Support/E2eAiClient` (réponse fixe, aucun appel réseau ; le journal et la vérification du schéma restent ceux du vrai service). Ignoré en production, et la classe n'existe pas dans l'image de production (`tests/` est en `autoload-dev`). Ne jamais poser cette variable sur une installation.

@@ -3,6 +3,7 @@
 namespace App\Modules\Catalogue;
 
 use App\Http\Controllers\Controller;
+use App\Modules\Catalogue\Assistant\TrainingAssistant;
 use App\Modules\Core\Audit\AuditRecorder;
 use App\Modules\Core\Exports\ExportCell;
 use App\Modules\Core\Exports\XlsxExporter;
@@ -51,6 +52,7 @@ class TrainingController extends Controller
         return Inertia::render('catalogue/form', [
             'training' => null,
             'options' => self::formOptions(null),
+            'assistant' => self::assistant(),
         ]);
     }
 
@@ -62,9 +64,15 @@ class TrainingController extends Controller
         $funding = array_values($validated['funding_mode_ids'] ?? []);
         unset($validated['funding_mode_ids']);
 
-        DB::transaction(function () use ($validated, $funding): void {
+        $modules = array_key_exists('modules', $validated) ? array_values($validated['modules'] ?? []) : null;
+        unset($validated['modules']);
+
+        DB::transaction(function () use ($validated, $funding, $modules): void {
             $training = Training::query()->create($validated);
             $training->syncFundingModes($funding);
+            if ($modules !== null) {
+                TrainingModules::sync($training, $modules);
+            }
         });
 
         return to_route('catalogue.index')->with('status', 'Formation créée.');
@@ -87,11 +95,24 @@ class TrainingController extends Controller
                 'price_company' => $training->price_company,
                 'price_individual' => $training->price_individual,
                 'is_active' => $training->is_active,
+                'description' => $training->description,
+                'objectives' => $training->objectives ?? [],
+                'methods' => $training->methods,
+                'evaluation' => $training->evaluation,
+                'sanction' => $training->sanction,
+                'accessibility' => $training->accessibility,
+                'access_terms' => $training->access_terms,
+                'results' => $training->results,
+                'modules' => app(Trainings::class)->modules($training->id),
+                'modules_hours' => TrainingModules::hours($training),
+                'modules_gap' => TrainingModules::gap($training),
                 'funding_mode_ids' => $training->fundingModes()->pluck('reference_items.id')->all(),
             ],
             'options' => self::formOptions($training),
+            'assistant' => self::assistant(),
             'brochures' => app(Brochures::class)->forTrainingPage($training),
-            'can' => ['brochures' => $this->user($request)->can(Permissions::VIEW)],
+            'can' => ['brochures' => $this->user($request)->can(Permissions::VIEW), 'manage' => $this->user($request)->can(Permissions::MANAGE)],
+            'status' => $request->session()->get('status'),
         ]);
     }
 
@@ -103,14 +124,33 @@ class TrainingController extends Controller
         $funding = array_key_exists('funding_mode_ids', $validated) ? array_values($validated['funding_mode_ids'] ?? []) : null;
         unset($validated['funding_mode_ids']);
 
-        DB::transaction(function () use ($training, $validated, $funding): void {
+        $modules = array_key_exists('modules', $validated) ? array_values($validated['modules'] ?? []) : null;
+        unset($validated['modules']);
+
+        DB::transaction(function () use ($training, $validated, $funding, $modules): void {
             $training->update($validated);
+            if ($modules !== null) {
+                TrainingModules::sync($training, $modules);
+            }
             if ($funding !== null) {
                 $training->syncFundingModes($funding);
             }
         });
 
         return to_route('catalogue.index')->with('status', 'Formation enregistrée.');
+    }
+
+    /**
+     * An independent, inactive copy (TrainingDuplicator), opened for
+     * checking before it is activated.
+     */
+    public function duplicate(Training $training, TrainingDuplicator $duplicator): RedirectResponse
+    {
+        Gate::authorize('create', Training::class);
+
+        $copy = $duplicator->duplicate($training);
+
+        return to_route('catalogue.edit', $copy)->with('status', 'Formation dupliquée : vérifiez-la puis activez-la.');
     }
 
     public function toggle(Training $training): RedirectResponse
@@ -214,7 +254,18 @@ class TrainingController extends Controller
         return [
             'das' => TrainingListQuery::reference(ReferenceList::Das, array_filter([$current?->das_id])),
             'funding_mode' => TrainingListQuery::reference(ReferenceList::FundingMode, $current?->fundingModes()->pluck('reference_items.id')->all() ?? []),
+            'modality' => TrainingListQuery::reference(ReferenceList::TrainingModality, $current?->modules()->whereNotNull('modality_id')->pluck('modality_id')->all() ?? []),
         ];
+    }
+
+    /**
+     * The AI assistant of the form: usable when the organisme's AI connector is active.
+     *
+     * @return array{configured: bool}
+     */
+    private static function assistant(): array
+    {
+        return ['configured' => app(TrainingAssistant::class)->configured()];
     }
 
     private function user(Request $request): User

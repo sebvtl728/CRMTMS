@@ -19,13 +19,27 @@ interface ConnectorMeta {
     settings: string[];
     secrets: string[];
     labels: Record<string, string>;
+    fields: Record<string, FieldMeta>;
 }
+
+interface FieldMeta {
+    type: 'select' | 'checkbox' | 'text';
+    options?: { value: string; label: string }[];
+    default?: string | boolean;
+    suggestions?: string[];
+    help?: string;
+    warning?: string;
+    hidden?: boolean;
+    visible_when?: Record<string, string[]>;
+}
+
+type SettingValue = string | boolean;
 
 interface EditProps {
     connector: ConnectorMeta;
     companyId: string | null;
     companies: { id: string; name: string }[];
-    config: { id: string; enabled: boolean; settings: Record<string, string | number | null>; secrets_set: Record<string, boolean> } | null;
+    config: { id: string; enabled: boolean; settings: Record<string, string | number | boolean | null>; secrets_set: Record<string, boolean> } | null;
     status?: string;
 }
 
@@ -43,18 +57,33 @@ function xsrfToken(): string {
     return match ? decodeURIComponent(match[1]) : '';
 }
 
+function initialSetting(key: string, field: FieldMeta | undefined, saved: string | number | boolean | null | undefined): SettingValue {
+    if (field?.type === 'checkbox') {
+        return saved === true || saved === 1 || saved === '1' || (saved == null && field.default === true);
+    }
+    if (saved != null) {
+        return String(saved);
+    }
+    if (typeof field?.default === 'string') {
+        return field.default;
+    }
+
+    return key === 'port' ? '587' : key === 'encryption' ? 'tls' : '';
+}
+
 export default function EditConnector({ connector, companyId, companies, config, status }: EditProps) {
     const label = (key: string) => connector.labels[key] ?? key;
+    const field = (key: string): FieldMeta | undefined => connector.fields[key];
 
-    const { data, setData, put, processing, errors } = useForm<{
+    const { data, setData, put, processing, errors, transform } = useForm<{
         company_id: string | null;
         enabled: boolean;
-        settings: Record<string, string>;
+        settings: Record<string, SettingValue>;
         secrets: Record<string, string>;
     }>({
         company_id: companyId,
         enabled: config?.enabled ?? true,
-        settings: Object.fromEntries(connector.settings.map((key) => [key, String(config?.settings[key] ?? (key === 'port' ? '587' : key === 'encryption' ? 'tls' : ''))])),
+        settings: Object.fromEntries(connector.settings.map((key) => [key, initialSetting(key, field(key), config?.settings[key])])),
         // Secrets are write-only: the fields start empty.
         secrets: Object.fromEntries(connector.secrets.map((key) => [key, ''])),
     });
@@ -70,8 +99,16 @@ export default function EditConnector({ connector, companyId, companies, config,
     // Settings errors come back keyed "settings.host".
     const error = (group: 'settings' | 'secrets', key: string) => (errors as Record<string, string | undefined>)[`${group}.${key}`];
 
+    // A field may only make sense for some values of another setting (e.g. the address of an OpenAI-compatible server).
+    const visible = (key: string) =>
+        !field(key)?.hidden &&
+        Object.entries(field(key)?.visible_when ?? {}).every(([other, values]) => values.includes(String(data.settings[other] ?? '')));
+    const setSetting = (key: string, value: SettingValue) => setData('settings', { ...data.settings, [key]: value });
+
     const submit: FormEventHandler = (e) => {
         e.preventDefault();
+        // Hidden fields are neither validated nor stored (e.g. the address for Anthropic).
+        transform((current) => ({ ...current, settings: Object.fromEntries(Object.entries(current.settings).filter(([key]) => visible(key))) }));
         put(route('admin.connectors.update', connector.key), {
             preserveScroll: true,
             onSuccess: () => setData('secrets', Object.fromEntries(connector.secrets.map((key) => [key, '']))),
@@ -89,7 +126,7 @@ export default function EditConnector({ connector, companyId, companies, config,
             const json = await response.json();
             setResult({ ok: Boolean(json.ok), message: json.message ?? 'Réponse inattendue.' });
         } catch {
-            setResult({ ok: false, message: 'Le test n\'a pas pu être lancé.' });
+            setResult({ ok: false, message: "Le test n'a pas pu être lancé." });
         } finally {
             setTesting(false);
         }
@@ -97,7 +134,9 @@ export default function EditConnector({ connector, companyId, companies, config,
 
     const clearSecret = (key: string) => {
         if (confirm(`Effacer « ${label(key)} » ?`)) {
-            router.delete(route('admin.connectors.secrets.clear', { key: connector.key, secret: key, company: companyId ?? undefined }), { preserveScroll: true });
+            router.delete(route('admin.connectors.secrets.clear', { key: connector.key, secret: key, company: companyId ?? undefined }), {
+                preserveScroll: true,
+            });
         }
     };
 
@@ -140,33 +179,75 @@ export default function EditConnector({ connector, companyId, companies, config,
                         <Label htmlFor="enabled">Connecteur activé</Label>
                     </div>
 
-                    {connector.settings.map((key) => (
-                        <div key={key} className="grid gap-2">
-                            <Label htmlFor={key}>{label(key)}</Label>
-                            {key === 'encryption' ? (
-                                <Select value={data.settings[key]} onValueChange={(value) => setData('settings', { ...data.settings, [key]: value })}>
-                                    <SelectTrigger id={key}>
-                                        <SelectValue />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        {encryptionOptions.map((option) => (
-                                            <SelectItem key={option.value} value={option.value}>
-                                                {option.label}
-                                            </SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                </Select>
-                            ) : (
-                                <Input
-                                    id={key}
-                                    value={data.settings[key]}
-                                    inputMode={key === 'port' ? 'numeric' : undefined}
-                                    onChange={(e) => setData('settings', { ...data.settings, [key]: e.target.value })}
-                                />
-                            )}
-                            <InputError message={error('settings', key)} />
-                        </div>
-                    ))}
+                    {connector.settings.filter(visible).map((key) => {
+                        const meta = field(key);
+                        const value = data.settings[key];
+
+                        if (meta?.type === 'checkbox') {
+                            return (
+                                <div key={key} className="grid gap-2">
+                                    <div className="flex items-center gap-2">
+                                        <Checkbox
+                                            id={key}
+                                            checked={value === true}
+                                            onCheckedChange={(checked) => setSetting(key, checked === true)}
+                                        />
+                                        <Label htmlFor={key}>{label(key)}</Label>
+                                    </div>
+                                    {meta.warning && (
+                                        <p
+                                            role="note"
+                                            className="rounded-md border border-amber-300 bg-amber-50 p-2 text-xs text-amber-900 dark:border-amber-700 dark:bg-amber-950 dark:text-amber-100"
+                                        >
+                                            {meta.warning}
+                                        </p>
+                                    )}
+                                    <InputError message={error('settings', key)} />
+                                </div>
+                            );
+                        }
+
+                        const options = meta?.type === 'select' ? meta.options : key === 'encryption' ? encryptionOptions : undefined;
+
+                        return (
+                            <div key={key} className="grid gap-2">
+                                <Label htmlFor={key}>{label(key)}</Label>
+                                {options ? (
+                                    <Select value={String(value)} onValueChange={(selected) => setSetting(key, selected)}>
+                                        <SelectTrigger id={key}>
+                                            <SelectValue />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            {options.map((option) => (
+                                                <SelectItem key={option.value} value={option.value}>
+                                                    {option.label}
+                                                </SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
+                                ) : (
+                                    <>
+                                        <Input
+                                            id={key}
+                                            value={String(value)}
+                                            inputMode={key === 'port' ? 'numeric' : undefined}
+                                            list={meta?.suggestions ? `${key}-suggestions` : undefined}
+                                            onChange={(e) => setSetting(key, e.target.value)}
+                                        />
+                                        {meta?.suggestions && (
+                                            <datalist id={`${key}-suggestions`}>
+                                                {meta.suggestions.map((suggestion) => (
+                                                    <option key={suggestion} value={suggestion} />
+                                                ))}
+                                            </datalist>
+                                        )}
+                                    </>
+                                )}
+                                {meta?.help && <p className="text-muted-foreground text-xs">{meta.help}</p>}
+                                <InputError message={error('settings', key)} />
+                            </div>
+                        );
+                    })}
 
                     {connector.secrets.map((key) => {
                         const isSet = config?.secrets_set[key] ?? false;
@@ -189,6 +270,7 @@ export default function EditConnector({ connector, companyId, companies, config,
                                         </Button>
                                     )}
                                 </div>
+                                {field(key)?.help && <p className="text-muted-foreground text-xs">{field(key)?.help}</p>}
                                 <InputError message={error('secrets', key)} />
                             </div>
                         );
@@ -210,7 +292,11 @@ export default function EditConnector({ connector, companyId, companies, config,
                     {!config && <p className="text-muted-foreground text-xs">Enregistrez la configuration pour pouvoir la tester.</p>}
 
                     {result && (
-                        <div role="status" aria-live="polite" className={`rounded-md border p-3 text-sm ${result.ok ? 'text-green-700' : 'text-red-700'}`}>
+                        <div
+                            role="status"
+                            aria-live="polite"
+                            className={`rounded-md border p-3 text-sm ${result.ok ? 'text-green-700' : 'text-red-700'}`}
+                        >
                             {result.message}
                         </div>
                     )}

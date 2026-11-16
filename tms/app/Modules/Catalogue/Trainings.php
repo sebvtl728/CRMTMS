@@ -81,6 +81,29 @@ final class Trainings
         return self::data(self::active());
     }
 
+    /**
+     * The modules of a training, in order. Durations as stored decimals
+     * (« 7.00 »); an unknown training has none.
+     *
+     * @return list<array{id: string, title: string, duration_hours: ?string, modality_id: ?string, content: ?string, position: int}>
+     */
+    public function modules(string $trainingId): array
+    {
+        if (! Str::isUuid($trainingId)) {
+            return [];
+        }
+
+        return TrainingModule::query()->where('training_id', $trainingId)->orderBy('position')->orderBy('id')->get()
+            ->map(fn (TrainingModule $m) => [
+                'id' => $m->id,
+                'title' => $m->title,
+                'duration_hours' => $m->duration_hours,
+                'modality_id' => $m->modality_id,
+                'content' => $m->content,
+                'position' => $m->position,
+            ])->values()->all();
+    }
+
     // ------------------------------------------------------------ import
 
     /**

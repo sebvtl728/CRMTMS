@@ -36,7 +36,8 @@ class UserFactory extends Factory
     public function definition(): array
     {
         return [
-            'name' => fake()->name(),
+            // Never a real-looking surname: tests assert personal names (Durand, Martin…) never reach the journal.
+            'name' => 'Utilisateur '.fake()->numerify('######'),
             'email' => mb_strtolower(fake()->unique()->safeEmail()),
             'email_verified_at' => now(),
             'password' => static::$password ??= Hash::make('password'),

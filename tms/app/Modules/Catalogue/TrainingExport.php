@@ -38,6 +38,14 @@ final class TrainingExport implements ExportResource
             'is_active' => 'Active',
             'audience' => 'Public visé',
             'prerequisites' => 'Prérequis',
+            'description' => 'Présentation',
+            'objectives' => 'Objectifs pédagogiques',
+            'methods' => 'Méthodes et moyens',
+            'evaluation' => 'Évaluation',
+            'sanction' => 'Sanction de la formation',
+            'accessibility' => 'Accessibilité',
+            'access_terms' => 'Modalités et délais d\'accès',
+            'results' => 'Résultats',
         ];
     }
 
@@ -78,6 +86,14 @@ final class TrainingExport implements ExportResource
             'is_active' => $model->is_active ? 'Oui' : 'Non',
             'audience' => $model->audience,
             'prerequisites' => $model->prerequisites,
+            'description' => $model->description,
+            'objectives' => $model->objectives === null ? null : implode("\n", $model->objectives),
+            'methods' => $model->methods,
+            'evaluation' => $model->evaluation,
+            'sanction' => $model->sanction,
+            'accessibility' => $model->accessibility,
+            'access_terms' => $model->access_terms,
+            'results' => $model->results,
             default => null,
         };
     }

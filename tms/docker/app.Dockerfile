@@ -9,8 +9,10 @@ FROM php:8.4-fpm AS base
 
 COPY --from=ghcr.io/mlocati/php-extension-installer:2 /usr/bin/install-php-extensions /usr/local/bin/
 
+# poppler-utils: pdftotext, text of a training programme (PDF) read by the AI assistant
+# (Catalogue\Assistant\PdfText), in the base stage so dev and prod both have it.
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends unzip \
+    && apt-get install -y --no-install-recommends unzip poppler-utils \
     && rm -rf /var/lib/apt/lists/* \
     && install-php-extensions pdo_pgsql redis intl zip gd bcmath pcntl opcache
 

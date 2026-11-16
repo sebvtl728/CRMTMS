@@ -37,6 +37,9 @@ class RateLimitServiceProvider extends ServiceProvider
      */
     public const FEED_PER_IP = 300;
 
+    /** AI requests (connector « Intelligence artificielle »): per user and organisme, per hour. */
+    public const AI_PER_HOUR = 20;
+
     public function boot(): void
     {
         foreach (self::LIMITS as $name => $perMinute) {
@@ -47,6 +50,11 @@ class RateLimitServiceProvider extends ServiceProvider
             Limit::perMinute(self::LIMITS['calendar-feed'])->by(self::key('calendar-feed', $request)),
             Limit::perMinute(self::FEED_PER_IP)->by(self::key('calendar-feed-ip', $request)),
         ]);
+
+        // Applied by the routes that call the AI (each call costs and may be slow).
+        RateLimiter::for('ai', fn (Request $request) => Limit::perHour(self::AI_PER_HOUR)->by(self::key('ai', $request))
+            ->response(fn (Request $request, array $headers) => response()->json(
+                ['message' => 'Vous avez atteint la limite de '.self::AI_PER_HOUR.' demandes à l\'intelligence artificielle par heure. Réessayez plus tard.'], 429, $headers)));
     }
 
     public static function key(string $name, Request $request): string

@@ -176,8 +176,9 @@ function personalTraces(array $values): array
 }
 
 it('anonymisation scrubs import rows and keeps batch undoable', function () {
-    $batch = runImport("Nom;Prénom;E-mail\nDurand;Claire;claire@example.test\nMartin;Paul;paul@example.test\nLeroy;Anne;anne@example.test\n", ImportTarget::People);
-    $durand = Person::query()->where('last_name', 'Durand')->sole();
+    // A name no factory generates: the journal also holds random fake users.
+    $batch = runImport("Nom;Prénom;E-mail\nZorglubeau;Claire;claire@example.test\nMartin;Paul;paul@example.test\nLeroy;Anne;anne@example.test\n", ImportTarget::People);
+    $durand = Person::query()->where('last_name', 'Zorglubeau')->sole();
     $row = ImportRow::query()->where('batch_id', $batch->id)->where('line', 2)->sole();
     expect($row->source)->not->toBeNull();
 
@@ -188,11 +189,11 @@ it('anonymisation scrubs import rows and keeps batch undoable', function () {
     expect($rows[0]->source)->toBeNull()
         ->and($rows[1]->source)->not->toBeNull()
         ->and($rows[2]->source)->not->toBeNull()
-        ->and(json_encode($rows[0]->messages))->not->toContain('Durand')
+        ->and(json_encode($rows[0]->messages))->not->toContain('Zorglubeau')
         ->and($batch->refresh()->stored_path)->toBeNull();
     // Journal: values were masked from the start, nothing to scrub there.
     $journal = AuditLog::query()->get()->map(fn ($l) => json_encode([$l->old_values, $l->new_values], JSON_UNESCAPED_UNICODE))->implode(' ');
-    expect($journal)->not->toContain('Durand')->not->toContain('claire@example.test');
+    expect($journal)->not->toContain('Zorglubeau')->not->toContain('claire@example.test');
 
     // The batch can still be undone: the other people go, the anonymised one stays.
     expect($batch->canUndo())->toBeTrue();
@@ -202,7 +203,7 @@ it('anonymisation scrubs import rows and keeps batch undoable', function () {
         ->and(Person::onlyTrashed()->orderBy('last_name')->pluck('last_name')->all())->toBe(['Leroy', 'Martin']);
 
     // A re-import never brings her back.
-    $again = runImport("Nom;Prénom;E-mail\nDurand;Claire;claire@example.test\n", ImportTarget::People);
+    $again = runImport("Nom;Prénom;E-mail\nZorglubeau;Claire;claire@example.test\n", ImportTarget::People);
     expect($again->created)->toBe(1); // a new, different fiche (nothing links it to the anonymised one)
     expect($durand->refresh()->last_name)->toBe('Anonyme');
 });

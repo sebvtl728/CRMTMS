@@ -102,6 +102,32 @@ final class HostPolicy
     }
 
     /**
+     * French reason why $ips are not allowed for ONE server an administrator
+     * declared on the local network (the AI connector's « Serveur sur le
+     * réseau local »), or null. Public and private (RFC 1918, ULA) addresses
+     * pass; loopback, link-local (cloud metadata), unspecified, multicast,
+     * shared and reserved addresses never do. With $privateOnly (plain http),
+     * a public address is refused too. The caller applies this only to the
+     * registered host and port; every other call keeps violation().
+     *
+     * @param  list<string>  $ips
+     */
+    public static function localNetworkViolation(array $ips, bool $privateOnly = false): ?string
+    {
+        foreach ($ips as $ip) {
+            $class = self::classify($ip);
+            if ($class === 'internal') {
+                return 'une adresse locale ou réservée';
+            }
+            if ($class === null && $privateOnly) {
+                return 'une adresse publique (http n\'est permis que sur le réseau local)';
+            }
+        }
+
+        return null;
+    }
+
+    /**
      * @return 'internal'|'private'|null
      */
     public static function classify(string $ip): ?string

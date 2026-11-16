@@ -70,6 +70,15 @@ return [
         // Accept private-network SMTP hosts (RFC 1918, IPv6 ULA): a LAN relay. Allowed by default on a
         // self-hosted install (single mode), refused in multi mode (shared platform).
         'allow_private_hosts' => $bool('TMS_ALLOW_PRIVATE_SMTP_HOSTS', $mode === 'single'),
+
+        // Offer the AI connector's « Serveur sur le réseau local » (an AI server on a private address of the
+        // organisme's network). Allowed by default on a self-hosted install (single mode), refused in multi
+        // mode (an organisme's admin must not reach the shared platform's internal network).
+        'allow_local_ai' => $bool('TMS_ALLOW_LOCAL_AI', $mode === 'single'),
+
+        // End-to-end stack only (compose.e2e.yaml): an offline AI answering a fixed training sheet
+        // (tests/Support/E2eAiClient). Ignored in production. Never set it on an installation.
+        'e2e_fake_ai' => $bool('TMS_E2E_FAKE_AI', false),
     ],
 
 ];
