@@ -121,7 +121,7 @@ it('registers the microsoft365 sync connector with its settings and secret', fun
     expect($validator->fails())->toBeTrue()
         ->and($validator->errors()->keys())->toContain('tenant', 'client_id');
     expect(validator(['tenant' => 'common', 'client_id' => M365_CLIENT], $connector->settingsRules())->passes())->toBeTrue()
-        ->and(validator(['tenant' => 'capformation.onmicrosoft.com', 'client_id' => M365_CLIENT], $connector->settingsRules())->passes())->toBeTrue();
+        ->and(validator(['tenant' => 'organisme.onmicrosoft.com', 'client_id' => M365_CLIENT], $connector->settingsRules())->passes())->toBeTrue();
 });
 
 it('tests the azure application with the client credentials, without relaying microsoft text', function () {

@@ -79,7 +79,7 @@ class Microsoft365MailConnector implements Connector, HasFormLabels, OrganismeWi
         return [
             'tenant' => ['required', 'string', 'max:253', function (string $attribute, mixed $value, Closure $fail): void {
                 if (! is_string($value) || ! self::validDirectory($value)) {
-                    $fail('Indiquez l\'identifiant (GUID) de l\'annuaire Azure ou un de ses domaines (ex. capformation.net) : « common », « organizations » et « consumers » ne permettent pas l\'envoi par l\'application.');
+                    $fail('Indiquez l\'identifiant (GUID) de l\'annuaire Azure ou un de ses domaines (ex. organisme.fr ou organisme.onmicrosoft.com) : « common », « organizations » et « consumers » ne permettent pas l\'envoi par l\'application.');
                 }
             }],
             'client_id' => ['required', 'uuid'],

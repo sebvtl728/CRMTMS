@@ -97,7 +97,7 @@ it('requires the secret again when the directory or the application changes', fu
     $payload['secrets']['client_secret'] = '';
     $this->putJson('/admin/connectors/microsoft365_mail', $payload)->assertRedirect();
 })->with([
-    'directory' => ['tenant', 'capformation.net'],
+    'directory' => ['tenant', 'organisme.fr'],
     'application' => ['client_id', 'c5b8d3f2-4a6e-4d9b-8f7c-2e3a4b5c6d7e'],
 ]);
 
