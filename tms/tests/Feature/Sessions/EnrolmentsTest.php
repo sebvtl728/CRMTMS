@@ -636,3 +636,36 @@ it('leaves the waiting list out of the span of a dossier', function () {
     expect(DossierSchedule::spans([$waiting->id]))->toBe([])
         ->and($waiting->effectiveStatus(Dossier::today())->value)->toBe('created');
 });
+
+it('refuses to cancel a session when an enrolment of another dossier slipped in before its lock', function () {
+    $session = enrSession();
+    $dossier = enrDossier();
+    $late = enrDossier(Organisation::query()->create(['name' => 'Arrivé tard']));
+    $first = enrol($dossier, $session);
+    $lateLine = enrLine($late);
+    $person = Person::query()->create(['last_name' => 'Tardif', 'first_name' => 'Paul']);
+
+    // Interleaving: right after the dossiers are locked, another request
+    // commits an enrolment of a dossier not locked, before the session lock.
+    $slipped = false;
+    DB::listen(function ($query) use (&$slipped, $session, $late, $lateLine, $person): void {
+        if ($slipped || ! str_contains($query->sql, 'from "dossiers"') || ! str_contains($query->sql, 'for update')) {
+            return;
+        }
+        $slipped = true;
+        DB::table('enrolments')->insert([
+            'id' => (string) Str::uuid7(), 'tenant_id' => tenant()->id, 'person_id' => $person->id, 'training_session_id' => $session->id,
+            'dossier_id' => $late->id, 'dossier_line_id' => $lateLine->id, 'status' => 'enrolled', 'created_at' => now(), 'updated_at' => now(),
+        ]);
+    });
+
+    try {
+        app(SessionWriter::class)->cancel($session, crmItem(ReferenceList::CancelReason, 'Effectif insuffisant')->id);
+        $this->fail('Cancelled a session with an enrolment of a dossier not locked.');
+    } catch (UserFacingHttpException $e) {
+        expect($e->getStatusCode())->toBe(409)->and($e->getMessage())->toBe(Enrolments::ENROLMENT_ADDED);
+    }
+    expect($slipped)->toBeTrue()
+        ->and($session->refresh()->isCancelled())->toBeFalse()
+        ->and($first->refresh()->status)->toBe(EnrolmentStatus::Enrolled);
+});

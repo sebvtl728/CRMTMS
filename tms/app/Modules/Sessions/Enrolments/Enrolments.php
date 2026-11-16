@@ -56,6 +56,9 @@ final class Enrolments
 
     public const CANCELLED = 'Une inscription annulée ne se modifie plus.';
 
+    /** An enrolment of a dossier not locked arrived between the two locks of lockSession(). */
+    public const ENROLMENT_ADDED = 'Une inscription vient d\'être ajoutée : réessayez.';
+
     public function __construct(private readonly Fiches $fiches) {}
 
     /**
@@ -264,11 +267,20 @@ final class Enrolments
      */
     public function lockSession(TrainingSession $session): TrainingSession
     {
-        $dossierIds = Enrolment::query()->where('training_session_id', $session->id)
+        $dossierIds = fn (): array => Enrolment::query()->where('training_session_id', $session->id)
             ->where('status', '<>', EnrolmentStatus::Cancelled->value)->distinct()->pluck('dossier_id')->all();
-        Dossier::withTrashed()->whereKey($dossierIds)->orderBy('id')->lockForUpdate()->get();
+        $locked = $dossierIds();
+        Dossier::withTrashed()->whereKey($locked)->orderBy('id')->lockForUpdate()->get();
+        $session = TrainingSession::withTrashed()->lockForUpdate()->findOrFail($session->id);
 
-        return TrainingSession::withTrashed()->lockForUpdate()->findOrFail($session->id);
+        // An enrolment of another dossier may have been committed between the
+        // read above and the session lock (enrolling locks its dossier, then
+        // the session): its dossier is not locked, so the caller stops (rare).
+        if (array_diff($dossierIds(), $locked) !== []) {
+            throw new UserFacingHttpException(409, self::ENROLMENT_ADDED);
+        }
+
+        return $session;
     }
 
     /**
