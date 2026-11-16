@@ -2,6 +2,7 @@
 
 namespace App\Modules\Connectors\Mail365;
 
+use App\Modules\Connectors\Core\PermanentDeliveryFailure;
 use RuntimeException;
 
 /**
@@ -12,7 +13,7 @@ use RuntimeException;
  * the HTTP status (0 when no call was made). Retryable failures (429, 5xx,
  * timeouts) raise Calendar\GraphRetryLater instead.
  */
-final class GraphMailFailed extends RuntimeException
+final class GraphMailFailed extends RuntimeException implements PermanentDeliveryFailure
 {
     public const REFUSED = 'Microsoft 365 a refusé l\'envoi : vérifiez la permission Mail.Send et l\'adresse d\'expédition.';
 
