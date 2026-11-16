@@ -48,6 +48,9 @@ it('seeds the lot 2a lists for a new organisme with the agreed values', function
     expect($forceMajeure)->toBe(['maladie', 'accident'])
         ->and(ReferenceItem::query()->where('list', ReferenceList::AbandonReason)->where('code', 'demission')->value('meta'))->toBeNull();
 
+    $defaults = ReferenceItem::options(ReferenceList::FundingType)->mapWithKeys(fn ($i) => [$i->code => $i->meta['default_for'] ?? null])->filter()->all();
+    expect($defaults)->toBe(['entreprise' => 'organisation', 'personnel' => 'person']);
+
     // No second « employment status » list: the professional situation is reused.
     expect(array_map(fn (ReferenceList $l) => $l->value, ReferenceList::cases()))->not->toContain('employment_status');
 });
@@ -63,6 +66,7 @@ it('creates the same values for an existing organisme by migration, without dupl
     $migration = lot2aMigration('2026_12_07_000002_seed_sessions_reference_lists');
 
     $migration->up();
+    lot2aMigration('2026_12_13_000001_flag_default_funding_types')->up();
     $migrated = lot2aItems();
     expect($migrated['funding_type'])->toHaveCount(6)->and($migrated['abandon_reason'][1][3])->toBe(['force_majeure' => true]);
 
@@ -127,4 +131,46 @@ it('lets an administrator flag an abandon reason as force majeure', function () 
     $funding = ReferenceItem::query()->where('list', ReferenceList::FundingType)->where('code', 'cpf')->firstOrFail();
     $this->put("/admin/references/funding_type/{$funding->id}", ['label' => 'CPF', 'meta' => ['force_majeure' => true]])->assertRedirect();
     expect($funding->fresh()->meta)->toBeNull();
+});
+
+it('flags once, by migration, the funding types funding a new dossier by default', function () {
+    inTenant();
+    lot2aMigration('2026_12_07_000002_seed_sessions_reference_lists')->up();
+    $type = fn (string $code) => ReferenceItem::query()->where('list', ReferenceList::FundingType)->where('code', $code)->firstOrFail();
+    // The organisme already chose its default for particuliers: kept.
+    $type('cpf')->update(['meta' => ['default_for' => 'person']]);
+    $migration = lot2aMigration('2026_12_13_000001_flag_default_funding_types');
+
+    $migration->up();
+    expect($type('entreprise')->meta)->toBe(['default_for' => 'organisation'])
+        ->and($type('personnel')->meta)->toBeNull()
+        ->and($type('cpf')->meta)->toBe(['default_for' => 'person']);
+
+    // Idempotent.
+    $migration->up();
+    expect(ReferenceItem::query()->where('list', ReferenceList::FundingType)->where('meta->default_for', 'organisation')->count())->toBe(1)
+        ->and(ReferenceItem::query()->where('list', ReferenceList::FundingType)->where('meta->default_for', 'person')->pluck('code')->all())->toBe(['cpf']);
+});
+
+it('lets an administrator choose the funding type of each contractant, one per kind', function () {
+    inTenant();
+    CapFormationReferenceSeeder::run(tenant());
+    $type = fn (string $code) => ReferenceItem::query()->where('list', ReferenceList::FundingType)->where('code', $code)->firstOrFail();
+    $this->actingAs(admin(twoFactor: true))->get('/admin/references')->assertInertia(fn (Assert $page) => $page
+        ->where('lists.funding_type.has_default_for', true)->where('lists.abandon_reason.has_default_for', false));
+
+    $this->put("/admin/references/funding_type/{$type('cpf')->id}", ['label' => 'CPF', 'meta' => ['default_for' => 'person']])->assertRedirect();
+    expect($type('cpf')->meta)->toBe(['default_for' => 'person'])
+        ->and($type('personnel')->meta)->toBeNull()
+        ->and($type('entreprise')->meta)->toBe(['default_for' => 'organisation']);
+
+    $this->put("/admin/references/funding_type/{$type('cpf')->id}", ['label' => 'CPF', 'meta' => ['default_for' => null]])->assertRedirect();
+    expect($type('cpf')->meta)->toBeNull();
+
+    $this->put("/admin/references/funding_type/{$type('cpf')->id}", ['label' => 'CPF', 'meta' => ['default_for' => 'robot']])
+        ->assertSessionHasErrors('meta.default_for');
+    // Elsewhere the key is ignored.
+    $reason = ReferenceItem::query()->where('list', ReferenceList::AbandonReason)->where('code', 'demission')->firstOrFail();
+    $this->put("/admin/references/abandon_reason/{$reason->id}", ['label' => 'Démission', 'meta' => ['default_for' => 'person']])->assertRedirect();
+    expect($reason->fresh()->meta)->toBeNull();
 });

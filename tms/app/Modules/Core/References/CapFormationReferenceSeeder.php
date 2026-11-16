@@ -33,6 +33,9 @@ final class CapFormationReferenceSeeder
     /** Abandon reasons that are a force majeure (never a dédit), by code. */
     private const FORCE_MAJEURE = ['maladie', 'accident'];
 
+    /** Funding types funding a new dossier by default (meta.default_for), by code. */
+    private const DEFAULT_FOR = ['entreprise' => 'organisation', 'personnel' => 'person'];
+
     /** The stage a sent quote brings its opportunity to (meta.quote_stage). */
     private const QUOTE_STAGE = 'Proposition';
 
@@ -75,6 +78,9 @@ final class CapFormationReferenceSeeder
                     $meta = $planning === null ? null : ['planning' => $planning];
                     if ($list === ReferenceList::AbandonReason->value && in_array($code, self::FORCE_MAJEURE, true)) {
                         $meta = ['force_majeure' => true];
+                    }
+                    if ($list === ReferenceList::FundingType->value && isset(self::DEFAULT_FOR[$code])) {
+                        $meta = ['default_for' => self::DEFAULT_FOR[$code]];
                     }
                     self::ensure(ReferenceList::from($list), $code, $label, $i + 1, $meta);
                 }

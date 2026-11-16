@@ -181,6 +181,22 @@ it('funds a particulier\'s dossier as « Personnel » and plans him an individua
         ->and($funding->amount)->toBe('2820.00');
 });
 
+it('funds a new dossier with the funding type flagged for its contractant, or not at all', function () {
+    $opco = crmItem(ReferenceList::FundingType, 'OPCO');
+    $opco->update(['meta' => ['default_for' => 'organisation']]);
+    crmItem(ReferenceList::FundingType, 'Entreprise')->update(['meta' => null]);
+    crmItem(ReferenceList::FundingType, 'Personnel')->update(['meta' => null]);
+    $admin = admin(true);
+
+    $this->actingAs($admin)->postJson(route('dossiers.from-quote.store', dfqQuote(Organisation::query()->create(['name' => 'Hôtel du Parc']))->id), ['lines' => [[], [], []]])->assertCreated();
+    expect(Funding::query()->sole()->funding_type_id)->toBe($opco->id);
+
+    // No type flagged for a particulier: his dossier starts without funding.
+    $person = makePerson('Durand', ['first_name' => 'Paul', 'is_individual' => true]);
+    $this->postJson(route('dossiers.from-quote.store', dfqQuote($person)->id), ['lines' => [[], [], []]])->assertCreated();
+    expect(Dossier::query()->where('account_person_id', $person->id)->sole()->fundings()->count())->toBe(0);
+});
+
 it('refuses an intra session to a particulier', function () {
     $quote = dfqQuote(makePerson('Durand', ['is_individual' => true]));
 

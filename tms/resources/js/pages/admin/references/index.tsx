@@ -19,10 +19,14 @@ type ReferenceMeta = {
     planning?: 'meeting' | 'call' | null;
     quote_stage?: boolean;
     force_majeure?: boolean;
+    default_for?: 'organisation' | 'person' | null;
 };
 
 /** Place of an action type in the CRM planning (meta.planning). */
 const PLANNING_KINDS = { meeting: 'Rendez-vous', call: 'Appel' } as const;
+
+/** Contractant a funding type funds by default (meta.default_for). */
+const DEFAULT_FOR = { organisation: 'Entreprise contractante', person: 'Particulier contractant' } as const;
 
 interface ReferenceItem {
     id: string;
@@ -42,6 +46,7 @@ interface ReferenceListData {
     has_planning: boolean;
     has_quote_stage: boolean;
     has_force_majeure: boolean;
+    has_default_for: boolean;
     items: ReferenceItem[];
 }
 
@@ -58,6 +63,7 @@ interface EditorState {
     planning: string; // '' = not in the planning
     quoteStage: boolean;
     forceMajeure: boolean;
+    defaultFor: string; // '' = none
 }
 
 const breadcrumbs: BreadcrumbItem[] = [{ title: 'Référentiels', href: '/admin/references' }];
@@ -97,6 +103,7 @@ export default function ReferencesIndex({ lists, status }: ReferencesIndexProps)
             planning: item?.meta.planning ?? '',
             quoteStage: item?.meta.quote_stage === true,
             forceMajeure: item?.meta.force_majeure === true,
+            defaultFor: item?.meta.default_for ?? '',
         });
 
     const closing = editor?.item?.meta.outcome != null; // won / lost: fixed probability
@@ -110,6 +117,7 @@ export default function ReferencesIndex({ lists, status }: ReferencesIndexProps)
         if (list.has_planning) meta.planning = editor.planning === '' ? null : (editor.planning as 'meeting' | 'call');
         if (list.has_quote_stage && !closing) meta.quote_stage = editor.quoteStage;
         if (list.has_force_majeure) meta.force_majeure = editor.forceMajeure;
+        if (list.has_default_for) meta.default_for = editor.defaultFor === '' ? null : (editor.defaultFor as 'organisation' | 'person');
         const payload = { label: editor.label, meta };
         const options = {
             preserveScroll: true,
@@ -223,6 +231,9 @@ export default function ReferencesIndex({ lists, status }: ReferencesIndexProps)
                                     <Badge variant="outline">Planning : {PLANNING_KINDS[item.meta.planning]}</Badge>
                                 )}
                                 {list.has_force_majeure && item.meta.force_majeure && <Badge variant="outline">Force majeure</Badge>}
+                                {list.has_default_for && item.meta.default_for && (
+                                    <Badge variant="outline">Par défaut : {DEFAULT_FOR[item.meta.default_for]}</Badge>
+                                )}
                                 {item.is_system && <Badge variant="secondary">Système</Badge>}
                                 {item.in_use && <Badge variant="secondary">Utilisée</Badge>}
                                 {!item.is_active && (
@@ -372,6 +383,27 @@ export default function ReferencesIndex({ lists, status }: ReferencesIndexProps)
                                 </label>
                                 <p className="text-muted-foreground text-xs">Un abandon pour ce motif n'entraîne jamais de dédit.</p>
                                 <InputError message={errors['meta.force_majeure']} />
+                            </div>
+                        )}
+
+                        {list.has_default_for && (
+                            <div className="grid gap-1">
+                                <Label htmlFor="ref-default-for">Financement initial d'un dossier</Label>
+                                <select
+                                    id="ref-default-for"
+                                    className="border-input bg-background focus:ring-ring h-9 w-full rounded-md border px-3 text-sm focus:ring-2 focus:outline-hidden"
+                                    value={editor?.defaultFor ?? ''}
+                                    onChange={(e) => setEditor((s) => s && { ...s, defaultFor: e.target.value })}
+                                >
+                                    <option value="">Jamais par défaut</option>
+                                    <option value="organisation">Par défaut quand le contractant est une entreprise</option>
+                                    <option value="person">Par défaut quand le contractant est un particulier</option>
+                                </select>
+                                <p className="text-muted-foreground text-xs">
+                                    Un dossier créé depuis un devis accepté reçoit un financement de ce type pour tout son prix. Une seule valeur par cas
+                                    ; aucune : pas de financement initial.
+                                </p>
+                                <InputError message={errors['meta.default_for']} />
                             </div>
                         )}
 

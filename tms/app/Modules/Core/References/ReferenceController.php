@@ -33,6 +33,7 @@ class ReferenceController extends Controller
                 'has_planning' => $list->hasPlanning(),
                 'has_quote_stage' => $list->hasQuoteStage(),
                 'has_force_majeure' => $list->hasForceMajeure(),
+                'has_default_for' => $list->hasDefaultFor(),
                 'items' => ($items[$list->value] ?? collect())->map(fn (ReferenceItem $i) => [
                     'id' => $i->id,
                     'code' => $i->code,
@@ -65,6 +66,7 @@ class ReferenceController extends Controller
                 'meta' => $this->metaFrom($list, $data, null),
             ]);
             $this->keepOneQuoteStage($item);
+            $this->keepOneDefaultFor($item);
         });
 
         return $this->back('Valeur ajoutée.');
@@ -90,6 +92,7 @@ class ReferenceController extends Controller
                 'meta' => $meta,
             ]);
             $this->keepOneQuoteStage($item);
+            $this->keepOneDefaultFor($item);
         });
 
         return $this->back('Valeur enregistrée.');
@@ -158,6 +161,7 @@ class ReferenceController extends Controller
             'meta.planning' => ['nullable', Rule::in(array_keys(ReferenceItem::PLANNING_KINDS))],
             'meta.quote_stage' => ['nullable', 'boolean'],
             'meta.force_majeure' => ['nullable', 'boolean'],
+            'meta.default_for' => ['nullable', Rule::in(array_keys(ReferenceItem::DEFAULT_FOR))],
         ], [
             'label.required' => 'Le libellé est obligatoire.',
             'label.unique' => 'Une valeur portant ce libellé existe déjà dans cette liste.',
@@ -168,6 +172,7 @@ class ReferenceController extends Controller
             'meta.planning.in' => 'Choisissez Rendez-vous, Appel ou rien pour le planning.',
             'meta.quote_stage.boolean' => 'Cochez ou décochez la case.',
             'meta.force_majeure.boolean' => 'Cochez ou décochez la case.',
+            'meta.default_for.in' => 'Choisissez Entreprise contractante, Particulier contractant ou rien.',
         ]);
     }
 
@@ -215,6 +220,13 @@ class ReferenceController extends Controller
                 unset($meta['force_majeure']);
             }
         }
+        // Contractant funded by default by a funding type: kept unless the form sends it (null clears it).
+        if ($list->hasDefaultFor() && array_key_exists('default_for', $input)) {
+            $meta['default_for'] = $input['default_for'];
+            if ($meta['default_for'] === null) {
+                unset($meta['default_for']);
+            }
+        }
         if (array_key_exists('color', $input)) {
             $meta['color'] = $input['color'];
         }
@@ -239,6 +251,26 @@ class ReferenceController extends Controller
             ->each(function (ReferenceItem $other): void {
                 $meta = $other->meta ?? [];
                 unset($meta['quote_stage']);
+                $other->update(['meta' => $meta === [] ? null : $meta]);
+            });
+    }
+
+    /**
+     * At most one funding type per kind of contractant: flagging one clears
+     * the others of that kind.
+     */
+    private function keepOneDefaultFor(ReferenceItem $item): void
+    {
+        $kind = $item->meta['default_for'] ?? null;
+        if (! $item->list->hasDefaultFor() || $kind === null) {
+            return;
+        }
+
+        ReferenceItem::withTrashed()->where('list', $item->list)->whereKeyNot($item->getKey())->get()
+            ->filter(fn (ReferenceItem $other) => ($other->meta['default_for'] ?? null) === $kind)
+            ->each(function (ReferenceItem $other): void {
+                $meta = $other->meta ?? [];
+                unset($meta['default_for']);
                 $other->update(['meta' => $meta === [] ? null : $meta]);
             });
     }

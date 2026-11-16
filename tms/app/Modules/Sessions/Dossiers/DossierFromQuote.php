@@ -504,16 +504,17 @@ final class DossierFromQuote
     }
 
     /**
-     * The whole price, « À demander », paid by the contractant: an entreprise
-     * as « Entreprise », a particulier as « Personnel » (items of « Types de
-     * financeur »; none when the organisme removed it, or for a free dossier).
+     * The whole price, « À demander », paid by the contractant, as the active
+     * funding type flagged for his kind (meta.default_for organisation|person
+     * of « Types de financeur », first by position): none flagged, or a free
+     * dossier, no initial funding.
      */
     private function fund(Dossier $dossier, AcceptedQuoteData $quote): void
     {
         $total = $dossier->load('lines')->priceCents();
         $organisation = $quote->account['type'] === 'organisation';
-        $type = ReferenceItem::query()->where('list', ReferenceList::FundingType)->where('code', $organisation ? 'entreprise' : 'personnel')
-            ->where('is_active', true)->value('id');
+        $type = ReferenceItem::query()->where('list', ReferenceList::FundingType)->where('meta->default_for', $organisation ? 'organisation' : 'person')
+            ->where('is_active', true)->orderBy('position')->orderBy('id')->value('id');
         if ($total <= 0 || ! is_string($type)) {
             return;
         }

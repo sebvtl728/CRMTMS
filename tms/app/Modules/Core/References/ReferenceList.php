@@ -89,4 +89,15 @@ enum ReferenceList: string
     {
         return $this === self::AbandonReason;
     }
+
+    /**
+     * Funding types carry the kind of contractant they fund by default
+     * (meta.default_for: organisation|person): the initial funding of a
+     * dossier created from a quote. One item per kind at most; none: no
+     * initial funding.
+     */
+    public function hasDefaultFor(): bool
+    {
+        return $this === self::FundingType;
+    }
 }

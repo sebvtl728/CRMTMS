@@ -103,7 +103,7 @@ Sur un devis **accepté**, **Créer le dossier** (droit « Créer et modifier le
 2. **Sessions** : pour chaque ligne de formation, une **session existante** de cette formation, une **nouvelle** session (intra ou individuelle pré-remplie pour l'entreprise) ou **Plus tard** ;
 3. **Stagiaires** : cherchés dans le CRM (les salariés du contractant en premier) ou créés sur place, puis inscrits ; une même personne nouvelle n'est créée qu'une fois, même inscrite sur plusieurs lignes.
 
-Tout est créé d'un seul coup : le dossier (DAS de l'opportunité), ses lignes, les sessions nouvelles, les inscriptions et un financement initial « Entreprise » (« Personnel » pour un particulier) du prix total, *À demander*. Un devis ne donne **qu'un dossier** : ensuite le bouton devient **Voir le dossier** (un double clic ou un second onglet ne crée pas de doublon). Un dossier mis à la corbeille bloque toujours la création d'un nouveau dossier pour ce devis : restaurez-le.
+Tout est créé d'un seul coup : le dossier (DAS de l'opportunité), ses lignes, les sessions nouvelles, les inscriptions et un financement initial du prix total, *À demander*, payé par le contractant, du type de financeur marqué « par défaut » pour une entreprise ou pour un particulier (*Référentiels* › *Types de financeur*, champ **Financement initial d'un dossier** ; « Entreprise » et « Personnel » à l'installation). Si aucun type n'est marqué pour ce cas, le dossier est créé sans financement. Un devis ne donne **qu'un dossier** : ensuite le bouton devient **Voir le dossier** (un double clic ou un second onglet ne crée pas de doublon). Un dossier mis à la corbeille bloque toujours la création d'un nouveau dossier pour ce devis : restaurez-le.
 
 ## 7. Accueil
 

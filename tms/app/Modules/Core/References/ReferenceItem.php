@@ -27,7 +27,7 @@ use Illuminate\Support\Str;
  * @property int $position
  * @property bool $is_system
  * @property bool $is_active
- * @property array{probability?: int, outcome?: string|null, color?: string|null, planning?: string|null, quote_stage?: bool, force_majeure?: bool}|null $meta
+ * @property array{probability?: int, outcome?: string|null, color?: string|null, planning?: string|null, quote_stage?: bool, force_majeure?: bool, default_for?: string}|null $meta
  * @property Carbon|null $deleted_at
  */
 class ReferenceItem extends Model
@@ -36,6 +36,9 @@ class ReferenceItem extends Model
 
     /** Kinds of meta.planning of an action type (CRM planning): value => label. */
     public const PLANNING_KINDS = ['meeting' => 'Rendez-vous', 'call' => 'Appel'];
+
+    /** Contractant a funding type funds by default (meta.default_for). */
+    public const DEFAULT_FOR = ['organisation' => 'Entreprise contractante', 'person' => 'Particulier contractant'];
 
     /** @var list<string> */
     protected $fillable = ['list', 'code', 'label', 'position', 'is_system', 'is_active', 'meta'];
