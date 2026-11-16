@@ -593,7 +593,9 @@ type EditFields = {
 function EditForm({ activityId, onDone }: { activityId: string; onDone: () => void }) {
     const [loaded, setLoaded] = useState<(Choices & { activity: ActivityData; responsibles: Option[] }) | null>(null);
     const [failed, setFailed] = useState(false);
-    const { data, setData, put, transform, processing, errors } = useForm<EditFields>({
+    // Dates as loaded: sent back only when changed (no minute rounding of an untouched date).
+    const [initialDates, setInitialDates] = useState({ due_at: '', done_at: '' });
+    const { data, setData, put, transform, processing, errors, setError, clearErrors } = useForm<EditFields>({
         type_id: '',
         subject: '',
         due_at: '',
@@ -610,6 +612,7 @@ function EditForm({ activityId, onDone }: { activityId: string; onDone: () => vo
             .then((json) => {
                 setLoaded(json);
                 const a = json.activity;
+                setInitialDates({ due_at: isoToLocal(a.due_at), done_at: isoToLocal(a.done_at) });
                 setData({
                     type_id: a.type_id,
                     subject: a.subject,
@@ -630,6 +633,16 @@ function EditForm({ activityId, onDone }: { activityId: string; onDone: () => vo
 
     const submit: FormEventHandler = (e) => {
         e.preventDefault();
+        clearErrors();
+        // A done action stays done: its date is required.
+        if (done && data.done_at === '') {
+            setError('done_at', 'Indiquez la date à laquelle l’action a été faite.');
+            return;
+        }
+        if (!done && data.due_at === '') {
+            setError('due_at', 'Indiquez l’échéance de l’action à faire.');
+            return;
+        }
         // An action to do keeps its report and stays to do; a done one keeps its due date.
         transform((d) => {
             const common = {
@@ -640,7 +653,10 @@ function EditForm({ activityId, onDone }: { activityId: string; onDone: () => vo
                 ...(d.responsible_user_id ? { responsible_user_id: d.responsible_user_id } : {}),
             };
 
-            return done ? { ...common, done_at: d.done_at, result_id: d.result_id, report: d.report } : { ...common, due_at: d.due_at };
+            const doneAt = d.done_at !== initialDates.done_at ? { done_at: d.done_at } : {};
+            const dueAt = d.due_at !== initialDates.due_at ? { due_at: d.due_at } : {};
+
+            return done ? { ...common, ...doneAt, result_id: d.result_id, report: d.report } : { ...common, ...dueAt };
         });
         put(route('crm.activities.update', activityId), {
             preserveScroll: true,
@@ -740,7 +756,7 @@ function EditForm({ activityId, onDone }: { activityId: string; onDone: () => vo
                             value={data.done_at}
                             onChange={(e) => setData('done_at', e.target.value)}
                         />
-                        <InputError message={errors.done_at} />
+                        <InputError message={errors.done_at ?? errors.due_at} />
                     </div>
                 ) : (
                     <div className="grid gap-2">

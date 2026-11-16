@@ -5,11 +5,13 @@ use App\Modules\Core\Access\Scopes;
 use App\Modules\Core\References\CapFormationReferenceSeeder;
 use App\Modules\Core\References\ReferenceList;
 use App\Modules\Crm\Activities\Activity;
+use App\Modules\Crm\Activities\Events\ActivityChanged;
 use App\Modules\Crm\CrmServiceProvider;
 use App\Modules\Crm\Organisations\Organisation;
 use App\Modules\Crm\Permissions;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Event;
 
 // « Modifier » of an action (À faire, planning, fiches): the dialog reads
 // the action with GET and saves with PUT.
@@ -134,4 +136,53 @@ it('shows a Modifier right on each row of À faire and of the planning', functio
 
     $this->get('/crm/todo')->assertInertia(fn ($page) => $page->where('sections.today.0.can_update', true)->etc());
     $this->get('/crm/planning')->assertInertia(fn ($page) => $page->where('days.0.items.0.can_update', true)->etc());
+});
+
+it('edits a done action: date done, result and report, the last contact following', function () {
+    $this->travelTo(CarbonImmutable::parse('2026-11-16 10:00', 'Europe/Paris'));
+    $this->actingAs(commercial());
+    $org = Organisation::query()->create(['name' => 'Hôtel du Lac']);
+    $done = aeTodo(['organisation_id' => $org->id, 'due_at' => null, 'done_at' => CarbonImmutable::parse('2026-11-14 11:00', 'Europe/Paris')]);
+    expect($org->refresh()->last_contact_at?->equalTo(CarbonImmutable::parse('2026-11-14 11:00', 'Europe/Paris')))->toBeTrue();
+
+    $this->put("/crm/activities/{$done->id}", [
+        'type_id' => aeType('Appel'),
+        'subject' => 'Appel au chef',
+        'done_at' => '2026-11-15T16:45',
+        'result_id' => crmItem(ReferenceList::ActionResult, 'Réussi')->id,
+        'report' => 'Intéressé par la session de mars.',
+    ])->assertSessionHasNoErrors();
+
+    $done->refresh();
+    expect($done->done_at?->equalTo(CarbonImmutable::parse('2026-11-15 16:45', 'Europe/Paris')))->toBeTrue()
+        ->and($done->result_id)->toBe(crmItem(ReferenceList::ActionResult, 'Réussi')->id)
+        ->and($done->report)->toBe('Intéressé par la session de mars.')
+        ->and($org->refresh()->last_contact_at?->equalTo(CarbonImmutable::parse('2026-11-15 16:45', 'Europe/Paris')))->toBeTrue();
+});
+
+it('never reopens a done action through Modifier: its date done is required', function () {
+    $this->actingAs(commercial());
+    $org = Organisation::query()->create(['name' => 'Hôtel du Lac']);
+    $withDue = aeTodo(['organisation_id' => $org->id, 'done_at' => CarbonImmutable::parse('2026-11-14 11:00', 'Europe/Paris')]);
+    $withoutDue = aeTodo(['organisation_id' => $org->id, 'due_at' => null, 'done_at' => CarbonImmutable::parse('2026-11-14 11:00', 'Europe/Paris')]);
+
+    foreach ([$withDue, $withoutDue] as $activity) {
+        $this->put("/crm/activities/{$activity->id}", ['type_id' => aeType('Appel'), 'subject' => 'Appel', 'done_at' => ''])
+            ->assertSessionHasErrors(['done_at' => 'Indiquez la date à laquelle l\'action a été faite.'])
+            ->assertSessionDoesntHaveErrors('due_at');
+        expect($activity->refresh()->done_at)->not->toBeNull();
+    }
+});
+
+it('announces a new due date to the calendars, not a subject change alone', function () {
+    $this->actingAs(commercial());
+    $org = Organisation::query()->create(['name' => 'Hôtel du Lac']);
+    $todo = aeTodo(['organisation_id' => $org->id]);
+    Event::fake([ActivityChanged::class]);
+
+    $this->put("/crm/activities/{$todo->id}", ['type_id' => aeType('Appel'), 'subject' => 'Autre objet'])->assertSessionHasNoErrors();
+    Event::assertNotDispatched(ActivityChanged::class);
+
+    $this->put("/crm/activities/{$todo->id}", ['type_id' => aeType('Appel'), 'subject' => 'Autre objet', 'due_at' => '2026-11-25T08:15'])->assertSessionHasNoErrors();
+    Event::assertDispatched(ActivityChanged::class, fn (ActivityChanged $e) => $e->activityId === $todo->id);
 });
