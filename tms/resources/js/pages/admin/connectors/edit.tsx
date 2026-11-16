@@ -15,6 +15,7 @@ interface ConnectorMeta {
     key: string;
     label: string;
     kind: string;
+    organisme_wide: boolean;
     settings: string[];
     secrets: string[];
     labels: Record<string, string>;
@@ -113,23 +114,25 @@ export default function EditConnector({ connector, companyId, companies, config,
 
                 {status && <div className="mb-4 text-sm font-medium text-green-600">{status}</div>}
 
-                <div className="mb-6 grid gap-2">
-                    <Label htmlFor="scope">Portée</Label>
-                    <Select value={companyId ?? TENANT_WIDE} onValueChange={switchScope}>
-                        <SelectTrigger id="scope">
-                            <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                            <SelectItem value={TENANT_WIDE}>Tout l'organisme (par défaut)</SelectItem>
-                            {companies.map((company) => (
-                                <SelectItem key={company.id} value={company.id}>
-                                    {company.name}
-                                </SelectItem>
-                            ))}
-                        </SelectContent>
-                    </Select>
-                    <InputError message={errors.company_id} />
-                </div>
+                {!connector.organisme_wide && (
+                    <div className="mb-6 grid gap-2">
+                        <Label htmlFor="scope">Portée</Label>
+                        <Select value={companyId ?? TENANT_WIDE} onValueChange={switchScope}>
+                            <SelectTrigger id="scope">
+                                <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value={TENANT_WIDE}>Tout l'organisme (par défaut)</SelectItem>
+                                {companies.map((company) => (
+                                    <SelectItem key={company.id} value={company.id}>
+                                        {company.name}
+                                    </SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
+                        <InputError message={errors.company_id} />
+                    </div>
+                )}
 
                 <form onSubmit={submit} className="space-y-6">
                     <div className="flex items-center gap-2">

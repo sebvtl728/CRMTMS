@@ -4,6 +4,7 @@ namespace App\Modules\Crm\Brochures;
 
 use App\Modules\Catalogue\Brochures;
 use App\Modules\Connectors\Core\ConnectorRun;
+use App\Modules\Connectors\Core\PermanentDeliveryFailure;
 use App\Modules\Connectors\Smtp\TenantMailer;
 use App\Modules\Core\Tenancy\Tenant;
 use App\Modules\Core\Tenancy\TenantAwareJob;
@@ -27,8 +28,9 @@ use Throwable;
  *
  * Failures are rethrown as BrochureMailFailed (reason and SMTP code only);
  * three tries with a backoff, then status « failed » and a fixed French
- * reason, never the server's text. With an SMTP connector each try is
- * journaled in connector_runs with the sending's id only.
+ * reason, never the server's text; a refusal Microsoft 365 would repeat
+ * (PermanentDeliveryFailure) fails at once. With an SMTP or Microsoft 365 connector
+ * each try is journaled in connector_runs with the sending's id only.
  */
 class SendBrochure implements ShouldQueue
 {
@@ -99,8 +101,8 @@ class SendBrochure implements ShouldQueue
         /** @var Throwable|null $error set by the closure */
         if ($error !== null) {
             $failure = new BrochureMailFailed(self::reason($error), SendQuote::smtpCode($error));
-            if ($this->job instanceof SyncJob) {
-                // No worker (sync queue): no retry, the history shows « Échec ».
+            if ($this->job instanceof SyncJob || $error instanceof PermanentDeliveryFailure) {
+                // No worker (sync queue), or a refusal a retry would repeat: the history shows « Échec ».
                 $this->failed($failure);
 
                 return;

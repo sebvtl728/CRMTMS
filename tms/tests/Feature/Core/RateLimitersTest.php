@@ -43,3 +43,12 @@ it('answers a throttled page in french html', function () {
     }
     $this->get('/activation/'.str_repeat('a', 128))->assertStatus(429)->assertSee('Trop de tentatives');
 });
+
+it('limits the connector test button to 5 a minute per user, in french', function () {
+    $this->actingAs(admin(twoFactor: true));
+
+    foreach (range(1, 5) as $i) {
+        expect($this->postJson('/admin/connectors/smtp/test')->status())->not->toBe(429);
+    }
+    $this->postJson('/admin/connectors/smtp/test')->assertStatus(429)->assertExactJson(['message' => FR_THROTTLE]);
+});

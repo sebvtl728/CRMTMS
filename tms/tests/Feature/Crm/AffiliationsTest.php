@@ -1,6 +1,7 @@
 <?php
 
 use App\Modules\Core\Access\Role;
+use App\Modules\Core\Access\Scopes;
 use App\Modules\Core\References\CapFormationReferenceSeeder;
 use App\Modules\Core\References\ReferenceItem;
 use App\Modules\Core\References\ReferenceList;
@@ -8,6 +9,7 @@ use App\Modules\Crm\Affiliations\Affiliation;
 use App\Modules\Crm\CrmServiceProvider;
 use App\Modules\Crm\Organisations\Organisation;
 use App\Modules\Crm\People\Person;
+use App\Modules\Crm\Permissions;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Facades\DB;
 use Inertia\Testing\AssertableInertia as Assert;
@@ -223,4 +225,49 @@ it('searches people to attach, leaving out those already attached', function () 
         ->and(collect($found)->firstWhere('last_name', 'Rouxailleurs')['organisations'])->toBe(['Autre hôtel']);
     $this->getJson('/crm/people/search?q=')->assertOk()->assertJson(['people' => []]);
     $this->getJson('/crm/people/search?q=r')->assertOk()->assertJson(['people' => []]);
+});
+
+it('stores the mobile of a new interlocuteur on the person, normalised', function () {
+    $org = lakeHotel();
+    $this->actingAs(commercial())->post("/crm/organisations/{$org->id}/affiliations", [
+        'first_name' => 'Léa', 'last_name' => 'Martin', 'mobile' => '06 12 34 56 78', 'work_email' => 'lea@hotel.fr',
+    ])->assertRedirect();
+
+    expect(Person::query()->sole()->mobile)->toBe('+33612345678')
+        ->and(Affiliation::query()->sole()->getAttributes())->not->toHaveKey('mobile');
+});
+
+it('refuses an invalid mobile in French', function () {
+    $org = lakeHotel();
+    $this->actingAs(commercial())->postJson("/crm/organisations/{$org->id}/affiliations", [
+        'last_name' => 'Martin', 'mobile' => str_repeat('1', 40),
+    ])->assertJsonValidationErrors(['mobile' => 'Ce champ est trop long.']);
+    expect(Person::count())->toBe(0);
+});
+
+it('does not change the mobile of an existing person picked in the dialog', function () {
+    $org = lakeHotel();
+    $person = makePerson('Existante', ['mobile' => '0698765432']);
+    $this->actingAs(commercial())->post("/crm/organisations/{$org->id}/affiliations", ['person_id' => $person->id, 'mobile' => '0611111111'])->assertRedirect();
+
+    expect($person->fresh()->mobile)->toBe('+33698765432');
+});
+
+it('lists the mobile of visible people only', function () {
+    $org = lakeHotel();
+    $seen = makePerson('Visible', ['mobile' => '0612345678']);
+    $hidden = makePerson('Cachee', ['mobile' => '0687654321']);
+    affiliate($seen, $org);
+    affiliate($hidden, $org);
+    $user = userWithPermissions([Permissions::FICHES_VIEW]);
+    DB::table('role_permission_scopes')->insert(['tenant_id' => tenant()->id, 'role_id' => $user->roles()->firstOrFail()->id, 'permission' => Permissions::FICHES_VIEW, 'scope' => 'own']);
+    Scopes::forget();
+    DB::table('organisations')->where('id', $org->id)->update(['created_by' => $user->id]);
+    DB::table('people')->where('id', $seen->id)->update(['created_by' => $user->id]);
+
+    $this->actingAs($user)->get("/crm/organisations/{$org->id}")->assertInertia(fn (Assert $page) => $page
+        ->where('affiliations', fn ($rows) => collect($rows)->map(fn ($r) => $r['person']['name'].'='.($r['mobile'] ?? '-'))->sort()->values()->all() === ['Cachee=-', 'Visible=+33612345678']));
+
+    $this->actingAs(commercial())->get("/crm/organisations/{$org->id}")->assertInertia(fn (Assert $page) => $page
+        ->where('affiliations', fn ($rows) => collect($rows)->pluck('mobile')->sort()->values()->all() === ['+33612345678', '+33687654321']));
 });

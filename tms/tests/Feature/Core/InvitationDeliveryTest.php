@@ -1,12 +1,14 @@
 <?php
 
 use App\Modules\Connectors\Core\ConnectorConfig;
+use App\Modules\Connectors\Core\HostPolicy;
 use App\Modules\Connectors\Smtp\SmtpHostRefused;
 use App\Modules\Connectors\Smtp\SmtpTransportFactory;
 use App\Modules\Connectors\Smtp\TenantMailer;
 use App\Modules\Core\Audit\AuditLog;
 use App\Modules\Core\Users\Invitation;
 use App\Modules\Core\Users\InvitationMail;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Mail;
 use Inertia\Testing\AssertableInertia as Assert;
 use Symfony\Component\Mailer\Envelope;
@@ -172,4 +174,27 @@ it('passes the warning and the link to the users page', function () {
         ->assertInertia(fn (Assert $page) => $page->component('admin/users/index')
             ->where('warning', 'Attention')
             ->where('activationLink', 'https://tms.test/activation/abc'));
+});
+
+it('says Microsoft 365 is unreachable, in French, when Graph answers 503', function () {
+    HostPolicy::resolveUsing(fn (string $host): array => ['203.0.113.30']);
+    tenant();
+    ConnectorConfig::create([
+        'connector_key' => 'microsoft365_mail',
+        'enabled' => true,
+        'settings' => ['tenant' => '9188040d-6c67-4c5b-b112-36a304b66dad', 'client_id' => 'b4a7c2e1-3f5d-4c8a-9e6b-1d2f3a4b5c6d', 'from_address' => 'envoi@cap.test', 'from_name' => 'CAP'],
+        'secrets' => ['client_secret' => 'test-secret-value'],
+    ]);
+    Http::fake([
+        'login.microsoftonline.com/*' => Http::response(['token_type' => 'Bearer', 'expires_in' => 3599, 'access_token' => 'tok']),
+        'graph.microsoft.com/*' => Http::response('', 503),
+    ]);
+
+    invite()->assertRedirect('/admin/users')
+        ->assertSessionHas('warning', fn (string $w) => str_contains($w, 'Microsoft 365 est injoignable pour le moment. Réessayez dans quelques minutes'))
+        ->assertSessionHas('activation_link');
+
+    expect(AuditLog::query()->where('event', 'users.invitation_send_failed')->sole()->new_values['reason'])
+        ->toBe('Microsoft 365 est injoignable pour le moment. Réessayez dans quelques minutes.');
+    HostPolicy::resolveUsing(null);
 });

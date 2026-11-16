@@ -17,7 +17,7 @@ use Illuminate\Validation\ValidationException;
  */
 class AffiliationController extends Controller
 {
-    private const PERSON_FIELDS = ['civility', 'first_name', 'last_name'];
+    private const PERSON_FIELDS = ['civility', 'first_name', 'last_name', 'mobile'];
 
     public const ANONYMISED = 'Cette personne est anonymisée (RGPD) : ses coordonnées ne peuvent plus être saisies.';
 
