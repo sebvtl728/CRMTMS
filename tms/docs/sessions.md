@@ -193,6 +193,14 @@ Menu **Formation › Planning des séances** (`/sessions/planning`, droit « Con
 - Sur un téléphone, les jours qui ont une séance s'affichent l'un sous l'autre.
 - Un formateur qui l'ouvre n'y voit que ses séances, sans alertes ni note interne (une alerte peut nommer des stagiaires d'autres sessions).
 
+### Feuille d'émargement et scans signés (0.8.0)
+
+Depuis la feuille de présences d'une séance (bouton **Présences**), section **Feuille d'émargement** :
+
+- **Imprimer cette séance** ou **Imprimer la journée** (toutes les séances de la session ce jour-là que vous pouvez voir) : un PDF A4 généré à la demande (aucune archive) avec l'organisme (nom et logo de la société par défaut), la session, la date, les créneaux et leur module, le formateur, **une ligne par stagiaire attendu ce jour** (mêmes règles que les présences : entrée tardive et abandon respectés, liste d'attente et annulés absents), une case de signature **matin** et **après-midi** et une case **formateur**. Une séance annulée n'a pas de feuille (409). Si le service PDF est indisponible, un message en français invite à réessayer (503).
+- **Déposer la feuille signée** : un PDF, une image PNG ou JPEG de **10 Mo au plus**, dont le type est vérifié sur le **contenu** du fichier (un fichier renommé est refusé). Le scan se rattache à la séance, ou à **toute la journée** de la session (case à cocher). Il se télécharge par quiconque voit la séance ; le formateur dépose et lit les scans de **ses** séances. Seuls les gestionnaires de présences (droit **Saisir les présences** avec un autre périmètre que « Ses séances ») les **suppriment** (définitif, journalisé sans nom de fichier). Les scans sont rangés dans l'espace privé de l'organisme (zone `attendance_sheets`).
+- **RGPD** : l'anonymisation d'un stagiaire **garde** ses présences et ses heures (preuve et facturation) et efface leurs **motifs** ; les scans, pièces de preuve collectives, sont gardés, sauf sur une **session individuelle** (un seul stagiaire), où ils sont supprimés. L'export RGPD de la personne contient ses **présences** (séance, état, minutes, motif) et ses **heures du mois**.
+
 ### Mon planning
 
 **Mon planning** (`/mon-planning`) montre au formateur lié à votre compte **ses** séances (celles dont il est le formateur, même si vos droits vont au-delà), en mois ou en semaine. Un clic sur une séance ouvre directement la **saisie des présences** (« Tous présents », puis les exceptions) quand il peut la faire ; sinon (séance annulée) ses détails. **Abonner mon agenda** mène à « Mon agenda ».
