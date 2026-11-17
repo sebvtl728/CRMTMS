@@ -36,10 +36,10 @@ class CalendarTokenController extends Controller
             ],
             'url' => $url,
             'status' => $request->session()->get('status'),
-            // Outlook carries the CRM actions only: not offered without them (a trainer).
             'crm' => $crm,
             'sources' => CalendarSources::serves($user),
-            'outlook' => $crm ? OutlookController::props($user) : null,
+            // Outlook carries the CRM actions and the items of the Outlook sources (a trainer's séances).
+            'outlook' => $user->can('calendar.outlook') ? OutlookController::props($user) : null,
             'outlook_error' => $request->session()->get('outlook_error'),
         ]);
         if ($url !== null) {

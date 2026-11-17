@@ -11,8 +11,9 @@ Route::middleware(['auth', 'can:calendar.subscribe'])->prefix('settings/calendar
     Route::post('/', [CalendarTokenController::class, 'store'])->name('store');
     Route::delete('/', [CalendarTokenController::class, 'destroy'])->name('destroy');
 
-    // « Connecter Outlook » (Microsoft 365, OAuth code + PKCE): the CRM actions only.
-    Route::middleware('can:crm.activities.view')->group(function () {
+    // « Connecter Outlook » (Microsoft 365, OAuth code + PKCE): the CRM actions or an
+    // Outlook source (OutlookController::allowed; a trainer).
+    Route::middleware('can:calendar.outlook')->group(function () {
         Route::post('outlook/connect', [OutlookController::class, 'connect'])->middleware('throttle:outlook-oauth')->name('outlook.connect');
         Route::get('outlook/callback', [OutlookController::class, 'callback'])->middleware('throttle:outlook-oauth')->name('outlook.callback');
         Route::delete('outlook', [OutlookController::class, 'disconnect'])->name('outlook.disconnect');

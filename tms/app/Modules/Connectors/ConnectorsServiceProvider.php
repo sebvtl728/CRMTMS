@@ -9,6 +9,7 @@ use App\Modules\Connectors\Ai\OpenAiCompatibleClient;
 use App\Modules\Connectors\Calendar\GraphClient;
 use App\Modules\Connectors\Calendar\IcalFeed;
 use App\Modules\Connectors\Calendar\Microsoft365Connector;
+use App\Modules\Connectors\Calendar\OutlookController;
 use App\Modules\Connectors\Calendar\QueueOutlookPush;
 use App\Modules\Connectors\Core\ConnectorConfig;
 use App\Modules\Connectors\Core\ConnectorRegistry;
@@ -90,5 +91,7 @@ class ConnectorsServiceProvider extends ServiceProvider
         Event::listen(ActivityChanged::class, QueueOutlookPush::class);
         // « Mon agenda » and its iCal feed: the CRM actions or a registered calendar source.
         Gate::define('calendar.subscribe', fn (User $user): bool => IcalFeed::allowed($user));
+        // « Connecter Outlook »: the CRM actions or a registered Outlook source (a trainer).
+        Gate::define('calendar.outlook', fn (User $user): bool => OutlookController::allowed($user));
     }
 }

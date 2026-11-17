@@ -9,6 +9,7 @@ use App\Modules\Core\Access\Role;
 use App\Modules\Core\References\ReferenceList;
 use App\Modules\Core\Users\User;
 use App\Modules\Sessions\Modules\SessionModules;
+use App\Modules\Sessions\Permissions as SessionsPermissions;
 use App\Modules\Sessions\Planning\GenerationRequest;
 use App\Modules\Sessions\Planning\SeanceBatch;
 use App\Modules\Sessions\Planning\SeanceGenerator;
@@ -23,6 +24,8 @@ use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Queue;
+use Illuminate\Support\Str;
+use Tests\TestCase;
 
 require_once __DIR__.'/Support/outlook.php';
 require_once __DIR__.'/../Sessions/Support/lot2a.php';
@@ -321,4 +324,66 @@ it('updates the copies when the session, its module or the room is renamed', fun
 
 it('keeps the name of the CRM actions to the CRM', function () {
     expect(fn () => OutlookSources::register('crm.activity', fn (string $id) => null))->toThrow(InvalidArgumentException::class);
+});
+
+/** Connects $user to Outlook through the OAuth flow; Graph answers with $graph. */
+function osConnect(TestCase $test, User $user, array $graph = []): void
+{
+    $location = (string) $test->actingAs($user)->post('/settings/calendar/outlook/connect')->assertRedirect()->headers->get('Location');
+    expect($location)->toStartWith('https://login.microsoftonline.com/');
+    parse_str((string) parse_url($location, PHP_URL_QUERY), $query);
+    m365Http([M365_TOKEN_URL => Http::response([
+        'token_type' => 'Bearer', 'scope' => 'https://graph.microsoft.com/Calendars.ReadWrite', 'expires_in' => 3599,
+        'access_token' => 'access-'.Str::random(20), 'refresh_token' => 'refresh-'.Str::random(20),
+    ]), ...$graph]);
+    $test->actingAs($user)->get('/settings/calendar/outlook/callback?code=code-123&state='.urlencode($query['state']))
+        ->assertRedirect('/settings/calendar')->assertSessionHas('status');
+}
+
+it('lets a trainer without CRM connect Outlook; a user without actions nor séances gets 403', function () {
+    m365Config();
+    [$user] = osFormateur();
+
+    $this->actingAs($user)->get('/settings/calendar')->assertOk()
+        ->assertInertia(fn ($page) => $page->where('crm', false)
+            ->where('outlook.available', true)->where('outlook.status', 'none')->where('outlook.sources', true));
+    $location = (string) $this->actingAs($user)->post('/settings/calendar/outlook/connect')->assertRedirect()->headers->get('Location');
+    expect($location)->toStartWith('https://login.microsoftonline.com/'.M365_TENANT.'/oauth2/v2.0/authorize');
+
+    // An inactive trainer: no Outlook source serves him any more.
+    $trainer = Trainers::forUser($user);
+    Trainers::update($trainer, TrainerStatus::from($trainer->status), false);
+    $this->actingAs($user)->post('/settings/calendar/outlook/connect')->assertForbidden();
+
+    $nobody = userWithPermissions([SessionsPermissions::SESSIONS_VIEW]);
+    $this->actingAs($nobody)->post('/settings/calendar/outlook/connect')->assertForbidden();
+    $this->actingAs($nobody)->get('/settings/calendar/outlook/callback?code=c')->assertForbidden();
+    $this->actingAs($nobody)->delete('/settings/calendar/outlook')->assertForbidden();
+});
+
+it('sends the upcoming séances of the trainer when he connects Outlook, and again after a reconnection', function () {
+    m365Config();
+    [$user, $trainer] = osFormateur();
+    $session = plSession('2026-08-01', '2027-04-30');
+    $module = plModule($session);
+    $this->travelTo(CarbonImmutable::parse('2026-08-01 08:00', 'Europe/Paris'));
+    plSeance($module, '2026-08-20', '09:00', '12:30', ['trainer_id' => $trainer->id]);
+    $this->travelTo(CarbonImmutable::parse('2026-09-01 08:00', 'Europe/Paris'));
+    $soon = plSeance($module, '2026-09-02', '09:00', '12:30', ['trainer_id' => $trainer->id]);
+    plSeance($module, '2027-03-15', '09:00', '12:30', ['trainer_id' => $trainer->id]);
+    plSeance($module, '2026-09-03', '09:00', '12:30', ['trainer_id' => plTrainer('Autre')->id]);
+    expect(graphRequests())->toBe([]);
+
+    osConnect($this, $user, [GRAPH_EVENTS => Http::response(['id' => 'AAMk1'], 201)]);
+    expect(osCalls())->toBe(['POST '.GRAPH_EVENTS])
+        ->and(CalendarLinkEvent::query()->sole()->source_id)->toBe($soon->id);
+
+    m365Http([GRAPH_EVENTS.'/*' => Http::response(null, 204)]);
+    $this->actingAs($user)->delete('/settings/calendar/outlook')->assertRedirect('/settings/calendar');
+    expect(osCalls())->toBe(['DELETE '.GRAPH_EVENTS.'/AAMk1'])
+        ->and(CalendarLinkEvent::query()->count())->toBe(0);
+
+    osConnect($this, $user, [GRAPH_EVENTS => Http::response(['id' => 'AAMk2'], 201)]);
+    expect(osCalls())->toBe(['POST '.GRAPH_EVENTS])
+        ->and(CalendarLinkEvent::query()->sole()->outlook_event_id)->toBe('AAMk2');
 });

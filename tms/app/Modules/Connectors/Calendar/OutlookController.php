@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Modules\Core\Audit\AuditRecorder;
 use App\Modules\Core\Users\User;
 use App\Modules\Crm\Activities\CalendarEvents;
+use App\Modules\Crm\Permissions;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -23,9 +24,18 @@ use Throwable;
  */
 class OutlookController extends Controller
 {
-    public const RECONNECT_MESSAGE = 'Outlook est à reconnecter : Microsoft a refusé l\'accès à votre agenda (mot de passe changé, accès retiré ou connexion trop ancienne). Vos rendez-vous n\'y sont plus envoyés : cliquez sur « Reconnecter Outlook ».';
+    public const RECONNECT_MESSAGE = 'Outlook est à reconnecter : Microsoft a refusé l\'accès à votre agenda (mot de passe changé, accès retiré ou connexion trop ancienne). Plus rien n\'y est envoyé : cliquez sur « Reconnecter Outlook ».';
 
     public function __construct(private readonly GraphClient $graph, private readonly AuditRecorder $audit) {}
+
+    /**
+     * Who may connect Outlook: a user of the CRM actions, or one an Outlook
+     * source has items for (a trainer, OutlookSources::serves).
+     */
+    public static function allowed(User $user): bool
+    {
+        return $user->can(Permissions::ACTIVITIES_VIEW) || OutlookSources::serves($user);
+    }
 
     /**
      * Props of the Outlook section of « Mon agenda ».
@@ -42,6 +52,8 @@ class OutlookController extends Controller
             'status' => $link === null ? 'none' : ($link->isActive() ? 'active' : 'reconnect'),
             'connected_at' => $link?->connected_at?->toIso8601String(),
             'message' => $link !== null && ! $link->isActive() ? self::RECONNECT_MESSAGE : null,
+            // A source sends him items too (the séances of a trainer).
+            'sources' => OutlookSources::serves($user),
         ];
     }
 
@@ -83,13 +95,16 @@ class OutlookController extends Controller
         $link->storeTokens($tokens);
         $this->audit->record('calendar.outlook_connected', $user);
 
-        // What is already planned goes to Outlook too.
-        $now = CarbonImmutable::now();
-        foreach (CalendarEvents::for($user, $now->subDay(), $now->addDays(IcalFeed::DAYS_AFTER)) as $event) {
-            PushActivityToOutlook::dispatch($event->id);
+        // What is already planned goes to Outlook too: the CRM actions, and the items of the sources.
+        if ($user->can(Permissions::ACTIVITIES_VIEW)) {
+            $now = CarbonImmutable::now();
+            foreach (CalendarEvents::for($user, $now->subDay(), $now->addDays(IcalFeed::DAYS_AFTER)) as $event) {
+                PushActivityToOutlook::dispatch($event->id);
+            }
         }
+        OutlookSources::connected($user->id);
 
-        return to_route('calendar.settings')->with('status', 'Outlook connecté : vos rendez-vous et appels planifiés y seront envoyés.');
+        return to_route('calendar.settings')->with('status', 'Outlook connecté : '.self::what($user).' planifiés y seront envoyés.');
     }
 
     public function disconnect(Request $request): RedirectResponse
@@ -103,7 +118,20 @@ class OutlookController extends Controller
             RemoveOutlookEvents::dispatch($link->id);
         }
 
-        return to_route('calendar.settings')->with('status', 'Outlook déconnecté : plus rien n\'y sera envoyé, et les rendez-vous déjà envoyés sont retirés de votre agenda Outlook.');
+        return to_route('calendar.settings')->with('status', 'Outlook déconnecté : plus rien n\'y sera envoyé, et les évènements déjà envoyés sont retirés de votre agenda Outlook.');
+    }
+
+    /** What Outlook receives for $user, in words. */
+    private static function what(User $user): string
+    {
+        $crm = $user->can(Permissions::ACTIVITIES_VIEW);
+        $sources = OutlookSources::serves($user);
+
+        return match (true) {
+            $crm && $sources => 'vos rendez-vous, appels et séances',
+            $sources => 'vos séances',
+            default => 'vos rendez-vous et appels',
+        };
     }
 
     /** On this organisme's address (declared in the Azure application). */

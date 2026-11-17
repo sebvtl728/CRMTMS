@@ -2,8 +2,10 @@
 
 namespace App\Modules\Sessions\Planning;
 
+use App\Modules\Connectors\Calendar\IcalFeed;
 use App\Modules\Connectors\Calendar\OutlookItem;
 use App\Modules\Connectors\Calendar\OutlookSources;
+use App\Modules\Core\Users\User;
 use App\Modules\Sessions\Modules\SessionModule;
 use App\Modules\Sessions\Resources\Room;
 use App\Modules\Sessions\Sessions\TrainingSession;
@@ -31,7 +33,27 @@ final class SeanceOutlook
 
     public static function register(): void
     {
-        OutlookSources::register(self::SOURCE, self::find(...));
+        OutlookSources::register(self::SOURCE, self::find(...), self::serves(...), self::connected(...));
+    }
+
+    /** An active trainer is linked to $user: « Connecter Outlook » is offered to him. */
+    public static function serves(User $user): bool
+    {
+        return Trainer::query()->where('user_id', $user->getKey())->where('active', true)->exists();
+    }
+
+    /**
+     * $userId has just connected Outlook: the séances of his trainer from
+     * today (Paris) to the horizon of the iCal feed (IcalFeed::DAYS_AFTER).
+     */
+    public static function connected(string $userId): void
+    {
+        $trainer = Trainer::query()->where('user_id', $userId)->where('active', true)->first();
+        if ($trainer === null) {
+            return;
+        }
+        $today = TrainingSession::today();
+        self::touchWhere('trainer_id', $trainer->id, $today->toDateString(), $today->addDays(IcalFeed::DAYS_AFTER)->toDateString());
     }
 
     public static function find(string $seanceId): ?OutlookItem
@@ -69,36 +91,37 @@ final class SeanceOutlook
     /** The session was cancelled, trashed, restored, renamed or moved: each of its séances with a trainer. */
     public static function touchSession(string $sessionId): void
     {
-        self::touchWhere('training_session_id', $sessionId, false);
+        self::touchWhere('training_session_id', $sessionId);
     }
 
     /** The session module was renamed: each of its séances with a trainer. */
     public static function touchModule(string $moduleId): void
     {
-        self::touchWhere('session_module_id', $moduleId, false);
+        self::touchWhere('session_module_id', $moduleId);
     }
 
     /** The trainer was linked, unlinked, deactivated or activated: his séances to come. */
     public static function touchTrainer(string $trainerId): void
     {
-        self::touchWhere('trainer_id', $trainerId, true);
+        self::touchWhere('trainer_id', $trainerId, TrainingSession::today()->toDateString());
     }
 
     /** The room was renamed or moved: its séances to come with a trainer. */
     public static function touchRoom(string $roomId): void
     {
-        self::touchWhere('room_id', $roomId, true);
+        self::touchWhere('room_id', $roomId, TrainingSession::today()->toDateString());
     }
 
     /**
      * After commit, pushes the séances having $column = $id (with a trainer;
-     * from today, Paris, when $toCome).
+     * dated from $from and up to $until, Paris days, when given).
      */
-    private static function touchWhere(string $column, string $id, bool $toCome): void
+    private static function touchWhere(string $column, string $id, ?string $from = null, ?string $until = null): void
     {
-        DB::afterCommit(function () use ($column, $id, $toCome): void {
+        DB::afterCommit(function () use ($column, $id, $from, $until): void {
             $ids = Seance::query()->where($column, $id)->whereNotNull('trainer_id')
-                ->when($toCome, fn ($q) => $q->where('date', '>=', TrainingSession::today()->toDateString()))->pluck('id');
+                ->when($from !== null, fn ($q) => $q->where('date', '>=', $from))
+                ->when($until !== null, fn ($q) => $q->where('date', '<=', $until))->pluck('id');
             foreach ($ids as $seanceId) {
                 OutlookSources::push(self::SOURCE, (string) $seanceId);
             }
