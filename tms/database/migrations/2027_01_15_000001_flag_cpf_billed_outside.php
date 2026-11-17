@@ -30,7 +30,7 @@ return new class extends Migration
     public function down(): void
     {
         $this->eachTenant(function (): void {
-            foreach (DB::table('reference_items')->where('list', 'funding_type')->where('label', 'CPF')->whereNotNull('meta')->get(['id', 'meta']) as $item) {
+            foreach (DB::table('reference_items')->where('list', 'funding_type')->where('label', 'CPF')->whereNull('deleted_at')->whereNotNull('meta')->get(['id', 'meta']) as $item) {
                 $meta = (array) json_decode((string) $item->meta, true);
                 unset($meta['external_billing']);
                 DB::table('reference_items')->where('id', $item->id)->update(['meta' => $meta === [] ? null : json_encode($meta)]);

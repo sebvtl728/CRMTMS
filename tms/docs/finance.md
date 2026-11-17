@@ -31,7 +31,7 @@ Les montants calculés partent du **prix des lignes du dossier, remises déduite
 
 Les frais (déplacement, repas, forfaits) sont facturés en entier à la première facture (mensuel), à la fin (fin de formation) ou au prorata des pourcentages (échéancier).
 
-**Verrouillage** : dès la **première facture validée** d'un dossier, le rythme, la base, l'échéancier, le réglage « Paie directement », la **société émettrice** et le **contractant** du dossier ne changent plus, ni le **financeur** d'un financement déjà facturé (« Ce dossier a des factures validées : faites d'abord un avoir. ») ; il faut d'abord faire un avoir (§ 7). Un dossier qui a des factures validées ne peut pas non plus être mis à la corbeille. La règle des absences non justifiées du dossier est figée elle aussi (§ 3).
+**Verrouillage** : dès la **première facture validée** d'un dossier, le rythme, la base, l'échéancier, le réglage « Paie directement », la **société émettrice** et le **contractant** du dossier ne changent plus, ni le **financeur** d'un financement déjà facturé, qui ne se supprime pas non plus (« Ce dossier a des factures validées : faites d'abord un avoir. ») ; il faut d'abord faire un avoir (§ 7). Un dossier qui a des factures validées ne peut pas non plus être mis à la corbeille. La règle des absences non justifiées du dossier est figée elle aussi (§ 3).
 
 ## 3. Absences non justifiées et dédit
 
@@ -73,7 +73,7 @@ TVA d'une ligne : 0 pour une société exonérée et pour le dédit, sinon 0 / 5
 - ajoute la pièce au **journal chaîné** (§ 10) ;
 - passe le dossier à l'état « Facturé » quand tout est facturé (et le ramène à « Réalisé » si un avoir fait revenir un dû). L'état est posé **au moment d'une validation** : un dossier dont les sessions se terminent après sa dernière facture reste « Réalisé » jusqu'à la validation suivante.
 
-**Contrôle à la validation** : le dû est recalculé à cet instant ; si le brouillon facture plus que le dû actuel, la validation est refusée (« Le montant dû a changé : recalculez le brouillon avant de le valider. »). Autres refus : total nul, destinataire qui n'est plus facturable, numéro d'accord manquant pour un financeur. Si le PDF ne peut pas être produit (service indisponible), rien n'est validé et le numéro n'est pas consommé.
+**Contrôle à la validation** : le dû est recalculé à cet instant ; si le brouillon facture plus que le dû actuel, la validation est refusée (« Le montant dû a changé : recalculez le brouillon avant de le valider. »). Autres refus : total nul, destinataire qui n'est plus facturable, numéro d'accord manquant pour un financeur, société du dossier changée depuis la préparation du brouillon (« La société du dossier a changé : recalculez le brouillon avant de le valider. »). Si le PDF ne peut pas être produit (service indisponible), rien n'est validé et le numéro n'est pas consommé.
 
 Une facture validée est **immuable**, même dans la base de données, et ne se supprime jamais. La corriger = un avoir.
 

@@ -1010,3 +1010,40 @@ it('freezes the absences rule of a dossier at its first validated invoice', func
     FinanceSettings::saveAbsences('not_billed');
     expect(app(BillingPlans::class)->for($x['dossier']->id))->toMatchArray(['unjustified_absences' => 'bill_contractor', 'absences' => 'bill_contractor']);
 });
+
+it('refuses an invoice whose company is no longer the dossier\'s, until it is recalculated', function () {
+    $x = fiSeed();
+    $user = fvAccountant();
+    $draft = fvDraft($x, 'contractor', $user);
+    $other = Company::factory()->create(['invoice_prefix' => 'FB', 'credit_note_prefix' => 'AVB']);
+    // Nothing validated yet: the company of the dossier may change.
+    $dossier = Dossier::query()->findOrFail($x['dossier']->id);
+    app(DossierWriter::class)->update($dossier, fvDossierPayload($dossier, ['company_id' => $other->id]));
+
+    expect(InvoiceValidator::COMPANY_CHANGED)->toBe('La société du dossier a changé : recalculez le brouillon avant de le valider.')
+        ->and(fn () => fvValidate($draft->refresh(), $user))->toThrow(UserFacingHttpException::class, InvoiceValidator::COMPANY_CHANGED);
+    expect($draft->refresh()->isDraft())->toBeTrue();
+
+    $invoice = fvValidate(fiDrafts()->recompute($draft)->refresh(), $user);
+    expect([$invoice->company_id, $invoice->number])->toBe([$other->id, 'FB-2026-00001']);
+});
+
+it('refuses to delete a funding already invoiced', function () {
+    $x = fiSeed();
+    $user = fvAccountant();
+    $fundings = app(FundingWriter::class);
+    $free = l2Funding($x['dossier'], ['amount' => '100,00']);
+    fvValidate(fvDraft($x, 'funding:'.$x['funding']->id, $user), $user);
+
+    try {
+        $fundings->delete(Funding::query()->findOrFail($x['funding']->id));
+        $this->fail('An invoiced funding should not be deleted.');
+    } catch (ValidationException $e) {
+        expect($e->errors())->toBe(['funder' => [BillingPlans::HAS_INVOICES]]);
+    }
+    expect(Funding::query()->whereKey($x['funding']->id)->exists())->toBeTrue();
+
+    // A funding never invoiced still goes.
+    $fundings->delete($free);
+    expect(Funding::query()->whereKey($free->id)->exists())->toBeFalse();
+});

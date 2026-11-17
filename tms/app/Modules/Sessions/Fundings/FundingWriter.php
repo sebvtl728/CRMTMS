@@ -93,10 +93,18 @@ final class FundingWriter
         });
     }
 
+    /**
+     * @throws ValidationException the funding is invoiced (BillingGuards::FUNDER_LOCKED)
+     */
     public function delete(Funding $funding): void
     {
         $this->locked($funding->dossier_id, function (Dossier $locked) use ($funding): void {
-            Funding::query()->where('dossier_id', $locked->id)->lockForUpdate()->findOrFail($funding->id)->delete();
+            $current = Funding::query()->where('dossier_id', $locked->id)->lockForUpdate()->findOrFail($funding->id);
+            // A funding invoiced keeps its funder, and stays (its invoices and credit notes go to that funder).
+            if (($refusal = BillingGuards::funderLocked($current->id)) !== null) {
+                throw ValidationException::withMessages(['funder' => $refusal]);
+            }
+            $current->delete();
         });
     }
 

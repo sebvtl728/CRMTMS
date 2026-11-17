@@ -72,6 +72,8 @@ final class InvoiceValidator
 
     public const NO_CORRECTED = 'Un avoir corrige une facture validée du même destinataire : celle-ci est introuvable.';
 
+    public const COMPANY_CHANGED = 'La société du dossier a changé : recalculez le brouillon avant de le valider.';
+
     public const OTHER_PARTIES = 'Un avoir doit être émis par la même société et au même destinataire que la facture corrigée.';
 
     /** %s: the number of the corrected invoice. */
@@ -193,6 +195,10 @@ final class InvoiceValidator
         $dossier = Billing::dossier($invoice->dossier_id);
         if ($dossier === null || $dossier['trashed']) {
             throw new UserFacingHttpException(409, self::TRASHED);
+        }
+        // Issued by the dossier's company of today (Recalculer re-aligns a draft prepared before a change).
+        if ($invoice->company_id !== $dossier['company_id']) {
+            throw new UserFacingHttpException(409, self::COMPANY_CHANGED);
         }
         $key = Ledger::keyOf($invoice);
         $who = InvoiceDrafts::recipientOf($dossier, $key);
