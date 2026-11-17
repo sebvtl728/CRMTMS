@@ -47,7 +47,7 @@ export interface SessionPlanning {
     seances: SeanceRow[];
     seance_modules: Option[];
     placements: PlacementRow[];
-    calendar: { holidays: Record<string, string>; closures: ClosureRow[]; interval_days: Record<string, string[]> };
+    calendar: { holidays: Record<string, string>; closures: ClosureRow[]; interval_days: Record<string, string[]>; placement_days: Record<string, string[]> };
     options:
         | ({ modality: Option[]; dating_mode: Option[] } & Partial<{
               trainers: (Option & { das_match?: boolean })[];

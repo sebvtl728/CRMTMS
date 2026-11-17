@@ -107,19 +107,17 @@ function PlanningCalendar({
     const [view, setView] = useState<'month' | 'week'>('month');
     const [month, setMonth] = useState(firstDay.slice(0, 7));
     const [week, setWeek] = useState(mondayOf(firstDay));
-    const { holidays, closures, interval_days } = planning.calendar;
+    const { holidays, closures, interval_days, placement_days } = planning.calendar;
 
     const items = useMemo(() => {
         const byDay: Record<string, CalendarItem[]> = {};
         const push = (day: string, item: CalendarItem) => (byDay[day] ??= []).push(item);
         planning.seances.forEach((s) => push(s.date, { kind: 'seance', seance: s }));
         planning.modules.forEach((m) => (interval_days[m.id] ?? []).forEach((d) => push(d, { kind: 'interval', title: m.title })));
-        planning.placements.forEach((p) => {
-            for (let d = p.starts_on; d <= p.ends_on; d = addDays(d, 1)) push(d, { kind: 'placement', label: p.label });
-        });
+        planning.placements.forEach((p) => (placement_days[p.id] ?? []).forEach((d) => push(d, { kind: 'placement', label: p.label })));
 
         return byDay;
-    }, [planning, interval_days]);
+    }, [planning, interval_days, placement_days]);
 
     const shift = (n: number) => {
         if (view === 'month') {
@@ -253,7 +251,8 @@ function PlanningCalendar({
                 </table>
             </div>
             <p className="text-muted-foreground text-xs">
-                Bleu : séances · gris : modules en intervalle (jours ouvrés) · vert : stages · fond grisé : week-end, jour férié ou fermeture.
+                Bleu : séances · gris : modules en intervalle (jours ouvrés) · vert : stages (jours ouvrés) · fond grisé : week-end, jour férié ou
+                fermeture.
             </p>
         </section>
     );
@@ -1062,7 +1061,32 @@ export function SessionPlanningSeances({ session, planning }: { session: Session
                     )}
                 </div>
                 {planning.can_seances && planning.seance_modules.length === 0 && (
-                    <p className="text-muted-foreground text-sm">Passez un module en « Séances » pour planifier ses séances.</p>
+                    <div className="grid gap-2 rounded-xl border border-dashed p-3 text-sm" data-testid="no-seance-module">
+                        <p>
+                            Les séances se planifient sur un module en mode « Séances ». Les modules de cette session sont en mode « Intervalle »
+                            (heures saisies par mois).
+                        </p>
+                        {planning.can_manage && planning.modules.length > 0 && (
+                            <div className="flex flex-wrap gap-2">
+                                {planning.modules.map((m) => (
+                                    <Button
+                                        key={m.id}
+                                        type="button"
+                                        size="sm"
+                                        variant="outline"
+                                        onClick={() =>
+                                            router.post(route('sessions.modules.mode', [session.id, m.id]), { dating_mode: 'seances' }, visit)
+                                        }
+                                    >
+                                        Passer « {m.title} » en séances
+                                    </Button>
+                                ))}
+                            </div>
+                        )}
+                        {!planning.can_manage && (
+                            <p className="text-muted-foreground">Demandez à un gestionnaire de la session de changer le mode d'un module.</p>
+                        )}
+                    </div>
                 )}
                 <PlanningCalendar
                     session={session}

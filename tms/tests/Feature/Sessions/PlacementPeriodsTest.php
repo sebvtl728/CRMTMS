@@ -12,6 +12,7 @@ use App\Modules\Sessions\Permissions;
 use App\Modules\Sessions\Planning\PlacementPeriod;
 use App\Modules\Sessions\Planning\PlacementPeriodHost;
 use App\Modules\Sessions\Planning\PlacementPeriods;
+use App\Modules\Sessions\Resources\ClosurePeriod;
 use App\Modules\Sessions\Sessions\SessionWriter;
 use Inertia\Testing\AssertableInertia as Assert;
 
@@ -171,4 +172,14 @@ it('changes no placement of a cancelled session (409)', function () {
         ->and(fn () => PlacementPeriods::removeHost($period, $durand))->toThrow(UserFacingHttpException::class)
         ->and(fn () => PlacementPeriods::delete($period))->toThrow(UserFacingHttpException::class);
     expect(PlacementPeriod::query()->count())->toBe(1)->and(PlacementPeriodHost::query()->count())->toBe(1);
+});
+
+it('shows a placement on the session calendar on working days only', function () {
+    $session = plSession('2026-11-01', '2026-11-30');
+    ClosurePeriod::query()->create(['starts_on' => '2026-11-12', 'ends_on' => '2026-11-13', 'label' => 'Pont']);
+    $period = PlacementPeriods::save($session, ['starts_on' => '2026-11-06', 'ends_on' => '2026-11-17', 'label' => 'Stage']);
+
+    // Weekends, 11 November (public holiday) and the closure are left out.
+    $this->actingAs(plManager())->get("/sessions/{$session->id}")->assertOk()->assertInertia(fn (Assert $page) => $page
+        ->where("planning.calendar.placement_days.{$period->id}", ['2026-11-06', '2026-11-09', '2026-11-10', '2026-11-16', '2026-11-17']));
 });

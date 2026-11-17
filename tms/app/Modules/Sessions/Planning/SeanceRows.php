@@ -62,9 +62,11 @@ final class SeanceRows
 
     /**
      * What the calendar of the session shades and shows: holidays and
-     * closures within its dates, the working days of its interval modules.
+     * closures within its dates, the working days of its interval modules
+     * and of its placement periods (common dates: never a weekend, a
+     * holiday nor a closure).
      *
-     * @return array{holidays: array<string, string>, closures: list<array{starts_on: string, ends_on: string, label: string}>, interval_days: array<string, list<string>>}
+     * @return array{holidays: array<string, string>, closures: list<array{starts_on: string, ends_on: string, label: string}>, interval_days: array<string, list<string>>, placement_days: array<string, list<string>>}
      */
     public static function calendar(TrainingSession $session): array
     {
@@ -76,10 +78,16 @@ final class SeanceRows
             $days[$module->id] = WorkingDays::between($module->starts_on?->toDateString() ?? $from, $module->ends_on?->toDateString() ?? $to, $closures);
         }
 
+        $placementDays = [];
+        foreach (PlacementPeriod::query()->where('training_session_id', $session->id)->get() as $period) {
+            $placementDays[$period->id] = WorkingDays::between($period->starts_on->toDateString(), $period->ends_on->toDateString(), $closures);
+        }
+
         return [
             'holidays' => PublicHolidays::between($from, $to),
             'closures' => self::closures($closures),
             'interval_days' => $days,
+            'placement_days' => $placementDays,
         ];
     }
 
