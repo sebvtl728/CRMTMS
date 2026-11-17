@@ -15,8 +15,10 @@ déménager vers un autre serveur sans perte.
 - **Page Administration › Sauvegardes** (droit `settings.manage`, absente en mode multi-organismes) : dernière
   sauvegarde, copie hors site, sauvegardes disponibles ; **bandeau** d'accueil si la dernière sauvegarde a échoué,
   date de plus de 36 heures ou est inconnue.
-- **Sauvegarder maintenant** : demande déposée par l'application, exécutée sur le serveur par `tms-backup-request.path`
-  (`ops/backup.sh --tag manuel`) ; demande inscrite au journal d'audit.
+- **Sauvegarder maintenant** : demande déposée par l'application, exécutée aussitôt sur le serveur par
+  `tms-backup-request.path` (`ops/backup.sh --tag manuel`) ; demande inscrite au journal d'audit, remise en attente si
+  une autre opération de maintenance empêche la sauvegarde de démarrer, signalée sur la page au bout de 10 minutes sans
+  prise en charge ; la page se met à jour d'elle-même tant qu'une sauvegarde est demandée ou en cours.
 - **Fichier d'état** `ops/backup-status.json` (et `backup-running.json`, `backup-request.json`) dans le volume
   `storage`, hors de `storage/app` : écrit par `ops/backup.sh` à chaque fin, réussie ou non.
 - **Export / import pour déménager** : `ops/export.sh` (un seul fichier chiffré par mot de passe d'export, empreinte
@@ -25,7 +27,13 @@ déménager vers un autre serveur sans perte.
   version installée).
 - **Test de déménagement** (bats, piles jetables) : mêmes nombres de lignes par table, mêmes fichiers, secret de
   connecteur et 2FA valides, refus sans modification (mauvais mot de passe, fichier tronqué, version trop récente).
-- **Guide** : copie hors site (NAS par SSHFS/SFTP, stockage compatible S3), vérification sur la page et procédure de
+- **Copie hors site en SFTP** : `RESTIC_REMOTE_SSH_KEY` (clé SSH dédiée) et `RESTIC_REMOTE_SSH_KNOWN_HOSTS`
+  (empreintes du NAS), obligatoires pour une adresse `sftp:` ; montés en lecture seule pour restic, empreinte vérifiée
+  strictement (`StrictHostKeyChecking=yes`), clé jamais affichée.
+- **`ops/export.sh --stop`** : arrête l'application de l'ancien serveur avant la sauvegarde de l'export (rien de saisi
+  après l'export ne peut manquer, aucune tâche ne tourne en double), désactive ses sauvegardes automatiques après un
+  export réussi et affiche la commande pour le remettre en service ; redémarre l'application si l'export échoue.
+- **Guide** : copie hors site (NAS en SFTP, stockage compatible S3), vérification sur la page et procédure de
   déménagement (`docs/install.md`, `docs/admin.md` § 17).
 
 ### Modifié
