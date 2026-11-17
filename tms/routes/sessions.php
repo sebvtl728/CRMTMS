@@ -7,6 +7,7 @@ use App\Modules\Sessions\Dossiers\DossierFromQuoteController;
 use App\Modules\Sessions\Enrolments\EnrolmentController;
 use App\Modules\Sessions\Fundings\FundingController;
 use App\Modules\Sessions\Modules\SessionModuleController;
+use App\Modules\Sessions\Notes\SessionNoteController;
 use App\Modules\Sessions\Planning\PlacementController;
 use App\Modules\Sessions\Planning\PlanningController;
 use App\Modules\Sessions\Planning\SeanceController;
@@ -52,6 +53,14 @@ Route::middleware(['auth'])->prefix('sessions')->name('sessions.')->group(functi
     Route::get('{trainingSession}/modules/catalogue', [SessionModuleController::class, 'catalogue'])->middleware('can:sessions.sessions.update')->name('modules.catalogue');
     Route::post('{trainingSession}/modules/catalogue', [SessionModuleController::class, 'fromCatalogue'])->middleware('can:sessions.sessions.update')->name('modules.from-catalogue');
     Route::post('{trainingSession}/modules/{sessionModule}/mode', [SessionModuleController::class, 'mode'])->middleware('can:sessions.sessions.update')->name('modules.mode');
+    // Tasks and notes of the « Synthèse »: seen with the session, written with the update right (checked by SessionNotes).
+    Route::post('{trainingSession}/tasks', [SessionNoteController::class, 'storeTask'])->middleware('can:sessions.sessions.view')->name('tasks.store');
+    Route::put('{trainingSession}/tasks/{sessionTask}', [SessionNoteController::class, 'updateTask'])->middleware('can:sessions.sessions.view')->name('tasks.update');
+    Route::post('{trainingSession}/tasks/{sessionTask}/toggle', [SessionNoteController::class, 'toggleTask'])->middleware('can:sessions.sessions.view')->name('tasks.toggle');
+    Route::delete('{trainingSession}/tasks/{sessionTask}', [SessionNoteController::class, 'destroyTask'])->middleware('can:sessions.sessions.view')->name('tasks.destroy');
+    Route::post('{trainingSession}/notes', [SessionNoteController::class, 'storeNote'])->middleware('can:sessions.sessions.view')->name('notes.store');
+    Route::put('{trainingSession}/notes/{sessionNote}', [SessionNoteController::class, 'updateNote'])->middleware('can:sessions.sessions.view')->name('notes.update');
+    Route::delete('{trainingSession}/notes/{sessionNote}', [SessionNoteController::class, 'destroyNote'])->middleware('can:sessions.sessions.view')->name('notes.destroy');
     // Séances, the generation assistant and placements: sessions.seances.manage and its scope on the session.
     Route::middleware('can:sessions.seances.manage')->group(function () {
         Route::post('{trainingSession}/seances', [SeanceController::class, 'store'])->name('seances.store');

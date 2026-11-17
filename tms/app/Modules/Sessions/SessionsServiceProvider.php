@@ -39,6 +39,8 @@ use App\Modules\Sessions\Gdpr\PersonSessionsExport;
 use App\Modules\Sessions\Gdpr\RetentionHolds;
 use App\Modules\Sessions\History\SessionsHistory;
 use App\Modules\Sessions\Modules\SessionModule;
+use App\Modules\Sessions\Notes\SessionNote;
+use App\Modules\Sessions\Notes\SessionTask;
 use App\Modules\Sessions\Planning\PlacementPeriod;
 use App\Modules\Sessions\Planning\PlacementPeriodHost;
 use App\Modules\Sessions\Planning\Seance;
@@ -108,6 +110,8 @@ class SessionsServiceProvider extends ServiceProvider
             MonthlyHour::MORPH_ALIAS => MonthlyHour::class,
             AttendanceClosure::MORPH_ALIAS => AttendanceClosure::class,
             AttendanceSheetScan::MORPH_ALIAS => AttendanceSheetScan::class,
+            SessionTask::MORPH_ALIAS => SessionTask::class,
+            SessionNote::MORPH_ALIAS => SessionNote::class,
         ]);
     }
 
@@ -217,6 +221,18 @@ class SessionsServiceProvider extends ServiceProvider
 
             return SessionModule::query()->findOrFail($value);
         });
+
+        // A task or a note of a session: malformed or of another organisme
+        // (RLS) is a 404; the controller checks it belongs to the session of the route.
+        foreach (['sessionTask' => SessionTask::class, 'sessionNote' => SessionNote::class] as $name => $model) {
+            Route::bind($name, function (string $value) use ($model): Model {
+                if (! Str::isUuid($value)) {
+                    throw (new ModelNotFoundException)->setModel($model, [$value]);
+                }
+
+                return $model::query()->findOrFail($value);
+            });
+        }
 
         // An enrolment: its session within the view scope (trashed ones with
         // sessions.sessions.delete), otherwise 404.

@@ -4,6 +4,7 @@ import { EnrolDialog, type EnrolDossierOption } from '@/components/sessions/enro
 import { EnrolmentList, type EnrolmentReferences, type EnrolmentRow } from '@/components/sessions/enrolment-list';
 import { SessionAttendance } from '@/components/sessions/session-attendance';
 import { SessionModules, type SessionPlanning } from '@/components/sessions/session-modules';
+import { SessionNotesPanel, type NotesPanel } from '@/components/sessions/session-notes-panel';
 import { SessionPlanningSeances } from '@/components/sessions/session-planning';
 import { StepNav, useStep } from '@/components/sessions/session-steps';
 import { SessionSynthesis, type CardRow } from '@/components/sessions/session-synthesis';
@@ -45,6 +46,8 @@ interface ShowProps {
     steps: string[];
     /** Cards of the « Synthèse » (none once cancelled). */
     checklist: CardRow[];
+    /** Tasks and notes of the « Synthèse » (spec § 4.5). */
+    notes_panel: NotesPanel;
     status?: string;
     /** Trainees planned above the new hours of the session (their enrolments unchanged). */
     warning?: string | null;
@@ -115,6 +118,7 @@ export default function SessionShow({
     attendance_tab,
     steps,
     checklist,
+    notes_panel,
     status,
     warning,
 }: ShowProps) {
@@ -204,6 +208,7 @@ export default function SessionShow({
                     <SessionSynthesis
                         cards={checklist}
                         cancelled={session.status === 'cancelled' ? { reason: session.cancel_reason } : null}
+                        aside={<SessionNotesPanel sessionId={session.id} panel={notes_panel} />}
                         onOpen={setStep}
                     />
                 )}

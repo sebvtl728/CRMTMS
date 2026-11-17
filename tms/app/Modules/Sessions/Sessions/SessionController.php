@@ -13,6 +13,7 @@ use App\Modules\Sessions\Enrolments\EnrolmentRows;
 use App\Modules\Sessions\Enrolments\Enrolments;
 use App\Modules\Sessions\Modules\DatingMode;
 use App\Modules\Sessions\Modules\SessionModules;
+use App\Modules\Sessions\Notes\SessionNotes;
 use App\Modules\Sessions\Permissions;
 use App\Modules\Sessions\Planning\PlacementPeriods;
 use App\Modules\Sessions\Planning\PublicHolidays;
@@ -177,6 +178,7 @@ class SessionController extends Controller
             'steps' => [...self::STEPS, ...($attendance ? ['suivi'] : [])],
             // Cards of the « Synthèse » (none once cancelled).
             'checklist' => array_map(fn (Card $card) => $card->toArray(), SessionChecklist::for($session, $user)),
+            'notes_panel' => app(SessionNotes::class)->panel($session, $user),
             'status' => $request->session()->get('status'),
             'warning' => $request->session()->get('warning'),
         ]);
