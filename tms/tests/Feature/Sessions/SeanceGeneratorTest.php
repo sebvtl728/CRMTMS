@@ -241,3 +241,55 @@ it('never creates a séance overlapping a planned séance of the session, whatev
     expect(collect($created)->map(fn (Seance $s) => $s->date->toDateString().' '.$s->start())->all())
         ->toBe(['2026-09-01 13:30', '2026-09-02 13:30', '2026-09-03 09:30', '2026-09-03 13:30']);
 });
+
+// ---------------------------------------------------------------- end estimated from the planned hours
+
+it('stops at the planned hours of the module and gives the estimated end', function () {
+    [, $module] = septemberSetUp();
+    $module->forceFill(['planned_minutes' => 2100])->save(); // 35 h = 5 days of 7 h
+
+    $preview = app(SeanceGenerator::class)->preview($module, genRequest($module, genInput('2026-09-01', '', ['until' => 'hours'])));
+
+    expect($preview->kept())->toHaveCount(10)
+        ->and($preview->total_minutes)->toBe(2100)
+        ->and($preview->toArray()['estimated_end'])->toBe('2026-09-08')
+        ->and($preview->toArray()['reached'])->toBeTrue()
+        ->and($preview->warning)->toBeNull();
+    // The closure (14–15) and the placement (21–25) are skipped on the way, never counted.
+    $module->forceFill(['planned_minutes' => 2100 + 420 * 3])->save();
+    $later = app(SeanceGenerator::class)->preview($module, genRequest($module, genInput('2026-09-01', '', ['until' => 'hours'])));
+    expect($later->toArray()['estimated_end'])->toBe('2026-09-16');
+});
+
+it('counts the séances already planned and generates only the remaining hours', function () {
+    [, $module] = septemberSetUp();
+    $module->forceFill(['planned_minutes' => 2100])->save();
+    plSeance($module, '2026-09-01', '09:00', '12:30');
+    plSeance($module, '2026-09-01', '13:30', '17:00');
+
+    $created = app(SeanceGenerator::class)->generate($module, genRequest($module, genInput('2026-09-01', '', ['until' => 'hours'])));
+
+    expect($created)->toHaveCount(8)
+        ->and((int) Seance::query()->where('session_module_id', $module->id)->sum('duration_minutes'))->toBe(2100)
+        ->and((string) Seance::query()->max('date'))->toStartWith('2026-09-08');
+});
+
+it('says when the planned hours do not fit before the end of the session', function () {
+    [, $module] = septemberSetUp();
+    $module->forceFill(['planned_minutes' => 12000])->save();
+
+    $preview = app(SeanceGenerator::class)->preview($module, genRequest($module, genInput('2026-09-01', '', ['until' => 'hours'])))->toArray();
+
+    expect($preview['count'])->toBe(24)
+        ->and($preview['reached'])->toBeFalse()
+        ->and($preview['estimated_end'])->toBe('2026-09-30')
+        ->and($preview['warning'])->toContain('planifiées pour 200 h prévues');
+});
+
+it('needs planned hours to estimate the end', function () {
+    [, $module] = septemberSetUp();
+    $module->forceFill(['planned_minutes' => null])->save();
+
+    expect(fn () => genRequest($module, genInput('2026-09-01', '', ['until' => 'hours'])))
+        ->toThrow(fn (ValidationException $e) => expect($e->errors())->toBe(['until' => ['Ce module n\'a pas d\'heures prévues : indiquez la date de fin.']]));
+});

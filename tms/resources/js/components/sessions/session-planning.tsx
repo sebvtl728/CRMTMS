@@ -12,7 +12,7 @@ import { formatDay, type Option } from '@/lib/crm';
 import { addDays, dayShade, isoWeekday, mondayOf, monthGrid, MONTHS, sendJson, WEEKDAYS_SHORT } from '@/lib/sessions';
 import { router, useForm } from '@inertiajs/react';
 import { AlertTriangle, CalendarPlus, ChevronLeft, ChevronRight, LoaderCircle, Pencil, Plus, Trash2, Wand2, X } from 'lucide-react';
-import { FormEventHandler, useEffect, useMemo, useState } from 'react';
+import { FormEventHandler, useEffect, useMemo, useRef, useState } from 'react';
 
 const NONE = '__none__';
 const visit = { preserveScroll: true, preserveState: true };
@@ -496,6 +496,8 @@ interface Preview {
     existing: string;
     alerts: Alert[];
     warning: string | null;
+    estimated_end: string | null;
+    reached: boolean;
 }
 
 type Slot = { start: string; end: string; break_minutes: string };
@@ -511,6 +513,10 @@ function GeneratorDialog({ session, planning, onClose }: { session: SessionDates
     );
     const [from, setFrom] = useState(module?.starts_on ?? session.starts_on);
     const [to, setTo] = useState(module?.ends_on ?? session.ends_on);
+    // « hours »: the end is computed from the planned hours of the module (estimated); « date »: chosen.
+    const [until, setUntil] = useState<'hours' | 'date'>(module?.planned_minutes != null ? 'hours' : 'date');
+    const canEstimate = module?.planned_minutes != null;
+    const byHours = until === 'hours' && canEstimate;
     const [trainer, setTrainer] = useState('');
     const [room, setRoom] = useState('');
     const [place, setPlace] = useState('');
@@ -519,19 +525,39 @@ function GeneratorDialog({ session, planning, onClose }: { session: SessionDates
     const [message, setMessage] = useState<string | null>(null);
     const [busy, setBusy] = useState(false);
 
-    const payload = () => ({ weekdays, slots, from, to, trainer_id: trainer, room_id: room, place_text: place });
+    const payload = () => ({
+        weekdays,
+        slots,
+        from,
+        to: byHours ? '' : to,
+        until: byHours ? 'hours' : 'date',
+        trainer_id: trainer,
+        room_id: room,
+        place_text: place,
+    });
 
-    // Any change makes the preview stale.
-    useEffect(() => setPreview(null), [moduleId, weekdays, slots, from, to, trainer, room, place]);
-
+    const latest = useRef(0);
     const runPreview = async () => {
+        const call = ++latest.current;
         setBusy(true);
         const answer = await sendJson<Preview>('POST', route('sessions.seances.preview', [session.id, moduleId]), payload());
+        // Only the answer to the latest input counts.
+        if (call !== latest.current) return;
         setBusy(false);
         setErrors(answer.errors);
         setMessage(answer.ok || answer.status === 422 ? null : answer.message);
         setPreview(answer.data);
     };
+
+    // Any change makes the preview stale; computed again shortly after (the estimated end follows the input).
+    useEffect(() => {
+        setPreview(null);
+        if (!moduleId || weekdays.length === 0 || slots.some((sl) => !sl.start || !sl.end) || !from) return;
+        const timer = setTimeout(() => void runPreview(), 500);
+
+        return () => clearTimeout(timer);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [moduleId, weekdays, slots, from, to, until, trainer, room, place]);
 
     const generate = () => {
         setBusy(true);
@@ -553,8 +579,9 @@ function GeneratorDialog({ session, planning, onClose }: { session: SessionDates
                 <DialogHeader>
                     <DialogTitle>Générer les séances</DialogTitle>
                     <DialogDescription>
-                        Jours fériés, fermetures et dates communes des stages sont exclus ; une séance existante (même module, jour et heure de début)
-                        n'est jamais recréée ni modifiée.
+                        Choisissez le début : la fin est estimée d'après les heures prévues du module (heures déjà planifiées déduites). Jours fériés,
+                        fermetures et dates communes des stages sont exclus ; une séance existante (même module, jour et heure de début) n'est jamais
+                        recréée ni modifiée.
                     </DialogDescription>
                 </DialogHeader>
                 <div className="grid gap-4">
@@ -640,6 +667,23 @@ function GeneratorDialog({ session, planning, onClose }: { session: SessionDates
                             </Button>
                         )}
                     </fieldset>
+                    <fieldset className="grid gap-2">
+                        <legend className="mb-1 text-sm font-medium">Fin de la période</legend>
+                        <div className="flex flex-wrap gap-4 text-sm">
+                            <label className="flex items-center gap-1.5">
+                                <input type="radio" name="gen_until" checked={byHours} disabled={!canEstimate} onChange={() => setUntil('hours')} />
+                                Calculée d'après les heures prévues du module
+                            </label>
+                            <label className="flex items-center gap-1.5">
+                                <input type="radio" name="gen_until" checked={!byHours} onChange={() => setUntil('date')} />
+                                Date de fin choisie
+                            </label>
+                        </div>
+                        {!canEstimate && (
+                            <p className="text-muted-foreground text-xs">Ce module n'a pas d'heures prévues : choisissez la date de fin.</p>
+                        )}
+                        <InputError message={errors.until} />
+                    </fieldset>
                     <div className="grid gap-4 sm:grid-cols-2">
                         <div className="grid gap-2">
                             <Label htmlFor="gen_from">Du *</Label>
@@ -653,11 +697,37 @@ function GeneratorDialog({ session, planning, onClose }: { session: SessionDates
                             />
                             <InputError message={errors.from} />
                         </div>
-                        <div className="grid gap-2">
-                            <Label htmlFor="gen_to">Au *</Label>
-                            <Input id="gen_to" type="date" min={from} max={session.ends_on} value={to} onChange={(e) => setTo(e.target.value)} />
-                            <InputError message={errors.to} />
-                        </div>
+                        {byHours ? (
+                            <div className="grid gap-2">
+                                <span className="text-sm font-medium">Fin estimée</span>
+                                <p className="flex h-9 items-center text-sm" aria-live="polite" data-testid="estimated-end">
+                                    {busy && !preview ? (
+                                        <LoaderCircle className="h-4 w-4 animate-spin" />
+                                    ) : preview?.estimated_end ? (
+                                        <span>
+                                            <strong>{formatDay(preview.estimated_end)}</strong>
+                                            {!preview.reached && (
+                                                <span className="text-amber-700 dark:text-amber-400">
+                                                    {' '}
+                                                    · heures prévues non atteintes avant la fin de la session
+                                                </span>
+                                            )}
+                                        </span>
+                                    ) : preview ? (
+                                        <span className="text-muted-foreground">Les heures prévues sont déjà planifiées.</span>
+                                    ) : (
+                                        <span className="text-muted-foreground">—</span>
+                                    )}
+                                </p>
+                                <InputError message={errors.to} />
+                            </div>
+                        ) : (
+                            <div className="grid gap-2">
+                                <Label htmlFor="gen_to">Au *</Label>
+                                <Input id="gen_to" type="date" min={from} max={session.ends_on} value={to} onChange={(e) => setTo(e.target.value)} />
+                                <InputError message={errors.to} />
+                            </div>
+                        )}
                     </div>
                     <div className="grid gap-4 sm:grid-cols-3">
                         <div className="grid gap-2">

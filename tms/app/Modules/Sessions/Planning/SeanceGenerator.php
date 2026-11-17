@@ -65,8 +65,17 @@ final class SeanceGenerator
             return $open[substr($date, 0, 7)] ??= Seances::isMonthOpen($session, $date);
         };
 
+        $already = (int) Seance::query()->where('session_module_id', $module->id)->where('status', Seance::PLANNED)->sum('duration_minutes');
+        // « Jusqu'aux heures prévues »: stop once the planned hours of the module are reached.
+        $remaining = $request->untilPlanned ? max(0, (int) $module->planned_minutes - $already) : null;
+        $added = 0;
+        $keptCount = 0;
+
         $rows = [];
         for ($day = WorkingDays::day($request->from); $day->toDateString() <= $request->to; $day = $day->addDay()) {
+            if ($remaining !== null && ($added >= $remaining || $keptCount >= GenerationRequest::MAX)) {
+                break;
+            }
             if (! in_array($day->isoWeekday(), $request->weekdays, true)) {
                 continue;
             }
@@ -81,19 +90,26 @@ final class SeanceGenerator
                     $overlaps($date, $slot) => 'Séance déjà planifiée sur ce créneau',
                     default => null,
                 };
+                if ($remaining !== null && $reason === null && $added >= $remaining) {
+                    break;
+                }
+                $minutes = Seances::minutesBetween($slot['start'], $slot['end']) - $slot['break_minutes'];
                 $rows[] = [
                     'date' => $date,
                     'start' => $slot['start'],
                     'end' => $slot['end'],
-                    'minutes' => Seances::minutesBetween($slot['start'], $slot['end']) - $slot['break_minutes'],
+                    'minutes' => $minutes,
                     'skipped_reason' => $reason,
                 ];
+                if ($reason === null) {
+                    $added += $minutes;
+                    $keptCount++;
+                }
             }
         }
 
         $kept = array_values(array_filter($rows, fn (array $r) => $r['skipped_reason'] === null));
         $total = array_sum(array_column($kept, 'minutes'));
-        $already = (int) Seance::query()->where('session_module_id', $module->id)->where('status', Seance::PLANNED)->sum('duration_minutes');
 
         $alerts = [];
         $conflicts = Conflicts::forMany(array_map(fn (array $r) => [
@@ -106,7 +122,9 @@ final class SeanceGenerator
             }
         }
 
-        return new GenerationPreview($rows, $total, $module->planned_minutes, $already, array_values($alerts), self::warning($module, $already + $total));
+        return new GenerationPreview($rows, $total, $module->planned_minutes, $already, array_values($alerts), self::warning($module, $already + $total),
+            $kept === [] ? null : $kept[count($kept) - 1]['date'],
+            $module->planned_minutes !== null && $already + $total >= $module->planned_minutes);
     }
 
     /**

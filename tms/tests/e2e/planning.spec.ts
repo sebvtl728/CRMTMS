@@ -98,6 +98,8 @@ test('planning: a manager generates séances with the assistant, a trainer marks
     await page.getByRole('button', { name: 'Générer les séances' }).click();
     const assistant = page.getByRole('dialog', { name: 'Générer les séances' });
     await choose(page, assistant.getByLabel('Formateur'), new RegExp(TRAINER.name));
+    // The whole week of the session, whatever the planned hours of the module.
+    await assistant.getByLabel('Date de fin choisie').check();
     await assistant.getByRole('button', { name: 'Aperçu' }).click();
     // Monday to Friday, 9:00–12:30 and 13:30–17:00: 10 séances.
     await expect(assistant.getByRole('region', { name: 'Aperçu' })).toContainText('10 séances à créer');

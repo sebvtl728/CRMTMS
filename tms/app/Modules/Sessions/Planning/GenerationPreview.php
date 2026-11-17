@@ -8,7 +8,9 @@ use App\Modules\Sessions\Modules\SessionModules;
  * What the assistant would create: one row per day and slot (skipped ones
  * with their reason: holiday, closure, common placement, existing séance),
  * the minutes it adds, the module's planned and already planned minutes
- * (null planned: « à définir »), the alerts of the séances it would create.
+ * (null planned: « à définir »), the alerts of the séances it would create,
+ * the day of its last séance (the estimated end) and whether the planned
+ * hours are reached.
  */
 final readonly class GenerationPreview
 {
@@ -23,6 +25,8 @@ final readonly class GenerationPreview
         public int $existing_minutes,
         public array $alerts,
         public ?string $warning,
+        public ?string $estimated_end = null,
+        public bool $reached = false,
     ) {}
 
     /**
@@ -49,6 +53,8 @@ final readonly class GenerationPreview
             'existing' => SessionModules::label($this->existing_minutes),
             'alerts' => array_map(fn (Conflict $c) => $c->toArray(), $this->alerts),
             'warning' => $this->warning,
+            'estimated_end' => $this->estimated_end,
+            'reached' => $this->reached,
         ];
     }
 }

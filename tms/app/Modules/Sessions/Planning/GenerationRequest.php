@@ -14,6 +14,9 @@ use Illuminate\Validation\ValidationException;
  * 1 = Monday … 7 = Sunday), one or more slots of the day (« H:i », a break
  * in minutes, not overlapping), a period within the session's dates
  * (default: the module's, else the session's), trainer, room, free place.
+ * « until » = hours: no end date, the assistant goes on from the start
+ * until the planned hours of the module are reached (at the latest the
+ * end of the session) and gives the estimated end.
  */
 final readonly class GenerationRequest
 {
@@ -32,6 +35,7 @@ final readonly class GenerationRequest
         public ?string $trainerId = null,
         public ?string $roomId = null,
         public ?string $placeText = null,
+        public bool $untilPlanned = false,
     ) {}
 
     /**
@@ -48,6 +52,13 @@ final readonly class GenerationRequest
         $sessionStart = $session->starts_on->toDateString();
         $sessionEnd = $session->ends_on->toDateString();
         $blank = fn (mixed $v): mixed => is_string($v) && trim($v) === '' ? null : (is_string($v) ? trim($v) : $v);
+        $untilPlanned = ($input['until'] ?? null) === 'hours';
+        if ($untilPlanned && $module->planned_minutes === null) {
+            throw ValidationException::withMessages(['until' => 'Ce module n\'a pas d\'heures prévues : indiquez la date de fin.']);
+        }
+        if ($untilPlanned) {
+            $input['to'] = $sessionEnd;
+        }
         $data = [
             'weekdays' => $input['weekdays'] ?? null,
             'slots' => $input['slots'] ?? null,
@@ -100,7 +111,7 @@ final readonly class GenerationRequest
             'room_id.*' => 'Salle introuvable.',
             'place_text.*' => 'Le lieu ne doit pas dépasser 300 caractères.',
         ]);
-        $validator->after(function ($v) use ($data, $sessionStart, $sessionEnd): void {
+        $validator->after(function ($v) use ($data, $sessionStart, $sessionEnd, $untilPlanned): void {
             $errors = $v->errors();
             if (is_array($data['slots'])) {
                 $previous = [];
@@ -137,7 +148,7 @@ final readonly class GenerationRequest
                 $errors->add('from', $outside);
             } elseif ($data['to'] > $sessionEnd) {
                 $errors->add('to', $outside);
-            } elseif (! $errors->hasAny(['weekdays', 'slots']) && is_array($data['weekdays']) && is_array($data['slots'])) {
+            } elseif (! $untilPlanned && ! $errors->hasAny(['weekdays', 'slots']) && is_array($data['weekdays']) && is_array($data['slots'])) {
                 $days = WorkingDays::day($data['to'])->diffInDays(WorkingDays::day($data['from']), true) + 1;
                 if (intdiv((int) $days + 6, 7) * count(array_unique($data['weekdays'])) * count($data['slots']) > self::MAX) {
                     $errors->add('to', 'L\'assistant crée au plus '.self::MAX.' séances à la fois : raccourcissez la période.');
@@ -160,6 +171,7 @@ final readonly class GenerationRequest
             is_string($data['trainer_id']) ? $data['trainer_id'] : null,
             is_string($data['room_id']) ? $data['room_id'] : null,
             is_string($data['place_text']) ? $data['place_text'] : null,
+            $untilPlanned,
         );
     }
 

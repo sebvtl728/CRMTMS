@@ -38,6 +38,8 @@ une feuille d'émargement imprimable.
 - **Modification en masse des séances** : cases à cocher dans la liste ; **Modifier la sélection** (formateur, salle
   ou lieu, horaires), **Annuler la sélection** (motif commun) et **Supprimer la sélection** (séances planifiées par
   erreur, sans présences), tout ou rien.
+- **Fin estimée dans l'assistant** : on choisit la date de début, et la fin se calcule d'après les heures prévues du
+  module (heures déjà planifiées déduites, fériés, fermetures et stages sautés) ; ou on garde une date de fin choisie.
 - **Présences** par séance (présent, partiel, absent, absence justifiée, « Tous présents »), **heures du mois** des
   modules en intervalle, **clôture mensuelle** d'une session (réouverture avec motif obligatoire, journalisée) et
   **heures réalisées** en minutes entières, base de la facturation au réalisé ; séance modifiée ou annulée après
