@@ -68,7 +68,9 @@ ENV
     fi
     [[ -z "${STACK_VERSION:-}" ]] || docker tag tms-ci:bats "tms-ci:$STACK_VERSION" >&2 || return 1
 
-    compose up -d --wait >&2 || return 1
+    # A fresh named volume is populated by each container from the image at the same time:
+    # Docker can race on it (« mkdir …: file exists »). One retry, the volume is then in place.
+    compose up -d --wait >&2 || compose up -d --wait >&2 || return 1
     "$TMS_ROOT/ops/migrate.sh" >&2 || return 1
     compose exec -T app php artisan db:seed --force >&2 || return 1
     wait_health 120
