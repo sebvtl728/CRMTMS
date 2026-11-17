@@ -769,6 +769,29 @@ function SeanceList({
                     <Button type="button" size="sm" variant="outline" onClick={() => setBatch('cancel')}>
                         Annuler la sélection
                     </Button>
+                    <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        className="text-destructive"
+                        onClick={() => {
+                            const n = ticked.length;
+                            if (
+                                window.confirm(
+                                    `Supprimer ${n} séance${n > 1 ? 's' : ''} ? À utiliser pour des séances planifiées par erreur ; une séance avec des présences ne se supprime pas (annulez-la).`,
+                                )
+                            ) {
+                                router.post(
+                                    route('sessions.seances.batch-delete', sessionId),
+                                    { seance_ids: ticked },
+                                    { ...visit, onSuccess: () => setSelected([]) },
+                                );
+                            }
+                        }}
+                    >
+                        <Trash2 className="h-4 w-4" />
+                        Supprimer la sélection
+                    </Button>
                     <Button type="button" size="sm" variant="ghost" onClick={() => setSelected([])}>
                         Tout décocher
                     </Button>

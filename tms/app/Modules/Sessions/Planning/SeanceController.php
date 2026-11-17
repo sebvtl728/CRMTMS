@@ -88,6 +88,14 @@ class SeanceController extends Controller
         return self::back($trainingSession, self::count(count($saved), 'annulée'));
     }
 
+    /** « Supprimer la sélection »: séances planned by mistake (none with attendance). */
+    public function batchDelete(Request $request, TrainingSession $trainingSession): RedirectResponse
+    {
+        self::authorizeManage($request, $trainingSession);
+
+        return self::back($trainingSession, self::count($this->batch->delete($trainingSession, $request->all()), 'supprimée'));
+    }
+
     private static function count(int $count, string $done): string
     {
         return $count === 1 ? "1 séance {$done}." : "{$count} séances {$done}s.";

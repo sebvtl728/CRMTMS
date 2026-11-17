@@ -16,6 +16,7 @@ use Illuminate\Validation\ValidationException;
  * review, SeanceChanged), all in one transaction: one séance refused and
  * nothing changes, the error names its day. Only the ticked groups change:
  * trainer; room and place; hours (start, end, break; the day stays).
+ * Deleting several (planned by mistake) follows the same rules.
  */
 final class SeanceBatch
 {
@@ -73,6 +74,27 @@ final class SeanceBatch
         ])->validate();
 
         return self::each($seances, fn (Seance $s) => $this->seances->cancel($s, $reason));
+    }
+
+    /**
+     * « Supprimer la sélection »: séances planned by mistake, none with
+     * attendance (Seances::delete, 409 otherwise), all or nothing.
+     *
+     * @param  array<string, mixed>  $data  seance_ids
+     * @return int the number deleted
+     *
+     * @throws ValidationException
+     */
+    public function delete(TrainingSession $session, array $data): int
+    {
+        $seances = self::selected($session, $data);
+        self::each($seances, function (Seance $s): Seance {
+            $this->seances->delete($s);
+
+            return $s;
+        });
+
+        return $seances->count();
     }
 
     /**

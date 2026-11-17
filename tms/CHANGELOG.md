@@ -36,7 +36,8 @@ une feuille d'émargement imprimable.
   salle, stagiaire, indisponibilité, stage, fermeture) qui avertissent sans jamais bloquer ; calendrier de la session
   (mois et semaine).
 - **Modification en masse des séances** : cases à cocher dans la liste ; **Modifier la sélection** (formateur, salle
-  ou lieu, horaires) et **Annuler la sélection** (motif commun), tout ou rien.
+  ou lieu, horaires), **Annuler la sélection** (motif commun) et **Supprimer la sélection** (séances planifiées par
+  erreur, sans présences), tout ou rien.
 - **Présences** par séance (présent, partiel, absent, absence justifiée, « Tous présents »), **heures du mois** des
   modules en intervalle, **clôture mensuelle** d'une session (réouverture avec motif obligatoire, journalisée) et
   **heures réalisées** en minutes entières, base de la facturation au réalisé ; séance modifiée ou annulée après

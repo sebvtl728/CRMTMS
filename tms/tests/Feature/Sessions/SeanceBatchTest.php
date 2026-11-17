@@ -134,3 +134,25 @@ it('needs sessions.seances.manage on the session', function () {
     $this->actingAs($own)->post("/sessions/{$session->id}/seances/batch-cancel", ['seance_ids' => [$a->id], 'reason' => 'x'])->assertForbidden();
     expect($a->refresh()->status)->toBe(Seance::PLANNED);
 });
+
+it('deletes several séances planned by mistake, all or nothing', function () {
+    $session = plSession();
+    $module = plModule($session);
+    $a = plSeance($module, '2026-09-07');
+    $b = plSeance($module, '2026-09-08');
+    $kept = plSeance($module, '2026-09-09');
+    $url = "/sessions/{$session->id}/seances/batch-delete";
+
+    // A séance with attendance stops the whole batch.
+    Seances::registerAttendance('test', fn (string $id) => $id === $b->id);
+    $this->actingAs(plManager())->post($url, ['seance_ids' => [$a->id, $b->id]])->assertStatus(409);
+    expect(Seance::query()->count())->toBe(3);
+    Seances::registerAttendance('test', fn (string $id) => false);
+
+    $this->actingAs(plManager())->post($url, ['seance_ids' => [$a->id, $b->id]])
+        ->assertRedirect("/sessions/{$session->id}")->assertSessionHas('status', '2 séances supprimées.');
+    expect(Seance::query()->pluck('id')->all())->toBe([$kept->id]);
+
+    $viewer = l2User([Permissions::SESSIONS_VIEW => null, Permissions::SEANCES_VIEW => null]);
+    $this->actingAs($viewer)->post($url, ['seance_ids' => [$kept->id]])->assertForbidden();
+});
