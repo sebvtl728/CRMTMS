@@ -15,6 +15,7 @@ use App\Modules\Sessions\Enrolments\Enrolment;
 use App\Modules\Sessions\Enrolments\EnrolmentStatus;
 use App\Modules\Sessions\Enrolments\PriceShares;
 use App\Modules\Sessions\Fundings\Funding;
+use App\Modules\Sessions\Public\BillingGuards;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -116,7 +117,8 @@ final class DossierWriter
 
     /**
      * Puts the dossier in the trash, unless trainees are still enrolled on
-     * it (cancelled enrolments aside): 409.
+     * it (cancelled enrolments aside) or the invoicing refuses it (a
+     * validated invoice, BillingGuards): 409.
      */
     public function trash(Dossier $dossier): void
     {
@@ -124,6 +126,9 @@ final class DossierWriter
             $locked = Dossier::query()->lockForUpdate()->findOrFail($dossier->id);
             if (Enrolment::query()->where('dossier_id', $locked->id)->where('status', '<>', EnrolmentStatus::Cancelled->value)->exists()) {
                 throw new UserFacingHttpException(409, self::ENROLLED);
+            }
+            if (($refusal = BillingGuards::dossierTrashable($locked->id)) !== null) {
+                throw new UserFacingHttpException(409, $refusal);
             }
             $locked->delete();
         });

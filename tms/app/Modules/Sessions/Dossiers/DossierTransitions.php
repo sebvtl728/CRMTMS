@@ -93,7 +93,9 @@ final class DossierTransitions
 
     /**
      * « Facturé », from « Réalisé » only (stored, or computed from the dates
-     * of its sessions); already « Facturé »: unchanged.
+     * of its sessions); already « Facturé »: unchanged. A dossier in the
+     * trash too: its invoices stay (Finance refuses to trash a dossier with
+     * a validated invoice, but one may be validated just before).
      */
     public function markInvoiced(Dossier $dossier): Dossier
     {
@@ -105,11 +107,12 @@ final class DossierTransitions
                 throw new UserFacingHttpException(409, self::NOT_DONE);
             }
             $locked->status = DossierStatus::Invoiced;
-        });
+        }, withTrashed: true);
     }
 
     /**
-     * Back to « Réalisé » from « Facturé »; any other state: unchanged.
+     * Back to « Réalisé » from « Facturé »; any other state: unchanged. A
+     * dossier in the trash too (a credit note on it).
      */
     public function unmarkInvoiced(Dossier $dossier): Dossier
     {
@@ -117,7 +120,7 @@ final class DossierTransitions
             if ($locked->status === DossierStatus::Invoiced) {
                 $locked->status = DossierStatus::Done;
             }
-        });
+        }, withTrashed: true);
     }
 
     /**
@@ -182,11 +185,12 @@ final class DossierTransitions
 
     /**
      * @param  Closure(Dossier): void  $change
+     * @param  bool  $withTrashed  the invoicing states only: a dossier in the trash is found too
      */
-    private function transition(Dossier $dossier, Closure $change, bool $checkCancelled = true): Dossier
+    private function transition(Dossier $dossier, Closure $change, bool $checkCancelled = true, bool $withTrashed = false): Dossier
     {
-        return DB::transaction(function () use ($dossier, $change, $checkCancelled): Dossier {
-            $locked = Dossier::query()->lockForUpdate()->findOrFail($dossier->getKey());
+        return DB::transaction(function () use ($dossier, $change, $checkCancelled, $withTrashed): Dossier {
+            $locked = ($withTrashed ? Dossier::withTrashed() : Dossier::query())->lockForUpdate()->findOrFail($dossier->getKey());
             if ($checkCancelled && $locked->isCancelled()) {
                 throw new UserFacingHttpException(409, self::CANCELLED);
             }

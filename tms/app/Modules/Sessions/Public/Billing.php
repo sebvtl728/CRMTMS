@@ -19,6 +19,7 @@ use App\Modules\Sessions\Fundings\Funding;
 use App\Modules\Sessions\Modules\DatingMode;
 use App\Modules\Sessions\Modules\SessionModule;
 use App\Modules\Sessions\Modules\SessionModules;
+use App\Modules\Sessions\Permissions;
 use App\Modules\Sessions\Planning\Seance;
 use App\Modules\Sessions\Sessions\TrainingSession;
 use App\Modules\Sessions\SessionsVisibility;
@@ -39,6 +40,7 @@ use InvalidArgumentException;
  *  - hours(): realised, planned and unjustified absent minutes per
  *    enrolment, and per session of a line priced for the group (see the
  *    method); a fixed number of queries whatever the number of trainees;
+ *  - allows(): whether a right (and its scope) reaches one dossier;
  *  - dossiersFor(): the dossiers a user reaches (sessions.dossiers.view and
  *    its scope), for the lists of the invoicing.
  *
@@ -285,21 +287,38 @@ final class Billing
     }
 
     /**
-     * The dossiers (out of the trash) $user reaches by sessions.dossiers.view
-     * and its scope, as a query of their ids, to use as a subquery
-     * (whereIn('dossier_id', Billing::dossiersFor(...))). Filters:
-     * company_id, das_id, responsible_user_id.
+     * The dossiers (out of the trash) $user reaches by $permission and its
+     * scope (sessions.dossiers.view by default; Finance passes its own
+     * rights, whose own / das / all are read on the dossier), as a query of
+     * their ids, to use as a subquery (whereIn('dossier_id',
+     * Billing::dossiersFor(...))). Filters: company_id, das_id,
+     * responsible_user_id.
      *
      * @param  array{company_id?: string|null, das_id?: string|null, responsible_user_id?: string|null}  $filters
      * @return Builder<Dossier>
      */
-    public static function dossiersFor(User $user, array $filters = []): Builder
+    public static function dossiersFor(User $user, array $filters = [], string $permission = Permissions::DOSSIERS_VIEW): Builder
     {
-        return SessionsVisibility::dossiers(Dossier::query(), $user)
+        return SessionsVisibility::dossiers(Dossier::query(), $user, $permission)
             ->when($filters['company_id'] ?? null, fn (Builder $q, string $id) => $q->where('dossiers.company_id', $id))
             ->when($filters['das_id'] ?? null, fn (Builder $q, string $id) => $q->where('dossiers.das_id', $id))
             ->when($filters['responsible_user_id'] ?? null, fn (Builder $q, string $id) => $q->where('dossiers.responsible_user_id', $id))
             ->select('dossiers.id');
+    }
+
+    /**
+     * $permission (its scope read on the dossier: own, das, all) reaches the
+     * dossier $dossierId; false for an unknown id. $withTrashed: a dossier in
+     * the trash counts too (reading its invoices), else it is never reached.
+     */
+    public static function allows(User $user, string $permission, string $dossierId, bool $withTrashed = false): bool
+    {
+        if (! Str::isUuid($dossierId)) {
+            return false;
+        }
+        $dossier = ($withTrashed ? Dossier::withTrashed() : Dossier::query())->find($dossierId);
+
+        return $dossier !== null && SessionsVisibility::allows($user, $permission, $dossier);
     }
 
     /**

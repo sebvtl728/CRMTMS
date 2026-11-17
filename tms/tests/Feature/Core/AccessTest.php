@@ -36,11 +36,12 @@ it('lists the core permission catalogue, then the modules\' permissions', functi
         'users.manage', 'roles.manage', 'companies.manage', 'references.manage', 'connectors.manage',
         'audit.view', 'settings.manage', 'exports.run',
     ])
-        // The CRM themes, the Catalogue, Sessions, then « Imports, exports et RGPD » (CrmServiceProvider).
+        // The CRM themes, the Catalogue, Sessions, Finance, then « Imports, exports et RGPD » (CrmServiceProvider).
         ->and(array_slice(Permissions::all(), 8))->toBe([
             ...array_values(array_diff(App\Modules\Crm\Permissions::all(), App\Modules\Crm\Permissions::GROUPS[App\Modules\Crm\Permissions::DATA_GROUP])),
             ...App\Modules\Catalogue\Permissions::all(),
             ...App\Modules\Sessions\Permissions::all(),
+            ...App\Modules\Finance\Permissions::all(),
             ...App\Modules\Crm\Permissions::GROUPS[App\Modules\Crm\Permissions::DATA_GROUP],
         ]);
 });
@@ -56,9 +57,9 @@ it('seeds the roles and the default matrix for a tenant', function () {
 
         // Core permissions only (the modules' defaults are tested with PermissionSync).
         $matrix = RoleModel::query()->with('permissions')->get()
-            ->mapWithKeys(fn (RoleModel $r) => [$r->name => $r->permissions->pluck('name')->reject(fn ($p) => str_starts_with($p, 'crm.') || str_starts_with($p, 'catalogue.') || str_starts_with($p, 'sessions.'))->sort()->values()->all()]);
+            ->mapWithKeys(fn (RoleModel $r) => [$r->name => $r->permissions->pluck('name')->reject(fn ($p) => str_starts_with($p, 'crm.') || str_starts_with($p, 'catalogue.') || str_starts_with($p, 'sessions.') || str_starts_with($p, 'finance.'))->sort()->values()->all()]);
 
-        expect($matrix['admin_organisme'])->toBe(collect(Permissions::all())->reject(fn ($p) => str_starts_with($p, 'crm.') || str_starts_with($p, 'catalogue.') || str_starts_with($p, 'sessions.'))->sort()->values()->all())
+        expect($matrix['admin_organisme'])->toBe(collect(Permissions::all())->reject(fn ($p) => str_starts_with($p, 'crm.') || str_starts_with($p, 'catalogue.') || str_starts_with($p, 'sessions.') || str_starts_with($p, 'finance.'))->sort()->values()->all())
             ->and($matrix['direction'])->toBe(['audit.view', 'exports.run'])
             ->and($matrix['commercial'])->toBe([])
             ->and($matrix['charge_relations'])->toBe([])
@@ -77,7 +78,8 @@ it('does not overwrite the matrix of an existing role when seeding again', funct
         ->toEqualCanonicalizing(['audit.view', 'crm.fiches.view', 'crm.opportunities.view', 'crm.quotes.view', 'crm.activities.view', 'crm.activities.team',
             'crm.revenue.view', 'crm.revenue.manage', 'crm.export', 'crm.gdpr', 'catalogue.view', 'catalogue.manage', 'catalogue.delete',
             'sessions.dossiers.view', 'sessions.sessions.view', 'sessions.seances.view', 'sessions.seances.manage', 'sessions.attendance.manage',
-            'sessions.attendance.close', 'sessions.trainers.manage', 'sessions.rooms.manage']);
+            'sessions.attendance.close', 'sessions.trainers.manage', 'sessions.rooms.manage',
+            'finance.invoices.view', 'finance.invoices.manage', 'finance.invoices.validate']);
 });
 
 // ---------------------------------------------------------------- authorization

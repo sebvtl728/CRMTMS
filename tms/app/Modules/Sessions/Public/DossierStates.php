@@ -9,7 +9,8 @@ use App\Modules\Sessions\Dossiers\DossierTransitions;
  * Public service of the invoicing states of a dossier (0.9): the Finance
  * module sets « Facturé » once everything is invoiced and takes it back
  * (a credit note) — through DossierTransitions, on the locked row, journaled
- * by the audit trail of the dossier like any other change of state.
+ * by the audit trail of the dossier like any other change of state. A
+ * dossier in the trash is found too: its invoices remain.
  */
 final class DossierStates
 {
@@ -21,7 +22,7 @@ final class DossierStates
      */
     public function markInvoiced(string $dossierId): void
     {
-        $this->transitions->markInvoiced(Dossier::query()->findOrFail($dossierId));
+        $this->transitions->markInvoiced(Dossier::withTrashed()->findOrFail($dossierId));
     }
 
     /**
@@ -29,6 +30,6 @@ final class DossierStates
      */
     public function unmarkInvoiced(string $dossierId): void
     {
-        $this->transitions->unmarkInvoiced(Dossier::query()->findOrFail($dossierId));
+        $this->transitions->unmarkInvoiced(Dossier::withTrashed()->findOrFail($dossierId));
     }
 }

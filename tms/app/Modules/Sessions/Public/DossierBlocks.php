@@ -12,19 +12,23 @@ use Closure;
  * null when the viewer may not see it (the module applies its own rights and
  * scopes). Same shape as Crm\Public\FicheBlocks: title, the text shown when
  * it is empty, rows (title, optional subtitle, meta, badge, link and detail
- * lines). The dossier page renders them all the same way.
+ * lines). The dossier page renders them all the same way, unless the block
+ * names an interactive component (« component », with its « props »: the
+ * billing settings of Finance), which the page looks up in its registry of
+ * block components (resources/js/components/dossier-blocks.tsx) and shows
+ * above the rows.
  *
  * The registry lives in the application container: a fresh application
  * (each test) starts with only what the providers register.
  */
 final class DossierBlocks
 {
-    /** @var array<string, Closure(string, User): (array{title: string, empty: string, rows: list<array<string, mixed>>}|null)> */
+    /** @var array<string, Closure(string, User): (array{title: string, empty: string, rows: list<array<string, mixed>>, component?: string, props?: array<string, mixed>}|null)> */
     private array $blocks = [];
 
     /**
      * @param  string  $key  unique name (module.block); a second registration replaces the first
-     * @param  Closure(string, User): (array{title: string, empty: string, rows: list<array<string, mixed>>}|null)  $block
+     * @param  Closure(string, User): (array{title: string, empty: string, rows: list<array<string, mixed>>, component?: string, props?: array<string, mixed>}|null)  $block
      */
     public static function register(string $key, Closure $block): void
     {
@@ -35,7 +39,7 @@ final class DossierBlocks
      * The blocks of the dossier $dossierId that $viewer may see, in the order
      * of registration.
      *
-     * @return list<array{key: string, title: string, empty: string, rows: list<array<string, mixed>>}>
+     * @return list<array{key: string, title: string, empty: string, rows: list<array<string, mixed>>, component?: string, props?: array<string, mixed>}>
      */
     public static function for(string $dossierId, User $viewer): array
     {

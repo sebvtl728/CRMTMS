@@ -39,21 +39,32 @@ type CompanyForm = {
     quote_validity_days: string;
     quote_terms: string;
     quote_footer: string;
+    invoice_prefix: string;
+    credit_note_prefix: string;
+    payment_terms_days: string;
+    invoice_footer: string;
 };
 
-interface CompanyData extends Omit<CompanyForm, 'scop_underlying_form' | 'capital_amount' | 'quote_validity_days' | 'quote_terms' | 'quote_footer'> {
+interface CompanyData
+    extends Omit<
+        CompanyForm,
+        'scop_underlying_form' | 'capital_amount' | 'quote_validity_days' | 'quote_terms' | 'quote_footer' | 'payment_terms_days' | 'invoice_footer'
+    > {
     id: string;
     scop_underlying_form: string | null;
     capital_amount: string | null;
     quote_validity_days: number;
     quote_terms: string | null;
     quote_footer: string | null;
+    payment_terms_days: number;
+    invoice_footer: string | null;
     /** data URI of the current logo, null without one */
     logo: string | null;
 }
 
 const MAX_LOGO_BYTES = 1024 * 1024;
 const MAX_TEXT = 5000;
+const MAX_INVOICE_FOOTER = 2000;
 const textareaClass =
     'border-input bg-background ring-offset-background placeholder:text-muted-foreground focus-visible:ring-ring w-full rounded-md border px-3 py-2 text-base focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-hidden md:text-sm';
 
@@ -108,6 +119,10 @@ export default function EditCompany({ company, mentions, legalForms, underlyingF
         quote_validity_days: String(company?.quote_validity_days ?? 30),
         quote_terms: company?.quote_terms ?? '',
         quote_footer: company?.quote_footer ?? '',
+        invoice_prefix: company?.invoice_prefix ?? 'F',
+        credit_note_prefix: company?.credit_note_prefix ?? 'AV',
+        payment_terms_days: String(company?.payment_terms_days ?? 30),
+        invoice_footer: company?.invoice_footer ?? '',
     });
 
     const [logoError, setLogoError] = useState<string | undefined>();
@@ -199,7 +214,10 @@ export default function EditCompany({ company, mentions, legalForms, underlyingF
             <Head title={company ? 'Modifier la société' : 'Nouvelle société'} />
 
             <div className="max-w-3xl p-4">
-                <Heading title={company ? 'Modifier la société' : 'Nouvelle société'} description="Identité juridique utilisée sur vos devis et factures." />
+                <Heading
+                    title={company ? 'Modifier la société' : 'Nouvelle société'}
+                    description="Identité juridique utilisée sur vos devis et factures."
+                />
 
                 <div className="bg-muted/50 mb-6 rounded-xl border p-4" aria-live="polite">
                     <p className="text-muted-foreground mb-1 text-xs font-medium uppercase">Mentions légales</p>
@@ -366,7 +384,8 @@ export default function EditCompany({ company, mentions, legalForms, underlyingF
                                     aria-describedby="quote_prefix-help"
                                 />
                                 <p id="quote_prefix-help" className="text-muted-foreground text-xs">
-                                    Lettres majuscules et chiffres. Exemple de numéro : {(data.quote_prefix || 'DEV') + '-' + new Date().getFullYear() + '-0001'}
+                                    Lettres majuscules et chiffres. Exemple de numéro :{' '}
+                                    {(data.quote_prefix || 'DEV') + '-' + new Date().getFullYear() + '-0001'}
                                 </p>
                             </Field>
                             <Field id="quote_validity_days" label="Durée de validité (jours)" error={errors.quote_validity_days}>
@@ -394,6 +413,51 @@ export default function EditCompany({ company, mentions, legalForms, underlyingF
                                 rows={3}
                                 className={textareaClass}
                             />
+                        </Field>
+                    </fieldset>
+
+                    <fieldset className="space-y-6 rounded-xl border p-4">
+                        <legend className="px-1 text-sm font-semibold">Factures</legend>
+
+                        <div className="grid gap-6 sm:grid-cols-3">
+                            <Field id="invoice_prefix" label="Préfixe des factures" error={errors.invoice_prefix}>
+                                <Input
+                                    {...text('invoice_prefix')}
+                                    onChange={(e) => setData('invoice_prefix', e.target.value.toUpperCase())}
+                                    maxLength={10}
+                                    required
+                                    aria-describedby="invoice_prefix-help"
+                                />
+                                <p id="invoice_prefix-help" className="text-muted-foreground text-xs">
+                                    Exemple : {(data.invoice_prefix || 'F') + '-' + new Date().getFullYear() + '-00001'}
+                                </p>
+                            </Field>
+                            <Field id="credit_note_prefix" label="Préfixe des avoirs" error={errors.credit_note_prefix}>
+                                <Input
+                                    {...text('credit_note_prefix')}
+                                    onChange={(e) => setData('credit_note_prefix', e.target.value.toUpperCase())}
+                                    maxLength={10}
+                                    required
+                                />
+                            </Field>
+                            <Field id="payment_terms_days" label="Délai de paiement (jours)" error={errors.payment_terms_days}>
+                                <Input {...text('payment_terms_days')} type="number" min={0} max={60} required />
+                            </Field>
+                        </div>
+
+                        <Field id="invoice_footer" label="Mentions de pied de facture" error={errors.invoice_footer}>
+                            <textarea
+                                id="invoice_footer"
+                                value={data.invoice_footer}
+                                onChange={(e) => setData('invoice_footer', e.target.value)}
+                                maxLength={MAX_INVOICE_FOOTER}
+                                rows={3}
+                                className={textareaClass}
+                                aria-describedby="invoice_footer-help"
+                            />
+                            <p id="invoice_footer-help" className="text-muted-foreground text-xs">
+                                Pénalités de retard, indemnité forfaitaire de 40 € pour frais de recouvrement, coordonnées bancaires…
+                            </p>
                         </Field>
                     </fieldset>
 

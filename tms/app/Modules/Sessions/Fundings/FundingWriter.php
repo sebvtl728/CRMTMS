@@ -12,6 +12,7 @@ use App\Modules\Sessions\Dossiers\DossierLine;
 use App\Modules\Sessions\Dossiers\DossierWriter;
 use App\Modules\Sessions\Enrolments\Enrolment;
 use App\Modules\Sessions\Enrolments\EnrolmentStatus;
+use App\Modules\Sessions\Public\BillingGuards;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rule;
@@ -75,7 +76,12 @@ final class FundingWriter
     {
         return $this->locked($funding->dossier_id, function (Dossier $locked) use ($funding, $data): Funding {
             $current = Funding::query()->where('dossier_id', $locked->id)->lockForUpdate()->findOrFail($funding->id);
-            $current->fill($this->validated($locked, [...self::input($current), ...$data], $current))->save();
+            $values = $this->validated($locked, [...self::input($current), ...$data], $current);
+            // The invoicing may have frozen who pays directly (a validated invoice: a credit note first).
+            if ($values['pays_directly'] !== $current->pays_directly && ($refusal = BillingGuards::fundingLocked($locked->id)) !== null) {
+                throw ValidationException::withMessages(['pays_directly' => $refusal]);
+            }
+            $current->fill($values)->save();
             $funding->setRawAttributes($current->getAttributes(), true);
 
             return $current;

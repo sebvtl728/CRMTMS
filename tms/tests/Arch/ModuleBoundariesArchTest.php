@@ -226,3 +226,74 @@ it('keeps Sessions, Crm, Catalogue, Core and Connectors free of any reference to
         expect(moduleFilesMatching($module, '/App\\\\Modules\\\\Finance\\\\|App\\\\Modules\\\\\{[^}]*\bFinance\\\\/'), $module)->toBe([]);
     }
 });
+
+/**
+ * Any mention of a Sessions table, same shapes as CRM_TABLES: Finance reads
+ * the dossiers through Sessions\Public only.
+ */
+const SESSIONS_TABLES_LIST = 'training_sessions|session_sequences|dossiers|dossier_lines|dossier_sequences|enrolments|fundings|session_modules|seances'
+    .'|attendances|monthly_hours|attendance_closures|attendance_sheet_scans|placement_periods|placement_period_hosts|rooms|closure_periods'
+    .'|trainers|trainer_das|trainer_unavailabilities|session_tasks|session_notes';
+
+const SESSIONS_TABLES = '/[\'"`](?:public\.)?(?:'.SESSIONS_TABLES_LIST.')(?:[\'"`.]|\s+as\b)'
+    .'|\b(?:exists|unique):(?:public\.)?(?:'.SESSIONS_TABLES_LIST.')\b'
+    .'|\b(?:from|join|into|update)\s+(?:public\.)?["`]?(?:'.SESSIONS_TABLES_LIST.')\b/i';
+
+/**
+ * A reference to another module than Finance and Core, beyond their public
+ * services: Sessions\Public, Crm\Public and the catalogue's Trainings,
+ * TrainingData and TrainingUsage (a use line, a grouped use or an inline
+ * fully qualified name).
+ */
+const FINANCE_FOREIGN_REFERENCE = '/App\\\\Modules\\\\(?!(?:Finance|Core)\b|Sessions\\\\Public\b|Crm\\\\Public\b|Catalogue\\\\(?:Trainings|TrainingData|TrainingUsage)\b)\w+'
+    .'|App\\\\Modules\\\\\{[^}]*\b(?!(?:Finance|Core)\\\\|Sessions\\\\Public\b|Crm\\\\Public\b|Catalogue\\\\(?:Trainings|TrainingData|TrainingUsage)\b)(?:Sessions|Crm|Catalogue|Connectors)\\\\/';
+
+it('lets Finance reach the other modules through their public services only, never their tables', function () {
+    expect(moduleFilesMatching('Finance', FINANCE_FOREIGN_REFERENCE))->toBe([]);
+
+    $offenders = [];
+    foreach (new RecursiveIteratorIterator(new RecursiveDirectoryIterator(app_path('Modules/Finance'))) as $file) {
+        if ($file->getExtension() !== 'php') {
+            continue;
+        }
+        $code = (string) file_get_contents($file->getPathname());
+        if (namesCrmTables($code) || namesCatalogueTables($code) || preg_match(SESSIONS_TABLES, $code) === 1) {
+            $offenders[] = $file->getPathname();
+        }
+    }
+    expect($offenders)->toBe([]);
+});
+
+it('detects every way Finance could reach Sessions, the Crm, the catalogue or the connectors beyond their public services', function () {
+    foreach ([
+        'use App\Modules\Sessions\Dossiers\Dossier;',
+        'use App\Modules\Sessions\Fundings\FundingWriter;',
+        'use App\Modules\Crm\People\Person;',
+        'use App\Modules\Catalogue\Training;',
+        'use App\Modules\Connectors\Smtp\TenantMailer;',
+        'use App\Modules\{Sessions\Dossiers\Dossier, Core\Access\Role};',
+        '$d = \App\Modules\Sessions\SessionsVisibility::class;',
+    ] as $code) {
+        expect(preg_match(FINANCE_FOREIGN_REFERENCE, $code), $code)->toBe(1);
+    }
+    foreach ([
+        'use App\Modules\Sessions\Public\Billing;',
+        'use App\Modules\Sessions\Public\{Billing, DossierBlocks};',
+        'use App\Modules\Crm\Public\Fiches;',
+        'use App\Modules\Catalogue\Trainings;',
+        'use App\Modules\Core\Access\Permissions;',
+        'use App\Modules\Finance\Plans\BillingPlans;',
+        'namespace App\Modules\Finance;',
+        'use App\Modules\{Core\Access\Role, Sessions\Public\Billing};',
+    ] as $code) {
+        expect(preg_match(FINANCE_FOREIGN_REFERENCE, $code), $code)->toBe(0);
+    }
+
+    foreach (["DB::table('dossiers')", "->join('enrolments as e', 'a', 'b')", "Rule::exists('fundings', 'id')", 'select 1 from seances',
+        "'dossier_id' => 'exists:dossiers,id'", "->where('training_sessions.id', 1)"] as $code) {
+        expect(preg_match(SESSIONS_TABLES, $code), $code)->toBe(1);
+    }
+    foreach (["'dossier_id'", "DB::table('billing_plans')", "'billing_plans.dossier_id'", '// the dossiers of the organisme', "route('finance.plans.update')"] as $code) {
+        expect(preg_match(SESSIONS_TABLES, $code), $code)->toBe(0);
+    }
+});
