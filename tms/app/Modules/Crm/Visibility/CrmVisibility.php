@@ -119,7 +119,8 @@ final class CrmVisibility
         $scope = Scopes::of($user, $permission);
 
         return match ($scope) {
-            null => false,
+            // « Ses séances » is never applied to a CRM right (Scopes::of): nothing.
+            null, AccessScope::Trainer => false,
             AccessScope::All, AccessScope::Own => true,
             AccessScope::Das => self::opportunitiesIn(Opportunity::withTrashed(), $user, $scope)->whereKey($opportunity->getKey())->exists(),
         };
@@ -229,7 +230,7 @@ final class CrmVisibility
     private static function organisationsIn(Builder $query, User $user, ?AccessScope $scope): Builder
     {
         return match ($scope) {
-            null => $query->whereRaw('false'),
+            null, AccessScope::Trainer => $query->whereRaw('false'),
             AccessScope::All => $query,
             AccessScope::Own => self::own($query, $user),
             AccessScope::Das => $query->whereExists(fn ($sub) => $sub
@@ -257,7 +258,7 @@ final class CrmVisibility
     {
         if ($scope !== AccessScope::Das) {
             return match ($scope) {
-                null => $query->whereRaw('false'),
+                null, AccessScope::Trainer => $query->whereRaw('false'),
                 AccessScope::All => $query,
                 AccessScope::Own => self::own($query, $user),
             };
@@ -309,7 +310,7 @@ final class CrmVisibility
     private static function opportunitiesIn(Builder $query, User $user, ?AccessScope $scope): Builder
     {
         return match ($scope) {
-            null => $query->whereRaw('false'),
+            null, AccessScope::Trainer => $query->whereRaw('false'),
             AccessScope::All => $query,
             AccessScope::Own => self::own($query, $user),
             AccessScope::Das => $query->whereIn($query->getModel()->qualifyColumn('das_id'), DB::table('user_das')

@@ -13,7 +13,7 @@ import { Head, router } from '@inertiajs/react';
 import { Lock, MoreHorizontal, Plus } from 'lucide-react';
 import { useState } from 'react';
 
-type ScopeValue = 'own' | 'das' | 'all';
+type ScopeValue = 'own' | 'das' | 'all' | 'trainer';
 
 interface RoleColumn {
     id: string;
@@ -39,6 +39,8 @@ interface PermissionRow {
     label: string;
     description: string;
     scoped: boolean;
+    /** The scopes offered for this right (« Ses séances » for the séances and attendance only). */
+    scope_options: ScopeValue[];
     /** Reserved to the administrator, never editable here. */
     locked: boolean;
     /** Administration-level power, worth a second thought before granting it. */
@@ -435,7 +437,7 @@ export default function Roles({ roles, groups, scopeOptions, status }: RolesProp
                                                                         <SelectValue />
                                                                     </SelectTrigger>
                                                                     <SelectContent>
-                                                                        {scopeOptions.map((o) => (
+                                                                        {scopeOptions.filter((o) => p.scope_options.includes(o.value)).map((o) => (
                                                                             <SelectItem key={o.value} value={o.value}>
                                                                                 {o.label}
                                                                             </SelectItem>

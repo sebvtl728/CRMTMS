@@ -63,10 +63,17 @@ class InvitationController extends Controller
         ]);
     }
 
-    public function create(): Response
+    /**
+     * The form, optionally prefilled from the query (email, name, role):
+     * « Inviter » of a module's page (a trainer).
+     */
+    public function create(Request $request): Response
     {
+        $prefill = fn (string $key, int $max): string => is_string($value = $request->query($key)) ? mb_substr(trim($value), 0, $max) : '';
+
         return Inertia::render('admin/users/invite', [
             'roles' => RoleCatalogue::options(),
+            'defaults' => ['email' => $prefill('email', 254), 'name' => $prefill('name', 255), 'role' => $prefill('role', 100)],
         ]);
     }
 

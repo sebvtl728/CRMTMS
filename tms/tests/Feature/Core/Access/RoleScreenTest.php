@@ -12,7 +12,7 @@ use App\Modules\Crm\Permissions as CrmPermissions;
 use Illuminate\Support\Facades\DB;
 use Inertia\Testing\AssertableInertia as Assert;
 
-function screenRole(string $label = 'Formateur', bool $requires2fa = false, ?RoleModel $copyFrom = null): RoleModel
+function screenRole(string $label = 'Tuteur', bool $requires2fa = false, ?RoleModel $copyFrom = null): RoleModel
 {
     tenant();
 
@@ -23,7 +23,7 @@ it('gives the screen the roles, system first then custom, with 2fa lock, users a
     $this->actingAs(admin(twoFactor: true));
     $commercial = RoleModel::forSystem(Role::Commercial);
     app(RoleMatrix::class)->setScope($commercial, CrmPermissions::FICHES_VIEW, AccessScope::Own);
-    $custom = screenRole('Formateur', true, $commercial);
+    $custom = screenRole('Tuteur', true, $commercial);
     $holder = User::factory()->create();
     $holder->assignPrimaryRole($custom);
     $holder->deactivate();
@@ -42,7 +42,7 @@ it('gives the screen the roles, system first then custom, with 2fa lock, users a
                 && $roles->last()['id'] === $custom->id
                 && $system->every(fn ($r) => $r['system'] === true)
                 && $c['system'] === false && $c['admin'] === false
-                && $c['label'] === 'Formateur' && $c['requires_2fa'] === true && $c['locked_2fa'] === false
+                && $c['label'] === 'Tuteur' && $c['requires_2fa'] === true && $c['locked_2fa'] === false
                 && $c['users_count'] === 1
                 && $roles->where('locked_2fa', true)->pluck('label')->sort()->values()->all() === [Role::AdminOrganisme->label(), Role::Direction->label()]
                 && $roles->first()['admin'] === true
@@ -67,11 +67,11 @@ it('gives the screen the roles, system first then custom, with 2fa lock, users a
 
 it('sets the scope of a granted scoped permission over HTTP', function () {
     $this->actingAs(admin(twoFactor: true));
-    $role = screenRole('Formateur', false, RoleModel::forSystem(Role::Assistant));
+    $role = screenRole('Tuteur', false, RoleModel::forSystem(Role::Assistant));
 
     $this->post("/admin/roles/{$role->id}", ['permission' => CrmPermissions::OPPORTUNITIES_VIEW, 'scope' => 'own'])
         ->assertSessionHasNoErrors()
-        ->assertSessionHas('status', 'Périmètre de « '.Permissions::label(CrmPermissions::OPPORTUNITIES_VIEW)['label'].' » pour le rôle Formateur : Ses fiches.');
+        ->assertSessionHas('status', 'Périmètre de « '.Permissions::label(CrmPermissions::OPPORTUNITIES_VIEW)['label'].' » pour le rôle Tuteur : Ses fiches.');
 
     expect(DB::table('role_permission_scopes')->where('role_id', $role->id)->where('permission', CrmPermissions::OPPORTUNITIES_VIEW)->value('scope'))->toBe('own')
         ->and(AuditLog::query()->where('event', 'roles.scope_changed')->sole()->new_values)->toMatchArray(['permission' => CrmPermissions::OPPORTUNITIES_VIEW, 'scope' => 'own']);
@@ -79,7 +79,7 @@ it('sets the scope of a granted scoped permission over HTTP', function () {
 
 it('refuses a scope for an ungranted, unscoped or administrator permission, or an unknown scope', function () {
     $this->actingAs(admin(twoFactor: true));
-    $role = screenRole('Formateur', false, RoleModel::forSystem(Role::Assistant));
+    $role = screenRole('Tuteur', false, RoleModel::forSystem(Role::Assistant));
     $url = "/admin/roles/{$role->id}";
 
     // Not granted (Assistant has no delete): 422 with the server's message.
@@ -96,7 +96,7 @@ it('gives the default scopes of a system role so that a changed scope is highlig
     $this->actingAs(admin(twoFactor: true));
     $commercial = RoleModel::forSystem(Role::Commercial);
     app(RoleMatrix::class)->setScope($commercial, CrmPermissions::FICHES_VIEW, AccessScope::Own);
-    $custom = screenRole('Formateur', false, $commercial);
+    $custom = screenRole('Tuteur', false, $commercial);
 
     $this->get('/admin/roles')->assertOk()->assertInertia(fn (Assert $page) => $page
         ->where('roles', function ($roles) use ($commercial, $custom) {
@@ -114,7 +114,7 @@ it('gives the default scopes of a system role so that a changed scope is highlig
 
 it('warns when a role without mandatory 2fa holds a sensitive right', function () {
     $this->actingAs(admin(twoFactor: true));
-    $plain = screenRole('Formateur', false);
+    $plain = screenRole('Tuteur', false);
     $sensitive = screenRole('Auditeur', false);
     app(RoleMatrix::class)->set($sensitive, Permissions::AUDIT_VIEW, true);
     $protected = screenRole('Contrôleur', true);

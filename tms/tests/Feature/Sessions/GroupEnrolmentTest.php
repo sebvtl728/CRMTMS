@@ -321,12 +321,13 @@ it('takes any positive hours when the session has none', function () {
 
 // ---------------------------------------------------------------- review fixes
 
-it('lowers the hours of the trainees above the new hours of the session, journaled', function () {
+it('never changes the trainees\' hours from the session form: the hours are those of the modules (0.8.0)', function () {
     $session = grpSession();
     $dossier = grpDossier();
     $line = $dossier->lines()->firstOrFail();
     $full = app(Enrolments::class)->enrol($dossier, $line, $session, makePerson('A')->id);
     $part = app(Enrolments::class)->enrol($dossier, $line, $session, makePerson('B')->id, ['planned_hours' => '20']);
+    $hours = $session->fresh()->planned_hours;
     $this->actingAs(admin(true));
 
     $this->put("/sessions/{$session->id}", [
@@ -334,16 +335,8 @@ it('lowers the hours of the trainees above the new hours of the session, journal
         'location_kind' => 'remote', 'capacity' => '10', 'status' => 'planned', 'planned_hours' => '28',
     ])->assertSessionHasNoErrors();
 
-    expect($full->fresh()->planned_hours)->toBe('28.00')->and($part->fresh()->planned_hours)->toBe('20.00')
-        ->and(AuditLog::query()->where('auditable_type', 'enrolment')->where('auditable_id', $full->id)->where('event', 'updated')
-            ->where('new_values->planned_hours', '28.00')->exists())->toBeTrue();
-
-    // Raising them back leaves the trainees' hours alone.
-    $this->put("/sessions/{$session->id}", [
-        'training_id' => grpTraining()->id, 'kind' => 'inter', 'starts_on' => '2026-11-30', 'ends_on' => '2027-03-05',
-        'location_kind' => 'remote', 'capacity' => '10', 'status' => 'planned', 'planned_hours' => '35',
-    ])->assertSessionHasNoErrors();
-    expect($full->fresh()->planned_hours)->toBe('28.00');
+    expect($session->fresh()->planned_hours)->toBe($hours)
+        ->and($full->fresh()->planned_hours)->toBe($hours)->and($part->fresh()->planned_hours)->toBe('20.00');
 });
 
 it('computes the shares of the line once for the whole group, with the same result', function () {

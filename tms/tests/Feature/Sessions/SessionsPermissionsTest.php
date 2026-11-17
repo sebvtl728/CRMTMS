@@ -13,10 +13,12 @@ use Illuminate\Support\Facades\DB;
 use Inertia\Testing\AssertableInertia as Assert;
 use Spatie\Permission\PermissionRegistrar;
 
-it('declares the six scoped rights of the Sessions module', function () {
+it('declares the rights of the Sessions module, scoped but for trainers and rooms', function () {
     expect(Permissions::all())->toBe([
         'sessions.dossiers.view', 'sessions.dossiers.update', 'sessions.dossiers.delete',
         'sessions.sessions.view', 'sessions.sessions.update', 'sessions.sessions.delete',
+        'sessions.seances.view', 'sessions.seances.manage', 'sessions.attendance.manage', 'sessions.attendance.close',
+        'sessions.trainers.manage', 'sessions.rooms.manage',
     ])
         ->and(Permissions::DOSSIERS_VIEW)->toBe('sessions.dossiers.view')
         ->and(Permissions::SESSIONS_VIEW)->toBe('sessions.sessions.view')
@@ -24,7 +26,7 @@ it('declares the six scoped rights of the Sessions module', function () {
 
     foreach (Permissions::all() as $permission) {
         $label = CorePermissions::label($permission);
-        expect(CorePermissions::isScoped($permission), $permission)->toBeTrue()
+        expect(CorePermissions::isScoped($permission), $permission)->toBe($permission !== Permissions::ROOMS_MANAGE)
             ->and($label, $permission)->not->toBeNull()
             ->and($label['label'] ?? '', $permission)->not->toBe('')
             ->and($label['description'] ?? '', $permission)->not->toBe('');
@@ -37,13 +39,16 @@ it('declares the six scoped rights of the Sessions module', function () {
 it('grants the default rights and scopes per role', function () {
     $view = [Permissions::DOSSIERS_VIEW, Permissions::SESSIONS_VIEW];
     $viewUpdate = [Permissions::DOSSIERS_VIEW, Permissions::DOSSIERS_UPDATE, Permissions::SESSIONS_VIEW, Permissions::SESSIONS_UPDATE];
+    // Dossiers and sessions only (the planning rights: FormateurRoleTest).
+    $lot2a = fn (Role $role) => array_values(array_filter(Permissions::defaultsFor($role), fn (string $p) => preg_match('/^sessions\.(dossiers|sessions)\./', $p) === 1));
 
     expect(Permissions::defaultsFor(Role::AdminOrganisme))->toEqualCanonicalizing(Permissions::all())
-        ->and(Permissions::defaultsFor(Role::Direction))->toEqualCanonicalizing($view)
-        ->and(Permissions::defaultsFor(Role::Commercial))->toEqualCanonicalizing($viewUpdate)
-        ->and(Permissions::defaultsFor(Role::ChargeRelations))->toEqualCanonicalizing($viewUpdate)
-        ->and(Permissions::defaultsFor(Role::Assistant))->toEqualCanonicalizing($viewUpdate)
-        ->and(Permissions::defaultsFor(Role::ResponsableDas))->toEqualCanonicalizing($view);
+        ->and($lot2a(Role::Direction))->toEqualCanonicalizing($view)
+        ->and($lot2a(Role::Commercial))->toEqualCanonicalizing($viewUpdate)
+        ->and($lot2a(Role::ChargeRelations))->toEqualCanonicalizing($viewUpdate)
+        ->and($lot2a(Role::Assistant))->toEqualCanonicalizing($viewUpdate)
+        ->and($lot2a(Role::ResponsableDas))->toEqualCanonicalizing($view)
+        ->and($lot2a(Role::Formateur))->toBe([]);
 
     // Seeded roles of a tenant: the whole organisme, the Responsable DAS his DAS.
     foreach ([Role::AdminOrganisme, Role::Direction, Role::Commercial, Role::ChargeRelations, Role::Assistant] as $role) {
@@ -103,8 +108,8 @@ it('offers the Sessions rights and their scopes to the roles of an existing orga
 
     $synced = sessionsMatrix($tenant);
     expect($synced)->toBe($fresh)
-        ->and($synced['rights']['responsable_das'])->toBe(['sessions.dossiers.view', 'sessions.sessions.view'])
-        ->and($synced['scopes'])->toContain('responsable_das sessions.dossiers.view das', 'responsable_das sessions.sessions.view das');
+        ->and($synced['rights']['responsable_das'])->toBe(['sessions.dossiers.view', 'sessions.seances.view', 'sessions.sessions.view', 'sessions.trainers.manage'])
+        ->and($synced['scopes'])->toContain('responsable_das sessions.dossiers.view das', 'responsable_das sessions.sessions.view das', 'responsable_das sessions.trainers.manage das');
 
     // Twice: nothing changes.
     $applied = app(TenantContext::class)->run($tenant, fn () => DB::table(PermissionSync::TABLE)->count());

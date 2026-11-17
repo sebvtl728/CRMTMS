@@ -5,6 +5,72 @@ Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) ; ve
 
 ## [Non publié]
 
+## [0.8.0] - 2026-11-17
+
+Planning des séances, formateurs, présences et heures réalisées : une session se découpe en modules, se planifie en
+séances (assistant, stages, jours fériés, conflits), se suit par les présences et les heures du mois, et se signe sur
+une feuille d'émargement imprimable.
+
+### Ajouté
+
+- **Modules de session** : une session est la somme de ses modules (intitulé, heures prévues en minutes entières, mode
+  de planification en **séances** ou en **intervalle** de dates) ; **Reprendre les modules de la formation** copie ceux
+  du catalogue (aperçu, puis remplacement refusé dès qu'un module a une séance, une présence ou des heures) ; les
+  heures prévues de la session deviennent la somme des modules ; les sessions existantes reçoivent un module
+  « intervalle » unique (migration).
+- **Salles et fermetures** (Administration › Salles et fermetures, droit `sessions.rooms.manage`) : salles (capacité,
+  adresse, actif) et périodes de fermeture exclues de la planification.
+- **Formateurs** (menu Formation › Formateurs, droit `sessions.trainers.manage`) : issus des **utilisateurs du TMS** ou
+  sans compte, statut, indisponibilités, compte lié (lien automatique à l'invitation si une seule fiche a l'e-mail),
+  bloc « Formateur » sur la fiche Personne ; **liés à des DAS** (les formateurs du DAS de la session sont proposés en
+  premier).
+- **Rôle Formateur** (septième rôle système) et périmètre **« Ses séances »** (`AccessScope::Trainer`, proposé
+  seulement pour « Consulter les séances » et « Saisir les présences ») : le formateur ne voit que ses séances, par
+  **Mon planning** ; jamais besoins d'adaptation, notes, financements ni prix ; aucun droit CRM, devis, catalogue ni
+  export. Nouveaux droits : `sessions.seances.view|manage`, `sessions.attendance.manage|close`,
+  `sessions.trainers.manage`, `sessions.rooms.manage` (accordés une fois par `tms:permissions:sync`).
+- **Séances** (table `seances`, heures de Paris, durée = fin − début − pause) avec salle, formateur, lieu libre, note ;
+  **assistant « Générer les séances »** (aperçu, sans doublon ni modification des séances existantes, jours ouvrés,
+  fermetures) ; **périodes de stage** par session avec dates et entreprise d'accueil propres à chaque stagiaire ;
+  **jours fériés nationaux** (les 11, lundi de Pentecôte compris, calcul local) ; **alertes de conflits** (formateur,
+  salle, stagiaire, indisponibilité, stage, fermeture) qui avertissent sans jamais bloquer ; calendrier de la session
+  (mois et semaine).
+- **Modification en masse des séances** : cases à cocher dans la liste ; **Modifier la sélection** (formateur, salle
+  ou lieu, horaires), **Annuler la sélection** (motif commun) et **Supprimer la sélection** (séances planifiées par
+  erreur, sans présences), tout ou rien.
+- **Fin estimée dans l'assistant** : on choisit la date de début, et la fin se calcule d'après les heures prévues du
+  module (heures déjà planifiées déduites, fériés, fermetures et stages sautés) ; ou on garde une date de fin choisie.
+- **Présences** par séance (présent, partiel, absent, absence justifiée, « Tous présents »), **heures du mois** des
+  modules en intervalle, **clôture mensuelle** d'une session (réouverture avec motif obligatoire, journalisée) et
+  **heures réalisées** en minutes entières, base de la facturation au réalisé ; séance modifiée ou annulée après
+  présences : « à revoir », recalcul atomique ; une séance avec présences ne se supprime pas.
+- **Plannings** : **Planning des séances** (général, mois et semaine, filtres formateur / salle / session / DAS),
+  **Mon planning** du formateur (saisie directe des présences), planning du stagiaire sur sa fiche (« Formations
+  suivies »), et séances publiées dans le **flux iCal** du formateur et du responsable de session (fuseau
+  `Europe/Paris` ; sans le CRM, « Mon agenda » reste ouvert au formateur). Outlook : en 0.8.1.
+- **Feuille d'émargement** : PDF par séance ou par journée (organisme, session, module, date, créneaux, formateur, une
+  ligne par stagiaire attendu avec case matin / après-midi, case formateur) et **dépôt du scan signé** (PDF, PNG ou
+  JPEG, 10 Mo, type vérifié sur le contenu) rattaché à la séance ou à la journée, téléchargeable selon le périmètre de
+  la séance, supprimable par les gestionnaires. Nouvelle zone de stockage privée `attendance_sheets`.
+- **RGPD** : l'anonymisation d'un stagiaire garde ses présences et ses heures (preuve, facturation) et efface leurs
+  motifs ; les scans sont gardés, sauf sur une session individuelle ; l'export RGPD de la personne contient ses
+  présences et ses heures du mois.
+
+### Mise à jour
+
+- Un organisme qui a déjà un rôle **personnalisé** nommé « Formateur » verra deux rôles de ce libellé : renommez le rôle personnalisé.
+
+### Modifié
+
+- **Mois clôturé** : changer la date d'entrée d'un stagiaire, ou enregistrer son abandon, est refusé (409) quand cela
+  touche un mois clôturé de la session ; les heures réalisées exposent aussi `enrolment_planned_minutes`. Supprimer un
+  scan d'un mois clôturé, ou en déposer un sur une séance annulée, est refusé. Les scans portent un nom neutre
+  (`emargement-<date>.<ext>`), jamais le nom envoyé.
+- Les heures prévues d'un stagiaire restent plafonnées par celles de la session (somme des modules) ; un module qui
+  ferait passer la session sous une inscription existante avertit sans rien modifier.
+- Les alertes et le registre de calendrier du module Connecteurs acceptent désormais plusieurs sources (le CRM et les
+  séances) ; le flux iCal est ouvert à tout utilisateur dont une source publie des évènements.
+
 ## [0.7.1] - 2026-11-16
 
 L'import devine mieux les colonnes, se prépare avec un modèle Excel et s'abandonne avant exécution ; une action se
@@ -423,7 +489,8 @@ Lot 1a : socle de l'application.
   mise à jour avec retour arrière automatique.
 - Publication : image multi-architecture signée (cosign), archive de version, sommes de contrôle.
 
-[Non publié]: https://github.com/sebvtl728/CRMTMS/compare/v0.7.1...HEAD
+[Non publié]: https://github.com/sebvtl728/CRMTMS/compare/v0.8.0...HEAD
+[0.8.0]: https://github.com/sebvtl728/CRMTMS/compare/v0.7.1...v0.8.0
 [0.7.1]: https://github.com/sebvtl728/CRMTMS/compare/v0.7.0...v0.7.1
 [0.7.0]: https://github.com/sebvtl728/CRMTMS/compare/v0.6.2...v0.7.0
 [0.6.2]: https://github.com/sebvtl728/CRMTMS/compare/v0.6.1...v0.6.2

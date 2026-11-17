@@ -143,7 +143,8 @@ it('lets a commercial read the catalogue but not change it', function () {
 it('grants catalogue.view to every crm role and catalogue.manage to admin and direction', function () {
     expect(Permissions::all())->toContain('catalogue.view', 'catalogue.manage');
 
-    foreach (Role::cases() as $role) {
+    // The Formateur reaches his séances only (FormateurRoleTest).
+    foreach (array_filter(Role::cases(), fn (Role $r) => $r !== Role::Formateur) as $role) {
         $defaults = Permissions::defaultsFor($role);
         expect($defaults)->toContain('catalogue.view');
         expect(in_array('catalogue.manage', $defaults, true))->toBe(in_array($role, [Role::AdminOrganisme, Role::Direction], true));

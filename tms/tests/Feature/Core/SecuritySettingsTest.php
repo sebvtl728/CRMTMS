@@ -139,7 +139,7 @@ it('shares an explicit whitelist of user fields and the permission names', funct
 
 it('shares only the permissions the user holds', function () {
     $this->actingAs(direction(twoFactor: true))->get('/dashboard')->assertInertia(fn (Assert $page) => $page
-        ->where('auth.permissions', fn ($permissions) => collect($permissions)->sort()->values()->all() === ['audit.view', 'catalogue.delete', 'catalogue.manage', 'catalogue.view', 'crm.activities.team', 'crm.activities.view', 'crm.export', 'crm.fiches.view', 'crm.gdpr', 'crm.opportunities.view', 'crm.quotes.view', 'crm.revenue.manage', 'crm.revenue.view', 'exports.run', 'sessions.dossiers.view', 'sessions.sessions.view']));
+        ->where('auth.permissions', fn ($permissions) => collect($permissions)->sort()->values()->all() === ['audit.view', 'catalogue.delete', 'catalogue.manage', 'catalogue.view', 'crm.activities.team', 'crm.activities.view', 'crm.export', 'crm.fiches.view', 'crm.gdpr', 'crm.opportunities.view', 'crm.quotes.view', 'crm.revenue.manage', 'crm.revenue.view', 'exports.run', 'sessions.attendance.close', 'sessions.attendance.manage', 'sessions.dossiers.view', 'sessions.rooms.manage', 'sessions.seances.manage', 'sessions.seances.view', 'sessions.sessions.view', 'sessions.trainers.manage']));
 });
 
 it('lets a 300-minute setting outlive the 120-minute session default', function () {

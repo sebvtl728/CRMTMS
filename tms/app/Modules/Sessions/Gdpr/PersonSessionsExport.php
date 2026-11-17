@@ -5,10 +5,14 @@ namespace App\Modules\Sessions\Gdpr;
 use App\Modules\Catalogue\Trainings;
 use App\Modules\Core\References\ReferenceItem;
 use App\Modules\Sessions\Amounts;
+use App\Modules\Sessions\Attendance\Attendance;
+use App\Modules\Sessions\Attendance\MonthlyHour;
 use App\Modules\Sessions\Dossiers\Dossier;
 use App\Modules\Sessions\Dossiers\DossierLine;
 use App\Modules\Sessions\Enrolments\Enrolment;
 use App\Modules\Sessions\Fundings\Funding;
+use App\Modules\Sessions\Modules\SessionModule;
+use App\Modules\Sessions\Planning\Seance;
 use App\Modules\Sessions\Sessions\TrainingSession;
 
 /**
@@ -16,14 +20,15 @@ use App\Modules\Sessions\Sessions\TrainingSession;
  * enrolments (session, training, dates, state, abandon and its reason, BPF
  * category, share of the price, adaptation needs, notes), the dossiers she
  * is the contractant (particulier, with lines and price) or the contact of,
- * and the fundings she pays (type, amount, state, agreement, notes). Complete: trashed sessions and dossiers
+ * the fundings she pays (type, amount, state, agreement, notes), her attendance
+ * (séance, state, minutes, reason) and her monthly hours (0.8.0). Complete: trashed sessions and dossiers
  * included (flagged), whatever the viewer's scopes (the export is reserved
  * to users who see the whole organisme).
  */
 final class PersonSessionsExport
 {
     /**
-     * @return array{inscriptions: list<array<string, mixed>>, dossiers: list<array<string, mixed>>, financements: list<array<string, mixed>>}
+     * @return array{presences: list<array<string, mixed>>, heures_mensuelles: list<array<string, mixed>>, inscriptions: list<array<string, mixed>>, dossiers: list<array<string, mixed>>, financements: list<array<string, mixed>>}
      */
     public static function for(string $personId): array
     {
@@ -41,7 +46,32 @@ final class PersonSessionsExport
             ->merge($enrolments->pluck('bpf_category_id'))->merge($fundings->pluck('funding_type_id'))
             ->filter()->unique()->values()->all())->pluck('label', 'id');
 
+        $enrolmentIds = $enrolments->pluck('id')->all();
+        $attendances = Attendance::query()->whereIn('enrolment_id', $enrolmentIds)->get();
+        $seances = Seance::withTrashed()->whereKey($attendances->pluck('seance_id')->unique()->values()->all())->get()->keyBy('id');
+        $hours = MonthlyHour::query()->whereIn('enrolment_id', $enrolmentIds)->orderBy('month')->get();
+        $modules = SessionModule::withTrashed()->whereKey($seances->pluck('session_module_id')->merge($hours->pluck('session_module_id'))->unique()->values()->all())->pluck('title', 'id');
+        $sessionOf = $enrolments->pluck('session', 'id');
+
         return [
+            'presences' => $attendances->sortBy(fn (Attendance $a) => $seances[$a->seance_id]->date->toDateString().$seances[$a->seance_id]->starts_at.$a->id)
+                ->map(fn (Attendance $a): array => [
+                    'session' => $sessionOf[$a->enrolment_id]?->number,
+                    'module' => $modules[$seances[$a->seance_id]->session_module_id] ?? null,
+                    'date' => $seances[$a->seance_id]->date->toDateString(),
+                    'debut' => $seances[$a->seance_id]->start(),
+                    'fin' => $seances[$a->seance_id]->end(),
+                    'statut' => Attendance::label($a->status),
+                    'minutes' => $a->minutes,
+                    'motif' => $a->reason,
+                    'seance_annulee' => $seances[$a->seance_id]->isCancelled(),
+                ])->values()->all(),
+            'heures_mensuelles' => $hours->map(fn (MonthlyHour $h): array => [
+                'session' => $sessionOf[$h->enrolment_id]?->number,
+                'module' => $modules[$h->session_module_id] ?? null,
+                'mois' => $h->monthKey(),
+                'minutes' => $h->minutes,
+            ])->values()->all(),
             'inscriptions' => $enrolments->map(function (Enrolment $e) use ($trainings, $labels): array {
                 /** @var TrainingSession|null $session */
                 $session = $e->session;

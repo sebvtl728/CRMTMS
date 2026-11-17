@@ -68,7 +68,7 @@ final class Permissions
      * Permissions of the modules (crm.*, ...), registered by their service
      * provider so that Core never depends on a module.
      *
-     * @var array<string, array{permissions: list<string>, defaults: callable(Role): list<string>, labels: array<string, array{0: string, 1: string}>, group: string, scoped: list<string>, defaultScopes: (callable(Role): array<string, AccessScope>)|null}>
+     * @var array<string, array{permissions: list<string>, defaults: callable(Role): list<string>, labels: array<string, array{0: string, 1: string}>, group: string, scoped: list<string>, defaultScopes: (callable(Role): array<string, AccessScope>)|null, extraScopes: array<string, list<AccessScope>>}>
      */
     private static array $modules = [];
 
@@ -85,10 +85,11 @@ final class Permissions
      * @param  array<string, array{0: string, 1: string}>  $labels  permission => [label, explanation]
      * @param  list<string>  $scoped  permissions that carry a scope (own / das / all)
      * @param  (callable(Role): array<string, AccessScope>)|null  $defaultScopesFor  default scope of the scoped permissions, per role (all when missing)
+     * @param  array<string, list<AccessScope>>  $extraScopes  scoped permission => scopes offered on top of own / das / all (AccessScope::Trainer)
      */
-    public static function registerModule(string $module, array $permissions, callable $defaultsFor, array $labels = [], string $group = '', array $scoped = [], ?callable $defaultScopesFor = null): void
+    public static function registerModule(string $module, array $permissions, callable $defaultsFor, array $labels = [], string $group = '', array $scoped = [], ?callable $defaultScopesFor = null, array $extraScopes = []): void
     {
-        self::$modules[$module] = ['permissions' => $permissions, 'defaults' => $defaultsFor, 'labels' => $labels, 'group' => $group, 'scoped' => $scoped, 'defaultScopes' => $defaultScopesFor];
+        self::$modules[$module] = ['permissions' => $permissions, 'defaults' => $defaultsFor, 'labels' => $labels, 'group' => $group, 'scoped' => $scoped, 'defaultScopes' => $defaultScopesFor, 'extraScopes' => $extraScopes];
     }
 
     /**
@@ -108,6 +109,37 @@ final class Permissions
         }
 
         return false;
+    }
+
+    /**
+     * The scopes a permission may carry: none for an unscoped one; own, das
+     * and all for a scoped one, plus those its module declared for it
+     * (« Ses séances » for the séances and attendance of the Sessions
+     * module). The « Rôles et droits » screen offers these only, and
+     * Scopes::of never applies another one.
+     *
+     * @return list<AccessScope>
+     */
+    public static function scopesFor(string $permission): array
+    {
+        if (! self::isScoped($permission)) {
+            return [];
+        }
+        $scopes = [AccessScope::Own, AccessScope::Das, AccessScope::All];
+        foreach (self::$modules as $module) {
+            foreach ($module['extraScopes'][$permission] ?? [] as $extra) {
+                if (! in_array($extra, $scopes, true)) {
+                    $scopes[] = $extra;
+                }
+            }
+        }
+
+        return $scopes;
+    }
+
+    public static function allowsScope(string $permission, AccessScope $scope): bool
+    {
+        return in_array($scope, self::scopesFor($permission), true);
     }
 
     /**

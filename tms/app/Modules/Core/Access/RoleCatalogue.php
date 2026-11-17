@@ -12,7 +12,7 @@ use Illuminate\Validation\ValidationException;
 use Spatie\Permission\PermissionRegistrar;
 
 /**
- * The roles of the current organisme: the six system roles (never deleted,
+ * The roles of the current organisme: the seven system roles (never deleted,
  * the administrator's never changed) and the custom roles created by the
  * administrator. Every change is journaled (labels and flags only: no
  * personal data) and drops the organisme's cached permissions.

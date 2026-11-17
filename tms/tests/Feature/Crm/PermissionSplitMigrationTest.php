@@ -59,6 +59,8 @@ const MATRIX_042 = [
     'charge_relations' => ['catalogue.view', 'crm.create', 'crm.delete', 'crm.export', 'crm.import', 'crm.merge', 'crm.update', 'crm.view'],
     'assistant' => ['catalogue.view', 'crm.create', 'crm.update', 'crm.view'],
     'responsable_das' => ['catalogue.view', 'crm.export', 'crm.view'],
+    // 0.8.0: no CRM nor catalogue right.
+    'formateur' => [],
 ];
 
 it('migration maps every default role', function () {

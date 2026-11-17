@@ -7,15 +7,18 @@ import {
     BookOpen,
     Building2,
     CalendarCheck,
+    CalendarClock,
     CalendarDays,
     CalendarRange,
-    ClipboardPen,
     ClipboardList,
+    ClipboardPen,
     Columns3,
     Contact,
+    DoorOpen,
     Euro,
     Factory,
     FileText,
+    GraduationCap,
     Handshake,
     History,
     KeyRound,
@@ -53,7 +56,11 @@ const commercialNavItems: (NavItem & { permission: string })[] = [
 const trainingNavItems: (NavItem & { permission: string })[] = [
     { title: 'Dossiers', url: '/dossiers', icon: ClipboardList, permission: 'sessions.dossiers.view' },
     { title: 'Sessions', url: '/sessions', icon: CalendarDays, permission: 'sessions.sessions.view' },
+    { title: 'Planning des séances', url: '/sessions/planning', icon: CalendarRange, permission: 'sessions.seances.view' },
+    { title: 'Formateurs', url: '/trainers', icon: GraduationCap, permission: 'sessions.trainers.manage' },
 ];
+
+const myPlanningItem: NavItem = { title: 'Mon planning', url: '/mon-planning', icon: CalendarClock };
 
 // Each entry is shown only when the user holds the permission (the server stays the authority).
 const adminNavItems: (NavItem & { permission: string })[] = [
@@ -65,6 +72,7 @@ const adminNavItems: (NavItem & { permission: string })[] = [
     { title: "Journal d'audit", url: '/admin/audit', icon: History, permission: 'audit.view' },
     { title: 'Sécurité', url: '/admin/security', icon: ShieldCheck, permission: 'settings.manage' },
     { title: "Règle d'abandon", url: '/admin/abandon-rule', icon: UserMinus, permission: 'settings.manage' },
+    { title: 'Salles et fermetures', url: '/admin/sessions-settings', icon: DoorOpen, permission: 'sessions.rooms.manage' },
     { title: "Modèles d'e-mails", url: '/admin/mail-templates', icon: Mail, permission: 'settings.manage' },
 ];
 
@@ -73,7 +81,10 @@ export function AppSidebar() {
     const commercialItems = commercialNavItems
         .filter((item) => auth.permissions.includes(item.permission))
         .map((item) => (item.url === '/crm/todo' ? { ...item, badge: todo_count } : item));
-    const trainingItems = trainingNavItems.filter((item) => auth.permissions.includes(item.permission));
+    const trainingItems: NavItem[] = [
+        ...(auth.my_planning ? [myPlanningItem] : []),
+        ...trainingNavItems.filter((item) => auth.permissions.includes(item.permission)),
+    ];
     const adminItems = adminNavItems.filter((item) => auth.permissions.includes(item.permission));
 
     return (
@@ -82,7 +93,7 @@ export function AppSidebar() {
                 <SidebarMenu>
                     <SidebarMenuItem>
                         <SidebarMenuButton size="lg" asChild>
-                            <Link href="/dashboard" prefetch>
+                            <Link href={auth.trainer_only ? '/mon-planning' : '/dashboard'} prefetch>
                                 <AppLogo />
                             </Link>
                         </SidebarMenuButton>
@@ -91,10 +102,17 @@ export function AppSidebar() {
             </SidebarHeader>
 
             <SidebarContent>
-                <NavMain items={homeNavItems} label="Navigation" />
-                {commercialItems.length > 0 && <NavMain items={commercialItems} label="Commercial" />}
-                {trainingItems.length > 0 && <NavMain items={trainingItems} label="Formation" />}
-                {adminItems.length > 0 && <NavMain items={adminItems} label="Administration" />}
+                {auth.trainer_only ? (
+                    // A trainer and nothing else: his planning only.
+                    <NavMain items={[myPlanningItem]} label="Navigation" />
+                ) : (
+                    <>
+                        <NavMain items={homeNavItems} label="Navigation" />
+                        {commercialItems.length > 0 && <NavMain items={commercialItems} label="Commercial" />}
+                        {trainingItems.length > 0 && <NavMain items={trainingItems} label="Formation" />}
+                        {adminItems.length > 0 && <NavMain items={adminItems} label="Administration" />}
+                    </>
+                )}
             </SidebarContent>
 
             <SidebarFooter>

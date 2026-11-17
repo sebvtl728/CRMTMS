@@ -9,13 +9,20 @@ use App\Modules\Core\Users\User;
 use App\Modules\Crm\Public\FicheHistory;
 use App\Modules\Crm\Public\Fiches;
 use App\Modules\Sessions\Amounts;
+use App\Modules\Sessions\Attendance\Attendance;
+use App\Modules\Sessions\Attendance\AttendanceClosure;
+use App\Modules\Sessions\Attendance\MonthlyHour;
+use App\Modules\Sessions\Attendance\Months;
 use App\Modules\Sessions\Dossiers\Dossier;
 use App\Modules\Sessions\Dossiers\DossierStatus;
 use App\Modules\Sessions\Enrolments\Enrolment;
 use App\Modules\Sessions\Enrolments\EnrolmentStatus;
 use App\Modules\Sessions\Fundings\Funding;
 use App\Modules\Sessions\Fundings\FundingStatus;
+use App\Modules\Sessions\Modules\SessionModule;
+use App\Modules\Sessions\Modules\SessionModules;
 use App\Modules\Sessions\Permissions;
+use App\Modules\Sessions\Planning\Seance;
 use App\Modules\Sessions\Sessions\SessionRows;
 use App\Modules\Sessions\Sessions\TrainingSession;
 use App\Modules\Sessions\SessionsVisibility;
@@ -168,6 +175,8 @@ final class SessionsHistory
         }));
 
         $entries = $entries->concat(self::fundingEntries($dossier));
+        $enrolments = Enrolment::query()->where('dossier_id', $dossier->id)->get(['id', 'person_id', 'training_session_id']);
+        $entries = $entries->concat(self::attendanceEntries($enrolments))->concat(self::closureEntries($enrolments));
 
         return $entries->sort(fn (array $a, array $b) => strcmp($b['at']->utc()->format('Y-m-d H:i:s.u'), $a['at']->utc()->format('Y-m-d H:i:s.u'))
             ?: strcmp($b['type'], $a['type']) ?: strcmp((string) $b['id'], (string) $a['id']))
@@ -179,6 +188,133 @@ final class SessionsHistory
                 'body' => $e['body'],
                 'author' => $e['author'],
             ])->values()->all();
+    }
+
+    /**
+     * Attendance and monthly hours of the trainees of the dossier (0.8.0):
+     * entered, changed (the state after each change, rebuilt from the
+     * journal), « à revoir », cleared; ids and minutes only, never a reason.
+     *
+     * @param  Collection<int, Enrolment>  $enrolments
+     * @return list<array{type: string, at: CarbonImmutable, id: string, title: string, body: string|null, author: string|null}>
+     */
+    private static function attendanceEntries(Collection $enrolments): array
+    {
+        $ids = $enrolments->pluck('id')->all();
+        if ($ids === []) {
+            return [];
+        }
+        $names = app(Fiches::class)->personLabels($enrolments->pluck('person_id')->map(fn ($id) => (string) $id)->unique()->values()->all());
+        $nameOf = $enrolments->mapWithKeys(fn (Enrolment $e) => [$e->id => $names[$e->person_id]['label'] ?? 'Stagiaire']);
+        $entries = [];
+
+        // Attendance: rows of the trainees, removed ones named by the journal of their creation.
+        $attendanceIds = array_values(array_unique([
+            ...Attendance::query()->whereIn('enrolment_id', $ids)->pluck('id')->all(),
+            ...AuditLog::query()->where('auditable_type', Attendance::MORPH_ALIAS)->where('event', 'created')
+                ->whereIn('new_values->enrolment_id', $ids)->pluck('auditable_id')->filter()->all(),
+        ]));
+        $logs = self::chronological(Attendance::MORPH_ALIAS, $attendanceIds);
+        $seanceIds = $logs->map(fn (AuditLog $l) => $l->new_values['seance_id'] ?? $l->old_values['seance_id'] ?? null)->filter(fn ($v) => is_string($v))->unique()->values()->all();
+        $seances = Seance::withTrashed()->whereKey($seanceIds)->get(['id', 'date', 'status'])->keyBy('id');
+        $state = [];
+        foreach ($logs as $log) {
+            $state[$log->auditable_id] = [...($state[$log->auditable_id] ?? []), ...($log->old_values ?? []), ...($log->new_values ?? [])];
+            $current = $state[$log->auditable_id];
+            $seance = $seances[$current['seance_id'] ?? ''] ?? null;
+            $name = $nameOf[$current['enrolment_id'] ?? ''] ?? null;
+            if ($seance === null || $name === null) {
+                continue;
+            }
+            $what = "{$name} — Présence du ".$seance->date->format('d/m/Y');
+            $value = Attendance::label((string) ($current['status'] ?? '')).' ('.SessionModules::label((int) ($current['minutes'] ?? 0)).')';
+            $new = $log->new_values ?? [];
+            $title = match (true) {
+                $log->event === 'created' => "{$what} : {$value}",
+                $log->event === 'deleted' => "{$what} effacée",
+                $seance->isCancelled() && ($new['minutes'] ?? null) === 0 => "{$what} : séance annulée, 0 h",
+                ($new['needs_review'] ?? false) === true => "{$what} à revoir (séance modifiée) : {$value}",
+                default => "{$what} modifiée : {$value}",
+            };
+            $entries[] = ['type' => 'attendance', 'at' => CarbonImmutable::instance($log->created_at), 'id' => $log->id, 'title' => $title, 'body' => null, 'author' => $log->user?->name];
+        }
+
+        // Monthly hours, the same way.
+        $hourIds = array_values(array_unique([
+            ...MonthlyHour::query()->whereIn('enrolment_id', $ids)->pluck('id')->all(),
+            ...AuditLog::query()->where('auditable_type', MonthlyHour::MORPH_ALIAS)->where('event', 'created')
+                ->whereIn('new_values->enrolment_id', $ids)->pluck('auditable_id')->filter()->all(),
+        ]));
+        $logs = self::chronological(MonthlyHour::MORPH_ALIAS, $hourIds);
+        $moduleIds = $logs->map(fn (AuditLog $l) => $l->new_values['session_module_id'] ?? $l->old_values['session_module_id'] ?? null)->filter(fn ($v) => is_string($v))->unique()->values()->all();
+        $modules = SessionModule::withTrashed()->whereKey($moduleIds)->pluck('title', 'id');
+        $state = [];
+        foreach ($logs as $log) {
+            $state[$log->auditable_id] = [...($state[$log->auditable_id] ?? []), ...($log->old_values ?? []), ...($log->new_values ?? [])];
+            $current = $state[$log->auditable_id];
+            $name = $nameOf[$current['enrolment_id'] ?? ''] ?? null;
+            if ($name === null || ! is_string($current['month'] ?? null)) {
+                continue;
+            }
+            $what = "{$name} — Heures de ".Months::label(substr($current['month'], 0, 7)).' ('.($modules[$current['session_module_id'] ?? ''] ?? 'module').')';
+            $value = SessionModules::label((int) ($current['minutes'] ?? 0));
+            $title = match ($log->event) {
+                'created' => "{$what} : {$value}",
+                'deleted' => "{$what} effacées",
+                default => "{$what} modifiées : {$value}",
+            };
+            $entries[] = ['type' => 'monthly_hours', 'at' => CarbonImmutable::instance($log->created_at), 'id' => $log->id, 'title' => $title, 'body' => null, 'author' => $log->user?->name];
+        }
+
+        return $entries;
+    }
+
+    /**
+     * Months closed and reopened on the sessions of the trainees of the
+     * dossier (the reason of a reopening never: personal).
+     *
+     * @param  Collection<int, Enrolment>  $enrolments
+     * @return list<array{type: string, at: CarbonImmutable, id: string, title: string, body: string|null, author: string|null}>
+     */
+    private static function closureEntries(Collection $enrolments): array
+    {
+        $sessionIds = $enrolments->pluck('training_session_id')->unique()->values()->all();
+        if ($sessionIds === []) {
+            return [];
+        }
+        $closures = AttendanceClosure::query()->whereIn('training_session_id', $sessionIds)->get(['id', 'training_session_id', 'month'])->keyBy('id');
+        $numbers = TrainingSession::withTrashed()->whereKey($sessionIds)->pluck('number', 'id');
+        $logs = self::chronological(AttendanceClosure::MORPH_ALIAS, $closures->keys()->all());
+
+        return $logs->map(function (AuditLog $log) use ($closures, $numbers): ?array {
+            $closure = $closures[$log->auditable_id] ?? null;
+            $new = $log->new_values ?? [];
+            if ($closure === null || ! array_key_exists('closed_at', $new)) {
+                return null;
+            }
+            $what = 'Présences de '.Months::label($closure->month).' — session '.($numbers[$closure->training_session_id] ?? '');
+
+            return [
+                'type' => 'closure',
+                'at' => CarbonImmutable::instance($log->created_at),
+                'id' => $log->id,
+                'title' => $new['closed_at'] === null ? "{$what} : mois rouvert" : "{$what} : mois clôturé",
+                'body' => null,
+                'author' => $log->user?->name,
+            ];
+        })->filter()->values()->all();
+    }
+
+    /**
+     * Journal entries of $type for the ids, oldest first.
+     *
+     * @param  list<string>  $ids
+     * @return Collection<int, AuditLog>
+     */
+    private static function chronological(string $type, array $ids): Collection
+    {
+        return $ids === [] ? new Collection : AuditLog::query()->with('user:id,name')->where('auditable_type', $type)->whereIn('auditable_id', $ids)
+            ->whereIn('event', ['created', 'updated', 'deleted'])->orderBy('created_at')->orderBy('id')->get();
     }
 
     /**

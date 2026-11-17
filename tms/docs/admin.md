@@ -65,7 +65,7 @@ Pour chaque société : raison sociale, forme juridique, capital (montant et « 
 
 Inviter : **Inviter un utilisateur** → nom, adresse e-mail, rôle → **Envoyer l'invitation**. Un e-mail contenant le lien d'activation (usage unique, 24 h) est envoyé par le connecteur SMTP de l'organisme (voir *Connecteurs*), à défaut par la messagerie de l'instance ; l'invitation apparaît dans « Invitations en attente » avec sa date d'expiration. Si l'e-mail ne peut pas partir (serveur refusé, erreur SMTP) ou si aucune messagerie n'est configurée, l'invitation est conservée et le lien d'activation s'affiche une seule fois à l'écran, avec un bouton « Copier le lien » : transmettez-le vous-même à la personne invitée (journal : « Échec d'envoi de l'invitation », avec la raison). Il est impossible d'inviter une adresse qui a déjà un compte actif dans l'organisme. L'envoi est consigné dans le journal d'audit (« Invitation envoyée »).
 
-Rôles disponibles : les six rôles système (Administrateur de l'organisme, Direction, Commercial, Chargé de relations, Assistant, Responsable DAS) et les rôles personnalisés de l'organisme (voir § 10). Les changements de rôle sont consignés (« Changement de rôle »).
+Rôles disponibles : les sept rôles système (Administrateur de l'organisme, Direction, Commercial, Chargé de relations, Assistant, Responsable DAS, Formateur) et les rôles personnalisés de l'organisme (voir § 10). Les changements de rôle sont consignés (« Changement de rôle »).
 
 Autres actions de la liste :
 
@@ -183,6 +183,18 @@ Les dossiers et sessions (lot 2a) ont deux domaines de plus, eux aussi à périm
 
 Inscrire un stagiaire depuis un dossier demande les deux : modifier la session et consulter le dossier. « Ses fiches » = responsable ou créateur du dossier ou de la session ; « Ses DAS » = DAS du dossier, DAS de la formation de la session.
 
+Le planning (0.8.0) ajoute les thèmes *Planning et présences* (droits à périmètre) et *Formateurs et salles* (organisme entier) :
+
+| Droit | Ce qu'il permet |
+|---|---|
+| `sessions.seances.view` / `.manage` | Voir le planning des séances, leurs formateurs et leurs salles ; créer, déplacer, annuler, supprimer des séances, générer les séances d'un module |
+| `sessions.attendance.manage` | Saisir les présences des séances et les heures réalisées par mois |
+| `sessions.attendance.close` | Clôturer un mois de présences d'une session et le rouvrir (motif obligatoire) |
+| `sessions.trainers.manage` | Menu **Formateurs** (droit à périmètre : « Ses fiches » = formateurs créés par l'utilisateur ou liés à son compte ; « Ses DAS » = formateurs d'un DAS suivi **ou sans DAS** ; tout l'organisme ; Responsable de DAS : Ses DAS par défaut) : déclarer des formateurs, leur statut, leurs DAS, leurs indisponibilités, leur compte ; bloc « Formateur » des fiches Personne |
+| `sessions.rooms.manage` | Administration › **Salles et fermetures** |
+
+Les séances et présences suivent le périmètre de leur session (« Ses fiches », « Ses DAS »). « Consulter les séances » et « Saisir les présences » proposent aussi le périmètre **Ses séances** : les séances dont l'utilisateur est le formateur (fiche formateur liée à son compte), et les sessions qui les portent, en lecture. Ce périmètre n'est proposé, ni appliqué, pour aucun autre droit.
+
 Les droits d'**administration** (`users.manage`, `roles.manage`, `companies.manage`, `references.manage`, `connectors.manage`, `audit.view`, `settings.manage`, `exports.run`) sont inchangés.
 
 ### Périmètres
@@ -192,6 +204,7 @@ Les droits **Consulter**, **Créer et modifier**, **Supprimer** des quatre domai
 - **Ses fiches** : uniquement ce dont l'utilisateur est le **responsable** ou le **créateur** (fiche, opportunité ou action). Un devis est « à soi » quand son opportunité l'est ou qu'il en est le créateur. Une fiche sans responsable créée par un collègue n'est pas visible ; celle qu'il vient de créer lui-même l'est.
 - **Ses DAS** : ce qui touche les DAS qu'il suit (**DAS suivis** de la page Utilisateurs). Sans DAS suivi, rien n'est visible. Pour les actions, « Ses DAS » couvre aussi celles dont il est le **responsable** (consulter et modifier, jamais supprimer), même sur une fiche hors de ses DAS.
 - **Tout l'organisme** : tout.
+- **Ses séances** (« Consulter les séances » et « Saisir les présences » seulement) : les séances dont il est le formateur.
 
 Le périmètre d'un droit sans réglage enregistré vaut « Tout l'organisme ». Les périmètres de consultation et de modification sont indépendants : avec « Consulter : Ses DAS » et « Modifier : Tout l'organisme », une fiche hors de ses DAS reste introuvable (404), même par son adresse directe. Créer un devis (ou une nouvelle version) exige de voir son opportunité ; modifier ou supprimer un devis existant suit les périmètres des droits « Devis » eux-mêmes. Un droit détenu par une permission accordée directement à un utilisateur (hors rôle, sans écran pour le faire) vaut « Tout l'organisme ».
 
@@ -209,8 +222,13 @@ Un nouvel organisme reçoit ces droits (identiques au comportement de la version
 | Commercial, Chargé de relations | Consulter, modifier, supprimer, « Tout » | Chiffre d'affaires : consulter « Ses fiches » ; fusion, import, export, consulter le catalogue |
 | Assistant | Consulter, modifier, « Tout » ; supprimer des actions (`crm.activities.delete`) | Consulter le catalogue |
 | Responsable DAS | Consulter, « Ses DAS » | Chiffre d'affaires : consulter « Ses DAS » ; export, consulter le catalogue |
+| Formateur | Aucun | Aucun droit CRM, devis, catalogue, export, dossier ni financement |
 
 Dossiers et sessions (`tms:permissions:sync` les accorde une fois aux rôles existants lors de la mise à jour) : l'administrateur a tous les droits ; la direction consulte ; le commercial, le chargé de relations et l'assistant consultent, créent et modifient ; le Responsable DAS consulte « Ses DAS ».
+
+Planning (0.8.0, accordé une fois de la même façon, rôle Formateur créé dans chaque organisme) : l'administrateur et la direction ont les six droits ; le commercial, le chargé de relations et l'assistant ont tout sauf « Clôturer les présences » ; le Responsable DAS consulte les séances et gère les formateurs (`sessions.trainers.manage`, droit à périmètre) sur « Ses DAS » ; le **Formateur** a « Consulter les séances » et « Saisir les présences » sur « Ses séances », rien d'autre. Un utilisateur qui n'a que des droits « Ses séances » voit un menu réduit à **Mon planning** (l'accueil l'y renvoie).
+
+**Mise à jour vers la 0.8.0** : le septième rôle système « Formateur » est créé dans chaque organisme. Si un rôle **personnalisé** s'appelle déjà « Formateur », deux rôles porteront ce libellé : renommez le rôle personnalisé (Rôles et droits › Renommer).
 
 Le comportement de la 0.4 est conservé : le Commercial modifie toutes les fiches. Pour qu'il ne modifie que les siennes, réglez le périmètre de « Créer et modifier » sur « Ses fiches ».
 
@@ -241,12 +259,12 @@ Administration › **Rôles et droits** (droit `roles.manage`, accordé au seul 
 
 **Nouveau rôle** crée un rôle propre à l'organisme : libellé (unique, 80 caractères au plus), rôle dont reprendre les droits et périmètres (ou aucun) et double authentification (cochée par défaut). Le rôle apparaît ensuite dans la liste des rôles des invitations et du changement de rôle. Un rôle personnalisé se renomme et se supprime.
 
-- **Suppression** : impossible tant qu'un utilisateur (actif **ou** désactivé) porte le rôle ou qu'une invitation non expirée le vise ; réattribuez-les d'abord. Les six rôles système (Administrateur de l'organisme, Direction, Commercial, Chargé de relations, Assistant, Responsable DAS) ne se suppriment jamais ; leurs libellés se renomment.
+- **Suppression** : impossible tant qu'un utilisateur (actif **ou** désactivé) porte le rôle ou qu'une invitation non expirée le vise ; réattribuez-les d'abord. Les sept rôles système (Administrateur de l'organisme, Direction, Commercial, Chargé de relations, Assistant, Responsable DAS, Formateur) ne se suppriment jamais ; leurs libellés se renomment.
 - **DAS suivis** : un utilisateur dont un droit a le périmètre « Ses DAS » se voit attribuer ses DAS suivis sur la page Utilisateurs, quel que soit son rôle ; sans DAS suivi, il ne voit aucune fiche pour ce droit. Un DAS suivi ne peut pas être supprimé des référentiels (désactivez-le).
 
 ### Double authentification par rôle
 
-La double authentification est **toujours obligatoire** pour l'Administrateur et la Direction (interrupteur verrouillé). Pour les autres rôles, système ou personnalisés, l'interrupteur est libre. Quand elle devient obligatoire pour un rôle, ses utilisateurs déjà connectés sont envoyés vers l'activation à leur prochaine page, sans attendre une nouvelle connexion.
+La double authentification est **toujours obligatoire** pour l'Administrateur et la Direction (interrupteur verrouillé). Pour les autres rôles, système ou personnalisés, l'interrupteur est libre ; elle est désactivée par défaut pour le Formateur. Quand elle devient obligatoire pour un rôle, ses utilisateurs déjà connectés sont envoyés vers l'activation à leur prochaine page, sans attendre une nouvelle connexion.
 
 ### Règles qui ne changent pas
 
@@ -286,7 +304,7 @@ Les imports de fichiers (CRM) s'exécutent en arrière-plan.
 
 - **Récapitulatif quotidien** : chaque jour à **7 h 30** (heure de Paris), `tms:crm:daily-digest` envoie à chaque utilisateur qui l'a demandé (**Paramètres › Profil › Recevoir le récapitulatif quotidien**, désactivé par défaut) la liste de ses actions en retard et du jour. Aucun e-mail aux comptes désactivés, sans droit « Consulter les actions » (`crm.activities.view`), ni les jours sans action. L'envoi passe par la messagerie de l'organisme (connecteur SMTP).
 - **Envoi vers Outlook** : file par défaut, en arrière-plan, quelques instants après chaque modification d'une action ; une indisponibilité de Microsoft est retentée pendant 24 h (journal d'exécution du connecteur, sans donnée personnelle).
-- **Lien iCal** : l'adresse est privée (jeton aléatoire dont seule l'empreinte est stockée) et limitée en nombre d'appels ; un utilisateur désactivé ou sans « Consulter les actions » n'obtient plus rien. Révoquer un lien : l'utilisateur le fait lui-même dans **Mon agenda** ; désactiver son compte coupe aussi le flux.
+- **Lien iCal** : l'adresse est privée (jeton aléatoire dont seule l'empreinte est stockée) et limitée en nombre d'appels ; un utilisateur désactivé, ou qui n'a ni « Consulter les actions » ni séance à publier (formateur lié, responsable de session avec « Consulter les séances »), n'obtient plus rien. Révoquer un lien : l'utilisateur le fait lui-même dans **Mon agenda** ; désactiver son compte coupe aussi le flux.
 - Ces traitements reposent, comme les autres, sur le **planificateur** et le *worker* (voir § 11).
 
 ## 14. Devis : envoi, expiration et archives
@@ -306,3 +324,12 @@ Guide utilisateur : `sessions.md`.
 - **Export RGPD d'une personne** : il contient aussi ses inscriptions et ses dossiers ; toujours complet, il exige désormais, en plus des quatre droits « Consulter » du CRM, « Consulter les dossiers » et « Consulter les sessions » sur « Tout l'organisme ».
 - **Corbeille et fusion** : une personne inscrite peut aller à la corbeille (ses inscriptions restent et reviennent avec elle) ; une fusion déplace sessions, dossiers, inscriptions et financements, et est refusée pour deux personnes inscrites sur la même session. L'annulation d'un import conserve les fiches qu'un dossier, une session, une inscription ou un financement nomme.
 - **Règle d'abandon** (Administration > Règle d'abandon, droit `settings.manage`) : *prorata seulement* (défaut) ou *prorata et dédit* de 1 à 100 %. Réglage `sessions.abandon_rule` de l'organisme (changement journalisé) ; un dossier pourra la remplacer par la sienne. Le lot 2a l'enregistre et l'affiche ; les heures suivies (2d) et la facturation (lot 3) l'appliqueront.
+
+## 16. Planning : salles, fermetures et formateurs (0.8.0)
+
+Guide utilisateur : `sessions.md` (§ 9).
+
+- **Salles et fermetures** (Administration › Salles et fermetures, droit `sessions.rooms.manage`, qui couvre les salles **et** les périodes de fermeture) : une salle a un nom (120 caractères), une capacité facultative (places), une adresse facultative et un état actif / inactif ; seules les salles actives sont proposées au planning. Une salle utilisée par des séances ne se supprime pas : désactivez-la. Une **période de fermeture** (intitulé, du … au …, bornes incluses) est exclue de la génération des séances ; les jours fériés nationaux le sont d'office.
+- **Formateurs** (menu Formation › Formateurs, droit `sessions.trainers.manage`) : voir `sessions.md`. Pour donner un accès au formateur, **Inviter à se connecter** sur sa page (visible avec `users.manage`) ouvre l'invitation habituelle préremplie (nom, e-mail, rôle Formateur). À l'activation du compte, il est lié automatiquement à la fiche formateur **si une seule** fiche formateur a cet e-mail (e-mail principal de la personne, sans tenir compte des majuscules) ; sinon, liez-le à la main (« Compte lié » sur la page du formateur). Un utilisateur qui reçoit le rôle Formateur (invitation ou changement de rôle) sans fiche formateur en reçoit une, créée avec une fiche Personne reprise par e-mail (une seule correspondance) ou nouvelle ; plusieurs formateurs avec son e-mail : rien n'est créé, liez à la main. Un compte n'est lié qu'à un formateur. Il n'y a pas de droit « indisponibilités » : un formateur lié à son compte saisit lui-même ses indisponibilités dans « Mon planning » ; les gestionnaires (`sessions.trainers.manage`) les saisissent pour tous.
+- **RGPD** : une personne formateur est conservée par l'annulation d'un import ; la fusion de deux personnes formateurs est refusée (supprimez d'abord l'une des deux fiches formateur) ; l'anonymisation efface les motifs de ses indisponibilités. Le motif d'une indisponibilité n'apparaît jamais en clair dans le journal d'audit.
+- **Feuilles d'émargement et scans signés** (voir `sessions.md` § 10) : le PDF est généré par le service Gotenberg de la pile (comme les devis), à partir du nom et du logo de la **société par défaut** ; les scans signés (PDF, PNG, JPEG, 10 Mo) sont rangés dans l'espace privé de l'organisme (`tenants/<id>/attendance_sheets/`), inclus dans les sauvegardes de l'espace de fichiers. Ils ne se suppriment que par un gestionnaire de présences ; l'anonymisation d'un stagiaire les garde (preuve collective) sauf sur une session individuelle, et garde aussi présences et heures (elle n'en efface que les motifs).

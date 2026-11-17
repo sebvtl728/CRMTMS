@@ -4,6 +4,7 @@ namespace App\Modules\Connectors\Calendar;
 
 use App\Http\Controllers\Controller;
 use App\Modules\Core\Users\User;
+use App\Modules\Crm\Permissions;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -17,7 +18,9 @@ class CalendarTokenController extends Controller
 {
     public function edit(Request $request): Response
     {
-        $token = CalendarToken::activeFor($this->user($request));
+        $user = $this->user($request);
+        $token = CalendarToken::activeFor($user);
+        $crm = $user->can(Permissions::ACTIVITIES_VIEW);
         $url = $request->session()->get('calendar_url');
 
         // The link is a page prop, kept in the browser history state: that
@@ -33,7 +36,10 @@ class CalendarTokenController extends Controller
             ],
             'url' => $url,
             'status' => $request->session()->get('status'),
-            'outlook' => OutlookController::props($this->user($request)),
+            // Outlook carries the CRM actions only: not offered without them (a trainer).
+            'crm' => $crm,
+            'sources' => CalendarSources::serves($user),
+            'outlook' => $crm ? OutlookController::props($user) : null,
             'outlook_error' => $request->session()->get('outlook_error'),
         ]);
         if ($url !== null) {

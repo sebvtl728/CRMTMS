@@ -32,7 +32,7 @@ function roleRights(RoleModel $role): array
     ];
 }
 
-function customRole(string $label = 'Formateur', bool $requires2fa = false, ?RoleModel $copyFrom = null): RoleModel
+function customRole(string $label = 'Coordinateur', bool $requires2fa = false, ?RoleModel $copyFrom = null): RoleModel
 {
     tenant();
 
@@ -44,20 +44,20 @@ it('admin creates a role copied from commercial', function () {
     $commercial = RoleModel::forSystem(Role::Commercial);
     app(RoleMatrix::class)->setScope($commercial, CrmPermissions::FICHES_VIEW, AccessScope::Own);
 
-    $this->post('/admin/roles', ['label' => '  Formateur ', 'requires_2fa' => true, 'copy_from' => $commercial->id])
-        ->assertRedirect()->assertSessionHasNoErrors()->assertSessionHas('status', 'Rôle « Formateur » créé.');
+    $this->post('/admin/roles', ['label' => '  Coordinateur ', 'requires_2fa' => true, 'copy_from' => $commercial->id])
+        ->assertRedirect()->assertSessionHasNoErrors()->assertSessionHas('status', 'Rôle « Coordinateur » créé.');
 
-    $role = RoleModel::query()->where('label', 'Formateur')->sole();
+    $role = RoleModel::query()->where('label', 'Coordinateur')->sole();
     expect($role->name)->toStartWith('custom_')
         ->and($role->system)->toBeFalse()
         ->and($role->requires2fa())->toBeTrue()
-        ->and($role->label())->toBe('Formateur')
+        ->and($role->label())->toBe('Coordinateur')
         ->and($role->systemRole())->toBeNull()
         ->and(roleRights($role))->toBe(roleRights($commercial))
         ->and(roleRights($role)['scopes'])->toHaveKey(CrmPermissions::FICHES_VIEW, 'own');
 
     $log = AuditLog::query()->where('event', 'roles.created')->sole();
-    expect($log->new_values)->toMatchArray(['label' => 'Formateur', 'requires_2fa' => true, 'copied_from' => 'commercial']);
+    expect($log->new_values)->toMatchArray(['label' => 'Coordinateur', 'requires_2fa' => true, 'copied_from' => 'commercial']);
 });
 
 it('creates an empty role by default and orders the roles system first', function () {
@@ -71,9 +71,9 @@ it('creates an empty role by default and orders the roles system first', functio
 });
 
 it('duplicate label refused ignoring case and accents', function () {
-    customRole('Formateur');
+    customRole('Coordinateur');
 
-    foreach (['formateur', 'Formatéur', ' FORMATEUR '] as $label) {
+    foreach (['coordinateur', 'Coordinatéur', ' COORDINATEUR '] as $label) {
         expect(fn () => customRole($label))->toThrow(ValidationException::class, 'Un rôle porte déjà ce libellé.');
     }
     // System labels are taken too, and the length is checked.
@@ -82,7 +82,7 @@ it('duplicate label refused ignoring case and accents', function () {
         ->and(fn () => customRole(str_repeat('a', 81)))->toThrow(ValidationException::class);
 
     $other = customRole('Tuteur');
-    expect(fn () => app(RoleCatalogue::class)->rename($other, 'FORMATÉUR'))->toThrow(ValidationException::class, 'Un rôle porte déjà ce libellé.');
+    expect(fn () => app(RoleCatalogue::class)->rename($other, 'COORDINATÉUR'))->toThrow(ValidationException::class, 'Un rôle porte déjà ce libellé.');
     app(RoleCatalogue::class)->rename($other, 'Tuteurs');
     expect($other->fresh()->label())->toBe('Tuteurs')
         ->and(AuditLog::query()->where('event', 'roles.renamed')->sole()->new_values)->toBe(['label' => 'Tuteurs']);
@@ -90,13 +90,13 @@ it('duplicate label refused ignoring case and accents', function () {
     // Another organisme may use the same label.
     $tenant = Tenant::factory()->create();
     PermissionSync::forTenant($tenant);
-    app(TenantContext::class)->run($tenant, fn () => app(RoleCatalogue::class)->create('Formateur', false));
-    expect(app(TenantContext::class)->run($tenant, fn () => RoleModel::query()->where('label', 'Formateur')->count()))->toBe(1);
+    app(TenantContext::class)->run($tenant, fn () => app(RoleCatalogue::class)->create('Coordinateur', false));
+    expect(app(TenantContext::class)->run($tenant, fn () => RoleModel::query()->where('label', 'Coordinateur')->count()))->toBe(1);
 });
 
 it('renames, changes 2fa and deletes a role over HTTP', function () {
     $this->actingAs(admin(twoFactor: true));
-    $role = customRole('Formateur');
+    $role = customRole('Coordinateur');
 
     $this->patch("/admin/roles/{$role->id}", ['label' => 'Formatrice'])->assertSessionHasNoErrors()
         ->assertSessionHas('status', 'Rôle renommé : Formatrice.');
@@ -114,7 +114,7 @@ it('renames, changes 2fa and deletes a role over HTTP', function () {
 });
 
 it('role held by a deactivated user cannot be deleted', function () {
-    $role = customRole('Formateur');
+    $role = customRole('Coordinateur');
     $user = User::factory()->create();
     $user->assignPrimaryRole($role);
     $user->deactivate();
@@ -128,7 +128,7 @@ it('role held by a deactivated user cannot be deleted', function () {
 });
 
 it('role targeted by a pending invitation cannot be deleted', function () {
-    $role = customRole('Formateur');
+    $role = customRole('Coordinateur');
     Invitation::issue('a@cap.test', 'A', $role);
     Invitation::issue('b@cap.test', 'B', $role);
 
@@ -137,7 +137,7 @@ it('role targeted by a pending invitation cannot be deleted', function () {
 });
 
 it('expired invitation does not block', function () {
-    $role = customRole('Formateur');
+    $role = customRole('Coordinateur');
     Invitation::issue('a@cap.test', 'A', $role);
     $this->travel(Invitation::VALIDITY_HOURS + 1)->hours();
 
@@ -197,10 +197,10 @@ it('locked permissions never granted to a custom role', function () {
 
 it('edits the matrix of a custom role and resets it to no right', function () {
     $this->actingAs(admin(twoFactor: true));
-    $role = customRole('Formateur');
+    $role = customRole('Coordinateur');
 
     $this->post("/admin/roles/{$role->id}", ['permission' => CrmPermissions::FICHES_VIEW, 'granted' => true])
-        ->assertSessionHas('status', 'Droit « '.Permissions::label(CrmPermissions::FICHES_VIEW)['label'].' » accordé au rôle Formateur.');
+        ->assertSessionHas('status', 'Droit « '.Permissions::label(CrmPermissions::FICHES_VIEW)['label'].' » accordé au rôle Coordinateur.');
     expect(roleRights($role)['permissions'])->toBe([CrmPermissions::FICHES_VIEW]);
     expect(RoleMatrix::editable($role))->toBeTrue()
         ->and(RoleMatrix::editable(RoleModel::forSystem(Role::AdminOrganisme)))->toBeFalse();
@@ -214,7 +214,7 @@ it('edits the matrix of a custom role and resets it to no right', function () {
 });
 
 it('turning 2fa on forces enrolment at next request', function () {
-    $role = customRole('Formateur', false);
+    $role = customRole('Coordinateur', false);
     $user = User::factory()->create();
     $user->assignPrimaryRole($role);
 
@@ -227,17 +227,17 @@ it('turning 2fa on forces enrolment at next request', function () {
 
 it('invitation to a custom role activates with that role', function () {
     $this->actingAs(admin(twoFactor: true));
-    $role = customRole('Formateur');
+    $role = customRole('Coordinateur');
 
     $this->get('/admin/users/invite')->assertInertia(fn (Assert $page) => $page
-        ->where('roles', fn ($roles) => collect($roles)->contains(fn ($o) => $o['value'] === $role->name && $o['label'] === 'Formateur')));
+        ->where('roles', fn ($roles) => collect($roles)->contains(fn ($o) => $o['value'] === $role->name && $o['label'] === 'Coordinateur')));
     $this->post('/admin/users/invitations', ['email' => 'nouveau@cap.test', 'name' => 'Nouveau', 'role' => $role->name])
         ->assertSessionHasNoErrors();
     $invitation = Invitation::query()->pending()->where('email', 'nouveau@cap.test')->sole();
     expect($invitation->role)->toBe($role->name);
 
     $this->get('/admin/users')->assertInertia(fn (Assert $page) => $page
-        ->where('invitations.0.role', 'Formateur'));
+        ->where('invitations.0.role', 'Coordinateur'));
 
     $plain = Invitation::issue('nouveau@cap.test', 'Nouveau', $role)->plainToken;
     auth()->logout();
@@ -248,7 +248,7 @@ it('invitation to a custom role activates with that role', function () {
 });
 
 it('invitation whose role was deleted is refused', function () {
-    $role = customRole('Formateur');
+    $role = customRole('Coordinateur');
     $plain = Invitation::issue('nouveau@cap.test', 'Nouveau', $role)->plainToken;
     // Removed behind the catalogue's back (a deletion racing the invitation).
     RoleModel::query()->whereKey($role->id)->delete();
@@ -263,7 +263,7 @@ it('invitation whose role was deleted is refused', function () {
 it('role of another tenant is 404', function () {
     $tenant = Tenant::factory()->create();
     PermissionSync::forTenant($tenant);
-    $theirs = app(TenantContext::class)->run($tenant, fn () => app(RoleCatalogue::class)->create('Formateur', false));
+    $theirs = app(TenantContext::class)->run($tenant, fn () => app(RoleCatalogue::class)->create('Coordinateur', false));
 
     $this->actingAs(admin(twoFactor: true));
     $this->patch("/admin/roles/{$theirs->id}", ['label' => 'Pirate'])->assertNotFound();
@@ -273,37 +273,37 @@ it('role of another tenant is 404', function () {
     $this->post('/admin/roles', ['label' => 'Copie', 'requires_2fa' => false, 'copy_from' => $theirs->id])->assertSessionHasErrors('copy_from');
     $this->patch('/admin/roles/inconnu', ['label' => 'X'])->assertNotFound();
 
-    expect(app(TenantContext::class)->run($tenant, fn () => $theirs->fresh()->label()))->toBe('Formateur');
+    expect(app(TenantContext::class)->run($tenant, fn () => $theirs->fresh()->label()))->toBe('Coordinateur');
 });
 
 it('users page lists custom roles', function () {
     $this->actingAs(admin(twoFactor: true));
-    $role = customRole('Formateur');
+    $role = customRole('Coordinateur');
     $user = User::factory()->create(['name' => 'Zoé Formatrice']);
     $user->assignPrimaryRole($role);
 
     $this->get('/admin/users')->assertInertia(fn (Assert $page) => $page
-        ->where('roleOptions', fn ($options) => collect($options)->pluck('label')->all() === [...array_map(fn (Role $r) => $r->label(), Role::cases()), 'Formateur']
+        ->where('roleOptions', fn ($options) => collect($options)->pluck('label')->all() === [...array_map(fn (Role $r) => $r->label(), Role::cases()), 'Coordinateur']
             && collect($options)->last()['value'] === $role->name)
         ->where('users', fn ($users) => collect($users)->firstWhere('name', 'Zoé Formatrice')['role'] === $role->name));
 
     $this->get('/settings/profile')->assertInertia(fn (Assert $page) => $page->where('auth.user.role', Role::AdminOrganisme->label()));
-    $this->actingAs($user)->get('/settings/profile')->assertInertia(fn (Assert $page) => $page->where('auth.user.role', 'Formateur'));
+    $this->actingAs($user)->get('/settings/profile')->assertInertia(fn (Assert $page) => $page->where('auth.user.role', 'Coordinateur'));
 });
 
 it('updateRole accepts a custom role of the organisme', function () {
     $this->actingAs(admin(twoFactor: true));
-    $role = customRole('Formateur');
+    $role = customRole('Coordinateur');
     $user = commercial();
 
     $this->patch("/admin/users/{$user->id}/role", ['role' => $role->name])->assertSessionHasNoErrors()
-        ->assertSessionHas('status', "Rôle de {$user->name} modifié : Formateur.");
+        ->assertSessionHas('status', "Rôle de {$user->name} modifié : Coordinateur.");
     expect($user->fresh()->role()?->is($role))->toBeTrue()
-        ->and(AuditLog::query()->where('event', 'access.role_changed')->latest('id')->first()->new_values)->toEqual(['role' => $role->name, 'role_label' => 'Formateur']);
+        ->and(AuditLog::query()->where('event', 'access.role_changed')->latest('id')->first()->new_values)->toEqual(['role' => $role->name, 'role_label' => 'Coordinateur']);
 
     $tenant = Tenant::factory()->create();
     PermissionSync::forTenant($tenant);
-    $theirs = app(TenantContext::class)->run($tenant, fn () => app(RoleCatalogue::class)->create('Formateur', false));
+    $theirs = app(TenantContext::class)->run($tenant, fn () => app(RoleCatalogue::class)->create('Coordinateur', false));
     $this->patch("/admin/users/{$user->id}/role", ['role' => $theirs->name])->assertSessionHasErrors('role');
     $this->patch("/admin/users/{$user->id}/role", ['role' => 'inconnu'])->assertSessionHasErrors('role');
     expect($user->fresh()->role()?->is($role))->toBeTrue();
@@ -376,7 +376,7 @@ it('empties the followed DAS when a role is reset to defaults without « Ses DAS
 
 it('serialises label checks of an organisme with an advisory lock', function () {
     $tenant = tenant();
-    customRole('Formateur');
+    customRole('Coordinateur');
 
     // The lock is held until the end of the transaction: another connection cannot take it.
     config(['database.connections.label_probe' => config('database.connections.'.config('database.default'))]);
@@ -387,5 +387,5 @@ it('serialises label checks of an organisme with an advisory lock', function () 
     DB::purge('label_probe');
 
     expect($free)->toBeFalse()->and($other)->toBeTrue()
-        ->and(fn () => customRole('FORMATÉUR'))->toThrow(ValidationException::class, RoleCatalogue::DUPLICATE);
+        ->and(fn () => customRole('COORDINATÉUR'))->toThrow(ValidationException::class, RoleCatalogue::DUPLICATE);
 });

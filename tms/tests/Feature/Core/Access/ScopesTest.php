@@ -181,6 +181,7 @@ it('exposes the scope options in French', function () {
         ['value' => 'own', 'label' => 'Ses fiches'],
         ['value' => 'das', 'label' => 'Ses DAS'],
         ['value' => 'all', 'label' => "Tout l'organisme"],
+        ['value' => 'trainer', 'label' => 'Ses séances'],
     ])->and(Permissions::isScoped(SCOPED))->toBeTrue()
         ->and(Permissions::isScoped(UNSCOPED))->toBeFalse()
         ->and(Permissions::defaultScopesFor(Role::Commercial))->toBe(['crm.revenue.view' => AccessScope::Own, SCOPED => AccessScope::Own]);

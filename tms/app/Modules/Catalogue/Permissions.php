@@ -52,6 +52,8 @@ final class Permissions
         return match ($role) {
             Role::AdminOrganisme, Role::Direction => [self::VIEW, self::MANAGE, self::DELETE],
             Role::Commercial, Role::ChargeRelations, Role::Assistant, Role::ResponsableDas => [self::VIEW],
+            // A trainer reaches his séances only, never the catalogue.
+            Role::Formateur => [],
         };
     }
 }

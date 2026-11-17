@@ -23,11 +23,19 @@ interface CalendarProps {
     calendar: { created_at: string | null; last_used_at: string | null } | null;
     url: string | null;
     status?: string | null;
-    outlook: OutlookProps;
+    /** The CRM actions (meetings, calls) are published; Outlook is offered with them only. */
+    crm: boolean;
+    /** Séances are published too (linked trainer, session responsible). */
+    sources: boolean;
+    outlook: OutlookProps | null;
     outlook_error?: string | null;
 }
 
-export default function Calendar({ calendar, url, status, outlook, outlook_error }: CalendarProps) {
+export default function Calendar({ calendar, url, status, crm, sources, outlook, outlook_error }: CalendarProps) {
+    const what = [crm ? 'vos rendez-vous et appels planifiés dans le CRM' : null, sources ? 'vos séances de formation' : null]
+        .filter(Boolean)
+        .join(' et ');
+
     const [copied, setCopied] = useState(false);
     const [processing, setProcessing] = useState(false);
 
@@ -81,18 +89,24 @@ export default function Calendar({ calendar, url, status, outlook, outlook_error
 
             <SettingsLayout>
                 <div className="space-y-6">
-                    <HeadingSmall
-                        title="Mon agenda"
-                        description="Abonnez votre agenda (Outlook, Google, Apple) à vos rendez-vous et appels planifiés dans le CRM."
-                    />
+                    <HeadingSmall title="Mon agenda" description={`Abonnez votre agenda (Outlook, Google, Apple) à ${what}.`} />
 
                     {status && <p className="text-sm font-medium text-green-700 dark:text-green-400">{status}</p>}
 
                     <div className="text-muted-foreground space-y-2 text-sm">
-                        <p>
-                            Le lien est personnel : toute personne qui le connaît voit vos rendez-vous et appels des 30 derniers jours et des 180
-                            prochains jours (type, fiche, lieu, opportunité, résultat). Les comptes rendus n'y figurent jamais.
-                        </p>
+                        {crm && (
+                            <p>
+                                Le lien est personnel : toute personne qui le connaît voit vos rendez-vous et appels des 30 derniers jours et des 180
+                                prochains jours (type, fiche, lieu, opportunité, résultat). Les comptes rendus n'y figurent jamais.
+                            </p>
+                        )}
+                        {sources && (
+                            <p>
+                                {crm ? 'Il contient aussi' : 'Le lien est personnel : toute personne qui le connaît voit'} vos séances (celles que
+                                vous animez et celles des sessions dont vous êtes responsable) sur la même période : session, module, horaires et
+                                salle. Les noms des stagiaires n'y figurent jamais.
+                            </p>
+                        )}
                         <p>Votre agenda se met à jour automatiquement, en général en quelques heures selon le logiciel.</p>
                     </div>
 
@@ -164,41 +178,43 @@ export default function Calendar({ calendar, url, status, outlook, outlook_error
                         </div>
                     </div>
 
-                    <div className="space-y-3 text-sm">
-                        <HeadingSmall
-                            title="Connecter Outlook"
-                            description="Avec un compte Microsoft 365, vos rendez-vous et appels sont créés directement dans votre agenda Outlook, mis à jour et supprimés avec eux, en quelques instants."
-                        />
-                        {outlook_error && <p className="font-medium text-red-700 dark:text-red-400">{outlook_error}</p>}
-                        {outlook.message !== null && (
-                            <p className="rounded-md border border-amber-300 bg-amber-50 p-3 dark:border-amber-700 dark:bg-amber-950">
-                                {outlook.message}
-                            </p>
-                        )}
-                        {outlook.status === 'active' && (
-                            <p>
-                                Outlook connecté{outlook.connected_at !== null ? ` le ${formatDateTime(outlook.connected_at)}` : ''}. Les comptes
-                                rendus n'y sont jamais envoyés.
-                            </p>
-                        )}
-                        {!outlook.available && outlook.status === 'none' && (
-                            <p className="text-muted-foreground">
-                                L'envoi vers Outlook n'est pas activé pour votre organisme : contactez votre administrateur.
-                            </p>
-                        )}
-                        <div className="flex flex-wrap gap-2">
-                            {outlook.available && outlook.status !== 'active' && (
-                                <Button type="button" onClick={connectOutlook} disabled={processing}>
-                                    {outlook.status === 'reconnect' ? 'Reconnecter Outlook' : 'Connecter Outlook'}
-                                </Button>
+                    {outlook !== null && (
+                        <div className="space-y-3 text-sm">
+                            <HeadingSmall
+                                title="Connecter Outlook"
+                                description="Avec un compte Microsoft 365, vos rendez-vous et appels sont créés directement dans votre agenda Outlook, mis à jour et supprimés avec eux, en quelques instants."
+                            />
+                            {outlook_error && <p className="font-medium text-red-700 dark:text-red-400">{outlook_error}</p>}
+                            {outlook.message !== null && (
+                                <p className="rounded-md border border-amber-300 bg-amber-50 p-3 dark:border-amber-700 dark:bg-amber-950">
+                                    {outlook.message}
+                                </p>
                             )}
-                            {outlook.status !== 'none' && (
-                                <Button type="button" variant="outline" onClick={disconnectOutlook} disabled={processing}>
-                                    Déconnecter Outlook
-                                </Button>
+                            {outlook.status === 'active' && (
+                                <p>
+                                    Outlook connecté{outlook.connected_at !== null ? ` le ${formatDateTime(outlook.connected_at)}` : ''}. Les comptes
+                                    rendus n'y sont jamais envoyés.
+                                </p>
                             )}
+                            {!outlook.available && outlook.status === 'none' && (
+                                <p className="text-muted-foreground">
+                                    L'envoi vers Outlook n'est pas activé pour votre organisme : contactez votre administrateur.
+                                </p>
+                            )}
+                            <div className="flex flex-wrap gap-2">
+                                {outlook.available && outlook.status !== 'active' && (
+                                    <Button type="button" onClick={connectOutlook} disabled={processing}>
+                                        {outlook.status === 'reconnect' ? 'Reconnecter Outlook' : 'Connecter Outlook'}
+                                    </Button>
+                                )}
+                                {outlook.status !== 'none' && (
+                                    <Button type="button" variant="outline" onClick={disconnectOutlook} disabled={processing}>
+                                        Déconnecter Outlook
+                                    </Button>
+                                )}
+                            </div>
                         </div>
-                    </div>
+                    )}
                 </div>
             </SettingsLayout>
         </AppLayout>

@@ -3,16 +3,18 @@
 namespace App\Modules\Connectors\Calendar;
 
 use App\Modules\Core\Users\User;
-use App\Modules\Crm\Activities\CalendarEvent;
+use App\Modules\Crm\Activities\CalendarEvent as CrmEvent;
 use App\Modules\Crm\Activities\CalendarEvents;
+use App\Modules\Crm\Permissions;
 use Carbon\CarbonImmutable;
 
 /**
- * The iCalendar (RFC 5545) feed of a user: his meetings and calls from 30
- * days back to 180 days ahead, in local Paris time (TZID with its
- * VTIMEZONE, so an event keeps its wall-clock time across DST changes).
- * Lengths are DURATION values (exact time). The report of an action never
- * leaves the tool.
+ * The iCalendar (RFC 5545) feed of a user: his meetings and calls (with
+ * the CRM) and the events of the registered sources (CalendarSources: the
+ * séances of a trainer…) from 30 days back to 180 days ahead, in local
+ * Paris time (TZID with its VTIMEZONE, so an event keeps its wall-clock
+ * time across DST changes). Lengths are DURATION values (exact time). The
+ * report of an action never leaves the tool.
  */
 final class IcalFeed
 {
@@ -30,9 +32,48 @@ final class IcalFeed
     public static function for(User $user, ?CarbonImmutable $now = null): string
     {
         $today = ($now ?? CarbonImmutable::now())->setTimezone(self::TZID)->startOfDay();
-        $events = CalendarEvents::for($user, $today->subDays(self::DAYS_BEFORE), $today->addDays(self::DAYS_AFTER + 1)->startOfDay());
+        $from = $today->subDays(self::DAYS_BEFORE);
+        $to = $today->addDays(self::DAYS_AFTER + 1)->startOfDay();
+        $events = $user->can(Permissions::ACTIVITIES_VIEW)
+            ? array_map(self::fromAction(...), CalendarEvents::for($user, $from, $to))
+            : [];
+        array_push($events, ...CalendarSources::eventsFor($user, $from, $to));
+        usort($events, fn (CalendarEvent $a, CalendarEvent $b) => [$a->start->getTimestamp(), $a->uid] <=> [$b->start->getTimestamp(), $b->uid]);
 
         return self::render($events, $now ?? CarbonImmutable::now());
+    }
+
+    /**
+     * Who may have a feed (« Mon agenda »): a user of the CRM actions, or
+     * one a registered source has something for (a trainer without CRM).
+     */
+    public static function allowed(User $user): bool
+    {
+        return $user->can(Permissions::ACTIVITIES_VIEW) || CalendarSources::serves($user);
+    }
+
+    /**
+     * A meeting or a call of the CRM: « Type – Fiche », its fiche,
+     * opportunity and result in the description (never its report).
+     */
+    public static function fromAction(CrmEvent $event): CalendarEvent
+    {
+        $description = array_filter([
+            $event->fiche !== '' ? 'Fiche : '.$event->fiche : null,
+            $event->opportunity !== null ? 'Opportunité : '.$event->opportunity : null,
+            $event->result !== null ? 'Résultat : '.$event->result : null,
+        ]);
+
+        return new CalendarEvent(
+            uid: $event->id,
+            title: trim($event->type.($event->fiche !== '' ? ' – '.$event->fiche : '')),
+            start: $event->start,
+            minutes: $event->durationMinutes ?? self::DEFAULT_MINUTES[$event->kind],
+            location: $event->location,
+            description: $description === [] ? null : implode("\n", $description),
+            url: $event->url,
+            updatedAt: $event->updatedAt,
+        );
     }
 
     /**
@@ -101,34 +142,27 @@ final class IcalFeed
         $start = $event->start->setTimezone(self::TZID);
         // DURATION, not DTEND: an exact length stays right across a DST
         // change (02:30 CEST + 1 h is 02:30 CET, which a local DTEND loses).
-        $minutes = $event->durationMinutes ?? self::DEFAULT_MINUTES[$event->kind];
         $local = fn (CarbonImmutable $at): string => $at->format('Ymd\THis');
         $utc = fn (CarbonImmutable $at): string => $at->utc()->format('Ymd\THis\Z');
 
-        $description = array_filter([
-            $event->fiche !== '' ? 'Fiche : '.$event->fiche : null,
-            $event->opportunity !== null ? 'Opportunité : '.$event->opportunity : null,
-            $event->result !== null ? 'Résultat : '.$event->result : null,
-        ]);
-
         $lines = [
             'BEGIN:VEVENT',
-            'UID:'.$event->id,
+            'UID:'.$event->uid,
             'DTSTAMP:'.$utc($now),
             'LAST-MODIFIED:'.$utc($event->updatedAt),
             'DTSTART;TZID='.self::TZID.':'.$local($start),
-            'DURATION:PT'.$minutes.'M',
-            'SUMMARY:'.self::text(trim($event->type.($event->fiche !== '' ? ' – '.$event->fiche : ''))),
+            'DURATION:PT'.$event->minutes.'M',
+            'SUMMARY:'.self::text($event->title),
         ];
         if ($event->location !== null && trim($event->location) !== '') {
             $lines[] = 'LOCATION:'.self::text($event->location);
         }
-        if ($description !== []) {
-            $lines[] = 'DESCRIPTION:'.self::text(implode("\n", $description));
+        if ($event->description !== null && $event->description !== '') {
+            $lines[] = 'DESCRIPTION:'.self::text($event->description);
         }
         $lines[] = 'URL:'.$event->url;
-        $lines[] = 'STATUS:CONFIRMED';
-        $lines[] = 'TRANSP:OPAQUE';
+        $lines[] = $event->cancelled ? 'STATUS:CANCELLED' : 'STATUS:CONFIRMED';
+        $lines[] = $event->cancelled ? 'TRANSP:TRANSPARENT' : 'TRANSP:OPAQUE';
         $lines[] = 'END:VEVENT';
 
         return $lines;

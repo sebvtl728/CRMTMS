@@ -60,13 +60,13 @@ tenant_id = nullif(current_setting('app.tenant_id', true), '')::uuid   -- using 
 PK (`tenant_id`, `email`) · `token` (haché) · `created_at`. `tenant_id` est renseigné par défaut depuis `app.tenant_id`.
 
 ### `invitations` — invitations
-`id`, `tenant_id` · `email`, `name` · `role` (nom du rôle proposé : un des six rôles système ou un rôle personnalisé `custom_<uuid>`) · `token_hash` (char 64, unique : sha256 du jeton, jamais le jeton) · `expires_at` (+24 h) · `accepted_at` (null tant qu'en attente) · `user_id` (FK users, null) compte créé · `invited_by` (FK users, null) · horodatages ; index (`tenant_id`, `email`).
+`id`, `tenant_id` · `email`, `name` · `role` (nom du rôle proposé : un des sept rôles système ou un rôle personnalisé `custom_<uuid>`) · `token_hash` (char 64, unique : sha256 du jeton, jamais le jeton) · `expires_at` (+24 h) · `accepted_at` (null tant qu'en attente) · `user_id` (FK users, null) compte créé · `invited_by` (FK users, null) · horodatages ; index (`tenant_id`, `email`).
 
 ### `external_identities` — identités externes (SSO, préparées)
 `id`, `tenant_id` · `user_id` (FK, cascade) · `provider` · `subject` · horodatages ; unique (`provider`, `subject`).
 
 ### `roles` — rôles de l'organisme
-`id`, `tenant_id` · `name` (rôle système : `admin_organisme`, `direction`, `commercial`, `charge_relations`, `assistant`, `responsable_das` ; rôle personnalisé : `custom_<uuid>`, jamais affiché) · `label` (string 80, null : libellé du rôle ; null = libellé par défaut du rôle système) · `guard_name` · `requires_2fa` (bool : double authentification obligatoire ; toujours vraie pour `admin_organisme` et `direction`) · `system` (bool : les six rôles système, jamais supprimés) · horodatages ; unique (`tenant_id`, `name`, `guard_name`) ; libellé unique par organisme (contrôle applicatif sérialisé).
+`id`, `tenant_id` · `name` (rôle système : `admin_organisme`, `direction`, `commercial`, `charge_relations`, `assistant`, `responsable_das`, `formateur` ; rôle personnalisé : `custom_<uuid>`, jamais affiché) · `label` (string 80, null : libellé du rôle ; null = libellé par défaut du rôle système) · `guard_name` · `requires_2fa` (bool : double authentification obligatoire ; toujours vraie pour `admin_organisme` et `direction`) · `system` (bool : les sept rôles système, jamais supprimés) · horodatages ; unique (`tenant_id`, `name`, `guard_name`) ; libellé unique par organisme (contrôle applicatif sérialisé).
 
 ### `role_has_permissions` — matrice rôle → permission
 `permission_id` · `role_id` · `tenant_id` ; PK (`permission_id`, `role_id`). Clés étrangères composites (`role_id`, `tenant_id`) : un rôle ne peut pas recevoir de permission d'un autre organisme.
@@ -460,7 +460,7 @@ Nommée ainsi pour ne pas se confondre avec la table `sessions` (sessions web). 
 | `modality_id` | uuid (FK `reference_items`, liste `training_modality`) | Modalité : Présentiel, Distanciel (classe virtuelle), FOAD / e-learning, Mixte (paramétrable) ; obligatoire |
 | `organisation_id` | uuid, null (FK `organisations`) | Entreprise d'une session intra (obligatoire en intra, vide en inter, facultative en individuel : CHECK) |
 | `starts_on`, `ends_on` | date | Jours de Paris ; CHECK `ends_on >= starts_on` |
-| `planned_hours` | numeric(6,2), null | Heures prévues, reprises de la formation sauf saisie |
+| `planned_hours` | numeric(6,2), null | Heures prévues = somme des `session_modules.planned_minutes` (0.8.0), recalculée sous verrou de la session à chaque écriture d'un module ; la saisie ne sert qu'au module unique d'une formation sans module |
 | `location_kind` | string(10) | `address` (adresse obligatoire), `client` (chez le client), `remote` (distanciel) |
 | `location_text` | string(500), null | Adresse, précision ou lien |
 | `capacity` | int, null | Places d'une session inter (≥ 1, vide en intra et en individuel : CHECK). Une session individuelle n'accueille qu'un stagiaire (inscription non annulée), sans liste d'attente |
@@ -471,6 +471,57 @@ Nommée ainsi pour ne pas se confondre avec la table `sessions` (sessions web). 
 | `created_by`, `updated_by`, `created_at`, `updated_at`, `deleted_at` | | Suppression logique (corbeille) |
 
 Une formation utilisée par une session (corbeille comprise) ne se supprime pas du catalogue (`TrainingUsage` « sessions »).
+
+### `session_modules` — modules d'une session (0.8.0)
+Module `Sessions` (`Modules\SessionModule`, écrite par `Modules\SessionModules`). Copiés de `Catalogue\Trainings::modules()` à la création de la session (et au changement de formation), puis propres à la session ; la migration `2026_12_17_000002` a donné à chaque session existante un module `interval` (intitulé de la formation, heures et dates de la session).
+
+| Colonne | Type | Rôle |
+|---|---|---|
+| `id`, `tenant_id` | uuid | |
+| `training_session_id` | uuid (FK `training_sessions`, cascade) | Session |
+| `position` | smallint | Ordre (1, 2…) ; un ajout va à la fin |
+| `title` | string(200) | Intitulé |
+| `planned_minutes` | int, null | Heures prévues en minutes entières (CHECK > 0 ; vide quand le catalogue n'en donnait pas). Conversion des heures décimales arrondie à la minute (demi supérieur, `brick/math`) |
+| `modality_id` | uuid, null (FK `reference_items`, liste `training_modality`) | Modalité (`ReferenceUsage` : une valeur utilisée ne se supprime pas) |
+| `dating_mode` | string(10) | `interval` (début, fin, heures ; pas de séances) ou `seances` (CHECK) ; ne change plus dès qu'il y a des séances ou des heures saisies (`SessionModule::hasActivity()`) |
+| `starts_on`, `ends_on` | date, null | Dates d'un module en intervalle, dans celles de la session à l'enregistrement (CHECK `ends_on >= starts_on`) ; hors des dates après un changement de la session : signalé, pas déplacé |
+| `created_by`, `updated_by`, `created_at`, `updated_at`, `deleted_at` | | Suppression logique ; journalisé (`session_module`) |
+
+### `rooms` — salles de formation (0.8.0)
+Module `Sessions` (`Resources\Room`, écrite par `Resources\Rooms`). `id`, `tenant_id` · `name` string(120) · `capacity` int, null (CHECK > 0, places) · `address` string(500), null · `active` bool (seules les salles actives sont proposées, `Rooms::active()`) · `created_by`, `updated_by`, horodatages, `deleted_at` (suppression logique, refusée pour une salle utilisée : `Rooms::registerUsage`). Journalisée (`room`).
+
+### `closure_periods` — périodes de fermeture (0.8.0)
+Module `Sessions` (`Resources\ClosurePeriod`, `Resources\ClosurePeriods`). `id`, `tenant_id` · `starts_on`, `ends_on` date (jours de Paris, bornes incluses, CHECK `ends_on >= starts_on`) · `label` string(120) · `created_by`, `updated_by`, horodatages. Suppression définitive. `ClosurePeriods::covering($date)` donne la fermeture d'un jour. Journalisée (`closure_period`).
+
+### `trainers` — formateurs (0.8.0)
+Module `Sessions` (`Trainers\Trainer`, écrite par `Trainers\Trainers`) ; la personne est lue par `Crm\Public\Fiches`, jamais par les tables du CRM. `id`, `tenant_id` · `person_id` (FK `people`) : une personne n'est formateur qu'une fois par organisme parmi les formateurs hors corbeille (index unique partiel `trainers_person_unique`) · `status` string(10) `employee` | `freelance` (CHECK) · `active` bool · `user_id` (FK `users`, null, unique par organisme) compte lié, à la main ou à l'acceptation d'une invitation (une seule fiche formateur avec l'e-mail) · `created_by`, `updated_by`, horodatages, `deleted_at` (suppression logique, refusée pour un formateur utilisé : `Trainers::registerUsage` ; le compte est délié). Journalisée (`trainer`). Une fusion de personnes repointe `person_id` (refusée si les deux sont formateurs).
+
+### `trainer_unavailabilities` — indisponibilités des formateurs (0.8.0)
+`id`, `tenant_id` · `trainer_id` (FK `trainers`, cascade) · `starts_at`, `ends_at` timestamptz (CHECK `ends_at > starts_at`, saisis en heure de Paris) · `reason` string(200), null (donnée personnelle : journalisée sans valeur, effacée par l'anonymisation de la personne) · `created_by`, horodatages ; index (`trainer_id`, `starts_at`). `Trainers::available($id, $from, $to)` : aucune indisponibilité ne chevauche [début, fin[.
+
+### `trainer_das` — DAS des formateurs (0.8.0)
+`id`, `tenant_id` · `trainer_id` (FK `trainers`, cascade) · `das_id` (FK `reference_items`, liste DAS ; `ReferenceUsage` : un DAS utilisé ne se supprime pas) · horodatages ; unique (`trainer_id`, `das_id`). Écrite par `Trainers::setDas` ; `Trainers::ofDas(?string)` filtre. Un formateur sans ligne = sans DAS, visible de tous. Journalisée (`trainer_das`), rien de personnel.
+
+### `seances` — séances des modules (0.8.0)
+Module `Sessions` (`Planning\Seance`, écrite par `Planning\Seances` et `Planning\SeanceGenerator`). `id`, `tenant_id` · `training_session_id` (FK `training_sessions`, cascade) · `session_module_id` (FK `session_modules`, cascade ; module en mode `seances`) · `date` date (jour de Paris) · `starts_at`, `ends_at` time sans fuseau (heure murale de Paris, CHECK `ends_at > starts_at`) · `break_minutes` int (CHECK ≥ 0) · `duration_minutes` int **générée** (`ends_at − starts_at − break_minutes`, CHECK > 0) · `trainer_id` (FK `trainers`, null) · `room_id` (FK `rooms`, null) · `place_text` string(300), null · `status` `planned` | `cancelled` (CHECK) · `cancel_reason` string(300), null (seulement annulée) · `note` string(1000), null · `created_by`, `updated_by`, horodatages, `deleted_at`. Index unique partiel `seances_module_slot_unique` (`session_module_id`, `date`, `starts_at`) hors corbeille ; index (`training_session_id`, `date`), (`trainer_id`, `date`), (`room_id`, `date`). Journalisée (`seance`) sans `note` ni `cancel_reason` en clair. Une séance rend son module « actif » (`SessionModule::hasActivity()`), sa salle et son formateur « utilisés ». Évènement `Planning\Events\SeanceChanged` (après commit) quand ses horaires changent ou qu'elle est annulée.
+
+### `placement_periods` — périodes de stage (0.8.0)
+`id`, `tenant_id` · `training_session_id` (FK, cascade) · `starts_on`, `ends_on` date (dates communes, dans celles de la session, CHECK) · `label` string(120) · `created_by`, `updated_by`, horodatages. Suppression définitive. Journalisée (`placement_period`).
+
+### `placement_period_hosts` — stage d'un stagiaire (0.8.0)
+`id`, `tenant_id` · `placement_period_id` (FK, cascade) · `enrolment_id` (FK `enrolments`, cascade), unique avec la période · `organisation_id` (FK `organisations`, null : entreprise d'accueil, lue par `Crm\Public\Fiches`, repointée à la fusion, gardée par l'annulation d'un import) · `starts_on`, `ends_on` date, null (dates propres, les deux ou aucune, CHECK) · `created_by`, `updated_by`, horodatages. `PlacementPeriods::datesFor()` : dates propres, sinon communes. Journalisée (`placement_period_host`).
+
+### `attendances` — présences aux séances (0.8.0)
+Module `Sessions` (`Attendance\Attendance`, écrite par `Attendance\Attendances` et l'écouteur de `SeanceChanged`). `id`, `tenant_id` · `seance_id` (FK `seances`, sans cascade) · `enrolment_id` (FK `enrolments`, sans cascade), unique avec la séance · `status` `present` | `absent` | `partial` | `excused` (CHECK) · `minutes` int (CHECK ≥ 0 ; `absent`/`excused` = 0, CHECK) : présent = durée de la séance, partiel 0 < m < durée, séance annulée = 0 · `reason` string(300), null (donnée personnelle, effacée par l'anonymisation) · `needs_review` bool (la séance a changé d'horaires depuis) · `recorded_by` (FK `users`, null) · horodatages. Journalisée (`attendance`) sans `reason` en clair ; historique du dossier.
+
+### `monthly_hours` — heures du mois des modules en intervalle (0.8.0)
+`Attendance\MonthlyHour`, écrite par `Attendance\MonthlyHours`. `id`, `tenant_id` · `enrolment_id` (FK `enrolments`) · `session_module_id` (FK `session_modules`, module `interval`) · `month` date (1er du mois de Paris, CHECK) · `minutes` int (CHECK ≥ 0, ≤ 44 640 par l'application) · `trainer_id` (FK `trainers`, null) · `recorded_by` (FK `users`, null) · horodatages. Unique (`enrolment_id`, `session_module_id`, `month`). Journalisée (`monthly_hour`) ; historique du dossier.
+
+### `attendance_closures` — mois clôturés d'une session (0.8.0)
+`Attendance\AttendanceClosure`, écrite par `Attendance\Closures`. `id`, `tenant_id` · `training_session_id` (FK `training_sessions`) · `month` date (1er du mois de Paris, CHECK), unique avec la session · `closed_at` timestamptz, null (non nul = clôturé) · `closed_by` (FK `users`, null) · `reopened_at` timestamptz, null · `reopened_by` (FK `users`, null) · `reopen_reason` string(300), null (motif de la dernière réouverture, donnée personnelle) · horodatages. Journalisée (`attendance_closure`) sans le motif en clair. Un mois clôturé refuse (409) présences, heures du mois et création, suppression, annulation ou changement d'horaires de ses séances. Service public `Sessions\Public\RealisedHours` (`forEnrolment`, `forSession`) : minutes réalisées (dans les dates d'entrée et de sortie du stagiaire) et prévues (somme des modules, null = 0), mois clôturés.
+
+### `attendance_sheet_scans` — feuilles d'émargement signées, scannées (0.8.0)
+`Attendance\AttendanceSheetScan`, écrite par `Attendance\AttendanceScans`. `id`, `tenant_id` · `training_session_id` (FK `training_sessions`) · `seance_id` (FK `seances`, sans cascade, null = scan de toute la journée de la session) · `date` date (jour de Paris) · `path` string(300) (fichier privé `tenants/<tenant_id>/attendance_sheets/<session>/<date>/<uuid>.<pdf|png|jpg>`) · `original_name` string(200) (nom envoyé, jamais journalisé) · `mime` string(100) · `size_bytes` int (≤ 10 Mo) · `uploaded_by` (FK `users`, null) · horodatages. Journalisée (`attendance_sheet_scan`) sans le chemin ni le nom du fichier. Supprimée par un gestionnaire, ou par l'anonymisation du stagiaire d'une session individuelle (fichier compris) ; gardée sinon.
 
 ### `session_sequences` — compteurs de numérotation des sessions
 `tenant_id` (FK `tenants`, cascade) · `year` smallint (année civile de Paris à la création, CHECK 2000–2999) · `last_number` int (CHECK > 0) · `created_at`, `updated_at`. PK (`tenant_id`, `year`). Même mécanique que `quote_sequences` (incrément atomique dans la transaction de création, numéro rendu en cas d'échec).
@@ -553,8 +604,8 @@ Le module ne lit aucune table du CRM ; il se déclare par `Crm\Public\FicheLinks
 | Données liées (annulation d'un import) | `training_sessions.organisation_id`, `dossiers.account_organisation_id` / `account_person_id` / `contact_person_id`, `enrolments.person_id`, `fundings.funder_organisation_id` / `funder_person_id` (corbeille comprise) | La fiche nommée est conservée (« Liée à des données ajoutées depuis l'import, conservée. ») |
 | Fusion de deux fiches | mêmes colonnes | Repointées vers la fiche conservée, dans la transaction de la fusion ; fusion refusée (rien n'est écrit) si les deux personnes ont chacune une inscription non annulée sur la même session |
 | Corbeille d'une personne | `enrolments.person_id` | Autorisée : les inscriptions restent (badge « Fiche à la corbeille »), restauration possible ; une personne à la corbeille ne peut pas être inscrite |
-| Anonymisation (`Sessions\Gdpr\EnrolmentAnonymisation`) | `enrolments.adaptation_needs`, `enrolments.notes` ; `fundings.notes` (financements qu'elle paie, qui visent ses inscriptions ou ses dossiers de particulier) ; `dossiers.notes` (ses dossiers de particulier) | Valeurs effacées ; inscriptions, dossiers et financements gardés (statistiques, BPF, facturation) |
-| Export RGPD (`Sessions\Gdpr\PersonSessionsExport`) | inscriptions, dossiers dont elle est contractante ou contact | Sections `inscriptions` et `dossiers` ; l'export exige aussi `sessions.dossiers.view` et `sessions.sessions.view` sur « Tout l'organisme » |
+| Anonymisation (`Sessions\Gdpr\EnrolmentAnonymisation`) | `enrolments.adaptation_needs`, `enrolments.notes` ; `attendances.reason` (présences et heures du mois gardées) ; scans `attendance_sheet_scans` d'une session individuelle supprimés (gardés sur une session collective) ; `fundings.notes` (financements qu'elle paie, qui visent ses inscriptions ou ses dossiers de particulier) ; `dossiers.notes` (ses dossiers de particulier) | Valeurs effacées ; inscriptions, dossiers, financements, présences et heures gardés (statistiques, BPF, facturation) |
+| Export RGPD (`Sessions\Gdpr\PersonSessionsExport`) | inscriptions, dossiers dont elle est contractante ou contact, financements, présences, heures du mois | Sections `inscriptions`, `dossiers`, `financements`, `presences` et `heures_mensuelles` ; l'export exige aussi `sessions.dossiers.view` et `sessions.sessions.view` sur « Tout l'organisme » |
 
 **Historique** : aucune table propre ; lu dans `audit_logs` (créations et changements d'état des `dossier`, `enrolment`, `funding`). Fiche d'une entreprise ou d'une personne : ses dossiers (contractant ; contact pour une personne), selon le périmètre de `sessions.dossiers.view` ; inscriptions d'une personne, selon `sessions.sessions.view`. Page d'un dossier : création et états, inscriptions (stagiaire nommé), financements ajoutés, modifiés, supprimés (200 derniers évènements).
 
@@ -562,4 +613,4 @@ Le module ne lit aucune table du CRM ; il se déclare par `Crm\Public\FicheLinks
 
 ## Permissions CRM (catalogue global `permissions`)
 
-CRM : `crm.fiches.view|update|delete`, `crm.opportunities.view|update|delete`, `crm.quotes.view|update|delete`, `crm.activities.view|update|delete`, `crm.activities.team`, `crm.revenue.view`, `crm.revenue.manage`, `crm.merge`, `crm.import`, `crm.export`, `crm.gdpr` ; catalogue : `catalogue.view`, `catalogue.manage`, `catalogue.delete`. Les anciens `crm.view|create|update|delete` sont supprimés par la migration 0.5.0 (convertis organisme par organisme). La matrice par rôle est dans `admin.md`. `role_permission_defaults_applied` (`tenant_id`, `role`, `permission`) mémorise les droits par défaut déjà accordés à chaque organisme, pour qu'une mise à jour n'ajoute que les nouveaux droits sans rétablir ceux qu'un administrateur a retirés. `role_permission_scopes` (`tenant_id`, `role_id`, `permission`, `scope` = `own`/`das`/`all`) : périmètre d'un rôle pour un droit à périmètre ; sans ligne, le périmètre vaut `all`.
+CRM : `crm.fiches.view|update|delete`, `crm.opportunities.view|update|delete`, `crm.quotes.view|update|delete`, `crm.activities.view|update|delete`, `crm.activities.team`, `crm.revenue.view`, `crm.revenue.manage`, `crm.merge`, `crm.import`, `crm.export`, `crm.gdpr` ; catalogue : `catalogue.view`, `catalogue.manage`, `catalogue.delete`. Les anciens `crm.view|create|update|delete` sont supprimés par la migration 0.5.0 (convertis organisme par organisme). La matrice par rôle est dans `admin.md`. `role_permission_defaults_applied` (`tenant_id`, `role`, `permission`) mémorise les droits par défaut déjà accordés à chaque organisme, pour qu'une mise à jour n'ajoute que les nouveaux droits sans rétablir ceux qu'un administrateur a retirés. `role_permission_scopes` (`tenant_id`, `role_id`, `permission`, `scope` = `own`/`das`/`all`/`trainer`) : périmètre d'un rôle pour un droit à périmètre ; sans ligne, le périmètre vaut `all` ; `trainer` (« Ses séances », 0.8.0) n'est accepté que pour `sessions.seances.view` et `sessions.attendance.manage`.

@@ -80,6 +80,9 @@ final class RoleMatrix
         if (! Permissions::isScoped($permission)) {
             throw new AccessDeniedHttpException;
         }
+        if (! Permissions::allowsScope($permission, $scope)) {
+            throw new UserFacingHttpException(422, "Ce périmètre n'est pas proposé pour ce droit.");
+        }
 
         DB::transaction(function () use ($model, $permission, $scope): void {
             if (! $model->permissions()->where('name', $permission)->exists()) {

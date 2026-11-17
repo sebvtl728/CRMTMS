@@ -2,6 +2,9 @@ import Heading from '@/components/heading';
 import InputError from '@/components/input-error';
 import { EnrolDialog, type EnrolDossierOption } from '@/components/sessions/enrolment-dialog';
 import { EnrolmentList, type EnrolmentReferences, type EnrolmentRow } from '@/components/sessions/enrolment-list';
+import { SessionModules, type SessionPlanning } from '@/components/sessions/session-modules';
+import { SessionAttendance } from '@/components/sessions/session-attendance';
+import { SessionPlanningSeances } from '@/components/sessions/session-planning';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -33,8 +36,15 @@ interface ShowProps {
     /** Null without sessions.sessions.update on the session, or once cancelled. */
     enrol: { dossiers: EnrolDossierOption[] } | null;
     enrolment_references: EnrolmentReferences | null;
+    planning: SessionPlanning;
+    /** The « Présences » tab: attendance managed or closed on the session. */
+    attendance_tab: boolean;
     status?: string;
+    /** Trainees planned above the new hours of the session (their enrolments unchanged). */
+    warning?: string | null;
 }
+
+const TABS = ['Session', 'Planning', 'Présences'] as const;
 
 function CancelDialog({ sessionId, reasons, open, onClose }: { sessionId: string; reasons: Option[]; open: boolean; onClose: () => void }) {
     const { data, setData, post, processing, errors, reset } = useForm({ cancel_reason_id: '' });
@@ -89,7 +99,20 @@ function CancelDialog({ sessionId, reasons, open, onClose }: { sessionId: string
     );
 }
 
-export default function SessionShow({ session, can, cancel_reasons, enrolments, places, enrol, enrolment_references, status }: ShowProps) {
+export default function SessionShow({
+    session,
+    can,
+    cancel_reasons,
+    enrolments,
+    places,
+    enrol,
+    enrolment_references,
+    planning,
+    attendance_tab,
+    status,
+    warning,
+}: ShowProps) {
+    const [tab, setTab] = useState<(typeof TABS)[number]>('Session');
     const [cancelling, setCancelling] = useState(false);
     const [enrolling, setEnrolling] = useState(false);
     const waiting = enrolments.filter((e) => e.status === 'waitlisted');
@@ -161,6 +184,7 @@ export default function SessionShow({ session, can, cancel_reasons, enrolments, 
                 </div>
 
                 {status && <div className="text-sm font-medium text-green-600">{status}</div>}
+                {warning && <div className="text-sm font-medium text-amber-700 dark:text-amber-400">{warning}</div>}
 
                 {session.status === 'cancelled' && (
                     <div className="border-destructive/40 bg-destructive/5 rounded-xl border p-3 text-sm">
@@ -168,74 +192,110 @@ export default function SessionShow({ session, can, cancel_reasons, enrolments, 
                     </div>
                 )}
 
-                <section aria-label="Informations" className="rounded-xl border p-4">
-                    <dl className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                        {field(
-                            'Formation',
-                            session.training ? (
-                                <>
-                                    {session.training.title}
-                                    {session.training.code && <span className="text-muted-foreground"> ({session.training.code})</span>}
-                                </>
-                            ) : (
-                                '—'
-                            ),
-                        )}
-                        {field('DAS', session.das ?? '—')}
-                        {field('Dates', sessionDates(session))}
-                        {field('Heures prévues', session.planned_hours ? `${session.planned_hours} h` : '—')}
-                        {field('Lieu', sessionLocation(session))}
-                        {field('Modalité', session.modality ?? '—')}
-                        {session.kind !== 'inter'
-                            ? field(
-                                  'Entreprise',
-                                  session.organisation ? (
-                                      session.organisation.can_open ? (
-                                          <Link href={route('crm.organisations.show', session.organisation.id)} className="hover:underline">
-                                              {session.organisation.label}
-                                              {session.organisation.trashed && ' (supprimée)'}
-                                          </Link>
-                                      ) : (
-                                          `${session.organisation.label}${session.organisation.trashed ? ' (supprimée)' : ''}`
-                                      )
-                                  ) : (
-                                      '—'
-                                  ),
-                              )
-                            : field('Places', session.capacity ?? '—')}
-                        {field('Responsable', session.responsible ?? '—')}
-                        {field('Créée', `${formatDateTime(session.created_at)}${session.created_by ? ` par ${session.created_by}` : ''}`)}
-                    </dl>
-                    {session.notes && (
-                        <div className="mt-4 grid gap-0.5">
-                            <div className="text-muted-foreground text-xs">Notes</div>
-                            <p className="text-sm whitespace-pre-line">{session.notes}</p>
-                        </div>
-                    )}
-                </section>
+                <div role="tablist" aria-label="Sections de la session" className="flex gap-1 overflow-x-auto border-b">
+                    {TABS.filter((t) => t !== 'Présences' || attendance_tab).map((t) => (
+                        <button
+                            key={t}
+                            role="tab"
+                            type="button"
+                            id={`tab-${t}`}
+                            aria-selected={tab === t}
+                            aria-controls={`panel-${t}`}
+                            onClick={() => setTab(t)}
+                            className={`-mb-px border-b-2 px-4 py-2 text-sm whitespace-nowrap ${tab === t ? 'border-primary font-medium' : 'text-muted-foreground hover:text-foreground border-transparent'}`}
+                        >
+                            {t}
+                        </button>
+                    ))}
+                </div>
 
-                <section aria-label="Inscrits" className="grid gap-3">
-                    <div className="flex flex-wrap items-center justify-between gap-2">
-                        <h2 className="text-sm font-semibold">
-                            Inscrits · {places.taken}
-                            {places.capacity !== null && ` / ${places.capacity} places (${places.free} libre${(places.free ?? 0) > 1 ? 's' : ''})`}
-                        </h2>
-                        {enrol && (
-                            <Button type="button" size="sm" onClick={() => setEnrolling(true)}>
-                                <UserPlus className="h-4 w-4" />
-                                Inscrire des stagiaires
-                            </Button>
+                {tab === 'Planning' && (
+                    <div role="tabpanel" id="panel-Planning" aria-labelledby="tab-Planning" className="grid gap-6">
+                        <SessionModules sessionId={session.id} session={session} planning={planning} />
+                        <SessionPlanningSeances session={session} planning={planning} />
+                    </div>
+                )}
+
+                {tab === 'Présences' && attendance_tab && (
+                    <div role="tabpanel" id="panel-Présences" aria-labelledby="tab-Présences" className="grid gap-6">
+                        <SessionAttendance sessionId={session.id} />
+                    </div>
+                )}
+                {tab === 'Session' && (
+                    <div role="tabpanel" id="panel-Session" aria-labelledby="tab-Session" className="grid gap-6">
+                        <section aria-label="Informations" className="rounded-xl border p-4">
+                            <dl className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                                {field(
+                                    'Formation',
+                                    session.training ? (
+                                        <>
+                                            {session.training.title}
+                                            {session.training.code && <span className="text-muted-foreground"> ({session.training.code})</span>}
+                                        </>
+                                    ) : (
+                                        '—'
+                                    ),
+                                )}
+                                {field('DAS', session.das ?? '—')}
+                                {field('Dates', sessionDates(session))}
+                                {field('Heures prévues', session.planned_hours ? `${session.planned_hours} h` : '—')}
+                                {field('Lieu', sessionLocation(session))}
+                                {field('Modalité', session.modality ?? '—')}
+                                {session.kind !== 'inter'
+                                    ? field(
+                                          'Entreprise',
+                                          session.organisation ? (
+                                              session.organisation.can_open ? (
+                                                  <Link href={route('crm.organisations.show', session.organisation.id)} className="hover:underline">
+                                                      {session.organisation.label}
+                                                      {session.organisation.trashed && ' (supprimée)'}
+                                                  </Link>
+                                              ) : (
+                                                  `${session.organisation.label}${session.organisation.trashed ? ' (supprimée)' : ''}`
+                                              )
+                                          ) : (
+                                              '—'
+                                          ),
+                                      )
+                                    : field('Places', session.capacity ?? '—')}
+                                {field('Responsable', session.responsible ?? '—')}
+                                {field('Créée', `${formatDateTime(session.created_at)}${session.created_by ? ` par ${session.created_by}` : ''}`)}
+                            </dl>
+                            {session.notes && (
+                                <div className="mt-4 grid gap-0.5">
+                                    <div className="text-muted-foreground text-xs">Notes</div>
+                                    <p className="text-sm whitespace-pre-line">{session.notes}</p>
+                                </div>
+                            )}
+                        </section>
+
+                        <section aria-label="Inscrits" className="grid gap-3">
+                            <div className="flex flex-wrap items-center justify-between gap-2">
+                                <h2 className="text-sm font-semibold">
+                                    Inscrits · {places.taken}
+                                    {places.capacity !== null &&
+                                        ` / ${places.capacity} places (${places.free} libre${(places.free ?? 0) > 1 ? 's' : ''})`}
+                                </h2>
+                                {enrol && (
+                                    <Button type="button" size="sm" onClick={() => setEnrolling(true)}>
+                                        <UserPlus className="h-4 w-4" />
+                                        Inscrire des stagiaires
+                                    </Button>
+                                )}
+                            </div>
+                            <EnrolmentList rows={others} context="session" references={enrolment_references} />
+                        </section>
+
+                        {waiting.length > 0 && (
+                            <section aria-label="Liste d'attente" className="grid gap-3">
+                                <h2 className="text-sm font-semibold">Liste d'attente · {waiting.length}</h2>
+                                <p className="text-muted-foreground text-sm">
+                                    Ordre d'arrivée ; une place libérée ne promeut personne automatiquement.
+                                </p>
+                                <EnrolmentList rows={waiting} context="session" references={enrolment_references} />
+                            </section>
                         )}
                     </div>
-                    <EnrolmentList rows={others} context="session" references={enrolment_references} />
-                </section>
-
-                {waiting.length > 0 && (
-                    <section aria-label="Liste d'attente" className="grid gap-3">
-                        <h2 className="text-sm font-semibold">Liste d'attente · {waiting.length}</h2>
-                        <p className="text-muted-foreground text-sm">Ordre d'arrivée ; une place libérée ne promeut personne automatiquement.</p>
-                        <EnrolmentList rows={waiting} context="session" references={enrolment_references} />
-                    </section>
                 )}
             </div>
 

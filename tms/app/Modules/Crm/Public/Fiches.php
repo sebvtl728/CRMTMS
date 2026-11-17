@@ -4,13 +4,15 @@ namespace App\Modules\Crm\Public;
 
 use App\Modules\Core\Users\User;
 use App\Modules\Crm\Organisations\Organisation;
+use App\Modules\Crm\Organisations\OrganisationStatus;
 use App\Modules\Crm\People\Person;
 use App\Modules\Crm\Permissions;
 use App\Modules\Crm\Visibility\CrmVisibility;
 use Illuminate\Support\Str;
 
 /**
- * Public read façade of the fiches for the other modules: the minimal
+ * Public façade of the fiches for the other modules (and personForTrainer(),
+ * its one writer: the person behind a trainer). Reads give the minimal
  * identity of an entreprise or a person of the organisme (fiches out of the
  * trash, people not anonymised), whatever the CRM visibility of the user. The caller decides who
  * may see it (a dossier's contractant, a session's entreprise...).
@@ -84,6 +86,90 @@ final class Fiches
 
         return Person::withTrashed()->whereKey($ids)->get()
             ->mapWithKeys(fn (Person $p) => [$p->id => ['label' => $p->fullName(), 'trashed' => $p->trashed()]])->all();
+    }
+
+    /**
+     * Primary e-mail of these people keyed by id (null when none), trashed
+     * ones included, anonymised ones without e-mail. Unknown ids are left out.
+     *
+     * @param  list<string>  $ids
+     * @return array<string, string|null>
+     */
+    public function personEmails(array $ids): array
+    {
+        $ids = array_values(array_unique(array_filter($ids, fn (string $id) => Str::isUuid($id))));
+        if ($ids === []) {
+            return [];
+        }
+
+        return Person::withTrashed()->whereKey($ids)->get(['id', 'email', 'anonymised_at'])
+            ->mapWithKeys(fn (Person $p) => [$p->id => $p->anonymised_at === null ? $p->email : null])->all();
+    }
+
+    /**
+     * Ids of the people of the organisme (out of the trash, not anonymised)
+     * whose primary e-mail is $email, case-insensitive.
+     *
+     * @return list<string>
+     */
+    public function peopleWithEmail(string $email): array
+    {
+        $email = mb_strtolower(trim($email));
+        if ($email === '') {
+            return [];
+        }
+
+        return Person::query()->whereNull('people.anonymised_at')->whereRaw('lower(people.email) = ?', [$email])
+            ->orderBy('people.id')->pluck('people.id')->map(fn ($id) => (string) $id)->all();
+    }
+
+    /**
+     * The person behind a trainer of the Sessions module. Reused only when
+     * exactly one person of the organisme (out of the trash, not anonymised)
+     * has the primary e-mail $email AND the same last name (accents and case
+     * aside); else a trashed one with both (exactly one, never merged nor
+     * anonymised) is restored; otherwise a new person is created. A new one
+     * is no prospect (status « Inactif »: no commercial relation), has no
+     * creator nor responsible, so it never lands in anybody's « Ses fiches ».
+     *
+     * @return string the person's id
+     */
+    public function personForTrainer(string $lastName, ?string $firstName, ?string $email): string
+    {
+        $email = $email === null || trim($email) === '' ? null : mb_strtolower(trim($email));
+        $name = self::comparable($lastName);
+        if ($email !== null) {
+            $live = Person::query()->whereNull('people.anonymised_at')->whereRaw('lower(people.email) = ?', [$email])->get(['id', 'last_name']);
+            if ($live->count() === 1 && self::comparable((string) $live->first()?->last_name) === $name) {
+                return (string) $live->firstOrFail()->id;
+            }
+            if ($live->isEmpty()) {
+                $trashed = Person::onlyTrashed()->whereNull('people.anonymised_at')->whereNull('people.merged_into_id')
+                    ->whereRaw('lower(people.email) = ?', [$email])->get()
+                    ->filter(fn (Person $p) => self::comparable($p->last_name) === $name);
+                if ($trashed->count() === 1) {
+                    $person = $trashed->firstOrFail();
+                    $person->restore();
+
+                    return (string) $person->id;
+                }
+            }
+        }
+        $firstName = $firstName === null || trim($firstName) === '' ? null : trim($firstName);
+
+        $id = (string) Person::query()->create([
+            'last_name' => trim($lastName), 'first_name' => $firstName, 'email' => $email,
+            'country' => 'FR', 'status' => OrganisationStatus::Inactif->value,
+        ])->getKey();
+        // Nobody's fiche: no creator (the creating hook sets the current user).
+        Person::query()->whereKey($id)->update(['created_by' => null]);
+
+        return $id;
+    }
+
+    private static function comparable(string $name): string
+    {
+        return Str::lower(Str::ascii(Str::squish($name)));
     }
 
     /**

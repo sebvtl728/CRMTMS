@@ -3,7 +3,7 @@
 namespace App\Modules\Core\Access;
 
 /**
- * The six system roles of every organisme (one primary role per user). Each
+ * The seven system roles of every organisme (one primary role per user). Each
  * tenant has its own spatie role records (RoleSeeder, RoleModel with
  * system = true), named after these values; the default permissions are in
  * Permissions::defaultsFor(). An organisme adds its own roles with
@@ -17,6 +17,8 @@ enum Role: string
     case ChargeRelations = 'charge_relations';
     case Assistant = 'assistant';
     case ResponsableDas = 'responsable_das';
+    /** Trainer (0.8.0): his séances and their attendance only (scope « Ses séances »). */
+    case Formateur = 'formateur';
 
     public function label(): string
     {
@@ -27,6 +29,7 @@ enum Role: string
             self::ChargeRelations => 'Chargé de relations',
             self::Assistant => 'Assistant',
             self::ResponsableDas => 'Responsable DAS',
+            self::Formateur => 'Formateur',
         };
     }
 

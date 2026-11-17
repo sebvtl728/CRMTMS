@@ -20,6 +20,7 @@ export function FichePicker({
     value,
     onPick,
     placeholder,
+    searchUrl,
 }: {
     id: string;
     kind: 'organisation' | 'person';
@@ -27,6 +28,8 @@ export function FichePicker({
     value: Picked | null;
     onPick: (p: Picked | null) => void;
     placeholder: string;
+    /** Another search endpoint answering the same shape (entreprises / personnes). */
+    searchUrl?: string;
 }) {
     const [term, setTerm] = useState('');
     const [hits, setHits] = useState<Picked[]>([]);
@@ -42,7 +45,7 @@ export function FichePicker({
         const timer = setTimeout(() => {
             const params: Record<string, string> = { q: term };
             if (organisationId) params.organisation = organisationId;
-            fetch(`${route(kind === 'organisation' ? 'dossiers.organisations' : 'dossiers.people')}?${new URLSearchParams(params)}`, {
+            fetch(`${searchUrl ?? route(kind === 'organisation' ? 'dossiers.organisations' : 'dossiers.people')}?${new URLSearchParams(params)}`, {
                 headers: { Accept: 'application/json' },
                 signal: controller.signal,
             })
@@ -73,7 +76,7 @@ export function FichePicker({
             clearTimeout(timer);
             controller.abort();
         };
-    }, [term, kind, organisationId]);
+    }, [term, kind, organisationId, searchUrl]);
 
     if (value) {
         return (

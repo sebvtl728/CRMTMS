@@ -17,6 +17,8 @@ export interface FicheBlock {
         meta?: string | null;
         badge?: string | null;
         href?: string | null;
+        /** Detail lines (the planning of a trainee: next séances, placements). */
+        details?: string[];
     }[];
 }
 
@@ -36,6 +38,13 @@ export function FicheBlockPanel({ block }: { block: FicheBlock }) {
                                 </div>
                                 {row.subtitle && <p className="text-muted-foreground mt-1 text-sm">{row.subtitle}</p>}
                                 {row.meta && <p className="mt-1 text-sm">{row.meta}</p>}
+                                {row.details && row.details.length > 0 && (
+                                    <ul className="text-muted-foreground mt-2 grid gap-0.5 border-t pt-2 text-xs">
+                                        {row.details.map((line, i) => (
+                                            <li key={i}>{line}</li>
+                                        ))}
+                                    </ul>
+                                )}
                             </>
                         );
 
