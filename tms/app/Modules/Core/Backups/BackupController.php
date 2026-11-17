@@ -40,6 +40,7 @@ class BackupController extends Controller
             ], $status['snapshots'] ?? []),
             'running' => BackupStatus::running(),
             'pending' => BackupStatus::requestPending(),
+            'request_stale' => BackupStatus::requestStale(),
             'status' => $request->session()->get('status'),
         ]);
     }
@@ -57,7 +58,7 @@ class BackupController extends Controller
         }
         $this->audit->record('backup.requested');
 
-        return to_route('admin.backups.show')->with('status', 'Sauvegarde demandée : elle démarre dans quelques minutes.');
+        return to_route('admin.backups.show')->with('status', 'Sauvegarde demandée : le serveur la lance dans un instant.');
     }
 
     private function ensureSingleMode(): void

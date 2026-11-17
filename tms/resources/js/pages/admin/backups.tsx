@@ -6,8 +6,8 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
-import { Head, useForm } from '@inertiajs/react';
-import { FormEventHandler } from 'react';
+import { Head, useForm, usePoll } from '@inertiajs/react';
+import { FormEventHandler, useEffect } from 'react';
 
 interface Last {
     finished_at: string;
@@ -31,6 +31,8 @@ interface BackupsProps {
     snapshots: Snapshot[];
     running: boolean;
     pending: boolean;
+    /** A request is still waiting after 10 minutes: no unit of the server consumes it. */
+    request_stale: boolean;
     status?: string;
 }
 
@@ -44,8 +46,19 @@ function remoteLabel(remote: Last['remote']): string {
     return remote.success ? 'Configurée, dernière copie réussie' : 'Configurée, dernière copie échouée';
 }
 
-export default function Backups({ last, stale, snapshots, running, pending, status }: BackupsProps) {
+/** While a backup is requested or running, the page reloads its state every 15 seconds. */
+const POLL_MS = 15000;
+
+export default function Backups({ last, stale, snapshots, running, pending, request_stale, status }: BackupsProps) {
     const { post, processing, errors } = useForm<{ request?: string }>({});
+    const busy = running || pending;
+    const { start, stop } = usePoll(POLL_MS, { only: ['last', 'stale', 'snapshots', 'running', 'pending', 'request_stale'] }, { autoStart: false });
+
+    useEffect(() => {
+        if (busy) start();
+        else stop();
+        return stop;
+    }, [busy, start, stop]);
 
     const submit: FormEventHandler = (e) => {
         e.preventDefault();
@@ -115,8 +128,18 @@ export default function Backups({ last, stale, snapshots, running, pending, stat
                     </>
                 )}
 
+                {request_stale && !running && (
+                    <Alert variant="destructive">
+                        <AlertDescription>
+                            La demande n&apos;a pas été prise en charge par le serveur. Vous pouvez la renouveler ; si le problème persiste,
+                            l&apos;administrateur du serveur doit vérifier la sauvegarde à la demande (guide d&apos;installation, section «
+                            Sauvegardes »).
+                        </AlertDescription>
+                    </Alert>
+                )}
+
                 <form onSubmit={submit} className="flex flex-col items-start gap-2">
-                    <Button type="submit" disabled={running || pending || processing}>
+                    <Button type="submit" disabled={busy || processing}>
                         {label}
                     </Button>
                     <InputError message={errors.request} />

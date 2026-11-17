@@ -146,3 +146,57 @@ it('shows a French error when the ops folder is not usable', function () {
         ->assertSessionHasErrors(['request' => BackupStatus::ERROR_NOT_READY]);
     expect(AuditLog::query()->where('event', 'backup.requested')->count())->toBe(0);
 });
+
+it('treats a request nobody picked up for 10 minutes as stale and accepts a new one', function () {
+    $admin = admin(twoFactor: true);
+    $path = $this->ops.'/backup-request.json';
+    file_put_contents($path, json_encode(['requested_at' => now()->subMinutes(11)->toIso8601String(), 'requested_by_id' => 'x']));
+    touch($path, now()->subMinutes(11)->getTimestamp());
+
+    expect(BackupStatus::requestPending())->toBeFalse()->and(BackupStatus::requestStale())->toBeTrue();
+    $this->actingAs($admin)->get('/admin/backups')
+        ->assertInertia(fn (Assert $p) => $p->where('pending', false)->where('request_stale', true));
+
+    $this->actingAs($admin)->post('/admin/backups/request')
+        ->assertSessionHas('status', fn ($s) => str_starts_with($s, 'Sauvegarde demandée'));
+    expect(json_decode(file_get_contents($path), true)['requested_by_id'])->toBe($admin->getKey())
+        ->and(BackupStatus::requestPending())->toBeTrue()
+        ->and(BackupStatus::requestStale())->toBeFalse();
+    $this->actingAs($admin)->get('/admin/backups')
+        ->assertInertia(fn (Assert $p) => $p->where('pending', true)->where('request_stale', false));
+
+    // Nine minutes: still waiting for the host.
+    touch($path, now()->subMinutes(9)->getTimestamp());
+    expect(BackupStatus::requestPending())->toBeTrue()->and(BackupStatus::requestStale())->toBeFalse();
+});
+
+it('never creates the ops folder itself: the host does', function () {
+    $missing = $this->ops.'/absent/ops';
+    config(['tms.ops_path' => $missing]);
+
+    $this->actingAs(admin(twoFactor: true))->post('/admin/backups/request')
+        ->assertSessionHasErrors(['request' => BackupStatus::ERROR_NOT_READY]);
+    expect($missing)->not->toBeDirectory()->and($this->ops.'/absent')->not->toBeDirectory();
+});
+
+it('rejects a finished_at more than 5 minutes in the future', function () {
+    writeStatus(['finished_at' => now()->addMinutes(6)->toIso8601String()]);
+    expect(BackupStatus::read())->toBeNull()->and(BackupStatus::alert())->toStartWith('Aucune sauvegarde connue');
+
+    writeStatus(['finished_at' => now()->addMinutes(4)->toIso8601String()]);
+    expect(BackupStatus::read())->not->toBeNull();
+});
+
+it('caps the error at 500 characters and ignores a negative size', function () {
+    writeStatus(['success' => false, 'error' => str_repeat('é', 800), 'size_bytes' => -1]);
+    $status = BackupStatus::read();
+
+    expect(mb_strlen($status['error']))->toBe(500)
+        ->and($status['error'])->toBe(str_repeat('é', 500))
+        ->and($status['size_bytes'])->toBeNull();
+    $this->actingAs(admin(twoFactor: true))->get('/admin/backups')
+        ->assertInertia(fn (Assert $p) => $p->where('last.size', null));
+
+    writeStatus(['size_bytes' => 0]);
+    expect(BackupStatus::read()['size_bytes'])->toBe(0);
+});

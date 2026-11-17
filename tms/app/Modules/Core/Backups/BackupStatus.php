@@ -18,6 +18,15 @@ final class BackupStatus
     /** A running marker older than this is a leftover of a crash. */
     public const RUNNING_STALE_HOURS = 6;
 
+    /** A request the host has not picked up after this long will not be: a new one may be made. */
+    public const REQUEST_STALE_MINUTES = 10;
+
+    /** A finished_at further in the future than this is not trusted (clock or forged file). */
+    public const FUTURE_TOLERANCE_MINUTES = 5;
+
+    /** Longest error message kept from the status file. */
+    public const ERROR_MAX_LENGTH = 500;
+
     public const ERROR_NOT_READY = "Impossible de demander une sauvegarde : le serveur n'est pas prêt (dossier ops absent).";
 
     public static function directory(): string
@@ -37,7 +46,7 @@ final class BackupStatus
             return null;
         }
         $finished = self::date($data['finished_at']);
-        if ($finished === null) {
+        if ($finished === null || $finished->gt(CarbonImmutable::now()->addMinutes(self::FUTURE_TOLERANCE_MINUTES))) {
             return null;
         }
 
@@ -59,9 +68,9 @@ final class BackupStatus
             'finished_at' => $finished,
             'success' => $data['success'],
             'snapshot_id' => is_string($data['snapshot_id'] ?? null) ? $data['snapshot_id'] : null,
-            'error' => is_string($data['error'] ?? null) ? $data['error'] : null,
+            'error' => is_string($data['error'] ?? null) ? mb_substr($data['error'], 0, self::ERROR_MAX_LENGTH) : null,
             'version' => is_string($data['version'] ?? null) ? $data['version'] : null,
-            'size_bytes' => is_int($data['size_bytes'] ?? null) ? $data['size_bytes'] : null,
+            'size_bytes' => is_int($data['size_bytes'] ?? null) && $data['size_bytes'] >= 0 ? $data['size_bytes'] : null,
             'remote' => [
                 'configured' => ($remote['configured'] ?? false) === true,
                 'success' => is_bool($remote['success'] ?? null) ? $remote['success'] : null,
@@ -108,20 +117,30 @@ final class BackupStatus
         return $started !== null && $started->gt(CarbonImmutable::now()->subHours(self::RUNNING_STALE_HOURS));
     }
 
-    /** A request is waiting for the host. */
+    /** A request is waiting for the host (written less than 10 minutes ago). */
     public static function requestPending(): bool
     {
-        return is_file(self::directory().'/backup-request.json');
+        $age = self::requestAgeInSeconds();
+
+        return $age !== null && $age < self::REQUEST_STALE_MINUTES * 60;
     }
 
-    /** Write the request atomically; false when the folder is missing or not writable. */
+    /** A request is still there 10 minutes later: no unit on the host consumes it. */
+    public static function requestStale(): bool
+    {
+        $age = self::requestAgeInSeconds();
+
+        return $age !== null && $age >= self::REQUEST_STALE_MINUTES * 60;
+    }
+
+    /**
+     * Write the request atomically (replacing a stale one); false when the folder is missing or not
+     * writable. The folder belongs to the host (installer, updater): never created here.
+     */
     public static function writeRequest(string $userId): bool
     {
         $dir = self::directory();
-        if (! is_dir($dir) && ! @mkdir($dir, 0775, true) && ! is_dir($dir)) {
-            return false;
-        }
-        if (! is_writable($dir)) {
+        if (! is_dir($dir) || ! is_writable($dir)) {
             return false;
         }
 
@@ -144,6 +163,16 @@ final class BackupStatus
         }
 
         return true;
+    }
+
+    /** Seconds since the request file was written, null without a request. */
+    private static function requestAgeInSeconds(): ?int
+    {
+        $path = self::directory().'/backup-request.json';
+        clearstatcache(true, $path);
+        $written = is_file($path) ? @filemtime($path) : false;
+
+        return $written === false ? null : max(0, CarbonImmutable::now()->getTimestamp() - $written);
     }
 
     /** @return array<string, mixed>|null */
