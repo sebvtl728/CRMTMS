@@ -336,6 +336,78 @@ env_value() {
     grep -q "releases/download/v$FIXTURE_VERSION/tms-$FIXTURE_VERSION.tar.gz" "$MOCK_LOG/curl.log"
 }
 
+# Release whose ops/import.sh is a stub: logs its arguments and whether the export password
+# reached it (never its value), exits with MOCK_IMPORT_RC.
+build_release_with_import_stub() {
+    local stage="$BATS_TEST_TMPDIR/stage-import"
+    stage_src "$stage"
+    cat >"$stage/ops/import.sh" <<'SH'
+#!/usr/bin/env bash
+{
+    echo "import.sh $*"
+    [ -n "${TMS_IMPORT_PASSWORD:-}" ] && echo "password: set"
+} >>"$MOCK_LOG/import.log"
+echo "Récapitulatif de contrôle"
+exit "${MOCK_IMPORT_RC:-0}"
+SH
+    rm -rf "$MOCK_DIST" && mkdir -p "$MOCK_DIST"
+    bundle_src "$stage" "$FIXTURE_VERSION" "$MOCK_DIST" "$FIXTURE_DIGEST"
+}
+
+@test "install --import: fresh secrets, no organisme nor administrator, then import.sh on the file" {
+    build_release_with_import_stub
+    local export_file="$BATS_TEST_TMPDIR/tms-export-a.tar" password="mot-de-passe-de-l-export"
+    echo "export" >"$export_file"
+    unset TMS_TENANT_NAME
+    TMS_IMPORT_PASSWORD="$password" run bash "$INSTALL_SH" --import "$export_file"
+    [ "$status" -eq 0 ]
+    grep -qx "import.sh $export_file" "$MOCK_LOG/import.log"
+    grep -qx "password: set" "$MOCK_LOG/import.log"
+    refute grep -q "tms:install" "$MOCK_LOG/docker.log"
+    # The stack itself is installed: secrets, migrations, start, backups.
+    for key in APP_KEY POSTGRES_OWNER_PASSWORD POSTGRES_APP_PASSWORD REDIS_PASSWORD RESTIC_PASSWORD; do
+        [ -n "$(env_value "$key")" ]
+    done
+    grep -q "migrate --database=pgsql_owner --force" "$MOCK_LOG/docker.log"
+    grep -q "enable --now tms-backup.timer" "$MOCK_LOG/systemctl.log"
+    [[ "$output" == *"Récapitulatif de contrôle"* ]] || false
+    [[ "$output" == *"ceux du"*"serveur exporté"* ]] || false
+    [[ "$output" != *"Activation"* ]] || false
+    # Only the new RESTIC_PASSWORD is shown: APP_KEY comes from the export.
+    [[ "$output" == *"RESTIC_PASSWORD=$(env_value RESTIC_PASSWORD)"* ]] || false
+    [[ "$output" != *"$(env_value APP_KEY)"* ]] || false
+    # The export password never reaches a log or a command line.
+    [[ "$output" != *"$password"* ]] || false
+    refute grep -qF -- "$password" "$MOCK_LOG/docker.log" "$MOCK_LOG/import.log" "$TMS_DIR/.env"
+}
+
+@test "install reads TMS_IMPORT_FILE from the settings file and refuses a missing export before anything" {
+    build_release_with_import_stub
+    unset TMS_TENANT_NAME
+    printf 'TMS_IMPORT_FILE=%s\n' "$BATS_TEST_TMPDIR/absent.tar" >"$BATS_TEST_TMPDIR/settings.env"
+    TMS_INSTALL_ENV="$BATS_TEST_TMPDIR/settings.env" run bash "$INSTALL_SH"
+    [ "$status" -ne 0 ]
+    [[ "$output" == *"Fichier d'export introuvable ou illisible"* ]] || false
+    [ ! -f "$MOCK_LOG/curl.log" ]
+    [ ! -e "$TMS_DIR/.env" ]
+
+    echo "export" >"$BATS_TEST_TMPDIR/absent.tar"
+    TMS_IMPORT_PASSWORD="mot-de-passe-de-l-export" TMS_INSTALL_ENV="$BATS_TEST_TMPDIR/settings.env" run bash "$INSTALL_SH"
+    [ "$status" -eq 0 ]
+    grep -qx "import.sh $BATS_TEST_TMPDIR/absent.tar" "$MOCK_LOG/import.log"
+}
+
+@test "install --import: a failed import keeps the installation and says how to run it again" {
+    build_release_with_import_stub
+    echo "export" >"$BATS_TEST_TMPDIR/e.tar"
+    MOCK_IMPORT_RC=1 TMS_IMPORT_PASSWORD="mot-de-passe-de-l-export" run bash "$INSTALL_SH" --import "$BATS_TEST_TMPDIR/e.tar"
+    [ "$status" -ne 0 ]
+    [[ "$output" == *"relancez $TMS_DIR/ops/import.sh $BATS_TEST_TMPDIR/e.tar"* ]] || false
+    [[ "$output" != *"down -v"* ]] || false
+    [ -f "$TMS_DIR/.env" ]
+    grep -q "enable --now tms-backup.timer" "$MOCK_LOG/systemctl.log"
+}
+
 # --- proxmox.sh ----------------------------------------------------------------
 
 @test "proxmox.sh refuses to run outside proxmox" {

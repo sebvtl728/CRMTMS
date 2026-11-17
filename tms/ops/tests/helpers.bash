@@ -7,6 +7,9 @@
 #                          $STACK_DIR/tms (like /opt/tms), not from the source tree
 #   TMS_TEST_TMPDIR        base directory for the stack files (must be bind-mountable
 #                          by Docker; default ~/.cache/tms-bats)
+#   STACK_VERSION          TMS_VERSION of the stack (default bats; the image tms-ci:bats is
+#                          tagged with it)
+#   STACK_ENV_EXTRA        extra KEY=VALUE lines appended to the stack .env
 
 TMS_ROOT="$(cd "$BATS_TEST_DIRNAME/../.." && pwd)"
 export TMS_ROOT
@@ -41,7 +44,7 @@ stack_up() {
     # Throwaway secrets, generated for this run only.
     cat >"$TMS_ENV_FILE" <<ENV
 TMS_IMAGE=tms-ci
-TMS_VERSION=bats
+TMS_VERSION=${STACK_VERSION:-bats}
 TMS_DOMAIN=localhost
 TMS_ACME_EMAIL=ci@example.test
 TMS_HTTP_PORT=18080
@@ -55,6 +58,7 @@ MAIL_MAILER=log
 RESTIC_PASSWORD=$(gen_secret 24)
 RESTIC_REPOSITORY=$STACK_DIR/restic
 TMS_BACKUP_TMPDIR=$STACK_DIR/staging
+${STACK_ENV_EXTRA:-}
 ENV
     chmod 600 "$TMS_ENV_FILE"
 
@@ -62,6 +66,7 @@ ENV
         docker build -f "$TMS_ROOT/docker/app.Dockerfile" --target prod \
             --build-arg APP_VERSION=bats -t tms-ci:bats "$TMS_ROOT" >&2 || return 1
     fi
+    [[ -z "${STACK_VERSION:-}" ]] || docker tag tms-ci:bats "tms-ci:$STACK_VERSION" >&2 || return 1
 
     compose up -d --wait >&2 || return 1
     "$TMS_ROOT/ops/migrate.sh" >&2 || return 1

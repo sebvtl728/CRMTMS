@@ -131,7 +131,7 @@ fetch_bundle() {
     fi
     local f
     for f in compose.prod.yaml .env.prod.example ops/lib.sh ops/migrate.sh ops/backup.sh ops/restore.sh ops/update.sh \
-        docker/caddy/Caddyfile docker/postgres/init.sh docker/postgres/init.sql release.env; do
+        ops/export.sh ops/import.sh docker/caddy/Caddyfile docker/postgres/init.sh docker/postgres/init.sql release.env; do
         [[ -f "$BUNDLE_ROOT/$f" ]] || die "Archive invalide : $f manquant."
     done
     # Image of this version, pinned by digest (verified bundle -> .env -> compose).
@@ -268,6 +268,57 @@ load_env() {
     done <"$TMS_ENV_FILE"
 }
 
+# env_get <KEY>: value of KEY in the env file (first occurrence, like load_env; quotes removed,
+# never evaluated), empty when absent. Exports nothing: a script that starts other ops scripts
+# (import.sh) must not hand them values that would win over their own .env (APP_KEY adopted
+# by restore.sh, for instance).
+env_get() {
+    local line value
+    [[ -f "$TMS_ENV_FILE" ]] || return 0
+    while IFS= read -r line || [[ -n "$line" ]]; do
+        [[ "$line" =~ ^[[:space:]]*([A-Za-z_][A-Za-z0-9_]*)=(.*)$ && "${BASH_REMATCH[1]}" == "$1" ]] || continue
+        value="${BASH_REMATCH[2]}"
+        if [[ "$value" =~ ^\"(.*)\"$ ]] || [[ "$value" =~ ^\'(.*)\'$ ]]; then
+            value="${BASH_REMATCH[1]}"
+        fi
+        printf '%s' "$value"
+        return 0
+    done <"$TMS_ENV_FILE"
+}
+
+# env_set <KEY> <VALUE>: replaces (or appends) KEY in the env file; atomic, mode 600.
+env_set() {
+    local tmp
+    tmp="$(umask 077 && mktemp "${TMS_ENV_FILE}.XXXXXX")" || return 1
+    if ! { grep -v "^$1=" "$TMS_ENV_FILE" || true; printf '%s=%s\n' "$1" "$2"; } >"$tmp" \
+        || ! chmod 600 "$tmp" || ! mv -f "$tmp" "$TMS_ENV_FILE"; then
+        rm -f "$tmp"
+        return 1
+    fi
+}
+
+# read_password <prompt>: one line typed without echo (stdin), printed on stdout for a command
+# substitution (never on a command line nor in a log). Fails at end of input.
+read_password() {
+    local value
+    printf '%s' "$1" >&2
+    if ! IFS= read -rs value; then
+        printf '\n' >&2
+        return 1
+    fi
+    printf '\n' >&2
+    printf '%s' "$value"
+}
+
+# sha256_of <file>: hexadecimal SHA-256 of the file.
+sha256_of() {
+    if command -v sha256sum >/dev/null 2>&1; then
+        sha256sum "$1" | awk '{print $1}'
+    else
+        shasum -a 256 "$1" | awk '{print $1}'
+    fi
+}
+
 # require_var <NAME>: dies naming the variable when it is empty.
 require_var() {
     [[ -n "${!1:-}" ]] || die "Variable $1 manquante dans $TMS_ENV_FILE"
@@ -298,6 +349,14 @@ restic_run() {
         -e RESTIC_REPOSITORY -e RESTIC_PASSWORD -e RESTIC_FROM_REPOSITORY -e RESTIC_FROM_PASSWORD \
         ${docker_args[@]+"${docker_args[@]}"} \
         "$RESTIC_IMAGE" --no-cache "$@"
+}
+
+# restic_snapshot_ids: full ids of the snapshots of RESTIC_REPOSITORY, one per line (fails when
+# the repository cannot be read).
+restic_snapshot_ids() {
+    local json
+    json="$(restic_run -- snapshots --json)" || return 1
+    printf '%s' "$json" | { grep -o '"id":"[0-9a-f]\{64\}"' || true; } | sed 's/^"id":"\(.*\)"$/\1/'
 }
 
 # --- Backup status and requests (exchange with the application) ---------------------

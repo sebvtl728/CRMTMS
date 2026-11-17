@@ -10,6 +10,10 @@
 # from the current .env the restore is refused (connector secrets and 2FA enrolments could
 # not be decrypted) unless --with-app-key is given: once the database is restored, the
 # snapshot key is written into .env (the previous file is kept as .env.bak-<timestamp>, mode 600).
+#
+# Another repository than the one of .env (RESTIC_REPOSITORY / RESTIC_PASSWORD) can be given by
+# the caller through the environment, never on the command line: TMS_RESTORE_REPOSITORY and
+# TMS_RESTORE_PASSWORD (ops/import.sh restores the repository of an export file this way).
 set -euo pipefail
 
 # shellcheck source=lib.sh
@@ -38,9 +42,16 @@ on_exit() {
 trap on_exit EXIT
 
 load_env
-require_var RESTIC_PASSWORD
-export RESTIC_PASSWORD
-export RESTIC_REPOSITORY="${RESTIC_REPOSITORY:-/var/backups/tms}"
+if [[ -n "${TMS_RESTORE_REPOSITORY:-}" ]]; then
+    # Repository chosen by the caller (ops/import.sh: the repository of an export file).
+    [[ -n "${TMS_RESTORE_PASSWORD:-}" ]] || die "Mot de passe du dépôt ${TMS_RESTORE_REPOSITORY} manquant (TMS_RESTORE_PASSWORD)."
+    export RESTIC_REPOSITORY="$TMS_RESTORE_REPOSITORY" RESTIC_PASSWORD="$TMS_RESTORE_PASSWORD"
+else
+    require_var RESTIC_PASSWORD
+    export RESTIC_PASSWORD
+    export RESTIC_REPOSITORY="${RESTIC_REPOSITORY:-/var/backups/tms}"
+fi
+unset TMS_RESTORE_PASSWORD
 
 STAGE="$(mktemp -d "${TMS_BACKUP_TMPDIR:-/var/tmp}/tms-restore.XXXXXX")"
 
