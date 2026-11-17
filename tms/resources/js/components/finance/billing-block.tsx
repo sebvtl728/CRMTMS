@@ -7,7 +7,7 @@ import { formatDate } from '@/lib/crm';
 import { formatCents } from '@/lib/revenue';
 import { Link, router, useForm } from '@inertiajs/react';
 import { Plus, Trash2 } from 'lucide-react';
-import { FormEventHandler, useState } from 'react';
+import { FormEventHandler, useEffect, useState } from 'react';
 
 type Rhythm = 'end' | 'monthly' | 'schedule';
 type Basis = 'realised' | 'planned';
@@ -38,10 +38,8 @@ export interface BillingBlockProps {
     update_url: string;
     /** Fundings paying directly the organisme, each invoiced on its own. */
     direct_fundings: { id: string; funder: string; amount_cents: number; status: string; agreement_number: string | null }[];
-    /** What is due now (« À facturer »). */
-    due: { recipient: string; kind: 'invoice' | 'credit_note'; total_cents: number; period: string; draft_url: string | null }[];
-    /** Why nothing is due yet (« Formation non terminée »…). */
-    soon: string | null;
+    /** What is due now (« À facturer »), read apart: { due, soon } (null: a dossier in the trash). */
+    due_url: string | null;
     /** A draft made by hand (null: not allowed). */
     create_url: string | null;
     recipients: { value: string; label: string }[];
@@ -85,9 +83,32 @@ export function BillingBlock(props: BillingBlockProps) {
 }
 
 /** Fundings paying directly, what is left to invoice, and a draft made by hand. */
-function BillingSummary({ direct_fundings, due, soon, create_url, recipients }: BillingBlockProps) {
+interface DueSummary {
+    due: { recipient: string; kind: 'invoice' | 'credit_note'; total_cents: number; period: string; draft_url: string | null }[];
+    /** Why nothing is due yet (« Formation non terminée »…). */
+    soon: string | null;
+}
+
+function BillingSummary({ direct_fundings, due_url, create_url, recipients }: BillingBlockProps) {
     const [recipient, setRecipient] = useState(recipients[0]?.value ?? 'contractor');
     const [busy, setBusy] = useState(false);
+    const [summary, setSummary] = useState<DueSummary | null>(null);
+    const [failed, setFailed] = useState(false);
+
+    useEffect(() => {
+        if (!due_url) return;
+        let live = true;
+        fetch(due_url, { headers: { Accept: 'application/json' }, credentials: 'same-origin' })
+            .then((response) => (response.ok ? (response.json() as Promise<DueSummary>) : Promise.reject(new Error(String(response.status)))))
+            .then((json) => live && setSummary(json))
+            .catch(() => live && setFailed(true));
+
+        return () => {
+            live = false;
+        };
+    }, [due_url]);
+    const due = summary?.due ?? [];
+    const soon = summary?.soon ?? null;
 
     return (
         <div className="grid gap-3 rounded-xl border p-4 text-sm">
@@ -106,7 +127,13 @@ function BillingSummary({ direct_fundings, due, soon, create_url, recipients }: 
             )}
             <div>
                 <p className="font-medium">Reste à facturer</p>
-                {due.length === 0 ? (
+                {!due_url ? (
+                    <p className="text-muted-foreground">Dossier à la corbeille.</p>
+                ) : failed ? (
+                    <p className="text-muted-foreground">Calcul indisponible pour le moment.</p>
+                ) : summary === null ? (
+                    <p className="text-muted-foreground">Calcul en cours…</p>
+                ) : due.length === 0 ? (
                     <p className="text-muted-foreground">
                         {soon ? `Rien pour le moment : ${soon.toLowerCase()}.` : 'Rien à facturer pour le moment.'}
                     </p>

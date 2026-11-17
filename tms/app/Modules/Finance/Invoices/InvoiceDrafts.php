@@ -38,6 +38,11 @@ final class InvoiceDrafts
 
     public const MAX_LINES = 100;
 
+    /** Bounds of a line: its total stays far below the bigint limits. */
+    public const MAX_QUANTITY = 100000;
+
+    public const MAX_UNIT_PRICE_CENTS = 999_999_999;
+
     public function __construct(
         private readonly Due $due,
         private readonly BillingPlans $plans,
@@ -67,10 +72,8 @@ final class InvoiceDrafts
 
                 continue;
             }
-            $rows = array_column($this->due->forDossier((string) $dossierId)['rows'], null, 'recipient_key');
             foreach ($recipients as $recipient) {
-                $row = $rows[$recipient] ?? null;
-                if ($row === null || $row['draft'] !== null || $this->create((string) $dossierId, $recipient, $row, $user) === null) {
+                if ($this->create((string) $dossierId, $recipient, $user) === null) {
                     $skipped++;
                 } else {
                     $created++;
@@ -95,19 +98,15 @@ final class InvoiceDrafts
         $who = $this->recipientOf($dossier, $recipient)
             ?? throw ValidationException::withMessages(['recipient' => 'Choisissez le destinataire de la facture.']);
 
-        $row = array_column($this->due->forDossier($dossierId)['rows'], null, 'recipient_key')[$recipient] ?? null;
-        if ($row !== null && $row['draft'] === null) {
-            $invoice = $this->create($dossierId, $recipient, $row, $user);
-            if ($invoice !== null) {
-                return $invoice;
-            }
-        }
-
         return DB::transaction(function () use ($dossier, $dossierId, $recipient, $who, $user): Invoice {
             self::lockDossier($dossierId);
             $open = $this->openDraft($dossierId, $recipient);
             if ($open !== null) {
                 return $open;
+            }
+            $created = $this->create($dossierId, $recipient, $user);
+            if ($created !== null) {
+                return $created;
             }
             $plan = $this->plans->for($dossierId);
             $starts = array_column($dossier['sessions'], 'starts_on');
@@ -183,48 +182,123 @@ final class InvoiceDrafts
     }
 
     /**
-     * The draft of a due row, or null when the recipient has one already.
-     *
-     * @param  array<string, mixed>  $row  Due row
+     * The draft of what is due now to the recipient, computed under the
+     * lock of the dossier; null when it has a draft in progress, nothing is
+     * due, or an invoice would go to a recipient no longer invoiceable (a
+     * funding billed outside the TMS, deleted, or no longer paying
+     * directly: a credit note only).
      */
-    private function create(string $dossierId, string $recipient, array $row, User $user): ?Invoice
+    private function create(string $dossierId, string $recipient, User $user): ?Invoice
     {
-        return DB::transaction(function () use ($dossierId, $recipient, $row, $user): ?Invoice {
+        return DB::transaction(function () use ($dossierId, $recipient, $user): ?Invoice {
             self::lockDossier($dossierId);
             if ($this->openDraft($dossierId, $recipient) !== null) {
                 return null;
             }
             $dossier = Billing::dossier($dossierId) ?? throw new NotFoundHttpException;
+            $row = $this->rowFor($dossier, $recipient);
+            if ($row === null) {
+                return null;
+            }
             $company = Company::withTrashed()->findOrFail($dossier['company_id']);
             $invoice = Invoice::query()->create([
                 'company_id' => $company->id,
-                'kind' => $row['kind'],
                 'dossier_id' => $dossierId,
                 'recipient_type' => $row['recipient']['type'],
                 'recipient_id' => $row['recipient']['id'],
                 'funding_id' => $row['recipient']['funding_id'],
-                'period_from' => $row['period']['from'],
-                'period_to' => $row['period']['to'],
-                'cut_off' => $row['cut_off'],
-                'rhythm' => $row['rhythm'],
-                'basis' => $row['basis'],
-                'corrected_invoice_id' => $row['corrected_invoice_id'],
                 'created_by' => $user->id,
                 'updated_by' => $user->id,
+                ...self::header($row),
             ]);
-            foreach (array_values($row['lines']) as $position => $line) {
-                InvoiceLine::query()->create([
-                    ...$line,
-                    'invoice_id' => $invoice->id,
-                    'position' => $position,
-                    'vat_rate' => InvoiceTotals::rateFor($company, $line['component']),
-                    'computed_cents' => $line['total_ht_cents'],
-                ]);
-            }
+            $this->insertLines($invoice, $row['lines'], $company, 0);
             $this->totals($invoice);
 
             return $invoice;
         });
+    }
+
+    /**
+     * Rebuilds the computed lines of a draft from what is due now (under the
+     * lock of the dossier), its free lines kept after them; nothing due: no
+     * computed line left.
+     *
+     * @throws UserFacingHttpException 409 not a draft
+     */
+    public function recompute(Invoice $draft): Invoice
+    {
+        return DB::transaction(function () use ($draft): Invoice {
+            self::lockDossier($draft->dossier_id);
+            $invoice = $this->lockedDraft($draft, self::VALIDATED);
+            $dossier = Billing::dossier($invoice->dossier_id) ?? throw new NotFoundHttpException;
+            $row = $this->rowFor($dossier, Ledger::keyOf($invoice));
+            $company = Company::withTrashed()->findOrFail($invoice->company_id);
+
+            $lines = $invoice->lines()->get();
+            $lines->where('kind', InvoiceLine::COMPUTED)->each(fn (InvoiceLine $l) => $l->delete());
+            $computed = $row['lines'] ?? [];
+            $this->insertLines($invoice, $computed, $company, 0);
+            foreach ($lines->where('kind', InvoiceLine::FREE)->values() as $i => $free) {
+                $free->forceFill(['position' => count($computed) + $i])->save();
+            }
+            if ($row !== null) {
+                $invoice->forceFill(self::header($row));
+            }
+            $invoice->updated_by = Auth::id();
+            $this->totals($invoice);
+
+            return $invoice;
+        });
+    }
+
+    /**
+     * The due row of the recipient now, null when nothing is due or when an
+     * invoice would go to a recipient no longer invoiceable.
+     *
+     * @param  array<string, mixed>  $dossier
+     * @return array<string, mixed>|null
+     */
+    private function rowFor(array $dossier, string $recipient): ?array
+    {
+        $row = array_column($this->due->forDossier($dossier['id'])['rows'], null, 'recipient_key')[$recipient] ?? null;
+        if ($row !== null && $row['kind'] === Invoice::INVOICE && $this->recipientOf($dossier, $recipient) === null) {
+            return null;
+        }
+
+        return $row;
+    }
+
+    /**
+     * @param  array<string, mixed>  $row
+     * @return array<string, mixed>
+     */
+    private static function header(array $row): array
+    {
+        return [
+            'kind' => $row['kind'],
+            'period_from' => $row['period']['from'],
+            'period_to' => $row['period']['to'],
+            'cut_off' => $row['cut_off'],
+            'rhythm' => $row['rhythm'],
+            'basis' => $row['basis'],
+            'corrected_invoice_id' => $row['corrected_invoice_id'],
+        ];
+    }
+
+    /**
+     * @param  list<array<string, mixed>>  $lines  computed lines of a due row
+     */
+    private function insertLines(Invoice $invoice, array $lines, Company $company, int $from): void
+    {
+        foreach ($lines as $i => $line) {
+            InvoiceLine::query()->create([
+                ...$line,
+                'invoice_id' => $invoice->id,
+                'position' => $from + $i,
+                'vat_rate' => InvoiceTotals::rateFor($company, $line['component']),
+                'computed_cents' => $line['total_ht_cents'],
+            ]);
+        }
     }
 
     private function totals(Invoice $invoice): void
@@ -319,8 +393,15 @@ final class InvoiceDrafts
                 if (! is_array($line)) {
                     continue;
                 }
-                if (array_key_exists('unit_price', $line) && Money::parse($line['unit_price']) === null) {
+                $price = array_key_exists('unit_price', $line) ? Money::parse($line['unit_price']) : 0;
+                if ($price === null) {
                     $v->errors()->add("lines.{$i}.unit_price", 'Indiquez un montant valide (ex. 1 200,50).');
+                } elseif (abs($price) > self::MAX_UNIT_PRICE_CENTS) {
+                    $v->errors()->add("lines.{$i}.unit_price", 'Le prix unitaire ne peut pas dépasser 9 999 999,99 €.');
+                }
+                $quantity = is_string($line['quantity'] ?? null) || is_int($line['quantity'] ?? null) ? str_replace(',', '.', (string) $line['quantity']) : '';
+                if (preg_match('/^\d{1,7}(\.\d{1,2})?$/', $quantity) === 1 && BigDecimal::of($quantity)->isGreaterThan(self::MAX_QUANTITY)) {
+                    $v->errors()->add("lines.{$i}.quantity", 'La quantité ne peut pas dépasser 100 000.');
                 }
                 $rate = self::rate($line['vat_rate'] ?? null);
                 if (($line['vat_rate'] ?? null) !== null && $line['vat_rate'] !== '' && $rate === null) {

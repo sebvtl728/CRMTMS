@@ -19,6 +19,7 @@ Route::middleware(['auth', 'can:finance.invoices.manage'])->prefix('finance')->n
     Route::post('dossiers/{dossierId}/invoices', [InvoiceController::class, 'store'])->name('invoices.store');
     Route::post('to-invoice/prepare', [ToInvoiceController::class, 'prepare'])->name('to-invoice.prepare');
     Route::put('invoices/{invoiceId}', [InvoiceController::class, 'update'])->name('invoices.update');
+    Route::post('invoices/{invoiceId}/recompute', [InvoiceController::class, 'recompute'])->name('invoices.recompute');
     Route::delete('invoices/{invoiceId}', [InvoiceController::class, 'destroy'])->name('invoices.destroy');
 });
 
@@ -27,4 +28,5 @@ Route::middleware(['auth', 'can:finance.invoices.view'])->prefix('finance')->nam
     Route::get('to-invoice', [ToInvoiceController::class, 'index'])->name('to-invoice.index');
     Route::get('invoices', [InvoiceController::class, 'index'])->name('invoices.index');
     Route::get('invoices/{invoiceId}', [InvoiceController::class, 'show'])->name('invoices.show');
+    Route::get('dossiers/{dossierId}/due', [InvoiceController::class, 'due'])->name('dossiers.due');
 });

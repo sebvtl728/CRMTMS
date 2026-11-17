@@ -30,6 +30,9 @@ final class Ledger
     /** @var array<string, Invoice> recipient => its latest validated invoice (not a credit note) */
     public array $latestInvoice = [];
 
+    /** Some invoice or credit note of the dossier is validated. */
+    public bool $issued = false;
+
     /** @var array<string, array{role: string, type: string, id: string, funding_id: ?string}> recipients met on the invoices */
     public array $recipients = [];
 
@@ -52,6 +55,7 @@ final class Ledger
 
                 continue;
             }
+            $ledger->issued = true;
             if ($invoice->kind === Invoice::INVOICE) {
                 $ledger->latestInvoice[$key] = $invoice;
             }

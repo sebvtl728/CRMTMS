@@ -70,12 +70,20 @@ final class Due
      */
     public function forUser(User $user, array $filters = []): array
     {
-        $ids = Billing::dossiersFor($user, [
+        $scope = [
             'company_id' => $filters['company_id'] ?? null,
             'das_id' => $filters['das_id'] ?? null,
             'responsible_user_id' => $filters['responsible_user_id'] ?? null,
-            'started_by' => self::today(),
-        ], Permissions::VIEW)->toBase()->orderBy('number')->pluck('id')->map(fn ($id) => (string) $id)->all();
+        ];
+        $started = Billing::dossiersFor($user, [...$scope, 'started_by' => self::today()], Permissions::VIEW)
+            ->toBase()->pluck('id')->map(fn ($id) => (string) $id)->all();
+        // Cancelled or settled dossiers already invoiced: a credit note or a complement may be due.
+        $invoiced = Invoice::query()->whereIn('status', InvoiceStatus::values(InvoiceStatus::ISSUED))
+            ->whereIn('dossier_id', Billing::dossiersFor($user, $scope, Permissions::VIEW))
+            ->distinct()->pluck('dossier_id')->map(fn ($id) => (string) $id)->all();
+        $numbers = Billing::numbers(array_values(array_unique([...$started, ...$invoiced])));
+        uasort($numbers, fn (array $a, array $b) => $a['number'] <=> $b['number']);
+        $ids = array_map('strval', array_keys($numbers));
 
         $month = $filters['month'] ?? null;
         $rows = [];
@@ -99,13 +107,21 @@ final class Due
     public function forDossier(string $dossierId): array
     {
         $dossier = Billing::dossier($dossierId);
-        if ($dossier === null || $dossier['trashed'] || $dossier['status'] === 'cancelled') {
+        if ($dossier === null || $dossier['trashed']) {
+            return ['rows' => [], 'soon' => []];
+        }
+        $ledger = Ledger::of($dossierId);
+        $cancelled = $dossier['status'] === 'cancelled';
+        if ($cancelled && ! $ledger->issued) {
             return ['rows' => [], 'soon' => []];
         }
         $plan = $this->plans->for($dossierId);
         $today = self::today();
-        $ledger = Ledger::of($dossierId);
-        $cuts = self::cuts($dossier, $plan, $today);
+        // A dossier cancelled after an invoice: what was done, today (a credit note or a complement).
+        if ($cancelled) {
+            $plan = [...$plan, 'rhythm' => BillingPlans::END];
+        }
+        $cuts = $cancelled ? [self::cancelledCut($dossier, $today)] : self::cuts($dossier, $plan, $today);
 
         $found = [];
         $reason = null;
@@ -128,7 +144,8 @@ final class Due
                 }
                 $components = [];
                 foreach (self::COMPONENTS as $component => $field) {
-                    $share = (int) ($shares->byRecipient[$key][$field] ?? 0);
+                    // A share billed outside the TMS (its funding type marked so after an invoice): 0 here, a credit note at most.
+                    $share = ($shares->byRecipient[$key]['external'] ?? false) ? 0 : (int) ($shares->byRecipient[$key][$field] ?? 0);
                     $invoiced = $ledger->invoiced($key, $component);
                     $components[$component] = ['share' => $share, 'invoiced' => $invoiced, 'due' => $share - $invoiced];
                 }
@@ -261,6 +278,9 @@ final class Due
      */
     private function trainingLines(array $dossier, Shares $shares, string $key, int $due, Ledger $ledger, array $cut, array $labels): array
     {
+        if ($due === 0) {
+            return [];
+        }
         $lineAmounts = [];
         foreach ($dossier['lines'] as $line) {
             $lineAmounts[$line['id']] = 0;
@@ -447,6 +467,21 @@ final class Due
         }
 
         return [['cut' => CutOff::on($today), 'key' => $today, 'month' => null, ...$whole]];
+    }
+
+    /**
+     * The cut-off of a dossier cancelled after an invoice: today, over the
+     * dates of its sessions (cancelled ones included).
+     *
+     * @param  array<string, mixed>  $dossier
+     * @return Cut
+     */
+    private static function cancelledCut(array $dossier, string $today): array
+    {
+        $from = $dossier['sessions'] === [] ? $today : min(array_column($dossier['sessions'], 'starts_on'));
+        $to = $dossier['sessions'] === [] ? $today : max(array_column($dossier['sessions'], 'ends_on'));
+
+        return ['cut' => CutOff::on($today), 'key' => $today, 'month' => null, 'from' => $from, 'to' => $to, 'label' => self::period($from, $to)];
     }
 
     /** « du 01/09/2026 au 30/09/2026 » */

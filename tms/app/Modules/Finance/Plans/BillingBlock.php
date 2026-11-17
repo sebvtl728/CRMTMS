@@ -4,7 +4,6 @@ namespace App\Modules\Finance\Plans;
 
 use App\Modules\Core\Users\User;
 use App\Modules\Crm\Public\Fiches;
-use App\Modules\Finance\Invoices\Due;
 use App\Modules\Finance\Invoices\Invoice;
 use App\Modules\Finance\Invoices\InvoiceRows;
 use App\Modules\Finance\Invoices\Money;
@@ -40,7 +39,6 @@ final class BillingBlock
         $canManage = ! $dossier['trashed'] && Billing::allows($viewer, Permissions::MANAGE, $dossierId);
         $invoices = Invoice::query()->where('dossier_id', $dossierId)->orderBy('created_at')->orderBy('id')->get();
         $rows = app(InvoiceRows::class);
-        $due = $dossier['trashed'] ? ['rows' => [], 'soon' => []] : app(Due::class)->forDossier($dossierId);
         $direct = array_values(array_filter($dossier['fundings'], fn (array $f) => $f['pays_directly'] && ! $f['external_billing']));
         $funders = app(Fiches::class)->organisationLabels(array_values(array_map(fn (array $f) => $f['funder']['id'], array_filter($direct, fn (array $f) => $f['funder']['type'] === 'organisation'))))
             + app(Fiches::class)->personLabels(array_values(array_map(fn (array $f) => $f['funder']['id'], array_filter($direct, fn (array $f) => $f['funder']['type'] === 'person'))));
@@ -69,12 +67,8 @@ final class BillingBlock
                 'direct_fundings' => array_map(fn (array $f) => [
                     'id' => $f['id'], 'funder' => $funder($f), 'amount_cents' => $f['amount_cents'], 'status' => $f['status'], 'agreement_number' => $f['agreement_number'],
                 ], $direct),
-                // What is left to invoice now (« À facturer »), or why not yet.
-                'due' => array_map(fn (array $r) => [
-                    'recipient' => $r['recipient']['label'], 'kind' => $r['kind'], 'total_cents' => $r['total_cents'], 'period' => $r['period']['label'],
-                    'draft_url' => $r['draft']['url'] ?? null,
-                ], $due['rows']),
-                'soon' => $due['soon'][0]['reason'] ?? null,
+                // What is left to invoice now, read apart (InvoiceController::due).
+                'due_url' => $dossier['trashed'] ? null : route('finance.dossiers.due', $dossierId, absolute: false),
                 // A draft made by hand, for the contractor or a funder paying directly.
                 'create_url' => $canManage ? route('finance.invoices.store', $dossierId, absolute: false) : null,
                 'recipients' => [

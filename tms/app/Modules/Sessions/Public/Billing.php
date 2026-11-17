@@ -296,14 +296,15 @@ final class Billing
      * responsible_user_id; started_by (a Paris day): only the dossiers
      * neither cancelled nor settled with a trainee sharing the price in a
      * session (not in the trash) started on or before that day — those
-     * that may have something to invoice.
+     * that may have something to invoice; with_trashed: dossiers in the
+     * trash too (their validated invoices stay listed).
      *
-     * @param  array{company_id?: string|null, das_id?: string|null, responsible_user_id?: string|null, started_by?: string|null}  $filters
+     * @param  array{company_id?: string|null, das_id?: string|null, responsible_user_id?: string|null, started_by?: string|null, with_trashed?: bool}  $filters
      * @return Builder<Dossier>
      */
     public static function dossiersFor(User $user, array $filters = [], string $permission = Permissions::DOSSIERS_VIEW): Builder
     {
-        return SessionsVisibility::dossiers(Dossier::query(), $user, $permission)
+        return SessionsVisibility::dossiers(($filters['with_trashed'] ?? false) ? Dossier::withTrashed() : Dossier::query(), $user, $permission)
             ->when($filters['company_id'] ?? null, fn (Builder $q, string $id) => $q->where('dossiers.company_id', $id))
             ->when($filters['das_id'] ?? null, fn (Builder $q, string $id) => $q->where('dossiers.das_id', $id))
             ->when($filters['responsible_user_id'] ?? null, fn (Builder $q, string $id) => $q->where('dossiers.responsible_user_id', $id))

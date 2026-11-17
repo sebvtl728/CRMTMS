@@ -20,6 +20,7 @@ use App\Modules\Sessions\Fundings\FundingWriter;
 use App\Modules\Sessions\Permissions as SessionsPermissions;
 use App\Modules\Sessions\Planning\Seance;
 use Carbon\CarbonImmutable;
+use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Facades\DB;
 use Inertia\Testing\AssertableInertia as Assert;
 
@@ -367,10 +368,13 @@ it('creates a draft by hand from the dossier, edits it and deletes it', function
     // A computed line cannot be removed, a label is required, an amount is French.
     $this->actingAs($manager)->put("/finance/invoices/{$draft->id}", ['lines' => [
         ['label' => '', 'quantity' => '1', 'unit' => 'forfait', 'unit_price' => 'abc', 'vat_rate' => '0'],
+        ['label' => 'Trop', 'quantity' => '100000,01', 'unit' => 'forfait', 'unit_price' => '10 000 000,00', 'vat_rate' => '0'],
     ]])->assertSessionHasErrors([
         'lines' => 'Une ligne calculée ne se supprime pas : mettez son montant à 0.',
         'lines.0.label' => 'Indiquez le libellé de la ligne.',
         'lines.0.unit_price' => 'Indiquez un montant valide (ex. 1 200,50).',
+        'lines.1.quantity' => 'La quantité ne peut pas dépasser 100 000.',
+        'lines.1.unit_price' => 'Le prix unitaire ne peut pas dépasser 9 999 999,99 €.',
     ]);
 
     $this->actingAs($manager)->delete("/finance/invoices/{$draft->id}")->assertRedirect('/finance/invoices');
@@ -396,6 +400,83 @@ it('uses the line VAT rate of a company subject to VAT, never on the dédit', fu
         ->and($draft->lines()->sole()->vat_rate)->toBe('20.00')
         // 428,57 € × 20 % = 85,71 €.
         ->and([$draft->total_ht_cents, $draft->total_vat_cents, $draft->total_ttc_cents])->toBe([42857, 8571, 51428]);
+});
+
+it('never invoices a funding billed outside the TMS after it was invoiced: a credit note at most', function () {
+    $x = fiSeed();
+    fiDrafts()->prepare(fiManager(), array_column(fiDue($x['dossier']->id), 'key'));
+    Invoice::query()->get()->each(fn (Invoice $i) => fiValidate($i));
+    $opcoType = crmItem(ReferenceList::FundingType, 'OPCO');
+    $opcoType->forceFill(['meta' => [...($opcoType->meta ?? []), 'external_billing' => true]])->save();
+
+    fiLateAttendance($x, 3, 'present');
+    $rows = fiDue($x['dossier']->id);
+    $opco = "funding:{$x['funding']->id}";
+
+    // Its share leaves the contractor's invoice (342,86 € of 571,43 €) and its invoice is cancelled by a credit note.
+    expect($rows[$opco])->toMatchArray(['kind' => 'credit_note', 'total_cents' => -25714])
+        ->and($rows['contractor'])->toMatchArray(['kind' => 'invoice', 'total_cents' => 22857 - 17143]);
+
+    fiDrafts()->prepare(fiManager(), [$rows[$opco]['key']]);
+    expect(Invoice::query()->where('funding_id', $x['funding']->id)->where('status', 'draft')->sole()->kind)->toBe('credit_note');
+});
+
+it('recalculates a draft from what is due now, keeping its free lines', function () {
+    $x = fiSeed(opco: false);
+    fiDrafts()->prepare(fiManager(), array_column(fiDue($x['dossier']->id), 'key'));
+    $draft = Invoice::query()->sole();
+    $computed = $draft->lines()->sole();
+    fiDrafts()->update($draft, ['lines' => [
+        ['id' => $computed->id, 'label' => 'Changé', 'quantity' => '1', 'unit' => 'forfait', 'unit_price' => '1,00', 'vat_rate' => '0'],
+        ['label' => 'Repas', 'quantity' => '1', 'unit' => 'forfait', 'unit_price' => '15,00', 'vat_rate' => '0'],
+    ]]);
+    // Léa's fourth séance entered meanwhile: 571,43 €.
+    fiLateAttendance($x, 3, 'present');
+
+    $this->actingAs(fiManager())->post("/finance/invoices/{$draft->id}/recompute")
+        ->assertRedirect()->assertSessionHas('status', 'Brouillon recalculé.');
+    $lines = $draft->refresh()->lines()->get();
+    expect($lines->map(fn (InvoiceLine $l) => [$l->position, $l->kind, $l->total_ht_cents])->all())
+        ->toBe([[0, 'computed', 57143], [1, 'free', 1500]])
+        ->and($draft->total_ht_cents)->toBe(57143 + 1500)
+        ->and(Invoice::query()->count())->toBe(1);
+
+    fiValidate($draft);
+    $this->actingAs(fiManager())->post("/finance/invoices/{$draft->id}/recompute")->assertStatus(409);
+    $this->actingAs(l2User([SessionsPermissions::DOSSIERS_VIEW => null, Permissions::VIEW => null]))
+        ->post("/finance/invoices/{$draft->id}/recompute")->assertForbidden();
+});
+
+it('proposes a credit note on a dossier cancelled after its invoices, still listed', function () {
+    $x = fiSeed();
+    fiDrafts()->prepare(fiManager(), array_column(fiDue($x['dossier']->id), 'key'));
+    Invoice::query()->get()->each(fn (Invoice $i) => fiValidate($i));
+    $x['dossier']->forceFill(['status' => 'cancelled', 'cancelled_on' => '2026-11-17', 'cancelled_reason_id' => crmItem(ReferenceList::CancelReason, 'Autre')->id])->save();
+    fiLateAttendance($x, 2, 'absent');
+
+    $this->actingAs(fiManager())->get('/finance/to-invoice')->assertInertia(fn (Assert $page) => $page
+        ->has('rows', 2)
+        ->where('rows.0.recipient_key', 'contractor')
+        ->where('rows.0.kind', 'credit_note')
+        ->where('rows.0.total_cents', 11428 - 17143));
+});
+
+it('keeps one open draft per recipient in the database too', function () {
+    $x = fiSeed(opco: false);
+    fiDrafts()->prepare(fiManager(), array_column(fiDue($x['dossier']->id), 'key'));
+    $draft = Invoice::query()->sole();
+
+    expect(fn () => Invoice::query()->create([...$draft->only(['company_id', 'kind', 'dossier_id', 'recipient_type', 'recipient_id', 'rhythm', 'basis'])]))
+        ->toThrow(UniqueConstraintViolationException::class);
+});
+
+it('lists the invoices of a dossier in the trash', function () {
+    $x = fiSeed(opco: false);
+    fiDrafts()->prepare(fiManager(), array_column(fiDue($x['dossier']->id), 'key'));
+    fiValidate(Invoice::query()->sole());
+    $x['dossier']->delete();
+
+    $this->actingAs(fiManager())->get('/finance/invoices')->assertInertia(fn (Assert $page) => $page->has('invoices.data', 1));
 });
 
 // ---------------------------------------------------------------- pages, rights and scope
@@ -473,7 +554,13 @@ it('lists the invoices of the dossier in its billing block', function () {
         ->where('blocks.0.rows.1.badge', 'Brouillon')
         ->where('blocks.0.props.create_url', "/finance/dossiers/{$x['dossier']->id}/invoices")
         ->has('blocks.0.props.recipients', 2)
-        ->has('blocks.0.props.direct_fundings', 1));
+        ->has('blocks.0.props.direct_fundings', 1)
+        ->where('blocks.0.props.due_url', "/finance/dossiers/{$x['dossier']->id}/due"));
+
+    // What is left to invoice is read apart, in the scope of finance.invoices.view.
+    $this->actingAs(fiManager())->getJson("/finance/dossiers/{$x['dossier']->id}/due")->assertOk()
+        ->assertJson(['due' => [['recipient' => 'OPCO EP', 'kind' => 'invoice', 'total_cents' => 25714]], 'soon' => null]);
+    $this->actingAs(fiManager([Permissions::VIEW => AccessScope::Own]))->getJson("/finance/dossiers/{$x['dossier']->id}/due")->assertNotFound();
 });
 
 // ---------------------------------------------------------------- RLS

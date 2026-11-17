@@ -7,6 +7,7 @@ use App\Modules\Core\Companies\Company;
 use App\Modules\Core\Users\User;
 use App\Modules\Finance\Permissions;
 use App\Modules\Sessions\Public\Billing;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
@@ -37,7 +38,8 @@ class InvoiceController extends Controller
             'company' => is_string($c = $request->query('company')) && Str::isUuid($c) ? $c : null,
         ];
         $page = Invoice::query()
-            ->whereIn('dossier_id', Billing::dossiersFor($user, [], Permissions::VIEW))
+            // Dossiers in the trash too: their validated invoices stay findable.
+            ->whereIn('dossier_id', Billing::dossiersFor($user, ['with_trashed' => true], Permissions::VIEW))
             ->when($filters['status'], fn ($q, string $s) => $q->where('status', $s))
             ->when($filters['kind'], fn ($q, string $k) => $q->where('kind', $k))
             ->when($filters['company'], fn ($q, string $id) => $q->where('company_id', $id))
@@ -91,6 +93,37 @@ class InvoiceController extends Controller
         $this->drafts->update($invoice, $request->only(['notes', 'lines']));
 
         return back()->with('status', 'Brouillon enregistré.');
+    }
+
+    /** « Recalculer »: the computed lines of a draft from what is due now, free lines kept. */
+    public function recompute(Request $request, string $invoiceId): RedirectResponse
+    {
+        $invoice = $this->find($request, $invoiceId);
+        abort_unless($this->manages($request, $invoice), 403);
+
+        $this->drafts->recompute($invoice);
+
+        return back()->with('status', 'Brouillon recalculé.');
+    }
+
+    /**
+     * What is left to invoice on a dossier (its « Facturation » block, read
+     * apart so the dossier page never waits for the computation): 404 out of
+     * the scope of finance.invoices.view.
+     */
+    public function due(Request $request, string $dossierId, Due $due): JsonResponse
+    {
+        $user = $request->user();
+        abort_unless($user instanceof User && Billing::allows($user, Permissions::VIEW, $dossierId), 404);
+        $result = $due->forDossier($dossierId);
+
+        return response()->json([
+            'due' => array_map(fn (array $r) => [
+                'recipient' => $r['recipient']['label'], 'kind' => $r['kind'], 'total_cents' => $r['total_cents'], 'period' => $r['period']['label'],
+                'draft_url' => $r['draft']['url'] ?? null,
+            ], $result['rows']),
+            'soon' => $result['soon'][0]['reason'] ?? null,
+        ]);
     }
 
     public function destroy(Request $request, string $invoiceId): RedirectResponse

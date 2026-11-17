@@ -294,6 +294,13 @@ function DraftEditor({ invoice, options }: { invoice: InvoicePage; options: Show
                 </Button>
                 <Button
                     type="button"
+                    variant="outline"
+                    onClick={() => router.post(route('finance.invoices.recompute', invoice.id), {}, { preserveScroll: true })}
+                >
+                    Recalculer
+                </Button>
+                <Button
+                    type="button"
                     variant="destructive"
                     onClick={() => {
                         if (window.confirm('Supprimer ce brouillon ?')) router.delete(route('finance.invoices.destroy', invoice.id));
