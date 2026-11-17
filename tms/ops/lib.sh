@@ -11,6 +11,8 @@ TMS_COMPOSE_FILE="${TMS_COMPOSE_FILE:-$TMS_DIR/compose.prod.yaml}"
 RESTIC_IMAGE="${RESTIC_IMAGE:-restic/restic:0.18.0}"
 # Lock shared by update.sh, backup.sh and restore.sh (one maintenance operation at a time).
 TMS_LOCK_FILE="${TMS_LOCK_FILE:-$TMS_DIR/.ops.lock}"
+# systemd units of the backups (installer, updater).
+TMS_SYSTEMD_DIR="${TMS_SYSTEMD_DIR:-/etc/systemd/system}"
 # GitHub repository publishing the releases ("owner/repo"); same constant in
 # install/install.sh and install/proxmox.sh. Until set, TMS_DIST_URL is required.
 TMS_GITHUB_REPO="${TMS_GITHUB_REPO:-sebvtl728/CRMTMS}"
@@ -296,6 +298,121 @@ restic_run() {
         -e RESTIC_REPOSITORY -e RESTIC_PASSWORD -e RESTIC_FROM_REPOSITORY -e RESTIC_FROM_PASSWORD \
         ${docker_args[@]+"${docker_args[@]}"} \
         "$RESTIC_IMAGE" --no-cache "$@"
+}
+
+# --- Backup status and requests (exchange with the application) ---------------------
+# Both live in the storage volume under ops/, outside storage/app: never inside a snapshot,
+# never restored. The application reads ops/backup-status.json and writes
+# ops/backup-request.json; it has no Docker access and no restic secret.
+
+# storage_volume: name of the storage Docker volume of the stack (compose labels).
+storage_volume() {
+    local project volume
+    project="$(compose config 2>/dev/null | sed -n 's/^name: *//p' | head -n 1)"
+    [[ -n "$project" ]] || return 1
+    volume="$(docker volume ls -q --filter "label=com.docker.compose.project=${project}" --filter "label=com.docker.compose.volume=storage" | head -n 1)"
+    [[ -n "$volume" ]] || return 1
+    printf '%s\n' "$volume"
+}
+
+# Shell run in a throwaway container with the volume at /s: creates /s/ops owned by the owner
+# of the volume root (the app container user, whatever its uid), group-writable.
+# shellcheck disable=SC2016  # expanded inside the container
+TMS_OPS_DIR_SH='owner="$(stat -c %u:%g /s)"
+if [ ! -d /s/ops ]; then mkdir /s/ops && chown "$owner" /s/ops && chmod 770 /s/ops; fi'
+
+# ensure_ops_dir <volume>: storage/ops exists, readable and writable by the app user.
+ensure_ops_dir() {
+    docker run --rm -v "$1:/s" --entrypoint sh "$RESTIC_IMAGE" -c "set -e; $TMS_OPS_DIR_SH" >&2
+}
+
+# write_backup_status <volume> <success true|false> <snapshot id> <error> <size bytes>
+#   <remote configured true|false> <remote success true|false|"">
+# Writes ops/backup-status.json atomically (temporary file then rename), owned by the app user.
+# stdin: output of « restic snapshots --json » (empty or unreadable: no list); kept newest
+# first, at most 60, id/time/tags only. Empty strings become null. Values travel as
+# environment variables (never on a command line); built by jq of the restic image (the host
+# only needs Docker).
+write_backup_status() {
+    # shellcheck disable=SC2016  # jq program
+    local program='(try (input | if type == "array" then . else [] end) catch []) as $snaps
+        | def nullable: if . == "" then null else . end;
+        {
+            finished_at: $ENV.S_FINISHED_AT,
+            success: ($ENV.S_SUCCESS == "true"),
+            snapshot_id: ($ENV.S_SNAPSHOT_ID | nullable),
+            error: ($ENV.S_ERROR | nullable),
+            version: ($ENV.S_VERSION | nullable),
+            size_bytes: ($ENV.S_SIZE | nullable | if . == null then null else tonumber end),
+            remote: {
+                configured: ($ENV.S_REMOTE_CONFIGURED == "true"),
+                success: ($ENV.S_REMOTE_SUCCESS | nullable | if . == null then null else . == "true" end)
+            },
+            snapshots: ($snaps | reverse | .[:60] | map({id, time, tags: (.tags // [])}))
+        }'
+    # shellcheck disable=SC2016  # expanded inside the container
+    local script='set -e
+'"$TMS_OPS_DIR_SH"'
+tmp=/s/ops/.backup-status.json.tmp
+jq -n "$S_PROGRAM" >"$tmp"
+chown "$owner" "$tmp"
+chmod 640 "$tmp"
+mv -f "$tmp" /s/ops/backup-status.json'
+    S_PROGRAM="$program" S_FINISHED_AT="$(date -u '+%Y-%m-%dT%H:%M:%SZ')" S_SUCCESS="$2" S_SNAPSHOT_ID="$3" \
+        S_ERROR="$4" S_VERSION="${TMS_VERSION:-}" S_SIZE="$5" S_REMOTE_CONFIGURED="$6" S_REMOTE_SUCCESS="$7" \
+        docker run --rm -i -v "$1:/s" \
+        -e S_PROGRAM -e S_FINISHED_AT -e S_SUCCESS -e S_SNAPSHOT_ID -e S_ERROR -e S_VERSION -e S_SIZE \
+        -e S_REMOTE_CONFIGURED -e S_REMOTE_SUCCESS \
+        --entrypoint sh "$RESTIC_IMAGE" -c "$script" >&2
+}
+
+# consume_backup_request <volume>: removes ops/backup-request.json (the backup it asked for starts).
+consume_backup_request() {
+    docker run --rm -v "$1:/s" --entrypoint rm "$RESTIC_IMAGE" -f /s/ops/backup-request.json >&2
+}
+
+# enable_backup_requests: « Sauvegarder maintenant » of the application. Creates storage/ops and,
+# on a systemd host where the backup timer is installed, tms-backup-request.path (watches the
+# request file through the volume mount point on the host) and tms-backup-request.service
+# (ops/backup.sh --tag manuel). Idempotent: run by the installer and by every update.
+enable_backup_requests() {
+    local volume mountpoint
+    volume="$(storage_volume)" || { log_error "Volume storage introuvable : sauvegarde à la demande non activée."; return 1; }
+    ensure_ops_dir "$volume" || { log_error "Impossible de créer storage/ops dans le volume ${volume}."; return 1; }
+    if [[ ! -f "$TMS_SYSTEMD_DIR/tms-backup.service" ]] || ! command -v systemctl >/dev/null 2>&1; then
+        return 0
+    fi
+    mountpoint="$(docker volume inspect -f '{{.Mountpoint}}' "$volume")" && [[ "$mountpoint" == /* ]] \
+        || { log_error "Point de montage du volume ${volume} introuvable : sauvegarde à la demande non activée."; return 1; }
+    # Called in an « || » list (errexit off): every step checks its own result.
+    cat >"$TMS_SYSTEMD_DIR/tms-backup-request.service" <<UNIT || return 1
+[Unit]
+Description=Sauvegarde TMS demandée depuis l'application (restic)
+After=docker.service
+Requires=docker.service
+
+[Service]
+Type=oneshot
+# Consumed first, on the host: a failing run never re-triggers itself in a loop.
+ExecStartPre=/bin/rm -f ${mountpoint}/ops/backup-request.json
+ExecStart=$TMS_DIR/ops/backup.sh --tag manuel
+Nice=10
+IOSchedulingClass=idle
+UNIT
+    cat >"$TMS_SYSTEMD_DIR/tms-backup-request.path" <<UNIT || return 1
+[Unit]
+Description=Demandes de sauvegarde TMS (bouton « Sauvegarder maintenant »)
+
+[Path]
+PathExists=${mountpoint}/ops/backup-request.json
+Unit=tms-backup-request.service
+
+[Install]
+WantedBy=paths.target
+UNIT
+    { systemctl daemon-reload && systemctl enable tms-backup-request.path && systemctl restart tms-backup-request.path; } >&2 \
+        || { log_error "Activation de tms-backup-request.path impossible."; return 1; }
+    log_info "Sauvegarde à la demande activée (tms-backup-request.path)."
 }
 
 # wait_health [seconds] [version]: waits until the application answers 200 on /health

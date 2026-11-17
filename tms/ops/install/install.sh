@@ -403,6 +403,9 @@ UNIT
     systemctl daemon-reload >&2
     systemctl enable --now tms-backup.timer >&2
     log_info "Sauvegarde quotidienne programmée (tms-backup.timer, 02:30)."
+    # « Sauvegarder maintenant » (ops/lib.sh, sourced by start_stack): storage/ops and
+    # tms-backup-request.path. Not fatal: the installation itself is complete.
+    enable_backup_requests || log_error "Le bouton « Sauvegarder maintenant » restera sans effet : relancez ops/update.sh --force pour l'activer."
 }
 
 print_summary() {

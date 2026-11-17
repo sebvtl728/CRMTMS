@@ -76,6 +76,12 @@ teardown_file() {
     TMS_ENV_FILE="$STACK_DIR/env.nopass" run "$TMS_ROOT/ops/backup.sh"
     [ "$status" -ne 0 ]
     [[ "$output" == *"RESTIC_PASSWORD"* ]]
+    # The failure is recorded for the application too (no repository readable: no list).
+    json=$(backup_status)
+    [ "$(jq -r .success <<<"$json")" = "false" ]
+    [[ "$(jq -r .error <<<"$json")" == "Variable RESTIC_PASSWORD manquante"* ]] || false
+    [ "$(jq -c .snapshots <<<"$json")" = "[]" ]
+    refute_secrets "$json"
 }
 
 @test "only caddy publishes ports; postgres and redis are not exposed" {
@@ -139,6 +145,91 @@ teardown_file() {
     load_env
     run restic_run -- snapshots --json
     [[ "$output" == *'"version:bats"'* ]]
+}
+
+# backup_status: the status file, read by the app container user (as the application does).
+backup_status() {
+    compose exec -T app cat storage/ops/backup-status.json
+}
+
+# refute_secrets <text>: none of the secret values of .env appears in the text.
+refute_secrets() {
+    local name value
+    for name in RESTIC_PASSWORD APP_KEY POSTGRES_SUPERUSER_PASSWORD POSTGRES_OWNER_PASSWORD POSTGRES_APP_PASSWORD REDIS_PASSWORD; do
+        value=$(sed -n "s/^${name}=//p" "$TMS_ENV_FILE")
+        [ -n "$value" ]
+        [[ "$1" != *"$value"* ]] || false
+    done
+}
+
+@test "a successful backup writes the status file with the snapshot and the snapshot list" {
+    # storage/ops, as the installer and the updater prepare it.
+    enable_backup_requests
+    # A pending request is left alone by a backup that is not the requested one.
+    compose exec -T app sh -c 'printf "{\"requested_at\":\"2026-11-17T10:00:00+01:00\",\"requested_by_id\":\"x\"}" > storage/ops/backup-request.json'
+
+    run "$TMS_ROOT/ops/backup.sh" --tag test
+    [ "$status" -eq 0 ]
+    snap="${lines[${#lines[@]}-1]}"
+    compose exec -T app test -f storage/ops/backup-request.json
+
+    run backup_status
+    [ "$status" -eq 0 ]
+    json="$output"
+    [ "$(jq -r .success <<<"$json")" = "true" ]
+    [ "$(jq -r .snapshot_id <<<"$json")" = "$snap" ]
+    [ "$(jq -r .error <<<"$json")" = "null" ]
+    [ "$(jq -r .version <<<"$json")" = "bats" ]
+    [ "$(jq -r .size_bytes <<<"$json")" -gt 0 ]
+    [[ "$(jq -r .finished_at <<<"$json")" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(Z|[+-][0-9]{2}:[0-9]{2})$ ]] || false
+    [ "$(jq -c .remote <<<"$json")" = '{"configured":false,"success":null}' ]
+    # Newest first, every snapshot of the repository (at most 60), id, time and tags only.
+    [ "$(jq -r '.snapshots[0].id' <<<"$json")" = "$snap" ]
+    [ "$(jq -r '.snapshots[0].tags | index("test") != null' <<<"$json")" = "true" ]
+    [ "$(jq -r '.snapshots[0] | keys | join(",")' <<<"$json")" = "id,tags,time" ]
+    load_env
+    total=$(restic_run -- snapshots --host tms --json | jq length)
+    [ "$(jq '.snapshots | length' <<<"$json")" -eq "$((total < 60 ? total : 60))" ]
+    [ "$(jq -r '[.snapshots[].time] == ([.snapshots[].time] | sort | reverse)' <<<"$json")" = "true" ]
+    refute_secrets "$json"
+
+    # Outside storage/app: never inside a snapshot, so never restored over a newer one.
+    run restic_run -- ls "$snap"
+    [ "$status" -eq 0 ]
+    [[ "$output" != *"backup-status"* ]] || false
+    # The application can write its requests next to it.
+    compose exec -T app sh -c 'touch storage/ops/bats-write && rm storage/ops/bats-write'
+}
+
+@test "a failed backup writes success=false with the French error and no snapshot" {
+    compose stop postgres >&2
+    run "$TMS_ROOT/ops/backup.sh"
+    backup_rc=$status
+    compose up -d --wait >&2
+    [ "$backup_rc" -ne 0 ]
+
+    run backup_status
+    [ "$status" -eq 0 ]
+    json="$output"
+    [ "$(jq -r .success <<<"$json")" = "false" ]
+    [ "$(jq -r .error <<<"$json")" = "Échec de pg_dump." ]
+    [ "$(jq -r .snapshot_id <<<"$json")" = "null" ]
+    [ "$(jq -r .size_bytes <<<"$json")" = "null" ]
+    # The snapshots taken before are still listed.
+    [ "$(jq '.snapshots | length' <<<"$json")" -ge 1 ]
+    refute_secrets "$json"
+}
+
+@test "backup --tag manuel consumes the request of the application" {
+    compose exec -T app sh -c 'echo "{}" > storage/ops/backup-request.json'
+    run "$TMS_ROOT/ops/backup.sh" --tag manuel
+    [ "$status" -eq 0 ]
+    snap="${lines[${#lines[@]}-1]}"
+    run compose exec -T app test -e storage/ops/backup-request.json
+    [ "$status" -ne 0 ]
+    json=$(backup_status)
+    [ "$(jq -r .snapshot_id <<<"$json")" = "$snap" ]
+    [ "$(jq -r '.snapshots[0].tags | index("manuel") != null' <<<"$json")" = "true" ]
 }
 
 @test "backup still succeeds with the app container stopped" {

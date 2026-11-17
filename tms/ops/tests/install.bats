@@ -70,6 +70,9 @@ case "$*" in
     echo "Organisme installé."
     echo "Lien d activation de l administrateur (valable 24 h, usage unique) :"
     echo "https://tms.example.test/activation/token123" ;;
+  *" config") echo "name: tms" ;;
+  "volume ls -q --filter label=com.docker.compose.project=tms --filter label=com.docker.compose.volume=storage") echo "tms_storage" ;;
+  "volume inspect -f {{.Mountpoint}} tms_storage") echo "/var/lib/docker/volumes/tms_storage/_data" ;;
 esac
 exit 0'
 
@@ -254,6 +257,16 @@ env_value() {
     grep -q "Persistent=true" "$TMS_SYSTEMD_DIR/tms-backup.timer"
     grep -q "ExecStart=$TMS_DIR/ops/backup.sh" "$TMS_SYSTEMD_DIR/tms-backup.service"
     grep -q "enable --now tms-backup.timer" "$MOCK_LOG/systemctl.log"
+    # « Sauvegarder maintenant »: storage/ops in the volume, request file watched on the host.
+    grep -q "run --rm -v tms_storage:/s --entrypoint sh restic/restic:" "$log"
+    grep -q "mkdir /s/ops && chown" "$log"
+    grep -qx "PathExists=/var/lib/docker/volumes/tms_storage/_data/ops/backup-request.json" "$TMS_SYSTEMD_DIR/tms-backup-request.path"
+    grep -qx "Unit=tms-backup-request.service" "$TMS_SYSTEMD_DIR/tms-backup-request.path"
+    grep -qx "ExecStartPre=/bin/rm -f /var/lib/docker/volumes/tms_storage/_data/ops/backup-request.json" "$TMS_SYSTEMD_DIR/tms-backup-request.service"
+    grep -qx "ExecStart=$TMS_DIR/ops/backup.sh --tag manuel" "$TMS_SYSTEMD_DIR/tms-backup-request.service"
+    grep -q "enable tms-backup-request.path" "$MOCK_LOG/systemctl.log"
+    grep -q "restart tms-backup-request.path" "$MOCK_LOG/systemctl.log"
+    [[ "$output" != *"Sauvegarder maintenant"* ]] || false
 
     [[ "$output" == *"https://tms.example.test/activation/token123"* ]] || false
     [[ "$output" == *"https://tms.example.test"* ]] || false
