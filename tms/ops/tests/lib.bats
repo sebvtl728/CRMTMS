@@ -67,11 +67,10 @@ make_repo_tar() {
     run export_archive_check "$BATS_TEST_TMPDIR/export.tar"
     [ "$status" -eq 2 ]
 
-    # A truncated archive is refused: unreadable (1, bsdtar) or with repo/config missing (2, GNU
-    # tar lists what it could read); restic check --read-data then guards the content.
+    # A truncated archive is unreadable (1), whatever tar flavour lists it.
     head -c 20000 "$BATS_TEST_TMPDIR/export.tar" >"$BATS_TEST_TMPDIR/truncated.tar"
     run export_archive_check "$BATS_TEST_TMPDIR/truncated.tar"
-    [ "$status" -ne 0 ]
+    [ "$status" -eq 1 ]
 }
 
 @test "import_mode_check: several or an unknown number of organismes refused on a single installation" {

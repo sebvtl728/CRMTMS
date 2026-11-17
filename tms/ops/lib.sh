@@ -363,6 +363,8 @@ export_archive_check() {
     if ! listing="$(tar -tvf "$1" 2>/dev/null)" || ! names="$(tar -tf "$1" 2>/dev/null)"; then
         return 1
     fi
+    # GNU tar may list a truncated archive without error: read every member to the end.
+    tar -xOf "$1" >/dev/null 2>&1 || return 1
     if grep -q '^[^-d]' <<<"$listing" \
         || grep -Evq '^repo(/|$)' <<<"$names" \
         || grep -Eq '(^|/)\.\.(/|$)' <<<"$names" \
