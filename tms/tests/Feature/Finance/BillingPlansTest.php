@@ -105,12 +105,12 @@ it('gives a dossier without settings the default plan, following the organisme a
     expect(fpPlans()->for($dossier->id)['absences'])->toBe('bill_contractor');
 });
 
-it('saves a monthly plan on planned hours, and a schedule sorted by date', function () {
+it('saves a monthly plan, and a schedule sorted by date', function () {
     $dossier = fpDossier();
 
-    fpPlans()->save($dossier->id, ['rhythm' => 'monthly', 'basis' => 'planned', 'unjustified_absences' => 'bill_contractor', 'schedule' => [['due_on' => '2026-09-01', 'percent' => 100]]]);
+    fpPlans()->save($dossier->id, ['rhythm' => 'monthly', 'basis' => 'realised', 'unjustified_absences' => 'bill_contractor', 'schedule' => [['due_on' => '2026-09-01', 'percent' => 100]]]);
     expect(fpPlans()->for($dossier->id))->toBe([
-        'rhythm' => 'monthly', 'basis' => 'planned', 'unjustified_absences' => 'bill_contractor', 'absences' => 'bill_contractor', 'schedule' => [], 'locked' => false,
+        'rhythm' => 'monthly', 'basis' => 'realised', 'unjustified_absences' => 'bill_contractor', 'absences' => 'bill_contractor', 'schedule' => [], 'locked' => false,
     ]);
 
     fpPlans()->save($dossier->id, ['rhythm' => 'schedule', 'basis' => 'realised', 'unjustified_absences' => '', 'schedule' => [
@@ -169,7 +169,11 @@ it('refuses an invalid plan with French messages', function () {
         ['due_on' => '2026-10-10', 'percent' => 30], ['due_on' => '2026-10-10', 'percent' => 70],
     ]]))->toBe([
         'schedule.1.due_on' => ['Deux échéances ne peuvent pas tomber le même jour.'],
-    ])->and(BillingPlan::query()->count())->toBe(0);
+    ])
+        // The monthly rhythm is billed on the realised hours only.
+        ->and(fpErrors($dossier, ['rhythm' => 'monthly', 'basis' => 'planned']))->toBe([
+            'basis' => ['Le rythme mensuel se facture au réalisé.'],
+        ])->and(BillingPlan::query()->count())->toBe(0);
 });
 
 // ---------------------------------------------------------------- lock
@@ -184,7 +188,7 @@ it('locks the rhythm, the basis and the schedule after the first validated invoi
         ->and(fpPlans()->isLocked($dossier->id))->toBeTrue()
         ->and(fn () => fpPlans()->save($dossier->id, ['rhythm' => 'end', 'basis' => 'realised']))
         ->toThrow(UserFacingHttpException::class, BillingPlans::LOCKED)
-        ->and(fn () => fpPlans()->save($dossier->id, ['rhythm' => 'monthly', 'basis' => 'planned']))
+        ->and(fn () => fpPlans()->save($dossier->id, ['rhythm' => 'end', 'basis' => 'planned']))
         ->toThrow(UserFacingHttpException::class, BillingPlans::LOCKED);
 
     // The absences rule stays editable: the due amount is computed again.

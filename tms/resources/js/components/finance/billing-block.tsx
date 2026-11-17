@@ -91,6 +91,8 @@ export function BillingBlock({ plan, organisme_absences, starts_on, can_manage, 
         setData((d) => ({
             ...d,
             rhythm,
+            // The monthly rhythm is billed on the realised hours only.
+            basis: rhythm === 'monthly' ? 'realised' : d.basis,
             // A first schedule: two instalments to adjust.
             schedule:
                 rhythm === 'schedule' && d.schedule.length === 0
@@ -129,11 +131,18 @@ export function BillingBlock({ plan, organisme_absences, starts_on, can_manage, 
                 <div className="flex flex-wrap gap-4">
                     {BASES.map((b) => (
                         <label key={b.value} className="flex items-center gap-2 text-sm">
-                            <input type="radio" name="basis" checked={data.basis === b.value} onChange={() => setData('basis', b.value)} />
+                            <input
+                                type="radio"
+                                name="basis"
+                                checked={data.basis === b.value}
+                                disabled={data.rhythm === 'monthly' && b.value !== 'realised'}
+                                onChange={() => setData('basis', b.value)}
+                            />
                             {b.label}
                         </label>
                     ))}
                 </div>
+                {data.rhythm === 'monthly' && <p className="text-muted-foreground text-sm">Le rythme mensuel se facture toujours au réalisé.</p>}
                 <InputError message={err.basis} />
             </fieldset>
 

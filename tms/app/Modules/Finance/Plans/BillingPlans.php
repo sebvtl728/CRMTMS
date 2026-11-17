@@ -22,7 +22,8 @@ use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
  *    closed month), « schedule » (instalments {due_on, percent}: whole
  *    percents of 1 to 100 summing to 100, distinct days, none before the
  *    start of the dossier's first session; sorted by date);
- *  - basis: « realised » (default) or « planned » (a flat price);
+ *  - basis: « realised » (default) or « planned » (a flat price; never
+ *    with « monthly », billed at the realised hours only);
  *  - unjustified_absences: « not_billed », « bill_contractor », or null for
  *    the organisme's default (FinanceSettings);
  *  - locked once the first invoice of the dossier is validated (lock(),
@@ -58,6 +59,9 @@ final class BillingPlans
     public const ABSENCES = [self::NOT_BILLED, self::BILL_CONTRACTOR];
 
     public const MAX_INSTALMENTS = 24;
+
+    /** The monthly rhythm bills the closed months at the realised hours, never on the planned basis. */
+    public const MONTHLY_REALISED = 'Le rythme mensuel se facture au réalisé.';
 
     public const LOCKED = 'Le rythme ne change plus après une facture validée : faites d\'abord un avoir.';
 
@@ -175,6 +179,9 @@ final class BillingPlans
         ], self::messages());
 
         $validator->after(function ($v) use ($data, $schedule, $startsOn): void {
+            if ($data['rhythm'] === self::MONTHLY && $data['basis'] === self::PLANNED && ! $v->errors()->has('basis')) {
+                $v->errors()->add('basis', self::MONTHLY_REALISED);
+            }
             if (! $schedule || $v->errors()->isNotEmpty()) {
                 return;
             }

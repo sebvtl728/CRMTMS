@@ -345,15 +345,15 @@ it('waits for the month to be closed on every session of the dossier', function 
     expect(bcRun($dossier, $hours, bcPlan('monthly'), cut: CutOff::month('2026-10'))->ready)->toBeTrue();
 });
 
-it('bills a monthly planned basis at the planned hours up to the month', function () {
+it('bills a monthly plan on the realised hours, even a legacy plan on the planned basis', function () {
     $dossier = bcDossier([bcLine('l1', 100000)], [bcEnrolment('e1', 'l1', 100000)],
         extra: ['sessions' => [['id' => 's1', 'starts_on' => '2026-09-01', 'ends_on' => '2026-11-30', 'status' => 'running']]]);
-    $hours = bcHours(['e1' => [1200, 0]], closed: ['s1' => ['2026-09']], allClosed: ['s1' => false]);
-    $hours['enrolments'][0]['planned_until_minutes'] = 300;
+    $hours = bcHours(['e1' => [1200, 300]], closed: ['s1' => ['2026-09']], allClosed: ['s1' => false]);
 
     $shares = bcRun($dossier, $hours, bcPlan('monthly', 'planned'), cut: CutOff::month('2026-09'));
 
-    expect($shares->billableCents)->toBe(25000);
+    expect($shares->billableCents)->toBe(25000)
+        ->and($shares->detail[0])->toMatchArray(['planned' => 1200, 'realised' => 300]);
 });
 
 it('bills a schedule: the contractor\'s planned part by percent, the funders at the last instalment, at the realised', function () {

@@ -20,15 +20,19 @@ use InvalidArgumentException;
  *    share × realised / planned minutes (capped at 1), each rounded to the
  *    cent; a line priced for the group = its total × realised / planned
  *    minutes of its sessions; a fee line in full;
- *  - basis « planned »: the price (« end », the last instalment), or the
- *    price × planned minutes up to the month / planned minutes (« monthly »:
- *    hours must then carry planned_until_minutes);
+ *  - basis « planned »: the price (« end », the last instalment of a
+ *    schedule); « monthly » is billed on the realised basis only
+ *    (BillingPlans refuses it planned; a legacy monthly plan on the planned
+ *    basis is computed at the realised hours);
  *  - an abandon (« prorata_dedit », not force majeure, left on or before
- *    the cut-off): a dédit of the percent of the share not done, to the
- *    contractor alone, apart from B;
- *  - unjustified absences, « bill_contractor » only: the trainee's share ×
- *    absent / planned minutes (at most what is left of his share), to the
- *    contractor alone, apart from B; never for a trainee who left.
+ *    the cut-off), realised basis: a dédit of the percent of the share not
+ *    done, to the contractor alone, apart from B;
+ *  - unjustified absences, realised basis and « bill_contractor » only: the
+ *    trainee's share × absent / planned minutes (at most what is left of his
+ *    share), to the contractor alone, apart from B; never for a trainee who
+ *    left;
+ *  - dédits and absences concern the lines priced per trainee only: a line
+ *    priced for the group (billed on the séances held) has neither.
  *
  * Shares of B: each agreed funding (its funder not the contractor) paying
  * directly or billed outside the TMS (external: its part leaves the
@@ -46,8 +50,10 @@ use InvalidArgumentException;
  *  - « schedule »: the percents of the instalments due on or before the
  *    cut-off day (none: « Échéance non atteinte »); before the last one,
  *    the contractor alone, (price − the funders' planned shares) × percent
- *    (the funders are never billed in advance); at the last one, as « end »
- *    on a realised basis (training over), the planned price otherwise.
+ *    (the funders are never billed in advance, listed at 0): B is that
+ *    contractor part, while the detail gives each line's total × percent
+ *    (so the detail does not add up to B); at the last one, as « end » on a
+ *    realised basis (training over), the planned price otherwise.
  *
  * @phpstan-import-type Detail from Shares
  * @phpstan-import-type RecipientShare from Shares
@@ -64,15 +70,13 @@ final class BillingCalculator
 
     private const PLANNED = 'planned';
 
-    private const PLANNED_UNTIL = 'planned_until';
-
     /**
      * @param  array<string, mixed>  $dossier  Billing::dossier()
      * @param  array{enrolments: list<array<string, mixed>>, sessions: list<array<string, mixed>>}  $hours  Billing::hours(), up to $cut->month for « monthly »
      * @param  array<string, mixed>  $plan  BillingPlans::for()
      * @param  string  $absencesRule  « not_billed » or « bill_contractor »
      *
-     * @throws InvalidArgumentException a « monthly » plan cut on a day, or planned minutes up to the month missing
+     * @throws InvalidArgumentException a « monthly » plan cut on a day
      */
     public static function cumulative(array $dossier, array $hours, array $plan, string $absencesRule, CutOff $cut): Shares
     {
@@ -84,7 +88,7 @@ final class BillingCalculator
             }
 
             return self::monthClosed($dossier, $hours, $cut->month)
-                ? self::compute($dossier, $hours, $planned ? self::PLANNED_UNTIL : self::REALISED, $absencesRule, $cut)
+                ? self::compute($dossier, $hours, self::REALISED, $absencesRule, $cut)
                 : Shares::notReady(self::MONTH_NOT_CLOSED);
         }
 
@@ -153,7 +157,7 @@ final class BillingCalculator
                     $session = $bySession[$sessionId] ?? null;
                     if ($session !== null) {
                         $planned += (int) $session['planned_minutes'];
-                        $done += self::minutes($session, $measure);
+                        $done += (int) $session['realised_minutes'];
                     }
                 }
                 $amount = self::prorate($total, min($done, $planned), $planned);
@@ -164,14 +168,14 @@ final class BillingCalculator
                         continue;
                     }
                     $share = (int) ($e['price_share_cents'] ?? 0);
-                    $h = $byEnrolment[$e['id']] ?? ['planned_minutes' => 0, 'realised_minutes' => 0, 'absent_minutes' => 0, 'planned_until_minutes' => 0];
+                    $h = $byEnrolment[$e['id']] ?? ['planned_minutes' => 0, 'realised_minutes' => 0, 'absent_minutes' => 0];
                     $planned = (int) $h['planned_minutes'];
-                    $done = self::minutes($h, $measure);
+                    $done = (int) $h['realised_minutes'];
                     $part = self::prorate($share, min($done, $planned), $planned);
 
                     $eDedit = 0;
                     $eAbsences = 0;
-                    if ($measure === self::REALISED && $e['abandoned'] && $deditPercent > 0 && ! $e['force_majeure']
+                    if ($e['abandoned'] && $deditPercent > 0 && ! $e['force_majeure']
                         && ($e['left_on'] === null || $e['left_on'] <= $cut->date)) {
                         $eDedit = self::prorate($share - $part, $deditPercent, 100);
                     }
@@ -325,24 +329,6 @@ final class BillingCalculator
         }
 
         return true;
-    }
-
-    /**
-     * @param  array<string, mixed>  $row  hours of an enrolment or a session
-     *
-     * @throws InvalidArgumentException planned minutes up to the month missing
-     */
-    private static function minutes(array $row, string $measure): int
-    {
-        if ($measure === self::PLANNED_UNTIL) {
-            if (! array_key_exists('planned_until_minutes', $row)) {
-                throw new InvalidArgumentException('A monthly planned basis needs planned_until_minutes in the hours.');
-            }
-
-            return (int) $row['planned_until_minutes'];
-        }
-
-        return (int) $row['realised_minutes'];
     }
 
     /** round_half_up($cents × $numerator / $denominator), 0 when the denominator is not positive. */
