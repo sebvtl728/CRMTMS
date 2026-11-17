@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { formatDateTime, formatDay, type Option } from '@/lib/crm';
 import { sendJson } from '@/lib/sessions';
-import { CheckCheck, ClipboardCheck, LoaderCircle, Lock, LockOpen, Trash2 } from 'lucide-react';
+import { CheckCheck, ClipboardCheck, FileText, LoaderCircle, Lock, LockOpen, Trash2 } from 'lucide-react';
 import { FormEventHandler, useCallback, useEffect, useState } from 'react';
 
 /** Attendance of a trainee at a séance (AttendanceRows::grid): names only, never needs, notes nor prices. */
@@ -20,6 +20,22 @@ interface GridRow {
     needs_review: boolean;
     /** Expected that day (entry and leaving days); false: entered before the trainee's dates changed. */
     eligible: boolean;
+}
+
+/** Signed scan of an attendance sheet (AttendanceSheetController::list). */
+interface Scan {
+    id: string;
+    scope: 'seance' | 'day';
+    name: string;
+    mime: string;
+    size_bytes: number;
+    created_at: string | null;
+    url: string;
+}
+
+interface ScanList {
+    scans: Scan[];
+    can_delete: boolean;
 }
 
 interface Grid {
@@ -105,10 +121,20 @@ export function AttendanceDialog({ seanceId, open, onClose }: { seanceId: string
     const [drafts, setDrafts] = useState<Record<string, { minutes: string; reason: string }>>({});
     const [changed, setChanged] = useState(false);
     const [notice, setNotice] = useState<string | null>(null);
+    const [scans, setScans] = useState<ScanList>({ scans: [], can_delete: false });
+    const [scanDay, setScanDay] = useState(false);
+    const [scanError, setScanError] = useState<string | null>(null);
 
     const take = (answer: Grid) => {
         setGrid(answer);
-        setDrafts(Object.fromEntries(answer.rows.map((r) => [r.enrolment_id, { minutes: r.status === 'partial' && r.minutes !== null ? String(r.minutes) : '', reason: r.reason ?? '' }])));
+        setDrafts(
+            Object.fromEntries(
+                answer.rows.map((r) => [
+                    r.enrolment_id,
+                    { minutes: r.status === 'partial' && r.minutes !== null ? String(r.minutes) : '', reason: r.reason ?? '' },
+                ]),
+            ),
+        );
     };
 
     useEffect(() => {
@@ -118,9 +144,13 @@ export function AttendanceDialog({ seanceId, open, onClose }: { seanceId: string
         setErrors({});
         setChanged(false);
         setNotice(null);
-        sendJson<Grid>('GET', route('seances.attendance.show', seanceId)).then((answer) => {
-            if (answer.ok && answer.data) take(answer.data);
-            else setError(answer.message);
+        setScans({ scans: [], can_delete: false });
+        setScanError(null);
+        sendJson<Grid & ScanList>('GET', route('seances.attendance.show', seanceId)).then((answer) => {
+            if (answer.ok && answer.data) {
+                take(answer.data);
+                setScans({ scans: answer.data.scans, can_delete: answer.data.can_delete });
+            } else setError(answer.message);
         });
     }, [open, seanceId]);
 
@@ -167,8 +197,36 @@ export function AttendanceDialog({ seanceId, open, onClose }: { seanceId: string
             take(answer.data);
             setChanged(true);
             const n = answer.data.count ?? 0;
-            setNotice(n === 0 ? 'Aucun stagiaire à marquer : tous ont déjà une présence.' : n === 1 ? '1 stagiaire marqué présent.' : `${n} stagiaires marqués présents.`);
+            setNotice(
+                n === 0
+                    ? 'Aucun stagiaire à marquer : tous ont déjà une présence.'
+                    : n === 1
+                      ? '1 stagiaire marqué présent.'
+                      : `${n} stagiaires marqués présents.`,
+            );
         } else setError(answer.message);
+    };
+
+    const uploadScan = async (file: File | undefined) => {
+        if (!grid || !file) return;
+        const body = new FormData();
+        body.append('file', file);
+        if (scanDay) body.append('day', '1');
+        setBusy('scan');
+        setScanError(null);
+        const answer = await sendJson<ScanList>('POST', route('seances.scans.store', grid.seance.id), body);
+        setBusy(null);
+        if (answer.ok && answer.data) setScans(answer.data);
+        else setScanError(answer.errors.file ?? answer.message);
+    };
+
+    const deleteScan = async (scan: Scan) => {
+        if (!grid || !window.confirm('Supprimer ce scan ? Cette action est définitive.')) return;
+        setBusy('scan');
+        const answer = await sendJson<ScanList>('DELETE', route('seances.scans.destroy', [grid.seance.id, scan.id]));
+        setBusy(null);
+        if (answer.ok && answer.data) setScans(answer.data);
+        else setScanError(answer.message);
     };
 
     const missing = grid ? grid.rows.filter((r) => r.eligible && r.status === null).length : 0;
@@ -192,8 +250,12 @@ export function AttendanceDialog({ seanceId, open, onClose }: { seanceId: string
                 {!grid && !error && <LoaderCircle className="h-5 w-5 animate-spin" aria-label="Chargement" />}
                 {grid && (
                     <div className="grid gap-4">
-                        {grid.seance.cancelled && <p className="text-muted-foreground text-sm">Séance annulée : ses présences sont gardées à 0 minute.</p>}
-                        {grid.seance.closed && <p className="text-muted-foreground text-sm">Ce mois est clôturé : les présences ne se modifient plus.</p>}
+                        {grid.seance.cancelled && (
+                            <p className="text-muted-foreground text-sm">Séance annulée : ses présences sont gardées à 0 minute.</p>
+                        )}
+                        {grid.seance.closed && (
+                            <p className="text-muted-foreground text-sm">Ce mois est clôturé : les présences ne se modifient plus.</p>
+                        )}
                         {grid.can_edit && (
                             <div className="flex flex-wrap items-center gap-3">
                                 <Button type="button" onClick={allPresent} disabled={busy !== null || missing === 0}>
@@ -214,7 +276,8 @@ export function AttendanceDialog({ seanceId, open, onClose }: { seanceId: string
                                 const draft = drafts[row.enrolment_id] ?? { minutes: '', reason: '' };
                                 const rowErrors = errors[row.enrolment_id] ?? {};
                                 const editable = grid.can_edit && row.eligible && busy === null;
-                                const setDraft = (patch: Partial<typeof draft>) => setDrafts((d) => ({ ...d, [row.enrolment_id]: { ...draft, ...patch } }));
+                                const setDraft = (patch: Partial<typeof draft>) =>
+                                    setDrafts((d) => ({ ...d, [row.enrolment_id]: { ...draft, ...patch } }));
 
                                 return (
                                     <li key={row.enrolment_id} className="rounded-md border p-3">
@@ -241,7 +304,14 @@ export function AttendanceDialog({ seanceId, open, onClose }: { seanceId: string
                                                 </Button>
                                             ))}
                                             {row.status !== null && grid.can_edit && (
-                                                <Button type="button" size="sm" variant="ghost" disabled={busy !== null} onClick={() => clear(row)} aria-label={`Effacer la présence de ${row.name}`}>
+                                                <Button
+                                                    type="button"
+                                                    size="sm"
+                                                    variant="ghost"
+                                                    disabled={busy !== null}
+                                                    onClick={() => clear(row)}
+                                                    aria-label={`Effacer la présence de ${row.name}`}
+                                                >
                                                     <Trash2 className="h-4 w-4" />
                                                 </Button>
                                             )}
@@ -259,7 +329,12 @@ export function AttendanceDialog({ seanceId, open, onClose }: { seanceId: string
                                                 </div>
                                                 <div className="grid gap-1">
                                                     <Label htmlFor={`reason-${row.enrolment_id}`}>Motif</Label>
-                                                    <Input id={`reason-${row.enrolment_id}`} maxLength={300} value={draft.reason} onChange={(e) => setDraft({ reason: e.target.value })} />
+                                                    <Input
+                                                        id={`reason-${row.enrolment_id}`}
+                                                        maxLength={300}
+                                                        value={draft.reason}
+                                                        onChange={(e) => setDraft({ reason: e.target.value })}
+                                                    />
                                                 </div>
                                                 <Button
                                                     type="button"
@@ -276,6 +351,69 @@ export function AttendanceDialog({ seanceId, open, onClose }: { seanceId: string
                                 );
                             })}
                         </ul>
+                        <section aria-labelledby="sheet-title" className="grid gap-3 rounded-md border p-3">
+                            <h3 id="sheet-title" className="font-medium">
+                                Feuille d'émargement
+                            </h3>
+                            <div className="flex flex-wrap gap-2">
+                                <Button asChild variant="outline" size="sm" disabled={grid.seance.cancelled}>
+                                    <a href={route('seances.sheet', { seance: grid.seance.id })} target="_blank" rel="noreferrer">
+                                        <FileText className="h-4 w-4" />
+                                        Imprimer cette séance
+                                    </a>
+                                </Button>
+                                <Button asChild variant="outline" size="sm" disabled={grid.seance.cancelled}>
+                                    <a href={route('seances.sheet', { seance: grid.seance.id, day: 1 })} target="_blank" rel="noreferrer">
+                                        <FileText className="h-4 w-4" />
+                                        Imprimer la journée
+                                    </a>
+                                </Button>
+                            </div>
+                            {scans.scans.length > 0 && (
+                                <ul className="grid gap-1 text-sm">
+                                    {scans.scans.map((scan) => (
+                                        <li key={scan.id} className="flex flex-wrap items-center justify-between gap-2">
+                                            <a href={scan.url} className="underline">
+                                                {scan.name}
+                                            </a>
+                                            <span className="text-muted-foreground flex items-center gap-2">
+                                                {scan.scope === 'day' ? 'Journée' : 'Séance'} · {Math.max(1, Math.round(scan.size_bytes / 1024))} Ko
+                                                {scans.can_delete && (
+                                                    <Button
+                                                        type="button"
+                                                        size="sm"
+                                                        variant="ghost"
+                                                        disabled={busy !== null}
+                                                        onClick={() => deleteScan(scan)}
+                                                        aria-label={`Supprimer le scan ${scan.name}`}
+                                                    >
+                                                        <Trash2 className="h-4 w-4" />
+                                                    </Button>
+                                                )}
+                                            </span>
+                                        </li>
+                                    ))}
+                                </ul>
+                            )}
+                            <div className="grid gap-2">
+                                <Label htmlFor="scan-file">Déposer la feuille signée (PDF, PNG ou JPEG, 10 Mo au plus)</Label>
+                                <Input
+                                    id="scan-file"
+                                    type="file"
+                                    accept="application/pdf,image/png,image/jpeg"
+                                    disabled={busy !== null}
+                                    onChange={(e) => {
+                                        void uploadScan(e.target.files?.[0]);
+                                        e.target.value = '';
+                                    }}
+                                />
+                                <label className="flex items-center gap-2 text-sm">
+                                    <input type="checkbox" checked={scanDay} onChange={(e) => setScanDay(e.target.checked)} />
+                                    Ce scan couvre toute la journée
+                                </label>
+                                <InputError message={scanError ?? undefined} />
+                            </div>
+                        </section>
                     </div>
                 )}
                 <DialogFooter>
@@ -288,7 +426,17 @@ export function AttendanceDialog({ seanceId, open, onClose }: { seanceId: string
     );
 }
 
-function ReopenDialog({ open, month, onClose, onSubmit }: { open: boolean; month: string; onClose: () => void; onSubmit: (reason: string) => Promise<string | null> }) {
+function ReopenDialog({
+    open,
+    month,
+    onClose,
+    onSubmit,
+}: {
+    open: boolean;
+    month: string;
+    onClose: () => void;
+    onSubmit: (reason: string) => Promise<string | null>;
+}) {
     const [reason, setReason] = useState('');
     const [error, setError] = useState<string | null>(null);
     const [busy, setBusy] = useState(false);
@@ -311,7 +459,9 @@ function ReopenDialog({ open, month, onClose, onSubmit }: { open: boolean; month
                 <form onSubmit={submit} className="grid gap-4">
                     <DialogHeader>
                         <DialogTitle>Rouvrir {month}</DialogTitle>
-                        <DialogDescription>Les présences, les heures et les séances du mois redeviennent modifiables. La réouverture est journalisée.</DialogDescription>
+                        <DialogDescription>
+                            Les présences, les heures et les séances du mois redeviennent modifiables. La réouverture est journalisée.
+                        </DialogDescription>
                     </DialogHeader>
                     <div className="grid gap-2">
                         <Label htmlFor="reopen-reason">Motif *</Label>
@@ -395,13 +545,15 @@ export function SessionAttendance({ sessionId }: { sessionId: string }) {
 
     const load = useCallback(
         (m: string | null) => {
-            sendJson<SessionAttendance>('GET', route('sessions.attendance', sessionId) + (m ? `?month=${encodeURIComponent(m)}` : '')).then((answer) => {
-                if (answer.ok && answer.data) {
-                    setData(answer.data);
-                    setMonth(answer.data.month);
-                    setError(null);
-                } else setError(answer.message);
-            });
+            sendJson<SessionAttendance>('GET', route('sessions.attendance', sessionId) + (m ? `?month=${encodeURIComponent(m)}` : '')).then(
+                (answer) => {
+                    if (answer.ok && answer.data) {
+                        setData(answer.data);
+                        setMonth(answer.data.month);
+                        setError(null);
+                    } else setError(answer.message);
+                },
+            );
         },
         [sessionId],
     );
@@ -409,7 +561,11 @@ export function SessionAttendance({ sessionId }: { sessionId: string }) {
     useEffect(() => load(null), [load]);
 
     if (!data) {
-        return error ? <p className="text-destructive text-sm">{error}</p> : <LoaderCircle className="h-5 w-5 animate-spin" aria-label="Chargement" />;
+        return error ? (
+            <p className="text-destructive text-sm">{error}</p>
+        ) : (
+            <LoaderCircle className="h-5 w-5 animate-spin" aria-label="Chargement" />
+        );
     }
 
     const current = data.months.find((m) => m.value === data.month);
@@ -454,7 +610,14 @@ export function SessionAttendance({ sessionId }: { sessionId: string }) {
         <div className="grid gap-6">
             <div className="flex flex-wrap items-center gap-2" role="group" aria-label="Mois">
                 {data.months.map((m) => (
-                    <Button key={m.value} type="button" size="sm" variant={m.value === month ? 'default' : 'outline'} aria-pressed={m.value === month} onClick={() => load(m.value)}>
+                    <Button
+                        key={m.value}
+                        type="button"
+                        size="sm"
+                        variant={m.value === month ? 'default' : 'outline'}
+                        aria-pressed={m.value === month}
+                        onClick={() => load(m.value)}
+                    >
                         {m.closed && <Lock className="h-3 w-3" aria-label="clôturé" />}
                         {monthLabel(m.label)}
                     </Button>
@@ -556,7 +719,9 @@ export function SessionAttendance({ sessionId }: { sessionId: string }) {
             {data.monthly.modules.length > 0 && (
                 <section className="grid gap-2">
                     <h3 className="font-medium">Heures du mois (modules en intervalle)</h3>
-                    <p className="text-muted-foreground text-sm">Heures réalisées en {current?.label ?? data.month}, au format 12:30. Videz une case pour effacer ses heures.</p>
+                    <p className="text-muted-foreground text-sm">
+                        Heures réalisées en {current?.label ?? data.month}, au format 12:30. Videz une case pour effacer ses heures.
+                    </p>
                     {data.monthly.rows.length === 0 ? (
                         <p className="text-muted-foreground text-sm">Aucun stagiaire ce mois-ci.</p>
                     ) : (

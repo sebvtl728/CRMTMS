@@ -1,6 +1,7 @@
 <?php
 
 use App\Modules\Sessions\Attendance\AttendanceController;
+use App\Modules\Sessions\Attendance\AttendanceSheetController;
 use App\Modules\Sessions\Dossiers\DossierController;
 use App\Modules\Sessions\Dossiers\DossierFromQuoteController;
 use App\Modules\Sessions\Enrolments\EnrolmentController;
@@ -81,6 +82,14 @@ Route::middleware(['auth', 'can:sessions.attendance.manage'])->prefix('seances/{
     Route::post('/', [AttendanceController::class, 'record'])->name('store');
     Route::post('all-present', [AttendanceController::class, 'allPresent'])->name('all-present');
     Route::delete('{enrolmentId}', [AttendanceController::class, 'clear'])->name('destroy');
+});
+
+// Printable attendance sheet (?day=1: the whole day of the session) and signed scans of a séance.
+Route::middleware(['auth', 'can:sessions.attendance.manage'])->prefix('seances/{seance}')->name('seances.')->group(function () {
+    Route::get('sheet', [AttendanceSheetController::class, 'pdf'])->middleware('throttle:attendance-sheet')->name('sheet');
+    Route::post('scans', [AttendanceSheetController::class, 'store'])->middleware('throttle:attendance-scan')->name('scans.store');
+    Route::get('scans/{scan}', [AttendanceSheetController::class, 'show'])->name('scans.show');
+    Route::delete('scans/{scan}', [AttendanceSheetController::class, 'destroy'])->name('scans.destroy');
 });
 
 // An enrolment: sessions.sessions.update on its session (EnrolmentPolicy).

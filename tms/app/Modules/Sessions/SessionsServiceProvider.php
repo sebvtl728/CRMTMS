@@ -21,6 +21,7 @@ use App\Modules\Crm\Public\QuoteLinks;
 use App\Modules\Sessions\Attendance\Attendance;
 use App\Modules\Sessions\Attendance\AttendanceClosure;
 use App\Modules\Sessions\Attendance\Attendances;
+use App\Modules\Sessions\Attendance\AttendanceSheetScan;
 use App\Modules\Sessions\Attendance\Closures;
 use App\Modules\Sessions\Attendance\MonthlyHour;
 use App\Modules\Sessions\Dossiers\Dossier;
@@ -106,6 +107,7 @@ class SessionsServiceProvider extends ServiceProvider
             Attendance::MORPH_ALIAS => Attendance::class,
             MonthlyHour::MORPH_ALIAS => MonthlyHour::class,
             AttendanceClosure::MORPH_ALIAS => AttendanceClosure::class,
+            AttendanceSheetScan::MORPH_ALIAS => AttendanceSheetScan::class,
         ]);
     }
 

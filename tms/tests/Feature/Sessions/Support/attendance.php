@@ -11,6 +11,8 @@ use App\Modules\Sessions\Enrolments\Enrolment;
 use App\Modules\Sessions\Modules\SessionModule;
 use App\Modules\Sessions\Permissions;
 use App\Modules\Sessions\Sessions\TrainingSession;
+use Illuminate\Http\Client\Request;
+use Illuminate\Support\Facades\Http;
 
 /**
  * A trainee enrolled on the session (a dossier of his own).
@@ -42,4 +44,29 @@ function atIntervalModule(TrainingSession $session, int $plannedMinutes = 600, s
         'training_session_id' => $session->id, 'position' => $position, 'title' => $title, 'planned_minutes' => $plannedMinutes,
         'dating_mode' => 'interval', 'starts_on' => $session->starts_on->toDateString(), 'ends_on' => $session->ends_on->toDateString(),
     ]);
+}
+
+/**
+ * Gotenberg answers a recognisable PDF; the HTML it received is read back with sheetHtml().
+ */
+function fakeSheetGotenberg(): void
+{
+    config(['documents.gotenberg_url' => 'http://gotenberg:3000']);
+    Http::fake(['gotenberg:3000/*' => Http::response('%PDF-1.7 feuille', 200, ['Content-Type' => 'application/pdf'])]);
+}
+
+function sheetHtml(): string
+{
+    $html = '';
+    Http::assertSent(function (Request $request) use (&$html) {
+        foreach ($request->data() as $part) {
+            if (($part['filename'] ?? null) === 'index.html') {
+                $html = (string) $part['contents'];
+            }
+        }
+
+        return true;
+    });
+
+    return $html;
 }

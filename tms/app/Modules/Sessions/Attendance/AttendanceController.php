@@ -38,7 +38,7 @@ class AttendanceController extends Controller
     {
         self::authorizeSeance($request, $seance);
 
-        return self::json(AttendanceRows::grid($seance));
+        return self::json([...AttendanceRows::grid($seance), ...AttendanceSheetController::list($seance, self::user($request))]);
     }
 
     public function record(Request $request, Seance $seance): JsonResponse

@@ -138,9 +138,9 @@ export async function sendJson<T>(method: 'GET' | 'POST' | 'DELETE', url: string
             Accept: 'application/json',
             'X-Requested-With': 'XMLHttpRequest',
             'X-XSRF-TOKEN': xsrfToken(),
-            ...(body === undefined ? {} : { 'Content-Type': 'application/json' }),
+            ...(body === undefined || body instanceof FormData ? {} : { 'Content-Type': 'application/json' }),
         },
-        body: body === undefined ? undefined : JSON.stringify(body),
+        body: body === undefined ? undefined : body instanceof FormData ? body : JSON.stringify(body),
     });
     const json = await response.json().catch(() => null);
     const errors: Record<string, string> = {};

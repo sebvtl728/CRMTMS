@@ -29,6 +29,8 @@ class RateLimitServiceProvider extends ServiceProvider
         'calendar-feed' => 30,
         'outlook-oauth' => 10,
         'connector-test' => 5,
+        'attendance-sheet' => 60,
+        'attendance-scan' => 30,
     ];
 
     /**
