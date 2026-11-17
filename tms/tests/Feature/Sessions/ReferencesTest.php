@@ -51,6 +51,10 @@ it('seeds the lot 2a lists for a new organisme with the agreed values', function
     $defaults = ReferenceItem::options(ReferenceList::FundingType)->mapWithKeys(fn ($i) => [$i->code => $i->meta['default_for'] ?? null])->filter()->all();
     expect($defaults)->toBe(['entreprise' => 'organisation', 'personnel' => 'person']);
 
+    // The CPF is billed outside the TMS (EDOF): no invoice of the TMS for its share.
+    $outside = ReferenceItem::options(ReferenceList::FundingType)->filter(fn ($i) => ($i->meta['external_billing'] ?? false) === true)->pluck('code')->all();
+    expect($outside)->toBe(['cpf']);
+
     // No second « employment status » list: the professional situation is reused.
     expect(array_map(fn (ReferenceList $l) => $l->value, ReferenceList::cases()))->not->toContain('employment_status');
 });
@@ -67,6 +71,7 @@ it('creates the same values for an existing organisme by migration, without dupl
 
     $migration->up();
     lot2aMigration('2026_12_13_000001_flag_default_funding_types')->up();
+    lot2aMigration('2027_01_15_000001_flag_cpf_billed_outside')->up();
     $migrated = lot2aItems();
     expect($migrated['funding_type'])->toHaveCount(6)->and($migrated['abandon_reason'][1][3])->toBe(['force_majeure' => true]);
 
@@ -128,8 +133,8 @@ it('lets an administrator flag an abandon reason as force majeure', function () 
     expect($reason->fresh()->meta)->toBeNull();
 
     // The flag exists on abandon reasons only: ignored elsewhere.
-    $funding = ReferenceItem::query()->where('list', ReferenceList::FundingType)->where('code', 'cpf')->firstOrFail();
-    $this->put("/admin/references/funding_type/{$funding->id}", ['label' => 'CPF', 'meta' => ['force_majeure' => true]])->assertRedirect();
+    $funding = ReferenceItem::query()->where('list', ReferenceList::FundingType)->where('code', 'opco')->firstOrFail();
+    $this->put("/admin/references/funding_type/{$funding->id}", ['label' => 'OPCO', 'meta' => ['force_majeure' => true]])->assertRedirect();
     expect($funding->fresh()->meta)->toBeNull();
 });
 
@@ -152,6 +157,29 @@ it('flags once, by migration, the funding types funding a new dossier by default
         ->and(ReferenceItem::query()->where('list', ReferenceList::FundingType)->where('meta->default_for', 'person')->pluck('code')->all())->toBe(['cpf']);
 });
 
+it('flags once, by migration, the funding type « CPF » of each organisme as billed outside the TMS', function () {
+    inTenant();
+    [$other] = app(TenantProvisioner::class)->create('Deuxième', 'deuxieme', []);
+    $migration = lot2aMigration('2026_12_07_000002_seed_sessions_reference_lists');
+    $migration->up();
+    lot2aMigration('2026_12_13_000001_flag_default_funding_types')->up();
+    $type = fn (string $code) => ReferenceItem::query()->where('list', ReferenceList::FundingType)->where('code', $code)->firstOrFail();
+    // Another organisme renamed its CPF: not « CPF » exactly, left as it is.
+    app(TenantContext::class)->run($other, fn () => $type('cpf')->update(['label' => 'CPF (EDOF)']));
+    $type('cpf')->update(['meta' => ['default_for' => 'person']]);
+    $outside = lot2aMigration('2027_01_15_000001_flag_cpf_billed_outside');
+
+    $outside->up();
+    expect($type('cpf')->meta)->toBe(['default_for' => 'person', 'external_billing' => true])
+        ->and($type('opco')->meta)->toBeNull()
+        ->and(app(TenantContext::class)->run($other, fn () => $type('cpf')->meta))->toBeNull();
+
+    // Idempotent.
+    $outside->up();
+    expect($type('cpf')->meta)->toBe(['default_for' => 'person', 'external_billing' => true])
+        ->and(ReferenceItem::query()->where('list', ReferenceList::FundingType)->where('meta->external_billing', true)->count())->toBe(1);
+});
+
 it('lets an administrator choose the funding type of each contractant, one per kind', function () {
     inTenant();
     CapFormationReferenceSeeder::run(tenant());
@@ -160,12 +188,13 @@ it('lets an administrator choose the funding type of each contractant, one per k
         ->where('lists.funding_type.has_default_for', true)->where('lists.abandon_reason.has_default_for', false));
 
     $this->put("/admin/references/funding_type/{$type('cpf')->id}", ['label' => 'CPF', 'meta' => ['default_for' => 'person']])->assertRedirect();
-    expect($type('cpf')->meta)->toBe(['default_for' => 'person'])
+    // The CPF stays billed outside the TMS (seeded flag, kept since the form does not send it).
+    expect($type('cpf')->meta)->toBe(['default_for' => 'person', 'external_billing' => true])
         ->and($type('personnel')->meta)->toBeNull()
         ->and($type('entreprise')->meta)->toBe(['default_for' => 'organisation']);
 
     $this->put("/admin/references/funding_type/{$type('cpf')->id}", ['label' => 'CPF', 'meta' => ['default_for' => null]])->assertRedirect();
-    expect($type('cpf')->meta)->toBeNull();
+    expect($type('cpf')->meta)->toBe(['external_billing' => true]);
 
     $this->put("/admin/references/funding_type/{$type('cpf')->id}", ['label' => 'CPF', 'meta' => ['default_for' => 'robot']])
         ->assertSessionHasErrors('meta.default_for');

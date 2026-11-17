@@ -10,7 +10,7 @@ Pour chaque dossier, le TMS prépare une facture **par destinataire** :
 
 - **Le contractant du dossier** (l'entreprise, ou le particulier) : il reçoit la facture de tout ce qui n'est pas payé directement par un financeur.
 - **Un financeur qui paie directement l'organisme** (OPCO, France Travail, Région…) : il reçoit **sa propre facture pour sa part**. Pour cela, son financement doit être **Accordé**, cocher **« Paie directement l'organisme »** (page du dossier, section Financements) et porter un **numéro de prise en charge** (numéro d'accord). Un financement seulement demandé ne réduit pas la facture du contractant ; s'il est accordé plus tard, la page « À facturer » propose la facture du financeur et l'avoir correspondant au contractant (§ 4).
-- **Un financeur facturé hors du TMS** (par exemple le CPF, réglé par la plateforme EDOF) : son type de financement est marqué « Facturé hors du TMS » (Administration › Référentiels › Types de financeur). Sa part est retirée de la facture du contractant, aucune facture n'est émise pour elle dans le TMS, et la facture du contractant porte la mention « Part réglée par <financeur> ».
+- **Un financeur facturé hors du TMS** (par exemple le CPF, réglé par la plateforme EDOF) : son type de financement est marqué « Facturé hors du TMS » (Administration › Référentiels › Types de financeur). Sa part est retirée de la facture du contractant, aucune facture n'est émise pour elle dans le TMS, et la facture du contractant porte la mention « Part réglée par <financeur> ». Le type « CPF » est marqué ainsi d'origine (à la mise à jour 0.9, le type nommé exactement « CPF » de chaque organisme l'est aussi) ; décochez la case si votre organisme facture lui-même le CPF.
 
 Le financeur ne peut pas être le contractant lui-même : « Paie directement » est alors refusé. Un financement refusé ne compte jamais.
 
@@ -27,13 +27,15 @@ La **base** de calcul :
 - **Au réalisé** (par défaut) : on facture les heures réellement faites (présences), jamais plus que ce qui était prévu pour l'inscrit.
 - **Au prévu** : pour un forfait, on facture le prix prévu quelles que soient les heures faites.
 
+Les montants calculés partent du **prix des lignes du dossier, remises déduites** (une ligne à 1 000 € remisée de 10 % est facturée sur 900 €).
+
 Les frais (déplacement, repas, forfaits) sont facturés en entier à la première facture (mensuel), à la fin (fin de formation) ou au prorata des pourcentages (échéancier).
 
-**Verrouillage** : dès la **première facture validée** d'un dossier, le rythme, la base, l'échéancier et le réglage « Paie directement » ne changent plus ; il faut d'abord faire un avoir (§ 7). Un dossier qui a des factures validées ne peut pas non plus être mis à la corbeille.
+**Verrouillage** : dès la **première facture validée** d'un dossier, le rythme, la base, l'échéancier, le réglage « Paie directement », la **société émettrice** et le **contractant** du dossier ne changent plus, ni le **financeur** d'un financement déjà facturé (« Ce dossier a des factures validées : faites d'abord un avoir. ») ; il faut d'abord faire un avoir (§ 7). Un dossier qui a des factures validées ne peut pas non plus être mis à la corbeille. La règle des absences non justifiées du dossier est figée elle aussi (§ 3).
 
 ## 3. Absences non justifiées et dédit
 
-- **Absences non justifiées** : réglage de l'organisme (Finance › Réglages de facturation, « Non facturées » par défaut), que chaque dossier peut remplacer. Avec « Facturées au contractant », les heures d'un stagiaire **absent** (et la part manquante d'un « partiel ») sur des séances passées sont facturées **au contractant seul**, sur une ligne distincte « Absences non justifiées — non imputables sur les fonds de la formation professionnelle », au tarif horaire de la ligne. Jamais une absence justifiée, une séance annulée, un module en intervalle (pas de présence par séance) ni un stagiaire sorti (règle d'abandon). Jamais imputées à un financeur.
+- **Absences non justifiées** : réglage de l'organisme (Finance › Réglages de facturation, « Non facturées » par défaut), que chaque dossier peut remplacer. Avec « Facturées au contractant », les heures d'un stagiaire **absent** (et la part manquante d'un « partiel ») sur des séances passées sont facturées **au contractant seul**, sur une ligne distincte « Absences non justifiées — non imputables sur les fonds de la formation professionnelle », au tarif horaire de la ligne. Jamais une absence justifiée, une séance annulée, un module en intervalle (pas de présence par séance) ni un stagiaire sorti (règle d'abandon). Jamais imputées à un financeur. **Le réglage de l'organisme ne vaut que pour les dossiers pas encore facturés** : à la première facture validée, le dossier garde la règle alors appliquée, et un changement ultérieur du réglage de l'organisme ne le touche plus (rien de nouveau n'est dû). Le bloc Facturation du dossier permet encore de la changer à la main ; y choisir « Réglage de l'organisme » reprend le réglage du moment, figé à son tour.
 - **Dédit d'abandon** : si la règle d'abandon du dossier prévoit un dédit (`sessions.md` § 4), il est facturé **en entier au contractant** (jamais aux financeurs : il n'est pas imputable sur les fonds de la formation professionnelle), sur une **ligne distincte**, **hors champ de la TVA**. Aucun dédit pour un abandon de force majeure. *Traitement à faire confirmer par l'expert-comptable (§ 11).*
 
 ## 4. La page « À facturer » (menu Finance)
@@ -58,7 +60,9 @@ Un brouillon se crée depuis « À facturer » ou **à la main** depuis le bloc 
 
 TVA d'une ligne : 0 pour une société exonérée et pour le dédit, sinon 0 / 5,5 / 10 / 20 %.
 
-**Recalculer** remet le brouillon d'aplomb sur le dû actuel (après une présence ou un financement qui a changé). Un brouillon est modifiable et supprimable ; il y a **un seul brouillon ouvert** par destinataire, dossier et type (facture ou avoir). Les montants sont en centimes entiers, arrondis au demi supérieur.
+**Recalculer** remet le brouillon d'aplomb sur le dû actuel (après une présence ou un financement qui a changé). Il ne change jamais une facture en avoir, ni l'inverse : si le dû a changé de sens (ou s'il n'y a plus d'avoir dû pour un brouillon d'avoir), il refuse (« Le montant dû a changé de sens : supprimez ce brouillon et préparez-en un nouveau. ») sans toucher au brouillon.
+
+**Fiches fusionnées** : un brouillon adressé à une fiche du CRM fusionnée depuis dans une autre (doublon) garde l'ancienne fiche : supprimez-le et préparez-en un nouveau depuis « À facturer ». Un brouillon est modifiable et supprimable ; il y a **un seul brouillon ouvert** par destinataire, dossier et type (facture ou avoir). Les montants sont en centimes entiers, arrondis au demi supérieur.
 
 ## 6. La validation
 
@@ -67,7 +71,7 @@ TVA d'une ligne : 0 pour une société exonérée et pour le dédit, sinon 0 / 5
 - donne le **numéro définitif** `<préfixe>-<année>-<numéro sur 5 chiffres>` (`F-2026-00001`, avoirs `AV-2026-00001`), **continu, sans trou ni doublon**, par société, type et année (heure de Paris) ; l'échéance = date d'émission + délai de paiement de la société ;
 - **fige** le destinataire (nom, adresse, SIRET, e-mail, numéro de dossier, numéro d'accord), les lignes et les totaux, et **archive le PDF** ;
 - ajoute la pièce au **journal chaîné** (§ 10) ;
-- passe le dossier à l'état « Facturé » quand tout est facturé (et le ramène à « Réalisé » si un avoir fait revenir un dû).
+- passe le dossier à l'état « Facturé » quand tout est facturé (et le ramène à « Réalisé » si un avoir fait revenir un dû). L'état est posé **au moment d'une validation** : un dossier dont les sessions se terminent après sa dernière facture reste « Réalisé » jusqu'à la validation suivante.
 
 **Contrôle à la validation** : le dû est recalculé à cet instant ; si le brouillon facture plus que le dû actuel, la validation est refusée (« Le montant dû a changé : recalculez le brouillon avant de le valider. »). Autres refus : total nul, destinataire qui n'est plus facturable, numéro d'accord manquant pour un financeur. Si le PDF ne peut pas être produit (service indisponible), rien n'est validé et le numéro n'est pas consommé.
 
@@ -75,7 +79,7 @@ Une facture validée est **immuable**, même dans la base de données, et ne se 
 
 ## 7. Les avoirs
 
-Un **avoir corrige toujours une facture** validée du même destinataire. « Créer un avoir » depuis la facture (toutes les lignes, ou les lignes choisies) ; un avoir **partiel** s'obtient en réduisant les montants du brouillon. Même circuit : brouillon, validation, numéro `AV`.
+Un **avoir corrige toujours une facture** validée du même destinataire. Il est émis par la **même société** et adressé au **même destinataire** que la facture corrigée, même si la société ou le contractant du dossier ont changé depuis (fiches fusionnées) ; un brouillon d'avoir qui diffère est refusé à la validation (« Un avoir doit être émis par la même société et au même destinataire que la facture corrigée. »). « Créer un avoir » depuis la facture (toutes les lignes, ou les lignes choisies) ; un avoir **partiel** s'obtient en réduisant les montants du brouillon. Même circuit : brouillon, validation, numéro `AV`.
 
 - Un avoir **ne dépasse jamais ce qui reste de la facture** corrigée (facture moins ses avoirs déjà validés), ni ce qui a été facturé au destinataire sur le dossier.
 - Il reprend les **taux de TVA de la facture corrigée**, non modifiables.
@@ -105,5 +109,6 @@ Avant la première facture réelle :
 
 - le **régime de TVA** de chaque société (exonération de l'article 261-4-4° du CGI, ou assujettie) ;
 - le **traitement du dédit** (ligne distincte, hors champ de la TVA, facturée au seul contractant) et des **absences non justifiées** facturées ;
+- le **CPF facturé hors du TMS** (réglé par EDOF, coché d'origine sur le type « CPF ») : sa part n'apparaît que comme mention sur la facture du contractant ;
 - les mentions de pied de facture (pénalités, indemnité de 40 €, RIB) et l'absence de n° de TVA et d'e-mail de facturation dédié dans les fiches du CRM (le TMS utilise l'e-mail de la fiche) ;
 - la **conservation 10 ans** des pièces (le TMS n'efface jamais une facture validée, l'anonymisation RGPD d'une personne non plus ; voir `admin.md` § 11).

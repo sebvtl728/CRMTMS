@@ -25,11 +25,14 @@ use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
  *  - basis: « realised » (default) or « planned » (a flat price; never
  *    with « monthly », billed at the realised hours only);
  *  - unjustified_absences: « not_billed », « bill_contractor », or null for
- *    the organisme's default (FinanceSettings);
+ *    the organisme's default (FinanceSettings) — for a dossier not yet
+ *    invoiced only: the lock stores the rule then applied, so a later change
+ *    of the organisme's default never changes what an invoiced dossier owes;
  *  - locked once the first invoice of the dossier is validated (lock(),
  *    called by the validation): rhythm, basis and schedule no longer change
- *    (409, a credit note first); the absences rule still does (the due
- *    amount is computed again, as after a change of attendance).
+ *    (409, a credit note first); the absences rule still does, by hand on
+ *    the dossier (the due amount is computed again, as after a change of
+ *    attendance; « the organisme's rule » takes it as it is then).
  *
  * A dossier without a row has the default plan; the row is created at the
  * first save (or lock), one per dossier (unique), under a row lock.
@@ -104,6 +107,10 @@ final class BillingPlans
                 && ($plan->rhythm !== $values['rhythm'] || $plan->basis !== $values['basis'] || $plan->schedule !== $values['schedule'])) {
                 throw new UserFacingHttpException(409, self::LOCKED);
             }
+            // Invoiced: the organisme's rule is taken as it is now, frozen like at the lock.
+            if ($plan->locked_at !== null) {
+                $values['unjustified_absences'] ??= FinanceSettings::absencesDefault();
+            }
             $plan->fill([...$values, 'updated_by' => Auth::id()]);
             if ($plan->isDirty(['rhythm', 'basis', 'unjustified_absences', 'schedule'])) {
                 $plan->save();
@@ -117,7 +124,8 @@ final class BillingPlans
 
     /**
      * Freezes the plan of the dossier (its first invoice is validated),
-     * creating the default one when it has none; already locked: unchanged.
+     * creating the default one when it has none, with the absences rule then
+     * applied (the organisme's default resolved); already locked: unchanged.
      * Call inside the validation transaction.
      */
     public function lock(string $dossierId): void
@@ -125,7 +133,10 @@ final class BillingPlans
         DB::transaction(function () use ($dossierId): void {
             $plan = $this->lockedRow($dossierId);
             if ($plan->locked_at === null) {
-                $plan->forceFill(['locked_at' => CarbonImmutable::now()])->save();
+                $plan->forceFill([
+                    'locked_at' => CarbonImmutable::now(),
+                    'unjustified_absences' => $plan->unjustified_absences ?? FinanceSettings::absencesDefault(),
+                ])->save();
             }
         });
     }

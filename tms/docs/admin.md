@@ -59,7 +59,7 @@ Pour chaque société : raison sociale, forme juridique, capital (montant et « 
 
 **Section « Factures »** de la société (0.9) :
 
-- **Préfixe des factures** (`F` par défaut) et **préfixe des avoirs** (`AV` par défaut) : lettres majuscules et chiffres, 10 caractères au plus, **différents l'un de l'autre**. Les numéros sont `<préfixe>-<année>-<numéro sur 5 chiffres>` (`F-2026-00001`), sans trou, avec un compteur par société, par type (facture, avoir) et par année civile (heure de Paris) qui repart à 1 le 1er janvier. Changer de préfixe ne renumérote pas les pièces existantes.
+- **Préfixe des factures** (`F` par défaut) et **préfixe des avoirs** (`AV` par défaut) : lettres majuscules et chiffres, 10 caractères au plus, **différents l'un de l'autre**. Les numéros sont `<préfixe>-<année>-<numéro sur 5 chiffres>` (`F-2026-00001`), sans trou, avec un compteur par société, par type (facture, avoir) et par année civile (heure de Paris) qui repart à 1 le 1er janvier. Changer de préfixe ne renumérote pas les pièces existantes. Un préfixe qui a déjà numéroté l'autre type de pièce de la société est refusé (« Ce préfixe a déjà servi pour un autre type de pièce. ») : les factures et les avoirs ne se croisent jamais.
 - **Délai de paiement** : 0 à 60 jours (30 par défaut) ; l'échéance d'une facture = date d'émission + ce délai.
 - **Pied de facture** (2 000 caractères) : texte libre imprimé sur chaque facture (RIB, précisions de règlement…). Les pénalités de retard et l'indemnité de 40 € sont ajoutées automatiquement aux factures destinées à un professionnel.
 - Le **régime de TVA** de la société commande aussi les factures : exonérée, toutes les lignes sont à 0 % avec la mention d'exonération ; assujettie, taux par ligne (20 % proposé). Une facture validée garde le régime de sa validation.
@@ -368,9 +368,9 @@ Guide d'installation et d'exploitation : `install.md` (« Sauvegardes » et « D
 
 Guide utilisateur : `finance.md`.
 
-- **Finance › Réglages de facturation** (droit `settings.manage`) : **absences non justifiées** de l'organisme, « Non facturées » (défaut) ou « Facturées au contractant » ; chaque dossier peut remplacer ce réglage. Changement journalisé.
+- **Finance › Réglages de facturation** (droit `settings.manage`) : **absences non justifiées** de l'organisme, « Non facturées » (défaut) ou « Facturées au contractant » ; chaque dossier peut remplacer ce réglage. Il ne s'applique qu'aux **dossiers pas encore facturés** : la première facture validée fige la règle du dossier, qu'un changement ultérieur du réglage de l'organisme ne touche plus. Changement journalisé.
 - **Sociétés** : préfixes de factures et d'avoirs, délai de paiement (0 à 60 jours), pied de facture ; voir § 3.
-- **Référentiel « Types de financeur »** : case **Facturé hors du TMS** (par exemple CPF). Un financement de ce type retire sa part de la facture du contractant et n'émet aucune facture TMS. Les types existants ne sont pas modifiés par la mise à jour : cochez la case sur ceux qui le méritent.
+- **Référentiel « Types de financeur »** : case **Facturé hors du TMS** (par exemple CPF). Un financement de ce type retire sa part de la facture du contractant et n'émet aucune facture TMS. Cochée d'origine sur « CPF » ; la mise à jour 0.9 la coche, dans chaque organisme existant, sur le seul type nommé exactement « CPF » (s'il ne porte pas déjà ce réglage). Vérifiez les autres types, et décochez « CPF » si l'organisme le facture lui-même.
 - **Modèle d'e-mail « Facture »** : Administration › Modèles d'e-mails (variables : numéro, pièce, type, société, destinataire, montant TTC, échéance, règlement, organisme).
 - **PDF** : mêmes exigences que les devis (Gotenberg démarré, `GOTENBERG_URL`) ; une facture ne se valide pas si le PDF ne peut pas être produit. Les PDF validés sont archivés par organisme (zone `invoices`) et **font partie de la sauvegarde** : ne les excluez pas.
 - **Intégrité** : `docker compose exec app php artisan tms:finance:verify` (tous les organismes ; code de sortie 1 et numéro de la première pièce en cause en cas de rupture). À lancer après une restauration ou un déménagement (`ops/import.sh`), et à intervalles réguliers.
