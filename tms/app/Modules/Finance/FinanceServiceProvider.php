@@ -6,9 +6,11 @@ use App\Modules\Core\Access\Permissions as CorePermissions;
 use App\Modules\Core\Audit\MorphAliases;
 use App\Modules\Core\Users\User;
 use App\Modules\Crm\Public\FicheLinks;
+use App\Modules\Finance\Invoices\FinanceMailTemplates;
 use App\Modules\Finance\Invoices\Invoice;
 use App\Modules\Finance\Invoices\InvoiceAnonymisation;
 use App\Modules\Finance\Invoices\InvoiceLine;
+use App\Modules\Finance\Invoices\InvoiceSending;
 use App\Modules\Finance\Plans\BillingBlock;
 use App\Modules\Finance\Plans\BillingPlan;
 use App\Modules\Finance\Plans\BillingPlans;
@@ -39,7 +41,10 @@ class FinanceServiceProvider extends ServiceProvider
             FinanceSettings::MORPH_ALIAS => FinanceSettings::class,
             Invoice::MORPH_ALIAS => Invoice::class,
             InvoiceLine::MORPH_ALIAS => InvoiceLine::class,
+            InvoiceSending::MORPH_ALIAS => InvoiceSending::class,
         ]);
+
+        FinanceMailTemplates::register();
 
         $this->app->singleton(BillingPlans::class);
     }
@@ -59,6 +64,11 @@ class FinanceServiceProvider extends ServiceProvider
         FicheLinks::registerAnonymisation('finance.invoices', fn (array $personIds) => InvoiceAnonymisation::deleteDrafts($personIds));
 
         // Rendering a PDF (preview, archive at validation) costs a conversion.
+        $by = fn (Request $request, string $name): string => $name.':'.($request->user()?->getAuthIdentifier() ?? $request->ip());
+        RateLimiter::for('invoice-mail', fn (Request $request) => Limit::perMinute(20)->by($by($request, 'invoice-mail')));
+        RateLimiter::for('finance-export', fn (Request $request) => Limit::perMinute(20)->by($by($request, 'finance-export')));
+        // Recomputing the chain reads every archived PDF.
+        RateLimiter::for('invoice-integrity', fn (Request $request) => Limit::perMinute(6)->by($by($request, 'invoice-integrity')));
         RateLimiter::for('invoice-pdf', fn (Request $request) => Limit::perMinute(30)->by('invoice-pdf:'.($request->user()?->getAuthIdentifier() ?? $request->ip())));
     }
 }

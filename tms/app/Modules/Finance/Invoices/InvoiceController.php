@@ -4,11 +4,18 @@ namespace App\Modules\Finance\Invoices;
 
 use App\Exceptions\UserFacingHttpException;
 use App\Http\Controllers\Controller;
+use App\Modules\Connectors\Smtp\TenantMailer;
+use App\Modules\Core\Audit\AuditRecorder;
 use App\Modules\Core\Companies\Company;
+use App\Modules\Core\Exports\CsvExporter;
+use App\Modules\Core\Exports\XlsxExporter;
 use App\Modules\Core\Tenancy\TenantStorage;
 use App\Modules\Core\Users\User;
+use App\Modules\Finance\Integrity;
 use App\Modules\Finance\Permissions;
 use App\Modules\Sessions\Public\Billing;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -41,19 +48,8 @@ class InvoiceController extends Controller
     {
         /** @var User $user */
         $user = $request->user();
-        $filters = [
-            'status' => in_array($s = $request->query('status'), InvoiceStatus::values(InvoiceStatus::cases()), true) ? $s : null,
-            'kind' => in_array($k = $request->query('kind'), [Invoice::INVOICE, Invoice::CREDIT_NOTE], true) ? $k : null,
-            'company' => is_string($c = $request->query('company')) && Str::isUuid($c) ? $c : null,
-        ];
-        $page = Invoice::query()
-            // Dossiers in the trash too: their validated invoices stay findable.
-            ->whereIn('dossier_id', Billing::dossiersFor($user, ['with_trashed' => true], Permissions::VIEW))
-            ->when($filters['status'], fn ($q, string $s) => $q->where('status', $s))
-            ->when($filters['kind'], fn ($q, string $k) => $q->where('kind', $k))
-            ->when($filters['company'], fn ($q, string $id) => $q->where('company_id', $id))
-            ->orderByRaw('issued_on desc nulls first')->orderByDesc('created_at')->orderByDesc('id')
-            ->paginate(25)->withQueryString();
+        $filters = $this->filters($request);
+        $page = $this->listQuery($user, $filters)->paginate(25)->withQueryString();
 
         return Inertia::render('finance/invoices/index', [
             'invoices' => [...$page->toArray(), 'data' => $this->rows->rows($page->getCollection())],
@@ -63,12 +59,80 @@ class InvoiceController extends Controller
                 'kind' => [['value' => Invoice::INVOICE, 'label' => 'Facture'], ['value' => Invoice::CREDIT_NOTE, 'label' => 'Avoir']],
                 'company' => Company::query()->orderBy('name')->get(['id', 'name'])->map(fn (Company $c) => ['value' => $c->id, 'label' => $c->name])->values()->all(),
             ],
+            'can' => [
+                'export' => $user->can(Permissions::VIEW),
+                'integrity' => $user->can(Permissions::VALIDATE),
+            ],
         ]);
+    }
+
+    /**
+     * CSV export of the list (« ; », French dates and amounts): the filters,
+     * scope and sort of the list; audited with the filters and the row count.
+     */
+    public function export(Request $request, XlsxExporter $counter, CsvExporter $csv, AuditRecorder $audit, InvoiceExport $export): StreamedResponse
+    {
+        /** @var User $user */
+        $user = $request->user();
+        $filters = $this->filters($request);
+        /** @var Builder<Model> $query */
+        $query = $this->listQuery($user, $filters);
+
+        $rows = $counter->count($query);
+        $audit->export('finance.invoices', ['filters' => array_filter($filters), 'rows' => $rows]);
+
+        return $csv->export($query, $export, $user, $export->defaults(), $export->fileName().'-'.now()->format('Ymd-Hi').'.csv');
+    }
+
+    /**
+     * « Vérifier l'intégrité »: the chain of the journal of the organisme,
+     * recomputed (finance.invoices.validate); the result is flashed.
+     */
+    public function integrity(): RedirectResponse
+    {
+        $result = Integrity::verify();
+        if ($result['broken'] !== null) {
+            return back()->withErrors(['integrity' => "Intégrité rompue à la pièce {$result['broken']} : contactez l'administrateur."]);
+        }
+
+        return back()->with('status', $result['count'] === 0
+            ? 'Intégrité vérifiée : aucune pièce validée pour le moment.'
+            : 'Intégrité vérifiée : '.$result['count'].' pièce'.($result['count'] > 1 ? 's' : '').', chaîne intacte.');
+    }
+
+    /**
+     * @return array{status: string|null, kind: string|null, company: string|null}
+     */
+    private function filters(Request $request): array
+    {
+        return [
+            'status' => in_array($s = $request->query('status'), InvoiceStatus::values(InvoiceStatus::cases()), true) ? $s : null,
+            'kind' => in_array($k = $request->query('kind'), [Invoice::INVOICE, Invoice::CREDIT_NOTE], true) ? $k : null,
+            'company' => is_string($c = $request->query('company')) && Str::isUuid($c) ? $c : null,
+        ];
+    }
+
+    /**
+     * The invoices of the list: the dossiers of the scope of finance.invoices.view
+     * (in the trash too: their validated invoices stay findable), newest first.
+     *
+     * @param  array{status: string|null, kind: string|null, company: string|null}  $filters
+     * @return Builder<Invoice>
+     */
+    private function listQuery(User $user, array $filters): Builder
+    {
+        return Invoice::query()
+            ->whereIn('dossier_id', Billing::dossiersFor($user, ['with_trashed' => true], Permissions::VIEW))
+            ->when($filters['status'], fn ($q, string $s) => $q->where('status', $s))
+            ->when($filters['kind'], fn ($q, string $k) => $q->where('kind', $k))
+            ->when($filters['company'], fn ($q, string $id) => $q->where('company_id', $id))
+            ->orderByRaw('issued_on desc nulls first')->orderByDesc('created_at')->orderByDesc('id');
     }
 
     public function show(Request $request, string $invoiceId): Response
     {
         $invoice = $this->find($request, $invoiceId);
+        $canSend = ! $invoice->isDraft() && $this->manages($request, $invoice);
 
         return Inertia::render('finance/invoices/show', [
             'invoice' => $this->rows->page($invoice),
@@ -81,8 +145,67 @@ class InvoiceController extends Controller
                 'update' => $invoice->isDraft() && $this->manages($request, $invoice),
                 'validate' => $invoice->isDraft() && $this->validates($request, $invoice),
                 'credit_note' => ! $invoice->isDraft() && $invoice->kind === Invoice::INVOICE && $this->manages($request, $invoice),
+                'send' => $canSend,
+            ],
+            'email' => $invoice->isDraft() ? null : [
+                'status' => $invoice->email_status,
+                'sent_at' => $invoice->sent_at?->toIso8601String(),
+                'defaults' => $canSend ? [...InvoiceMail::defaults($invoice), 'delivers_nowhere' => TenantMailer::deliversNowhere($invoice->company)] : null,
+                'sendings' => $this->sendings($invoice),
             ],
         ]);
+    }
+
+    /**
+     * The e-mailings of an invoice, newest first (the last twenty).
+     *
+     * @return list<array<string, mixed>>
+     */
+    private function sendings(Invoice $invoice): array
+    {
+        $sendings = InvoiceSending::query()->where('invoice_id', $invoice->id)->orderByDesc('created_at')->orderByDesc('id')->limit(20)->get();
+        $names = User::query()->whereKey($sendings->pluck('sent_by')->filter()->unique()->all())->pluck('name', 'id');
+        $labels = ['pending' => 'En cours', 'sent' => 'Envoyé', 'failed' => 'Non parti'];
+
+        return $sendings->map(fn (InvoiceSending $s) => [
+            'id' => $s->id,
+            'email' => $s->email,
+            'status' => $s->status,
+            'status_label' => $labels[$s->status] ?? $s->status,
+            'error' => $s->error,
+            'at' => ($s->sent_at ?? $s->created_at)?->toIso8601String(),
+            'by' => $s->sent_by === null ? null : ($names[$s->sent_by] ?? null),
+        ])->values()->all();
+    }
+
+    /**
+     * « Envoyer »: the archived PDF by e-mail to the address typed (prefilled
+     * from the snapshot), queued after commit (finance.invoices.manage and its
+     * scope on the dossier: 403; 409 on a draft or while a sending is under way).
+     */
+    public function send(InvoiceMessageRequest $request, string $invoiceId, InvoiceSender $sender): RedirectResponse
+    {
+        $invoice = $this->find($request, $invoiceId);
+        abort_unless($this->manages($request, $invoice), 403);
+        /** @var User $user */
+        $user = $request->user();
+
+        $sender->send($user, $invoice, $request->message());
+
+        return back()->with('status', $invoice->title().' : envoi en cours.');
+    }
+
+    /** « Renvoyer »: the last message again, after the e-mail did not leave. */
+    public function resend(Request $request, string $invoiceId, InvoiceSender $sender): RedirectResponse
+    {
+        $invoice = $this->find($request, $invoiceId);
+        abort_unless($this->manages($request, $invoice), 403);
+        /** @var User $user */
+        $user = $request->user();
+
+        $sender->resend($user, $invoice);
+
+        return back()->with('status', "Nouvel essai d'envoi de ".$invoice->title().' en cours.');
     }
 
     public function store(Request $request, string $dossierId): RedirectResponse

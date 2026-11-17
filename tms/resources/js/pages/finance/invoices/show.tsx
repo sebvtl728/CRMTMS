@@ -1,3 +1,4 @@
+import { InvoiceSendDialog, type InvoiceMessageDefaults } from '@/components/finance/invoice-send-dialog';
 import Heading from '@/components/heading';
 import InputError from '@/components/input-error';
 import { Badge } from '@/components/ui/badge';
@@ -5,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import AppLayout from '@/layouts/app-layout';
-import { formatDay, type Option } from '@/lib/crm';
+import { formatDateTime, formatDay, type Option } from '@/lib/crm';
 import { formatMinutes, invoiceStatusVariant, type InvoiceRow } from '@/lib/finance';
 import { formatCents } from '@/lib/revenue';
 import { type BreadcrumbItem } from '@/types';
@@ -43,10 +44,28 @@ interface InvoicePage extends Omit<InvoiceRow, 'recipient'> {
     lines: InvoiceLine[];
 }
 
+interface Sending {
+    id: string;
+    email: string;
+    status: 'pending' | 'sent' | 'failed';
+    status_label: string;
+    error: string | null;
+    at: string | null;
+    by: string | null;
+}
+
+interface EmailState {
+    status: 'pending' | 'sent' | 'failed' | null;
+    sent_at: string | null;
+    defaults: InvoiceMessageDefaults | null;
+    sendings: Sending[];
+}
+
 interface ShowProps {
     invoice: InvoicePage;
     options: { units: Option[]; vat_rates: Option[]; vat_exempt: boolean };
-    can: { update: boolean; validate: boolean; credit_note: boolean };
+    can: { update: boolean; validate: boolean; credit_note: boolean; send: boolean };
+    email: EmailState | null;
     status?: string;
 }
 
@@ -391,7 +410,69 @@ function CreditNotePanel({ invoice }: { invoice: InvoicePage }) {
     );
 }
 
-export default function InvoiceShow({ invoice, options, can, status }: ShowProps) {
+/** « Envoyer » / « Renvoyer »: the window, the state of the last e-mail and the history of the sendings. */
+function EmailPanel({ invoice, email, canSend }: { invoice: InvoicePage; email: EmailState; canSend: boolean }) {
+    const [open, setOpen] = useState(false);
+
+    return (
+        <section aria-label="Envoi par e-mail" className="grid gap-2 rounded-xl border p-4 text-sm">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+                <h2 className="font-medium">Envoi par e-mail</h2>
+                {canSend && email.defaults && (
+                    <div className="flex flex-wrap gap-2">
+                        {email.status === 'failed' && (
+                            <Button
+                                type="button"
+                                size="sm"
+                                onClick={() => router.post(route('finance.invoices.resend', invoice.id), {}, { preserveScroll: true })}
+                            >
+                                Renvoyer
+                            </Button>
+                        )}
+                        <Button type="button" size="sm" variant="outline" disabled={email.status === 'pending'} onClick={() => setOpen(true)}>
+                            {email.sendings.length === 0 ? 'Envoyer' : 'Envoyer à une autre adresse'}
+                        </Button>
+                    </div>
+                )}
+            </div>
+            {email.status === 'pending' && <p className="text-muted-foreground">Un envoi est en cours.</p>}
+            {email.status === 'failed' && (
+                <p role="alert" className="text-destructive font-medium">
+                    L'e-mail n'est pas parti{email.sendings[0]?.error ? ` : ${email.sendings[0].error}` : '.'}
+                </p>
+            )}
+            {email.sendings.length === 0 ? (
+                <p className="text-muted-foreground">Cette pièce n'a pas encore été envoyée.</p>
+            ) : (
+                <ul className="grid gap-1">
+                    {email.sendings.map((s) => (
+                        <li key={s.id} className="flex flex-wrap gap-x-2">
+                            <Badge variant={s.status === 'failed' ? 'destructive' : s.status === 'sent' ? 'default' : 'outline'}>
+                                {s.status_label}
+                            </Badge>
+                            <span>{s.email}</span>
+                            <span className="text-muted-foreground">
+                                {formatDateTime(s.at)}
+                                {s.by ? ` · ${s.by}` : ''}
+                            </span>
+                        </li>
+                    ))}
+                </ul>
+            )}
+            {canSend && email.defaults && (
+                <InvoiceSendDialog
+                    invoiceId={invoice.id}
+                    title={invoice.title}
+                    defaults={email.defaults}
+                    open={open}
+                    onClose={() => setOpen(false)}
+                />
+            )}
+        </section>
+    );
+}
+
+export default function InvoiceShow({ invoice, options, can, email, status }: ShowProps) {
     const { errors } = usePage<{ errors: Record<string, string> }>().props;
     const breadcrumbs: BreadcrumbItem[] = [
         { title: 'Factures', href: '/finance/invoices' },
@@ -465,6 +546,8 @@ export default function InvoiceShow({ invoice, options, can, status }: ShowProps
                         </div>
                     )}
                 </dl>
+
+                {email && <EmailPanel invoice={invoice} email={email} canSend={can.send} />}
 
                 {can.update ? <DraftEditor invoice={invoice} options={options} /> : <LinesTable invoice={invoice} />}
 

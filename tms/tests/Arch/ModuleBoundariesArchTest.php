@@ -254,11 +254,13 @@ function namesSessionsTables(string $code): bool
 /**
  * A reference to another module than Finance and Core, beyond their public
  * services: Sessions\Public, Crm\Public and the catalogue's Trainings,
- * TrainingData and TrainingUsage (a use line, a grouped use or an inline
- * fully qualified name).
+ * TrainingData and TrainingUsage, and the four connector classes the e-mailing
+ * of an invoice needs (Smtp\TenantMailer, Smtp\SmtpHostRefused,
+ * Core\ConnectorRun, Core\PermanentDeliveryFailure) (a use line, a grouped use
+ * or an inline fully qualified name).
  */
-const FINANCE_FOREIGN_REFERENCE = '/App\\\\Modules\\\\(?!(?:Finance|Core)\b|Sessions\\\\Public\b|Crm\\\\Public\b|Catalogue\\\\(?:Trainings|TrainingData|TrainingUsage)\b)\w+'
-    .'|App\\\\Modules\\\\\{[^}]*\b(?!(?:Finance|Core)\\\\|Sessions\\\\Public\b|Crm\\\\Public\b|Catalogue\\\\(?:Trainings|TrainingData|TrainingUsage)\b)(?:Sessions|Crm|Catalogue|Connectors)\\\\/';
+const FINANCE_FOREIGN_REFERENCE = '/App\\\\Modules\\\\(?!(?:Finance|Core)\b|Sessions\\\\Public\b|Crm\\\\Public\b|Catalogue\\\\(?:Trainings|TrainingData|TrainingUsage)\b|Connectors\\\\(?:Smtp\\\\(?:TenantMailer|SmtpHostRefused)|Core\\\\(?:ConnectorRun|PermanentDeliveryFailure))\b)\w+'
+    .'|App\\\\Modules\\\\\{[^}]*\b(?!(?:Finance|Core)\\\\|Sessions\\\\Public\b|Crm\\\\Public\b|Catalogue\\\\(?:Trainings|TrainingData|TrainingUsage)\b|Connectors\\\\(?:Smtp\\\\(?:TenantMailer|SmtpHostRefused)|Core\\\\(?:ConnectorRun|PermanentDeliveryFailure))\b)(?:Sessions|Crm|Catalogue|Connectors)\\\\/';
 
 it('lets Finance reach the other modules through their public services only, never their tables', function () {
     expect(moduleFilesMatching('Finance', FINANCE_FOREIGN_REFERENCE))->toBe([]);
@@ -282,7 +284,9 @@ it('detects every way Finance could reach Sessions, the Crm, the catalogue or th
         'use App\Modules\Sessions\Fundings\FundingWriter;',
         'use App\Modules\Crm\People\Person;',
         'use App\Modules\Catalogue\Training;',
-        'use App\Modules\Connectors\Smtp\TenantMailer;',
+        'use App\Modules\Connectors\Smtp\SmtpTransportFactory;',
+        'use App\Modules\Connectors\Core\ConnectorConfig;',
+        'use App\Modules\Connectors\Mail365\GraphMailClient;',
         'use App\Modules\{Sessions\Dossiers\Dossier, Core\Access\Role};',
         '$d = \App\Modules\Sessions\SessionsVisibility::class;',
     ] as $code) {
@@ -294,6 +298,10 @@ it('detects every way Finance could reach Sessions, the Crm, the catalogue or th
         'use App\Modules\Crm\Public\Fiches;',
         'use App\Modules\Catalogue\Trainings;',
         'use App\Modules\Core\Access\Permissions;',
+        'use App\Modules\Connectors\Smtp\TenantMailer;',
+        'use App\Modules\Connectors\Smtp\SmtpHostRefused;',
+        'use App\Modules\Connectors\Core\ConnectorRun;',
+        'use App\Modules\Connectors\Core\PermanentDeliveryFailure;',
         'use App\Modules\Finance\Plans\BillingPlans;',
         'namespace App\Modules\Finance;',
         'use App\Modules\{Core\Access\Role, Sessions\Public\Billing};',

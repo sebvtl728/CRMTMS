@@ -7,8 +7,9 @@ import { formatDay, type Option, type Paginated } from '@/lib/crm';
 import { invoiceStatusVariant, type InvoiceRow } from '@/lib/finance';
 import { formatCents } from '@/lib/revenue';
 import { type BreadcrumbItem } from '@/types';
-import { Head, Link, router } from '@inertiajs/react';
-import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { Head, Link, router, usePage } from '@inertiajs/react';
+import { ChevronLeft, ChevronRight, Download, ShieldCheck } from 'lucide-react';
+import { useState } from 'react';
 
 interface Filters {
     status: string | null;
@@ -20,12 +21,15 @@ interface InvoicesIndexProps {
     invoices: Paginated<InvoiceRow>;
     filters: Filters;
     options: { status: Option[]; kind: Option[]; company: Option[] };
+    can: { export: boolean; integrity: boolean };
     status?: string;
 }
 
 const breadcrumbs: BreadcrumbItem[] = [{ title: 'Factures', href: '/finance/invoices' }];
 
-export default function InvoicesIndex({ invoices, filters, options, status }: InvoicesIndexProps) {
+export default function InvoicesIndex({ invoices, filters, options, can, status }: InvoicesIndexProps) {
+    const { errors } = usePage<{ errors: Record<string, string> }>().props;
+    const [checking, setChecking] = useState(false);
     const visit = (changes: Partial<Filters>) => {
         const next = { ...filters, ...changes };
         const query: Record<string, string> = {};
@@ -34,6 +38,7 @@ export default function InvoicesIndex({ invoices, filters, options, status }: In
         });
         router.get(route('finance.invoices.index'), query, { preserveState: true, replace: true });
     };
+    const exportQuery = new URLSearchParams(Object.entries(filters).filter(([, v]) => v) as [string, string][]).toString();
     const filtered = Boolean(filters.status || filters.kind || filters.company);
 
     return (
@@ -43,12 +48,44 @@ export default function InvoicesIndex({ invoices, filters, options, status }: In
             <div className="flex flex-col gap-4 p-4">
                 <div className="flex flex-wrap items-start justify-between gap-2">
                     <Heading title="Factures" description="Factures et avoirs des dossiers ; les brouillons se préparent depuis « À facturer »." />
-                    <Button variant="outline" asChild>
-                        <Link href={route('finance.to-invoice.index')}>À facturer</Link>
-                    </Button>
+                    <div className="flex flex-wrap gap-2">
+                        {can.integrity && (
+                            <Button
+                                type="button"
+                                variant="outline"
+                                disabled={checking}
+                                onClick={() =>
+                                    router.post(
+                                        route('finance.invoices.integrity'),
+                                        {},
+                                        { preserveScroll: true, onStart: () => setChecking(true), onFinish: () => setChecking(false) },
+                                    )
+                                }
+                            >
+                                <ShieldCheck className="h-4 w-4" />
+                                Vérifier l'intégrité
+                            </Button>
+                        )}
+                        {can.export && (
+                            <Button variant="outline" asChild>
+                                <a href={route('finance.invoices.export') + (exportQuery ? `?${exportQuery}` : '')}>
+                                    <Download className="h-4 w-4" />
+                                    Exporter (CSV)
+                                </a>
+                            </Button>
+                        )}
+                        <Button variant="outline" asChild>
+                            <Link href={route('finance.to-invoice.index')}>À facturer</Link>
+                        </Button>
+                    </div>
                 </div>
 
                 {status && <div className="text-sm font-medium text-green-600">{status}</div>}
+                {errors.integrity && (
+                    <div role="alert" className="text-destructive text-sm font-medium">
+                        {errors.integrity}
+                    </div>
+                )}
 
                 <section aria-label="Filtres" className="grid gap-3 rounded-xl border p-3 sm:grid-cols-2 lg:grid-cols-4">
                     <FilterSelect label="État" value={filters.status} options={options.status} onChange={(v) => visit({ status: v })} />
