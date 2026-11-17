@@ -134,21 +134,21 @@ export function PlanningBoard({
         return (
             <td
                 key={day}
-                className={`border-l p-1 align-top first:border-l-0 ${tall ? 'h-56' : 'h-28'} ${shade.off || !inMonth ? 'bg-muted/40' : ''} ${inMonth ? '' : 'text-muted-foreground'}`}
+                className={`overflow-hidden border-l p-1 align-top first:border-l-0 ${tall ? 'h-56' : 'h-28'} ${shade.off || !inMonth ? 'bg-muted/40' : ''} ${inMonth ? '' : 'text-muted-foreground'}`}
             >
-                <div className="mb-1 flex items-start justify-between gap-1 text-xs">
+                <div className="mb-1 flex min-w-0 items-start justify-between gap-1 text-xs">
                     <span className={day === period.today ? 'bg-primary text-primary-foreground rounded px-1 font-semibold' : ''}>
                         {tall ? `${WEEKDAYS_SHORT[isoWeekday(day) - 1]} ${formatDay(day)}` : Number(day.slice(8))}
                     </span>
                     {shade.label && (
-                        <span className="text-muted-foreground truncate text-[10px] italic" title={shade.label}>
+                        <span className="text-muted-foreground min-w-0 truncate text-[10px] italic" title={shade.label}>
                             {shade.label}
                         </span>
                     )}
                 </div>
-                <ul className="grid gap-1">
+                <ul className="grid min-w-0 gap-1">
                     {(byDay[day] ?? []).map((s) => (
-                        <li key={s.id}>
+                        <li key={s.id} className="min-w-0">
                             <SeanceButton seance={s} tall={tall} showTrainer={showTrainer} onOpen={onOpen} />
                         </li>
                     ))}
@@ -235,7 +235,7 @@ export function PlanningBoard({
                                 </h3>
                                 <ul className="grid gap-2">
                                     {(byDay[day] ?? []).map((s) => (
-                                        <li key={s.id}>
+                                        <li key={s.id} className="min-w-0">
                                             <SeanceButton seance={s} tall showTrainer={showTrainer} onOpen={onOpen} />
                                         </li>
                                     ))}

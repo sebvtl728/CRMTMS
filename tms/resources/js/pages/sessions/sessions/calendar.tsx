@@ -124,9 +124,9 @@ export default function SessionsCalendar({ month, label, prev, next, today, sess
                                         return (
                                             <td
                                                 key={day}
-                                                className={`h-28 border-l p-1 first:border-l-0 ${inMonth ? '' : 'text-muted-foreground'} ${shade.off || !inMonth ? 'bg-muted/40' : ''}`}
+                                                className={`h-28 overflow-hidden border-l p-1 first:border-l-0 ${inMonth ? '' : 'text-muted-foreground'} ${shade.off || !inMonth ? 'bg-muted/40' : ''}`}
                                             >
-                                                <div className="mb-1 flex items-start justify-between gap-1 text-xs">
+                                                <div className="mb-1 flex min-w-0 items-start justify-between gap-1 text-xs">
                                                     <span
                                                         className={
                                                             day === today ? 'bg-primary text-primary-foreground inline-block rounded px-1' : ''
@@ -135,14 +135,17 @@ export default function SessionsCalendar({ month, label, prev, next, today, sess
                                                         {Number(day.slice(8))}
                                                     </span>
                                                     {shade.label && (
-                                                        <span className="text-muted-foreground truncate text-[10px] italic" title={shade.label}>
+                                                        <span
+                                                            className="text-muted-foreground min-w-0 truncate text-[10px] italic"
+                                                            title={shade.label}
+                                                        >
                                                             {shade.label}
                                                         </span>
                                                     )}
                                                 </div>
-                                                <ul className="grid gap-1">
+                                                <ul className="grid min-w-0 gap-1">
                                                     {onDay(day).map((s) => (
-                                                        <li key={s.id}>
+                                                        <li key={s.id} className="min-w-0">
                                                             <Link
                                                                 href={route('sessions.show', s.id)}
                                                                 title={`${s.label} · ${sessionDates(s)} · ${s.status_label}`}

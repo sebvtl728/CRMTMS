@@ -56,6 +56,8 @@ Route::middleware(['auth'])->prefix('sessions')->name('sessions.')->group(functi
     Route::middleware('can:sessions.seances.manage')->group(function () {
         Route::post('{trainingSession}/seances', [SeanceController::class, 'store'])->name('seances.store');
         Route::post('{trainingSession}/seances/check', [SeanceController::class, 'check'])->name('seances.check');
+        Route::post('{trainingSession}/seances/batch', [SeanceController::class, 'batchUpdate'])->name('seances.batch');
+        Route::post('{trainingSession}/seances/batch-cancel', [SeanceController::class, 'batchCancel'])->name('seances.batch-cancel');
         Route::put('{trainingSession}/seances/{seance}', [SeanceController::class, 'update'])->name('seances.update');
         Route::post('{trainingSession}/seances/{seance}/cancel', [SeanceController::class, 'cancel'])->name('seances.cancel');
         Route::delete('{trainingSession}/seances/{seance}', [SeanceController::class, 'destroy'])->name('seances.destroy');

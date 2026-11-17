@@ -88,7 +88,13 @@ function OptionSelect({
 
 // ---------------------------------------------------------------- calendar
 
-type CalendarItem = { kind: 'seance'; seance: SeanceRow } | { kind: 'interval'; title: string } | { kind: 'placement'; label: string };
+type CalendarItem =
+    | { kind: 'seance'; seance: SeanceRow }
+    | { kind: 'interval'; title: string; detail?: string }
+    | { kind: 'placement'; label: string };
+
+/** Lines of a day in the month view (the last one becomes « +N autres » when there are more). */
+const MONTH_ITEMS = 4;
 
 /**
  * Calendar of the session (month or week): séances, interval modules on
@@ -134,26 +140,38 @@ function PlanningCalendar({
     const cell = (day: string, inMonth: boolean, tall: boolean) => {
         const shade = dayShade(day, holidays, closures);
         const inSession = day >= session.starts_on && day <= session.ends_on;
-        const list = items[day] ?? [];
+        const all = items[day] ?? [];
+        // Month view: the interval modules of a day on one line, at most MONTH_ITEMS lines, then « +N ».
+        const intervals = all.filter((i): i is Extract<CalendarItem, { kind: 'interval' }> => i.kind === 'interval');
+        const grouped: CalendarItem[] =
+            !tall && intervals.length > 1
+                ? [
+                      ...all.filter((i) => i.kind !== 'interval'),
+                      { kind: 'interval', title: `${intervals.length} modules en intervalle`, detail: intervals.map((i) => i.title).join('\n') },
+                  ]
+                : all;
+        const limit = tall ? grouped.length : MONTH_ITEMS;
+        const list = grouped.length > limit ? grouped.slice(0, limit - 1) : grouped;
+        const hidden = grouped.length - list.length;
 
         return (
             <td
                 key={day}
-                className={`border-l p-1 align-top first:border-l-0 ${tall ? 'h-48' : 'h-24'} ${shade.off || !inMonth ? 'bg-muted/40' : ''} ${inMonth ? '' : 'text-muted-foreground'}`}
+                className={`overflow-hidden border-l p-1 align-top first:border-l-0 ${tall ? 'h-48' : 'h-28'} ${shade.off || !inMonth ? 'bg-muted/40' : ''} ${inMonth ? '' : 'text-muted-foreground'}`}
             >
-                <div className="mb-1 flex items-start justify-between gap-1 text-xs">
-                    <span className={inSession ? 'font-semibold' : ''}>
+                <div className="mb-1 flex min-w-0 items-start justify-between gap-1 text-xs">
+                    <span className={`shrink-0 ${inSession ? 'font-semibold' : ''}`}>
                         {tall ? `${WEEKDAYS_SHORT[isoWeekday(day) - 1]} ${formatDay(day)}` : Number(day.slice(8))}
                     </span>
                     {shade.label && (
-                        <span className="text-muted-foreground truncate text-[10px] italic" title={shade.label}>
+                        <span className="text-muted-foreground min-w-0 truncate text-[10px] italic" title={shade.label}>
                             {shade.label}
                         </span>
                     )}
                 </div>
-                <ul className="grid gap-1">
+                <ul className="grid min-w-0 gap-1">
                     {list.map((item, i) => (
-                        <li key={i}>
+                        <li key={i} className="min-w-0">
                             {item.kind === 'seance' ? (
                                 <button
                                     type="button"
@@ -179,7 +197,7 @@ function PlanningCalendar({
                             ) : item.kind === 'interval' ? (
                                 <span
                                     className="bg-muted block truncate rounded border-l-4 border-l-slate-400 px-1 text-xs"
-                                    title={`${item.title} (intervalle de dates)`}
+                                    title={item.detail ?? `${item.title} (intervalle de dates)`}
                                 >
                                     {item.title}
                                 </span>
@@ -193,6 +211,20 @@ function PlanningCalendar({
                             )}
                         </li>
                     ))}
+                    {hidden > 0 && (
+                        <li>
+                            <button
+                                type="button"
+                                className="text-muted-foreground hover:text-foreground text-xs underline-offset-2 hover:underline"
+                                onClick={() => {
+                                    setWeek(mondayOf(day));
+                                    setView('week');
+                                }}
+                            >
+                                + {hidden} autre{hidden > 1 ? 's' : ''}
+                            </button>
+                        </li>
+                    )}
                 </ul>
             </td>
         );
@@ -711,85 +743,345 @@ function SeanceList({
         }
     };
 
+    const [selected, setSelected] = useState<string[]>([]);
+    const [batch, setBatch] = useState<'update' | 'cancel' | null>(null);
+    const plannedIds = planning.seances.filter((s) => s.status === 'planned').map((s) => s.id);
+    // Only planned séances still on the page stay ticked (after a reload).
+    const ticked = selected.filter((id) => plannedIds.includes(id));
+    const toggle = (id: string, on: boolean) => setSelected((cur) => (on ? [...cur.filter((x) => x !== id), id] : cur.filter((x) => x !== id)));
+    const allTicked = plannedIds.length > 0 && ticked.length === plannedIds.length;
+
     if (planning.seances.length === 0) {
         return <p className="text-muted-foreground text-sm">Aucune séance.</p>;
     }
 
     return (
-        <div className="overflow-x-auto rounded-xl border">
-            <table className="w-full text-sm">
-                <thead className="bg-muted/50 text-left">
-                    <tr>
-                        <th className="px-3 py-2 font-medium">Date</th>
-                        <th className="px-3 py-2 font-medium">Horaires</th>
-                        <th className="px-3 py-2 font-medium">Module</th>
-                        <th className="px-3 py-2 font-medium">Durée</th>
-                        <th className="px-3 py-2 font-medium">Formateur</th>
-                        <th className="px-3 py-2 font-medium">Salle / lieu</th>
-                        {planning.can_seances && <th className="px-3 py-2 font-medium">Actions</th>}
-                    </tr>
-                </thead>
-                <tbody>
-                    {planning.seances.map((s) => (
-                        <tr key={s.id} className={`border-t align-top ${s.status === 'cancelled' ? 'text-muted-foreground' : ''}`}>
-                            <td className="px-3 py-2 whitespace-nowrap">
-                                <span className={s.status === 'cancelled' ? 'line-through' : ''}>{formatDay(s.date)}</span>
-                                {s.status === 'cancelled' && (
-                                    <Badge variant="destructive" className="ml-2" title={s.cancel_reason ?? undefined}>
-                                        Annulée
-                                    </Badge>
-                                )}
-                            </td>
-                            <td className="px-3 py-2 whitespace-nowrap">
-                                {s.start}–{s.end}
-                                {s.break_minutes > 0 && <span className="text-muted-foreground text-xs"> (pause {s.break_minutes} min)</span>}
-                            </td>
-                            <td className="px-3 py-2">
-                                {s.module}
-                                {s.alerts.length > 0 && (
-                                    <div className="mt-1">
-                                        <AlertList alerts={s.alerts} />
-                                    </div>
-                                )}
-                            </td>
-                            <td className="px-3 py-2 whitespace-nowrap">{s.duration}</td>
-                            <td className="px-3 py-2">{s.trainer?.label ?? '—'}</td>
-                            <td className="px-3 py-2">{s.room?.name ?? s.place_text ?? '—'}</td>
+        <div className="grid gap-2">
+            {planning.can_seances && ticked.length > 0 && (
+                <div className="bg-muted/40 flex flex-wrap items-center gap-2 rounded-xl border p-2 text-sm" role="toolbar" aria-label="Sélection">
+                    <span className="font-medium">
+                        {ticked.length} séance{ticked.length > 1 ? 's' : ''} cochée{ticked.length > 1 ? 's' : ''}
+                    </span>
+                    <Button type="button" size="sm" onClick={() => setBatch('update')}>
+                        <Pencil className="h-4 w-4" />
+                        Modifier la sélection
+                    </Button>
+                    <Button type="button" size="sm" variant="outline" onClick={() => setBatch('cancel')}>
+                        Annuler la sélection
+                    </Button>
+                    <Button type="button" size="sm" variant="ghost" onClick={() => setSelected([])}>
+                        Tout décocher
+                    </Button>
+                </div>
+            )}
+            <div className="overflow-x-auto rounded-xl border">
+                <table className="w-full text-sm">
+                    <thead className="bg-muted/50 text-left">
+                        <tr>
                             {planning.can_seances && (
+                                <th className="w-8 px-3 py-2">
+                                    <Checkbox
+                                        aria-label="Cocher toutes les séances prévues"
+                                        checked={allTicked}
+                                        disabled={plannedIds.length === 0}
+                                        onCheckedChange={(v) => setSelected(v === true ? plannedIds : [])}
+                                    />
+                                </th>
+                            )}
+                            <th className="px-3 py-2 font-medium">Date</th>
+                            <th className="px-3 py-2 font-medium">Horaires</th>
+                            <th className="px-3 py-2 font-medium">Module</th>
+                            <th className="px-3 py-2 font-medium">Durée</th>
+                            <th className="px-3 py-2 font-medium">Formateur</th>
+                            <th className="px-3 py-2 font-medium">Salle / lieu</th>
+                            {planning.can_seances && <th className="px-3 py-2 font-medium">Actions</th>}
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {planning.seances.map((s) => (
+                            <tr key={s.id} className={`border-t align-top ${s.status === 'cancelled' ? 'text-muted-foreground' : ''}`}>
+                                {planning.can_seances && (
+                                    <td className="px-3 py-2">
+                                        {s.status === 'planned' && (
+                                            <Checkbox
+                                                aria-label={`Cocher la séance du ${formatDay(s.date)} (${s.start})`}
+                                                checked={ticked.includes(s.id)}
+                                                onCheckedChange={(v) => toggle(s.id, v === true)}
+                                            />
+                                        )}
+                                    </td>
+                                )}
+                                <td className="px-3 py-2 whitespace-nowrap">
+                                    <span className={s.status === 'cancelled' ? 'line-through' : ''}>{formatDay(s.date)}</span>
+                                    {s.status === 'cancelled' && (
+                                        <Badge variant="destructive" className="ml-2" title={s.cancel_reason ?? undefined}>
+                                            Annulée
+                                        </Badge>
+                                    )}
+                                </td>
+                                <td className="px-3 py-2 whitespace-nowrap">
+                                    {s.start}–{s.end}
+                                    {s.break_minutes > 0 && <span className="text-muted-foreground text-xs"> (pause {s.break_minutes} min)</span>}
+                                </td>
                                 <td className="px-3 py-2">
-                                    {s.status === 'planned' && (
-                                        <div className="flex flex-wrap gap-1">
-                                            <Button
-                                                type="button"
-                                                size="sm"
-                                                variant="ghost"
-                                                onClick={() => onEdit(s)}
-                                                aria-label={`Modifier la séance du ${formatDay(s.date)}`}
-                                            >
-                                                <Pencil className="h-4 w-4" />
-                                            </Button>
-                                            <Button type="button" size="sm" variant="ghost" onClick={() => onCancel(s)}>
-                                                Annuler
-                                            </Button>
-                                            <Button
-                                                type="button"
-                                                size="sm"
-                                                variant="ghost"
-                                                className="text-destructive"
-                                                onClick={() => destroy(s)}
-                                                aria-label={`Supprimer la séance du ${formatDay(s.date)}`}
-                                            >
-                                                <Trash2 className="h-4 w-4" />
-                                            </Button>
+                                    {s.module}
+                                    {s.alerts.length > 0 && (
+                                        <div className="mt-1">
+                                            <AlertList alerts={s.alerts} />
                                         </div>
                                     )}
                                 </td>
-                            )}
-                        </tr>
-                    ))}
-                </tbody>
-            </table>
+                                <td className="px-3 py-2 whitespace-nowrap">{s.duration}</td>
+                                <td className="px-3 py-2">{s.trainer?.label ?? '—'}</td>
+                                <td className="px-3 py-2">{s.room?.name ?? s.place_text ?? '—'}</td>
+                                {planning.can_seances && (
+                                    <td className="px-3 py-2">
+                                        {s.status === 'planned' && (
+                                            <div className="flex flex-wrap gap-1">
+                                                <Button
+                                                    type="button"
+                                                    size="sm"
+                                                    variant="ghost"
+                                                    onClick={() => onEdit(s)}
+                                                    aria-label={`Modifier la séance du ${formatDay(s.date)}`}
+                                                >
+                                                    <Pencil className="h-4 w-4" />
+                                                </Button>
+                                                <Button type="button" size="sm" variant="ghost" onClick={() => onCancel(s)}>
+                                                    Annuler
+                                                </Button>
+                                                <Button
+                                                    type="button"
+                                                    size="sm"
+                                                    variant="ghost"
+                                                    className="text-destructive"
+                                                    onClick={() => destroy(s)}
+                                                    aria-label={`Supprimer la séance du ${formatDay(s.date)}`}
+                                                >
+                                                    <Trash2 className="h-4 w-4" />
+                                                </Button>
+                                            </div>
+                                        )}
+                                    </td>
+                                )}
+                            </tr>
+                        ))}
+                    </tbody>
+                </table>
+            </div>
+            {batch === 'update' && (
+                <BatchSeanceDialog
+                    sessionId={sessionId}
+                    planning={planning}
+                    ids={ticked}
+                    onClose={() => setBatch(null)}
+                    onDone={() => {
+                        setBatch(null);
+                        setSelected([]);
+                    }}
+                />
+            )}
+            {batch === 'cancel' && (
+                <BatchCancelDialog
+                    sessionId={sessionId}
+                    ids={ticked}
+                    onClose={() => setBatch(null)}
+                    onDone={() => {
+                        setBatch(null);
+                        setSelected([]);
+                    }}
+                />
+            )}
         </div>
+    );
+}
+
+/** « Modifier la sélection »: only the ticked groups change (trainer; room and place; hours, the day stays). */
+function BatchSeanceDialog({
+    sessionId,
+    planning,
+    ids,
+    onClose,
+    onDone,
+}: {
+    sessionId: string;
+    planning: SessionPlanning;
+    ids: string[];
+    onClose: () => void;
+    onDone: () => void;
+}) {
+    const { data, setData, post, processing, errors } = useForm({
+        seance_ids: ids,
+        apply_trainer: false as boolean,
+        trainer_id: '',
+        apply_place: false as boolean,
+        room_id: '',
+        place_text: '',
+        apply_hours: false as boolean,
+        starts_at: '09:00',
+        ends_at: '12:30',
+        break_minutes: '0',
+    });
+    const errs = errors as Record<string, string | undefined>;
+
+    const submit: FormEventHandler = (e) => {
+        e.preventDefault();
+        post(route('sessions.seances.batch', sessionId), { ...visit, onSuccess: onDone });
+    };
+
+    return (
+        <Dialog open onOpenChange={(v) => !v && onClose()}>
+            <DialogContent className="max-h-[90vh] overflow-y-auto">
+                <form onSubmit={submit} className="grid gap-4">
+                    <DialogHeader>
+                        <DialogTitle>
+                            Modifier {ids.length} séance{ids.length > 1 ? 's' : ''}
+                        </DialogTitle>
+                        <DialogDescription>
+                            Cochez ce qui change ; le reste de chaque séance (jour, module, note) est conservé. Si une séance est refusée, aucune
+                            n'est modifiée.
+                        </DialogDescription>
+                    </DialogHeader>
+
+                    <fieldset className="grid gap-2 rounded-lg border p-3">
+                        <label className="flex items-center gap-2 text-sm font-medium">
+                            <Checkbox checked={data.apply_trainer} onCheckedChange={(v) => setData('apply_trainer', v === true)} />
+                            Changer le formateur
+                        </label>
+                        {data.apply_trainer && (
+                            <div className="grid gap-2">
+                                <Label htmlFor="batch_trainer">Formateur</Label>
+                                <OptionSelect
+                                    id="batch_trainer"
+                                    value={data.trainer_id}
+                                    options={planning.options?.trainers ?? []}
+                                    onChange={(v) => setData('trainer_id', v)}
+                                    none="Aucun (retirer le formateur)"
+                                />
+                                <InputError message={errors.trainer_id} />
+                            </div>
+                        )}
+                    </fieldset>
+
+                    <fieldset className="grid gap-2 rounded-lg border p-3">
+                        <label className="flex items-center gap-2 text-sm font-medium">
+                            <Checkbox checked={data.apply_place} onCheckedChange={(v) => setData('apply_place', v === true)} />
+                            Changer la salle ou le lieu
+                        </label>
+                        {data.apply_place && (
+                            <div className="grid gap-4 sm:grid-cols-2">
+                                <div className="grid gap-2">
+                                    <Label htmlFor="batch_room">Salle</Label>
+                                    <OptionSelect
+                                        id="batch_room"
+                                        value={data.room_id}
+                                        options={planning.options?.rooms ?? []}
+                                        onChange={(v) => setData('room_id', v)}
+                                        none="Aucune"
+                                    />
+                                    <InputError message={errors.room_id} />
+                                </div>
+                                <div className="grid gap-2">
+                                    <Label htmlFor="batch_place">Lieu (hors centre, distanciel)</Label>
+                                    <Input
+                                        id="batch_place"
+                                        maxLength={300}
+                                        value={data.place_text}
+                                        onChange={(e) => setData('place_text', e.target.value)}
+                                    />
+                                    <InputError message={errors.place_text} />
+                                </div>
+                            </div>
+                        )}
+                    </fieldset>
+
+                    <fieldset className="grid gap-2 rounded-lg border p-3">
+                        <label className="flex items-center gap-2 text-sm font-medium">
+                            <Checkbox checked={data.apply_hours} onCheckedChange={(v) => setData('apply_hours', v === true)} />
+                            Changer les horaires (le jour ne change pas)
+                        </label>
+                        {data.apply_hours && (
+                            <div className="grid gap-4 sm:grid-cols-3">
+                                <div className="grid gap-2">
+                                    <Label htmlFor="batch_start">Début *</Label>
+                                    <Input
+                                        id="batch_start"
+                                        type="time"
+                                        value={data.starts_at}
+                                        onChange={(e) => setData('starts_at', e.target.value)}
+                                    />
+                                    <InputError message={errors.starts_at} />
+                                </div>
+                                <div className="grid gap-2">
+                                    <Label htmlFor="batch_end">Fin *</Label>
+                                    <Input id="batch_end" type="time" value={data.ends_at} onChange={(e) => setData('ends_at', e.target.value)} />
+                                    <InputError message={errors.ends_at} />
+                                </div>
+                                <div className="grid gap-2">
+                                    <Label htmlFor="batch_break">Pause (min)</Label>
+                                    <Input
+                                        id="batch_break"
+                                        inputMode="numeric"
+                                        value={data.break_minutes}
+                                        onChange={(e) => setData('break_minutes', e.target.value)}
+                                    />
+                                    <InputError message={errors.break_minutes} />
+                                </div>
+                            </div>
+                        )}
+                    </fieldset>
+
+                    <InputError message={errs.batch ?? errs.seance_ids} />
+                    <DialogFooter>
+                        <Button type="button" variant="outline" onClick={onClose}>
+                            Retour
+                        </Button>
+                        <Button type="submit" disabled={processing || !(data.apply_trainer || data.apply_place || data.apply_hours)}>
+                            {processing && <LoaderCircle className="h-4 w-4 animate-spin" />}
+                            Appliquer aux {ids.length} séance{ids.length > 1 ? 's' : ''}
+                        </Button>
+                    </DialogFooter>
+                </form>
+            </DialogContent>
+        </Dialog>
+    );
+}
+
+function BatchCancelDialog({ sessionId, ids, onClose, onDone }: { sessionId: string; ids: string[]; onClose: () => void; onDone: () => void }) {
+    const { data, setData, post, processing, errors } = useForm({ seance_ids: ids, reason: '' });
+    const errs = errors as Record<string, string | undefined>;
+
+    const submit: FormEventHandler = (e) => {
+        e.preventDefault();
+        post(route('sessions.seances.batch-cancel', sessionId), { ...visit, onSuccess: onDone });
+    };
+
+    return (
+        <Dialog open onOpenChange={(v) => !v && onClose()}>
+            <DialogContent>
+                <form onSubmit={submit} className="grid gap-4">
+                    <DialogHeader>
+                        <DialogTitle>
+                            Annuler {ids.length} séance{ids.length > 1 ? 's' : ''}
+                        </DialogTitle>
+                        <DialogDescription>Les séances restent visibles, barrées. Le motif, obligatoire, vaut pour toutes.</DialogDescription>
+                    </DialogHeader>
+                    <div className="grid gap-2">
+                        <Label htmlFor="batch_cancel_reason">Motif *</Label>
+                        <Input id="batch_cancel_reason" maxLength={300} value={data.reason} onChange={(e) => setData('reason', e.target.value)} />
+                        <InputError message={errors.reason ?? errs.batch ?? errs.seance_ids} />
+                    </div>
+                    <DialogFooter>
+                        <Button type="button" variant="outline" onClick={onClose}>
+                            Retour
+                        </Button>
+                        <Button type="submit" variant="destructive" disabled={processing}>
+                            Annuler les {ids.length} séance{ids.length > 1 ? 's' : ''}
+                        </Button>
+                    </DialogFooter>
+                </form>
+            </DialogContent>
+        </Dialog>
     );
 }
 

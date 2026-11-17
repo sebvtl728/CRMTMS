@@ -25,7 +25,7 @@ use Illuminate\Support\Str;
  */
 class SeanceController extends Controller
 {
-    public function __construct(private readonly Seances $seances, private readonly SeanceGenerator $generator) {}
+    public function __construct(private readonly Seances $seances, private readonly SeanceGenerator $generator, private readonly SeanceBatch $batch) {}
 
     public function store(Request $request, TrainingSession $trainingSession): RedirectResponse
     {
@@ -65,6 +65,32 @@ class SeanceController extends Controller
         $this->seances->delete($seance);
 
         return self::back($trainingSession, 'Séance supprimée.');
+    }
+
+    /** « Modifier la sélection »: trainer, room or place, hours of the ticked séances. */
+    public function batchUpdate(Request $request, TrainingSession $trainingSession): RedirectResponse
+    {
+        self::authorizeManage($request, $trainingSession);
+
+        $saved = $this->batch->update($trainingSession, $request->all());
+        $alerts = array_merge(...array_map(fn (Seance $s) => Conflicts::for($s), $saved));
+
+        return self::back($trainingSession, self::count(count($saved), 'modifiée'), $alerts);
+    }
+
+    /** « Annuler la sélection »: the ticked séances, one reason. */
+    public function batchCancel(Request $request, TrainingSession $trainingSession): RedirectResponse
+    {
+        self::authorizeManage($request, $trainingSession);
+
+        $saved = $this->batch->cancel($trainingSession, $request->all());
+
+        return self::back($trainingSession, self::count(count($saved), 'annulée'));
+    }
+
+    private static function count(int $count, string $done): string
+    {
+        return $count === 1 ? "1 séance {$done}." : "{$count} séances {$done}s.";
     }
 
     /**
