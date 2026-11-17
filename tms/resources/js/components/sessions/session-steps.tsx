@@ -38,6 +38,15 @@ function stepUrl(step: string): string {
     return url.pathname + url.search;
 }
 
+/**
+ * Writes the step in the URL by replacing the current history entry, through
+ * Inertia (a client-side visit, no server round trip) so that its own later
+ * history writes (remembered form state, scroll positions) keep it.
+ */
+function writeStep(step: string) {
+    router.replace({ url: stepUrl(step), preserveState: true, preserveScroll: true });
+}
+
 /** Scrolls to an element of the step once it is shown (it may load later, as the attendance does). */
 function scrollToAnchor(anchor: string) {
     let tries = 0;
@@ -53,32 +62,82 @@ function scrollToAnchor(anchor: string) {
 }
 
 /**
+ * The step of the session page when a visit that changes data (POST, PUT…)
+ * leaves it: its redirect back to the session (without `etape`) may remount
+ * the page before the `navigate` listener below runs; the new page then
+ * starts on that step. Dropped once the user is on another page.
+ */
+let carried: { path: string; step: string } | null = null;
+
+if (typeof document !== 'undefined') {
+    document.addEventListener('inertia:navigate', () => {
+        if (carried !== null && window.location.pathname !== carried.path) {
+            carried = null;
+        }
+    });
+}
+
+function initialStep(steps: string[]): string {
+    if (typeof window === 'undefined') {
+        return DEFAULT_STEP;
+    }
+    const params = new URLSearchParams(window.location.search);
+    if (params.has('etape') || params.has('tab') || carried === null || carried.path !== window.location.pathname) {
+        return stepFromSearch(window.location.search, steps);
+    }
+    const step = carried.step;
+    carried = null;
+
+    return steps.includes(step) ? step : DEFAULT_STEP;
+}
+
+/**
  * The current step of the session page: read in the URL on load, written back
- * by replacing the history entry (no server round trip: every datum of the
- * page stays loaded). `setStep(step, anchor)` also scrolls to the anchor.
+ * by replacing the history entry (writeStep; every datum of the page stays
+ * loaded). `setStep(step, anchor)` also scrolls to the anchor.
+ * A redirect back to the session after an action keeps the step.
  */
 export function useStep(steps: string[]): [string, (step: string, anchor?: string | null) => void] {
-    const [step, setCurrent] = useState(() => (typeof window === 'undefined' ? DEFAULT_STEP : stepFromSearch(window.location.search, steps)));
+    const [step, setCurrent] = useState(() => initialStep(steps));
     const current = useRef(step);
     current.current = step;
 
-    // A visit that stays on the page (a redirect to the session) drops `etape`: put it back.
     useEffect(() => {
         const path = window.location.pathname;
-
-        return router.on('navigate', () => {
+        // Back on the page with `etape` lost (the step was carried): put it back.
+        const keepInUrl = () => {
             const params = new URLSearchParams(window.location.search);
             if (window.location.pathname === path && current.current !== DEFAULT_STEP && params.get('etape') !== current.current) {
-                window.history.replaceState(window.history.state, '', stepUrl(current.current));
+                writeStep(current.current);
+            }
+        };
+        // After the first page load of the router (a write before it would be cancelled).
+        const timer = window.setTimeout(keepInUrl, 0);
+        const offStart = router.on('start', (event) => {
+            if (event.detail.visit.method !== 'get' && window.location.pathname === path) {
+                carried = { path, step: current.current };
             }
         });
+        // A visit that stays on the page (a redirect to the session, state kept) drops `etape`: put it back.
+        const offNavigate = router.on('navigate', () => {
+            keepInUrl();
+            if (window.location.pathname === path) {
+                carried = null;
+            }
+        });
+
+        return () => {
+            window.clearTimeout(timer);
+            offStart();
+            offNavigate();
+        };
     }, []);
 
     const setStep = useCallback(
         (next: string, anchor?: string | null) => {
             const target = steps.includes(next) ? next : DEFAULT_STEP;
             setCurrent(target);
-            window.history.replaceState(window.history.state, '', stepUrl(target));
+            writeStep(target);
             if (anchor) {
                 scrollToAnchor(anchor);
             }
