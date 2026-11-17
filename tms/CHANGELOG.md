@@ -5,6 +5,62 @@ Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) ; ve
 
 ## [Non publié]
 
+## [0.9.0] - 2026-11-18
+
+Factures : le TMS émet les factures et avoirs officiels depuis le dossier, au réel des heures faites, partagés entre le
+contractant et les financeurs qui paient directement l'organisme. Règlements et relances viendront en 0.9.1, export
+comptable et facture électronique en 0.9.2.
+
+### Ajouté
+
+- **Module Finance** : menu **Finance** (À facturer, Factures, Réglages de facturation) ; guide `docs/finance.md`.
+- **Rythme de facturation par dossier** (bloc Facturation) : fin de formation, mensuel au réalisé (mois clôturés
+  seulement) ou échéancier (financeurs facturés à la dernière échéance seulement) ; base au réalisé ou au prévu ;
+  absences non justifiées non facturées ou facturées au contractant (réglage de l'organisme, modifiable par dossier).
+- **Financement « Paie directement l'organisme »** (`fundings.pays_directly`) : le financeur accordé reçoit sa facture
+  pour sa part, avec son numéro d'accord ; type de financeur **« Facturé hors du TMS »** (CPF…) : part retirée de la
+  facture du contractant, mention « Part réglée par … », aucune facture TMS.
+- **Calcul du dû en centimes entiers** (`BillingCalculator`, service pur) : prorata des heures réalisées, abandon et
+  dédit (au seul contractant, ligne distincte hors champ de la TVA, jamais en force majeure), parts des financeurs
+  plafonnées, déjà facturé par destinataire.
+- **Page « À facturer »** : dû par dossier et par destinataire avec détail du calcul, « Bientôt à facturer »,
+  « Brouillon en cours », « À régulariser » (avoir proposé, reste à régulariser) ; filtres société, DAS, responsable,
+  mois ; **Préparer les brouillons**.
+- **Brouillons** de factures et d'avoirs : lignes calculées et lignes libres, **Recalculer**, un seul brouillon ouvert
+  par destinataire, dossier et type.
+- **Validation** (droit `finance.invoices.validate`) : numéro `<préfixe>-<année>-<NNNNN>` continu par société, type et
+  année de Paris, échéance (délai de 0 à 60 jours), destinataire figé, PDF archivé, nouveau contrôle du dû ; dossier
+  « Facturé » quand tout est facturé.
+- **Avoirs** : corrigent toujours une facture, plafonnés à ce qui en reste, au taux de TVA de la facture corrigée,
+  propositions itératives.
+- **PDF** des factures et avoirs (Gotenberg) avec les mentions obligatoires : exonération de TVA, NDA, pénalités de
+  retard et indemnité de 40 € pour un destinataire professionnel seulement.
+- **Envoi par e-mail** (modèle « Facture », PDF archivé en pièce jointe, historique, **Renvoyer**), **export CSV** de la
+  liste, bouton **Vérifier l'intégrité** et commande `tms:finance:verify`.
+- **Sociétés** : préfixes de factures (`F`) et d'avoirs (`AV`), délai de paiement, pied de facture.
+- **Droits** `finance.invoices.view`, `.manage`, `.validate`, à périmètre ; défauts accordés par `tms:permissions:sync`.
+- **Tables** `billing_plans`, `finance_settings`, `invoices`, `invoice_lines`, `invoice_sequences`, `invoice_journal`,
+  `invoice_sendings` ; colonnes `fundings.pays_directly` et `companies.invoice_prefix` / `credit_note_prefix` /
+  `payment_terms_days` / `invoice_footer`.
+- **Surface publique de Sessions** pour Finance : `Billing`, `DossierBlocks`, `BillingGuards`, `DossierStates`.
+
+### Modifié
+
+- Rythme, base, échéancier et « Paie directement » se verrouillent à la première facture validée du dossier ; un
+  dossier qui porte des factures validées ne va plus à la corbeille.
+- L'anonymisation d'une personne supprime ses brouillons de factures et conserve les pièces validées (10 ans).
+- La page du dossier affiche des blocs déclarés par d'autres modules (`DossierBlocks`).
+
+### Sécurité
+
+- **Factures inaltérables** : déclencheurs PostgreSQL refusant toute modification d'une facture validée (hors passage à
+  « envoyée » et suivi de l'envoi), de ses lignes et toute suppression ; journal des pièces en ajout seul.
+- **Journal chaîné** : chaque pièce porte l'empreinte SHA-256 de son contenu et celle de la précédente, avec l'empreinte
+  de son PDF archivé ; contrôle par `tms:finance:verify` (code de sortie 1 en cas de rupture).
+- Numérotation sous verrou, sans trou ni doublon ; PDF archivé servi tel quel, jamais re-généré ; envoi refusé si
+  l'archive a été altérée.
+- Aucun texte du serveur de messagerie dans les erreurs d'envoi ; adresses absentes du journal d'audit.
+
 ## [0.8.2] - 2026-11-17
 
 Sauvegardes : suivi dans l'application, sauvegarde à la demande, et export / import en un fichier chiffré pour
