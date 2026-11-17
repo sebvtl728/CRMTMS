@@ -69,6 +69,8 @@ final class InvoiceValidator
 
     public const OVER_INVOICED = 'L\'avoir dépasse ce qui a été facturé à ce destinataire.';
 
+    public const NO_CORRECTED = 'Un avoir corrige une facture validée du même destinataire : celle-ci est introuvable.';
+
     /** %s: the number of the corrected invoice. */
     public const OVER_CORRECTED = 'Cet avoir dépasse le montant restant de la facture %s.';
 
@@ -157,13 +159,14 @@ final class InvoiceValidator
                 throw new UserFacingHttpException(409, self::NOT_NEGATIVE);
             }
             // What is left of the invoice it corrects: its HT minus its credit notes already validated.
-            if ($invoice->corrected_invoice_id !== null) {
-                $corrected = Invoice::query()->find($invoice->corrected_invoice_id);
-                $credited = (int) Invoice::query()->where('corrected_invoice_id', $invoice->corrected_invoice_id)
-                    ->whereIn('status', InvoiceStatus::values(InvoiceStatus::ISSUED))->sum('total_ht_cents');
-                if ($corrected !== null && -$invoice->total_ht_cents > $corrected->total_ht_cents + $credited) {
-                    throw new UserFacingHttpException(409, sprintf(self::OVER_CORRECTED, $corrected->number));
-                }
+            $corrected = $invoice->corrected_invoice_id === null ? null : Invoice::query()->find($invoice->corrected_invoice_id);
+            if ($corrected === null || $corrected->isDraft() || $corrected->kind !== Invoice::INVOICE || Ledger::keyOf($corrected) !== Ledger::keyOf($invoice)) {
+                throw new UserFacingHttpException(409, self::NO_CORRECTED);
+            }
+            $credited = (int) Invoice::query()->where('corrected_invoice_id', $invoice->corrected_invoice_id)
+                ->whereIn('status', InvoiceStatus::values(InvoiceStatus::ISSUED))->sum('total_ht_cents');
+            if (-$invoice->total_ht_cents > $corrected->total_ht_cents + $credited) {
+                throw new UserFacingHttpException(409, sprintf(self::OVER_CORRECTED, $corrected->number));
             }
             // Net of the recipient on the dossier: its invoices minus its credit notes (all lines; computed lines alone).
             $issued = (int) Invoice::query()->where('dossier_id', $invoice->dossier_id)->where('recipient_key', $invoice->recipient_key)

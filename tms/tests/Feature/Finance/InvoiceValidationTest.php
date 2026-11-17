@@ -727,52 +727,148 @@ it('never writes a line onto an invoice it cannot see (another organisme)', func
     ])))->toContain('not found');
 });
 
-it('splits a proposed credit note over the invoices it corrects, never beyond what is left of each', function () {
-    // 3 500 € on 21 h: each 6 h month bills 1 000 €.
+/**
+ * A dossier of 3 500 € on 21 h, monthly: Léa present 6 h in September and
+ * 6 h in October, each month billed 1 000 € (F-2026-00001, F-2026-00002;
+ * their training line at $rates[0], $rates[1] when the company is subject
+ * to VAT).
+ *
+ * @param  array{0: ?string, 1: ?string}  $rates
+ * @return array<string, mixed>
+ */
+function fvTwoMonths(string $vat = 'exempt', array $rates = [null, null]): array
+{
     $dossier = l2Dossier(null, null, ['lines' => [[
         'kind' => 'training', 'training_id' => l2Training()->id, 'label' => 'HACCP 3 jours', 'quantity' => '1',
         'unit' => 'forfait', 'unit_price' => '3500', 'discount_percent' => '', 'pricing_mode' => 'per_trainee',
     ]]]);
+    Company::query()->whereKey($dossier->company_id)->update(['vat_regime' => $vat]);
     $session = plSession('2026-09-01', '2026-10-31');
     $module = plModule($session);
     $lea = l2Enrol($dossier, $session, makePerson('Durand', ['first_name' => 'Léa']));
     $seances = [];
     foreach (['2026-09-02', '2026-09-03', '2026-10-01', '2026-10-02'] as $day) {
-        $seances[] = $s = plSeance($module, $day, '09:00', '12:00');
-        app(Attendances::class)->record($s, $lea->id, 'present', null, null);
+        $seances[] = $seance = plSeance($module, $day, '09:00', '12:00');
+        app(Attendances::class)->record($seance, $lea->id, 'present', null, null);
     }
     app(Closures::class)->close($session->refresh(), '2026-09');
     app(Closures::class)->close($session->refresh(), '2026-10');
     app(BillingPlans::class)->save($dossier->id, ['rhythm' => 'monthly', 'basis' => 'realised']);
     $user = fvAccountant();
-    $x = ['dossier' => $dossier];
+    $x = ['dossier' => $dossier, 'session' => $session, 'seances' => $seances, 'lea' => $lea, 'user' => $user];
 
-    $f1 = fvValidate(fvDraft($x, 'contractor', $user), $user);
-    $f2 = fvValidate(fvDraft($x, 'contractor', $user), $user);
-    expect([$f1->number, $f1->total_ht_cents, $f2->number, $f2->total_ht_cents])->toBe(['F-2026-00001', 100000, 'F-2026-00002', 100000]);
+    $invoices = [];
+    foreach ($rates as $rate) {
+        $draft = fvDraft($x, 'contractor', $user);
+        if ($rate !== null) {
+            fiDrafts()->update($draft, ['notes' => null, 'lines' => $draft->lines()->get()->map(fn (InvoiceLine $l) => [
+                'id' => $l->id, 'label' => $l->label, 'description' => $l->description, 'quantity' => '1', 'unit' => $l->unit, 'unit_price' => '1000', 'vat_rate' => $rate,
+            ])->all()]);
+        }
+        $invoices[] = fvValidate($draft->refresh(), $user);
+    }
 
-    // Léa was absent but for one séance: 3 h realised, 500 € in all, −1 500 € to give back.
+    return [...$x, 'f1' => $invoices[0], 'f2' => $invoices[1]];
+}
+
+/** Léa was absent but for one séance: 3 h realised, 500 € in all, −1 500 € to give back. */
+function fvHoursDrop(array $x): void
+{
     foreach (['2026-09', '2026-10'] as $month) {
-        app(Closures::class)->reopen($session->refresh(), $month, 'Feuilles corrigées');
+        app(Closures::class)->reopen($x['session']->refresh(), $month, 'Feuilles corrigées');
     }
     foreach ([0, 1, 2] as $i) {
-        app(Attendances::class)->record($seances[$i], $lea->id, 'absent', null, null);
+        app(Attendances::class)->record($x['seances'][$i], $x['lea']->id, 'absent', null, null);
     }
     foreach (['2026-09', '2026-10'] as $month) {
-        app(Closures::class)->close($session->refresh(), $month);
+        app(Closures::class)->close($x['session']->refresh(), $month);
     }
+}
+
+function fvCreditDraft(array $x): Invoice
+{
+    return Invoice::query()->where('dossier_id', $x['dossier']->id)->where('kind', 'credit_note')->where('status', 'draft')->sole();
+}
+
+it('splits a proposed credit note over the invoices it corrects, never beyond what is left of each', function () {
+    $x = fvTwoMonths();
+    [$dossier, $user, $f1, $f2] = [$x['dossier'], $x['user'], $x['f1'], $x['f2']];
+    expect([$f1->number, $f1->total_ht_cents, $f2->number, $f2->total_ht_cents])->toBe(['F-2026-00001', 100000, 'F-2026-00002', 100000]);
+    fvHoursDrop($x);
 
     $row = fiDue($dossier->id)['contractor'];
-    expect($row)->toMatchArray(['kind' => 'credit_note', 'total_cents' => -100000, 'unsettled_cents' => -50000, 'corrected_invoice_id' => $f2->id]);
+    expect($row)->toMatchArray(['kind' => 'credit_note', 'total_cents' => -100000, 'unsettled_cents' => -50000, 'corrected_invoice_id' => $f2->id, 'preparable' => true]);
     fiDrafts()->prepare($user, [$row['key']]);
-    $first = fvValidate(Invoice::query()->where('kind', 'credit_note')->where('status', 'draft')->sole(), $user);
+    $first = fvValidate(fvCreditDraft($x), $user);
     expect([$first->number, $first->total_ht_cents, $first->corrected_invoice_id])->toBe(['AV-2026-00001', -100000, $f2->id]);
 
     $row = fiDue($dossier->id)['contractor'];
     expect($row)->toMatchArray(['kind' => 'credit_note', 'total_cents' => -50000, 'unsettled_cents' => 0, 'corrected_invoice_id' => $f1->id]);
     fiDrafts()->prepare($user, [$row['key']]);
-    $second = fvValidate(Invoice::query()->where('kind', 'credit_note')->where('status', 'draft')->sole(), $user);
+    $second = fvValidate(fvCreditDraft($x), $user);
     expect([$second->number, $second->total_ht_cents, $second->corrected_invoice_id])->toBe(['AV-2026-00002', -50000, $f1->id])
         ->and(fiDue($dossier->id))->toBe([])
         ->and(Integrity::verify())->toBe(['count' => 4, 'broken' => null]);
+});
+
+it('gives back each proposed credit-note line at the VAT rate of the corrected invoice, not editable', function () {
+    $x = fvTwoMonths('subject', ['10', '10']);
+    fvHoursDrop($x);
+    fiDrafts()->prepare($x['user'], [fiDue($x['dossier']->id)['contractor']['key']]);
+    $draft = fvCreditDraft($x);
+    $line = $draft->lines()->sole();
+    expect((string) $line->vat_rate)->toBe('10.00');
+
+    // Changed to 20 % in the form: the rate of the corrected invoice stays.
+    fiDrafts()->update($draft, ['notes' => null, 'lines' => [[
+        'id' => $line->id, 'label' => $line->label, 'description' => null, 'quantity' => '1', 'unit' => $line->unit, 'unit_price' => '-1000', 'vat_rate' => '20',
+    ]]]);
+    expect((string) $line->refresh()->vat_rate)->toBe('10.00');
+
+    $credit = fvValidate($draft->refresh(), $x['user']);
+    expect([$credit->total_ht_cents, $credit->total_vat_cents, $credit->corrected_invoice_id])->toBe([-100000, -10000, $x['f2']->id]);
+});
+
+it('recalculates a credit-note draft onto the invoice now left to correct, with its VAT rate', function () {
+    $x = fvTwoMonths('subject', ['10', '20']);
+    fvHoursDrop($x);
+    fiDrafts()->prepare($x['user'], [fiDue($x['dossier']->id)['contractor']['key']]);
+    $draft = fvCreditDraft($x);
+    expect($draft->corrected_invoice_id)->toBe($x['f2']->id)
+        ->and((string) $draft->lines()->sole()->vat_rate)->toBe('20.00');
+
+    // Meanwhile F-2026-00002 was fully credited (an earlier credit note, validated).
+    DB::table('invoices')->insert([
+        'id' => (string) Str::uuid7(), 'tenant_id' => tenant()->id, 'company_id' => $x['f2']->company_id, 'kind' => 'credit_note', 'number' => 'AV-2026-00009',
+        'status' => 'validated', 'dossier_id' => $x['dossier']->id, 'recipient_type' => $x['f2']->recipient_type, 'recipient_id' => $x['f2']->recipient_id,
+        'issued_on' => '2026-11-17', 'rhythm' => 'monthly', 'basis' => 'realised', 'total_ht_cents' => -100000, 'corrected_invoice_id' => $x['f2']->id,
+        'created_at' => now(), 'updated_at' => now(),
+    ]);
+
+    $draft = fiDrafts()->recompute($draft)->refresh();
+    expect($draft->corrected_invoice_id)->toBe($x['f1']->id)
+        ->and((string) $draft->lines()->sole()->vat_rate)->toBe('10.00')
+        ->and($draft->total_vat_cents)->toBe(-10000);
+});
+
+it('proposes nothing to prepare when no invoice is left to correct, and never validates a credit note without one', function () {
+    $x = fiSeed();
+    $user = fvAccountant();
+    $invoice = fvInvoiceWithMeals($x, $user);
+    // The whole invoice credited on its free line: nothing left to correct, the computed amount still invoiced.
+    fvValidate(fvCreditPrices(app(CreditNotes::class)->create($user, $invoice, [$invoice->lines()->where('kind', 'free')->sole()->id]), ['-201,43']), $user);
+    fiLateAttendance($x, 0, 'absent');
+
+    $row = fiDue($x['dossier']->id)['contractor'];
+    expect($row)->toMatchArray(['kind' => 'credit_note', 'corrected_invoice_id' => null, 'preparable' => false, 'blocked_reason' => 'À régulariser : aucune facture à corriger'])
+        ->and(fiDrafts()->prepare($user, [$row['key']]))->toBe(['created' => 0, 'skipped' => 1]);
+    $this->actingAs(fiManager())->get('/finance/to-invoice')
+        ->assertInertia(fn (Assert $page) => $page->where('rows.0.preparable', false)->where('rows.0.blocked_reason', 'À régulariser : aucune facture à corriger'));
+
+    // A credit note always corrects a validated invoice of its recipient.
+    $opco = fvValidate(fvDraft($x, 'funding:'.$x['funding']->id, $user), $user);
+    $credit = app(CreditNotes::class)->create($user, $opco);
+    $credit->forceFill(['corrected_invoice_id' => $invoice->id])->save();
+    expect(fn () => fvValidate($credit, $user))->toThrow(UserFacingHttpException::class, InvoiceValidator::NO_CORRECTED)
+        ->and(fvRefused(fn () => $credit->forceFill(['corrected_invoice_id' => null])->save()))->toContain('invoices_credit_note_corrects_check');
 });

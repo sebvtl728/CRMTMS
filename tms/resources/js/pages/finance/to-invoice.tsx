@@ -54,6 +54,9 @@ interface DueRow {
     }[];
     modified_cents: number;
     draft: { id: string; url: string } | null;
+    preparable: boolean;
+    blocked_reason: string | null;
+    unsettled_cents: number;
 }
 
 interface SoonRow {
@@ -183,7 +186,7 @@ export default function ToInvoice({ rows, soon, filters, options, can, status }:
     const [selected, setSelected] = useState<string[]>([]);
     const [open, setOpen] = useState<string[]>([]);
     const [processing, setProcessing] = useState(false);
-    const selectable = rows.filter((r) => r.draft === null).map((r) => r.key);
+    const selectable = rows.filter((r) => r.draft === null && r.preparable).map((r) => r.key);
 
     const visit = (changes: Partial<Filters>) =>
         router.get(route('finance.to-invoice.index'), query({ ...filters, ...changes }), { preserveState: true, replace: true });
@@ -283,7 +286,7 @@ export default function ToInvoice({ rows, soon, filters, options, can, status }:
                                         <tr key={row.key} className="border-t align-top">
                                             {can.manage && (
                                                 <td className="px-3 py-2">
-                                                    {row.draft === null && (
+                                                    {row.draft === null && row.preparable && (
                                                         <Checkbox
                                                             aria-label={`Sélectionner ${row.dossier.number} — ${row.recipient.label}`}
                                                             checked={selected.includes(row.key)}
@@ -308,10 +311,16 @@ export default function ToInvoice({ rows, soon, filters, options, can, status }:
                                             <td className="px-3 py-2">{row.period.label}</td>
                                             <td className="px-3 py-2 text-right whitespace-nowrap tabular-nums">
                                                 {formatCents(row.total_cents)}
-                                                {row.kind === 'credit_note' && (
+                                                {row.kind === 'credit_note' && row.preparable && (
                                                     <Badge variant="destructive" className="ml-2">
                                                         Avoir proposé
                                                     </Badge>
+                                                )}
+                                                {row.blocked_reason && <span className="text-destructive block text-xs">{row.blocked_reason}</span>}
+                                                {row.unsettled_cents !== 0 && (
+                                                    <span className="text-muted-foreground block text-xs">
+                                                        Reste à régulariser ensuite : {formatCents(row.unsettled_cents)}
+                                                    </span>
                                                 )}
                                                 {row.draft && (
                                                     <Link href={row.draft.url} className="block text-xs underline">

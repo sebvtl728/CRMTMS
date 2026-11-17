@@ -154,7 +154,10 @@ final class InvoiceDrafts
                     'quantity' => $quantity,
                     'unit' => $input['unit'],
                     'unit_price_cents' => $price,
-                    'vat_rate' => InvoiceTotals::rateFor($exempt, $line->component, $input['vat_rate']),
+                    // A computed line of a credit note gives back at the rate of the corrected invoice: never changed here.
+                    'vat_rate' => $invoice->kind === Invoice::CREDIT_NOTE && $line->kind === InvoiceLine::COMPUTED && $line->exists
+                        ? (string) $line->vat_rate
+                        : InvoiceTotals::rateFor($exempt, $line->component, $input['vat_rate']),
                     'total_ht_cents' => InvoiceTotals::line($quantity, $price),
                 ]);
                 $line->save();
@@ -232,15 +235,16 @@ final class InvoiceDrafts
             $row = $this->rowFor($dossier, Ledger::keyOf($invoice));
             $company = Company::withTrashed()->findOrFail($invoice->company_id);
 
+            // The header first: the lines' VAT follows the invoice a credit note now corrects.
+            if ($row !== null) {
+                $invoice->forceFill(self::header($row));
+            }
             $lines = $invoice->lines()->get();
             $lines->where('kind', InvoiceLine::COMPUTED)->each(fn (InvoiceLine $l) => $l->delete());
             $computed = $row['lines'] ?? [];
             $this->insertLines($invoice, $computed, $company, 0);
             foreach ($lines->where('kind', InvoiceLine::FREE)->values() as $i => $free) {
                 $free->forceFill(['position' => count($computed) + $i])->save();
-            }
-            if ($row !== null) {
-                $invoice->forceFill(self::header($row));
             }
             $invoice->updated_by = Auth::id();
             $this->totals($invoice);
@@ -260,6 +264,10 @@ final class InvoiceDrafts
     {
         $row = array_column($this->due->forDossier($dossier['id'])['rows'], null, 'recipient_key')[$recipient] ?? null;
         if ($row !== null && $row['kind'] === Invoice::INVOICE && self::recipientOf($dossier, $recipient) === null) {
+            return null;
+        }
+        // A credit note corrects a validated invoice: with none left to correct, nothing to prepare.
+        if ($row !== null && $row['kind'] === Invoice::CREDIT_NOTE && $row['corrected_invoice_id'] === null) {
             return null;
         }
 
@@ -288,15 +296,37 @@ final class InvoiceDrafts
      */
     private function insertLines(Invoice $invoice, array $lines, Company $company, int $from): void
     {
+        $exempt = InvoiceTotals::exempt($invoice, $company);
+        $corrected = $invoice->kind === Invoice::CREDIT_NOTE && $invoice->corrected_invoice_id !== null
+            ? InvoiceLine::query()->where('invoice_id', $invoice->corrected_invoice_id)->where('kind', InvoiceLine::COMPUTED)->orderBy('position')->get()
+            : null;
         foreach ($lines as $i => $line) {
             InvoiceLine::query()->create([
                 ...$line,
                 'invoice_id' => $invoice->id,
                 'position' => $from + $i,
-                'vat_rate' => InvoiceTotals::rateFor(InvoiceTotals::exempt($invoice, $company), $line['component']),
+                'vat_rate' => $corrected !== null
+                    ? self::correctedRate($corrected, $line, InvoiceTotals::rateFor($exempt, $line['component']))
+                    : InvoiceTotals::rateFor($exempt, $line['component']),
                 'computed_cents' => $line['total_ht_cents'],
             ]);
         }
+    }
+
+    /**
+     * The VAT rate a credit-note line gives back: that of the line of the
+     * corrected invoice billing the same thing (component, and dossier line
+     * for the training), else of its component, else $default.
+     *
+     * @param  Collection<int, InvoiceLine>  $corrected
+     * @param  array<string, mixed>  $line
+     */
+    private static function correctedRate(Collection $corrected, array $line, string $default): string
+    {
+        $same = $corrected->where('component', $line['component']);
+        $match = $same->firstWhere('dossier_line_id', $line['dossier_line_id'] ?? null) ?? $same->first();
+
+        return $match === null ? $default : (string) $match->vat_rate;
     }
 
     private function totals(Invoice $invoice): void

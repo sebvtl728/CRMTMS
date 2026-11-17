@@ -43,6 +43,8 @@ final class Due
 
     public const ABSENCES_LABEL = 'Absences non justifiées — non imputables sur les fonds de la formation professionnelle';
 
+    public const NOTHING_TO_CORRECT = 'À régulariser : aucune facture à corriger';
+
     public const RHYTHMS = [
         BillingPlans::END => 'Fin de formation',
         BillingPlans::MONTHLY => 'Mensuel',
@@ -276,6 +278,9 @@ final class Due
             'modified_cents' => $ledger->modified[$key] ?? 0,
             'draft' => $draft === null ? null : ['id' => $draft->id, 'url' => '/finance/invoices/'.$draft->id],
             'corrected_invoice_id' => $corrected?->id,
+            // Nothing to prepare: a credit note with no validated invoice left to correct.
+            'preparable' => $kind === Invoice::INVOICE || $corrected !== null,
+            'blocked_reason' => $kind === Invoice::CREDIT_NOTE && $corrected === null ? self::NOTHING_TO_CORRECT : null,
             // The part of a negative due left for a later credit note (on another invoice).
             'unsettled_cents' => $unsettled,
         ];

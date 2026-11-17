@@ -138,7 +138,9 @@ function DraftEditor({ invoice, options }: { invoice: InvoicePage; options: Show
             <ul className="grid gap-3">
                 {data.lines.map((line, index) => {
                     const stored = line.id ? byId[line.id] : undefined;
-                    const vatLocked = options.vat_exempt || line.component === 'dedit';
+                    // A computed line of a credit note gives back at the rate of the corrected invoice.
+                    const vatLocked =
+                        options.vat_exempt || line.component === 'dedit' || (invoice.kind === 'credit_note' && line.kind === 'computed');
 
                     return (
                         <li key={line.id ?? `new-${index}`} className="grid gap-2 rounded-xl border p-3">
@@ -218,7 +220,7 @@ function DraftEditor({ invoice, options }: { invoice: InvoicePage; options: Show
                                     <select
                                         id={`line-${index}-vat_rate`}
                                         className="border-input bg-background h-9 rounded-md border px-2 text-sm"
-                                        value={vatLocked ? '0.00' : line.vat_rate}
+                                        value={options.vat_exempt || line.component === 'dedit' ? '0.00' : line.vat_rate}
                                         disabled={vatLocked}
                                         onChange={(e) => setLine(index, 'vat_rate', e.target.value)}
                                     >
