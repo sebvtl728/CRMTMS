@@ -10,7 +10,8 @@ return new class extends Migration
     /**
      * calendar_link_events carries the Outlook copies of any registered
      * source (0.8.1): « crm.activity » (the CRM actions, every existing row)
-     * and « sessions.seance » (the séances of a trainer). activity_id becomes
+     * and « sessions.seance » (the séances of a trainer), without a default
+     * once the existing rows are filled. activity_id becomes
      * source_id (still no foreign key: the source module is read through its
      * public service only).
      */
@@ -28,6 +29,8 @@ return new class extends Migration
             $table->unique(['calendar_link_id', 'source', 'source_id']);
             $table->index(['source', 'source_id']);
         });
+        // The default only filled the existing rows: every new copy names its source.
+        DB::statement('alter table calendar_link_events alter column source drop default');
     }
 
     /**

@@ -8,10 +8,12 @@ use App\Modules\Connectors\Core\HostPolicy;
 use App\Modules\Core\Access\Role;
 use App\Modules\Core\References\ReferenceList;
 use App\Modules\Core\Users\User;
+use App\Modules\Sessions\Modules\SessionModules;
 use App\Modules\Sessions\Planning\GenerationRequest;
 use App\Modules\Sessions\Planning\SeanceBatch;
 use App\Modules\Sessions\Planning\SeanceGenerator;
 use App\Modules\Sessions\Planning\Seances;
+use App\Modules\Sessions\Resources\Rooms;
 use App\Modules\Sessions\Sessions\SessionWriter;
 use App\Modules\Sessions\Trainers\Trainer;
 use App\Modules\Sessions\Trainers\Trainers;
@@ -276,6 +278,45 @@ it('does not duplicate the event when the job is replayed', function () {
     [$post] = graphRequests();
     expect($post->data()['transactionId'])->toBe($row->transaction_id)
         ->and(CalendarLinkEvent::query()->count())->toBe(1);
+});
+
+it('updates the copies when the session, its module or the room is renamed', function () {
+    m365Config();
+    [$user, $trainer] = osFormateur();
+    m365Link($user);
+    $session = plSession('2026-09-01', '2026-09-30', ['title' => 'Commis de cuisine']);
+    $module = plModule($session);
+    $room = plRoom('Salle A');
+    osCreates('AAMk1');
+    plSeance($module, '2026-09-02', '09:00', '12:30', ['trainer_id' => $trainer->id, 'room_id' => $room->id]);
+    $patched = fn (): array => array_map(fn (Request $r) => $r->method().' '.$r->data()['subject'].' @ '.$r->data()['location']['displayName'], graphRequests());
+
+    // The session renamed: the subject follows.
+    m365Http([GRAPH_EVENTS.'/AAMk1' => Http::response(['id' => 'AAMk1'])]);
+    $session->refresh();
+    app(SessionWriter::class)->update($session, [
+        ...$session->only(['training_id', 'kind', 'organisation_id', 'modality_id', 'location_kind', 'location_text', 'capacity', 'responsible_user_id', 'notes']),
+        'starts_on' => '2026-09-01', 'ends_on' => '2026-09-30', 'status' => $session->status->value, 'title' => 'Cuisinier confirmé',
+    ]);
+    expect($patched())->toBe(['PATCH Cuisinier confirmé ('.$session->number.') — '.$module->title.' @ Salle A']);
+
+    // A change that does not show (capacity): nothing sent.
+    m365Http();
+    app(SessionWriter::class)->update($session->refresh(), [
+        ...$session->only(['training_id', 'kind', 'organisation_id', 'modality_id', 'location_kind', 'location_text', 'responsible_user_id', 'notes', 'title']),
+        'starts_on' => '2026-09-01', 'ends_on' => '2026-09-30', 'status' => $session->status->value, 'capacity' => 12,
+    ]);
+    expect(graphRequests())->toBe([]);
+
+    // The module renamed.
+    m365Http([GRAPH_EVENTS.'/AAMk1' => Http::response(['id' => 'AAMk1'])]);
+    app(SessionModules::class)->save($session->refresh(), ['title' => 'Cuisine chaude', 'planned_hours' => '21', 'modality_id' => '', 'dating_mode' => 'seances', 'starts_on' => '', 'ends_on' => ''], $module);
+    expect($patched())->toBe(['PATCH Cuisinier confirmé ('.$session->number.') — Cuisine chaude @ Salle A']);
+
+    // The room renamed and given an address.
+    m365Http([GRAPH_EVENTS.'/AAMk1' => Http::response(['id' => 'AAMk1'])]);
+    Rooms::save($room, ['name' => 'Salle Mont-Blanc', 'capacity' => null, 'address' => '12 rue des Lilas, Annecy', 'active' => true]);
+    expect($patched())->toBe(['PATCH Cuisinier confirmé ('.$session->number.') — Cuisine chaude @ Salle Mont-Blanc, 12 rue des Lilas, Annecy']);
 });
 
 it('keeps the name of the CRM actions to the CRM', function () {

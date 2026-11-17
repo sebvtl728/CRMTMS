@@ -1,6 +1,7 @@
 <?php
 
 use Illuminate\Database\Connection;
+use Illuminate\Database\QueryException;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
@@ -57,6 +58,11 @@ it('turns activity_id into a source and a source_id, the actions as crm.activity
         $owner->statement('savepoint duplicate');
         expect(fn () => $owner->table('calendar_link_events')->insert($row('sessions.seance', $shared)))->toThrow(UniqueConstraintViolationException::class);
         $owner->statement('rollback to savepoint duplicate');
+        // No default: a copy always names its source.
+        $owner->statement('savepoint unnamed');
+        expect(fn () => $owner->table('calendar_link_events')->insert(array_diff_key($row('crm.activity'), ['source' => true])))
+            ->toThrow(QueryException::class, 'not-null');
+        $owner->statement('rollback to savepoint unnamed');
 
         linkEventsMigration()->down();
 

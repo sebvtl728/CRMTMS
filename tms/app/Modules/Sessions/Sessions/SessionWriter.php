@@ -118,9 +118,15 @@ final class SessionWriter
             if (! $retrained) {
                 $values['planned_hours'] = $locked->planned_hours;
             }
-            $locked->update($values);
+            $locked->fill($values);
+            // What the Outlook copies of its séances show: the label and the place.
+            $shown = $locked->isDirty(['title', 'training_id', 'kind', 'location_kind', 'location_text']);
+            $locked->save();
             if ($retrained) {
                 $this->modules->replaceFromTraining($locked);
+            }
+            if ($shown) {
+                SeanceOutlook::touchSession($locked->id);
             }
 
             return $locked;

@@ -66,25 +66,41 @@ final class SeanceOutlook
         DB::afterCommit(fn () => OutlookSources::push(self::SOURCE, $seanceId));
     }
 
-    /** The session was cancelled, trashed or restored: each of its séances with a trainer. */
+    /** The session was cancelled, trashed, restored, renamed or moved: each of its séances with a trainer. */
     public static function touchSession(string $sessionId): void
     {
-        DB::afterCommit(function () use ($sessionId): void {
-            $ids = Seance::query()->where('training_session_id', $sessionId)->whereNotNull('trainer_id')->pluck('id');
-            foreach ($ids as $id) {
-                OutlookSources::push(self::SOURCE, (string) $id);
-            }
-        });
+        self::touchWhere('training_session_id', $sessionId, false);
+    }
+
+    /** The session module was renamed: each of its séances with a trainer. */
+    public static function touchModule(string $moduleId): void
+    {
+        self::touchWhere('session_module_id', $moduleId, false);
     }
 
     /** The trainer was linked, unlinked, deactivated or activated: his séances to come. */
     public static function touchTrainer(string $trainerId): void
     {
-        DB::afterCommit(function () use ($trainerId): void {
-            $ids = Seance::query()->where('trainer_id', $trainerId)
-                ->where('date', '>=', TrainingSession::today()->toDateString())->pluck('id');
-            foreach ($ids as $id) {
-                OutlookSources::push(self::SOURCE, (string) $id);
+        self::touchWhere('trainer_id', $trainerId, true);
+    }
+
+    /** The room was renamed or moved: its séances to come with a trainer. */
+    public static function touchRoom(string $roomId): void
+    {
+        self::touchWhere('room_id', $roomId, true);
+    }
+
+    /**
+     * After commit, pushes the séances having $column = $id (with a trainer;
+     * from today, Paris, when $toCome).
+     */
+    private static function touchWhere(string $column, string $id, bool $toCome): void
+    {
+        DB::afterCommit(function () use ($column, $id, $toCome): void {
+            $ids = Seance::query()->where($column, $id)->whereNotNull('trainer_id')
+                ->when($toCome, fn ($q) => $q->where('date', '>=', TrainingSession::today()->toDateString()))->pluck('id');
+            foreach ($ids as $seanceId) {
+                OutlookSources::push(self::SOURCE, (string) $seanceId);
             }
         });
     }
