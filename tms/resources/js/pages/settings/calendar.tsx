@@ -17,13 +17,15 @@ interface OutlookProps {
     status: 'none' | 'active' | 'reconnect';
     connected_at: string | null;
     message: string | null;
+    /** A source sends items too (the séances of a linked trainer). */
+    sources: boolean;
 }
 
 interface CalendarProps {
     calendar: { created_at: string | null; last_used_at: string | null } | null;
     url: string | null;
     status?: string | null;
-    /** The CRM actions (meetings, calls) are published; Outlook is offered with them only. */
+    /** The CRM actions (meetings, calls) are published (and sent to Outlook). */
     crm: boolean;
     /** Séances are published too (linked trainer, session responsible). */
     sources: boolean;
@@ -35,6 +37,10 @@ export default function Calendar({ calendar, url, status, crm, sources, outlook,
     const what = [crm ? 'vos rendez-vous et appels planifiés dans le CRM' : null, sources ? 'vos séances de formation' : null]
         .filter(Boolean)
         .join(' et ');
+    const outlookWhat =
+        outlook === null
+            ? ''
+            : [crm ? 'vos rendez-vous et appels' : null, outlook.sources ? 'vos séances de formation' : null].filter(Boolean).join(' et ');
 
     const [copied, setCopied] = useState(false);
     const [processing, setProcessing] = useState(false);
@@ -61,7 +67,9 @@ export default function Calendar({ calendar, url, status, crm, sources, outlook,
     };
 
     const disconnectOutlook = () => {
-        if (!window.confirm("Déconnecter Outlook ? Vos rendez-vous n'y seront plus envoyés ; les évènements déjà créés restent dans votre agenda.")) {
+        if (
+            !window.confirm("Déconnecter Outlook ? Plus rien n'y sera envoyé, et les évènements déjà envoyés seront retirés de votre agenda Outlook.")
+        ) {
             return;
         }
         router.delete(route('calendar.outlook.disconnect'), {
@@ -182,7 +190,11 @@ export default function Calendar({ calendar, url, status, crm, sources, outlook,
                         <div className="space-y-3 text-sm">
                             <HeadingSmall
                                 title="Connecter Outlook"
-                                description="Avec un compte Microsoft 365, vos rendez-vous et appels sont créés directement dans votre agenda Outlook, mis à jour et supprimés avec eux, en quelques instants."
+                                description={
+                                    crm
+                                        ? `Avec un compte Microsoft 365, ${outlookWhat} sont créés directement dans votre agenda Outlook, mis à jour et supprimés avec eux, en quelques instants.`
+                                        : `Avec un compte Microsoft 365, ${outlookWhat} sont créées directement dans votre agenda Outlook, mises à jour et supprimées avec elles, en quelques instants.`
+                                }
                             />
                             {outlook_error && <p className="font-medium text-red-700 dark:text-red-400">{outlook_error}</p>}
                             {outlook.message !== null && (
@@ -192,8 +204,8 @@ export default function Calendar({ calendar, url, status, crm, sources, outlook,
                             )}
                             {outlook.status === 'active' && (
                                 <p>
-                                    Outlook connecté{outlook.connected_at !== null ? ` le ${formatDateTime(outlook.connected_at)}` : ''}. Les comptes
-                                    rendus n'y sont jamais envoyés.
+                                    Outlook connecté{outlook.connected_at !== null ? ` le ${formatDateTime(outlook.connected_at)}` : ''}.
+                                    {crm && " Les comptes rendus n'y sont jamais envoyés."}
                                 </p>
                             )}
                             {!outlook.available && outlook.status === 'none' && (

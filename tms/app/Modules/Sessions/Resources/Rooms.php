@@ -3,6 +3,7 @@
 namespace App\Modules\Sessions\Resources;
 
 use App\Exceptions\UserFacingHttpException;
+use App\Modules\Sessions\Planning\SeanceOutlook;
 use Closure;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -45,7 +46,13 @@ final class Rooms
     {
         return DB::transaction(function () use ($room, $data): Room {
             $room ??= new Room;
-            $room->fill($data)->save();
+            $room->fill($data);
+            $shown = $room->exists && $room->isDirty(['name', 'address']);
+            $room->save();
+            if ($shown) {
+                // The place of the Outlook copies of its séances to come.
+                SeanceOutlook::touchRoom($room->id);
+            }
 
             return $room;
         });

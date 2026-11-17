@@ -21,7 +21,7 @@ final class QueueOutlookPush
 
         $users = array_values(array_filter([$event->responsibleUserId, $event->previousResponsibleUserId]));
         $concerned = ($users !== [] && CalendarLink::query()->whereIn('user_id', $users)->where('status', CalendarLink::ACTIVE)->exists())
-            || CalendarLinkEvent::query()->where('activity_id', $event->activityId)->exists();
+            || CalendarLinkEvent::query()->of(CalendarLinkEvent::SOURCE_ACTIVITY, $event->activityId)->exists();
 
         if ($concerned) {
             PushActivityToOutlook::dispatch($event->activityId)->afterCommit();

@@ -94,6 +94,10 @@ test('sessions: a titled inter session, a group of four enrolled at once (one cr
 
     // The group: three found in the CRM, one created on the spot, one common entry day.
     await page.goto(sessionUrl);
+    // The « Synthèse » first, then the « Stagiaires » step (kept in the URL).
+    await expect(page.getByRole('region', { name: 'Avancement' }).getByRole('heading', { name: 'Inscriptions' })).toBeVisible();
+    await page.getByRole('navigation', { name: 'Étapes de la session' }).getByRole('link', { name: 'Stagiaires' }).click();
+    await expect(page).toHaveURL(/etape=stagiaires/);
     await page.getByRole('button', { name: 'Inscrire des stagiaires' }).click();
     const dialog = page.getByRole('dialog');
     await choose(page, dialog.getByLabel('Dossier *'), new RegExp(CLIENT));

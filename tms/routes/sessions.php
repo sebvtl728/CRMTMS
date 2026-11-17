@@ -7,11 +7,13 @@ use App\Modules\Sessions\Dossiers\DossierFromQuoteController;
 use App\Modules\Sessions\Enrolments\EnrolmentController;
 use App\Modules\Sessions\Fundings\FundingController;
 use App\Modules\Sessions\Modules\SessionModuleController;
+use App\Modules\Sessions\Notes\SessionNoteController;
 use App\Modules\Sessions\Planning\PlacementController;
 use App\Modules\Sessions\Planning\PlanningController;
 use App\Modules\Sessions\Planning\SeanceController;
 use App\Modules\Sessions\Resources\ResourceSettingsController;
 use App\Modules\Sessions\Sessions\SessionController;
+use App\Modules\Sessions\Sessions\SessionStatusController;
 use App\Modules\Sessions\Settings\AbandonRuleController;
 use App\Modules\Sessions\Trainers\MyPlanningController;
 use App\Modules\Sessions\Trainers\TrainerController;
@@ -36,6 +38,7 @@ Route::middleware(['auth'])->prefix('sessions')->name('sessions.')->group(functi
     Route::get('{trainingSession}', [SessionController::class, 'show'])->middleware('can:sessions.sessions.view')->name('show');
     Route::get('{trainingSession}/edit', [SessionController::class, 'edit'])->middleware('can:sessions.sessions.update')->name('edit');
     Route::put('{trainingSession}', [SessionController::class, 'update'])->middleware('can:sessions.sessions.update')->name('update');
+    Route::post('{trainingSession}/status', SessionStatusController::class)->middleware('can:sessions.sessions.update')->name('status');
     Route::post('{trainingSession}/cancel', [SessionController::class, 'cancel'])->middleware('can:sessions.sessions.update')->name('cancel');
     Route::delete('{trainingSession}', [SessionController::class, 'destroy'])->middleware('can:sessions.sessions.delete')->name('destroy');
     Route::post('{trainingSession}/restore', [SessionController::class, 'restore'])->middleware('can:sessions.sessions.delete')->name('restore');
@@ -52,6 +55,14 @@ Route::middleware(['auth'])->prefix('sessions')->name('sessions.')->group(functi
     Route::get('{trainingSession}/modules/catalogue', [SessionModuleController::class, 'catalogue'])->middleware('can:sessions.sessions.update')->name('modules.catalogue');
     Route::post('{trainingSession}/modules/catalogue', [SessionModuleController::class, 'fromCatalogue'])->middleware('can:sessions.sessions.update')->name('modules.from-catalogue');
     Route::post('{trainingSession}/modules/{sessionModule}/mode', [SessionModuleController::class, 'mode'])->middleware('can:sessions.sessions.update')->name('modules.mode');
+    // Tasks and notes of the « Synthèse »: seen with the session, written with the update right (checked by SessionNotes).
+    Route::post('{trainingSession}/tasks', [SessionNoteController::class, 'storeTask'])->middleware('can:sessions.sessions.view')->name('tasks.store');
+    Route::put('{trainingSession}/tasks/{sessionTask}', [SessionNoteController::class, 'updateTask'])->middleware('can:sessions.sessions.view')->name('tasks.update');
+    Route::post('{trainingSession}/tasks/{sessionTask}/toggle', [SessionNoteController::class, 'toggleTask'])->middleware('can:sessions.sessions.view')->name('tasks.toggle');
+    Route::delete('{trainingSession}/tasks/{sessionTask}', [SessionNoteController::class, 'destroyTask'])->middleware('can:sessions.sessions.view')->name('tasks.destroy');
+    Route::post('{trainingSession}/notes', [SessionNoteController::class, 'storeNote'])->middleware('can:sessions.sessions.view')->name('notes.store');
+    Route::put('{trainingSession}/notes/{sessionNote}', [SessionNoteController::class, 'updateNote'])->middleware('can:sessions.sessions.view')->name('notes.update');
+    Route::delete('{trainingSession}/notes/{sessionNote}', [SessionNoteController::class, 'destroyNote'])->middleware('can:sessions.sessions.view')->name('notes.destroy');
     // Séances, the generation assistant and placements: sessions.seances.manage and its scope on the session.
     Route::middleware('can:sessions.seances.manage')->group(function () {
         Route::post('{trainingSession}/seances', [SeanceController::class, 'store'])->name('seances.store');

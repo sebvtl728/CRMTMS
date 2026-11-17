@@ -27,6 +27,35 @@ Chaque session reçoit un numéro `S-2026-0001` (séquence par organisme et par 
 
 Dès qu'une session a des inscriptions, sa formation, son type et son entreprise ne changent plus, et elle ne va pas à la corbeille.
 
+### Page de la session en étapes et Synthèse (0.8.1)
+
+La page d'une session se lit en **étapes**, dans une barre numérotée en haut : **Synthèse**, **Configuration**, **Planning**, **Stagiaires** et, pour qui saisit ou clôt les présences, **Suivi**. L'étape ouverte figure dans l'adresse (`?etape=planning`) : copiez-la pour renvoyer un collègue à la bonne étape. Les anciennes adresses `?tab=` restent comprises.
+
+La **Synthèse** (étape d'ouverture) est un tableau d'**avancement** : une carte par point à régler, avec un état en texte et en icône (**Fait**, **À faire**, **Alerte**, **Sans objet**), une valeur et un lien **Ouvrir** qui mène à l'étape et à la section concernées :
+
+- **Heures planifiées** : heures planifiées sur heures prévues (en alerte si l'on planifie plus que prévu) ;
+- **Formateurs** : séances à venir sans formateur ; **Salles ou lieux** : séances à venir sans salle ni lieu ;
+- **Conflits** : alertes de conflit sur les séances à venir (formateur, salle, stagiaire…) ;
+- **Inscriptions** : places prises sur la capacité (alerte en cas de liste d'attente ou de dépassement) ;
+- **Financements** (avec le droit « Consulter les dossiers ») : dossiers dont le prix n'est pas encore couvert ; « Sans objet » sans dossier ;
+- **Stages** : stagiaires sans entreprise d'accueil sur une période de stage ;
+- **Présences** et **Clôture des mois** (avec le droit de saisir ou de clôturer les présences) : séances passées sans présences, mois écoulés non clôturés.
+
+Chaque carte suit **votre périmètre** : une carte dont vous n'avez pas le droit ne s'affiche pas. Une session **annulée** montre son motif à la place des cartes.
+
+À côté des cartes, le panneau **Tâches et notes** :
+
+- **Tâches** : un intitulé, une échéance facultative et un responsable facultatif (un utilisateur actif de l'organisme) ; cochez pour terminer ou rouvrir, modifiez ou supprimez ;
+- **Notes** : texte libre de 5 000 caractères au plus, avec l'auteur et la date ; seul l'auteur modifie sa note, qui peut être supprimée par toute personne ayant le droit de modifier la session ;
+- tâches et notes se créent et se modifient avec le droit « Créer et modifier les sessions et inscriptions » sur la session, et pas sur une session annulée ; elles sont journalisées **sans leur texte**. Elles sont internes à l'organisme : jamais envoyées aux stagiaires ni aux formateurs sans droit de consultation.
+
+### Liste et colonnes (0.8.1)
+
+L'écran **Sessions** se lit en **Liste** ou en **Colonnes** (bouton de bascule ; votre dernier choix est retenu sur cet appareil). La vue **Colonnes** est un kanban par **état** : *Planifiée*, *Confirmée*, *En cours*, *Terminée* (les 90 derniers jours) et, avec la case **Afficher les annulées**, *Annulée*. Les filtres de la liste (recherche, DAS, formation, responsable, dates…) s'y appliquent, sauf **État**, que les colonnes remplacent.
+
+- Chaque carte donne le libellé de la session, ses dates, les inscrits sur les places, une barre d'**heures planifiées / prévues**, un badge du nombre de points **à régler** (ceux de la Synthèse) et le responsable. Une colonne montre 50 cartes au plus et un lien « Voir les N autres » mène à la liste filtrée sur cet état.
+- **Glisser une carte** de *Planifiée* vers *Confirmée* (ou l'inverse) change l'état, avec le droit de modifier la session. Au clavier : menu de la carte, « Passer en confirmée » / « Repasser en planifiée ». *En cours* et *Terminée* se calculent d'après les dates et n'acceptent pas de dépôt ; une session déjà en cours ou terminée ne change plus d'état ainsi, et une annulation passe toujours par **Annuler la session** (motif obligatoire).
+
 ### Modules et onglet Planning (0.8.0)
 
 À sa création, une session reçoit une copie des **modules** de sa formation (intitulé, heures prévues, modalité, ordre) ; une formation sans module donne un module unique portant son intitulé et les heures prévues de la session. Ensuite, les modules de la session se modifient **sans toucher au catalogue**, dans l'onglet **Planning** de la page de la session, section **Modules** (droit « Créer et modifier les sessions et inscriptions » sur la session) : **Ajouter un module**, le **modifier** (intitulé, heures prévues — « 7 » ou « 3,5 », plus de zéro —, modalité, dates), le **supprimer**, **changer de mode**.
@@ -217,4 +246,10 @@ Depuis la feuille de présences d'une séance (bouton **Présences**), section *
 - les séances dont vous êtes le **formateur** ;
 - les séances des sessions dont vous êtes **responsable**, dans le périmètre de votre droit « Consulter les séances » (une session hors de vos DAS n'y figure pas ; « Ses séances » : celles que vous animez).
 
-Chaque séance : « <session> — <module> », de l'heure de début à l'heure de fin en **heure de Paris** (fuseau `Europe/Paris` déclaré : 9 h–17 h reste 9 h–17 h après un changement d'heure), lieu = la salle (et son adresse), sinon le lieu libre, sinon l'adresse de la session (jamais celle d'une session individuelle, qui peut être le domicile du stagiaire). **Jamais** le nom d'un stagiaire, la note interne ni le motif d'annulation. Une séance annulée (ou d'une session annulée) apparaît comme annulée ; une séance ou une session à la corbeille disparaît. Un formateur sans accès au CRM obtient lui aussi « Mon agenda » (sans « Connecter Outlook » : l'envoi vers Outlook des séances viendra en 0.8.1).
+Chaque séance : « <session> — <module> », de l'heure de début à l'heure de fin en **heure de Paris** (fuseau `Europe/Paris` déclaré : 9 h–17 h reste 9 h–17 h après un changement d'heure), lieu = la salle (et son adresse), sinon le lieu libre, sinon l'adresse de la session (jamais celle d'une session individuelle, qui peut être le domicile du stagiaire). **Jamais** le nom d'un stagiaire, la note interne ni le motif d'annulation. Une séance annulée (ou d'une session annulée) apparaît comme annulée ; une séance ou une session à la corbeille disparaît. Un formateur sans accès au CRM obtient lui aussi « Mon agenda » (la connexion à Outlook y est proposée dès qu'il a un compte : voir « Séances dans Outlook » ci-dessous).
+
+### Séances dans Outlook (0.8.1)
+
+Quand le connecteur Microsoft 365 « agenda » est actif (`connectors.md`) et que le formateur a **connecté son Outlook** dans « Mon agenda », ses séances **planifiées** y sont créées, déplacées et retirées automatiquement. Seul le **formateur de la séance** les reçoit, et seulement s'il a un compte lié à sa fiche formateur et actif. Chaque évènement s'intitule « <session> — <module> », avec les heures de Paris, le lieu (salle et adresse, sinon lieu libre, sinon adresse de la session) et un lien vers **Mon planning** ; il ne contient **jamais** de stagiaire, de note interne ni de prix.
+
+La copie suit la séance : création, changement d'horaire, de salle, de formateur (retirée chez l'ancien, créée chez le nouveau), annulation de la séance ou de la session, suppression, mise à la corbeille de la session, et renommage de la session, du module ou de la salle. Délier ou désactiver un formateur retire ses séances à venir de son agenda ; le relier ou le réactiver les y remet. Un formateur sans accès au CRM voit lui aussi « Connecter Outlook » dans « Mon agenda » ; à la connexion, ses séances des 180 prochains jours y sont envoyées, et une déconnexion suivie d'une reconnexion les y remet. C'est un envoi à sens unique : une modification faite dans Outlook n'est pas relue.

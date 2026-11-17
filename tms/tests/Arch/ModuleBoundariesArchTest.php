@@ -144,8 +144,8 @@ function namesCrmTables(string $code): bool
  */
 const SESSIONS_CRM_REFERENCE = '/App\\\\Modules\\\\Crm\\\\(?!Public\b)|App\\\\Modules\\\\\{[^}]*\bCrm\\\\(?!Public\b)/';
 
-/** Same for the catalogue: only Trainings, TrainingData and TrainingUsage. */
-const SESSIONS_CATALOGUE_REFERENCE = '/App\\\\Modules\\\\Catalogue\\\\(?!(?:Trainings|TrainingData|TrainingUsage)\b)|App\\\\Modules\\\\\{[^}]*\bCatalogue\\\\(?!(?:Trainings|TrainingData|TrainingUsage)\b)/';
+/** Same for the catalogue: only Trainings, TrainingData, TrainingUsage and the TrainingBlocks registry. */
+const SESSIONS_CATALOGUE_REFERENCE = '/App\\\\Modules\\\\Catalogue\\\\(?!(?:Trainings|TrainingData|TrainingUsage|TrainingBlocks)\b)|App\\\\Modules\\\\\{[^}]*\bCatalogue\\\\(?!(?:Trainings|TrainingData|TrainingUsage|TrainingBlocks)\b)/';
 
 it('lets Sessions reach the CRM and the catalogue through their public services only', function () {
     expect(moduleFilesMatching('Sessions', SESSIONS_CRM_REFERENCE))->toBe([])
@@ -195,6 +195,7 @@ it('detects every way of reaching the Crm or the catalogue beyond their public s
         'use App\Modules\Catalogue\Trainings;',
         'use App\Modules\Catalogue\TrainingData;',
         'use App\Modules\Catalogue\TrainingUsage;',
+        'use App\Modules\Catalogue\TrainingBlocks;',
         'app(\App\Modules\Catalogue\Trainings::class)',
     ] as $code) {
         expect(preg_match(SESSIONS_CATALOGUE_REFERENCE, $code), $code)->toBe(0);

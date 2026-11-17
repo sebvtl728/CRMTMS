@@ -12,6 +12,7 @@ use App\Modules\Sessions\Enrolments\Enrolment;
 use App\Modules\Sessions\Enrolments\Enrolments;
 use App\Modules\Sessions\Enrolments\EnrolmentStatus;
 use App\Modules\Sessions\Modules\SessionModules;
+use App\Modules\Sessions\Planning\SeanceOutlook;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -49,6 +50,8 @@ final class SessionWriter
     public const LOCKED = 'Des stagiaires sont inscrits à cette session : sa formation, son type et son entreprise ne changent plus.';
 
     public const ENROLLED = 'Des stagiaires sont inscrits à cette session : désinscrivez-les avant de la mettre à la corbeille.';
+
+    public const STATUS_FIXED = 'Cette session ne peut plus changer d\'état ainsi.';
 
     public function __construct(
         private readonly SessionNumbering $numbering,
@@ -115,9 +118,39 @@ final class SessionWriter
             if (! $retrained) {
                 $values['planned_hours'] = $locked->planned_hours;
             }
-            $locked->update($values);
+            $locked->fill($values);
+            // What the Outlook copies of its séances show: the label and the place.
+            $shown = $locked->isDirty(['title', 'training_id', 'kind', 'location_kind', 'location_text']);
+            $locked->save();
             if ($retrained) {
                 $this->modules->replaceFromTraining($locked);
+            }
+            if ($shown) {
+                SeanceOutlook::touchSession($locked->id);
+            }
+
+            return $locked;
+        });
+    }
+
+    /**
+     * The kanban's move (spec § 6.7): « Planifiée » ↔ « Confirmée » only,
+     * while the state shown on the Paris day is one of them (not running,
+     * done nor cancelled); otherwise 409. Under the session's lock.
+     */
+    public function setStatus(TrainingSession $session, SessionStatus $to): TrainingSession
+    {
+        if (! in_array($to, SessionStatus::SETTABLE, true)) {
+            throw new UserFacingHttpException(409, self::STATUS_FIXED);
+        }
+
+        return DB::transaction(function () use ($session, $to): TrainingSession {
+            $locked = TrainingSession::query()->lockForUpdate()->findOrFail($session->id);
+            if (! in_array($locked->effectiveStatus(TrainingSession::today()), SessionStatus::SETTABLE, true)) {
+                throw new UserFacingHttpException(409, self::STATUS_FIXED);
+            }
+            if ($locked->status !== $to) {
+                $locked->update(['status' => $to]);
             }
 
             return $locked;
@@ -135,6 +168,7 @@ final class SessionWriter
                 throw new UserFacingHttpException(409, self::ENROLLED);
             }
             $locked->delete();
+            SeanceOutlook::touchSession($locked->id);
         });
     }
 
@@ -178,6 +212,8 @@ final class SessionWriter
             $locked->save();
             // Its trainees are unenrolled (shares of their lines computed again).
             $enrolments->cancelAllOfSession($locked);
+            // Its séances leave the trainers' Outlook.
+            SeanceOutlook::touchSession($locked->id);
 
             return $locked;
         });
@@ -195,6 +231,7 @@ final class SessionWriter
                 throw new UserFacingHttpException(409, self::ORGANISATION_GONE);
             }
             $locked->restore();
+            SeanceOutlook::touchSession($locked->id);
             $session->setRawAttributes($locked->getAttributes(), true);
 
             return $locked;

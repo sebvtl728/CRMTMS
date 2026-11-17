@@ -2,9 +2,12 @@ import Heading from '@/components/heading';
 import InputError from '@/components/input-error';
 import { EnrolDialog, type EnrolDossierOption } from '@/components/sessions/enrolment-dialog';
 import { EnrolmentList, type EnrolmentReferences, type EnrolmentRow } from '@/components/sessions/enrolment-list';
-import { SessionModules, type SessionPlanning } from '@/components/sessions/session-modules';
 import { SessionAttendance } from '@/components/sessions/session-attendance';
+import { SessionModules, type SessionPlanning } from '@/components/sessions/session-modules';
+import { SessionNotesPanel, type NotesPanel } from '@/components/sessions/session-notes-panel';
 import { SessionPlanningSeances } from '@/components/sessions/session-planning';
+import { StepNav, useStep } from '@/components/sessions/session-steps';
+import { SessionSynthesis, type CardRow } from '@/components/sessions/session-synthesis';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -37,14 +40,18 @@ interface ShowProps {
     enrol: { dossiers: EnrolDossierOption[] } | null;
     enrolment_references: EnrolmentReferences | null;
     planning: SessionPlanning;
-    /** The « Présences » tab: attendance managed or closed on the session. */
+    /** The « Suivi » step: attendance managed or closed on the session. */
     attendance_tab: boolean;
+    /** Steps shown to the user (synthese, configuration, planning, stagiaires[, suivi]). */
+    steps: string[];
+    /** Cards of the « Synthèse » (none once cancelled). */
+    checklist: CardRow[];
+    /** Tasks and notes of the « Synthèse » (spec § 4.5). */
+    notes_panel: NotesPanel;
     status?: string;
     /** Trainees planned above the new hours of the session (their enrolments unchanged). */
     warning?: string | null;
 }
-
-const TABS = ['Session', 'Planning', 'Présences'] as const;
 
 function CancelDialog({ sessionId, reasons, open, onClose }: { sessionId: string; reasons: Option[]; open: boolean; onClose: () => void }) {
     const { data, setData, post, processing, errors, reset } = useForm({ cancel_reason_id: '' });
@@ -109,10 +116,13 @@ export default function SessionShow({
     enrolment_references,
     planning,
     attendance_tab,
+    steps,
+    checklist,
+    notes_panel,
     status,
     warning,
 }: ShowProps) {
-    const [tab, setTab] = useState<(typeof TABS)[number]>('Session');
+    const [step, setStep] = useStep(steps);
     const [cancelling, setCancelling] = useState(false);
     const [enrolling, setEnrolling] = useState(false);
     const waiting = enrolments.filter((e) => e.status === 'waitlisted');
@@ -186,43 +196,33 @@ export default function SessionShow({
                 {status && <div className="text-sm font-medium text-green-600">{status}</div>}
                 {warning && <div className="text-sm font-medium text-amber-700 dark:text-amber-400">{warning}</div>}
 
-                {session.status === 'cancelled' && (
+                {session.status === 'cancelled' && step !== 'synthese' && (
                     <div className="border-destructive/40 bg-destructive/5 rounded-xl border p-3 text-sm">
                         Annulée le {formatDay(session.cancelled_on)} · Motif : {session.cancel_reason ?? '—'}
                     </div>
                 )}
 
-                <div role="tablist" aria-label="Sections de la session" className="flex gap-1 overflow-x-auto border-b">
-                    {TABS.filter((t) => t !== 'Présences' || attendance_tab).map((t) => (
-                        <button
-                            key={t}
-                            role="tab"
-                            type="button"
-                            id={`tab-${t}`}
-                            aria-selected={tab === t}
-                            aria-controls={`panel-${t}`}
-                            onClick={() => setTab(t)}
-                            className={`-mb-px border-b-2 px-4 py-2 text-sm whitespace-nowrap ${tab === t ? 'border-primary font-medium' : 'text-muted-foreground hover:text-foreground border-transparent'}`}
-                        >
-                            {t}
-                        </button>
-                    ))}
-                </div>
+                <StepNav steps={steps} current={step} onChange={(s) => setStep(s)} />
 
-                {tab === 'Planning' && (
-                    <div role="tabpanel" id="panel-Planning" aria-labelledby="tab-Planning" className="grid gap-6">
-                        <SessionModules sessionId={session.id} session={session} planning={planning} />
-                        <SessionPlanningSeances session={session} planning={planning} />
-                    </div>
+                {step === 'synthese' && (
+                    <SessionSynthesis
+                        cards={checklist}
+                        cancelled={session.status === 'cancelled' ? { reason: session.cancel_reason } : null}
+                        aside={<SessionNotesPanel sessionId={session.id} panel={notes_panel} />}
+                        onOpen={setStep}
+                    />
                 )}
 
-                {tab === 'Présences' && attendance_tab && (
-                    <div role="tabpanel" id="panel-Présences" aria-labelledby="tab-Présences" className="grid gap-6">
+                {step === 'planning' && <SessionPlanningSeances session={session} planning={planning} />}
+
+                {step === 'suivi' && attendance_tab && (
+                    <div id="attendance" className="grid scroll-mt-4 gap-6">
                         <SessionAttendance sessionId={session.id} />
                     </div>
                 )}
-                {tab === 'Session' && (
-                    <div role="tabpanel" id="panel-Session" aria-labelledby="tab-Session" className="grid gap-6">
+
+                {step === 'configuration' && (
+                    <div className="grid gap-6">
                         <section aria-label="Informations" className="rounded-xl border p-4">
                             <dl className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
                                 {field(
@@ -269,9 +269,15 @@ export default function SessionShow({
                             )}
                         </section>
 
-                        <section aria-label="Inscrits" className="grid gap-3">
+                        <SessionModules sessionId={session.id} session={session} planning={planning} />
+                    </div>
+                )}
+
+                {step === 'stagiaires' && (
+                    <div className="grid gap-6">
+                        <section id="enrolments" aria-label="Inscrits" className="grid scroll-mt-4 gap-3">
                             <div className="flex flex-wrap items-center justify-between gap-2">
-                                <h2 className="text-sm font-semibold">
+                                <h2 id="fundings" className="scroll-mt-4 text-sm font-semibold">
                                     Inscrits · {places.taken}
                                     {places.capacity !== null &&
                                         ` / ${places.capacity} places (${places.free} libre${(places.free ?? 0) > 1 ? 's' : ''})`}

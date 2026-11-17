@@ -147,7 +147,7 @@ final class SeanceGenerator
             $created = [];
             foreach ($this->preview($locked, $request)->kept() as $row) {
                 Seances::assertMonthOpen($session, $row['date']);
-                $created[] = Seances::insert(new Seance([
+                $created[] = $seance = Seances::insert(new Seance([
                     'training_session_id' => $session->id,
                     'session_module_id' => $locked->id,
                     'date' => $row['date'],
@@ -158,6 +158,7 @@ final class SeanceGenerator
                     'room_id' => $request->roomId,
                     'place_text' => $request->placeText,
                 ]));
+                SeanceOutlook::touch($seance->id);
             }
 
             return $created;

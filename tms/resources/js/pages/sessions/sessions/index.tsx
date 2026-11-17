@@ -1,5 +1,6 @@
 import { FilterSelect } from '@/components/crm/filter-select';
 import Heading from '@/components/heading';
+import { SessionBoard, type BoardColumn } from '@/components/sessions/session-board';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -10,7 +11,7 @@ import { type Option, type Paginated } from '@/lib/crm';
 import { sessionDates, sessionLocation, sessionStatusVariant, type SessionRow } from '@/lib/sessions';
 import { type BreadcrumbItem } from '@/types';
 import { Head, Link, router } from '@inertiajs/react';
-import { ArrowDown, ArrowUp, CalendarDays, ChevronLeft, ChevronRight, Plus } from 'lucide-react';
+import { ArrowDown, ArrowUp, CalendarDays, ChevronLeft, ChevronRight, Columns3, List, Plus } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 
 interface Filters {
@@ -28,8 +29,16 @@ interface Filters {
     dir: 'asc' | 'desc';
 }
 
+type View = 'liste' | 'colonnes';
+
 interface IndexProps {
-    sessions: Paginated<SessionRow>;
+    view: View;
+    /** « Liste » only. */
+    sessions: Paginated<SessionRow> | null;
+    /** « Colonnes » only. */
+    board: BoardColumn[] | null;
+    /** « Afficher les annulées » (columns). */
+    with_cancelled: boolean;
     filters: Filters;
     options: { status: Option[]; kind: Option[]; modality: Option[]; das: Option[]; training: Option[]; responsible: Option[]; sort: Option[] };
     can: { create: boolean; trash: boolean };
@@ -38,8 +47,35 @@ interface IndexProps {
 
 const breadcrumbs: BreadcrumbItem[] = [{ title: 'Sessions', href: '/sessions' }];
 
-function sessionsQuery(filters: Filters): Record<string, string> {
+/** The last view chosen, remembered in this browser (storage may be refused). */
+const VIEW_KEY = 'sessions.vue';
+
+function rememberedView(): View | null {
+    try {
+        const value = window.localStorage.getItem(VIEW_KEY);
+
+        return value === 'liste' || value === 'colonnes' ? value : null;
+    } catch {
+        return null;
+    }
+}
+
+function rememberView(view: View): void {
+    try {
+        window.localStorage.setItem(VIEW_KEY, view);
+    } catch {
+        // Storage refused: the view is simply not remembered.
+    }
+}
+
+function sessionsQuery(filters: Filters, view: View = 'liste', withCancelled = false): Record<string, string> {
     const query: Record<string, string> = {};
+    if (view === 'colonnes') {
+        query.vue = 'colonnes';
+        if (withCancelled) query.annulees = '1';
+    } else {
+        query.vue = 'liste';
+    }
     if (filters.q) query.q = filters.q;
     (['status', 'kind', 'modality', 'das', 'training', 'responsible', 'from', 'to'] as const).forEach((k) => {
         if (filters[k]) query[k] = String(filters[k]);
@@ -59,12 +95,28 @@ function places(row: SessionRow): string {
     return row.kind === 'inter' && row.capacity !== null ? `${row.capacity} place${row.capacity > 1 ? 's' : ''}` : '—';
 }
 
-export default function SessionsIndex({ sessions, filters, options, can, status }: IndexProps) {
+export default function SessionsIndex({ view, sessions, board, with_cancelled, filters, options, can, status }: IndexProps) {
     const [search, setSearch] = useState(filters.q);
     const first = useRef(true);
 
     const visit = (changes: Partial<Filters>) =>
-        router.get(route('sessions.index'), sessionsQuery({ ...filters, ...changes }), { preserveState: true, replace: true });
+        router.get(route('sessions.index'), sessionsQuery({ ...filters, ...changes }, view, with_cancelled), { preserveState: true, replace: true });
+
+    const switchView = (next: View, withCancelled = with_cancelled) => {
+        rememberView(next);
+        router.get(route('sessions.index'), sessionsQuery(filters, next, withCancelled), { preserveState: true, replace: true });
+    };
+
+    // Opened without « vue »: the view chosen last time in this browser.
+    useEffect(() => {
+        if (new URLSearchParams(window.location.search).has('vue')) return;
+        const remembered = rememberedView();
+        if (remembered && remembered !== view) switchView(remembered);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
+
+    /** The list filtered on a state (« Voir les N autres », « Voir toutes »). */
+    const listHref = (state: string) => route('sessions.index', sessionsQuery({ ...filters, status: state }, 'liste'));
 
     useEffect(() => {
         if (first.current) {
@@ -116,6 +168,26 @@ export default function SessionsIndex({ sessions, filters, options, can, status 
                 <div className="flex flex-wrap items-start justify-between gap-4">
                     <Heading title="Sessions" description="Sessions de formation intra et inter, par date" />
                     <div className="flex flex-wrap items-start gap-2">
+                        <div role="group" aria-label="Affichage" className="flex rounded-md border">
+                            <Button
+                                type="button"
+                                variant={view === 'liste' ? 'secondary' : 'ghost'}
+                                aria-pressed={view === 'liste'}
+                                onClick={() => view !== 'liste' && switchView('liste')}
+                            >
+                                <List className="h-4 w-4" />
+                                Liste
+                            </Button>
+                            <Button
+                                type="button"
+                                variant={view === 'colonnes' ? 'secondary' : 'ghost'}
+                                aria-pressed={view === 'colonnes'}
+                                onClick={() => view !== 'colonnes' && switchView('colonnes')}
+                            >
+                                <Columns3 className="h-4 w-4" />
+                                Colonnes
+                            </Button>
+                        </div>
                         <Button asChild variant="outline">
                             <Link href={route('sessions.calendar')}>
                                 <CalendarDays className="h-4 w-4" />
@@ -148,7 +220,9 @@ export default function SessionsIndex({ sessions, filters, options, can, status 
                             placeholder="Ex. S-2026-0012, HACCP ou un intitulé"
                         />
                     </div>
-                    <FilterSelect label="État" value={filters.status} options={options.status} onChange={(v) => visit({ status: v })} />
+                    {view === 'liste' && (
+                        <FilterSelect label="État" value={filters.status} options={options.status} onChange={(v) => visit({ status: v })} />
+                    )}
                     <FilterSelect label="Type" value={filters.kind} options={options.kind} onChange={(v) => visit({ kind: v })} />
                     <FilterSelect label="Modalité" value={filters.modality} options={options.modality} onChange={(v) => visit({ modality: v })} />
                     <FilterSelect label="DAS" value={filters.das} options={options.das} onChange={(v) => visit({ das: v })} />
@@ -172,6 +246,12 @@ export default function SessionsIndex({ sessions, filters, options, can, status 
                         <Input id="to" type="date" value={filters.to ?? ''} onChange={(e) => visit({ to: e.target.value || null })} />
                     </div>
                     <div className="flex items-end gap-3">
+                        {view === 'colonnes' && (
+                            <Label className="flex items-center gap-2 text-sm font-normal">
+                                <Checkbox checked={with_cancelled} onCheckedChange={(v) => switchView('colonnes', v === true)} />
+                                Afficher les annulées
+                            </Label>
+                        )}
                         {can.trash && (
                             <Label className="flex items-center gap-2 text-sm font-normal">
                                 <Checkbox checked={filters.trashed} onCheckedChange={(v) => visit({ trashed: v === true })} />
@@ -179,18 +259,22 @@ export default function SessionsIndex({ sessions, filters, options, can, status 
                             </Label>
                         )}
                         {filtered && (
-                            <Button type="button" variant="ghost" size="sm" onClick={() => router.get(route('sessions.index'))}>
+                            <Button type="button" variant="ghost" size="sm" onClick={() => router.get(route('sessions.index'), { vue: view })}>
                                 Réinitialiser
                             </Button>
                         )}
                     </div>
                 </section>
 
-                <p className="text-sm">
-                    {sessions.total} session{sessions.total > 1 ? 's' : ''}
-                </p>
+                {board && <SessionBoard columns={board} listHref={listHref} />}
 
-                {sessions.data.length === 0 ? (
+                {sessions && (
+                    <p className="text-sm">
+                        {sessions.total} session{sessions.total > 1 ? 's' : ''}
+                    </p>
+                )}
+
+                {!sessions ? null : sessions.data.length === 0 ? (
                     <div className="text-muted-foreground rounded-xl border p-8 text-center text-sm">
                         {filtered ? 'Aucune session ne correspond à ces filtres.' : 'Aucune session pour le moment.'}
                     </div>

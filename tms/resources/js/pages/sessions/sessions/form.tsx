@@ -38,7 +38,7 @@ interface FormProps {
         status: string;
         notes: string | null;
     } | null;
-    defaults: { kind: Kind; organisation: Entreprise | null; responsible_user_id: string } | null;
+    defaults: { kind: Kind; organisation: Entreprise | null; responsible_user_id: string; training_id?: string | null } | null;
     options: {
         /** modules_hours: the training has modules, the session's hours are their sum (« 10 h 30 », « à définir »). */
         training: (Option & { hours: string | null; modules_hours: string | null })[];
@@ -157,15 +157,18 @@ export default function SessionFormPage({ session, defaults, options }: FormProp
     const editing = session !== null;
     const [organisation, setOrganisation] = useState<Entreprise | null>(session?.organisation ?? defaults?.organisation ?? null);
 
+    const preselected = session ? undefined : options.training.find((t) => t.value === defaults?.training_id);
+
     const { data, setData, post, put, processing, errors } = useForm<SessionForm>({
         title: session?.title ?? '',
-        training_id: session?.training_id ?? '',
+        training_id: session?.training_id ?? defaults?.training_id ?? '',
         kind: session?.kind ?? defaults?.kind ?? 'inter',
         modality_id: session?.modality_id ?? options.default_modality ?? '',
         organisation_id: session?.organisation?.id ?? defaults?.organisation?.id ?? '',
         starts_on: session?.starts_on ?? '',
         ends_on: session?.ends_on ?? '',
-        planned_hours: hoursInput(session?.planned_hours),
+        // A training preselected from its page: its hours, unless it has modules (their sum applies).
+        planned_hours: hoursInput(session?.planned_hours ?? (preselected && !preselected.modules_hours ? preselected.hours : null)),
         location_kind: session?.location_kind ?? 'address',
         location_text: session?.location_text ?? '',
         capacity: session?.capacity ? String(session.capacity) : '',

@@ -2,6 +2,7 @@
 
 namespace App\Modules\Sessions;
 
+use App\Modules\Catalogue\TrainingBlocks;
 use App\Modules\Catalogue\TrainingUsage;
 use App\Modules\Connectors\Calendar\CalendarSources;
 use App\Modules\Core\Access\AccessScope;
@@ -39,16 +40,20 @@ use App\Modules\Sessions\Gdpr\PersonSessionsExport;
 use App\Modules\Sessions\Gdpr\RetentionHolds;
 use App\Modules\Sessions\History\SessionsHistory;
 use App\Modules\Sessions\Modules\SessionModule;
+use App\Modules\Sessions\Notes\SessionNote;
+use App\Modules\Sessions\Notes\SessionTask;
 use App\Modules\Sessions\Planning\PlacementPeriod;
 use App\Modules\Sessions\Planning\PlacementPeriodHost;
 use App\Modules\Sessions\Planning\Seance;
 use App\Modules\Sessions\Planning\SeanceCalendar;
+use App\Modules\Sessions\Planning\SeanceOutlook;
 use App\Modules\Sessions\Planning\Seances;
 use App\Modules\Sessions\Resources\ClosurePeriod;
 use App\Modules\Sessions\Resources\Room;
 use App\Modules\Sessions\Resources\Rooms;
 use App\Modules\Sessions\Sessions\SessionPolicy;
 use App\Modules\Sessions\Sessions\TrainingSession;
+use App\Modules\Sessions\Summary\TrainingSessionsBlock;
 use App\Modules\Sessions\Trainers\Trainer;
 use App\Modules\Sessions\Trainers\TrainerDas;
 use App\Modules\Sessions\Trainers\TrainerRows;
@@ -108,6 +113,8 @@ class SessionsServiceProvider extends ServiceProvider
             MonthlyHour::MORPH_ALIAS => MonthlyHour::class,
             AttendanceClosure::MORPH_ALIAS => AttendanceClosure::class,
             AttendanceSheetScan::MORPH_ALIAS => AttendanceSheetScan::class,
+            SessionTask::MORPH_ALIAS => SessionTask::class,
+            SessionNote::MORPH_ALIAS => SessionNote::class,
         ]);
     }
 
@@ -116,12 +123,16 @@ class SessionsServiceProvider extends ServiceProvider
         self::registerReferenceUsage();
         self::registerTrainingUsage();
         self::registerFicheBlocks();
+        // « Sessions » block of the training page.
+        TrainingBlocks::register('sessions', fn (string $trainingId, User $viewer) => TrainingSessionsBlock::for($trainingId, $viewer));
         self::registerFicheLinks();
         self::registerPlanningUsage();
         self::registerAttendance();
         SessionsHistory::registerOnFiches();
         // The iCal feed (Connectors): séances of the linked trainer and of the sessions one is responsible for.
         CalendarSources::register('sessions.seances', SeanceCalendar::eventsFor(...), SeanceCalendar::serves(...));
+        // …and the séances of a trainer in his Outlook calendar (Connectors pushes them).
+        SeanceOutlook::register();
         // « Créer le dossier » / « Voir le dossier » on an accepted quote.
         QuoteLinks::register('sessions.dossier', fn (string $quoteId, User $viewer) => app(DossierFromQuote::class)->link($quoteId, $viewer));
 
@@ -217,6 +228,18 @@ class SessionsServiceProvider extends ServiceProvider
 
             return SessionModule::query()->findOrFail($value);
         });
+
+        // A task or a note of a session: malformed or of another organisme
+        // (RLS) is a 404; the controller checks it belongs to the session of the route.
+        foreach (['sessionTask' => SessionTask::class, 'sessionNote' => SessionNote::class] as $name => $model) {
+            Route::bind($name, function (string $value) use ($model): Model {
+                if (! Str::isUuid($value)) {
+                    throw (new ModelNotFoundException)->setModel($model, [$value]);
+                }
+
+                return $model::query()->findOrFail($value);
+            });
+        }
 
         // An enrolment: its session within the view scope (trashed ones with
         // sessions.sessions.delete), otherwise 404.

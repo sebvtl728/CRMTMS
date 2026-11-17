@@ -83,6 +83,8 @@ test('planning: a manager generates séances with the assistant, a trainer marks
     await expect(page.getByText(/Dossier .* créé\./)).toBeVisible();
 
     await page.goto(sessionUrl);
+    const steps = page.getByRole('navigation', { name: 'Étapes de la session' });
+    await steps.getByRole('link', { name: 'Stagiaires' }).click();
     await page.getByRole('button', { name: 'Inscrire des stagiaires' }).click();
     const enrolDialog = page.getByRole('dialog');
     await choose(page, enrolDialog.getByLabel('Dossier *'), new RegExp(CLIENT));
@@ -90,11 +92,28 @@ test('planning: a manager generates séances with the assistant, a trainer marks
     await enrolDialog.getByRole('button', { name: new RegExp(`^${TRAINEE.first_name} ${TRAINEE.last_name}`) }).click();
     await enrolDialog.getByRole('button', { name: 'Inscrire', exact: true }).click();
     await expect(enrolDialog).toBeHidden();
+    // Back from the action on the same step.
+    await expect(page).toHaveURL(/etape=stagiaires/);
+    await expect(steps.getByRole('link', { name: 'Stagiaires' })).toHaveAttribute('aria-current', 'step');
+
+    // A former link (`?tab=Planning`) opens the Planning step, its URL rewritten.
+    const legacy = new URL(sessionUrl);
+    legacy.search = '?tab=Planning';
+    await page.goto(legacy.toString());
+    await expect(page).toHaveURL(/etape=planning/);
+    expect(new URL(page.url()).searchParams.has('tab')).toBe(false);
+    await expect(steps.getByRole('link', { name: 'Planning' })).toHaveAttribute('aria-current', 'step');
 
     // 3. The manager: module in séances, assistant (preview, then create), séances on the calendar.
-    await page.getByRole('tab', { name: 'Planning' }).click();
+    await steps.getByRole('link', { name: 'Configuration' }).click();
     page.once('dialog', (d) => d.accept());
     await page.getByRole('button', { name: 'Passer en séances' }).click();
+    await expect(page.getByRole('button', { name: 'Passer en intervalle' })).toBeVisible();
+    // Still on « Configuration » after the redirect.
+    await expect(page).toHaveURL(/etape=configuration/);
+    await expect(steps.getByRole('link', { name: 'Configuration' })).toHaveAttribute('aria-current', 'step');
+    await steps.getByRole('link', { name: 'Planning' }).click();
+    await expect(page).toHaveURL(/etape=planning/);
     await page.getByRole('button', { name: 'Générer les séances' }).click();
     const assistant = page.getByRole('dialog', { name: 'Générer les séances' });
     await choose(page, assistant.getByLabel('Formateur'), new RegExp(TRAINER.name));

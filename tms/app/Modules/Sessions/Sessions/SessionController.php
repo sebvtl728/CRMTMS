@@ -13,6 +13,7 @@ use App\Modules\Sessions\Enrolments\EnrolmentRows;
 use App\Modules\Sessions\Enrolments\Enrolments;
 use App\Modules\Sessions\Modules\DatingMode;
 use App\Modules\Sessions\Modules\SessionModules;
+use App\Modules\Sessions\Notes\SessionNotes;
 use App\Modules\Sessions\Permissions;
 use App\Modules\Sessions\Planning\PlacementPeriods;
 use App\Modules\Sessions\Planning\PublicHolidays;
@@ -21,6 +22,8 @@ use App\Modules\Sessions\Planning\SessionDays;
 use App\Modules\Sessions\Planning\WorkingDays;
 use App\Modules\Sessions\Resources\ClosurePeriods;
 use App\Modules\Sessions\SessionsVisibility;
+use App\Modules\Sessions\Summary\Card;
+use App\Modules\Sessions\Summary\SessionChecklist;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
@@ -39,6 +42,9 @@ class SessionController extends Controller
 {
     public const OUTSIDE_DAS = 'Cette formation n\'est pas dans vos DAS.';
 
+    /** Steps of the session page shown to whoever views the session (« suivi » added with the attendance rights). */
+    public const STEPS = ['synthese', 'configuration', 'planning', 'stagiaires'];
+
     /** French month names (no locale dependency). */
     public const MONTHS = [1 => 'Janvier', 'Février', 'Mars', 'Avril', 'Mai', 'Juin', 'Juillet', 'Août', 'Septembre', 'Octobre', 'Novembre', 'Décembre'];
 
@@ -50,10 +56,17 @@ class SessionController extends Controller
         $filters = SessionListQuery::filters($request->query());
         $today = TrainingSession::today();
 
-        $page = SessionListQuery::build($filters, $user, $today)->paginate(25)->withQueryString();
+        // « Liste » (default) or « Colonnes » (the kanban, spec § 4.3).
+        $view = $request->query('vue') === 'colonnes' ? 'colonnes' : 'liste';
+        $withCancelled = filter_var($request->query('annulees', false), FILTER_VALIDATE_BOOL);
+
+        $page = $view === 'liste' ? SessionListQuery::build($filters, $user, $today)->paginate(25)->withQueryString() : null;
 
         return Inertia::render('sessions/sessions/index', [
-            'sessions' => [...$page->toArray(), 'data' => SessionRows::rows($page->items(), $today)],
+            'view' => $view,
+            'sessions' => $page === null ? null : [...$page->toArray(), 'data' => SessionRows::rows($page->items(), $today)],
+            'board' => $view === 'colonnes' ? SessionBoard::build($filters, $user, $today, $withCancelled) : null,
+            'with_cancelled' => $withCancelled,
             'filters' => $filters,
             'options' => SessionListQuery::options(),
             'can' => ['create' => $user->can(Permissions::SESSIONS_UPDATE), 'trash' => $user->can(Permissions::SESSIONS_DELETE)],
@@ -108,6 +121,8 @@ class SessionController extends Controller
                 'kind' => $organisation === null ? 'inter' : 'intra',
                 'organisation' => $organisation,
                 'responsible_user_id' => $this->user($request)->id,
+                // From a training page: preselected only when offered and in the user's DAS (else ignored).
+                'training_id' => $this->preselectedTraining($this->user($request), $request->query('training')),
             ],
             'options' => self::formOptions(null),
         ]);
@@ -165,9 +180,14 @@ class SessionController extends Controller
             // Choices of the enrolment dialogs (abandon, details) for who may change them.
             'enrolment_references' => $user->can('update', $session) ? EnrolmentOptions::references() : null,
             'planning' => self::planning($session, ! $session->isCancelled() && $user->can('update', $session), $user),
-            // « Présences » tab (loaded as JSON): attendance managed or closed on the session.
-            'attendance_tab' => SessionsVisibility::allows($user, Permissions::ATTENDANCE_MANAGE, $session)
+            // « Suivi » step (loaded as JSON): attendance managed or closed on the session.
+            'attendance_tab' => $attendance = SessionsVisibility::allows($user, Permissions::ATTENDANCE_MANAGE, $session)
                 || SessionsVisibility::allows($user, Permissions::ATTENDANCE_CLOSE, $session),
+            // Steps of the page (spec § 4.1), switched in the browser: every datum stays loaded.
+            'steps' => [...self::STEPS, ...($attendance ? ['suivi'] : [])],
+            // Cards of the « Synthèse » (none once cancelled).
+            'checklist' => array_map(fn (Card $card) => $card->toArray(), SessionChecklist::for($session, $user)),
+            'notes_panel' => app(SessionNotes::class)->panel($session, $user),
             'status' => $request->session()->get('status'),
             'warning' => $request->session()->get('warning'),
         ]);
@@ -288,6 +308,25 @@ class SessionController extends Controller
 
         return response()->json(['entreprises' => is_string($q) && mb_strlen(trim($q)) >= 2 ? $fiches->searchOrganisations(mb_substr($q, 0, 100)) : []])
             ->header('Cache-Control', 'no-store, private');
+    }
+
+    /**
+     * The training asked by « Créer une session » (`?training=`), kept when
+     * it is active and within the DAS $user may create sessions in; else none.
+     */
+    private function preselectedTraining(User $user, mixed $trainingId): ?string
+    {
+        $training = is_string($trainingId) ? app(Trainings::class)->find($trainingId) : null;
+        if ($training === null || ! $training->is_active) {
+            return null;
+        }
+        try {
+            $this->assertDas($user, $training->id);
+        } catch (ValidationException) {
+            return null;
+        }
+
+        return $training->id;
     }
 
     /**

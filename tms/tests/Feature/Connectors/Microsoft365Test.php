@@ -5,7 +5,6 @@ use App\Modules\Connectors\Calendar\CalendarLinkEvent;
 use App\Modules\Connectors\Calendar\GraphClient;
 use App\Modules\Connectors\Calendar\Microsoft365Connector;
 use App\Modules\Connectors\Calendar\PushActivityToOutlook;
-use App\Modules\Connectors\Core\ConnectorConfig;
 use App\Modules\Connectors\Core\ConnectorKind;
 use App\Modules\Connectors\Core\ConnectorRegistry;
 use App\Modules\Connectors\Core\ConnectorRun;
@@ -19,18 +18,13 @@ use App\Modules\Crm\Activities\Activity;
 use App\Modules\Crm\CrmServiceProvider;
 use App\Modules\Crm\Gdpr\Anonymiser;
 use App\Modules\Crm\Organisations\Organisation;
-use Carbon\CarbonImmutable;
 use Illuminate\Foundation\Testing\TestCase;
-use Illuminate\Http\Client\Factory;
 use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
 
-const M365_TENANT = '72f988bf-86f1-41af-91ab-2d7cd011db47';
-const M365_CLIENT = '6731de76-14a6-49ae-97bc-6eba6914391e';
-const GRAPH_EVENTS = 'https://graph.microsoft.com/v1.0/me/events';
-const M365_TOKEN_URL = 'https://login.microsoftonline.com/'.M365_TENANT.'/oauth2/v2.0/token';
+require_once __DIR__.'/Support/outlook.php';
 
 beforeEach(function () {
     CrmServiceProvider::registerReferenceUsage();
@@ -39,46 +33,6 @@ beforeEach(function () {
     m365Http();
 });
 afterEach(fn () => HostPolicy::resolveUsing(null));
-
-/** A fresh fake (Http::fake() alone keeps the first matching stub), no stray request. */
-function m365Http(array $stubs = []): void
-{
-    Http::swap((new Factory)->preventStrayRequests());
-    Http::fake($stubs);
-}
-
-/** A test secret generated per run: never a value written in the repository. */
-function m365Config(bool $enabled = true): ConnectorConfig
-{
-    $config = ConnectorConfig::query()->firstOrNew(['connector_key' => 'microsoft365', 'company_id' => null]);
-    $config->fill([
-        'enabled' => $enabled,
-        'settings' => ['tenant' => M365_TENANT, 'client_id' => M365_CLIENT],
-        'secrets' => ['client_secret' => 'test-'.Str::random(32)],
-    ])->save();
-
-    return $config;
-}
-
-function m365Link(User $user, array $attributes = []): CalendarLink
-{
-    $link = new CalendarLink(['user_id' => $user->id]);
-    $link->forceFill([
-        'status' => CalendarLink::ACTIVE,
-        'access_token' => 'access-'.Str::random(20),
-        'refresh_token' => 'refresh-'.Str::random(20),
-        'expires_at' => now()->addHour(),
-        'connected_at' => now(),
-        ...$attributes,
-    ])->save();
-
-    return $link;
-}
-
-function m365At(string $local): CarbonImmutable
-{
-    return CarbonImmutable::parse($local, 'Europe/Paris');
-}
 
 /**
  * @param  array<string, mixed>  $attributes
@@ -96,17 +50,6 @@ function m365Meeting(User $responsible, array $attributes = []): Activity
         'responsible_user_id' => $responsible->id,
         ...$attributes,
     ]);
-}
-
-/** @return list<Request> */
-function graphRequests(): array
-{
-    return Http::recorded(fn (Request $r) => str_starts_with($r->url(), 'https://graph.microsoft.com/'))->map(fn (array $pair) => $pair[0])->values()->all();
-}
-
-function graphCreated(string $id = 'AAMkEvent1'): array
-{
-    return [GRAPH_EVENTS => Http::response(['id' => $id], 201)];
 }
 
 it('registers the microsoft365 sync connector with its settings and secret', function () {
@@ -563,7 +506,7 @@ it('never duplicates an event when outlook is disconnected then connected again'
     // Microsoft refuses one deletion: its copy is remembered, the other one is gone.
     m365Http([GRAPH_EVENTS.'/AAMkEvent1' => Http::response(null, 403), GRAPH_EVENTS.'/AAMkEvent2' => Http::response(null, 204)]);
     $this->actingAs($user)->delete('/settings/calendar/outlook');
-    expect(CalendarLinkEvent::query()->sole()->activity_id)->toBe($kept->id)
+    expect(CalendarLinkEvent::query()->sole()->source_id)->toBe($kept->id)
         ->and($link->refresh()->refresh_token)->toBeNull();
 
     m365Reconnect($this, $user, [

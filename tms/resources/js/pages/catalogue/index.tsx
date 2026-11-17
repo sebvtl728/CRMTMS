@@ -215,7 +215,9 @@ export default function CatalogueIndex({ trainings, filters, options, can, statu
                                         <tr key={t.id} className="hover:bg-muted/30 border-t">
                                             <td className="px-3 py-2 whitespace-nowrap">{t.code ?? '—'}</td>
                                             <td className="px-3 py-2">
-                                                <span className="font-medium">{t.title}</span>{' '}
+                                                <Link className="font-medium hover:underline" href={route('catalogue.show', t.id)}>
+                                                    {t.title}
+                                                </Link>{' '}
                                                 {!t.is_active && <Badge variant="outline">Désactivée</Badge>}
                                             </td>
                                             <td className="px-3 py-2">{t.das ?? '—'}</td>
@@ -234,7 +236,10 @@ export default function CatalogueIndex({ trainings, filters, options, can, statu
                             {trainings.data.map((t) => (
                                 <li key={t.id} className="grid gap-1 rounded-xl border p-3 text-sm">
                                     <div className="font-medium">
-                                        {t.title} {!t.is_active && <Badge variant="outline">Désactivée</Badge>}
+                                        <Link className="hover:underline" href={route('catalogue.show', t.id)}>
+                                            {t.title}
+                                        </Link>{' '}
+                                        {!t.is_active && <Badge variant="outline">Désactivée</Badge>}
                                     </div>
                                     <div className="text-muted-foreground text-xs">{[t.code, t.das, duration(t)].filter(Boolean).join(' · ')}</div>
                                     <div>

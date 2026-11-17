@@ -629,7 +629,7 @@ export function SessionAttendance({ sessionId }: { sessionId: string }) {
                 </p>
             )}
 
-            <section className="flex flex-wrap items-center justify-between gap-3 rounded-md border p-4">
+            <section id="closures" className="flex scroll-mt-4 flex-wrap items-center justify-between gap-3 rounded-md border p-4">
                 <div className="text-sm">
                     {closed ? (
                         <p>

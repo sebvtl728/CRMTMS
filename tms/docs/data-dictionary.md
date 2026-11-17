@@ -129,8 +129,8 @@ Mêmes colonnes que ci-dessus avec `permission_id`. Non utilisée au lot 1a.
 ### `calendar_links` — connexion Microsoft 365 d'un utilisateur
 `id`, `tenant_id` · `user_id` (FK, cascade, unique) · `provider` (`microsoft365`) · `status` (`active`, `reconnect` : Microsoft a refusé le renouvellement, jetons effacés) · `access_token`, `refresh_token` (text, **chiffrés** `APP_KEY`) · `expires_at`, `connected_at` · horodatages (timestamptz, µs). **Volontairement hors journal d'audit** (pas `Auditable`) : la ligne porte des jetons ; la connexion, la déconnexion et la reconnexion demandée sont journalisées à part (`calendar.outlook_*`, sans jeton).
 
-### `calendar_link_events` — évènements Outlook créés pour une action
-`id`, `tenant_id` · `calendar_link_id` (FK, cascade : déconnecter supprime les lignes) · `activity_id` (uuid de l'action du CRM, **sans clé étrangère** : le module Connecteurs ne lit le CRM que par son service public) · `transaction_id` (uuid envoyé à Microsoft Graph, créé avant l'envoi pour qu'une reprise ne duplique pas l'évènement) · `outlook_event_id` (512, null tant que Graph n'a pas répondu) · horodatages. Unique (`calendar_link_id`, `activity_id`).
+### `calendar_link_events` — évènements Outlook créés pour un élément (action du CRM, séance)
+`id`, `tenant_id` · `calendar_link_id` (FK, cascade : déconnecter supprime les lignes) · `source` varchar(40) (non nul, sans valeur par défaut : `crm.activity` pour une action du CRM, `sessions.seance` pour une séance ; 0.8.1) · `source_id` (uuid de l'élément, ex-`activity_id`, **sans clé étrangère** : le module Connecteurs ne lit pas les tables des autres modules) · `transaction_id` (uuid envoyé à Microsoft Graph, créé avant l'envoi pour qu'une reprise ne duplique pas l'évènement) · `outlook_event_id` (512, null tant que Graph n'a pas répondu) · horodatages. Unique (`calendar_link_id`, `source`, `source_id`) ; index (`source`, `source_id`).
 
 ## Audit (RLS)
 
@@ -522,6 +522,9 @@ Module `Sessions` (`Attendance\Attendance`, écrite par `Attendance\Attendances`
 
 ### `attendance_sheet_scans` — feuilles d'émargement signées, scannées (0.8.0)
 `Attendance\AttendanceSheetScan`, écrite par `Attendance\AttendanceScans`. `id`, `tenant_id` · `training_session_id` (FK `training_sessions`) · `seance_id` (FK `seances`, sans cascade, null = scan de toute la journée de la session) · `date` date (jour de Paris) · `path` string(300) (fichier privé `tenants/<tenant_id>/attendance_sheets/<session>/<date>/<uuid>.<pdf|png|jpg>`) · `original_name` string(200) (nom envoyé, jamais journalisé) · `mime` string(100) · `size_bytes` int (≤ 10 Mo) · `uploaded_by` (FK `users`, null) · horodatages. Journalisée (`attendance_sheet_scan`) sans le chemin ni le nom du fichier. Supprimée par un gestionnaire, ou par l'anonymisation du stagiaire d'une session individuelle (fichier compris) ; gardée sinon.
+
+### `session_tasks` et `session_notes` — tâches et notes d'une session (0.8.1)
+`Notes\SessionTask` et `Notes\SessionNote`, écrites par `Notes\SessionNotes` (droit de modifier la session, session non annulée). Suppression logique, RLS. `session_tasks` : `id`, `tenant_id` · `training_session_id` (FK `training_sessions`) · `title` string(200) · `due_on` date null (jour de Paris) · `assignee_user_id` (FK `users`, null, utilisateur actif de l'organisme) · `done_at` timestamptz null, `done_by` (FK `users`, null) · `created_by` · horodatages. `session_notes` : `id`, `tenant_id` · `training_session_id` · `body` text (≤ 5 000) · `author_user_id` (FK `users`, null) · horodatages. Journalisées (`session_task`, `session_note`) sans l'intitulé ni le texte (`[donnée personnelle]`) ; non concernées par l'anonymisation ni l'export RGPD.
 
 ### `session_sequences` — compteurs de numérotation des sessions
 `tenant_id` (FK `tenants`, cascade) · `year` smallint (année civile de Paris à la création, CHECK 2000–2999) · `last_number` int (CHECK > 0) · `created_at`, `updated_at`. PK (`tenant_id`, `year`). Même mécanique que `quote_sequences` (incrément atomique dans la transaction de création, numéro rendu en cas d'échec).

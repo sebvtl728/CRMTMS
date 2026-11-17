@@ -165,7 +165,7 @@ CalendarSources::register('module.cle', fn (User $u, CarbonImmutable $from, Carb
 ```
 
 - `CalendarEvent` (Connectors) : `uid`, `title`, `start` (instant, écrit en heure de Paris avec `TZID`), `minutes` (durée réelle, `DURATION`), `location`, `description`, `url`, `updatedAt`, `cancelled` (`STATUS:CANCELLED`). Le module applique lui-même ses droits et ne publie aucune donnée personnelle qu'il n'afficherait pas.
-- Le second rappel ouvre « Mon agenda » et le flux à un utilisateur sans le CRM (`IcalFeed::allowed`, capacité `calendar.subscribe`) ; « Connecter Outlook » reste réservé au CRM (`crm.activities.view`).
+- Le second rappel ouvre « Mon agenda » et le flux à un utilisateur sans le CRM (`IcalFeed::allowed`, capacité `calendar.subscribe`). « Connecter Outlook » est proposé à un utilisateur des actions du CRM (`crm.activities.view`) ou à celui qu'une source Outlook sert (un formateur lié et actif : capacité `calendar.outlook`, voir « Séances de formation dans Outlook »).
 - Sessions déclare `sessions.seances` (`Sessions\Planning\SeanceCalendar`) : séances du formateur lié et des sessions dont l'utilisateur est responsable, dans le périmètre de son droit « Consulter les séances » (`sessions.md` § 10). Un utilisateur lié à une fiche formateur garde **ses** séances dans le flux même sans aucun droit Sessions : c'est son propre travail, et un évènement ne porte aucune donnée personnelle (ni stagiaire, ni note, ni motif d'annulation, ni adresse d'une session individuelle). Envoi des séances vers Outlook : 0.8.1.
 
 ## Connecteur Microsoft 365 (envoi vers l'agenda Outlook)
@@ -192,7 +192,7 @@ Paramètres : `tenant` (annuaire Azure : son ID, un de ses domaines `xxx.onmicro
 
 ### Côté utilisateur
 
-« Mon agenda » (`/settings/calendar`) › **Connecter Outlook** : connexion Microsoft, consentement, retour au TMS. Les actions déjà planifiées des 180 prochains jours sont alors envoyées. **Déconnecter Outlook** arrête l'envoi, retire de l'agenda Outlook les rendez-vous et appels que le TMS y avait créés (job `RemoveOutlookEvents`, par lots de 200, tant que les jetons sont encore valides), puis supprime les jetons. Le retrait est « au mieux » : un évènement que Microsoft refuse de supprimer reste dans l'agenda, mais le TMS garde sa trace. Une reconnexion le met alors à jour au lieu d'en créer un second : déconnecter puis reconnecter ne crée jamais de doublon.
+« Mon agenda » (`/settings/calendar`) › **Connecter Outlook** : connexion Microsoft, consentement, retour au TMS. Les actions déjà planifiées des 180 prochains jours sont alors envoyées, ainsi que les séances à venir d'un formateur (de ce jour à 180 jours). **Déconnecter Outlook** arrête l'envoi, retire de l'agenda Outlook les rendez-vous, appels et séances que le TMS y avait créés (job `RemoveOutlookEvents`, par lots de 200, tant que les jetons sont encore valides), puis supprime les jetons. Le retrait est « au mieux » : un évènement que Microsoft refuse de supprimer reste dans l'agenda, mais le TMS garde sa trace. Une reconnexion le met alors à jour au lieu d'en créer un second : déconnecter puis reconnecter ne crée jamais de doublon.
 
 ### Fonctionnement et sécurité
 
@@ -222,6 +222,21 @@ Paramètres : `tenant` (annuaire Azure : son ID, un de ses domaines `xxx.onmicro
 - **Réseau.** Seuls `login.microsoftonline.com` et `graph.microsoft.com` sont appelés, en https, sans suivre de redirection. `HostPolicy` strict est revérifié à chaque appel.
 - **Journal.** `connector_runs` (sens `out`) contient « Action <id> : évènement Outlook créé / mis à jour / supprimé » et des erreurs rédigées par l'application (code HTTP). Il ne contient ni titre, ni fiche, ni adresse e-mail, ni texte de Microsoft. Une exécution en échec peut être relancée (`payload_ref` = `activity:<id>`).
 - **Audit.** `calendar.outlook_connected`, `calendar.outlook_disconnected`, `calendar.outlook_reconnect_required`.
+
+### Séances de formation dans Outlook (0.8.1)
+
+Le même connecteur envoie aussi les **séances** du module Sessions, par le registre `Connectors\Calendar\OutlookSources` : un module déclare une **source** (`sessions.seance`, 40 caractères au plus ; `crm.activity` est réservé aux actions du CRM) et une fonction qui rend l'état **actuel** de l'élément (`OutlookItem` : utilisateur, titre, début, fin, lieu, corps), ou rien s'il ne doit plus avoir de copie. Le CRM n'est pas concerné et le connecteur ne lit pas les tables des Sessions.
+
+```php
+OutlookSources::register('module.cle', $find, serves: fn (User $u): bool => /* a-t-il des éléments ? */, connected: fn (string $userId) => /* pousser ses éléments à venir */);
+```
+
+- `serves` (facultatif) : la source a des éléments pour l'utilisateur. « Connecter Outlook » (routes et bloc de « Mon agenda ») est alors proposé même sans le CRM (`OutlookController::allowed`, capacité `calendar.outlook`) ; sans droit ni source : 403.
+- `connected` (facultatif) : appelé quand l'utilisateur vient de connecter (ou reconnecter) Outlook, lien actif ; la source pousse ses éléments à venir. Sessions pousse les séances du formateur lié (actif) de ce jour à `IcalFeed::DAYS_AFTER` jours : une déconnexion retire les copies, une reconnexion les remet.
+- **Qui reçoit** : seul le formateur de la séance, si sa fiche est liée à un compte actif qui a connecté Outlook (aucun droit CRM n'est requis, contrairement aux actions).
+- **Quoi** : une séance **planifiée**, non supprimée, d'une session ni annulée ni à la corbeille. Titre « <session> — <module> », heures de Paris, lieu, lien vers « Mon planning ». Jamais de stagiaire, de note ni de prix.
+- **Quand** : après validation de la transaction qui crée, déplace, annule ou supprime la séance, change son formateur ou sa salle, annule, met à la corbeille ou restaure la session, renomme la session, le module ou la salle, ou lie, délie, désactive ou réactive le formateur (ses séances à venir) ; et quand le formateur connecte Outlook (ses séances des 180 prochains jours). Le job `PushSourceToOutlook` (`TenantAwareJob`) suit le même principe que `PushActivityToOutlook` : état relu à l'exécution, un seul à la fois par élément, `transactionId` contre les doublons, reprises sur 429 / 5xx. Il n'est mis en file que si le connecteur est actif et que quelqu'un a un lien actif, ou que l'élément a déjà une copie.
+- **Journal** : « Élément <source> <id> : évènement Outlook créé / mis à jour / supprimé / recréé », sans donnée personnelle ; `payload_ref` = `<source>:<id>`.
 
 ## Connecteur « Intelligence artificielle »
 

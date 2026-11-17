@@ -11,6 +11,7 @@ use App\Modules\Sessions\Attendance\MonthlyHour;
 use App\Modules\Sessions\Enrolments\Enrolment;
 use App\Modules\Sessions\Enrolments\EnrolmentStatus;
 use App\Modules\Sessions\Planning\Seance;
+use App\Modules\Sessions\Planning\SeanceOutlook;
 use App\Modules\Sessions\Sessions\SessionRows;
 use App\Modules\Sessions\Sessions\SessionWriter;
 use App\Modules\Sessions\Sessions\TrainingSession;
@@ -157,6 +158,10 @@ final class SessionModules
             } else {
                 $module = SessionModule::query()->lockForUpdate()->findOrFail($module->id);
                 $module->fill($values);
+                if ($module->isDirty('title')) {
+                    // The subject of the Outlook copies of its séances.
+                    SeanceOutlook::touchModule($module->id);
+                }
             }
             $others = (int) SessionModule::query()->where('training_session_id', $locked->id)
                 ->when($module->exists, fn ($q) => $q->whereKeyNot($module->id))->sum('planned_minutes');
