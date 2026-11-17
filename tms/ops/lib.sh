@@ -115,8 +115,11 @@ fetch_bundle() {
     verify_checksum "$work/$archive" "$expected" || die "Archive refusée : somme de contrôle invalide ($archive)."
     log_info "Archive $archive vérifiée (version $TMS_VERSION)."
 
-    # Never extract absolute paths or parent references.
-    if tar -tzf "$work/$archive" | grep -Eq '(^/|(^|/)\.\.(/|$))'; then
+    # Never extract absolute paths or parent references. (A here-string, not a pipe into
+    # grep -q: under pipefail an early match would end in SIGPIPE and read as « no match ».)
+    local listing
+    listing="$(tar -tzf "$work/$archive")" || die "Archive illisible : $archive."
+    if grep -Eq '(^/|(^|/)\.\.(/|$))' <<<"$listing"; then
         die "Archive refusée : chemins non sûrs."
     fi
     mkdir -p "$work/bundle"
@@ -349,6 +352,23 @@ restic_run() {
         -e RESTIC_REPOSITORY -e RESTIC_PASSWORD -e RESTIC_FROM_REPOSITORY -e RESTIC_FROM_PASSWORD \
         ${docker_args[@]+"${docker_args[@]}"} \
         "$RESTIC_IMAGE" --no-cache "$@"
+}
+
+# export_archive_check <file>: the file is a tar holding a restic repository only (ops/export.sh):
+# regular files and directories under repo/, no absolute path, no parent reference, repo/config
+# present. Returns 1 when tar cannot read it (truncated, not a tar), 2 when the content is
+# unexpected. Listings are matched through here-strings (no pipe into grep -q: see fetch_bundle).
+export_archive_check() {
+    local listing names
+    if ! listing="$(tar -tvf "$1" 2>/dev/null)" || ! names="$(tar -tf "$1" 2>/dev/null)"; then
+        return 1
+    fi
+    if grep -q '^[^-d]' <<<"$listing" \
+        || grep -Evq '^repo(/|$)' <<<"$names" \
+        || grep -Eq '(^|/)\.\.(/|$)' <<<"$names" \
+        || ! grep -qx 'repo/config' <<<"$names"; then
+        return 2
+    fi
 }
 
 # restic_snapshot_ids: full ids of the snapshots of RESTIC_REPOSITORY, one per line (fails when

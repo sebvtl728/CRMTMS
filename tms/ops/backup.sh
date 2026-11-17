@@ -130,7 +130,9 @@ docker run --rm -v "${STORAGE_VOLUME}:/s:ro" --entrypoint tar "$RESTIC_IMAGE" -C
 
 # APP_KEY encrypts connector secrets and 2FA secrets: without it a restored database is
 # unusable on a fresh server. It travels inside the (encrypted) snapshot.
-printf 'APP_KEY=%s\nTMS_VERSION=%s\n' "${APP_KEY:-}" "${TMS_VERSION:-}" >"$STAGE/meta.env"
+# Mode and number of organismes: an import refuses a multi-organismes export on a single install.
+tenants="$(compose exec -T postgres psql -U postgres -d tms -tA -c 'select count(*) from tenants' 2>/dev/null | tr -d '[:space:]')" || tenants=""
+printf 'APP_KEY=%s\nTMS_VERSION=%s\nTMS_MODE=%s\nTMS_TENANTS=%s\n' "${APP_KEY:-}" "${TMS_VERSION:-}" "${TMS_MODE:-single}" "$tenants" >"$STAGE/meta.env"
 chmod 600 "$STAGE/meta.env"
 
 ensure_repo

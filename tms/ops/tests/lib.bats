@@ -33,3 +33,36 @@ lt() {
     lt test-broken test-ok
     lt bats test-sabotage
 }
+
+# make_repo_tar <dir> <files> [extra path]: a tar of repo/ (config + <files> long-named files),
+# optionally with an extra file outside repo/ at the end.
+make_repo_tar() {
+    local dir="$1" i
+    mkdir -p "$dir/src/repo/data/00"
+    echo config >"$dir/src/repo/config"
+    for ((i = 0; i < $2; i++)); do
+        echo "$i" >"$dir/src/repo/data/00/$(printf 'pack-%04d-%s' "$i" "$(printf 'a%.0s' {1..90})")"
+    done
+    if [[ -n "${3:-}" ]]; then
+        mkdir -p "$dir/src/$(dirname "$3")"
+        echo x >"$dir/src/$3"
+    fi
+    (cd "$dir/src" && tar -cf "$dir/export.tar" repo ${3:+"$3"})
+}
+
+@test "export_archive_check accepts a large repository listing (more than 64 KB, no SIGPIPE)" {
+    make_repo_tar "$BATS_TEST_TMPDIR" 1200
+    [ "$(tar -tvf "$BATS_TEST_TMPDIR/export.tar" | wc -c)" -gt 65536 ]
+    run export_archive_check "$BATS_TEST_TMPDIR/export.tar"
+    [ "$status" -eq 0 ]
+}
+
+@test "export_archive_check refuses content outside repo/ and a truncated tar" {
+    make_repo_tar "$BATS_TEST_TMPDIR" 1200 zzz/autre
+    run export_archive_check "$BATS_TEST_TMPDIR/export.tar"
+    [ "$status" -eq 2 ]
+
+    head -c 20000 "$BATS_TEST_TMPDIR/export.tar" >"$BATS_TEST_TMPDIR/truncated.tar"
+    run export_archive_check "$BATS_TEST_TMPDIR/truncated.tar"
+    [ "$status" -eq 1 ]
+}

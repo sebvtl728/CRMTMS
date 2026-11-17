@@ -8,8 +8,8 @@
 # 2. a standalone restic repository, initialised with the EXPORT password and the chunker
 #    parameters of the local one, receives that snapshot only (restic copy) and is checked;
 # 3. it is archived as tms-export-<organisme ou hôte>-<AAAAMMJJ-HHMM>-v<version>.tar (mode 600)
-#    in the output directory (default: the current directory). Everything inside is encrypted
-#    by restic: without the export password the file is unreadable.
+#    in the output directory (default /var/backups/tms-exports, created root:root mode 700).
+#    Everything inside is encrypted by restic: without the export password it is unreadable.
 # Prints the SHA-256 of the file, then, as the last line of stdout, its path.
 #
 # Export password: typed twice (at least 12 characters), or TMS_EXPORT_PASSWORD; it reaches
@@ -25,7 +25,8 @@ usage() {
     exit 2
 }
 
-OUTPUT="$PWD"
+DEFAULT_OUTPUT="/var/backups/tms-exports"
+OUTPUT=""
 while [[ $# -gt 0 ]]; do
     case "$1" in
         --output)
@@ -36,6 +37,12 @@ while [[ $# -gt 0 ]]; do
         *) usage ;;
     esac
 done
+if [[ -z "$OUTPUT" ]]; then
+    OUTPUT="$DEFAULT_OUTPUT"
+    (umask 077 && mkdir -p "$OUTPUT") || die "Création de $OUTPUT impossible."
+    chmod 700 "$OUTPUT" || die "Droits de $OUTPUT non modifiables."
+    if [[ "$(id -u)" -eq 0 ]]; then chown root:root "$OUTPUT" || die "Propriétaire de $OUTPUT non modifiable."; fi
+fi
 [[ -d "$OUTPUT" && -w "$OUTPUT" ]] || die "Dossier de destination inaccessible en écriture : $OUTPUT"
 OUTPUT="$(cd "$OUTPUT" && pwd)"
 
@@ -81,7 +88,7 @@ unset RESTIC_FROM_REPOSITORY RESTIC_FROM_PASSWORD
 log_info "Vérification du dépôt de l'export."
 restic_run -- check --read-data >/dev/null || die "Le dépôt de l'export est incohérent : export annulé."
 ids="$(restic_snapshot_ids)" || die "Le dépôt de l'export est illisible : export annulé."
-[[ "$(printf '%s\n' "$ids" | grep -c .)" -eq 1 ]] || die "Le dépôt de l'export doit contenir une seule sauvegarde."
+[[ "$(grep -c . <<<"$ids")" -eq 1 ]] || die "Le dépôt de l'export doit contenir une seule sauvegarde."
 
 # File name: organisme (single mode) or host name, date, version; nothing but [a-z0-9.+_-].
 if [[ "${TMS_MODE:-single}" == "multi" ]]; then

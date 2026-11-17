@@ -9,6 +9,8 @@
 # Versions: A and B run 0.8.2 (the image tms-ci:bats tagged 0.8.2). The « newer » export is taken
 # with TMS_VERSION=0.9.0 (its meta.env says 0.9.0); the « older » one with TMS_VERSION=0.8.1
 # after rolling back the last migration on A: importing it must run that migration again.
+# The « multi » export is taken with TMS_MODE=multi once A holds a second organisme: B (single
+# mode) must refuse it. At the end, the pre-import safety backup of B is restored.
 
 load helpers
 
@@ -92,6 +94,11 @@ setup_file() {
     export_a "$dir/export"
     (load_env && export RESTIC_PASSWORD RESTIC_REPOSITORY && restic_run -- snapshots --tag export --json) >"$dir/a-export-snapshots"
     export_a "$dir/newer" TMS_VERSION=0.9.0
+
+    # A second organisme, exported as a multi-organismes installation.
+    compose exec -T app php -r 'require "vendor/autoload.php"; $a = require "bootstrap/app.php"; $a->make(Illuminate\Contracts\Console\Kernel::class)->bootstrap();
+        app(App\Modules\Core\Platform\TenantProvisioner::class)->create("Organisme deux", "organisme-deux");' >&2
+    export_a "$dir/multi" TMS_MODE=multi
 
     # An « older version »: the last migration is not applied yet.
     DB_OWNER_USERNAME=tms_owner DB_OWNER_PASSWORD="$(env_get POSTGRES_OWNER_PASSWORD)" \
@@ -212,6 +219,15 @@ good_export() { tail -n 1 "$BATS_FILE_TMPDIR/export.out"; }
     [ "$(b_state)" = "$before" ]
 }
 
+@test "import refuses a multi-organismes export with several organismes on a single installation" {
+    local before
+    before="$(b_state)"
+    TMS_IMPORT_PASSWORD="$EXPORT_PASSWORD" run "$TMS_ROOT/ops/import.sh" "$(tail -n 1 "$BATS_FILE_TMPDIR/multi.out")"
+    [ "$status" -ne 0 ]
+    [[ "$output" == *"Cet export contient plusieurs organismes : installez en mode multi-organismes."* ]] || false
+    [ "$(b_state)" = "$before" ]
+}
+
 @test "import refuses to start while another maintenance operation holds the lock" {
     local before
     before="$(b_state)"
@@ -231,6 +247,9 @@ good_export() { tail -n 1 "$BATS_FILE_TMPDIR/export.out"; }
     local before_snapshots key_b
     before_snapshots="$(local_snapshots)"
     key_b="$(env_get APP_KEY)"
+    # B before the import, for the return to that state (last test).
+    table_counts >"$BATS_FILE_TMPDIR/b-before-counts"
+    storage_listing >"$BATS_FILE_TMPDIR/b-before-storage"
     [ "$key_b" != "$(cat "$BATS_FILE_TMPDIR/a-app-key")" ]
 
     TMS_IMPORT_PASSWORD="$EXPORT_PASSWORD" run "$TMS_ROOT/ops/import.sh" "$(good_export)"
@@ -262,6 +281,7 @@ good_export() { tail -n 1 "$BATS_FILE_TMPDIR/export.out"; }
     # Safety backup of B taken before, tagged pre-import, named in the summary.
     safety="$(comm -13 <(printf '%s\n' "$before_snapshots" | sort) <(local_snapshots | sort) | grep . )"
     [ "$(printf '%s\n' "$safety" | wc -l | tr -d ' ')" -eq 1 ]
+    printf '%s\n' "$safety" >"$BATS_FILE_TMPDIR/b-safety"
     [[ "$output" == *"ops/restore.sh --with-app-key ${safety:0:8}"* ]] || false
     (load_env && export RESTIC_PASSWORD RESTIC_REPOSITORY && restic_run -- snapshots --tag pre-import --json) | grep -q "$safety"
 
@@ -297,6 +317,22 @@ good_export() { tail -n 1 "$BATS_FILE_TMPDIR/export.out"; }
     run compose exec -T app php artisan migrate:status
     [ "$status" -eq 0 ]
     [[ "$output" != *"Pending"* ]] || false
+    run compose exec -T caddy wget -q -O - http://127.0.0.1:8081/health
+    [ "$status" -eq 0 ]
+    [[ "$output" == *'"status":"ok"'* ]] || false
+}
+
+@test "the pre-import safety backup brings B back to its state before the import" {
+    local safety key_b
+    safety="$(cat "$BATS_FILE_TMPDIR/b-safety")"
+    [ -n "$safety" ]
+    run "$TMS_ROOT/ops/restore.sh" --with-app-key "$safety"
+    [ "$status" -eq 0 ]
+    diff <(table_counts) "$BATS_FILE_TMPDIR/b-before-counts"
+    diff <(storage_listing) "$BATS_FILE_TMPDIR/b-before-storage"
+    # B's own APP_KEY is back (it travels in the safety snapshot).
+    key_b="$(sed -n 's/^APP_KEY=//p' "$(ls "$TMS_ENV_FILE".bak-* | head -n 1)")"
+    [ "$(env_get APP_KEY)" = "$key_b" ]
     run compose exec -T caddy wget -q -O - http://127.0.0.1:8081/health
     [ "$status" -eq 0 ]
     [[ "$output" == *'"status":"ok"'* ]] || false

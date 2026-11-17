@@ -346,6 +346,7 @@ build_release_with_import_stub() {
 {
     echo "import.sh $*"
     [ -n "${TMS_IMPORT_PASSWORD:-}" ] && echo "password: set"
+    echo "settings: ${TMS_VERSION-unset} ${TMS_MODE-unset} ${TMS_DOMAIN-unset} ${TMS_IMPORT_FILE-unset}"
 } >>"$MOCK_LOG/import.log"
 echo "Récapitulatif de contrôle"
 exit "${MOCK_IMPORT_RC:-0}"
@@ -359,10 +360,12 @@ SH
     local export_file="$BATS_TEST_TMPDIR/tms-export-a.tar" password="mot-de-passe-de-l-export"
     echo "export" >"$export_file"
     unset TMS_TENANT_NAME
-    TMS_IMPORT_PASSWORD="$password" run bash "$INSTALL_SH" --import "$export_file"
+    TMS_MODE=single TMS_IMPORT_PASSWORD="$password" run bash "$INSTALL_SH" --import "$export_file"
     [ "$status" -eq 0 ]
     grep -qx "import.sh $export_file" "$MOCK_LOG/import.log"
     grep -qx "password: set" "$MOCK_LOG/import.log"
+    # The values of the new .env win in import.sh: no installer setting left in its environment.
+    grep -qx "settings: unset unset unset unset" "$MOCK_LOG/import.log"
     refute grep -q "tms:install" "$MOCK_LOG/docker.log"
     # The stack itself is installed: secrets, migrations, start, backups.
     for key in APP_KEY POSTGRES_OWNER_PASSWORD POSTGRES_APP_PASSWORD REDIS_PASSWORD RESTIC_PASSWORD; do

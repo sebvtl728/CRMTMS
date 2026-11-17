@@ -69,17 +69,13 @@ psql_super() {
 # --- 1. Checks (nothing modified) -----------------------------------------------------
 
 log_info "Vérification de ${FILE} (SHA-256 $(sha256_of "$FILE"))."
-if ! listing="$(tar -tvf "$FILE" 2>/dev/null)" || ! names="$(tar -tf "$FILE" 2>/dev/null)"; then
-    die "Fichier d'export illisible ou incomplet (archive tar invalide ou tronquée) : $FILE"
-fi
-# A restic repository only: regular files and directories under repo/, no link, no absolute
-# path, no parent reference.
-if printf '%s\n' "$listing" | cut -c1 | grep -qv '^[-d]$' \
-    || printf '%s\n' "$names" | grep -Ev '^repo(/|$)' | grep -q . \
-    || printf '%s\n' "$names" | grep -Eq '(^|/)\.\.(/|$)' \
-    || ! printf '%s\n' "$names" | grep -qx 'repo/config'; then
-    die "Ce fichier n'est pas un export TMS (contenu inattendu) : $FILE"
-fi
+rc=0
+export_archive_check "$FILE" || rc=$?
+case "$rc" in
+    0) ;;
+    1) die "Fichier d'export illisible ou incomplet (archive tar invalide ou tronquée) : $FILE" ;;
+    *) die "Ce fichier n'est pas un export TMS (contenu inattendu) : $FILE" ;;
+esac
 tmp_base="${TMS_BACKUP_TMPDIR:-$(env_get TMS_BACKUP_TMPDIR)}"
 WORK="$(umask 077 && mktemp -d "${tmp_base:-/var/tmp}/tms-import.XXXXXX")"
 tar -xf "$FILE" -C "$WORK" --no-same-owner 2>/dev/null || die "Extraction du fichier d'export impossible : $FILE"
@@ -95,21 +91,35 @@ log_info "Vérification de l'intégrité de l'export (lecture complète)."
 in_export restic_run -- check --read-data >/dev/null 2>&1 || die "Fichier d'export endommagé ou incomplet (vérification restic échouée) : $FILE"
 ids="$(in_export restic_snapshot_ids 2>/dev/null)" \
     || die "Fichier d'export illisible : liste des sauvegardes inaccessible."
-[[ "$(printf '%s\n' "$ids" | grep -c .)" -eq 1 ]] || die "Le fichier d'export doit contenir exactement une sauvegarde."
+[[ "$(grep -c . <<<"$ids")" -eq 1 ]] || die "Le fichier d'export doit contenir exactement une sauvegarde."
 SNAPSHOT="$ids"
 
 # meta.env (APP_KEY, TMS_VERSION) read into memory only, never written nor displayed.
 meta="$(in_export restic_run -- dump "$SNAPSHOT" /backup-data/meta.env 2>/dev/null)" \
     || die "Le fichier d'export ne contient pas la version ni la clé APP_KEY (meta.env absent)."
-printf '%s\n' "$meta" | grep -Eq '^APP_KEY=.+' \
+grep -Eq '^APP_KEY=.+' <<<"$meta" \
     || die "Le fichier d'export ne contient pas la clé APP_KEY : les secrets des connecteurs et les doubles authentifications seraient perdus."
-EXPORT_VERSION="$(printf '%s\n' "$meta" | sed -n 's/^TMS_VERSION=//p' | head -n 1)"
+meta_value() { sed -n "s/^$1=//p" <<<"$meta" | head -n 1; }
+EXPORT_VERSION="$(meta_value TMS_VERSION)"
+# Exports made before 0.8.2 carry no mode: they come from a single installation.
+EXPORT_MODE="$(meta_value TMS_MODE)"
+EXPORT_MODE="${EXPORT_MODE:-single}"
+EXPORT_TENANTS="$(meta_value TMS_TENANTS)"
 unset meta
 INSTALLED_VERSION="$(env_get TMS_VERSION)"
 [[ -n "$EXPORT_VERSION" ]] || die "Version de l'export inconnue (TMS_VERSION absent de l'export)."
 [[ -n "$INSTALLED_VERSION" ]] || die "Version installée inconnue (TMS_VERSION absent de ${TMS_ENV_FILE})."
 if version_lt "$INSTALLED_VERSION" "$EXPORT_VERSION"; then
     die "Cet export vient de la version ${EXPORT_VERSION}, plus récente que la version installée (${INSTALLED_VERSION}) : mettez d'abord à jour en ${EXPORT_VERSION} (ops/update.sh --version ${EXPORT_VERSION}), puis relancez l'import."
+fi
+INSTALLED_MODE="$(env_get TMS_MODE)"
+INSTALLED_MODE="${INSTALLED_MODE:-single}"
+if [[ "$EXPORT_MODE" == "multi" && "$INSTALLED_MODE" != "multi" ]]; then
+    [[ "$EXPORT_TENANTS" =~ ^[0-9]+$ && "$EXPORT_TENANTS" -le 1 ]] \
+        || die "Cet export contient plusieurs organismes : installez en mode multi-organismes."
+    log_error "Attention : cet export vient d'une installation multi-organismes et ce serveur est en mode mono-organisme ; son unique organisme deviendra l'organisme par défaut."
+elif [[ "$EXPORT_MODE" != "multi" && "$INSTALLED_MODE" == "multi" ]]; then
+    log_error "Attention : cet export vient d'une installation mono-organisme et ce serveur est en mode multi-organismes : après l'import, associez un nom de domaine à l'organisme (sinon il reste inaccessible)."
 fi
 log_info "Export valide : version ${EXPORT_VERSION} (installée : ${INSTALLED_VERSION})."
 
@@ -139,10 +149,10 @@ if [[ "$(env_get TMS_MODE)" != "multi" ]]; then
     current="$(env_get TMS_DEFAULT_TENANT)"
     current="${current:-default}"
     slugs="$(psql_super "select slug from tenants order by slug")" || die "Lecture des organismes importés impossible."
-    if ! printf '%s\n' "$slugs" | grep -qxF -- "$current"; then
-        [[ "$(printf '%s\n' "$slugs" | grep -c .)" -eq 1 ]] \
+    if ! grep -qxF -- "$current" <<<"$slugs"; then
+        [[ "$(grep -c . <<<"$slugs")" -eq 1 ]] \
             || die "Organisme par défaut « ${current} » absent de l'export : renseignez TMS_DEFAULT_TENANT dans ${TMS_ENV_FILE} (parmi : $(printf '%s' "$slugs" | tr '\n' ' ')), puis relancez « docker compose up -d »."
-        log_info "Organisme par défaut : ${slugs} (TMS_DEFAULT_TENANT)."
+        log_info "Organisme par défaut : ${slugs} (TMS_DEFAULT_TENANT, valeur précédente : ${current} ; à remettre en cas de retour à l'état d'avant l'import)."
         env_set TMS_DEFAULT_TENANT "$slugs" || die "Écriture de TMS_DEFAULT_TENANT dans ${TMS_ENV_FILE} impossible."
     fi
 fi

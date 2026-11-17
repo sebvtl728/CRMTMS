@@ -252,8 +252,11 @@ fetch_bundle() {
     verify_checksum "$work/$archive" "$expected" || die "Archive refusée : somme de contrôle invalide ($archive)."
     log_info "Archive $archive vérifiée (version $TMS_VERSION)."
 
-    # Never extract absolute paths or parent references.
-    if tar -tzf "$work/$archive" | grep -Eq '(^/|(^|/)\.\.(/|$))'; then
+    # Never extract absolute paths or parent references. (A here-string, not a pipe into
+    # grep -q: under pipefail an early match would end in SIGPIPE and read as « no match ».)
+    local listing
+    listing="$(tar -tzf "$work/$archive")" || die "Archive illisible : $archive."
+    if grep -Eq '(^/|(^|/)\.\.(/|$))' <<<"$listing"; then
         die "Archive refusée : chemins non sûrs."
     fi
     mkdir -p "$work/bundle"
@@ -392,25 +395,37 @@ run_tms_install() {
     ACTIVATION_URL="$(printf '%s\n' "$INSTALL_OUTPUT" | grep -Eo 'https?://[^[:space:]]+/activation/[^[:space:]]+' | tail -n 1 || true)"
 }
 
-# Import mode: the export password is asked now, before the long installation, and handed to
-# ops/import.sh through the environment only.
+# Import mode: the export password is asked now, before the long installation. Kept in a shell
+# variable (not exported): only the import.sh process receives it (run_import).
+IMPORT_PASSWORD=""
 ask_import_password() {
     [[ -z "${TMS_IMPORT_PASSWORD:-}" && -t 0 ]] || return 0
-    local password
     printf "Mot de passe de l'export : " >&2
-    IFS= read -rs password || die "Mot de passe de l'export non saisi."
+    IFS= read -rs IMPORT_PASSWORD || die "Mot de passe de l'export non saisi."
     printf '\n' >&2
-    [[ -n "$password" ]] || die "Mot de passe de l'export vide."
-    export TMS_IMPORT_PASSWORD="$password"
+    [[ -n "$IMPORT_PASSWORD" ]] || die "Mot de passe de l'export vide."
 }
+
+# Settings exported by load_settings_file (or given in the environment): unset for import.sh and
+# the scripts it starts, so that the values of $TMS_DIR/.env win (load_env keeps a variable that
+# is already set; TMS_VERSION=latest, for instance, would name a missing image).
+INSTALL_SETTINGS="TMS_DOMAIN TMS_ADMIN_EMAIL TMS_ADMIN_NAME TMS_TENANT_NAME TMS_TENANT_SLUG TMS_VERSION TMS_DIST_URL
+TMS_IMAGE TMS_IMAGE_OWNER TMS_SEED_CAP TMS_TLS TMS_MODE TMS_PRINT_SECRETS TMS_IMPORT_FILE TMS_INSTALL_ENV"
 
 run_import() {
     log_info "Import de $TMS_IMPORT_FILE (sans création d'organisme ni d'administrateur)…"
-    if ! "$TMS_DIR/ops/import.sh" "$TMS_IMPORT_FILE"; then
+    local file="$TMS_IMPORT_FILE" password="${IMPORT_PASSWORD:-${TMS_IMPORT_PASSWORD:-}}"
+    # shellcheck disable=SC2086  # word list
+    if ! (
+        unset $INSTALL_SETTINGS TMS_IMPORT_PASSWORD
+        [[ -z "$password" ]] || export TMS_IMPORT_PASSWORD="$password"
+        exec "$TMS_DIR/ops/import.sh" "$file"
+    ); then
         # The installation itself is complete: no « down -v » advice from on_exit.
         ENV_WRITTEN=0
-        die "L'import a échoué : corrigez la cause indiquée, puis relancez $TMS_DIR/ops/import.sh $TMS_IMPORT_FILE (l'installation elle-même est terminée)."
+        die "L'import a échoué : corrigez la cause indiquée, puis relancez $TMS_DIR/ops/import.sh $file (l'installation elle-même est terminée)."
     fi
+    IMPORT_PASSWORD=""
     unset TMS_IMPORT_PASSWORD
 }
 
