@@ -9,9 +9,9 @@ import { formatDay, type Option } from '@/lib/crm';
 import { formatMinutes, invoiceStatusVariant, type InvoiceRow } from '@/lib/finance';
 import { formatCents } from '@/lib/revenue';
 import { type BreadcrumbItem } from '@/types';
-import { Head, Link, router, useForm } from '@inertiajs/react';
-import { Plus, Trash2 } from 'lucide-react';
-import { FormEventHandler } from 'react';
+import { Head, Link, router, useForm, usePage } from '@inertiajs/react';
+import { FileDown, Plus, Trash2 } from 'lucide-react';
+import { FormEventHandler, useState } from 'react';
 
 interface InvoiceLine {
     id: string;
@@ -46,7 +46,7 @@ interface InvoicePage extends Omit<InvoiceRow, 'recipient'> {
 interface ShowProps {
     invoice: InvoicePage;
     options: { units: Option[]; vat_rates: Option[]; vat_exempt: boolean };
-    can: { update: boolean };
+    can: { update: boolean; validate: boolean; credit_note: boolean };
     status?: string;
 }
 
@@ -313,7 +313,84 @@ function DraftEditor({ invoice, options }: { invoice: InvoicePage; options: Show
     );
 }
 
+/** « Valider »: definitive number, frozen content, archived PDF. */
+function ValidateButton({ invoice }: { invoice: InvoicePage }) {
+    const [processing, setProcessing] = useState(false);
+    const what = invoice.kind === 'credit_note' ? "l'avoir" : 'la facture';
+
+    return (
+        <Button
+            type="button"
+            disabled={processing}
+            onClick={() => {
+                if (!window.confirm(`Valider ${what} ? Son numéro sera définitif et elle ne pourra plus être modifiée.`)) return;
+                router.post(
+                    route('finance.invoices.validate', invoice.id),
+                    {},
+                    { preserveScroll: true, onStart: () => setProcessing(true), onFinish: () => setProcessing(false) },
+                );
+            }}
+        >
+            Valider {what}
+        </Button>
+    );
+}
+
+/** « Créer un avoir »: every line given back, or the chosen ones (amounts adjustable in the draft). */
+function CreditNotePanel({ invoice }: { invoice: InvoicePage }) {
+    const billed = invoice.lines.filter((l) => l.total_ht_cents !== 0);
+    const [open, setOpen] = useState(false);
+    const [chosen, setChosen] = useState<string[]>(billed.map((l) => l.id));
+    const { errors } = usePage<{ errors: Record<string, string> }>().props;
+
+    if (!open) {
+        return (
+            <Button type="button" variant="outline" onClick={() => setOpen(true)}>
+                Créer un avoir
+            </Button>
+        );
+    }
+
+    return (
+        <div className="grid w-full gap-2 rounded-xl border p-3 text-sm">
+            <p className="font-medium">Lignes reprises dans l'avoir</p>
+            <ul className="grid gap-1">
+                {billed.map((line) => (
+                    <li key={line.id}>
+                        <label className="flex items-start gap-2">
+                            <input
+                                type="checkbox"
+                                className="mt-1"
+                                checked={chosen.includes(line.id)}
+                                onChange={(e) => setChosen(e.target.checked ? [...chosen, line.id] : chosen.filter((id) => id !== line.id))}
+                            />
+                            <span>
+                                {line.label} · <span className="tabular-nums">{formatCents(line.total_ht_cents)}</span>
+                            </span>
+                        </label>
+                    </li>
+                ))}
+            </ul>
+            <p className="text-muted-foreground text-xs">Les montants se modifient ensuite dans le brouillon d'avoir (avoir partiel).</p>
+            <InputError message={errors.lines} />
+            <div className="flex flex-wrap gap-2">
+                <Button
+                    type="button"
+                    disabled={chosen.length === 0}
+                    onClick={() => router.post(route('finance.invoices.credit-note', invoice.id), { lines: chosen })}
+                >
+                    Préparer le brouillon d'avoir
+                </Button>
+                <Button type="button" variant="ghost" onClick={() => setOpen(false)}>
+                    Annuler
+                </Button>
+            </div>
+        </div>
+    );
+}
+
 export default function InvoiceShow({ invoice, options, can, status }: ShowProps) {
+    const { errors } = usePage<{ errors: Record<string, string> }>().props;
     const breadcrumbs: BreadcrumbItem[] = [
         { title: 'Factures', href: '/finance/invoices' },
         { title: invoice.title, href: invoice.url },
@@ -333,6 +410,18 @@ export default function InvoiceShow({ invoice, options, can, status }: ShowProps
                 </div>
 
                 {status && <div className="text-sm font-medium text-green-600">{status}</div>}
+                <InputError message={errors.invoice} />
+
+                <div className="flex flex-wrap items-start gap-2">
+                    {can.validate && <ValidateButton invoice={invoice} />}
+                    <Button variant="outline" asChild>
+                        <a href={route('finance.invoices.pdf', invoice.id)} target="_blank" rel="noreferrer">
+                            <FileDown className="h-4 w-4" />
+                            {invoice.status === 'draft' ? 'Aperçu PDF' : 'Télécharger le PDF'}
+                        </a>
+                    </Button>
+                    {can.credit_note && <CreditNotePanel invoice={invoice} />}
+                </div>
 
                 <dl className="grid gap-x-6 gap-y-2 rounded-xl border p-4 text-sm sm:grid-cols-2 lg:grid-cols-3">
                     <div>

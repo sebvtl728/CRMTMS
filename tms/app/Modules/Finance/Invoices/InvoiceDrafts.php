@@ -22,9 +22,11 @@ use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
  * due rows (« À facturer », one per recipient and dossier at its cut-off),
  * or by hand from the dossier; their lines edited (computed lines kept,
  * their amounts and labels editable; free lines added and removed) and
- * deleted. One open draft per recipient of a dossier: preparing again (a
- * double click, another user) skips it — under an advisory lock of the
- * dossier, the check is made again inside the transaction.
+ * deleted. One open draft per recipient of a dossier and kind (an invoice
+ * draft and a credit-note draft may live together): preparing again (a
+ * double click, another user) skips it — under the row lock of the
+ * dossier (Billing::lockDossier), the check is made again inside the
+ * transaction.
  */
 final class InvoiceDrafts
 {
@@ -85,9 +87,9 @@ final class InvoiceDrafts
     }
 
     /**
-     * A draft for the recipient of the dossier made by hand: its draft in
-     * progress if any; else what is due to it now; else an empty invoice
-     * (free lines). $recipient: « contractor » or « funding:<id> » (a
+     * A draft for the recipient of the dossier made by hand: its invoice
+     * draft in progress if any; else what is due to it now; else its
+     * credit-note draft in progress; else an empty invoice (free lines). $recipient: « contractor » or « funding:<id> » (a
      * funding of the dossier paying directly).
      *
      * @throws ValidationException an unknown recipient
@@ -95,18 +97,16 @@ final class InvoiceDrafts
     public function manual(User $user, string $dossierId, string $recipient): Invoice
     {
         $dossier = Billing::dossier($dossierId) ?? throw new NotFoundHttpException;
-        $who = $this->recipientOf($dossier, $recipient)
+        $who = self::recipientOf($dossier, $recipient)
             ?? throw ValidationException::withMessages(['recipient' => 'Choisissez le destinataire de la facture.']);
 
         return DB::transaction(function () use ($dossier, $dossierId, $recipient, $who, $user): Invoice {
             self::lockDossier($dossierId);
-            $open = $this->openDraft($dossierId, $recipient);
+            $open = $this->openDraft($dossierId, $recipient, Invoice::INVOICE)
+                ?? $this->create($dossierId, $recipient, $user)
+                ?? $this->openDraft($dossierId, $recipient);
             if ($open !== null) {
                 return $open;
-            }
-            $created = $this->create($dossierId, $recipient, $user);
-            if ($created !== null) {
-                return $created;
             }
             $plan = $this->plans->for($dossierId);
             $starts = array_column($dossier['sessions'], 'starts_on');
@@ -183,7 +183,7 @@ final class InvoiceDrafts
 
     /**
      * The draft of what is due now to the recipient, computed under the
-     * lock of the dossier; null when it has a draft in progress, nothing is
+     * lock of the dossier; null when it has a draft of that kind in progress, nothing is
      * due, or an invoice would go to a recipient no longer invoiceable (a
      * funding billed outside the TMS, deleted, or no longer paying
      * directly: a credit note only).
@@ -192,12 +192,9 @@ final class InvoiceDrafts
     {
         return DB::transaction(function () use ($dossierId, $recipient, $user): ?Invoice {
             self::lockDossier($dossierId);
-            if ($this->openDraft($dossierId, $recipient) !== null) {
-                return null;
-            }
             $dossier = Billing::dossier($dossierId) ?? throw new NotFoundHttpException;
             $row = $this->rowFor($dossier, $recipient);
-            if ($row === null) {
+            if ($row === null || $this->openDraft($dossierId, $recipient, $row['kind']) !== null) {
                 return null;
             }
             $company = Company::withTrashed()->findOrFail($dossier['company_id']);
@@ -261,7 +258,7 @@ final class InvoiceDrafts
     private function rowFor(array $dossier, string $recipient): ?array
     {
         $row = array_column($this->due->forDossier($dossier['id'])['rows'], null, 'recipient_key')[$recipient] ?? null;
-        if ($row !== null && $row['kind'] === Invoice::INVOICE && $this->recipientOf($dossier, $recipient) === null) {
+        if ($row !== null && $row['kind'] === Invoice::INVOICE && self::recipientOf($dossier, $recipient) === null) {
             return null;
         }
 
@@ -307,17 +304,23 @@ final class InvoiceDrafts
         $invoice->save();
     }
 
-    private function openDraft(string $dossierId, string $recipient): ?Invoice
+    /** The open draft of the recipient ($kind: of that kind only; else an invoice first). */
+    private function openDraft(string $dossierId, string $recipient, ?string $kind = null): ?Invoice
     {
         return Invoice::query()->where('dossier_id', $dossierId)->where('status', InvoiceStatus::Draft)
             ->where('recipient_key', $recipient === Invoice::CONTRACTOR ? Invoice::CONTRACTOR : substr($recipient, strlen('funding:')))
+            ->when($kind, fn ($q, string $k) => $q->where('kind', $k))
+            ->orderByRaw("kind = 'invoice' desc")
             ->first();
     }
 
-    /** Serialises the drafts of one dossier (preparing twice at once). */
+    /**
+     * Serialises the drafts of one dossier (preparing twice at once) and
+     * their validation (InvoiceValidator takes the same lock first).
+     */
     private static function lockDossier(string $dossierId): void
     {
-        DB::select('select pg_advisory_xact_lock(hashtextextended(?, 0))', ['finance.invoices:'.$dossierId]);
+        Billing::lockDossier($dossierId);
     }
 
     private function lockedDraft(Invoice $draft, string $refusal): Invoice
@@ -337,7 +340,7 @@ final class InvoiceDrafts
      * @param  array<string, mixed>  $dossier
      * @return array{type: string, id: string, funding_id: ?string}|null
      */
-    private function recipientOf(array $dossier, string $recipient): ?array
+    public static function recipientOf(array $dossier, string $recipient): ?array
     {
         if ($recipient === Invoice::CONTRACTOR) {
             return ['type' => $dossier['contractor']['type'], 'id' => $dossier['contractor']['id'], 'funding_id' => null];

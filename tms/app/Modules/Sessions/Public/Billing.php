@@ -26,8 +26,10 @@ use App\Modules\Sessions\Sessions\TrainingSession;
 use App\Modules\Sessions\SessionsVisibility;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use InvalidArgumentException;
+use LogicException;
 
 /**
  * Public service of what the invoicing (Finance, 0.9) reads of a dossier:
@@ -43,7 +45,10 @@ use InvalidArgumentException;
  *    method); a fixed number of queries whatever the number of trainees;
  *  - allows(): whether a right (and its scope) reaches one dossier;
  *  - dossiersFor(): the dossiers a user reaches (sessions.dossiers.view and
- *    its scope), for the lists of the invoicing.
+ *    its scope), for the lists of the invoicing;
+ *  - lockDossier(): the row lock of a dossier, taken first by the drafts
+ *    and the validation of its invoices;
+ *  - dossiersOfTrainees(): the dossiers of people (their anonymisation).
  *
  * @phpstan-type EnrolmentHours array{enrolment_id: string, session_id: string, planned_minutes: int, realised_minutes: int, absent_minutes: int, all_months_closed: bool, closed_months: list<string>}
  * @phpstan-type SessionHours array{session_id: string, planned_minutes: int, realised_minutes: int, all_months_closed: bool, closed_months: list<string>}
@@ -350,6 +355,43 @@ final class Billing
         $dossier = ($withTrashed ? Dossier::withTrashed() : Dossier::query())->find($dossierId);
 
         return $dossier !== null && SessionsVisibility::allows($user, $permission, $dossier);
+    }
+
+    /**
+     * Locks the row of the dossier (in the trash too) for the caller's
+     * transaction: the invoicing serialises its drafts and validations of a
+     * dossier on it, and with the writers of Sessions that lock it too
+     * (fundings, enrolments, transitions). An unknown id locks nothing.
+     *
+     * @throws LogicException outside a transaction (the lock would be released at once)
+     */
+    public static function lockDossier(string $dossierId): void
+    {
+        if (DB::transactionLevel() === 0) {
+            throw new LogicException('Billing::lockDossier() doit s\'exécuter dans une transaction.');
+        }
+        if (Str::isUuid($dossierId)) {
+            Dossier::withTrashed()->whereKey($dossierId)->lockForUpdate()->first(['id']);
+        }
+    }
+
+    /**
+     * Ids of the dossiers (in the trash too) where one of these people is
+     * or was enrolled, whatever the state of the enrolment (the invoicing
+     * names the trainees on a funder's invoice).
+     *
+     * @param  list<string>  $personIds
+     * @return list<string>
+     */
+    public static function dossiersOfTrainees(array $personIds): array
+    {
+        $personIds = array_values(array_filter($personIds, fn (string $id) => Str::isUuid($id)));
+        if ($personIds === []) {
+            return [];
+        }
+
+        return Enrolment::query()->whereIn('person_id', $personIds)->whereNotNull('dossier_id')
+            ->distinct()->pluck('dossier_id')->map(fn ($id) => (string) $id)->values()->all();
     }
 
     /**

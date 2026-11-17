@@ -213,7 +213,7 @@ final class Due
     {
         $total = array_sum(array_column($components, 'due'));
         $kind = $total < 0 ? Invoice::CREDIT_NOTE : Invoice::INVOICE;
-        $draft = $ledger->drafts[$key] ?? null;
+        $draft = $ledger->drafts[$key][$kind] ?? null;
         $linesById = array_column($dossier['lines'], null, 'id');
 
         $lines = $this->trainingLines($dossier, $shares, $key, $components[InvoiceLine::TRAINING]['due'], $ledger, $cut, $labels);

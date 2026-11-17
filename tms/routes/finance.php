@@ -21,6 +21,13 @@ Route::middleware(['auth', 'can:finance.invoices.manage'])->prefix('finance')->n
     Route::put('invoices/{invoiceId}', [InvoiceController::class, 'update'])->name('invoices.update');
     Route::post('invoices/{invoiceId}/recompute', [InvoiceController::class, 'recompute'])->name('invoices.recompute');
     Route::delete('invoices/{invoiceId}', [InvoiceController::class, 'destroy'])->name('invoices.destroy');
+    // « Créer un avoir » from a validated invoice.
+    Route::post('invoices/{invoiceId}/credit-note', [InvoiceController::class, 'creditNote'])->name('invoices.credit-note');
+});
+
+// « Valider »: number, frozen content, archived PDF (the scope of finance.invoices.validate on the dossier: 403).
+Route::middleware(['auth', 'can:finance.invoices.validate', 'throttle:invoice-pdf'])->prefix('finance')->name('finance.')->group(function () {
+    Route::post('invoices/{invoiceId}/validate', [InvoiceController::class, 'validateDraft'])->name('invoices.validate');
 });
 
 // « À facturer » and the invoices: the scope of finance.invoices.view on each dossier is applied by the queries (404 on one invoice).
@@ -28,5 +35,6 @@ Route::middleware(['auth', 'can:finance.invoices.view'])->prefix('finance')->nam
     Route::get('to-invoice', [ToInvoiceController::class, 'index'])->name('to-invoice.index');
     Route::get('invoices', [InvoiceController::class, 'index'])->name('invoices.index');
     Route::get('invoices/{invoiceId}', [InvoiceController::class, 'show'])->name('invoices.show');
+    Route::get('invoices/{invoiceId}/pdf', [InvoiceController::class, 'pdf'])->middleware('throttle:invoice-pdf')->name('invoices.pdf');
     Route::get('dossiers/{dossierId}/due', [InvoiceController::class, 'due'])->name('dossiers.due');
 });

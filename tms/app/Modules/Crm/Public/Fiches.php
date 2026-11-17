@@ -71,6 +71,41 @@ final class Fiches
     }
 
     /**
+     * Who an invoice is addressed to, as it is copied onto the invoice when
+     * it is validated (the invoicing): name, postal address, SIRET and SIREN
+     * of an entreprise, its e-mail as the billing e-mail. A trashed fiche
+     * too (its dossier still bills it); null when unknown. The CRM keeps no
+     * intra-community VAT number: vat_number is always null for now.
+     *
+     * @param  'organisation'|'person'  $type
+     * @return array{name: string, address_line1: ?string, address_line2: ?string, postal_code: ?string, city: ?string, country: ?string, siret: ?string, siren: ?string, vat_number: ?string, email: ?string}|null
+     */
+    public function billingIdentity(string $type, string $id): ?array
+    {
+        if (! Str::isUuid($id)) {
+            return null;
+        }
+        $fiche = $type === 'organisation' ? Organisation::withTrashed()->find($id) : Person::withTrashed()->find($id);
+        if ($fiche === null) {
+            return null;
+        }
+        $siret = $fiche instanceof Organisation && $fiche->siret !== null && $fiche->siret !== '' ? (string) $fiche->siret : null;
+
+        return [
+            'name' => $fiche instanceof Organisation ? $fiche->name : $fiche->fullName(),
+            'address_line1' => $fiche->address_line1,
+            'address_line2' => $fiche->address_line2,
+            'postal_code' => $fiche->postal_code,
+            'city' => $fiche->city,
+            'country' => $fiche->country,
+            'siret' => $siret,
+            'siren' => $siret === null ? null : substr($siret, 0, 9),
+            'vat_number' => null,
+            'email' => $fiche instanceof Person && $fiche->anonymised_at !== null ? null : $fiche->email,
+        ];
+    }
+
+    /**
      * Names of these people keyed by id, trashed ones included (anonymised:
      * their anonymised name). Unknown ids are left out.
      *

@@ -8,7 +8,7 @@ namespace App\Modules\Finance\Invoices;
  * lines of its validated (or sent) invoices and credit notes — the latter
  * negative, so a plain sum — at the amount really invoiced; free lines and
  * informative mentions never count. Open drafts are « in preparation »: not
- * invoiced, but one per recipient (Préparer skips it).
+ * invoiced, but one per recipient and kind (Préparer skips it).
  */
 final class Ledger
 {
@@ -24,7 +24,7 @@ final class Ledger
     /** @var array<string, string> recipient => the latest cut-off invoiced (« 2026-09 » or a day) */
     public array $lastCut = [];
 
-    /** @var array<string, Invoice> recipient => its open draft */
+    /** @var array<string, array<string, Invoice>> recipient => kind (invoice, credit_note) => its open draft */
     public array $drafts = [];
 
     /** @var array<string, Invoice> recipient => its latest validated invoice (not a credit note) */
@@ -51,7 +51,7 @@ final class Ledger
                 'funding_id' => $invoice->funding_id,
             ];
             if ($invoice->isDraft()) {
-                $ledger->drafts[$key] ??= $invoice;
+                $ledger->drafts[$key][$invoice->kind] ??= $invoice;
 
                 continue;
             }

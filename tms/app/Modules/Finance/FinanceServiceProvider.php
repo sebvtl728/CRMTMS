@@ -5,7 +5,9 @@ namespace App\Modules\Finance;
 use App\Modules\Core\Access\Permissions as CorePermissions;
 use App\Modules\Core\Audit\MorphAliases;
 use App\Modules\Core\Users\User;
+use App\Modules\Crm\Public\FicheLinks;
 use App\Modules\Finance\Invoices\Invoice;
+use App\Modules\Finance\Invoices\InvoiceAnonymisation;
 use App\Modules\Finance\Invoices\InvoiceLine;
 use App\Modules\Finance\Plans\BillingBlock;
 use App\Modules\Finance\Plans\BillingPlan;
@@ -13,6 +15,9 @@ use App\Modules\Finance\Plans\BillingPlans;
 use App\Modules\Finance\Settings\FinanceSettings;
 use App\Modules\Sessions\Public\BillingGuards;
 use App\Modules\Sessions\Public\DossierBlocks;
+use Illuminate\Cache\RateLimiting\Limit;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\ServiceProvider;
 
 /**
@@ -48,5 +53,12 @@ class FinanceServiceProvider extends ServiceProvider
         $hasInvoices = fn (string $dossierId): ?string => app(BillingPlans::class)->isLocked($dossierId) ? BillingPlans::HAS_INVOICES : null;
         BillingGuards::register(BillingGuards::FUNDING_LOCKED, 'finance.invoices', $hasInvoices);
         BillingGuards::register(BillingGuards::DOSSIER_TRASHABLE, 'finance.invoices', $hasInvoices);
+
+        // Anonymising a person: her drafts go (addressed to her, or naming her as a trainee);
+        // validated invoices are accounting records kept 10 years, never changed (spec § 4.7).
+        FicheLinks::registerAnonymisation('finance.invoices', fn (array $personIds) => InvoiceAnonymisation::deleteDrafts($personIds));
+
+        // Rendering a PDF (preview, archive at validation) costs a conversion.
+        RateLimiter::for('invoice-pdf', fn (Request $request) => Limit::perMinute(30)->by('invoice-pdf:'.($request->user()?->getAuthIdentifier() ?? $request->ip())));
     }
 }
