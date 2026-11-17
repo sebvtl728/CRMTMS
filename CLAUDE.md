@@ -119,6 +119,15 @@ Code dans `tms/app/Modules/Sessions/` (Sessions, Dossiers, Enrolments, Fundings,
 - **Séances dans Outlook** : `Planning\SeanceOutlook` déclare la source `sessions.seance` auprès de `Connectors\Calendar\OutlookSources` (registre ; `crm.activity` réservé) et appelle `OutlookSources::push` après commit ; `PushSourceToOutlook` relit l'état courant (`OutlookItem`) ; `calendar_link_events` est clé (`calendar_link_id`, `source`, `source_id`). Jamais de stagiaire, de note ni de prix dans l'évènement.
 - **Fiche formation** : `Catalogue\TrainingBlocks` (registre, comme `FicheBlocks`) ; `Summary\TrainingSessionsBlock` y déclare le bloc Sessions (`SessionsServiceProvider::boot`) ; le Catalogue n'importe jamais Sessions.
 
+## Sauvegardes (0.8.2) : points d'architecture à connaître
+
+Guide : `tms/docs/install.md` (« Sauvegardes », « Déménager vers un autre serveur »), `tms/docs/admin.md` (§ 17). Spec : `docs/superpowers/specs/2026-11-17-0.8.2-sauvegardes-design.md`.
+
+- **Échange hôte ↔ application** : fichiers JSON dans `storage/ops/` du volume `storage`, **hors de `storage/app`** (jamais sauvegardés ni restaurés). `ops/backup.sh` écrit `backup-status.json` à chaque fin (réussie ou non, écriture atomique) et `backup-running.json` tant qu'il tient le verrou ; l'application écrit `backup-request.json` (`Core\Backups\BackupStatus`, `BackupController`, droit `settings.manage`, absent en mode multi). L'application n'a ni socket Docker ni secret restic.
+- **Sauvegarde à la demande** : `tms-backup-request.path` (+ `.service`, `backup.sh --tag manuel`) créés par `enable_backup_requests` de `ops/lib.sh`, appelée par l'installateur et `update.sh` (idempotent) ; le verrou `/opt/tms/.ops.lock` reste la seule protection contre deux exécutions. Bandeau d'accueil après 36 h (`BackupStatus::STALE_AFTER_HOURS`).
+- **Export / import** : `ops/export.sh [--output]` (mot de passe saisi deux fois ou `TMS_EXPORT_PASSWORD`) produit un `.tar` contenant un dépôt restic autonome à un snapshot ; `ops/import.sh <fichier>` (`TMS_IMPORT_PASSWORD`) vérifie, fait une sauvegarde `pre-import`, restaure par `ops/restore.sh --with-app-key` puis `migrate.sh`, et refuse un export plus récent que la version installée. `restore.sh` lit `TMS_RESTORE_REPOSITORY` / `TMS_RESTORE_PASSWORD` (environnement seulement). `install.sh --import <fichier>` (ou `TMS_IMPORT_FILE`) : installation sans organisme ni administrateur, puis `import.sh`. Aucun mot de passe en argument ni dans un journal. Tests : `ops/tests/move.bats` (déménagement A → B), `backup.bats`, `install.bats`.
+- **Copie hors site** : `RESTIC_REMOTE_REPOSITORY`, `RESTIC_REMOTE_PASSWORD`, `RESTIC_REMOTE_ENV_FILE` ; restic s'exécute dans un conteneur sans les clés SSH de l'hôte (un chemin absolu est monté, d'où le NAS monté par SSHFS dans le guide).
+
 ## Conventions
 
 - Identifiants UUID v7 ; suppression logique sur les fiches métier.

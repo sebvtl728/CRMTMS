@@ -5,6 +5,41 @@ Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) ; ve
 
 ## [Non publié]
 
+## [0.8.2] - 2026-11-17
+
+Sauvegardes : suivi dans l'application, sauvegarde à la demande, et export / import en un fichier chiffré pour
+déménager vers un autre serveur sans perte.
+
+### Ajouté
+
+- **Page Administration › Sauvegardes** (droit `settings.manage`, absente en mode multi-organismes) : dernière
+  sauvegarde, copie hors site, sauvegardes disponibles ; **bandeau** d'accueil si la dernière sauvegarde a échoué,
+  date de plus de 36 heures ou est inconnue.
+- **Sauvegarder maintenant** : demande déposée par l'application, exécutée sur le serveur par `tms-backup-request.path`
+  (`ops/backup.sh --tag manuel`) ; demande inscrite au journal d'audit.
+- **Fichier d'état** `ops/backup-status.json` (et `backup-running.json`, `backup-request.json`) dans le volume
+  `storage`, hors de `storage/app` : écrit par `ops/backup.sh` à chaque fin, réussie ou non.
+- **Export / import pour déménager** : `ops/export.sh` (un seul fichier chiffré par mot de passe d'export, empreinte
+  SHA-256), `ops/import.sh <fichier>` et `install.sh --import <fichier>` (base, fichiers, `APP_KEY`, connecteurs et 2FA
+  repris ; sauvegarde de sécurité `pre-import` ; récapitulatif de contrôle ; refus d'un export plus récent que la
+  version installée).
+- **Test de déménagement** (bats, piles jetables) : mêmes nombres de lignes par table, mêmes fichiers, secret de
+  connecteur et 2FA valides, refus sans modification (mauvais mot de passe, fichier tronqué, version trop récente).
+- **Guide** : copie hors site (NAS par SSHFS/SFTP, stockage compatible S3), vérification sur la page et procédure de
+  déménagement (`docs/install.md`, `docs/admin.md` § 17).
+
+### Modifié
+
+- `ops/restore.sh` accepte un dépôt autre que le dépôt local (`TMS_RESTORE_REPOSITORY`, `TMS_RESTORE_PASSWORD`, par
+  l'environnement uniquement) ; `ops/update.sh` et l'installateur créent `storage/ops` et activent la sauvegarde à la
+  demande.
+
+### Sécurité
+
+- Aucune donnée téléchargeable depuis le navigateur : un compte administrateur volé ne peut pas emporter la base.
+- Le conteneur `app` n'obtient ni accès Docker ni secret restic ; mots de passe d'export et d'import transmis par
+  l'environnement ou saisis, jamais en argument de commande ni dans un journal.
+
 ## [0.8.1] - 2026-11-17
 
 Écrans de la formation : la page d'une session se lit en étapes avec une Synthèse d'avancement, les sessions se suivent

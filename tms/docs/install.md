@@ -236,10 +236,207 @@ doubles authentifications sont perdus.
 
 ### Sauvegardes
 
+#### Ce qui tourne chaque nuit
+
 L'installateur crée `tms-backup.service` et `tms-backup.timer` (systemd) : `ops/backup.sh` chaque nuit à 02:30
-(`Persistent=true` : rattrapée au démarrage si la machine était éteinte), dépôt `/var/backups/tms`. Vérifier :
-`systemctl list-timers tms-backup.timer`, `journalctl -u tms-backup.service`. Pour une copie hors site, renseigner
-`RESTIC_REMOTE_REPOSITORY` dans `.env`. Sur Proxmox, une sauvegarde `vzdump` du conteneur complète restic.
+(`Persistent=true` : rattrapée au démarrage si la machine était éteinte), dépôt chiffré `/var/backups/tms`
+(rétention : 14 jours, 8 semaines, 12 mois). Vérifier :
+
+```bash
+systemctl list-timers tms-backup.timer
+journalctl -u tms-backup.service -n 50
+```
+
+Sur Proxmox, une sauvegarde `vzdump` du conteneur complète restic.
+
+#### La page Administration › Sauvegardes
+
+Les administrateurs voient dans l'application (menu Administration › Sauvegardes) : la date, le résultat, la taille et
+la version de la dernière sauvegarde, l'état de la copie hors du serveur et la liste des sauvegardes disponibles.
+Si le serveur ne l'a jamais écrit (fichier d'état absent), la page affiche « Aucune sauvegarde connue » en alerte.
+Un bandeau s'affiche sur l'accueil des administrateurs quand la dernière sauvegarde a échoué, date de plus de
+36 heures ou est inconnue. La page ne permet pas de télécharger les données ni de restaurer : ces opérations restent
+des commandes sur le serveur (voir ci-dessous).
+
+**Sauvegarder maintenant** : le bouton demande une sauvegarde immédiate (étiquette `manuel`). Le serveur la lance dans
+la minute (`tms-backup-request.path`, installé et mis à jour automatiquement) ; le bouton indique « Sauvegarde
+demandée… » puis « Sauvegarde en cours… » et la page se met à jour à la fin. Si le bouton reste sur « demandée » :
+
+```bash
+systemctl status tms-backup-request.path
+journalctl -u tms-backup-request.service -n 50
+```
+
+Pour la lancer à la main, sans passer par la page : `sudo /opt/tms/ops/backup.sh --tag manuel`.
+
+#### Être prévenu en cas d'échec
+
+Renseigner dans `/opt/tms/.env` l'adresse qui doit recevoir l'alerte (envoyée par l'application si une sauvegarde
+échoue ; les connecteurs de messagerie doivent être configurés) :
+
+```bash
+sudo nano /opt/tms/.env      # ajouter une ligne : TMS_ALERT_EMAIL=admin@votre-organisme.fr
+```
+
+#### Copie hors du serveur
+
+Une sauvegarde qui reste sur le serveur disparaît avec lui (panne de disque, incendie, vol). Pour une copie
+automatique, ajoutez dans `/opt/tms/.env` les variables ci-dessous : à chaque sauvegarde, la nuit comme à la demande,
+le dernier état est copié dans le dépôt distant, avec la même rétention. Le dépôt distant est créé automatiquement
+au premier passage. Il est chiffré avec `RESTIC_PASSWORD` (ou `RESTIC_REMOTE_PASSWORD` si vous voulez un autre mot
+de passe pour le distant).
+
+**Exemple 1 : un NAS (Synology, QNAP…) joint par SSH/SFTP.** La copie de restic s'exécute dans un conteneur Docker
+qui n'a pas accès aux clés SSH du serveur. Le plus simple est donc de monter le NAS sur le serveur par SSHFS
+(protocole SFTP, clé dédiée), puis de désigner ce dossier. Sur le NAS, activez SSH/SFTP et créez un utilisateur
+`tms-backup` qui n'a accès qu'à un dossier `tms-backups`. Sur le serveur TMS, en root :
+
+```bash
+apt-get install -y sshfs
+ssh-keygen -t ed25519 -N '' -C 'tms-sauvegardes' -f /root/.ssh/tms_nas      # clé dédiée, sans phrase secrète
+ssh-copy-id -i /root/.ssh/tms_nas.pub tms-backup@nas.example.lan            # installe la clé sur le NAS
+ssh -i /root/.ssh/tms_nas tms-backup@nas.example.lan 'echo ok'              # doit afficher « ok » sans mot de passe
+ssh-keyscan nas.example.lan >> /root/.ssh/known_hosts                       # empreinte du NAS (à vérifier)
+mkdir -p /mnt/nas-tms
+chattr +i /mnt/nas-tms           # tant que le NAS n'est pas monté, rien ne peut s'écrire dans ce dossier
+```
+
+Montage permanent : ajoutez cette ligne (une seule ligne) à `/etc/fstab`, puis montez :
+
+```bash
+echo 'tms-backup@nas.example.lan:/tms-backups /mnt/nas-tms fuse.sshfs _netdev,allow_other,IdentityFile=/root/.ssh/tms_nas,reconnect,ServerAliveInterval=15 0 0' >> /etc/fstab
+mount /mnt/nas-tms
+mountpoint /mnt/nas-tms          # doit répondre « is a mountpoint »
+```
+
+Puis dans `/opt/tms/.env` :
+
+```
+RESTIC_REMOTE_REPOSITORY=/mnt/nas-tms/tms
+```
+
+Attention : sans le `chattr +i` ci-dessus, un NAS non monté (panne, redémarrage) ferait écrire la « copie distante »
+sur le disque du serveur lui-même. Dans un conteneur LXC Proxmox, SSHFS demande l'option `fuse=1` du conteneur
+(Options › Fonctionnalités) ; à défaut, montez le NAS en NFS ou SMB sur l'hôte Proxmox et partagez le dossier avec le
+conteneur.
+
+**Exemple 2 : un stockage compatible S3** (Scaleway, OVH, Backblaze B2, Wasabi, MinIO…). Créez un compartiment
+(bucket) dédié et une clé d'accès limitée à ce compartiment. Les identifiants vont dans un fichier à part, lisible par
+root seul (jamais directement dans `.env`) :
+
+```bash
+install -m 600 /dev/null /opt/tms/restic-remote.env
+nano /opt/tms/restic-remote.env
+```
+
+Contenu du fichier (une variable par ligne, sans guillemets) :
+
+```
+AWS_ACCESS_KEY_ID=votre-identifiant
+AWS_SECRET_ACCESS_KEY=votre-secret
+AWS_DEFAULT_REGION=fr-par
+```
+
+Puis dans `/opt/tms/.env` (l'adresse du service, ici un exemple, figure dans la documentation du fournisseur ; pour
+AWS même, `s3:s3.amazonaws.com/nom-du-compartiment/tms`) :
+
+```
+RESTIC_REMOTE_REPOSITORY=s3:https://s3.fr-par.scw.cloud/nom-du-compartiment/tms
+RESTIC_REMOTE_ENV_FILE=/opt/tms/restic-remote.env
+```
+
+**Vérifier que la copie fonctionne.** Lancez une sauvegarde et regardez le résultat :
+
+```bash
+sudo /opt/tms/ops/backup.sh --tag manuel
+```
+
+Les lignes « Copie vers le dépôt distant. » puis « Sauvegarde terminée. » doivent apparaître sans erreur. Sur la page
+Administration › Sauvegardes, la ligne **Copie hors site** doit indiquer « Configurée, dernière copie réussie » ;
+« dernière copie échouée » signifie que la sauvegarde locale est bonne mais que la copie a échoué (le message de la
+commande en donne la cause : réseau, identifiants, NAS non monté). Une fois par trimestre, vérifiez aussi que les
+sauvegardes sont lisibles depuis le distant, par exemple pour un NAS monté :
+`ls /mnt/nas-tms/tms` (le dossier contient `config`, `data`, `snapshots`…).
+
+#### À conserver HORS du serveur
+
+Notez dans un gestionnaire de mots de passe, sur un autre appareil : **`RESTIC_PASSWORD`** (sans lui, aucune
+sauvegarde n'est lisible), **`APP_KEY`** (sans elle, les secrets des connecteurs et les doubles authentifications sont
+perdus) et, quand vous en créez un, le **mot de passe d'un export**. Ils se lisent dans `/opt/tms/.env`
+(`sudo grep -E '^(RESTIC_PASSWORD|APP_KEY)=' /opt/tms/.env`). Ne les envoyez jamais par e-mail non chiffré.
+
+### Déménager vers un autre serveur
+
+Un **export** est un seul fichier chiffré qui contient la base, les fichiers déposés, la clé `APP_KEY` et la version :
+les utilisateurs, leur double authentification et les secrets des connecteurs sont repris tels quels. Pendant
+l'export la sauvegarde du serveur actuel continue de fonctionner ; le service reste utilisable.
+
+**1. Sur l'ancien serveur**, en root :
+
+```bash
+sudo /opt/tms/ops/export.sh
+```
+
+La commande demande **deux fois un mot de passe d'export** (12 caractères minimum, différent de `RESTIC_PASSWORD`
+de préférence ; notez-le hors du serveur). Elle fait une sauvegarde, la vérifie, puis écrit le fichier dans
+`/var/backups/tms-exports/` (accès root seul), nommé `tms-export-<organisme>-<date>-v<version>.tar`, et affiche son
+**empreinte SHA-256** puis son chemin. Notez l'empreinte.
+
+**2. Copiez le fichier** sur le nouveau serveur (ou sur le poste d'où vous installez), par exemple :
+
+```bash
+scp /var/backups/tms-exports/tms-export-cap-formation-20261117-1430-v0.8.2.tar root@nouveau-serveur:/root/
+```
+
+Sur le nouveau serveur, vérifiez que l'empreinte est la même : `sha256sum /root/tms-export-*.tar`. Sans le mot de
+passe d'export, le fichier est inutilisable : il peut donc transiter sans danger, mais supprimez-le des deux serveurs
+quand le déménagement est terminé.
+
+**3. Installez sur le nouveau serveur** (mêmes prérequis que l'installation habituelle, voir plus haut) en ajoutant
+`--import` ; le mot de passe de l'export est demandé :
+
+```bash
+bash -c "$(curl -fsSL <adresse de publication>/install.sh)" install.sh --import /root/tms-export-cap-formation-20261117-1430-v0.8.2.tar
+```
+
+Il faut renseigner `TMS_DOMAIN` et `TMS_ADMIN_EMAIL` comme pour toute installation ; aucun organisme ni
+administrateur n'est créé : ce sont ceux de l'export. Les secrets techniques (PostgreSQL, Redis, `RESTIC_PASSWORD`)
+sont nouveaux, propres au nouveau serveur : **notez les nouvelles valeurs affichées à la fin**. Seule l'`APP_KEY`
+est reprise de l'export.
+
+Sur un serveur **déjà installé** (installation précédente, ou installation vide faite avant), importez directement :
+
+```bash
+sudo /opt/tms/ops/import.sh /root/tms-export-cap-formation-20261117-1430-v0.8.2.tar
+```
+
+Règle de version : l'import **refuse** un export plus récent que la version installée (message « mettez d'abord à
+jour en <version> »), car une version ne sait pas lire les données d'une version plus récente. Dans ce cas, mettez
+d'abord à jour : `sudo /opt/tms/ops/update.sh --version <version>`. Un export plus ancien est accepté : les
+migrations sont rejouées après l'import.
+
+**4. Comparez le récapitulatif de contrôle** affiché à la fin avec ce que vous voyez sur l'ancien serveur
+(Organismes, Utilisateurs, Entreprises, Personnes, Sessions, Fichiers) : les nombres doivent être identiques. Puis
+connectez-vous sur le nouveau serveur avec un compte existant (même mot de passe, même double authentification) et
+ouvrez quelques fiches et un devis.
+
+**5. Basculez le nom de domaine.** Le nouveau serveur obtient son certificat HTTPS quand le nom de domaine pointe vers
+lui. Quand le contrôle est bon, modifiez l'enregistrement DNS (type A, ou AAAA) du nom de l'application pour
+l'adresse du nouveau serveur ; la propagation prend de quelques minutes à quelques heures. Si le nouveau serveur est
+derrière Nginx Proxy Manager, changez la cible du proxy host. Entre l'export et la bascule, ne saisissez plus rien
+sur l'ancien serveur (ce qui y est saisi après l'export n'est pas repris) ; gardez-le éteint mais intact quelques
+semaines.
+
+**Revenir en arrière.** Avant de remplacer quoi que ce soit, l'import fait une **sauvegarde de sécurité** de l'état du
+serveur (étiquette `pre-import`, visible sur la page Sauvegardes) et affiche sa commande de retour :
+
+```bash
+sudo /opt/tms/ops/restore.sh --with-app-key <identifiant de la sauvegarde pre-import>
+```
+
+Si l'import échoue avant tout changement (mauvais mot de passe, fichier tronqué ou endommagé, version trop récente),
+il le dit (« rien n'a été modifié ») et le serveur reste tel quel. Sur l'ancien serveur, rien n'est modifié par
+l'export : pour annuler le déménagement, il suffit de ne pas basculer le DNS.
 
 ### Mise à jour
 
