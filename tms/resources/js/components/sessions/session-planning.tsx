@@ -1384,7 +1384,7 @@ function Placements({ session, planning }: { session: SessionDates; planning: Se
         router.delete(route('sessions.placements.hosts.destroy', [session.id, p.id, t.enrolment_id]), visit);
 
     return (
-        <section aria-label="Stages" className="grid gap-3">
+        <section id="placements" aria-label="Stages" className="grid scroll-mt-4 gap-3">
             <div className="flex flex-wrap items-center justify-between gap-2">
                 <h2 className="text-sm font-semibold">Stages en entreprise · {planning.placements.length}</h2>
                 {planning.can_seances && (
@@ -1470,7 +1470,7 @@ export function SessionPlanningSeances({ session, planning }: { session: Session
 
     return (
         <div className="grid gap-6">
-            <section aria-label="Séances" className="grid gap-3">
+            <section id="seances" aria-label="Séances" className="grid scroll-mt-4 gap-3">
                 <div className="flex flex-wrap items-center justify-between gap-2">
                     <h2 className="text-sm font-semibold">Séances · {planning.seances.filter((s) => s.status === 'planned').length}</h2>
                     {planning.can_seances && (
