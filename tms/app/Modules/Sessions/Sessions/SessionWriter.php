@@ -50,6 +50,8 @@ final class SessionWriter
 
     public const ENROLLED = 'Des stagiaires sont inscrits à cette session : désinscrivez-les avant de la mettre à la corbeille.';
 
+    public const STATUS_FIXED = 'Cette session ne peut plus changer d\'état ainsi.';
+
     public function __construct(
         private readonly SessionNumbering $numbering,
         private readonly Trainings $trainings,
@@ -118,6 +120,30 @@ final class SessionWriter
             $locked->update($values);
             if ($retrained) {
                 $this->modules->replaceFromTraining($locked);
+            }
+
+            return $locked;
+        });
+    }
+
+    /**
+     * The kanban's move (spec § 6.7): « Planifiée » ↔ « Confirmée » only,
+     * while the state shown on the Paris day is one of them (not running,
+     * done nor cancelled); otherwise 409. Under the session's lock.
+     */
+    public function setStatus(TrainingSession $session, SessionStatus $to): TrainingSession
+    {
+        if (! in_array($to, SessionStatus::SETTABLE, true)) {
+            throw new UserFacingHttpException(409, self::STATUS_FIXED);
+        }
+
+        return DB::transaction(function () use ($session, $to): TrainingSession {
+            $locked = TrainingSession::query()->lockForUpdate()->findOrFail($session->id);
+            if (! in_array($locked->effectiveStatus(TrainingSession::today()), SessionStatus::SETTABLE, true)) {
+                throw new UserFacingHttpException(409, self::STATUS_FIXED);
+            }
+            if ($locked->status !== $to) {
+                $locked->update(['status' => $to]);
             }
 
             return $locked;

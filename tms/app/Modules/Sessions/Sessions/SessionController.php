@@ -56,10 +56,17 @@ class SessionController extends Controller
         $filters = SessionListQuery::filters($request->query());
         $today = TrainingSession::today();
 
-        $page = SessionListQuery::build($filters, $user, $today)->paginate(25)->withQueryString();
+        // « Liste » (default) or « Colonnes » (the kanban, spec § 4.3).
+        $view = $request->query('vue') === 'colonnes' ? 'colonnes' : 'liste';
+        $withCancelled = filter_var($request->query('annulees', false), FILTER_VALIDATE_BOOL);
+
+        $page = $view === 'liste' ? SessionListQuery::build($filters, $user, $today)->paginate(25)->withQueryString() : null;
 
         return Inertia::render('sessions/sessions/index', [
-            'sessions' => [...$page->toArray(), 'data' => SessionRows::rows($page->items(), $today)],
+            'view' => $view,
+            'sessions' => $page === null ? null : [...$page->toArray(), 'data' => SessionRows::rows($page->items(), $today)],
+            'board' => $view === 'colonnes' ? SessionBoard::build($filters, $user, $today, $withCancelled) : null,
+            'with_cancelled' => $withCancelled,
             'filters' => $filters,
             'options' => SessionListQuery::options(),
             'can' => ['create' => $user->can(Permissions::SESSIONS_UPDATE), 'trash' => $user->can(Permissions::SESSIONS_DELETE)],
