@@ -129,8 +129,8 @@ Mêmes colonnes que ci-dessus avec `permission_id`. Non utilisée au lot 1a.
 ### `calendar_links` — connexion Microsoft 365 d'un utilisateur
 `id`, `tenant_id` · `user_id` (FK, cascade, unique) · `provider` (`microsoft365`) · `status` (`active`, `reconnect` : Microsoft a refusé le renouvellement, jetons effacés) · `access_token`, `refresh_token` (text, **chiffrés** `APP_KEY`) · `expires_at`, `connected_at` · horodatages (timestamptz, µs). **Volontairement hors journal d'audit** (pas `Auditable`) : la ligne porte des jetons ; la connexion, la déconnexion et la reconnexion demandée sont journalisées à part (`calendar.outlook_*`, sans jeton).
 
-### `calendar_link_events` — évènements Outlook créés pour une action
-`id`, `tenant_id` · `calendar_link_id` (FK, cascade : déconnecter supprime les lignes) · `activity_id` (uuid de l'action du CRM, **sans clé étrangère** : le module Connecteurs ne lit le CRM que par son service public) · `transaction_id` (uuid envoyé à Microsoft Graph, créé avant l'envoi pour qu'une reprise ne duplique pas l'évènement) · `outlook_event_id` (512, null tant que Graph n'a pas répondu) · horodatages. Unique (`calendar_link_id`, `activity_id`).
+### `calendar_link_events` — évènements Outlook créés pour un élément (action du CRM, séance)
+`id`, `tenant_id` · `calendar_link_id` (FK, cascade : déconnecter supprime les lignes) · `source` varchar(40) (non nul, sans valeur par défaut : `crm.activity` pour une action du CRM, `sessions.seance` pour une séance ; 0.8.1) · `source_id` (uuid de l'élément, ex-`activity_id`, **sans clé étrangère** : le module Connecteurs ne lit pas les tables des autres modules) · `transaction_id` (uuid envoyé à Microsoft Graph, créé avant l'envoi pour qu'une reprise ne duplique pas l'évènement) · `outlook_event_id` (512, null tant que Graph n'a pas répondu) · horodatages. Unique (`calendar_link_id`, `source`, `source_id`) ; index (`source`, `source_id`).
 
 ## Audit (RLS)
 

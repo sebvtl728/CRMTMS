@@ -223,6 +223,15 @@ Paramètres : `tenant` (annuaire Azure : son ID, un de ses domaines `xxx.onmicro
 - **Journal.** `connector_runs` (sens `out`) contient « Action <id> : évènement Outlook créé / mis à jour / supprimé » et des erreurs rédigées par l'application (code HTTP). Il ne contient ni titre, ni fiche, ni adresse e-mail, ni texte de Microsoft. Une exécution en échec peut être relancée (`payload_ref` = `activity:<id>`).
 - **Audit.** `calendar.outlook_connected`, `calendar.outlook_disconnected`, `calendar.outlook_reconnect_required`.
 
+### Séances de formation dans Outlook (0.8.1)
+
+Le même connecteur envoie aussi les **séances** du module Sessions, par le registre `Connectors\Calendar\OutlookSources` : un module déclare une **source** (`sessions.seance`, 40 caractères au plus ; `crm.activity` est réservé aux actions du CRM) et une fonction qui rend l'état **actuel** de l'élément (`OutlookItem` : utilisateur, titre, début, fin, lieu, corps), ou rien s'il ne doit plus avoir de copie. Le CRM n'est pas concerné et le connecteur ne lit pas les tables des Sessions.
+
+- **Qui reçoit** : seul le formateur de la séance, si sa fiche est liée à un compte actif qui a connecté Outlook (aucun droit CRM n'est requis, contrairement aux actions).
+- **Quoi** : une séance **planifiée**, non supprimée, d'une session ni annulée ni à la corbeille. Titre « <session> — <module> », heures de Paris, lieu, lien vers « Mon planning ». Jamais de stagiaire, de note ni de prix.
+- **Quand** : après validation de la transaction qui crée, déplace, annule ou supprime la séance, change son formateur ou sa salle, annule, met à la corbeille ou restaure la session, renomme la session, le module ou la salle, ou lie, délie, désactive ou réactive le formateur (ses séances à venir). Le job `PushSourceToOutlook` (`TenantAwareJob`) suit le même principe que `PushActivityToOutlook` : état relu à l'exécution, un seul à la fois par élément, `transactionId` contre les doublons, reprises sur 429 / 5xx. Il n'est mis en file que si le connecteur est actif et que quelqu'un a un lien actif, ou que l'élément a déjà une copie.
+- **Journal** : « Élément <source> <id> : évènement Outlook créé / mis à jour / supprimé / recréé », sans donnée personnelle ; `payload_ref` = `<source>:<id>`.
+
 ## Connecteur « Intelligence artificielle »
 
 `AiConnector` (clé `ai`, type assistant, **organisme entier**, un seul actif). Sert à l'assistant de la fiche formation (proposition depuis un PDF ou une demande écrite) : l'IA **propose**, l'utilisateur relit et enregistre ; rien n'est enregistré par l'IA. Écran réservé à l'administrateur (`connectors.manage`).

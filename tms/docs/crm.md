@@ -128,6 +128,16 @@ La fiche d'une formation regroupe ce que Qualiopi attend de la présentation d'u
 
 Journal d'audit : les textes de la fiche (description, objectifs, public, méthodes…) sont des contenus du catalogue, pas des données personnelles, et sont journalisés en clair à chaque modification ; le **contenu des modules**, souvent long, est masqué (« [masqué] ») — seuls ses intitulé, durée, modalité et ordre apparaissent.
 
+### Page de la formation et « Créer une session » (0.8.1)
+
+Dans la liste, cliquez sur l'**intitulé** d'une formation : sa page présente ses informations (durées, tarifs, public, modules), ses **plaquettes** et, avec le droit de consulter les sessions, le bloc **Sessions** :
+
+- des indicateurs : sessions **à venir**, **en cours**, **terminées sur les 12 derniers mois** et **stagiaires** (inscriptions non annulées ni en attente des sessions démarrées sur 12 mois) ; les sessions annulées et à la corbeille ne comptent pas ;
+- la liste des sessions en cours et à venir, puis des terminées récentes (20 au plus), chacune avec son état, ses dates, ses inscrits et son lien ;
+- **Créer une session** (avec le droit de créer les sessions) : ouvre le formulaire de session avec la formation, ses heures et ses modules déjà choisis. Une formation désactivée ou hors de vos DAS n'est pas préremplie.
+
+Les sessions affichées suivent votre périmètre de consultation. **Modifier** (droit `catalogue.manage`) reste sur la page de la formation et dans la liste.
+
 ### Dupliquer une formation
 
 **Dupliquer** (page de modification d'une formation, `catalogue.manage`) crée une copie **indépendante** de la formation enregistrée : tous les champs de la fiche, les modules, le DAS, les tarifs et les financements. La copie s'intitule « Copie de … », n'a pas de code, n'est rattachée à aucune plaquette et est **désactivée** : vérifiez-la, puis activez-la. Modifier la copie ne touche jamais l'original (ni ses sessions, devis ou dossiers). Des modifications non enregistrées de la page ne sont pas copiées (une confirmation le rappelle).
