@@ -13,8 +13,8 @@ déménager vers un autre serveur sans perte.
 ### Ajouté
 
 - **Page Administration › Sauvegardes** (droit `settings.manage`, absente en mode multi-organismes) : dernière
-  sauvegarde, copie hors site, sauvegardes disponibles ; **bandeau** d'accueil si la dernière sauvegarde a échoué,
-  date de plus de 36 heures ou est inconnue.
+  sauvegarde, copie hors site, sauvegardes disponibles ; **pastille rouge** sur « Sauvegardes » dans le menu de
+  l'administrateur si la dernière sauvegarde a échoué, date de plus de 36 heures ou est inconnue.
 - **Sauvegarder maintenant** : demande déposée par l'application, exécutée aussitôt sur le serveur par
   `tms-backup-request.path` (`ops/backup.sh --tag manuel`) ; demande inscrite au journal d'audit, remise en attente si
   une autre opération de maintenance empêche la sauvegarde de démarrer, signalée sur la page au bout de 10 minutes sans

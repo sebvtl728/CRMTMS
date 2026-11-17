@@ -1,6 +1,5 @@
 import { OPEN_EVENT } from '@/components/crm/global-search';
 import Heading from '@/components/heading';
-import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import AppLayout from '@/layouts/app-layout';
@@ -181,7 +180,7 @@ const numberFormat = new Intl.NumberFormat('fr-FR');
 const percentFormat = new Intl.NumberFormat('fr-FR', { maximumFractionDigits: 1 });
 
 export default function Dashboard({ recent_views, counters, commercial, sessions_starting }: Props) {
-    const { auth, backup_alert } = usePage<SharedData>().props;
+    const { auth } = usePage<SharedData>().props;
     const can = (permission: string) => auth.permissions.includes(permission);
 
     return (
@@ -189,17 +188,6 @@ export default function Dashboard({ recent_views, counters, commercial, sessions
             <Head title="Accueil" />
             <div className="flex flex-1 flex-col gap-6 p-4">
                 <Heading title="Accueil" description="Vos raccourcis et les dernières fiches que vous avez consultées." />
-
-                {backup_alert && (
-                    <Alert variant="destructive">
-                        <AlertDescription>
-                            {backup_alert}{' '}
-                            <Link href="/admin/backups" className="font-medium underline">
-                                Voir les sauvegardes
-                            </Link>
-                        </AlertDescription>
-                    </Alert>
-                )}
 
                 {canViewCrm(auth.permissions) && (
                     <section aria-label="Raccourcis" className="flex flex-wrap gap-2">

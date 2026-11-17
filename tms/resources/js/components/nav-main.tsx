@@ -23,6 +23,11 @@ export function NavMain({ items = [], label }: { items: NavItem[]; label: string
                                 <span>{item.title}</span>
                             </Link>
                         </SidebarMenuButton>
+                        {item.alert && (
+                            <SidebarMenuBadge aria-label={item.alert} title={item.alert}>
+                                <span className="bg-destructive block h-2.5 w-2.5 rounded-full" aria-hidden />
+                            </SidebarMenuBadge>
+                        )}
                         {item.badge !== undefined && item.badge > 0 && (
                             <SidebarMenuBadge aria-label={`${item.badge} à faire`}>{item.badge > 99 ? '99+' : item.badge}</SidebarMenuBadge>
                         )}

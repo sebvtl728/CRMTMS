@@ -29,6 +29,8 @@ export interface NavItem {
     isActive?: boolean;
     /** Count shown beside the entry (hidden at 0). */
     badge?: number;
+    /** A red dot on the entry (e.g. backup in trouble); the text is its accessible label. */
+    alert?: string | null;
 }
 
 export interface SharedData {

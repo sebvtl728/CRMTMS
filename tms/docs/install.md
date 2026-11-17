@@ -254,8 +254,8 @@ Sur Proxmox, une sauvegarde `vzdump` du conteneur complète restic.
 Les administrateurs voient dans l'application (menu Administration › Sauvegardes) : la date, le résultat, la taille et
 la version de la dernière sauvegarde, l'état de la copie hors du serveur et la liste des sauvegardes disponibles.
 Si le serveur ne l'a jamais écrit (fichier d'état absent), la page affiche « Aucune sauvegarde connue » en alerte.
-Un bandeau s'affiche sur l'accueil des administrateurs quand la dernière sauvegarde a échoué, date de plus de
-36 heures ou est inconnue. La page ne permet pas de télécharger les données ni de restaurer : ces opérations restent
+Une pastille rouge s'affiche sur « Sauvegardes » dans le menu de l'administrateur quand la dernière sauvegarde a
+échoué, date de plus de 36 heures ou est inconnue (rien sur l'accueil). La page ne permet pas de télécharger les données ni de restaurer : ces opérations restent
 des commandes sur le serveur (voir ci-dessous).
 
 **Sauvegarder maintenant** : le bouton demande une sauvegarde immédiate (étiquette `manuel`). Le serveur la lance
