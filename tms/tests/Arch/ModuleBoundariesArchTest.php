@@ -240,6 +240,18 @@ const SESSIONS_TABLES = '/[\'"`](?:public\.)?(?:'.SESSIONS_TABLES_LIST.')(?:[\'"
     .'|\b(?:from|join|into|update)\s+(?:public\.)?["`]?(?:'.SESSIONS_TABLES_LIST.')\b/i';
 
 /**
+ * The keys « enrolments » and « fundings » of the arrays of
+ * Sessions\Public\Billing (a subscript or an array key), not tables: left
+ * out before looking for a Sessions table in Finance.
+ */
+const SESSIONS_BILLING_KEYS = "/\\[\\s*'(?:enrolments|fundings)'\\s*\\]|'(?:enrolments|fundings)'\\s*=>/";
+
+function namesSessionsTables(string $code): bool
+{
+    return preg_match(SESSIONS_TABLES, (string) preg_replace(SESSIONS_BILLING_KEYS, '', $code)) === 1;
+}
+
+/**
  * A reference to another module than Finance and Core, beyond their public
  * services: Sessions\Public, Crm\Public and the catalogue's Trainings,
  * TrainingData and TrainingUsage (a use line, a grouped use or an inline
@@ -257,7 +269,7 @@ it('lets Finance reach the other modules through their public services only, nev
             continue;
         }
         $code = (string) file_get_contents($file->getPathname());
-        if (namesCrmTables($code) || namesCatalogueTables($code) || preg_match(SESSIONS_TABLES, $code) === 1) {
+        if (namesCrmTables($code) || namesCatalogueTables($code) || namesSessionsTables($code)) {
             $offenders[] = $file->getPathname();
         }
     }
@@ -295,5 +307,12 @@ it('detects every way Finance could reach Sessions, the Crm, the catalogue or th
     }
     foreach (["'dossier_id'", "DB::table('billing_plans')", "'billing_plans.dossier_id'", '// the dossiers of the organisme', "route('finance.plans.update')"] as $code) {
         expect(preg_match(SESSIONS_TABLES, $code), $code)->toBe(0);
+    }
+    // The keys of the arrays of Sessions\Public\Billing are no tables; a table next to them still is.
+    foreach (['$dossier[\'fundings\']', '$hours[ \'enrolments\' ]', '[\'enrolments\' => [], \'sessions\' => []]'] as $code) {
+        expect(namesSessionsTables($code), $code)->toBeFalse();
+    }
+    foreach (['$dossier[\'fundings\']; DB::table(\'enrolments\')', "->join('fundings as f', 'a', 'b')"] as $code) {
+        expect(namesSessionsTables($code), $code)->toBeTrue();
     }
 });
