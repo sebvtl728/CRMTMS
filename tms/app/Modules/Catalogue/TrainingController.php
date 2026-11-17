@@ -7,6 +7,7 @@ use App\Modules\Catalogue\Assistant\TrainingAssistant;
 use App\Modules\Core\Audit\AuditRecorder;
 use App\Modules\Core\Exports\ExportCell;
 use App\Modules\Core\Exports\XlsxExporter;
+use App\Modules\Core\References\ReferenceItem;
 use App\Modules\Core\References\ReferenceList;
 use App\Modules\Core\Users\User;
 use Illuminate\Database\Eloquent\Builder;
@@ -41,6 +42,29 @@ class TrainingController extends Controller
             'filters' => $filters,
             'options' => TrainingListQuery::options(),
             'can' => ['manage' => $user->can(Permissions::MANAGE), 'delete' => $user->can(Permissions::DELETE), 'export' => $user->can(Permissions::EXPORT)],
+            'status' => $request->session()->get('status'),
+        ]);
+    }
+
+    /**
+     * The training page: its data, its brochures and the blocks other
+     * modules add (TrainingBlocks: « Sessions »); « Modifier » stays an action.
+     */
+    public function show(Request $request, Training $training): Response
+    {
+        $user = $this->user($request);
+        $training->load(['das', 'fundingModes']);
+        $brochures = app(Brochures::class)->forTrainingPage($training);
+        $modalityIds = $training->modules()->whereNotNull('modality_id')->pluck('modality_id')->unique()->all();
+
+        return Inertia::render('catalogue/show', [
+            'training' => [
+                ...self::row($training, new TrainingExport),
+                'modalities' => ReferenceItem::query()->withTrashed()->whereKey($modalityIds)->orderBy('position')->orderBy('label')->pluck('label')->values()->all(),
+            ],
+            'brochures' => $brochures,
+            'blocks' => TrainingBlocks::for($training, $user),
+            'can' => ['manage' => $user->can(Permissions::MANAGE), 'brochures' => $user->can(Permissions::VIEW)],
             'status' => $request->session()->get('status'),
         ]);
     }

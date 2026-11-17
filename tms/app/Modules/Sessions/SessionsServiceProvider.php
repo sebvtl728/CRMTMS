@@ -2,6 +2,7 @@
 
 namespace App\Modules\Sessions;
 
+use App\Modules\Catalogue\TrainingBlocks;
 use App\Modules\Catalogue\TrainingUsage;
 use App\Modules\Connectors\Calendar\CalendarSources;
 use App\Modules\Core\Access\AccessScope;
@@ -52,6 +53,7 @@ use App\Modules\Sessions\Resources\Room;
 use App\Modules\Sessions\Resources\Rooms;
 use App\Modules\Sessions\Sessions\SessionPolicy;
 use App\Modules\Sessions\Sessions\TrainingSession;
+use App\Modules\Sessions\Summary\TrainingSessionsBlock;
 use App\Modules\Sessions\Trainers\Trainer;
 use App\Modules\Sessions\Trainers\TrainerDas;
 use App\Modules\Sessions\Trainers\TrainerRows;
@@ -121,6 +123,8 @@ class SessionsServiceProvider extends ServiceProvider
         self::registerReferenceUsage();
         self::registerTrainingUsage();
         self::registerFicheBlocks();
+        // « Sessions » block of the training page.
+        TrainingBlocks::register('sessions', fn (string $trainingId, User $viewer) => TrainingSessionsBlock::for($trainingId, $viewer));
         self::registerFicheLinks();
         self::registerPlanningUsage();
         self::registerAttendance();

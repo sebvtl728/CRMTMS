@@ -121,6 +121,8 @@ class SessionController extends Controller
                 'kind' => $organisation === null ? 'inter' : 'intra',
                 'organisation' => $organisation,
                 'responsible_user_id' => $this->user($request)->id,
+                // From a training page: preselected only when offered and in the user's DAS (else ignored).
+                'training_id' => $this->preselectedTraining($this->user($request), $request->query('training')),
             ],
             'options' => self::formOptions(null),
         ]);
@@ -312,6 +314,21 @@ class SessionController extends Controller
      * « Ses DAS » on sessions.sessions.update: the training must be in one
      * of the DAS he follows (Own and All: any).
      */
+    private function preselectedTraining(User $user, mixed $trainingId): ?string
+    {
+        $training = is_string($trainingId) ? app(Trainings::class)->find($trainingId) : null;
+        if ($training === null || ! $training->is_active) {
+            return null;
+        }
+        try {
+            $this->assertDas($user, $training->id);
+        } catch (ValidationException) {
+            return null;
+        }
+
+        return $training->id;
+    }
+
     private function assertDas(User $user, mixed $trainingId): void
     {
         $training = is_string($trainingId) ? app(Trainings::class)->find($trainingId) : null;

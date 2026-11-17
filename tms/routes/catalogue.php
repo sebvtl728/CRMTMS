@@ -29,5 +29,6 @@ Route::middleware(['auth'])->prefix('catalogue')->name('catalogue.')->group(func
     Route::put('{training}/edit', [TrainingController::class, 'update'])->middleware('can:catalogue.manage')->name('update');
     Route::post('{training}/duplicate', [TrainingController::class, 'duplicate'])->middleware('can:catalogue.manage')->name('duplicate');
     Route::post('{training}/toggle', [TrainingController::class, 'toggle'])->middleware('can:catalogue.manage')->name('toggle');
+    Route::get('{training}', [TrainingController::class, 'show'])->middleware('can:catalogue.view')->name('show');
     Route::delete('{training}', [TrainingController::class, 'destroy'])->middleware('can:catalogue.delete')->name('destroy');
 });
