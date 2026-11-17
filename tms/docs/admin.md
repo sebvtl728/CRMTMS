@@ -57,6 +57,13 @@ Pour chaque société : raison sociale, forme juridique, capital (montant et « 
 - **Durée de validité (jours)** : 1 à 365, 30 par défaut ; date « Valable jusqu'au » proposée sur un nouveau devis.
 - **Conditions générales** et **Pied de page** (5 000 caractères chacun) : imprimés sur chaque devis, sous les lignes et en bas du document.
 
+**Section « Factures »** de la société (0.9) :
+
+- **Préfixe des factures** (`F` par défaut) et **préfixe des avoirs** (`AV` par défaut) : lettres majuscules et chiffres, 10 caractères au plus, **différents l'un de l'autre**. Les numéros sont `<préfixe>-<année>-<numéro sur 5 chiffres>` (`F-2026-00001`), sans trou, avec un compteur par société, par type (facture, avoir) et par année civile (heure de Paris) qui repart à 1 le 1er janvier. Changer de préfixe ne renumérote pas les pièces existantes.
+- **Délai de paiement** : 0 à 60 jours (30 par défaut) ; l'échéance d'une facture = date d'émission + ce délai.
+- **Pied de facture** (2 000 caractères) : texte libre imprimé sur chaque facture (RIB, précisions de règlement…). Les pénalités de retard et l'indemnité de 40 € sont ajoutées automatiquement aux factures destinées à un professionnel.
+- Le **régime de TVA** de la société commande aussi les factures : exonérée, toutes les lignes sont à 0 % avec la mention d'exonération ; assujettie, taux par ligne (20 % proposé). Une facture validée garde le régime de sa validation.
+
 **Régime de TVA : à décider à l'installation.** Le **régime de TVA** de la société (« Assujetti à la TVA » ou « Exonéré de TVA ») commande les devis : exonérée, toutes les lignes sont à 0 % et le devis porte la mention « TVA non applicable, art. 261-4-4° a du CGI » ; assujettie, chaque ligne a son taux (20 %, 10 %, 5,5 %, 2,1 % ou 0 %, 20 % proposé). Un organisme de formation peut relever de l'exonération de l'article 261-4-4° a du CGI ou être assujetti : **pour CAP FORMATION, faire confirmer le régime par l'expert-comptable et le régler sur chaque société avant le premier devis.** Un brouillon suit le régime actuel de sa société ; un devis envoyé garde celui de son envoi (PDF archivé).
 
 ## 4. Utilisateurs et rôles
@@ -183,6 +190,16 @@ Les dossiers et sessions (lot 2a) ont deux domaines de plus, eux aussi à périm
 
 Inscrire un stagiaire depuis un dossier demande les deux : modifier la session et consulter le dossier. « Ses fiches » = responsable ou créateur du dossier ou de la session ; « Ses DAS » = DAS du dossier, DAS de la formation de la session.
 
+Les factures (0.9) ajoutent le thème *Factures*, à périmètre (celui du dossier : « Ses fiches », « Ses DAS », tout l'organisme) :
+
+| Droit | Ce qu'il permet |
+|---|---|
+| `finance.invoices.view` (« Consulter les factures ») | Menu **Finance** : À facturer, Factures ; voir factures, avoirs, PDF, export CSV ; bloc Facturation d'un dossier |
+| `finance.invoices.manage` (« Préparer les factures ») | Régler le rythme d'un dossier ; préparer et modifier les brouillons ; créer un brouillon d'avoir ; envoyer et renvoyer |
+| `finance.invoices.validate` (« Valider les factures ») | Valider une facture ou un avoir ; **Vérifier l'intégrité** |
+
+**Défauts** (accordés une fois par `tms:permissions:sync` lors de la mise à jour vers la 0.9.0) : administrateur de l'organisme et direction, les trois droits ; commercial, chargé de relations et assistant, *Consulter* et *Préparer* ; Responsable DAS et Formateur, aucun. Seuls l'administrateur et la direction valident par défaut. Le menu **Finance › Réglages de facturation** exige `settings.manage`.
+
 Le planning (0.8.0) ajoute les thèmes *Planning et présences* (droits à périmètre) et *Formateurs et salles* (organisme entier) :
 
 | Droit | Ce qu'il permet |
@@ -284,6 +301,8 @@ Depuis l'écran **RGPD** (permission `crm.gdpr`), le champ **Années après le d
 - une anonymisation est reportée à la nuit suivante si un import est en cours ;
 - l'anonymisation est **irréversible** : elle efface les données personnelles de la fiche, de son historique, des pièces jointes et des lignes d'import, et, dans les dossiers et sessions, les besoins d'adaptation et notes de ses inscriptions, les notes des financements qui la concernent et de ses dossiers de particulier (inscriptions, dossiers et montants restent) ; le journal d'audit ne contenant jamais de valeur personnelle en clair, il n'a rien à effacer. Un import peut encore être annulé pour ses autres lignes.
 
+- **Factures (0.9)** : une facture ou un avoir **validé** est une pièce comptable à conserver **10 ans** (obligation légale, prioritaire sur l'effacement) : l'anonymisation d'une personne ne le modifie pas, même quand il la nomme (stagiaire d'une facture de financeur) ; elle **supprime ses brouillons** et ceux des dossiers où elle est ou a été stagiaire (ils se préparent à nouveau depuis « À facturer »). Les e-mails d'envoi conservent l'adresse et le message de chaque envoi, comme la pièce qu'ils accompagnent.
+
 Ce traitement repose sur le **planificateur** (service `scheduler` de `compose.prod.yaml`) et sur le *worker* ; vérifiez qu'ils tournent (`docker compose ps`).
 
 ## 12. Imports : file d'attente et conservation
@@ -344,3 +363,15 @@ Guide d'installation et d'exploitation : `install.md` (« Sauvegardes » et « D
 - **Pastille** : point rouge sur « Sauvegardes » dans le menu des détenteurs de `settings.manage` (son libellé accessible donne le message « La dernière sauvegarde… ») quand la dernière sauvegarde a échoué, date de plus de **36 heures** ou est inconnue ; aucune alerte sur l'accueil. Le détail s'affiche en haut de la page.
 - **Sauvegarder maintenant** : dépose une demande que le serveur lance aussitôt (étiquette `manuel`) ; le bouton est désactivé (« Sauvegarde demandée… », « Sauvegarde en cours… ») tant qu'une demande est en attente ou qu'une sauvegarde tourne, la page se met alors à jour d'elle-même toutes les 15 secondes, et la demande est inscrite au journal d'audit (« Sauvegarde demandée », qui et quand). Une demande que le serveur n'a pas prise en charge au bout de 10 minutes est signalée (« La demande n'a pas été prise en charge par le serveur. ») et peut être renouvelée. L'application ne lance rien elle-même et ne détient aucun secret de sauvegarde.
 - **Ce que la page ne fait pas** : ni téléchargement des données, ni restauration (commandes sur le serveur : `ops/restore.sh`, `ops/export.sh`, `ops/import.sh`).
+
+## 18. Factures : réglages et exploitation (0.9)
+
+Guide utilisateur : `finance.md`.
+
+- **Finance › Réglages de facturation** (droit `settings.manage`) : **absences non justifiées** de l'organisme, « Non facturées » (défaut) ou « Facturées au contractant » ; chaque dossier peut remplacer ce réglage. Changement journalisé.
+- **Sociétés** : préfixes de factures et d'avoirs, délai de paiement (0 à 60 jours), pied de facture ; voir § 3.
+- **Référentiel « Types de financeur »** : case **Facturé hors du TMS** (par exemple CPF). Un financement de ce type retire sa part de la facture du contractant et n'émet aucune facture TMS. Les types existants ne sont pas modifiés par la mise à jour : cochez la case sur ceux qui le méritent.
+- **Modèle d'e-mail « Facture »** : Administration › Modèles d'e-mails (variables : numéro, pièce, type, société, destinataire, montant TTC, échéance, règlement, organisme).
+- **PDF** : mêmes exigences que les devis (Gotenberg démarré, `GOTENBERG_URL`) ; une facture ne se valide pas si le PDF ne peut pas être produit. Les PDF validés sont archivés par organisme (zone `invoices`) et **font partie de la sauvegarde** : ne les excluez pas.
+- **Intégrité** : `docker compose exec app php artisan tms:finance:verify` (tous les organismes ; code de sortie 1 et numéro de la première pièce en cause en cas de rupture). À lancer après une restauration ou un déménagement (`ops/import.sh`), et à intervalles réguliers.
+- **Conservation** : une facture validée est une pièce comptable conservée **10 ans** ; elle n'est ni supprimée ni modifiée, même par l'anonymisation RGPD d'une personne (voir § 11).

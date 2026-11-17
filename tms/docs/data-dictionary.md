@@ -593,6 +593,7 @@ Module `Sessions` (`Funding`, écrit par `FundingWriter` seulement, sous le verr
 | `status` | string(20) | `to_request` (À demander, défaut), `requested` (Demandé), `agreed` (Accordé), `refused` (Refusé) — CHECK. Un financement refusé ne compte plus dans le financé ; aucun report automatique |
 | `agreement_number` | string(100), null | N° de prise en charge |
 | `agreed_on` | date, null | Date d'accord |
+| `pays_directly` | boolean, défaut faux (0.9) | « Paie directement l'organisme » : le financeur reçoit sa propre facture pour sa part (financement accordé seulement). Refusé quand le financeur est le contractant ; verrouillé dès la première facture validée du dossier (`BillingGuards`) |
 | `notes` | text, null | Journalisé sans valeur (`$auditPersonal`) |
 | `created_at`, `updated_at` | | |
 
@@ -614,6 +615,75 @@ Le module ne lit aucune table du CRM ; il se déclare par `Crm\Public\FicheLinks
 
 **Permissions** : `sessions.dossiers.view|update|delete` et `sessions.sessions.view|update|delete`, à périmètre (`own` : responsable ou créateur ; `das` : DAS du dossier ou de la session).
 
+## Finance : factures et avoirs (0.9, RLS)
+
+Module `Finance` (`tms/app/Modules/Finance/`). Toutes les tables ont `tenant_id` et une politique RLS. Montants en **centimes entiers** (`bigint`, HT ; les lignes et totaux d'un avoir sont négatifs). Finance lit les dossiers par `Sessions\Public\Billing` et les fiches par `Crm\Public\Fiches` : aucune clé étrangère vers les tables de ces modules (les références `dossier_line_id`, `enrolment_id`, `funding_id` sont de simples uuid, car une facture reste quand le dossier évolue). Guide : `finance.md`.
+
+### `billing_plans` — facturation d'un dossier
+Une ligne par dossier (`dossier_id` unique, FK `dossiers`), créée au premier réglage ; sans ligne : fin de formation, au réalisé, règle d'absences de l'organisme.
+
+| Colonne | Type | Rôle |
+|---|---|---|
+| `rhythm` | string(10) | `end`, `monthly`, `schedule` (CHECK) |
+| `basis` | string(10) | `realised` (défaut), `planned` (CHECK) |
+| `unjustified_absences` | string(20), null | `not_billed` / `bill_contractor` ; null = réglage de l'organisme (CHECK) |
+| `schedule` | jsonb, null | `[{due_on, percent}]` trié par date, somme 100 ; non nul **si et seulement si** `rhythm = schedule` (CHECK) |
+| `locked_at` | timestamptz, null | Posé à la première validation d'une facture du dossier : rythme, base, échéancier et « paie directement » ne changent plus |
+| `updated_by`, horodatages | | |
+
+### `finance_settings` — réglages de l'organisme
+Une ligne par organisme (`tenant_id` unique), créée au premier changement : `unjustified_absences` (`not_billed` par défaut, `bill_contractor`; CHECK).
+
+### `companies` — colonnes ajoutées (0.9)
+`invoice_prefix` (string(10), défaut `F`), `credit_note_prefix` (défaut `AV`) : CHECK `^[A-Z0-9]{1,10}$` pour les deux et **différents** ; `payment_terms_days` (smallint, défaut 30, CHECK 0 à 60) ; `invoice_footer` (text, null).
+
+### `invoices` — factures et avoirs
+| Colonne | Type | Rôle |
+|---|---|---|
+| `company_id` | uuid (FK `companies`) | Société émettrice |
+| `kind` | string(12) | `invoice` / `credit_note` (CHECK) |
+| `number` | string(30), null | `<préfixe>-<AAAA>-<NNNNN>` ; nul **exactement** tant que `status = draft` (CHECK) ; unique (`company_id`, `number`) |
+| `status` | string(10) | `draft`, `validated`, `sent` (CHECK) |
+| `dossier_id` | uuid (FK `dossiers`) | Dossier |
+| `recipient_type`, `recipient_id` | string(12), uuid | `organisation` / `person` et fiche du destinataire |
+| `funding_id` | uuid, null, **sans FK** | Financement d'un financeur payant directement ; nul = le contractant |
+| `recipient_key` | string(40), colonne générée stockée | `coalesce(funding_id::text, 'contractor')` : « déjà facturé » par destinataire et un seul brouillon ouvert (index unique partiel `invoices_one_open_draft` sur `dossier_id`, `recipient_key`, `kind` où `status = 'draft'`) |
+| `recipient_snapshot` | jsonb, null | Destinataire **figé** à la validation : identité, adresse, SIRET/SIREN, e-mail, n° de dossier, n° d'accord (`$auditPersonal`) |
+| `issued_on`, `due_on`, `period_from`, `period_to` | date, null | Émission, échéance, période de formation |
+| `cut_off` | string(10), null | Date de coupure du calcul (`2026-09` en mensuel, sinon un jour) |
+| `rhythm`, `basis` | string(10) | Photo du plan au moment du calcul |
+| `total_ht_cents`, `total_vat_cents`, `total_ttc_cents` | bigint | Totaux |
+| `vat_mention` | text, null | Exonération et/ou « Indemnité hors champ de la TVA » |
+| `corrected_invoice_id` | uuid, null (FK `invoices`) | Facture corrigée ; **obligatoire pour un avoir** (CHECK `invoices_credit_note_corrects_check`, `NOT VALID` : contrôlé sur toute ligne écrite, sans bloquer un ancien brouillon) et interdit pour une facture |
+| `notes` | text, null | Notes internes (`$auditPersonal`) |
+| `pdf_path`, `pdf_sha256` | string, char(64) | PDF archivé (`TenantStorage`, zone `invoices`) et son empreinte SHA-256 |
+| `hash`, `previous_hash` | char(64), null | Empreinte du contenu canonique, chaînée à la pièce précédente de l'organisme |
+| `sent_at`, `email_status`, `email_error_code` | | Dernier envoi (`pending`, `sent`, `failed`) |
+| `created_by`, `updated_by`, `validated_by`, `validated_at` | | |
+
+### `invoice_lines` — lignes
+`invoice_id` (FK, cascade, index) · `position` · `kind` (`computed` / `free`, CHECK) · `component` (`training`, `dedit`, `absences`, `mention`; **nul exactement pour une ligne libre**, CHECK) · `label`, `description` (`$auditPersonal`) · `quantity` numeric(10,2) · `unit` · `unit_price_cents` · `vat_rate` numeric(4,2) · `total_ht_cents` · `computed_cents` (montant proposé par le calcul : l'écart avec le total montre une modification à la main) · `planned_minutes`, `realised_minutes` · `dossier_line_id`, `enrolment_id`, `funding_id` (uuid sans FK). Les lignes libres et les mentions ne comptent jamais dans le « déjà facturé » (`Ledger`).
+
+### `invoice_sequences` — compteurs de numérotation
+Unique (`tenant_id`, `company_id`, `kind`, `year`) : `last_number`. Année de Paris ; incrémenté sous verrou, dans la transaction de validation (un échec rend le numéro : ni trou ni doublon). Le compteur appartient à la société et au type, pas au préfixe.
+
+### `invoice_journal` — journal inaltérable chaîné
+Une ligne par pièce validée (`invoice_id` unique) : `number`, `kind`, `issued_on`, totaux HT/TVA/TTC, `hash`, `previous_hash`, `pdf_sha256`, `created_at`, et `position` (bigint, unique par organisme : 1, 2, … : l'ordre de la chaîne). **Append-only.**
+
+### `invoice_sendings` — e-mails d'envoi
+Une ligne par « Envoyer » / « Renvoyer » : `invoice_id` (FK), `email`, `subject`, `body`, `status` (`pending` → `sent` ou `failed`, CHECK), `error_code`, `error` (raison fixe en français, jamais le texte du serveur SMTP), `sent_by` (FK `users`), `sent_at`. Le seul changement d'une ligne est `pending` → `sent`/`failed`. L'adresse, l'objet et le message vivent ici, jamais sur la facture, figée.
+
+### Déclencheurs d'immutabilité (migration `2027_01_13_000002_freeze_validated_invoices`)
+- `invoices_immutable` (avant `UPDATE` / `DELETE`) : un brouillon se modifie et se supprime librement (sa validation est son dernier changement) ; une pièce validée ou envoyée ne peut changer que `status` (`validated` → `sent`, jamais en arrière), `sent_at`, `email_status`, `email_error_code` et `updated_at` ; toute autre colonne, et toute suppression, lève une exception.
+- `invoice_lines_immutable` (avant `INSERT` / `UPDATE` / `DELETE`) : aucune ligne ne s'ajoute, ne change ni ne disparaît quand la facture n'est pas un brouillon ; la facture d'une ligne ne change jamais ; seule la cascade de suppression d'un brouillon est permise.
+- `invoice_journal_immutable` : aucune modification ni suppression (comme `audit_logs`).
+- Contrôle : `Integrity::verify` (commande `tms:finance:verify`, bouton « Vérifier l'intégrité ») recalcule `hash` = SHA-256(contenu canonique + `previous_hash`), recoupe chaque ligne du journal avec sa facture, vérifie la chaîne par `position` et détecte une pièce émise absente du journal ou un PDF remplacé (`pdf_sha256`).
+
+### Conservation légale et RGPD
+Une facture ou un avoir validé est une **pièce comptable à conserver 10 ans** : le droit à l'effacement ne s'y applique pas. L'anonymisation d'une personne (`Finance\Invoices\InvoiceAnonymisation`, enregistrée dans `Crm\Public\FicheLinks`) **ne touche jamais** une pièce validée ou envoyée (le contenu haché et la chaîne restent intacts, même si une ligne nomme un stagiaire), et **supprime seulement les brouillons** adressés à la personne ou aux dossiers où elle est ou a été stagiaire. `invoice_sendings` (adresse, message) suit la pièce et n'est pas purgée.
+
 ## Permissions CRM (catalogue global `permissions`)
 
 CRM : `crm.fiches.view|update|delete`, `crm.opportunities.view|update|delete`, `crm.quotes.view|update|delete`, `crm.activities.view|update|delete`, `crm.activities.team`, `crm.revenue.view`, `crm.revenue.manage`, `crm.merge`, `crm.import`, `crm.export`, `crm.gdpr` ; catalogue : `catalogue.view`, `catalogue.manage`, `catalogue.delete`. Les anciens `crm.view|create|update|delete` sont supprimés par la migration 0.5.0 (convertis organisme par organisme). La matrice par rôle est dans `admin.md`. `role_permission_defaults_applied` (`tenant_id`, `role`, `permission`) mémorise les droits par défaut déjà accordés à chaque organisme, pour qu'une mise à jour n'ajoute que les nouveaux droits sans rétablir ceux qu'un administrateur a retirés. `role_permission_scopes` (`tenant_id`, `role_id`, `permission`, `scope` = `own`/`das`/`all`/`trainer`) : périmètre d'un rôle pour un droit à périmètre ; sans ligne, le périmètre vaut `all` ; `trainer` (« Ses séances », 0.8.0) n'est accepté que pour `sessions.seances.view` et `sessions.attendance.manage`.
+
+Finance (0.9) : `finance.invoices.view`, `finance.invoices.manage`, `finance.invoices.validate` (tous à périmètre, celui du dossier ; défauts dans `admin.md` § 10).
