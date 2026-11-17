@@ -63,6 +63,7 @@ const EVENT_LABELS: Record<string, string> = {
     'users.invitation_sent': 'Invitation envoyée',
     'users.invitation_send_failed': "Échec d'envoi de l'invitation",
     'users.activation_reissued': "Lien d'activation réémis",
+    'backup.requested': 'Sauvegarde demandée',
     'settings.security_changed': 'Paramètres de sécurité modifiés',
     'settings.abandon_rule_changed': "Règle d'abandon modifiée",
     'roles.created': 'Rôle créé',

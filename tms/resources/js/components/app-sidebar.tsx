@@ -14,6 +14,7 @@ import {
     ClipboardPen,
     Columns3,
     Contact,
+    DatabaseBackup,
     DoorOpen,
     Euro,
     Factory,
@@ -71,13 +72,14 @@ const adminNavItems: (NavItem & { permission: string })[] = [
     { title: 'Connecteurs', url: '/admin/connectors', icon: Plug, permission: 'connectors.manage' },
     { title: "Journal d'audit", url: '/admin/audit', icon: History, permission: 'audit.view' },
     { title: 'Sécurité', url: '/admin/security', icon: ShieldCheck, permission: 'settings.manage' },
+    { title: 'Sauvegardes', url: '/admin/backups', icon: DatabaseBackup, permission: 'settings.manage' },
     { title: "Règle d'abandon", url: '/admin/abandon-rule', icon: UserMinus, permission: 'settings.manage' },
     { title: 'Salles et fermetures', url: '/admin/sessions-settings', icon: DoorOpen, permission: 'sessions.rooms.manage' },
     { title: "Modèles d'e-mails", url: '/admin/mail-templates', icon: Mail, permission: 'settings.manage' },
 ];
 
 export function AppSidebar() {
-    const { auth, todo_count } = usePage<SharedData>().props;
+    const { auth, todo_count, backups_enabled } = usePage<SharedData>().props;
     const commercialItems = commercialNavItems
         .filter((item) => auth.permissions.includes(item.permission))
         .map((item) => (item.url === '/crm/todo' ? { ...item, badge: todo_count } : item));
@@ -85,7 +87,9 @@ export function AppSidebar() {
         ...(auth.my_planning ? [myPlanningItem] : []),
         ...trainingNavItems.filter((item) => auth.permissions.includes(item.permission)),
     ];
-    const adminItems = adminNavItems.filter((item) => auth.permissions.includes(item.permission));
+    const adminItems = adminNavItems.filter(
+        (item) => auth.permissions.includes(item.permission) && (item.url !== '/admin/backups' || backups_enabled),
+    );
 
     return (
         <Sidebar collapsible="icon" variant="inset">

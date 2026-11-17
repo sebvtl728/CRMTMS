@@ -5,6 +5,7 @@ namespace App\Http\Middleware;
 use App\Modules\Connectors\Calendar\CalendarSources;
 use App\Modules\Core\Access\Permissions;
 use App\Modules\Core\Access\Scopes;
+use App\Modules\Core\Backups\BackupStatus;
 use App\Modules\Core\Companies\Brand;
 use App\Modules\Core\Users\User;
 use App\Modules\Crm\Activities\TodoQuery;
@@ -73,6 +74,9 @@ class HandleInertiaRequests extends Middleware
             ],
             // Menu badge of « À faire »: overdue + today, cached 60 s (lazy: skipped by partial reloads).
             'todo_count' => fn () => $user !== null && $user->can(CrmPermissions::ACTIVITIES_VIEW) ? TodoQuery::badge($user) : 0,
+            'backups_enabled' => config('tms.mode') !== 'multi',
+            // Banner of the dashboard: last backup failed, too old or unknown (administrators, self-hosted only).
+            'backup_alert' => fn () => $user !== null && config('tms.mode') !== 'multi' && $user->can(Permissions::SETTINGS_MANAGE) ? BackupStatus::alert() : null,
         ]);
     }
 }
