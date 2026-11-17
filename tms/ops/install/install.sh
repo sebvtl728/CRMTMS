@@ -5,12 +5,23 @@
 #   TMS_DOMAIN=tms.example.org TMS_ADMIN_EMAIL=admin@example.org TMS_TENANT_NAME="CAP FORMATION" \
 #     bash -c "$(curl -fsSL <release>/install.sh)"
 #
+# Moving from another server (export made there by ops/export.sh):
+#
+#   TMS_DOMAIN=tms.example.org TMS_ADMIN_EMAIL=admin@example.org \
+#     bash -c "$(curl -fsSL <release>/install.sh)" install.sh --import /root/tms-export-….tar
+#
+# installs the stack with new technical secrets (PostgreSQL, Redis, restic), creates no
+# organisme nor administrator, then runs ops/import.sh on the file: data, files and APP_KEY of
+# the exported server, whose accounts stay the same.
+#
 # Self-contained on purpose: it is fetched alone with curl, before the release
 # bundle (and its ops/lib.sh) exists on the machine. It embeds the few helpers it
 # needs before the bundle is verified, then sources the bundle's ops/lib.sh.
 #
 # Settings (environment, or KEY=VALUE file named by TMS_INSTALL_ENV):
-#   TMS_DOMAIN, TMS_ADMIN_EMAIL, TMS_TENANT_NAME   required
+#   TMS_DOMAIN, TMS_ADMIN_EMAIL, TMS_TENANT_NAME   required (TMS_TENANT_NAME: not with an import)
+#   TMS_IMPORT_FILE     export file to import (same as --import <file>)
+#   TMS_IMPORT_PASSWORD password of the export (environment only; asked otherwise)
 #   TMS_ADMIN_NAME      default "Administrateur"
 #   TMS_TENANT_SLUG     default derived from TMS_TENANT_NAME (TMS_DEFAULT_TENANT)
 #   TMS_VERSION         default latest (resolved from the release SHA256SUMS)
@@ -99,7 +110,8 @@ load_settings_file() {
         value="${BASH_REMATCH[2]}"
         case "$key" in
             TMS_DOMAIN | TMS_ADMIN_EMAIL | TMS_ADMIN_NAME | TMS_TENANT_NAME | TMS_TENANT_SLUG | TMS_VERSION | \
-                TMS_DIST_URL | TMS_IMAGE | TMS_IMAGE_OWNER | TMS_SEED_CAP | TMS_TLS | TMS_MODE | TMS_PRINT_SECRETS)
+                TMS_DIST_URL | TMS_IMAGE | TMS_IMAGE_OWNER | TMS_SEED_CAP | TMS_TLS | TMS_MODE | TMS_PRINT_SECRETS | \
+                TMS_IMPORT_FILE)
                 [[ -n "${!key:-}" ]] || export "$key=$value"
                 ;;
         esac
@@ -125,6 +137,12 @@ slugify() {
 check_settings() {
     [[ -n "${TMS_DOMAIN:-}" ]] || die "Variable TMS_DOMAIN manquante (nom de domaine, ex. tms.example.org)."
     [[ -n "${TMS_ADMIN_EMAIL:-}" ]] || die "Variable TMS_ADMIN_EMAIL manquante (e-mail de l'administrateur)."
+    if [[ -n "${TMS_IMPORT_FILE:-}" ]]; then
+        [[ -f "$TMS_IMPORT_FILE" && -r "$TMS_IMPORT_FILE" ]] || die "Fichier d'export introuvable ou illisible : $TMS_IMPORT_FILE"
+        TMS_IMPORT_FILE="$(cd "$(dirname "$TMS_IMPORT_FILE")" && pwd)/$(basename "$TMS_IMPORT_FILE")"
+        # No organisme created: ops/import.sh takes the one of the export (TMS_DEFAULT_TENANT).
+        TMS_TENANT_NAME="${TMS_TENANT_NAME:-import}"
+    fi
     [[ -n "${TMS_TENANT_NAME:-}" ]] || die "Variable TMS_TENANT_NAME manquante (nom de l'organisme)."
 
     TMS_DOMAIN="$(printf '%s' "$TMS_DOMAIN" | tr '[:upper:]' '[:lower:]')"
@@ -234,8 +252,11 @@ fetch_bundle() {
     verify_checksum "$work/$archive" "$expected" || die "Archive refusée : somme de contrôle invalide ($archive)."
     log_info "Archive $archive vérifiée (version $TMS_VERSION)."
 
-    # Never extract absolute paths or parent references.
-    if tar -tzf "$work/$archive" | grep -Eq '(^/|(^|/)\.\.(/|$))'; then
+    # Never extract absolute paths or parent references. (A here-string, not a pipe into
+    # grep -q: under pipefail an early match would end in SIGPIPE and read as « no match ».)
+    local listing
+    listing="$(tar -tzf "$work/$archive")" || die "Archive illisible : $archive."
+    if grep -Eq '(^/|(^|/)\.\.(/|$))' <<<"$listing"; then
         die "Archive refusée : chemins non sûrs."
     fi
     mkdir -p "$work/bundle"
@@ -250,7 +271,7 @@ fetch_bundle() {
     fi
     local f
     for f in compose.prod.yaml .env.prod.example ops/lib.sh ops/migrate.sh ops/backup.sh ops/restore.sh ops/update.sh \
-        docker/caddy/Caddyfile docker/postgres/init.sh docker/postgres/init.sql release.env; do
+        ops/export.sh ops/import.sh docker/caddy/Caddyfile docker/postgres/init.sh docker/postgres/init.sql release.env; do
         [[ -f "$BUNDLE_ROOT/$f" ]] || die "Archive invalide : $f manquant."
     done
     # Image of this version, pinned by digest (verified bundle -> .env -> compose).
@@ -374,6 +395,40 @@ run_tms_install() {
     ACTIVATION_URL="$(printf '%s\n' "$INSTALL_OUTPUT" | grep -Eo 'https?://[^[:space:]]+/activation/[^[:space:]]+' | tail -n 1 || true)"
 }
 
+# Import mode: the export password is asked now, before the long installation. Kept in a shell
+# variable (not exported): only the import.sh process receives it (run_import).
+IMPORT_PASSWORD=""
+ask_import_password() {
+    [[ -z "${TMS_IMPORT_PASSWORD:-}" && -t 0 ]] || return 0
+    printf "Mot de passe de l'export : " >&2
+    IFS= read -rs IMPORT_PASSWORD || die "Mot de passe de l'export non saisi."
+    printf '\n' >&2
+    [[ -n "$IMPORT_PASSWORD" ]] || die "Mot de passe de l'export vide."
+}
+
+# Settings exported by load_settings_file (or given in the environment): unset for import.sh and
+# the scripts it starts, so that the values of $TMS_DIR/.env win (load_env keeps a variable that
+# is already set; TMS_VERSION=latest, for instance, would name a missing image).
+INSTALL_SETTINGS="TMS_DOMAIN TMS_ADMIN_EMAIL TMS_ADMIN_NAME TMS_TENANT_NAME TMS_TENANT_SLUG TMS_VERSION TMS_DIST_URL
+TMS_IMAGE TMS_IMAGE_OWNER TMS_SEED_CAP TMS_TLS TMS_MODE TMS_PRINT_SECRETS TMS_IMPORT_FILE TMS_INSTALL_ENV"
+
+run_import() {
+    log_info "Import de $TMS_IMPORT_FILE (sans création d'organisme ni d'administrateur)…"
+    local file="$TMS_IMPORT_FILE" password="${IMPORT_PASSWORD:-${TMS_IMPORT_PASSWORD:-}}"
+    # shellcheck disable=SC2086  # word list
+    if ! (
+        unset $INSTALL_SETTINGS TMS_IMPORT_PASSWORD
+        [[ -z "$password" ]] || export TMS_IMPORT_PASSWORD="$password"
+        exec "$TMS_DIR/ops/import.sh" "$file"
+    ); then
+        # The installation itself is complete: no « down -v » advice from on_exit.
+        ENV_WRITTEN=0
+        die "L'import a échoué : corrigez la cause indiquée, puis relancez $TMS_DIR/ops/import.sh $file (l'installation elle-même est terminée)."
+    fi
+    IMPORT_PASSWORD=""
+    unset TMS_IMPORT_PASSWORD
+}
+
 install_backup_timer() {
     mkdir -p "$TMS_SYSTEMD_DIR"
     cat >"$TMS_SYSTEMD_DIR/tms-backup.service" <<UNIT
@@ -403,6 +458,9 @@ UNIT
     systemctl daemon-reload >&2
     systemctl enable --now tms-backup.timer >&2
     log_info "Sauvegarde quotidienne programmée (tms-backup.timer, 02:30)."
+    # « Sauvegarder maintenant » (ops/lib.sh, sourced by start_stack): storage/ops and
+    # tms-backup-request.path. Not fatal: the installation itself is complete.
+    enable_backup_requests || log_error "Le bouton « Sauvegarder maintenant » restera sans effet : relancez ops/update.sh --force pour l'activer."
 }
 
 print_summary() {
@@ -412,9 +470,21 @@ print_summary() {
  TMS $TMS_VERSION installé
 ======================================================================
  Adresse        : https://$TMS_DOMAIN
+EOF
+    if [[ -n "${TMS_IMPORT_FILE:-}" ]]; then
+        cat <<EOF
+ Données        : importées de ${TMS_IMPORT_FILE##*/}
+ Comptes        : les comptes administrateurs (et tous les autres) sont ceux du
+                  serveur exporté : mêmes mots de passe, même double authentification.
+EOF
+    else
+        cat <<EOF
  Activation     : ${ACTIVATION_URL:-(voir la sortie de tms:install ci-dessus)}
                   Lien à usage unique, valable 24 h : choisir le mot de passe
                   puis enrôler la double authentification.
+EOF
+    fi
+    cat <<EOF
  Configuration  : $TMS_DIR/.env (lisible par root uniquement)
  Sauvegardes    : /var/backups/tms, chaque nuit à 02:30 (tms-backup.timer)
 EOF
@@ -430,7 +500,21 @@ EOF
  Sans RESTIC_PASSWORD les sauvegardes sont illisibles ; sans APP_KEY les secrets
  des connecteurs et les doubles authentifications sont perdus.
 EOF
-    if [[ "$TMS_PRINT_SECRETS" == "1" ]]; then
+    if [[ -n "${TMS_IMPORT_FILE:-}" ]]; then
+        cat <<EOF
+ APP_KEY est celle du serveur exporté (reprise de l'export) ; RESTIC_PASSWORD
+ est nouveau : il protège les sauvegardes de ce serveur.
+EOF
+    fi
+    if [[ "$TMS_PRINT_SECRETS" == "1" && -n "${TMS_IMPORT_FILE:-}" ]]; then
+        cat <<EOF
+ Cette valeur n'est affichée qu'une fois et n'est écrite dans aucun journal :
+
+   RESTIC_PASSWORD=$GEN_RESTIC
+
+ Effacez ensuite l'historique du terminal si la session est enregistrée.
+EOF
+    elif [[ "$TMS_PRINT_SECRETS" == "1" ]]; then
         cat <<EOF
  Ces valeurs ne sont affichées qu'une fois et ne sont écrites dans aucun journal :
 
@@ -462,7 +546,22 @@ on_exit() {
     fi
 }
 
+usage() {
+    echo "Usage : install.sh [--import <fichier d'export>]" >&2
+    exit 2
+}
+
 main() {
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            --import)
+                [[ $# -ge 2 && -n "$2" ]] || usage
+                export TMS_IMPORT_FILE="$2"
+                shift 2
+                ;;
+            *) usage ;;
+        esac
+    done
     [[ -n "${TMS_INSTALL_ENV:-}" ]] && load_settings_file "$TMS_INSTALL_ENV"
     [[ "$(id -u)" -eq 0 ]] || die "Ce script doit être exécuté en root."
 
@@ -470,6 +569,7 @@ main() {
     [[ ! -e "$TMS_DIR/.env" ]] || die "Installation existante détectée : utilisez ops/update.sh"
 
     check_settings
+    [[ -z "${TMS_IMPORT_FILE:-}" ]] || ask_import_password
     trap on_exit EXIT
     ensure_packages
     ensure_docker
@@ -480,8 +580,14 @@ main() {
     install_bundle
     write_env
     start_stack
-    run_tms_install
-    install_backup_timer
+    if [[ -n "${TMS_IMPORT_FILE:-}" ]]; then
+        # Backups first: an import that fails can simply be run again.
+        install_backup_timer
+        run_import
+    else
+        run_tms_install
+        install_backup_timer
+    fi
     print_summary
 }
 

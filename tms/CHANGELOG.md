@@ -5,6 +5,49 @@ Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) ; ve
 
 ## [Non publié]
 
+## [0.8.2] - 2026-11-17
+
+Sauvegardes : suivi dans l'application, sauvegarde à la demande, et export / import en un fichier chiffré pour
+déménager vers un autre serveur sans perte.
+
+### Ajouté
+
+- **Page Administration › Sauvegardes** (droit `settings.manage`, absente en mode multi-organismes) : dernière
+  sauvegarde, copie hors site, sauvegardes disponibles ; **pastille rouge** sur « Sauvegardes » dans le menu de
+  l'administrateur si la dernière sauvegarde a échoué, date de plus de 36 heures ou est inconnue.
+- **Sauvegarder maintenant** : demande déposée par l'application, exécutée aussitôt sur le serveur par
+  `tms-backup-request.path` (`ops/backup.sh --tag manuel`) ; demande inscrite au journal d'audit, remise en attente si
+  une autre opération de maintenance empêche la sauvegarde de démarrer, signalée sur la page au bout de 10 minutes sans
+  prise en charge ; la page se met à jour d'elle-même tant qu'une sauvegarde est demandée ou en cours.
+- **Fichier d'état** `ops/backup-status.json` (et `backup-running.json`, `backup-request.json`) dans le volume
+  `storage`, hors de `storage/app` : écrit par `ops/backup.sh` à chaque fin, réussie ou non.
+- **Export / import pour déménager** : `ops/export.sh` (un seul fichier chiffré par mot de passe d'export, empreinte
+  SHA-256), `ops/import.sh <fichier>` et `install.sh --import <fichier>` (base, fichiers, `APP_KEY`, connecteurs et 2FA
+  repris ; sauvegarde de sécurité `pre-import` ; récapitulatif de contrôle ; refus d'un export plus récent que la
+  version installée).
+- **Test de déménagement** (bats, piles jetables) : mêmes nombres de lignes par table, mêmes fichiers, secret de
+  connecteur et 2FA valides, refus sans modification (mauvais mot de passe, fichier tronqué, version trop récente).
+- **Copie hors site en SFTP** : `RESTIC_REMOTE_SSH_KEY` (clé SSH dédiée) et `RESTIC_REMOTE_SSH_KNOWN_HOSTS`
+  (empreintes du NAS), obligatoires pour une adresse `sftp:` ; montés en lecture seule pour restic, empreinte vérifiée
+  strictement (`StrictHostKeyChecking=yes`), clé jamais affichée.
+- **`ops/export.sh --stop`** : arrête l'application de l'ancien serveur avant la sauvegarde de l'export (rien de saisi
+  après l'export ne peut manquer, aucune tâche ne tourne en double), désactive ses sauvegardes automatiques après un
+  export réussi et affiche la commande pour le remettre en service ; redémarre l'application si l'export échoue.
+- **Guide** : copie hors site (NAS en SFTP, stockage compatible S3), vérification sur la page et procédure de
+  déménagement (`docs/install.md`, `docs/admin.md` § 17).
+
+### Modifié
+
+- `ops/restore.sh` accepte un dépôt autre que le dépôt local (`TMS_RESTORE_REPOSITORY`, `TMS_RESTORE_PASSWORD`, par
+  l'environnement uniquement) ; `ops/update.sh` et l'installateur créent `storage/ops` et activent la sauvegarde à la
+  demande.
+
+### Sécurité
+
+- Aucune donnée téléchargeable depuis le navigateur : un compte administrateur volé ne peut pas emporter la base.
+- Le conteneur `app` n'obtient ni accès Docker ni secret restic ; mots de passe d'export et d'import transmis par
+  l'environnement ou saisis, jamais en argument de commande ni dans un journal.
+
 ## [0.8.1] - 2026-11-17
 
 Écrans de la formation : la page d'une session se lit en étapes avec une Synthèse d'avancement, les sessions se suivent

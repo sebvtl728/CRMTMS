@@ -29,6 +29,8 @@ export interface NavItem {
     isActive?: boolean;
     /** Count shown beside the entry (hidden at 0). */
     badge?: number;
+    /** A red dot on the entry (e.g. backup in trouble); the text is its accessible label. */
+    alert?: string | null;
 }
 
 export interface SharedData {
@@ -38,6 +40,10 @@ export interface SharedData {
     auth: Auth;
     /** Menu badge of « À faire »: overdue + today. */
     todo_count: number;
+    /** The « Sauvegardes » page exists (self-hosted install). */
+    backups_enabled: boolean;
+    /** French banner text about the backups (settings.manage, single mode), null when all is well. */
+    backup_alert: string | null;
     [key: string]: unknown;
 }
 

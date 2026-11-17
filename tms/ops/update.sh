@@ -17,7 +17,8 @@
 #   5. State file .update-in-progress written (old version, target, snapshot), previous .env
 #      and bundle files kept in .bundle-previous, new files swapped in (one rename each),
 #      new .env, ops/migrate.sh, compose up -d --wait, /health within 90 s reporting the new
-#      version: « Mise à jour vers X.Y.Z réussie », state file removed.
+#      version: « Mise à jour vers X.Y.Z réussie », state file removed. Then storage/ops and the
+#      units of « Sauvegarder maintenant » are (re)installed (lib.sh enable_backup_requests).
 # Any failure during step 5 rolls back (EXIT trap, errexit cannot skip it; INT, TERM and HUP
 # end in the trap too): previous files and .env, restore.sh <snapshot> (database + storage),
 # stack restarted on the previous version, exit 1. If the rollback fails: exit 2, the state
@@ -353,6 +354,8 @@ compose up -d --wait --wait-timeout 300 --force-recreate >&2
 wait_health 90 "$TARGET"
 PHASE="done"
 rm -f "$STATE_FILE" "$PREV_DIR/SWAPPED"
+# « Sauvegarder maintenant »: storage/ops and the request units of this version (idempotent).
+enable_backup_requests || log_info "Sauvegarde à la demande non activée : la mise à jour reste valide."
 
 log_info "Sauvegarde d'avant mise à jour : snapshot $SNAPSHOT ; fichiers et .env de la version $OLD_VERSION dans $PREV_DIR."
 log_info "Mise à jour vers $TARGET réussie"

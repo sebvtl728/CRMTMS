@@ -76,6 +76,12 @@ teardown_file() {
     TMS_ENV_FILE="$STACK_DIR/env.nopass" run "$TMS_ROOT/ops/backup.sh"
     [ "$status" -ne 0 ]
     [[ "$output" == *"RESTIC_PASSWORD"* ]]
+    # The failure is recorded for the application too (no repository readable: no list).
+    json=$(backup_status)
+    [ "$(jq -r .success <<<"$json")" = "false" ]
+    [[ "$(jq -r .error <<<"$json")" == "Variable RESTIC_PASSWORD manquante"* ]] || false
+    [ "$(jq -c .snapshots <<<"$json")" = "[]" ]
+    refute_secrets "$json"
 }
 
 @test "only caddy publishes ports; postgres and redis are not exposed" {
@@ -139,6 +145,132 @@ teardown_file() {
     load_env
     run restic_run -- snapshots --json
     [[ "$output" == *'"version:bats"'* ]]
+}
+
+# refute <cmd...>: fails when the command succeeds (a bare `! cmd` never fails a bats test).
+refute() {
+    if "$@"; then return 1; fi
+}
+
+# backup_status: the status file, read by the app container user (as the application does).
+backup_status() {
+    compose exec -T app cat storage/ops/backup-status.json
+}
+
+# refute_secrets <text>: none of the secret values of .env appears in the text.
+refute_secrets() {
+    local name value
+    for name in RESTIC_PASSWORD APP_KEY POSTGRES_SUPERUSER_PASSWORD POSTGRES_OWNER_PASSWORD POSTGRES_APP_PASSWORD REDIS_PASSWORD; do
+        value=$(sed -n "s/^${name}=//p" "$TMS_ENV_FILE")
+        [ -n "$value" ]
+        [[ "$1" != *"$value"* ]] || false
+    done
+}
+
+@test "a successful backup writes the status file with the snapshot and the snapshot list" {
+    # storage/ops, as the installer and the updater prepare it.
+    enable_backup_requests
+    # A pending request is left alone by a backup that is not the requested one.
+    compose exec -T app sh -c 'printf "{\"requested_at\":\"2026-11-17T10:00:00+01:00\",\"requested_by_id\":\"x\"}" > storage/ops/backup-request.json'
+
+    run "$TMS_ROOT/ops/backup.sh" --tag test
+    [ "$status" -eq 0 ]
+    snap="${lines[${#lines[@]}-1]}"
+    compose exec -T app test -f storage/ops/backup-request.json
+
+    run backup_status
+    [ "$status" -eq 0 ]
+    json="$output"
+    [ "$(jq -r .success <<<"$json")" = "true" ]
+    [ "$(jq -r .snapshot_id <<<"$json")" = "$snap" ]
+    [ "$(jq -r .error <<<"$json")" = "null" ]
+    [ "$(jq -r .version <<<"$json")" = "bats" ]
+    [ "$(jq -r .size_bytes <<<"$json")" -gt 0 ]
+    [[ "$(jq -r .finished_at <<<"$json")" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(Z|[+-][0-9]{2}:[0-9]{2})$ ]] || false
+    [ "$(jq -c .remote <<<"$json")" = '{"configured":false,"success":null}' ]
+    # Newest first, every snapshot of the repository (at most 60), id, time and tags only.
+    [ "$(jq -r '.snapshots[0].id' <<<"$json")" = "$snap" ]
+    [ "$(jq -r '.snapshots[0].tags | index("test") != null' <<<"$json")" = "true" ]
+    [ "$(jq -r '.snapshots[0] | keys | join(",")' <<<"$json")" = "id,tags,time" ]
+    load_env
+    total=$(restic_run -- snapshots --host tms --json | jq length)
+    [ "$(jq '.snapshots | length' <<<"$json")" -eq "$((total < 60 ? total : 60))" ]
+    [ "$(jq -r '[.snapshots[].time] == ([.snapshots[].time] | sort | reverse)' <<<"$json")" = "true" ]
+    refute_secrets "$json"
+
+    # Outside storage/app: never inside a snapshot, so never restored over a newer one.
+    run restic_run -- ls "$snap"
+    [ "$status" -eq 0 ]
+    [[ "$output" != *"backup-status"* ]] || false
+    # The application can write its requests next to it.
+    compose exec -T app sh -c 'touch storage/ops/bats-write && rm storage/ops/bats-write'
+}
+
+@test "ops/backup-running.json exists while the backup runs and is removed at the end" {
+    # A docker shim reads the marker when pg_dump starts (lock held, backup under way).
+    local shim="$STACK_DIR/shim" real_docker volume
+    real_docker=$(command -v docker)
+    volume=$(storage_volume)
+    mkdir -p "$shim"
+    cat >"$shim/docker" <<SH
+#!/usr/bin/env bash
+case "\$*" in
+  *pg_dump*) "$real_docker" run --rm -v "$volume:/s:ro" --entrypoint cat "$RESTIC_IMAGE" /s/ops/backup-running.json >"$STACK_DIR/running-seen" 2>&1 || true ;;
+esac
+exec "$real_docker" "\$@"
+SH
+    chmod +x "$shim/docker"
+
+    PATH="$shim:$PATH" run "$TMS_ROOT/ops/backup.sh" --tag test
+    [ "$status" -eq 0 ]
+    [ "$(jq -r .tag "$STACK_DIR/running-seen")" = "test" ]
+    [[ "$(jq -r .started_at "$STACK_DIR/running-seen")" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$ ]] || false
+    run compose exec -T app test -e storage/ops/backup-running.json
+    [ "$status" -ne 0 ]
+}
+
+@test "the status JSON escapes quotes and newlines of the error message" {
+    local volume
+    volume=$(storage_volume)
+    printf '' | write_backup_status "$volume" false "" "$(printf 'Échec "de" la copie\nligne 2 \\ fin')" "" true false
+    json=$(backup_status)
+    [ "$(jq -r .error <<<"$json")" = "$(printf 'Échec "de" la copie\nligne 2 \\ fin')" ]
+    [ "$(jq -c .remote <<<"$json")" = '{"configured":true,"success":false}' ]
+    [ "$(jq -c .snapshots <<<"$json")" = "[]" ]
+    compose exec -T app sh -c 'ls -A storage/ops' | refute grep -q '^\.tmp'
+}
+
+@test "a failed backup writes success=false with the French error and no snapshot" {
+    compose stop postgres >&2
+    run "$TMS_ROOT/ops/backup.sh"
+    backup_rc=$status
+    compose up -d --wait >&2
+    [ "$backup_rc" -ne 0 ]
+
+    run backup_status
+    [ "$status" -eq 0 ]
+    json="$output"
+    [ "$(jq -r .success <<<"$json")" = "false" ]
+    [ "$(jq -r .error <<<"$json")" = "Échec de pg_dump." ]
+    run compose exec -T app test -e storage/ops/backup-running.json
+    [ "$status" -ne 0 ]
+    [ "$(jq -r .snapshot_id <<<"$json")" = "null" ]
+    [ "$(jq -r .size_bytes <<<"$json")" = "null" ]
+    # The snapshots taken before are still listed.
+    [ "$(jq '.snapshots | length' <<<"$json")" -ge 1 ]
+    refute_secrets "$json"
+}
+
+@test "backup --tag manuel consumes the request of the application" {
+    compose exec -T app sh -c 'echo "{}" > storage/ops/backup-request.json'
+    run "$TMS_ROOT/ops/backup.sh" --tag manuel
+    [ "$status" -eq 0 ]
+    snap="${lines[${#lines[@]}-1]}"
+    run compose exec -T app test -e storage/ops/backup-request.json
+    [ "$status" -ne 0 ]
+    json=$(backup_status)
+    [ "$(jq -r .snapshot_id <<<"$json")" = "$snap" ]
+    [ "$(jq -r '.snapshots[0].tags | index("manuel") != null' <<<"$json")" = "true" ]
 }
 
 @test "backup still succeeds with the app container stopped" {
@@ -238,4 +370,71 @@ teardown_file() {
     [ "$(psql_owner "select has_schema_privilege('tms_app', 'public', 'CREATE')")" = "f" ]
 
     psql_owner "alter default privileges for role tms_owner in schema public grant delete on tables to tms_app" >/dev/null
+}
+
+@test "a requested backup that cannot take the lock puts the request back and fails" {
+    enable_backup_requests
+    # The unit removed the request before starting backup.sh (ExecStartPre).
+    compose exec -T app rm -f storage/ops/backup-request.json
+    before=$(backup_status)
+    # exec: the killed process is the one holding the lock (fd 9), no orphan keeps it.
+    bash -c 'source "$1/ops/lib.sh"; tms_lock 0; echo verrouillé; exec sleep 60' _ "$TMS_ROOT" >"$BATS_TEST_TMPDIR/holder" 2>&1 3>&- &
+    local holder=$!
+    until grep -q verrouillé "$BATS_TEST_TMPDIR/holder"; do sleep 0.2; done
+
+    TMS_BACKUP_LOCK_WAIT=2 run "$TMS_ROOT/ops/backup.sh" --tag manuel
+    kill "$holder"
+    wait "$holder" 2>/dev/null || true
+    [ "$status" -ne 0 ]
+    [[ "$output" == *"Une autre opération de maintenance"* ]] || false
+    [[ "$output" == *"Demande de sauvegarde remise en attente"* ]] || false
+
+    # Back for the application (pending, written by the app user) and for the unit (next run).
+    run compose exec -T app cat storage/ops/backup-request.json
+    [ "$status" -eq 0 ]
+    [[ "$(jq -r .requested_at <<<"$output")" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$ ]] || false
+    [ "$(jq -r .requested_by_id <<<"$output")" = "null" ]
+    compose exec -T app sh -c 'rm storage/ops/backup-request.json'
+    # Nothing ran: no status written, no running marker left.
+    [ "$(backup_status)" = "$before" ]
+    run compose exec -T app test -e storage/ops/backup-running.json
+    [ "$status" -ne 0 ]
+
+    # Any other backup that cannot take the lock creates no request.
+    bash -c 'source "$1/ops/lib.sh"; tms_lock 0; echo verrouillé; exec sleep 60' _ "$TMS_ROOT" >"$BATS_TEST_TMPDIR/holder2" 2>&1 3>&- &
+    holder=$!
+    until grep -q verrouillé "$BATS_TEST_TMPDIR/holder2"; do sleep 0.2; done
+    TMS_BACKUP_LOCK_WAIT=1 run "$TMS_ROOT/ops/backup.sh" --tag nightly
+    kill "$holder"
+    wait "$holder" 2>/dev/null || true
+    [ "$status" -ne 0 ]
+    run compose exec -T app test -e storage/ops/backup-request.json
+    [ "$status" -ne 0 ]
+}
+
+@test "sftp remote copy: a failure is recorded without ever showing the SSH key" {
+    local key="$STACK_DIR/tms_nas" known="$STACK_DIR/tms_nas_known_hosts"
+    printf -- '-----BEGIN OPENSSH PRIVATE KEY-----\ncle-privee-bats-ne-jamais-afficher\n-----END OPENSSH PRIVATE KEY-----\n' >"$key"
+    chmod 600 "$key"
+    echo "127.0.0.1 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIbats" >"$known"
+    cp "$TMS_ENV_FILE" "$STACK_DIR/env.sftp"
+    printf 'RESTIC_REMOTE_REPOSITORY=sftp:bats@127.0.0.1:/depot\nRESTIC_REMOTE_SSH_KEY=%s\nRESTIC_REMOTE_SSH_KNOWN_HOSTS=%s\n' "$key" "$known" >>"$STACK_DIR/env.sftp"
+
+    TMS_ENV_FILE="$STACK_DIR/env.sftp" run "$TMS_ROOT/ops/backup.sh" --tag test
+    [ "$status" -ne 0 ]
+    [[ "$output" == *"Échec de la copie vers le dépôt distant."* ]] || false
+    [[ "$output" != *"cle-privee-bats"* ]] || false
+    json=$(backup_status)
+    [ "$(jq -c .remote <<<"$json")" = '{"configured":true,"success":false}' ]
+    [ "$(jq -r .error <<<"$json")" = "Échec de la copie vers le dépôt distant." ]
+    [[ "$json" != *"cle-privee-bats"* ]] || false
+    refute_secrets "$json"
+
+    # Without the known hosts file: refused before any connection, French message recorded.
+    sed -i.bak '/^RESTIC_REMOTE_SSH_KNOWN_HOSTS=/d' "$STACK_DIR/env.sftp"
+    TMS_ENV_FILE="$STACK_DIR/env.sftp" run "$TMS_ROOT/ops/backup.sh" --tag test
+    [ "$status" -ne 0 ]
+    json=$(backup_status)
+    [[ "$(jq -r .error <<<"$json")" == "Copie SFTP : RESTIC_REMOTE_SSH_KNOWN_HOSTS (empreintes du serveur distant, ssh-keyscan) manquant"* ]] || false
+    [[ "$output$json" != *"cle-privee-bats"* ]] || false
 }

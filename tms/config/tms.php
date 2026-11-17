@@ -27,6 +27,11 @@ return [
     // Recipient of the operational alerts (failed backups...), see `php artisan tms:alert`.
     'alert_email' => env('TMS_ALERT_EMAIL') ?: null,
 
+    // Folder shared with the host (status of the backups, on-demand requests): inside the storage volume,
+    // outside storage/app (never backed up nor restored). Null = storage_path('ops'); no environment
+    // setting on purpose (the host scripts always use that folder), tests override it with config().
+    'ops_path' => null,
+
     // Follow the Vite dev server (public/hot) when it runs; false = always serve public/build (e2e stack).
     'vite_hot' => $bool('TMS_VITE_HOT', true),
 

@@ -6,13 +6,22 @@
 #
 # The last line of stdout is the restic snapshot id. Any failure sends an e-mail to
 # TMS_ALERT_EMAIL (php artisan tms:alert) and exits non-zero.
+# Every run, successful or not, ends by writing ops/backup-status.json in the storage volume
+# (lib.sh write_backup_status), read by Administration › Sauvegardes. --tag manuel is the
+# run asked for by the application: it consumes ops/backup-request.json once it holds the lock.
+# While it runs (lock held), ops/backup-running.json {started_at, tag} exists.
 #
 # .env: RESTIC_PASSWORD (required), RESTIC_REPOSITORY (default /var/backups/tms),
 # RESTIC_REMOTE_REPOSITORY, RESTIC_REMOTE_PASSWORD (default RESTIC_PASSWORD),
 # RESTIC_REMOTE_ENV_FILE (credentials of the remote backend, e.g. AWS_ACCESS_KEY_ID),
+# RESTIC_REMOTE_SSH_KEY and RESTIC_REMOTE_SSH_KNOWN_HOSTS (sftp: remote only, both required: path
+# of the dedicated private key, root-owned mode 600, and of the remote host keys from ssh-keyscan;
+# mounted read-only in the restic container, host key checked strictly; see restic_remote_copy),
 # TMS_ALERT_EMAIL, TMS_BACKUP_TMPDIR (staging directory, default /var/tmp).
 # Takes the maintenance lock (shared with update.sh and restore.sh), waiting up to
-# TMS_BACKUP_LOCK_WAIT seconds (default 900) for a running operation to finish.
+# TMS_BACKUP_LOCK_WAIT seconds (default 900) for a running operation to finish. --tag manuel: the
+# unit removed the request before starting; when the lock cannot be taken, the request is written
+# back (the next attempt starts at once) and the run fails without a status (nothing ran).
 set -euo pipefail
 
 # shellcheck source=lib.sh
@@ -21,6 +30,10 @@ source "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
 TAG=""
 STAGE=""
 SUCCESS=0
+STORAGE_VOLUME=""
+SNAPSHOT_ID=""
+SIZE_BYTES=""
+REMOTE_SUCCESS=""
 
 usage() {
     echo "Usage : ops/backup.sh [--tag <label>]" >&2
@@ -38,7 +51,19 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
+# put_request_back: EXIT trap while waiting for the lock of a requested backup (--tag manuel).
+put_request_back() {
+    local status=$? volume
+    ((status != 0)) || return 0
+    if volume="$(storage_volume)" && restore_backup_request "$volume"; then
+        log_info "Demande de sauvegarde remise en attente (ops/backup-request.json) : elle sera relancée."
+    else
+        log_error "Demande de sauvegarde perdue : relancez « Sauvegarder maintenant » une fois l'opération en cours terminée."
+    fi
+}
+[[ "$TAG" != "manuel" ]] || trap put_request_back EXIT
 tms_lock "${TMS_BACKUP_LOCK_WAIT:-900}"
+trap - EXIT
 
 send_alert() {
     local message="$1"
@@ -53,11 +78,32 @@ send_alert() {
     fi
 }
 
+# record_status <error>: the status file of this run (best effort: never changes the exit code).
+record_status() {
+    local error="$1" success=true snapshots="" remote_configured=false
+    [[ -z "$error" ]] || success=false
+    [[ -z "${RESTIC_REMOTE_REPOSITORY:-}" ]] || remote_configured=true
+    if [[ -n "${RESTIC_PASSWORD:-}" ]]; then
+        snapshots="$(restic_run -- snapshots --host tms --json 2>/dev/null)" || snapshots=""
+    fi
+    [[ -n "$STORAGE_VOLUME" ]] || STORAGE_VOLUME="$(storage_volume)" || STORAGE_VOLUME=""
+    if [[ -z "$STORAGE_VOLUME" ]] \
+        || ! printf '%s' "$snapshots" | write_backup_status "$STORAGE_VOLUME" "$success" "$SNAPSHOT_ID" "$error" \
+            "$SIZE_BYTES" "$remote_configured" "$REMOTE_SUCCESS"; then
+        log_error "État de la sauvegarde non enregistré pour l'application."
+    fi
+}
+
 on_exit() {
-    local status=$?
+    local status=$? error=""
     [[ -z "$STAGE" ]] || rm -rf "$STAGE"
+    [[ "$SUCCESS" -eq 1 ]] || error="${LAST_ERROR:-Erreur inattendue (code ${status}).}"
+    record_status "$error"
+    if [[ -n "$STORAGE_VOLUME" ]]; then
+        remove_backup_running "$STORAGE_VOLUME" || log_info "Indicateur de sauvegarde en cours non supprimé (ops/backup-running.json)."
+    fi
     if [[ "$SUCCESS" -ne 1 ]]; then
-        send_alert "La sauvegarde de $(hostname) a échoué le $(date '+%d/%m/%Y à %H:%M') : ${LAST_ERROR:-erreur inattendue (code ${status})}"
+        send_alert "La sauvegarde de $(hostname) a échoué le $(date '+%d/%m/%Y à %H:%M') : ${error}"
     fi
 }
 trap on_exit EXIT
@@ -75,6 +121,15 @@ ensure_repo() {
     fi
 }
 
+# Read straight from the storage volume: works even when the app container is down.
+STORAGE_VOLUME="$(storage_volume)" || die "Volume storage introuvable."
+# « Sauvegarde en cours… » for the application, before the request disappears.
+write_backup_running "$STORAGE_VOLUME" "$TAG" || log_info "Indicateur de sauvegarde en cours non écrit (ops/backup-running.json)."
+if [[ "$TAG" == "manuel" ]]; then
+    # A click during this run creates a new request, run after this one.
+    consume_backup_request "$STORAGE_VOLUME" || log_info "Demande de sauvegarde non supprimée (ops/backup-request.json)."
+fi
+
 STAGE="$(mktemp -d "${TMS_BACKUP_TMPDIR:-/var/tmp}/tms-backup.XXXXXX")"
 
 log_info "Export de la base de données."
@@ -86,17 +141,15 @@ compose exec -T postgres pg_dump -U postgres -d tms -Fc \
 compose exec -T postgres pg_restore -l <"$STAGE/db.dump" >/dev/null || die "L'export de la base de données est illisible."
 
 log_info "Archivage de storage/app."
-# Read straight from the storage volume: works even when the app container is down.
-project="$(compose config | sed -n 's/^name: *//p' | head -n 1)"
-volume="$(docker volume ls -q --filter "label=com.docker.compose.project=${project}" --filter "label=com.docker.compose.volume=storage" | head -n 1)"
-[[ -n "$volume" ]] || die "Volume storage introuvable pour le projet ${project}."
-docker run --rm -v "${volume}:/s:ro" --entrypoint tar "$RESTIC_IMAGE" -C /s -cf - app >"$STAGE/storage-app.tar" \
+docker run --rm -v "${STORAGE_VOLUME}:/s:ro" --entrypoint tar "$RESTIC_IMAGE" -C /s -cf - app >"$STAGE/storage-app.tar" \
     || die "Échec de l'archivage de storage/app."
 [[ -s "$STAGE/storage-app.tar" ]] || die "L'archive de storage/app est vide."
 
 # APP_KEY encrypts connector secrets and 2FA secrets: without it a restored database is
 # unusable on a fresh server. It travels inside the (encrypted) snapshot.
-printf 'APP_KEY=%s\nTMS_VERSION=%s\n' "${APP_KEY:-}" "${TMS_VERSION:-}" >"$STAGE/meta.env"
+# Mode and number of organismes: an import refuses a multi-organismes export on a single install.
+tenants="$(compose exec -T postgres psql -U postgres -d tms -tA -c 'select count(*) from tenants' 2>/dev/null | tr -d '[:space:]')" || tenants=""
+printf 'APP_KEY=%s\nTMS_VERSION=%s\nTMS_MODE=%s\nTMS_TENANTS=%s\n' "${APP_KEY:-}" "${TMS_VERSION:-}" "${TMS_MODE:-single}" "$tenants" >"$STAGE/meta.env"
 chmod 600 "$STAGE/meta.env"
 
 ensure_repo
@@ -109,6 +162,8 @@ summary="$(restic_run -v "$STAGE:/backup-data:ro" -- backup --host tms --json "$
     || die "Échec de restic backup."
 snapshot_id="$(printf '%s\n' "$summary" | sed -n 's/.*"message_type":"summary".*"snapshot_id":"\([0-9a-f]*\)".*/\1/p' | tail -n 1)"
 [[ -n "$snapshot_id" ]] || die "Identifiant du snapshot introuvable dans la sortie de restic."
+SNAPSHOT_ID="$snapshot_id"
+SIZE_BYTES="$(printf '%s\n' "$summary" | sed -n 's/.*"message_type":"summary".*"total_bytes_processed":\([0-9]*\).*/\1/p' | tail -n 1)"
 
 log_info "Application de la rétention (14 jours, 8 semaines, 12 mois)."
 restic_run -- forget --prune --host tms --keep-daily 14 --keep-weekly 8 --keep-monthly 12 >/dev/null \
@@ -116,17 +171,10 @@ restic_run -- forget --prune --host tms --keep-daily 14 --keep-weekly 8 --keep-m
 
 if [[ -n "${RESTIC_REMOTE_REPOSITORY:-}" ]]; then
     log_info "Copie vers le dépôt distant."
-    remote_args=()
-    [[ -z "${RESTIC_REMOTE_ENV_FILE:-}" ]] || remote_args+=(--env-file "$RESTIC_REMOTE_ENV_FILE")
-    (
-        export RESTIC_FROM_REPOSITORY="$RESTIC_REPOSITORY" RESTIC_FROM_PASSWORD="$RESTIC_PASSWORD"
-        export RESTIC_REPOSITORY="$RESTIC_REMOTE_REPOSITORY" RESTIC_PASSWORD="${RESTIC_REMOTE_PASSWORD:-$RESTIC_PASSWORD}"
-        if ! restic_run ${remote_args[@]+"${remote_args[@]}"} -- cat config >/dev/null 2>&1; then
-            restic_run ${remote_args[@]+"${remote_args[@]}"} -- init --from-repo "$RESTIC_FROM_REPOSITORY" --copy-chunker-params >/dev/null
-        fi
-        restic_run ${remote_args[@]+"${remote_args[@]}"} -- copy "$snapshot_id" >/dev/null
-        restic_run ${remote_args[@]+"${remote_args[@]}"} -- forget --prune --host tms --keep-daily 14 --keep-weekly 8 --keep-monthly 12 >/dev/null
-    ) || die "Échec de la copie vers le dépôt distant."
+    REMOTE_SUCCESS=false
+    LAST_ERROR=""
+    restic_remote_copy "$snapshot_id" || die "${LAST_ERROR:-Échec de la copie vers le dépôt distant.}"
+    REMOTE_SUCCESS=true
 fi
 
 SUCCESS=1

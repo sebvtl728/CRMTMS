@@ -11,6 +11,8 @@ TMS_COMPOSE_FILE="${TMS_COMPOSE_FILE:-$TMS_DIR/compose.prod.yaml}"
 RESTIC_IMAGE="${RESTIC_IMAGE:-restic/restic:0.18.0}"
 # Lock shared by update.sh, backup.sh and restore.sh (one maintenance operation at a time).
 TMS_LOCK_FILE="${TMS_LOCK_FILE:-$TMS_DIR/.ops.lock}"
+# systemd units of the backups (installer, updater).
+TMS_SYSTEMD_DIR="${TMS_SYSTEMD_DIR:-/etc/systemd/system}"
 # GitHub repository publishing the releases ("owner/repo"); same constant in
 # install/install.sh and install/proxmox.sh. Until set, TMS_DIST_URL is required.
 TMS_GITHUB_REPO="${TMS_GITHUB_REPO:-sebvtl728/CRMTMS}"
@@ -113,8 +115,11 @@ fetch_bundle() {
     verify_checksum "$work/$archive" "$expected" || die "Archive refusée : somme de contrôle invalide ($archive)."
     log_info "Archive $archive vérifiée (version $TMS_VERSION)."
 
-    # Never extract absolute paths or parent references.
-    if tar -tzf "$work/$archive" | grep -Eq '(^/|(^|/)\.\.(/|$))'; then
+    # Never extract absolute paths or parent references. (A here-string, not a pipe into
+    # grep -q: under pipefail an early match would end in SIGPIPE and read as « no match ».)
+    local listing
+    listing="$(tar -tzf "$work/$archive")" || die "Archive illisible : $archive."
+    if grep -Eq '(^/|(^|/)\.\.(/|$))' <<<"$listing"; then
         die "Archive refusée : chemins non sûrs."
     fi
     mkdir -p "$work/bundle"
@@ -129,7 +134,7 @@ fetch_bundle() {
     fi
     local f
     for f in compose.prod.yaml .env.prod.example ops/lib.sh ops/migrate.sh ops/backup.sh ops/restore.sh ops/update.sh \
-        docker/caddy/Caddyfile docker/postgres/init.sh docker/postgres/init.sql release.env; do
+        ops/export.sh ops/import.sh docker/caddy/Caddyfile docker/postgres/init.sh docker/postgres/init.sql release.env; do
         [[ -f "$BUNDLE_ROOT/$f" ]] || die "Archive invalide : $f manquant."
     done
     # Image of this version, pinned by digest (verified bundle -> .env -> compose).
@@ -266,6 +271,57 @@ load_env() {
     done <"$TMS_ENV_FILE"
 }
 
+# env_get <KEY>: value of KEY in the env file (first occurrence, like load_env; quotes removed,
+# never evaluated), empty when absent. Exports nothing: a script that starts other ops scripts
+# (import.sh) must not hand them values that would win over their own .env (APP_KEY adopted
+# by restore.sh, for instance).
+env_get() {
+    local line value
+    [[ -f "$TMS_ENV_FILE" ]] || return 0
+    while IFS= read -r line || [[ -n "$line" ]]; do
+        [[ "$line" =~ ^[[:space:]]*([A-Za-z_][A-Za-z0-9_]*)=(.*)$ && "${BASH_REMATCH[1]}" == "$1" ]] || continue
+        value="${BASH_REMATCH[2]}"
+        if [[ "$value" =~ ^\"(.*)\"$ ]] || [[ "$value" =~ ^\'(.*)\'$ ]]; then
+            value="${BASH_REMATCH[1]}"
+        fi
+        printf '%s' "$value"
+        return 0
+    done <"$TMS_ENV_FILE"
+}
+
+# env_set <KEY> <VALUE>: replaces (or appends) KEY in the env file; atomic, mode 600.
+env_set() {
+    local tmp
+    tmp="$(umask 077 && mktemp "${TMS_ENV_FILE}.XXXXXX")" || return 1
+    if ! { grep -v "^$1=" "$TMS_ENV_FILE" || true; printf '%s=%s\n' "$1" "$2"; } >"$tmp" \
+        || ! chmod 600 "$tmp" || ! mv -f "$tmp" "$TMS_ENV_FILE"; then
+        rm -f "$tmp"
+        return 1
+    fi
+}
+
+# read_password <prompt>: one line typed without echo (stdin), printed on stdout for a command
+# substitution (never on a command line nor in a log). Fails at end of input.
+read_password() {
+    local value
+    printf '%s' "$1" >&2
+    if ! IFS= read -rs value; then
+        printf '\n' >&2
+        return 1
+    fi
+    printf '\n' >&2
+    printf '%s' "$value"
+}
+
+# sha256_of <file>: hexadecimal SHA-256 of the file.
+sha256_of() {
+    if command -v sha256sum >/dev/null 2>&1; then
+        sha256sum "$1" | awk '{print $1}'
+    else
+        shasum -a 256 "$1" | awk '{print $1}'
+    fi
+}
+
 # require_var <NAME>: dies naming the variable when it is empty.
 require_var() {
     [[ -n "${!1:-}" ]] || die "Variable $1 manquante dans $TMS_ENV_FILE"
@@ -296,6 +352,256 @@ restic_run() {
         -e RESTIC_REPOSITORY -e RESTIC_PASSWORD -e RESTIC_FROM_REPOSITORY -e RESTIC_FROM_PASSWORD \
         ${docker_args[@]+"${docker_args[@]}"} \
         "$RESTIC_IMAGE" --no-cache "$@"
+}
+
+# export_archive_check <file>: the file is a tar holding a restic repository only (ops/export.sh):
+# regular files and directories under repo/, no absolute path, no parent reference, repo/config
+# present. Returns 1 when tar cannot read it (truncated, not a tar), 2 when the content is
+# unexpected. Listings are matched through here-strings (no pipe into grep -q: see fetch_bundle).
+export_archive_check() {
+    local listing names
+    if ! listing="$(tar -tvf "$1" 2>/dev/null)" || ! names="$(tar -tf "$1" 2>/dev/null)"; then
+        return 1
+    fi
+    # GNU tar may read a truncated archive without error (cut between two members): every
+    # member must read to its end, and a complete archive ends with two zero blocks.
+    tar -xOf "$1" >/dev/null 2>&1 || return 1
+    local size
+    size="$(wc -c <"$1" | tr -d ' ')"
+    [[ "$size" -ge 1024 && $((size % 512)) -eq 0 ]] || return 1
+    [[ -z "$(tail -c 1024 "$1" | tr -d '\0')" ]] || return 1
+    if grep -q '^[^-d]' <<<"$listing" \
+        || grep -Evq '^repo(/|$)' <<<"$names" \
+        || grep -Eq '(^|/)\.\.(/|$)' <<<"$names" \
+        || ! grep -qx 'repo/config' <<<"$names"; then
+        return 2
+    fi
+}
+
+# restic_snapshot_ids: full ids of the snapshots of RESTIC_REPOSITORY, one per line (fails when
+# the repository cannot be read).
+restic_snapshot_ids() {
+    local json
+    json="$(restic_run -- snapshots --json)" || return 1
+    printf '%s' "$json" | { grep -o '"id":"[0-9a-f]\{64\}"' || true; } | sed 's/^"id":"\(.*\)"$/\1/'
+}
+
+# --- Backup status and requests (exchange with the application) ---------------------
+# Both live in the storage volume under ops/, outside storage/app: never inside a snapshot,
+# never restored. The application reads ops/backup-status.json and writes
+# ops/backup-request.json; it has no Docker access and no restic secret.
+
+# storage_volume: name of the storage Docker volume of the stack (compose labels).
+storage_volume() {
+    local project volume
+    project="$(compose config 2>/dev/null | sed -n 's/^name: *//p' | head -n 1)"
+    [[ -n "$project" ]] || return 1
+    volume="$(docker volume ls -q --filter "label=com.docker.compose.project=${project}" --filter "label=com.docker.compose.volume=storage" | head -n 1)"
+    [[ -n "$volume" ]] || return 1
+    printf '%s\n' "$volume"
+}
+
+# Shell run as root in a throwaway container with the volume at /s, before any write in /s/ops
+# (a directory the app container user owns): refuses a symlinked ops/, then creates it or
+# re-applies its owner and mode. Owner = the app container user, whatever its uid: owner of the
+# volume root, or of storage/app when the root is still root-owned.
+# shellcheck disable=SC2016  # expanded inside the container
+TMS_OPS_DIR_SH='set -e
+if [ -L /s/ops ]; then echo "storage/ops est un lien symbolique : opération refusée." >&2; exit 1; fi
+owner="$(stat -c %u:%g /s)"
+if [ "${owner%%:*}" = 0 ] && [ -d /s/app ] && [ ! -L /s/app ]; then owner="$(stat -c %u:%g /s/app)"; fi
+if [ "${owner%%:*}" = 0 ]; then echo "Utilisateur de l application introuvable dans le volume storage." >&2; exit 1; fi
+mkdir -p /s/ops
+chown -h "$owner" /s/ops
+chmod 770 /s/ops'
+
+# ensure_ops_dir <volume>: storage/ops exists, readable and writable by the app user.
+ensure_ops_dir() {
+    docker run --rm -v "$1:/s" --entrypoint sh "$RESTIC_IMAGE" -c "$TMS_OPS_DIR_SH" >&2
+}
+
+# ops_json_write <volume> <file name> <jq program> [ENV NAME...]: writes ops/<file name>
+# atomically (mktemp in ops/, then rename; the temporary file never survives a failure), mode
+# 640, owned by the app user. The program (jq -n) reads the named environment variables
+# ($ENV.NAME) and the JSON on stdin (input). Values never travel on a command line. jq of the
+# restic image: the host only needs Docker.
+ops_json_write() {
+    local volume="$1" name="$2" var
+    local -a env_args=(-e S_PROGRAM -e S_NAME)
+    for var in "${@:4}"; do env_args+=(-e "$var"); done
+    # shellcheck disable=SC2016  # expanded inside the container
+    S_PROGRAM="$3" S_NAME="$name" docker run --rm -i -v "$volume:/s" "${env_args[@]}" \
+        --entrypoint sh "$RESTIC_IMAGE" -c "$TMS_OPS_DIR_SH"'
+tmp="$(mktemp /s/ops/.tmp.XXXXXX)"
+trap '\''rm -f "$tmp"'\'' EXIT
+jq -n "$S_PROGRAM" >"$tmp"
+chown "$owner" "$tmp"
+chmod 640 "$tmp"
+mv -f "$tmp" "/s/ops/$S_NAME"' >&2
+}
+
+# ops_remove <volume> <file name>: removes ops/<file name> (never through a symlinked ops/).
+ops_remove() {
+    # shellcheck disable=SC2016  # expanded inside the container
+    S_NAME="$2" docker run --rm -v "$1:/s" -e S_NAME --entrypoint sh "$RESTIC_IMAGE" -c '
+if [ -L /s/ops ]; then echo "storage/ops est un lien symbolique : opération refusée." >&2; exit 1; fi
+rm -f "/s/ops/$S_NAME"' >&2
+}
+
+# write_backup_status <volume> <success true|false> <snapshot id> <error> <size bytes>
+#   <remote configured true|false> <remote success true|false|"">
+# ops/backup-status.json. stdin: output of « restic snapshots --json » (empty or unreadable: no
+# list); kept newest first, at most 60, id/time/tags only. Empty strings become null.
+write_backup_status() {
+    # shellcheck disable=SC2016  # jq program
+    local program='(try (input | if type == "array" then . else [] end) catch []) as $snaps
+        | def nullable: if . == "" then null else . end;
+        {
+            finished_at: $ENV.S_FINISHED_AT,
+            success: ($ENV.S_SUCCESS == "true"),
+            snapshot_id: ($ENV.S_SNAPSHOT_ID | nullable),
+            error: ($ENV.S_ERROR | nullable),
+            version: ($ENV.S_VERSION | nullable),
+            size_bytes: ($ENV.S_SIZE | nullable | if . == null then null else tonumber end),
+            remote: {
+                configured: ($ENV.S_REMOTE_CONFIGURED == "true"),
+                success: ($ENV.S_REMOTE_SUCCESS | nullable | if . == null then null else . == "true" end)
+            },
+            snapshots: ($snaps | reverse | .[:60] | map({id, time, tags: (.tags // [])}))
+        }'
+    S_FINISHED_AT="$(date -u '+%Y-%m-%dT%H:%M:%SZ')" S_SUCCESS="$2" S_SNAPSHOT_ID="$3" S_ERROR="$4" \
+        S_VERSION="${TMS_VERSION:-}" S_SIZE="$5" S_REMOTE_CONFIGURED="$6" S_REMOTE_SUCCESS="$7" \
+        ops_json_write "$1" backup-status.json "$program" \
+        S_FINISHED_AT S_SUCCESS S_SNAPSHOT_ID S_ERROR S_VERSION S_SIZE S_REMOTE_CONFIGURED S_REMOTE_SUCCESS
+}
+
+# write_backup_running <volume> <tag>: ops/backup-running.json {started_at, tag} while a backup
+# runs (« Sauvegarde en cours… »); removed by backup.sh when it ends (remove_backup_running).
+write_backup_running() {
+    # shellcheck disable=SC2016  # jq program
+    S_STARTED_AT="$(date -u '+%Y-%m-%dT%H:%M:%SZ')" S_TAG="$2" \
+        ops_json_write "$1" backup-running.json '{started_at: $ENV.S_STARTED_AT, tag: $ENV.S_TAG}' S_STARTED_AT S_TAG </dev/null
+}
+
+remove_backup_running() {
+    ops_remove "$1" backup-running.json
+}
+
+# consume_backup_request <volume>: removes ops/backup-request.json (the backup it asked for starts).
+consume_backup_request() {
+    ops_remove "$1" backup-request.json
+}
+
+# restore_backup_request <volume>: writes ops/backup-request.json back ({requested_at,
+# requested_by_id: null}) when the requested backup could not start (lock held by another
+# operation): the unit consumed it before the run, the click must not be lost.
+restore_backup_request() {
+    # shellcheck disable=SC2016  # jq program
+    S_REQUESTED_AT="$(date -u '+%Y-%m-%dT%H:%M:%SZ')" \
+        ops_json_write "$1" backup-request.json '{requested_at: $ENV.S_REQUESTED_AT, requested_by_id: null}' S_REQUESTED_AT </dev/null
+}
+
+# restic_remote_copy <snapshot id>: copies the snapshot of RESTIC_REPOSITORY (RESTIC_PASSWORD) to
+# RESTIC_REMOTE_REPOSITORY (RESTIC_REMOTE_PASSWORD, default RESTIC_PASSWORD; backend credentials
+# in RESTIC_REMOTE_ENV_FILE), created on the first run with the chunker parameters of the local
+# one, then applies the retention there.
+# sftp: repositories: restic runs in a container without the SSH configuration of the host. The
+# dedicated key RESTIC_REMOTE_SSH_KEY and the host keys RESTIC_REMOTE_SSH_KNOWN_HOSTS (both
+# required) are mounted read-only; ssh never asks anything and refuses an unknown or changed host
+# key (StrictHostKeyChecking=yes). Only their paths are ever printed. Errors of the configuration
+# are logged (LAST_ERROR); those of restic only fail.
+restic_remote_copy() {
+    local snapshot="$1" key="${RESTIC_REMOTE_SSH_KEY:-}" known="${RESTIC_REMOTE_SSH_KNOWN_HOSTS:-}"
+    local -a docker_args=() opts=()
+    [[ -z "${RESTIC_REMOTE_ENV_FILE:-}" ]] || docker_args+=(--env-file "$RESTIC_REMOTE_ENV_FILE")
+    if [[ "$RESTIC_REMOTE_REPOSITORY" == sftp:* ]]; then
+        [[ -n "$key" ]] || { log_error "Copie SFTP : RESTIC_REMOTE_SSH_KEY (chemin de la clé SSH dédiée) manquant dans ${TMS_ENV_FILE}."; return 1; }
+        [[ -f "$key" && -r "$key" ]] || { log_error "Copie SFTP : clé SSH introuvable ou illisible (RESTIC_REMOTE_SSH_KEY=${key})."; return 1; }
+        [[ -n "$known" ]] || { log_error "Copie SFTP : RESTIC_REMOTE_SSH_KNOWN_HOSTS (empreintes du serveur distant, ssh-keyscan) manquant dans ${TMS_ENV_FILE}."; return 1; }
+        [[ -f "$known" && -r "$known" ]] || { log_error "Copie SFTP : fichier d'empreintes introuvable ou illisible (RESTIC_REMOTE_SSH_KNOWN_HOSTS=${known})."; return 1; }
+        docker_args+=(-v "$key:/run/tms/ssh_key:ro" -v "$known:/run/tms/known_hosts:ro")
+        opts+=(-o "sftp.args=-i /run/tms/ssh_key -o IdentitiesOnly=yes -o UserKnownHostsFile=/run/tms/known_hosts -o StrictHostKeyChecking=yes -o BatchMode=yes")
+    fi
+    if ! restic_remote_run cat config >/dev/null 2>&1; then
+        restic_remote_run init --from-repo "$RESTIC_REPOSITORY" --copy-chunker-params >/dev/null || return 1
+    fi
+    restic_remote_run copy "$snapshot" >/dev/null || return 1
+    restic_remote_run forget --prune --host tms --keep-daily 14 --keep-weekly 8 --keep-monthly 12 >/dev/null
+}
+
+# restic_remote_run <restic args...>: restic against the remote repository, the local one as the
+# source of copy (variables set for that call only); docker_args and opts of restic_remote_copy.
+restic_remote_run() {
+    local from_repo="$RESTIC_REPOSITORY" from_password="$RESTIC_PASSWORD"
+    RESTIC_FROM_REPOSITORY="$from_repo" RESTIC_FROM_PASSWORD="$from_password" \
+        RESTIC_REPOSITORY="$RESTIC_REMOTE_REPOSITORY" RESTIC_PASSWORD="${RESTIC_REMOTE_PASSWORD:-$from_password}" \
+        restic_run ${docker_args[@]+"${docker_args[@]}"} -- ${opts[@]+"${opts[@]}"} "$@"
+}
+
+# import_mode_check <export mode> <export tenants> <installed mode>: a multi-organismes export
+# goes into a single installation only when it holds one organisme (known count); other mode
+# changes are allowed with a warning. Returns 1 (log_error) when refused.
+import_mode_check() {
+    local export_mode="$1" tenants="$2" installed_mode="$3"
+    if [[ "$export_mode" == "multi" && "$installed_mode" != "multi" ]]; then
+        if [[ ! "$tenants" =~ ^[0-9]+$ ]]; then
+            log_error "Nombre d'organismes de l'export inconnu : installez en mode multi-organismes ou vérifiez l'export."
+            return 1
+        fi
+        if ((tenants > 1)); then
+            log_error "Cet export contient plusieurs organismes : installez en mode multi-organismes."
+            return 1
+        fi
+        log_error "Attention : cet export vient d'une installation multi-organismes et ce serveur est en mode mono-organisme ; son unique organisme deviendra l'organisme par défaut."
+    elif [[ "$export_mode" != "multi" && "$installed_mode" == "multi" ]]; then
+        log_error "Attention : cet export vient d'une installation mono-organisme et ce serveur est en mode multi-organismes : après l'import, associez un nom de domaine à l'organisme (sinon il reste inaccessible)."
+    fi
+    return 0
+}
+
+# enable_backup_requests: « Sauvegarder maintenant » of the application. Creates storage/ops and,
+# on a systemd host where the backup timer is installed, tms-backup-request.path (watches the
+# request file through the volume mount point on the host) and tms-backup-request.service
+# (ops/backup.sh --tag manuel). Idempotent: run by the installer and by every update.
+enable_backup_requests() {
+    local volume mountpoint
+    volume="$(storage_volume)" || { log_error "Volume storage introuvable : sauvegarde à la demande non activée."; return 1; }
+    ensure_ops_dir "$volume" || { log_error "Impossible de créer storage/ops dans le volume ${volume}."; return 1; }
+    if [[ ! -f "$TMS_SYSTEMD_DIR/tms-backup.service" ]] || ! command -v systemctl >/dev/null 2>&1; then
+        return 0
+    fi
+    mountpoint="$(docker volume inspect -f '{{.Mountpoint}}' "$volume")" && [[ "$mountpoint" == /* ]] \
+        || { log_error "Point de montage du volume ${volume} introuvable : sauvegarde à la demande non activée."; return 1; }
+    # Called in an « || » list (errexit off): every step checks its own result.
+    cat >"$TMS_SYSTEMD_DIR/tms-backup-request.service" <<UNIT || return 1
+[Unit]
+Description=Sauvegarde TMS demandée depuis l'application (restic)
+After=docker.service
+Requires=docker.service
+
+[Service]
+Type=oneshot
+# Consumed first, on the host: a failing run never re-triggers itself in a loop. ops/ belongs
+# to the app user: find (-P) never follows a symlinked ops/ nor deletes anything but a file.
+ExecStartPre=-/usr/bin/find ${mountpoint}/ops -maxdepth 1 -name backup-request.json -type f -delete
+ExecStart=$TMS_DIR/ops/backup.sh --tag manuel
+Nice=10
+IOSchedulingClass=idle
+UNIT
+    cat >"$TMS_SYSTEMD_DIR/tms-backup-request.path" <<UNIT || return 1
+[Unit]
+Description=Demandes de sauvegarde TMS (bouton « Sauvegarder maintenant »)
+
+[Path]
+PathExists=${mountpoint}/ops/backup-request.json
+Unit=tms-backup-request.service
+
+[Install]
+WantedBy=paths.target
+UNIT
+    { systemctl daemon-reload && systemctl enable tms-backup-request.path && systemctl restart tms-backup-request.path; } >&2 \
+        || { log_error "Activation de tms-backup-request.path impossible."; return 1; }
+    log_info "Sauvegarde à la demande activée (tms-backup-request.path)."
 }
 
 # wait_health [seconds] [version]: waits until the application answers 200 on /health
