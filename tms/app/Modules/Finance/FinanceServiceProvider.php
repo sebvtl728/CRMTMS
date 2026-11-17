@@ -5,6 +5,8 @@ namespace App\Modules\Finance;
 use App\Modules\Core\Access\Permissions as CorePermissions;
 use App\Modules\Core\Audit\MorphAliases;
 use App\Modules\Core\Users\User;
+use App\Modules\Finance\Invoices\Invoice;
+use App\Modules\Finance\Invoices\InvoiceLine;
 use App\Modules\Finance\Plans\BillingBlock;
 use App\Modules\Finance\Plans\BillingPlan;
 use App\Modules\Finance\Plans\BillingPlans;
@@ -30,6 +32,8 @@ class FinanceServiceProvider extends ServiceProvider
         MorphAliases::register([
             BillingPlan::MORPH_ALIAS => BillingPlan::class,
             FinanceSettings::MORPH_ALIAS => FinanceSettings::class,
+            Invoice::MORPH_ALIAS => Invoice::class,
+            InvoiceLine::MORPH_ALIAS => InvoiceLine::class,
         ]);
 
         $this->app->singleton(BillingPlans::class);

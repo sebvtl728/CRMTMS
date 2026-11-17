@@ -4,9 +4,10 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { formatDate } from '@/lib/crm';
-import { useForm } from '@inertiajs/react';
+import { formatCents } from '@/lib/revenue';
+import { Link, router, useForm } from '@inertiajs/react';
 import { Plus, Trash2 } from 'lucide-react';
-import { FormEventHandler } from 'react';
+import { FormEventHandler, useState } from 'react';
 
 type Rhythm = 'end' | 'monthly' | 'schedule';
 type Basis = 'realised' | 'planned';
@@ -35,6 +36,15 @@ export interface BillingBlockProps {
     starts_on: string | null;
     can_manage: boolean;
     update_url: string;
+    /** Fundings paying directly the organisme, each invoiced on its own. */
+    direct_fundings: { id: string; funder: string; amount_cents: number; status: string; agreement_number: string | null }[];
+    /** What is due now (« À facturer »). */
+    due: { recipient: string; kind: 'invoice' | 'credit_note'; total_cents: number; period: string; draft_url: string | null }[];
+    /** Why nothing is due yet (« Formation non terminée »…). */
+    soon: string | null;
+    /** A draft made by hand (null: not allowed). */
+    create_url: string | null;
+    recipients: { value: string; label: string }[];
 }
 
 const RHYTHMS: { value: Rhythm; label: string; help: string }[] = [
@@ -65,7 +75,94 @@ type PlanForm = {
  * schedule), editable by who manages its invoicing; read only otherwise and,
  * for rhythm, basis and schedule, once an invoice is validated.
  */
-export function BillingBlock({ plan, organisme_absences, starts_on, can_manage, update_url }: BillingBlockProps) {
+export function BillingBlock(props: BillingBlockProps) {
+    return (
+        <div className="grid gap-3">
+            <PlanForm {...props} />
+            <BillingSummary {...props} />
+        </div>
+    );
+}
+
+/** Fundings paying directly, what is left to invoice, and a draft made by hand. */
+function BillingSummary({ direct_fundings, due, soon, create_url, recipients }: BillingBlockProps) {
+    const [recipient, setRecipient] = useState(recipients[0]?.value ?? 'contractor');
+    const [busy, setBusy] = useState(false);
+
+    return (
+        <div className="grid gap-3 rounded-xl border p-4 text-sm">
+            {direct_fundings.length > 0 && (
+                <div>
+                    <p className="font-medium">Financements payés directement</p>
+                    <ul className="text-muted-foreground">
+                        {direct_fundings.map((f) => (
+                            <li key={f.id}>
+                                {f.funder} : {formatCents(f.amount_cents)}
+                                {f.agreement_number ? ` · accord ${f.agreement_number}` : " · sans numéro d'accord"}
+                            </li>
+                        ))}
+                    </ul>
+                </div>
+            )}
+            <div>
+                <p className="font-medium">Reste à facturer</p>
+                {due.length === 0 ? (
+                    <p className="text-muted-foreground">
+                        {soon ? `Rien pour le moment : ${soon.toLowerCase()}.` : 'Rien à facturer pour le moment.'}
+                    </p>
+                ) : (
+                    <ul>
+                        {due.map((d, i) => (
+                            <li key={i}>
+                                {d.kind === 'credit_note' ? 'Avoir à faire' : 'À facturer'} à {d.recipient} : {formatCents(d.total_cents)} ({d.period}
+                                )
+                                {d.draft_url && (
+                                    <>
+                                        {' · '}
+                                        <Link href={d.draft_url} className="underline">
+                                            brouillon en cours
+                                        </Link>
+                                    </>
+                                )}
+                            </li>
+                        ))}
+                    </ul>
+                )}
+            </div>
+            {create_url && (
+                <div className="flex flex-wrap items-end gap-2">
+                    <div className="grid gap-1">
+                        <Label htmlFor="invoice-recipient" className="text-xs">
+                            Destinataire
+                        </Label>
+                        <select
+                            id="invoice-recipient"
+                            className="border-input bg-background h-9 rounded-md border px-2 text-sm"
+                            value={recipient}
+                            onChange={(e) => setRecipient(e.target.value)}
+                        >
+                            {recipients.map((r) => (
+                                <option key={r.value} value={r.value}>
+                                    {r.label}
+                                </option>
+                            ))}
+                        </select>
+                    </div>
+                    <Button
+                        type="button"
+                        variant="outline"
+                        disabled={busy}
+                        onClick={() => router.post(create_url, { recipient }, { onStart: () => setBusy(true), onFinish: () => setBusy(false) })}
+                    >
+                        Préparer une facture
+                    </Button>
+                </div>
+            )}
+        </div>
+    );
+}
+
+function PlanForm({ plan, organisme_absences, starts_on, can_manage, update_url }: BillingBlockProps) {
     const { data, setData, put, processing, errors, isDirty } = useForm<PlanForm>({
         rhythm: plan.rhythm,
         basis: plan.basis,

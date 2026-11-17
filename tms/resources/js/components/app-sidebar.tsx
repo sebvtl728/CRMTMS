@@ -6,6 +6,7 @@ import { Link, usePage } from '@inertiajs/react';
 import {
     BookOpen,
     Building2,
+    Calculator,
     CalendarCheck,
     CalendarClock,
     CalendarDays,
@@ -27,6 +28,7 @@ import {
     ListChecks,
     Mail,
     Plug,
+    ReceiptEuro,
     Settings2,
     ShieldAlert,
     ShieldCheck,
@@ -64,6 +66,8 @@ const trainingNavItems: (NavItem & { permission: string })[] = [
 
 // « Finance »: invoicing (0.9).
 const financeNavItems: (NavItem & { permission: string })[] = [
+    { title: 'À facturer', url: '/finance/to-invoice', icon: Calculator, permission: 'finance.invoices.view' },
+    { title: 'Factures', url: '/finance/invoices', icon: ReceiptEuro, permission: 'finance.invoices.view' },
     { title: 'Réglages de facturation', url: '/finance/settings', icon: Settings2, permission: 'settings.manage' },
 ];
 

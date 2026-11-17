@@ -13,6 +13,7 @@ use App\Modules\Sessions\Attendance\MonthlyHour;
 use App\Modules\Sessions\Attendance\Months;
 use App\Modules\Sessions\Dossiers\Dossier;
 use App\Modules\Sessions\Dossiers\DossierLine;
+use App\Modules\Sessions\Dossiers\DossierStatus;
 use App\Modules\Sessions\Enrolments\Enrolment;
 use App\Modules\Sessions\Enrolments\EnrolmentStatus;
 use App\Modules\Sessions\Fundings\Funding;
@@ -292,9 +293,12 @@ final class Billing
      * rights, whose own / das / all are read on the dossier), as a query of
      * their ids, to use as a subquery (whereIn('dossier_id',
      * Billing::dossiersFor(...))). Filters: company_id, das_id,
-     * responsible_user_id.
+     * responsible_user_id; started_by (a Paris day): only the dossiers
+     * neither cancelled nor settled with a trainee sharing the price in a
+     * session (not in the trash) started on or before that day — those
+     * that may have something to invoice.
      *
-     * @param  array{company_id?: string|null, das_id?: string|null, responsible_user_id?: string|null}  $filters
+     * @param  array{company_id?: string|null, das_id?: string|null, responsible_user_id?: string|null, started_by?: string|null}  $filters
      * @return Builder<Dossier>
      */
     public static function dossiersFor(User $user, array $filters = [], string $permission = Permissions::DOSSIERS_VIEW): Builder
@@ -303,7 +307,33 @@ final class Billing
             ->when($filters['company_id'] ?? null, fn (Builder $q, string $id) => $q->where('dossiers.company_id', $id))
             ->when($filters['das_id'] ?? null, fn (Builder $q, string $id) => $q->where('dossiers.das_id', $id))
             ->when($filters['responsible_user_id'] ?? null, fn (Builder $q, string $id) => $q->where('dossiers.responsible_user_id', $id))
+            ->when($filters['started_by'] ?? null, fn (Builder $q, string $day) => $q
+                ->whereNotIn('dossiers.status', [DossierStatus::Cancelled->value, DossierStatus::Settled->value])
+                ->whereExists(fn ($sub) => $sub->selectRaw('1')->from('enrolments')
+                    ->join('training_sessions', 'training_sessions.id', '=', 'enrolments.training_session_id')
+                    ->whereColumn('enrolments.dossier_id', 'dossiers.id')
+                    ->whereIn('enrolments.status', EnrolmentStatus::values(EnrolmentStatus::SHARING_THE_PRICE))
+                    ->whereNull('training_sessions.deleted_at')
+                    ->where('training_sessions.starts_on', '<=', $day)))
             ->select('dossiers.id');
+    }
+
+    /**
+     * Number of these dossiers keyed by id, trashed ones included (the lists
+     * of invoices); unknown ids are left out.
+     *
+     * @param  list<string>  $ids
+     * @return array<string, array{number: string, trashed: bool}>
+     */
+    public static function numbers(array $ids): array
+    {
+        $ids = array_values(array_unique(array_filter($ids, fn (string $id) => Str::isUuid($id))));
+        if ($ids === []) {
+            return [];
+        }
+
+        return Dossier::withTrashed()->whereKey($ids)->get(['id', 'number', 'deleted_at'])
+            ->mapWithKeys(fn (Dossier $d) => [$d->id => ['number' => (string) $d->number, 'trashed' => $d->trashed()]])->all();
     }
 
     /**
