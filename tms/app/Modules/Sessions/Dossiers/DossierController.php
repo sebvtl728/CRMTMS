@@ -20,6 +20,7 @@ use App\Modules\Sessions\Enrolments\EnrolmentRows;
 use App\Modules\Sessions\Fundings\FundingRows;
 use App\Modules\Sessions\History\SessionsHistory;
 use App\Modules\Sessions\Permissions;
+use App\Modules\Sessions\Public\DossierBlocks;
 use App\Modules\Sessions\Sessions\SessionListQuery;
 use App\Modules\Sessions\SessionsVisibility;
 use Carbon\CarbonImmutable;
@@ -215,6 +216,8 @@ class DossierController extends Controller
             'funding_options' => $update ? FundingRows::options($dossier) : null,
             'enrol' => $open && $user->can(Permissions::SESSIONS_UPDATE) ? ['sessions' => EnrolmentOptions::sessionsFor($dossier, $user)] : null,
             'enrolment_references' => $user->can(Permissions::SESSIONS_UPDATE) ? EnrolmentOptions::references() : null,
+            // Blocks of other modules (« Factures »…), each applying its own rights.
+            'blocks' => DossierBlocks::for($dossier->id, $user),
             'status' => $request->session()->get('status'),
         ]);
     }

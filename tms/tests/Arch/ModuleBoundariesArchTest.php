@@ -218,3 +218,11 @@ it('detects a use of the CRM tables', function () {
         expect(namesCrmTables($code))->toBeFalse($code);
     }
 });
+
+// ---------------------------------------------------------------- Finance (0.9)
+
+it('keeps Sessions, Crm, Catalogue, Core and Connectors free of any reference to the Finance module', function () {
+    foreach (['Sessions', 'Crm', 'Catalogue', 'Core', 'Connectors'] as $module) {
+        expect(moduleFilesMatching($module, '/App\\\\Modules\\\\Finance\\\\|App\\\\Modules\\\\\{[^}]*\bFinance\\\\/'), $module)->toBe([]);
+    }
+});

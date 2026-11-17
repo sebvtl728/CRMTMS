@@ -24,7 +24,9 @@ use Illuminate\Validation\ValidationException;
  *  - « En cours » and « Réalisé » set by hand (then no longer computed from
  *    the sessions);
  *  - cancellation with a reason of the « Motifs d'annulation » list, from
- *    any state before « Réalisé ».
+ *    any state before « Réalisé »;
+ *  - « Facturé » set and taken back by the invoicing (0.9, through
+ *    Public\DossierStates): only from « Réalisé », back to « Réalisé ».
  *
  * A refused transition is a 409 with a French message.
  */
@@ -45,6 +47,8 @@ final class DossierTransitions
     public const ALREADY_RUNNING = 'Ce dossier est déjà en cours ou réalisé.';
 
     public const ALREADY_DONE = 'Ce dossier est déjà réalisé.';
+
+    public const NOT_DONE = 'Seul un dossier réalisé peut passer à l\'état « Facturé ».';
 
     public function sendConvention(Dossier $dossier, CarbonImmutable $on): Dossier
     {
@@ -84,6 +88,35 @@ final class DossierTransitions
                 throw new UserFacingHttpException(409, self::ALREADY_DONE);
             }
             $locked->status = DossierStatus::Done;
+        });
+    }
+
+    /**
+     * « Facturé », from « Réalisé » only (stored, or computed from the dates
+     * of its sessions); already « Facturé »: unchanged.
+     */
+    public function markInvoiced(Dossier $dossier): Dossier
+    {
+        return $this->transition($dossier, function (Dossier $locked): void {
+            if ($locked->status === DossierStatus::Invoiced) {
+                return;
+            }
+            if ($locked->effectiveStatus(Dossier::today()) !== DossierStatus::Done) {
+                throw new UserFacingHttpException(409, self::NOT_DONE);
+            }
+            $locked->status = DossierStatus::Invoiced;
+        });
+    }
+
+    /**
+     * Back to « Réalisé » from « Facturé »; any other state: unchanged.
+     */
+    public function unmarkInvoiced(Dossier $dossier): Dossier
+    {
+        return $this->transition($dossier, function (Dossier $locked): void {
+            if ($locked->status === DossierStatus::Invoiced) {
+                $locked->status = DossierStatus::Done;
+            }
         });
     }
 

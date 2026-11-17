@@ -31,6 +31,7 @@ use Illuminate\Support\Carbon;
  * @property string|null $agreement_number n° de prise en charge
  * @property CarbonImmutable|null $agreed_on
  * @property string|null $notes
+ * @property bool $pays_directly the funder pays the organisme and receives its own invoice (0.9)
  * @property Carbon|null $created_at
  */
 class Funding extends Model
@@ -49,12 +50,13 @@ class Funding extends Model
     /** @var list<string> */
     protected $fillable = [
         'dossier_id', 'funder_organisation_id', 'funder_person_id', 'funding_type_id', 'dossier_line_id', 'enrolment_id',
-        'amount', 'status', 'agreement_number', 'agreed_on', 'notes',
+        'amount', 'status', 'agreement_number', 'agreed_on', 'notes', 'pays_directly',
     ];
 
     /** @var array<string, mixed> */
     protected $attributes = [
         'status' => 'to_request',
+        'pays_directly' => false,
     ];
 
     protected function casts(): array
@@ -63,6 +65,7 @@ class Funding extends Model
             'status' => FundingStatus::class,
             'amount' => 'decimal:2',
             'agreed_on' => 'immutable_date',
+            'pays_directly' => 'boolean',
         ];
     }
 

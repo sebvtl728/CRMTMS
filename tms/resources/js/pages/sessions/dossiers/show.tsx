@@ -1,3 +1,4 @@
+import { BlockRows, type FicheBlock } from '@/components/crm/fiche-blocks';
 import Heading from '@/components/heading';
 import InputError from '@/components/input-error';
 import { EnrolDialog, type EnrolSessionOption } from '@/components/sessions/enrolment-dialog';
@@ -63,6 +64,8 @@ interface ShowProps {
     funding_options: FundingOptions | null;
     /** Creation, states, enrolments and fundings, most recent first (journal). */
     history: HistoryEntry[];
+    /** Blocks of other modules (« Factures »…), same shape as the blocks of a fiche. */
+    blocks: FicheBlock[];
     status?: string;
 }
 
@@ -191,6 +194,7 @@ export default function DossierShow({
     balance,
     funding_options,
     history,
+    blocks,
     status,
 }: ShowProps) {
     const [cancelling, setCancelling] = useState(false);
@@ -413,6 +417,13 @@ export default function DossierShow({
                         ))
                     )}
                 </section>
+
+                {blocks.map((b) => (
+                    <section key={b.key} aria-label={b.title} className="grid gap-3">
+                        <h2 className="text-sm font-semibold">{b.title}</h2>
+                        <BlockRows block={b} />
+                    </section>
+                ))}
 
                 <HistoryList entries={history} />
             </div>

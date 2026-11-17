@@ -100,4 +100,14 @@ enum ReferenceList: string
     {
         return $this === self::FundingType;
     }
+
+    /**
+     * Funding types may be billed outside the TMS (meta.external_billing,
+     * e.g. the CPF through EDOF): their share comes off the contractant's
+     * invoice and no invoice of the TMS is issued for it (0.9).
+     */
+    public function hasExternalBilling(): bool
+    {
+        return $this === self::FundingType;
+    }
 }
