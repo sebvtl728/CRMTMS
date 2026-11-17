@@ -42,10 +42,10 @@ class SessionController extends Controller
 {
     public const OUTSIDE_DAS = 'Cette formation n\'est pas dans vos DAS.';
 
-    /** French month names (no locale dependency). */
     /** Steps of the session page shown to whoever views the session (« suivi » added with the attendance rights). */
     public const STEPS = ['synthese', 'configuration', 'planning', 'stagiaires'];
 
+    /** French month names (no locale dependency). */
     public const MONTHS = [1 => 'Janvier', 'Février', 'Mars', 'Avril', 'Mai', 'Juin', 'Juillet', 'Août', 'Septembre', 'Octobre', 'Novembre', 'Décembre'];
 
     public function __construct(private readonly SessionWriter $writer) {}
@@ -311,8 +311,8 @@ class SessionController extends Controller
     }
 
     /**
-     * « Ses DAS » on sessions.sessions.update: the training must be in one
-     * of the DAS he follows (Own and All: any).
+     * The training asked by « Créer une session » (`?training=`), kept when
+     * it is active and within the DAS $user may create sessions in; else none.
      */
     private function preselectedTraining(User $user, mixed $trainingId): ?string
     {
@@ -329,6 +329,10 @@ class SessionController extends Controller
         return $training->id;
     }
 
+    /**
+     * « Ses DAS » on sessions.sessions.update: the training must be in one
+     * of the DAS he follows (Own and All: any).
+     */
     private function assertDas(User $user, mixed $trainingId): void
     {
         $training = is_string($trainingId) ? app(Trainings::class)->find($trainingId) : null;
