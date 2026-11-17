@@ -1003,6 +1003,20 @@ function BatchSeanceDialog({
     onClose: () => void;
     onDone: () => void;
 }) {
+    // One line per current slot of the ticked séances (morning, afternoon…), in order.
+    const currentSlots = useMemo(() => {
+        const found = new Map<string, { current: string; start: string; end: string; break_minutes: number; count: number }>();
+        planning.seances
+            .filter((s) => ids.includes(s.id))
+            .forEach((s) => {
+                const key = `${s.start}-${s.end}`;
+                const slot = found.get(key) ?? { current: key, start: s.start, end: s.end, break_minutes: s.break_minutes, count: 0 };
+                slot.count++;
+                found.set(key, slot);
+            });
+
+        return [...found.values()].sort((a, b) => a.start.localeCompare(b.start));
+    }, [planning.seances, ids]);
     const { data, setData, post, processing, errors } = useForm({
         seance_ids: ids,
         apply_trainer: false as boolean,
@@ -1011,10 +1025,13 @@ function BatchSeanceDialog({
         room_id: '',
         place_text: '',
         apply_hours: false as boolean,
-        starts_at: '09:00',
-        ends_at: '12:30',
-        break_minutes: '0',
+        hours: currentSlots.map((c) => ({ current: c.current, starts_at: c.start, ends_at: c.end, break_minutes: String(c.break_minutes) })),
     });
+    const setHour = (i: number, patch: Partial<{ starts_at: string; ends_at: string; break_minutes: string }>) =>
+        setData(
+            'hours',
+            data.hours.map((h, j) => (j === i ? { ...h, ...patch } : h)),
+        );
     const errs = errors as Record<string, string | undefined>;
 
     const submit: FormEventHandler = (e) => {
@@ -1094,32 +1111,56 @@ function BatchSeanceDialog({
                             Changer les horaires (le jour ne change pas)
                         </label>
                         {data.apply_hours && (
-                            <div className="grid gap-4 sm:grid-cols-3">
-                                <div className="grid gap-2">
-                                    <Label htmlFor="batch_start">Début *</Label>
-                                    <Input
-                                        id="batch_start"
-                                        type="time"
-                                        value={data.starts_at}
-                                        onChange={(e) => setData('starts_at', e.target.value)}
-                                    />
-                                    <InputError message={errors.starts_at} />
-                                </div>
-                                <div className="grid gap-2">
-                                    <Label htmlFor="batch_end">Fin *</Label>
-                                    <Input id="batch_end" type="time" value={data.ends_at} onChange={(e) => setData('ends_at', e.target.value)} />
-                                    <InputError message={errors.ends_at} />
-                                </div>
-                                <div className="grid gap-2">
-                                    <Label htmlFor="batch_break">Pause (min)</Label>
-                                    <Input
-                                        id="batch_break"
-                                        inputMode="numeric"
-                                        value={data.break_minutes}
-                                        onChange={(e) => setData('break_minutes', e.target.value)}
-                                    />
-                                    <InputError message={errors.break_minutes} />
-                                </div>
+                            <div className="grid gap-3">
+                                <p className="text-muted-foreground text-xs">
+                                    Une ligne par créneau actuel des séances cochées : chaque séance prend les nouveaux horaires de son créneau.
+                                </p>
+                                {data.hours.map((h, i) => (
+                                    <div key={h.current} className="grid gap-2 rounded-md border p-2">
+                                        <span className="text-sm font-medium">
+                                            Séances de {currentSlots[i].start} à {currentSlots[i].end}
+                                            <span className="text-muted-foreground font-normal"> ({currentSlots[i].count})</span>
+                                        </span>
+                                        <div className="grid gap-3 sm:grid-cols-3">
+                                            <div className="grid gap-1">
+                                                <Label htmlFor={`batch_start_${i}`} className="text-xs">
+                                                    Nouveau début *
+                                                </Label>
+                                                <Input
+                                                    id={`batch_start_${i}`}
+                                                    type="time"
+                                                    value={h.starts_at}
+                                                    onChange={(e) => setHour(i, { starts_at: e.target.value })}
+                                                />
+                                                <InputError message={errs[`hours.${i}.starts_at`]} />
+                                            </div>
+                                            <div className="grid gap-1">
+                                                <Label htmlFor={`batch_end_${i}`} className="text-xs">
+                                                    Nouvelle fin *
+                                                </Label>
+                                                <Input
+                                                    id={`batch_end_${i}`}
+                                                    type="time"
+                                                    value={h.ends_at}
+                                                    onChange={(e) => setHour(i, { ends_at: e.target.value })}
+                                                />
+                                                <InputError message={errs[`hours.${i}.ends_at`]} />
+                                            </div>
+                                            <div className="grid gap-1">
+                                                <Label htmlFor={`batch_break_${i}`} className="text-xs">
+                                                    Pause (min)
+                                                </Label>
+                                                <Input
+                                                    id={`batch_break_${i}`}
+                                                    inputMode="numeric"
+                                                    value={h.break_minutes}
+                                                    onChange={(e) => setHour(i, { break_minutes: e.target.value })}
+                                                />
+                                                <InputError message={errs[`hours.${i}.break_minutes`]} />
+                                            </div>
+                                        </div>
+                                    </div>
+                                ))}
                             </div>
                         )}
                     </fieldset>

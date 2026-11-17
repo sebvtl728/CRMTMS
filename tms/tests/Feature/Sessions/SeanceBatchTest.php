@@ -156,3 +156,47 @@ it('deletes several séances planned by mistake, all or nothing', function () {
     $viewer = l2User([Permissions::SESSIONS_VIEW => null, Permissions::SEANCES_VIEW => null]);
     $this->actingAs($viewer)->post($url, ['seance_ids' => [$kept->id]])->assertForbidden();
 });
+
+it('changes the hours slot by slot: morning séances and afternoon séances each get their own', function () {
+    $session = plSession();
+    $module = plModule($session);
+    $am1 = plSeance($module, '2026-09-07', '09:00', '12:30');
+    $pm1 = plSeance($module, '2026-09-07', '13:30', '17:00');
+    $am2 = plSeance($module, '2026-09-08', '09:00', '12:30');
+    $pm2 = plSeance($module, '2026-09-08', '13:30', '17:00');
+
+    $this->actingAs(plManager())->post("/sessions/{$session->id}/seances/batch", [
+        'seance_ids' => [$am1->id, $pm1->id, $am2->id, $pm2->id],
+        'apply_hours' => true,
+        'hours' => [
+            ['current' => '09:00-12:30', 'starts_at' => '08:30', 'ends_at' => '12:00', 'break_minutes' => '15'],
+            ['current' => '13:30-17:00', 'starts_at' => '13:00', 'ends_at' => '16:30', 'break_minutes' => '0'],
+        ],
+    ])->assertSessionHasNoErrors()->assertSessionHas('status', '4 séances modifiées.');
+
+    foreach ([$am1, $am2] as $s) {
+        $s->refresh();
+        expect($s->start())->toBe('08:30')->and($s->end())->toBe('12:00')->and($s->break_minutes)->toBe(15);
+    }
+    foreach ([$pm1, $pm2] as $s) {
+        $s->refresh();
+        expect($s->start())->toBe('13:00')->and($s->end())->toBe('16:30')->and($s->break_minutes)->toBe(0);
+    }
+});
+
+it('validates each slot of the hours in French, and leaves a slot not listed unchanged', function () {
+    $session = plSession();
+    $module = plModule($session);
+    $am = plSeance($module, '2026-09-07', '09:00', '12:30');
+    $pm = plSeance($module, '2026-09-07', '13:30', '17:00');
+    $url = "/sessions/{$session->id}/seances/batch";
+
+    $this->actingAs(plManager())->post($url, ['seance_ids' => [$am->id, $pm->id], 'apply_hours' => true, 'hours' => [
+        ['current' => '13:30-17:00', 'starts_at' => '17:00', 'ends_at' => '16:00', 'break_minutes' => '0'],
+    ]])->assertSessionHasErrors(['hours.0.ends_at' => 'L\'heure de fin doit suivre l\'heure de début.']);
+
+    $this->actingAs(plManager())->post($url, ['seance_ids' => [$am->id, $pm->id], 'apply_hours' => true, 'hours' => [
+        ['current' => '13:30-17:00', 'starts_at' => '14:00', 'ends_at' => '17:30', 'break_minutes' => '0'],
+    ]])->assertSessionHasNoErrors();
+    expect($am->refresh()->start())->toBe('09:00')->and($pm->refresh()->start())->toBe('14:00');
+});

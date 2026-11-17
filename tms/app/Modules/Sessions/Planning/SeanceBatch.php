@@ -27,7 +27,13 @@ final class SeanceBatch
     public function __construct(private readonly Seances $seances) {}
 
     /**
-     * @param  array<string, mixed>  $data  seance_ids, apply_trainer, trainer_id, apply_place, room_id, place_text, apply_hours, starts_at, ends_at, break_minutes
+     * Hours: « hours » lists, for each current slot of the ticked séances
+     * (« current » = « H:i-H:i »), its new start, end and break: a morning
+     * séance takes the morning's, an afternoon one the afternoon's; a slot
+     * not listed keeps its hours. Without « hours », starts_at / ends_at /
+     * break_minutes apply to every ticked séance.
+     *
+     * @param  array<string, mixed>  $data  seance_ids, apply_trainer, trainer_id, apply_place, room_id, place_text, apply_hours, hours | starts_at, ends_at, break_minutes
      * @return list<Seance> the séances as saved
      *
      * @throws ValidationException
@@ -43,19 +49,55 @@ final class SeanceBatch
             $changes['room_id'] = $data['room_id'] ?? null;
             $changes['place_text'] = $data['place_text'] ?? null;
         }
-        if (filter_var($data['apply_hours'] ?? false, FILTER_VALIDATE_BOOL)) {
+        /** @var array<string, array<string, mixed>> $bySlot current « H:i-H:i » => new hours */
+        $bySlot = [];
+        $applyHours = filter_var($data['apply_hours'] ?? false, FILTER_VALIDATE_BOOL);
+        if ($applyHours && is_array($data['hours'] ?? null)) {
+            foreach (array_values($data['hours']) as $i => $slot) {
+                if (! is_array($slot) || ! is_string($slot['current'] ?? null)) {
+                    throw ValidationException::withMessages(["hours.{$i}.starts_at" => 'Créneau invalide.']);
+                }
+                $bySlot[$slot['current']] = [
+                    'index' => $i,
+                    'starts_at' => $slot['starts_at'] ?? null,
+                    'ends_at' => $slot['ends_at'] ?? null,
+                    'break_minutes' => $slot['break_minutes'] ?? null,
+                ];
+            }
+        } elseif ($applyHours) {
             $changes['starts_at'] = $data['starts_at'] ?? null;
             $changes['ends_at'] = $data['ends_at'] ?? null;
             $changes['break_minutes'] = $data['break_minutes'] ?? null;
         }
-        if ($changes === []) {
+        if ($changes === [] && $bySlot === []) {
             throw ValidationException::withMessages(['batch' => self::NOTHING]);
         }
-        // The values themselves are checked once, on the first séance, with their own field errors.
+        $for = function (Seance $s) use ($changes, $bySlot): array {
+            $slot = $bySlot[$s->start().'-'.$s->end()] ?? null;
+
+            return $slot === null ? $changes : [...$changes, ...array_diff_key($slot, ['index' => true])];
+        };
+        // The values themselves are checked once (on the first séance, then on one séance of each
+        // slot), with their own field errors: « hours.<i>.<field> » for a slot.
         $first = $seances->first();
         Seances::validated($session, [...self::current($first), ...$changes], $first);
+        foreach ($bySlot as $current => $slot) {
+            $sample = $seances->first(fn (Seance $s) => $s->start().'-'.$s->end() === $current);
+            if ($sample === null) {
+                continue;
+            }
+            try {
+                Seances::validated($session, [...self::current($sample), ...$for($sample)], $sample);
+            } catch (ValidationException $e) {
+                $errors = [];
+                foreach ($e->errors() as $key => $messages) {
+                    $errors[in_array($key, ['starts_at', 'ends_at', 'break_minutes'], true) ? "hours.{$slot['index']}.{$key}" : $key] = $messages;
+                }
+                throw ValidationException::withMessages($errors);
+            }
+        }
 
-        return self::each($seances, fn (Seance $s) => $this->seances->reschedule($s, $changes));
+        return self::each($seances, fn (Seance $s) => $this->seances->reschedule($s, $for($s)));
     }
 
     /**
