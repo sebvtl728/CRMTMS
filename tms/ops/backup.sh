@@ -9,6 +9,7 @@
 # Every run, successful or not, ends by writing ops/backup-status.json in the storage volume
 # (lib.sh write_backup_status), read by Administration › Sauvegardes. --tag manuel is the
 # run asked for by the application: it consumes ops/backup-request.json once it holds the lock.
+# While it runs (lock held), ops/backup-running.json {started_at, tag} exists.
 #
 # .env: RESTIC_PASSWORD (required), RESTIC_REPOSITORY (default /var/backups/tms),
 # RESTIC_REMOTE_REPOSITORY, RESTIC_REMOTE_PASSWORD (default RESTIC_PASSWORD),
@@ -81,6 +82,9 @@ on_exit() {
     [[ -z "$STAGE" ]] || rm -rf "$STAGE"
     [[ "$SUCCESS" -eq 1 ]] || error="${LAST_ERROR:-Erreur inattendue (code ${status}).}"
     record_status "$error"
+    if [[ -n "$STORAGE_VOLUME" ]]; then
+        remove_backup_running "$STORAGE_VOLUME" || log_info "Indicateur de sauvegarde en cours non supprimé (ops/backup-running.json)."
+    fi
     if [[ "$SUCCESS" -ne 1 ]]; then
         send_alert "La sauvegarde de $(hostname) a échoué le $(date '+%d/%m/%Y à %H:%M') : ${error}"
     fi
@@ -102,6 +106,8 @@ ensure_repo() {
 
 # Read straight from the storage volume: works even when the app container is down.
 STORAGE_VOLUME="$(storage_volume)" || die "Volume storage introuvable."
+# « Sauvegarde en cours… » for the application, before the request disappears.
+write_backup_running "$STORAGE_VOLUME" "$TAG" || log_info "Indicateur de sauvegarde en cours non écrit (ops/backup-running.json)."
 if [[ "$TAG" == "manuel" ]]; then
     # A click during this run creates a new request, run after this one.
     consume_backup_request "$STORAGE_VOLUME" || log_info "Demande de sauvegarde non supprimée (ops/backup-request.json)."

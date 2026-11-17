@@ -147,6 +147,11 @@ teardown_file() {
     [[ "$output" == *'"version:bats"'* ]]
 }
 
+# refute <cmd...>: fails when the command succeeds (a bare `! cmd` never fails a bats test).
+refute() {
+    if "$@"; then return 1; fi
+}
+
 # backup_status: the status file, read by the app container user (as the application does).
 backup_status() {
     compose exec -T app cat storage/ops/backup-status.json
@@ -201,6 +206,40 @@ refute_secrets() {
     compose exec -T app sh -c 'touch storage/ops/bats-write && rm storage/ops/bats-write'
 }
 
+@test "ops/backup-running.json exists while the backup runs and is removed at the end" {
+    # A docker shim reads the marker when pg_dump starts (lock held, backup under way).
+    local shim="$STACK_DIR/shim" real_docker volume
+    real_docker=$(command -v docker)
+    volume=$(storage_volume)
+    mkdir -p "$shim"
+    cat >"$shim/docker" <<SH
+#!/usr/bin/env bash
+case "\$*" in
+  *pg_dump*) "$real_docker" run --rm -v "$volume:/s:ro" --entrypoint cat "$RESTIC_IMAGE" /s/ops/backup-running.json >"$STACK_DIR/running-seen" 2>&1 || true ;;
+esac
+exec "$real_docker" "\$@"
+SH
+    chmod +x "$shim/docker"
+
+    PATH="$shim:$PATH" run "$TMS_ROOT/ops/backup.sh" --tag test
+    [ "$status" -eq 0 ]
+    [ "$(jq -r .tag "$STACK_DIR/running-seen")" = "test" ]
+    [[ "$(jq -r .started_at "$STACK_DIR/running-seen")" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$ ]] || false
+    run compose exec -T app test -e storage/ops/backup-running.json
+    [ "$status" -ne 0 ]
+}
+
+@test "the status JSON escapes quotes and newlines of the error message" {
+    local volume
+    volume=$(storage_volume)
+    printf '' | write_backup_status "$volume" false "" "$(printf 'Échec "de" la copie\nligne 2 \\ fin')" "" true false
+    json=$(backup_status)
+    [ "$(jq -r .error <<<"$json")" = "$(printf 'Échec "de" la copie\nligne 2 \\ fin')" ]
+    [ "$(jq -c .remote <<<"$json")" = '{"configured":true,"success":false}' ]
+    [ "$(jq -c .snapshots <<<"$json")" = "[]" ]
+    compose exec -T app sh -c 'ls -A storage/ops' | refute grep -q '^\.tmp'
+}
+
 @test "a failed backup writes success=false with the French error and no snapshot" {
     compose stop postgres >&2
     run "$TMS_ROOT/ops/backup.sh"
@@ -213,6 +252,8 @@ refute_secrets() {
     json="$output"
     [ "$(jq -r .success <<<"$json")" = "false" ]
     [ "$(jq -r .error <<<"$json")" = "Échec de pg_dump." ]
+    run compose exec -T app test -e storage/ops/backup-running.json
+    [ "$status" -ne 0 ]
     [ "$(jq -r .snapshot_id <<<"$json")" = "null" ]
     [ "$(jq -r .size_bytes <<<"$json")" = "null" ]
     # The snapshots taken before are still listed.

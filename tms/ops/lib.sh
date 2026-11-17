@@ -315,24 +315,57 @@ storage_volume() {
     printf '%s\n' "$volume"
 }
 
-# Shell run in a throwaway container with the volume at /s: creates /s/ops owned by the owner
-# of the volume root (the app container user, whatever its uid), group-writable.
+# Shell run as root in a throwaway container with the volume at /s, before any write in /s/ops
+# (a directory the app container user owns): refuses a symlinked ops/, then creates it or
+# re-applies its owner and mode. Owner = the app container user, whatever its uid: owner of the
+# volume root, or of storage/app when the root is still root-owned.
 # shellcheck disable=SC2016  # expanded inside the container
-TMS_OPS_DIR_SH='owner="$(stat -c %u:%g /s)"
-if [ ! -d /s/ops ]; then mkdir /s/ops && chown "$owner" /s/ops && chmod 770 /s/ops; fi'
+TMS_OPS_DIR_SH='set -e
+if [ -L /s/ops ]; then echo "storage/ops est un lien symbolique : opération refusée." >&2; exit 1; fi
+owner="$(stat -c %u:%g /s)"
+if [ "${owner%%:*}" = 0 ] && [ -d /s/app ] && [ ! -L /s/app ]; then owner="$(stat -c %u:%g /s/app)"; fi
+if [ "${owner%%:*}" = 0 ]; then echo "Utilisateur de l application introuvable dans le volume storage." >&2; exit 1; fi
+mkdir -p /s/ops
+chown -h "$owner" /s/ops
+chmod 770 /s/ops'
 
 # ensure_ops_dir <volume>: storage/ops exists, readable and writable by the app user.
 ensure_ops_dir() {
-    docker run --rm -v "$1:/s" --entrypoint sh "$RESTIC_IMAGE" -c "set -e; $TMS_OPS_DIR_SH" >&2
+    docker run --rm -v "$1:/s" --entrypoint sh "$RESTIC_IMAGE" -c "$TMS_OPS_DIR_SH" >&2
+}
+
+# ops_json_write <volume> <file name> <jq program> [ENV NAME...]: writes ops/<file name>
+# atomically (mktemp in ops/, then rename; the temporary file never survives a failure), mode
+# 640, owned by the app user. The program (jq -n) reads the named environment variables
+# ($ENV.NAME) and the JSON on stdin (input). Values never travel on a command line. jq of the
+# restic image: the host only needs Docker.
+ops_json_write() {
+    local volume="$1" name="$2" var
+    local -a env_args=(-e S_PROGRAM -e S_NAME)
+    for var in "${@:4}"; do env_args+=(-e "$var"); done
+    # shellcheck disable=SC2016  # expanded inside the container
+    S_PROGRAM="$3" S_NAME="$name" docker run --rm -i -v "$volume:/s" "${env_args[@]}" \
+        --entrypoint sh "$RESTIC_IMAGE" -c "$TMS_OPS_DIR_SH"'
+tmp="$(mktemp /s/ops/.tmp.XXXXXX)"
+trap '\''rm -f "$tmp"'\'' EXIT
+jq -n "$S_PROGRAM" >"$tmp"
+chown "$owner" "$tmp"
+chmod 640 "$tmp"
+mv -f "$tmp" "/s/ops/$S_NAME"' >&2
+}
+
+# ops_remove <volume> <file name>: removes ops/<file name> (never through a symlinked ops/).
+ops_remove() {
+    # shellcheck disable=SC2016  # expanded inside the container
+    S_NAME="$2" docker run --rm -v "$1:/s" -e S_NAME --entrypoint sh "$RESTIC_IMAGE" -c '
+if [ -L /s/ops ]; then echo "storage/ops est un lien symbolique : opération refusée." >&2; exit 1; fi
+rm -f "/s/ops/$S_NAME"' >&2
 }
 
 # write_backup_status <volume> <success true|false> <snapshot id> <error> <size bytes>
 #   <remote configured true|false> <remote success true|false|"">
-# Writes ops/backup-status.json atomically (temporary file then rename), owned by the app user.
-# stdin: output of « restic snapshots --json » (empty or unreadable: no list); kept newest
-# first, at most 60, id/time/tags only. Empty strings become null. Values travel as
-# environment variables (never on a command line); built by jq of the restic image (the host
-# only needs Docker).
+# ops/backup-status.json. stdin: output of « restic snapshots --json » (empty or unreadable: no
+# list); kept newest first, at most 60, id/time/tags only. Empty strings become null.
 write_backup_status() {
     # shellcheck disable=SC2016  # jq program
     local program='(try (input | if type == "array" then . else [] end) catch []) as $snaps
@@ -350,25 +383,27 @@ write_backup_status() {
             },
             snapshots: ($snaps | reverse | .[:60] | map({id, time, tags: (.tags // [])}))
         }'
-    # shellcheck disable=SC2016  # expanded inside the container
-    local script='set -e
-'"$TMS_OPS_DIR_SH"'
-tmp=/s/ops/.backup-status.json.tmp
-jq -n "$S_PROGRAM" >"$tmp"
-chown "$owner" "$tmp"
-chmod 640 "$tmp"
-mv -f "$tmp" /s/ops/backup-status.json'
-    S_PROGRAM="$program" S_FINISHED_AT="$(date -u '+%Y-%m-%dT%H:%M:%SZ')" S_SUCCESS="$2" S_SNAPSHOT_ID="$3" \
-        S_ERROR="$4" S_VERSION="${TMS_VERSION:-}" S_SIZE="$5" S_REMOTE_CONFIGURED="$6" S_REMOTE_SUCCESS="$7" \
-        docker run --rm -i -v "$1:/s" \
-        -e S_PROGRAM -e S_FINISHED_AT -e S_SUCCESS -e S_SNAPSHOT_ID -e S_ERROR -e S_VERSION -e S_SIZE \
-        -e S_REMOTE_CONFIGURED -e S_REMOTE_SUCCESS \
-        --entrypoint sh "$RESTIC_IMAGE" -c "$script" >&2
+    S_FINISHED_AT="$(date -u '+%Y-%m-%dT%H:%M:%SZ')" S_SUCCESS="$2" S_SNAPSHOT_ID="$3" S_ERROR="$4" \
+        S_VERSION="${TMS_VERSION:-}" S_SIZE="$5" S_REMOTE_CONFIGURED="$6" S_REMOTE_SUCCESS="$7" \
+        ops_json_write "$1" backup-status.json "$program" \
+        S_FINISHED_AT S_SUCCESS S_SNAPSHOT_ID S_ERROR S_VERSION S_SIZE S_REMOTE_CONFIGURED S_REMOTE_SUCCESS
+}
+
+# write_backup_running <volume> <tag>: ops/backup-running.json {started_at, tag} while a backup
+# runs (« Sauvegarde en cours… »); removed by backup.sh when it ends (remove_backup_running).
+write_backup_running() {
+    # shellcheck disable=SC2016  # jq program
+    S_STARTED_AT="$(date -u '+%Y-%m-%dT%H:%M:%SZ')" S_TAG="$2" \
+        ops_json_write "$1" backup-running.json '{started_at: $ENV.S_STARTED_AT, tag: $ENV.S_TAG}' S_STARTED_AT S_TAG </dev/null
+}
+
+remove_backup_running() {
+    ops_remove "$1" backup-running.json
 }
 
 # consume_backup_request <volume>: removes ops/backup-request.json (the backup it asked for starts).
 consume_backup_request() {
-    docker run --rm -v "$1:/s" --entrypoint rm "$RESTIC_IMAGE" -f /s/ops/backup-request.json >&2
+    ops_remove "$1" backup-request.json
 }
 
 # enable_backup_requests: « Sauvegarder maintenant » of the application. Creates storage/ops and,
@@ -393,8 +428,9 @@ Requires=docker.service
 
 [Service]
 Type=oneshot
-# Consumed first, on the host: a failing run never re-triggers itself in a loop.
-ExecStartPre=/bin/rm -f ${mountpoint}/ops/backup-request.json
+# Consumed first, on the host: a failing run never re-triggers itself in a loop. ops/ belongs
+# to the app user: find (-P) never follows a symlinked ops/ nor deletes anything but a file.
+ExecStartPre=-/usr/bin/find ${mountpoint}/ops -maxdepth 1 -name backup-request.json -type f -delete
 ExecStart=$TMS_DIR/ops/backup.sh --tag manuel
 Nice=10
 IOSchedulingClass=idle
