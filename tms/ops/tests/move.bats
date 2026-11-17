@@ -10,7 +10,9 @@
 # with TMS_VERSION=0.9.0 (its meta.env says 0.9.0); the « older » one with TMS_VERSION=0.8.1
 # after rolling back the last migration on A: importing it must run that migration again.
 # The « multi » export is taken with TMS_MODE=multi once A holds a second organisme: B (single
-# mode) must refuse it. At the end, the pre-import safety backup of B is restored.
+# mode) must refuse it. The « older » export is taken with --stop (systemctl stubbed): A is stopped
+# before its backup and its backup units disabled; a --stop export that fails first starts A again.
+# At the end, the pre-import safety backup of B is restored.
 
 load helpers
 
@@ -71,6 +73,11 @@ export_a() {
     env "$@" TMS_EXPORT_PASSWORD="$EXPORT_PASSWORD" "$TMS_ROOT/ops/export.sh" --output "$dir" >"$dir.out" 2>"$dir.err"
 }
 
+# running_services: services of the stack currently running, one per line.
+running_services() {
+    compose ps --status running --services | LC_ALL=C sort
+}
+
 setup_file() {
     local dir="$BATS_FILE_TMPDIR"
 
@@ -100,12 +107,29 @@ setup_file() {
         app(App\Modules\Core\Platform\TenantProvisioner::class)->create("Organisme deux", "organisme-deux");' >&2
     export_a "$dir/multi" TMS_MODE=multi
 
+    # --stop with a backup that fails (no RESTIC_PASSWORD): the application is started again.
+    sed '/^RESTIC_PASSWORD=/d' "$TMS_ENV_FILE" >"$dir/env.nopass"
+    mkdir -p "$dir/failed"
+    rc=0
+    TMS_ENV_FILE="$dir/env.nopass" TMS_EXPORT_PASSWORD="$EXPORT_PASSWORD" \
+        "$TMS_ROOT/ops/export.sh" --output "$dir/failed" --stop >"$dir/failed.out" 2>"$dir/failed.err" || rc=$?
+    echo "$rc" >"$dir/failed.rc"
+    running_services >"$dir/failed-services"
+    compose stop worker scheduler >&2
+
     # An « older version »: the last migration is not applied yet.
     DB_OWNER_USERNAME=tms_owner DB_OWNER_PASSWORD="$(env_get POSTGRES_OWNER_PASSWORD)" \
         compose run --rm --no-deps -T -e DB_OWNER_USERNAME -e DB_OWNER_PASSWORD \
         app php artisan migrate:rollback --step=1 --database=pgsql_owner --force >&2
     psql_su "select count(*) from information_schema.columns where table_name = 'calendar_link_events' and column_name = 'source'" >"$dir/a-old-source-column"
-    export_a "$dir/older" TMS_VERSION=0.8.1
+    # Exported with --stop: systemctl stubbed, units of the backups present.
+    mkdir -p "$dir/bin" "$dir/systemd" "$dir/older"
+    printf '#!/usr/bin/env bash\nprintf "%%s\\n" "$*" >>"%s/systemctl.log"\n' "$dir" >"$dir/bin/systemctl"
+    chmod +x "$dir/bin/systemctl"
+    touch "$dir/systemd/tms-backup.timer" "$dir/systemd/tms-backup-request.path"
+    PATH="$dir/bin:$PATH" TMS_SYSTEMD_DIR="$dir/systemd" TMS_VERSION=0.8.1 TMS_EXPORT_PASSWORD="$EXPORT_PASSWORD" \
+        "$TMS_ROOT/ops/export.sh" --output "$dir/older" --stop >"$dir/older.out" 2>"$dir/older.err"
+    running_services >"$dir/older-services"
 
     stack_down
 
@@ -143,6 +167,25 @@ good_export() { tail -n 1 "$BATS_FILE_TMPDIR/export.out"; }
     [[ "$(tail -n 1 "$BATS_FILE_TMPDIR/newer.out")" == *-v0.9.0.tar ]] || false
     [[ "$(tail -n 1 "$BATS_FILE_TMPDIR/older.out")" == *-v0.8.1.tar ]] || false
     [ "$(cat "$BATS_FILE_TMPDIR/a-old-source-column")" = "0" ]
+}
+
+@test "export --stop: old server stopped, backup units disabled, restart commands printed; restarted on failure" {
+    local dir="$BATS_FILE_TMPDIR"
+    # Successful export (« older »): nothing of the application runs any more, the database does.
+    refute grep -qxE 'app|worker|scheduler' "$dir/older-services"
+    grep -qx postgres "$dir/older-services"
+    [ "$(cat "$dir/systemctl.log")" = "disable --now tms-backup.timer tms-backup-request.path" ]
+    grep -qF "Ancien serveur arrêté" "$dir/older.err"
+    grep -qF "Pour annuler le déménagement et le remettre en service : docker compose --project-directory $TMS_ROOT" "$dir/older.err"
+    grep -qF " up -d && systemctl enable --now tms-backup.timer tms-backup-request.path" "$dir/older.err"
+    [[ "$(tail -n 1 "$dir/older.out")" == "$dir/older/"*-v0.8.1.tar ]] || false
+
+    # Failed export: refused, no file, the application runs again.
+    [ "$(cat "$dir/failed.rc")" -ne 0 ]
+    grep -qF "RESTIC_PASSWORD" "$dir/failed.err"
+    grep -qF "Export échoué : redémarrage de l'application sur ce serveur." "$dir/failed.err"
+    grep -qx app "$dir/failed-services"
+    [ -z "$(ls -A "$dir/failed")" ]
 }
 
 @test "export refuses a short password and two different passwords, before any backup" {
