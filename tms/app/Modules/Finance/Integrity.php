@@ -2,11 +2,15 @@
 
 namespace App\Modules\Finance;
 
+use App\Modules\Core\Companies\Company;
+use App\Modules\Core\Tenancy\TenantStorage;
 use App\Modules\Finance\Invoices\Invoice;
 use App\Modules\Finance\Invoices\InvoiceJournalEntry;
 use App\Modules\Finance\Invoices\InvoiceLine;
 use App\Modules\Finance\Invoices\InvoiceStatus;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 
 /**
  * The tamper-evident chain of the validated invoices and credit notes of
@@ -15,12 +19,15 @@ use Illuminate\Support\Collection;
  *  - canonical(): the frozen content of an invoice as JSON, keys sorted at
  *    every level, no whitespace — number, kind, company, dossier,
  *    recipient (type, id, funding, snapshot), dates, period, corrected
- *    invoice, VAT mention, lines (in order) and totals;
+ *    invoice, VAT mention, fingerprint of the archived PDF, lines (in
+ *    order) and totals;
  *  - hash(): SHA-256 (hex) of that JSON followed by the hash of the
  *    previous piece of the organisme ('' for the first);
  *  - verify(): walks the journal in order and recomputes every link; the
- *    first number whose content, totals, link or journal row does not
- *    match, or an issued invoice missing from the journal, breaks it.
+ *    first number whose content, totals, link, journal row or archived PDF
+ *    (its SHA-256) does not match, an issued invoice missing from the
+ *    journal, or a number given (invoice_sequences) missing from it — a
+ *    deleted tail, a hole — breaks it.
  */
 final class Integrity
 {
@@ -52,6 +59,7 @@ final class Integrity
             'period_to' => $invoice->period_to?->toDateString(),
             'corrected_invoice_id' => $invoice->corrected_invoice_id,
             'vat_mention' => $invoice->vat_mention,
+            'pdf_sha256' => $invoice->pdf_sha256,
             'lines' => $lines->map(fn (InvoiceLine $l) => [
                 'position' => $l->position,
                 'kind' => $l->kind,
@@ -104,6 +112,8 @@ final class Integrity
                 && $invoice->total_ttc_cents === $entry->total_ttc_cents
                 && $invoice->hash === $entry->hash
                 && $invoice->previous_hash === $entry->previous_hash
+                && $invoice->pdf_sha256 === $entry->pdf_sha256
+                && self::archiveIntact($invoice)
                 && self::hash($invoice, $previous) === $entry->hash;
             if (! $intact) {
                 return ['count' => $count, 'broken' => $entry->number];
@@ -115,7 +125,65 @@ final class Integrity
             ->orderBy('validated_at')->orderBy('number')->get(['id', 'number'])
             ->first(fn (Invoice $i) => ! isset($journaled[$i->id]));
 
-        return ['count' => $count, 'broken' => $missing?->number];
+        return ['count' => $count, 'broken' => $missing !== null ? $missing->number : self::firstMissingNumber()];
+    }
+
+    /**
+     * The archived PDF is there and is the one validated.
+     */
+    private static function archiveIntact(Invoice $invoice): bool
+    {
+        $disk = Storage::disk(TenantStorage::DISK);
+        if ($invoice->pdf_path === null || $invoice->pdf_sha256 === null || ! $disk->exists($invoice->pdf_path)) {
+            return false;
+        }
+
+        return hash('sha256', (string) $disk->get($invoice->pdf_path)) === $invoice->pdf_sha256;
+    }
+
+    /**
+     * Per company, kind and Paris year, the numbers given (invoice_sequences)
+     * must all be in the journal, 1 to the last: a deleted tail or a hole
+     * gives the first number missing.
+     */
+    private static function firstMissingNumber(): ?string
+    {
+        $given = DB::table('invoice_sequences')->where('last_number', '>', 0)
+            ->orderBy('company_id')->orderBy('kind')->orderBy('year')->get(['company_id', 'kind', 'year', 'last_number']);
+        if ($given->isEmpty()) {
+            return null;
+        }
+        /** @var array<string, array<int, string>> $journaled  « company|kind|year » => counter => number */
+        $journaled = [];
+        $entries = InvoiceJournalEntry::query()->join('invoices', 'invoices.id', '=', 'invoice_journal.invoice_id')
+            ->get(['invoices.company_id', 'invoice_journal.kind', 'invoice_journal.issued_on', 'invoice_journal.number']);
+        foreach ($entries as $entry) {
+            if (preg_match('/^(.*)-(\d{4})-(\d+)$/', (string) $entry->number, $m) === 1) {
+                $journaled[$entry->getAttribute('company_id').'|'.$entry->kind.'|'.$m[2]][(int) $m[3]] = $m[1];
+            }
+        }
+        foreach ($given as $row) {
+            $numbers = $journaled[$row->company_id.'|'.$row->kind.'|'.$row->year] ?? [];
+            for ($n = 1; $n <= (int) $row->last_number; $n++) {
+                if (! isset($numbers[$n])) {
+                    $prefix = $numbers === [] ? self::prefix((string) $row->company_id, (string) $row->kind) : $numbers[max(array_keys($numbers))];
+
+                    return sprintf('%s-%d-%05d', $prefix, $row->year, $n);
+                }
+            }
+            if (count($numbers) !== (int) $row->last_number) {
+                return sprintf('%s-%d-%05d', $numbers[max(array_keys($numbers))], $row->year, max(array_keys($numbers)));
+            }
+        }
+
+        return null;
+    }
+
+    private static function prefix(string $companyId, string $kind): string
+    {
+        $company = Company::withTrashed()->find($companyId);
+
+        return $company === null ? '?' : ($kind === Invoice::CREDIT_NOTE ? $company->credit_note_prefix : $company->invoice_prefix);
     }
 
     /**

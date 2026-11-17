@@ -26,16 +26,19 @@ use Illuminate\Validation\ValidationException;
  *     paying directly, not billed outside the TMS) with the agreement number
  *     of its funding, and its computed lines never exceed what is due to
  *     that recipient now (Due, recomputed under the locks); a credit note
- *     never gives back more than was invoiced to that recipient; an
+ *     never gives back more than is left of the invoice it corrects (its
+ *     HT minus its validated credit notes), nor more than was invoiced to
+ *     that recipient on the dossier (all lines; computed lines alone); an
  *     invoice is positive, a credit note negative;
  *  2. the billing plan of the dossier is locked (rhythm, basis, « paie
  *     directement » and the trash: credit note first);
  *  3. number <prefix>-<AAAA>-<NNNNN> (InvoiceNumbering), issued today
  *     (Paris), due after the payment terms of the company, recipient copied
  *     (InvoiceRecipient), totals recomputed;
- *  4. hash of the canonical content chained to the last piece of the
- *     organisme (Integrity), one row appended to invoice_journal;
- *  5. PDF rendered and archived (InvoicePdf), status « Validée »;
+ *  4. PDF rendered and archived (InvoicePdf), its SHA-256 kept;
+ *  5. hash of the canonical content (the PDF fingerprint included)
+ *     chained to the last piece of the organisme (Integrity), one row
+ *     appended to invoice_journal, status « Validée »;
  *  6. the dossier « Facturé » when nothing is due any more and its sessions
  *     are over (« Réalisé »); back to « Réalisé » when a credit note leaves
  *     something due.
@@ -65,6 +68,9 @@ final class InvoiceValidator
     public const NOT_NEGATIVE = 'Le total d\'un avoir doit être négatif.';
 
     public const OVER_INVOICED = 'L\'avoir dépasse ce qui a été facturé à ce destinataire.';
+
+    /** %s: the number of the corrected invoice. */
+    public const OVER_CORRECTED = 'Cet avoir dépasse le montant restant de la facture %s.';
 
     public function __construct(
         private readonly Due $due,
@@ -108,9 +114,11 @@ final class InvoiceValidator
                 'updated_by' => $user->id,
                 'previous_hash' => $previous['hash'],
             ]);
-            $invoice->hash = Integrity::hash($invoice, $previous['hash']);
+            // Validated before the rendering: the archive bears no « BROUILLON » watermark.
             $invoice->status = InvoiceStatus::Validated;
-            $invoice->pdf_path = $this->pdf->archive($invoice);
+            $archive = $this->pdf->archive($invoice);
+            $invoice->forceFill(['pdf_path' => $archive['path'], 'pdf_sha256' => $archive['sha256']]);
+            $invoice->hash = Integrity::hash($invoice, $previous['hash']);
             $invoice->save();
 
             InvoiceJournalEntry::query()->create([
@@ -124,6 +132,7 @@ final class InvoiceValidator
                 'total_ttc_cents' => $invoice->total_ttc_cents,
                 'hash' => $invoice->hash,
                 'previous_hash' => $previous['hash'],
+                'pdf_sha256' => $invoice->pdf_sha256,
             ]);
 
             $this->followDossier($invoice->dossier_id);
@@ -146,6 +155,15 @@ final class InvoiceValidator
         if ($invoice->kind === Invoice::CREDIT_NOTE) {
             if ($invoice->total_ht_cents >= 0) {
                 throw new UserFacingHttpException(409, self::NOT_NEGATIVE);
+            }
+            // What is left of the invoice it corrects: its HT minus its credit notes already validated.
+            if ($invoice->corrected_invoice_id !== null) {
+                $corrected = Invoice::query()->find($invoice->corrected_invoice_id);
+                $credited = (int) Invoice::query()->where('corrected_invoice_id', $invoice->corrected_invoice_id)
+                    ->whereIn('status', InvoiceStatus::values(InvoiceStatus::ISSUED))->sum('total_ht_cents');
+                if ($corrected !== null && -$invoice->total_ht_cents > $corrected->total_ht_cents + $credited) {
+                    throw new UserFacingHttpException(409, sprintf(self::OVER_CORRECTED, $corrected->number));
+                }
             }
             // Net of the recipient on the dossier: its invoices minus its credit notes (all lines; computed lines alone).
             $issued = (int) Invoice::query()->where('dossier_id', $invoice->dossier_id)->where('recipient_key', $invoice->recipient_key)

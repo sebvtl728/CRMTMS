@@ -4,6 +4,7 @@ use App\Exceptions\UserFacingHttpException;
 use App\Modules\Core\Access\AccessScope;
 use App\Modules\Core\Companies\Company;
 use App\Modules\Core\Documents\PdfRenderingFailed;
+use App\Modules\Core\Tenancy\Tenant;
 use App\Modules\Core\Tenancy\TenantStorage;
 use App\Modules\Core\Users\User;
 use App\Modules\Crm\Gdpr\Anonymiser;
@@ -16,6 +17,7 @@ use App\Modules\Finance\Invoices\InvoiceJournalEntry;
 use App\Modules\Finance\Invoices\InvoiceLine;
 use App\Modules\Finance\Invoices\InvoiceNumbering;
 use App\Modules\Finance\Invoices\InvoiceStatus;
+use App\Modules\Finance\Invoices\InvoiceTotals;
 use App\Modules\Finance\Invoices\InvoiceValidator;
 use App\Modules\Finance\Permissions;
 use App\Modules\Finance\Plans\BillingPlans;
@@ -166,6 +168,8 @@ it('validates a draft: number, dates, frozen recipient, chained hash, journal, a
 
     expect($invoice->pdf_path)->toBe(TenantStorage::path('invoices', $invoice->id.'/F-2026-00001.pdf'))
         ->and(Storage::disk(TenantStorage::DISK)->get($invoice->pdf_path))->toBe('%PDF-1.7 facture 1')
+        ->and($invoice->pdf_sha256)->toBe(hash('sha256', '%PDF-1.7 facture 1'))
+        ->and($entry->pdf_sha256)->toBe($invoice->pdf_sha256)
         ->and(app(BillingPlans::class)->isLocked($x['dossier']->id))->toBeTrue()
         // Who pays directly and the trash are frozen too (Sessions guards).
         ->and(BillingGuards::fundingLocked($x['dossier']->id))->toBe(BillingPlans::HAS_INVOICES)
@@ -377,7 +381,7 @@ it('creates a credit note from a validated invoice, numbered AV, and the due is 
 
     // Nothing left to give back to the contractor.
     $again = app(CreditNotes::class)->create($user, $invoice);
-    expect(fn () => fvValidate($again, $user))->toThrow(UserFacingHttpException::class, InvoiceValidator::OVER_INVOICED);
+    expect(fn () => fvValidate($again, $user))->toThrow(UserFacingHttpException::class, 'Cet avoir dépasse le montant restant de la facture F-2026-00001.');
 
     // An invoice draft and a credit-note draft of the same recipient live together.
     fvDraft($x, 'contractor', $user);
@@ -406,7 +410,81 @@ it('gives back the chosen lines only, never more than was invoiced', function ()
     // Raised beyond what the invoice billed: refused.
     $line = $credit->lines()->sole();
     fiDrafts()->update($credit, ['notes' => null, 'lines' => [['id' => $line->id, 'label' => 'Repas', 'description' => null, 'quantity' => '2', 'unit' => 'forfait', 'unit_price' => '-200', 'vat_rate' => '0']]]);
-    expect(fn () => fvValidate($credit->refresh(), $user))->toThrow(UserFacingHttpException::class, InvoiceValidator::OVER_INVOICED);
+    expect(fn () => fvValidate($credit->refresh(), $user))->toThrow(UserFacingHttpException::class, 'Cet avoir dépasse le montant restant de la facture F-2026-00001.');
+});
+
+/**
+ * The contractor's invoice F-2026-00001: the training line (171,43 €, computed) and two meals (30 €, free).
+ */
+function fvInvoiceWithMeals(array $x, User $user): Invoice
+{
+    $draft = fvDraft($x, 'contractor', $user);
+    fiDrafts()->update($draft, ['notes' => null, 'lines' => [
+        ...$draft->lines()->get()->map(fn (InvoiceLine $l) => ['id' => $l->id, 'label' => $l->label, 'description' => $l->description, 'quantity' => '1', 'unit' => $l->unit, 'unit_price' => '171,43', 'vat_rate' => '0'])->all(),
+        ['label' => 'Repas', 'description' => null, 'quantity' => '2', 'unit' => 'forfait', 'unit_price' => '15', 'vat_rate' => '0'],
+    ]]);
+
+    return fvValidate($draft, $user);
+}
+
+/** Sets the unit prices of the credit-note draft, in the order of its lines. */
+function fvCreditPrices(Invoice $credit, array $prices): Invoice
+{
+    fiDrafts()->update($credit, ['notes' => null, 'lines' => $credit->lines()->get()->values()->map(fn (InvoiceLine $l, int $i) => [
+        'id' => $l->id, 'label' => $l->label, 'description' => $l->description, 'quantity' => '1', 'unit' => $l->unit, 'unit_price' => $prices[$i], 'vat_rate' => '0',
+    ])->all()]);
+
+    return $credit->refresh();
+}
+
+it('never gives back more than is left of the corrected invoice, net of its earlier credit notes', function () {
+    $x = fiSeed();
+    $user = fvAccountant();
+    $invoice = fvInvoiceWithMeals($x, $user);
+    expect($invoice->total_ht_cents)->toBe(20143);
+
+    // A first credit note of 100 € on the training.
+    $first = fvCreditPrices(app(CreditNotes::class)->create($user, $invoice, [$invoice->lines()->where('kind', 'computed')->sole()->id]), ['-100']);
+    expect(fvValidate($first, $user)->number)->toBe('AV-2026-00001');
+
+    // The whole invoice again: more than the 101,43 € left.
+    $second = app(CreditNotes::class)->create($user, $invoice);
+    expect($second->total_ht_cents)->toBe(-20143)
+        ->and(fn () => fvValidate($second, $user))->toThrow(UserFacingHttpException::class, 'Cet avoir dépasse le montant restant de la facture F-2026-00001.');
+
+    // Exactly what is left goes through.
+    expect(fvValidate(fvCreditPrices($second, ['-71,43', '-30']), $user)->total_ht_cents)->toBe(-10143);
+});
+
+it('keeps the computed lines of a credit note within what the dossier invoiced to the recipient', function () {
+    $x = fiSeed();
+    $user = fvAccountant();
+    $invoice = fvInvoiceWithMeals($x, $user);
+
+    // 190 € on the training (171,43 € invoiced), the meals at 0: within the invoice, beyond the computed amount.
+    $credit = fvCreditPrices(app(CreditNotes::class)->create($user, $invoice), ['-190', '0']);
+    expect(fn () => fvValidate($credit, $user))->toThrow(UserFacingHttpException::class, InvoiceValidator::OVER_INVOICED);
+});
+
+it('gives a credit note the VAT regime of the invoice it corrects, not the company\'s of today', function () {
+    $x = fiSeed();
+    $user = fvAccountant();
+    $invoice = fvValidate(fvDraft($x, 'contractor', $user), $user);
+    expect($invoice->vat_mention)->toBe(InvoiceTotals::EXEMPTION);
+
+    // The company became subject to VAT since.
+    Company::query()->whereKey($invoice->company_id)->update(['vat_regime' => 'subject']);
+    $credit = app(CreditNotes::class)->create($user, $invoice);
+    $credit = fvCreditPrices($credit, ['-171,43']);
+    fiDrafts()->update($credit, ['notes' => null, 'lines' => $credit->lines()->get()->map(fn (InvoiceLine $l) => [
+        'id' => $l->id, 'label' => $l->label, 'description' => null, 'quantity' => '1', 'unit' => $l->unit, 'unit_price' => '-171,43', 'vat_rate' => '20',
+    ])->all()]);
+    $credit = fvValidate($credit->refresh(), $user);
+
+    expect($credit->total_vat_cents)->toBe(0)
+        ->and($credit->vat_mention)->toBe(InvoiceTotals::EXEMPTION)
+        ->and($credit->lines()->pluck('vat_rate')->map(fn ($r) => (string) $r)->all())->toBe(['0.00'])
+        ->and(fvSentText())->toContain('Exonération de TVA, article 261-4-4° du CGI')->not->toContain('Taux de TVA');
 });
 
 // ---------------------------------------------------------------- the dossier
@@ -414,8 +492,10 @@ it('gives back the chosen lines only, never more than was invoiced', function ()
 it('marks the dossier invoiced once nothing is due, and back after a credit note', function () {
     $x = fiSeed();
     $user = fvAccountant();
+    // Stored « created »: « Réalisé » is computed from the dates of its sessions (Billing::dossier gives the effective state).
+    expect(Dossier::query()->findOrFail($x['dossier']->id)->status->value)->toBe('created');
     fvValidate(fvDraft($x, 'contractor', $user), $user);
-    expect(Dossier::query()->findOrFail($x['dossier']->id)->status->value)->not->toBe('invoiced');
+    expect(Dossier::query()->findOrFail($x['dossier']->id)->status->value)->toBe('created');
 
     $opco = fvValidate(fvDraft($x, 'funding:'.$x['funding']->id, $user), $user);
     expect(Dossier::query()->findOrFail($x['dossier']->id)->status->value)->toBe('invoiced');
@@ -472,7 +552,7 @@ it('prints every mandatory mention, the funding and the VAT exemption', function
 
     foreach ([
         'CAP FORMATION', 'SIRET 732 829 320 00074', 'N° TVA intracommunautaire : FR40732829320',
-        "Déclaration d'activité enregistrée sous le n° 84740123474",
+        "Déclaration d'activité enregistrée sous le n° 84740123474. Cet enregistrement ne vaut pas agrément de l'État.",
         'FACTURE', 'F-2026-00001', "Date d'émission 17/11/2026", "Date d'échéance 17/12/2026",
         'OPCO EP', 'Dossier : '.$x['dossier']->number, "Financement — n° d'accord : PEC-42",
         'Période de formation : du 01/09/2026 au 30/09/2026',
@@ -618,4 +698,29 @@ it('deletes the drafts addressed to an anonymised particulier', function () {
     app(Anonymiser::class)->anonymise($person, 'request');
 
     expect(Invoice::query()->find($draft->id))->toBeNull();
+});
+
+it('prints the late penalties and the 40 € indemnity for a professional only, never for a particulier', function () {
+    $person = makePerson('Martin', ['first_name' => 'Paul', 'is_individual' => true, 'address_line1' => '3 rue des Lilas', 'postal_code' => '74000', 'city' => 'Annecy']);
+    $dossier = l2Dossier($person);
+    l2Enrol($dossier, plSession('2026-09-01', '2026-09-30'), makePerson('Durand', ['first_name' => 'Léa']));
+    $user = fvAccountant();
+    $draft = fiDrafts()->manual($user, $dossier->id, 'contractor');
+    fiDrafts()->update($draft, ['notes' => null, 'lines' => [['label' => 'Frais de dossier', 'description' => null, 'quantity' => '1', 'unit' => 'forfait', 'unit_price' => '50', 'vat_rate' => '0']]]);
+
+    fvValidate($draft->refresh(), $user);
+    $text = fvSentText();
+    expect($text)->toContain('Paul Martin')->toContain('Paiement à 30 jours')
+        ->not->toContain('40 €')->not->toContain('pénalités');
+});
+
+it('never writes a line onto an invoice it cannot see (another organisme)', function () {
+    $x = fiSeed();
+    $draft = fiDrafts()->manual(fvAccountant(), $x['dossier']->id, 'contractor');
+
+    inTenant(Tenant::factory()->create());
+    expect(fvRefused(fn () => InvoiceLine::query()->create([
+        'invoice_id' => $draft->id, 'position' => 0, 'kind' => 'free', 'label' => 'Intrus', 'quantity' => '1', 'unit' => 'forfait',
+        'unit_price_cents' => 100, 'vat_rate' => '0', 'total_ht_cents' => 100,
+    ])))->toContain('not found');
 });

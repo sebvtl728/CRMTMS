@@ -43,6 +43,7 @@ use Illuminate\Support\Carbon;
  * @property string|null $corrected_invoice_id the invoice a credit note corrects
  * @property string|null $notes internal notes (personal)
  * @property string|null $pdf_path
+ * @property string|null $pdf_sha256 SHA-256 of the archived PDF (validated)
  * @property string|null $hash
  * @property string|null $previous_hash
  * @property Carbon|null $sent_at

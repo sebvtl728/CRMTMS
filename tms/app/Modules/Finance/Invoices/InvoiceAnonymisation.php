@@ -23,11 +23,16 @@ final class InvoiceAnonymisation
             return;
         }
         $dossiers = Billing::dossiersOfTrainees($personIds);
-        $drafts = Invoice::query()->where('status', InvoiceStatus::Draft)
+        $concerned = fn () => Invoice::query()->where('status', InvoiceStatus::Draft)
             ->where(fn ($q) => $q->where(fn ($r) => $r->where('recipient_type', 'person')->whereIn('recipient_id', $personIds))
-                ->orWhereIn('dossier_id', $dossiers))
-            // Locked: a draft validated meanwhile is read again and left out (never deleted).
-            ->lockForUpdate()->get();
+                ->orWhereIn('dossier_id', $dossiers));
+        // The lock order of the invoicing: the dossiers first (sorted: no deadlock between two anonymisations), then the drafts.
+        $dossierIds = $concerned()->distinct()->pluck('dossier_id')->map(fn ($id) => (string) $id)->sort()->values()->all();
+        foreach ($dossierIds as $dossierId) {
+            Billing::lockDossier($dossierId);
+        }
+        // Read again under the locks: a draft validated meanwhile is left out (never deleted).
+        $drafts = $concerned()->lockForUpdate()->get();
         $drafts->each(function (Invoice $draft): void {
             $draft->lines()->get()->each(fn (InvoiceLine $line) => $line->delete());
             $draft->delete();

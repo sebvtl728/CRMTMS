@@ -26,6 +26,7 @@ use Illuminate\Support\Carbon;
  * @property int $total_ttc_cents
  * @property string $hash
  * @property string|null $previous_hash
+ * @property string|null $pdf_sha256 SHA-256 of the archived PDF
  * @property Carbon|null $created_at
  */
 class InvoiceJournalEntry extends Model
@@ -39,7 +40,7 @@ class InvoiceJournalEntry extends Model
     /** @var list<string> */
     protected $fillable = [
         'invoice_id', 'position', 'number', 'kind', 'issued_on',
-        'total_ht_cents', 'total_vat_cents', 'total_ttc_cents', 'hash', 'previous_hash',
+        'total_ht_cents', 'total_vat_cents', 'total_ttc_cents', 'hash', 'previous_hash', 'pdf_sha256',
     ];
 
     protected function casts(): array

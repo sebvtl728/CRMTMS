@@ -75,7 +75,7 @@ class InvoiceController extends Controller
             'options' => [
                 'units' => array_map(fn (string $u) => ['value' => $u, 'label' => $u], InvoiceDrafts::UNITS),
                 'vat_rates' => array_map(fn (string $r) => ['value' => $r, 'label' => str_replace('.', ',', rtrim(rtrim($r, '0'), '.')).' %'], InvoiceTotals::RATES),
-                'vat_exempt' => Company::withTrashed()->find($invoice->company_id)?->vat_regime?->value === 'exempt',
+                'vat_exempt' => InvoiceTotals::exempt($invoice, Company::withTrashed()->findOrFail($invoice->company_id)),
             ],
             'can' => [
                 'update' => $invoice->isDraft() && $this->manages($request, $invoice),

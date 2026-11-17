@@ -12,7 +12,8 @@ use Brick\Math\RoundingMode;
  * The amounts of an invoice in integer cents (brick/math, half up, never a
  * float): a line = round(quantity × unit price); HT = Σ lines; VAT per
  * rate on the sum of its lines (as the quotes); TTC = HT + VAT. The VAT
- * mention follows the company and the lines (spec 0.9 § 4.2, § 4 bis 1).
+ * mention follows the company — or, for a credit note, the invoice it
+ * corrects — and the lines (spec 0.9 § 4.2, § 4 bis 1).
  */
 final class InvoiceTotals
 {
@@ -31,14 +32,56 @@ final class InvoiceTotals
         return BigDecimal::of($quantity)->multipliedBy($unitPriceCents)->toScale(0, RoundingMode::HalfUp)->toInt();
     }
 
-    /** The rate of a line of $component for $company (exempt: 0; the dédit never bears VAT). */
-    public static function rateFor(Company $company, ?string $component, ?string $wanted = null): string
+    /**
+     * Whether the invoice is exempt from VAT: a credit note follows the
+     * invoice it corrects (its regime as printed, whatever the company's
+     * settings today); anything else the company's regime.
+     */
+    public static function exempt(Invoice $invoice, Company $company): bool
     {
-        if ($company->vat_regime === VatRegime::Exempt || $component === InvoiceLine::DEDIT) {
+        if ($invoice->corrected_invoice_id !== null) {
+            $corrected = Invoice::query()->find($invoice->corrected_invoice_id);
+            if ($corrected !== null && ! $corrected->isDraft()) {
+                return str_contains((string) $corrected->vat_mention, self::EXEMPTION);
+            }
+        }
+
+        return $company->vat_regime === VatRegime::Exempt;
+    }
+
+    /** The rate of a line of $component ($exempt: 0; the dédit never bears VAT). */
+    public static function rateFor(bool $exempt, ?string $component, ?string $wanted = null): string
+    {
+        if ($exempt || $component === InvoiceLine::DEDIT) {
             return '0.00';
         }
 
         return $wanted ?? self::DEFAULT_RATE;
+    }
+
+    /**
+     * Base and VAT per rate (« 20.00 »), sorted by rate: VAT = round(base ×
+     * rate / 100), half up, on the sum of the lines of that rate.
+     *
+     * @param  iterable<InvoiceLine>  $lines
+     * @return list<array{rate: string, base: int, vat: int}>
+     */
+    public static function byRate(iterable $lines): array
+    {
+        /** @var array<string, int> $bases */
+        $bases = [];
+        foreach ($lines as $line) {
+            $rate = (string) $line->vat_rate;
+            $bases[$rate] = ($bases[$rate] ?? 0) + $line->total_ht_cents;
+        }
+        ksort($bases, SORT_STRING);
+        $rows = [];
+        foreach ($bases as $rate => $base) {
+            $rate = (string) $rate;
+            $rows[] = ['rate' => $rate, 'base' => $base, 'vat' => BigInteger::of($base)->toBigDecimal()->multipliedBy($rate)->dividedBy(100, 0, RoundingMode::HalfUp)->toInt()];
+        }
+
+        return $rows;
     }
 
     /**
@@ -47,22 +90,11 @@ final class InvoiceTotals
     public static function apply(Invoice $invoice, Company $company): void
     {
         $lines = $invoice->lines()->get();
-        $ht = 0;
-        /** @var array<string, int> $byRate */
-        $byRate = [];
-        $dedit = false;
-        foreach ($lines as $line) {
-            $ht += $line->total_ht_cents;
-            $rate = (string) $line->vat_rate;
-            $byRate[$rate] = ($byRate[$rate] ?? 0) + $line->total_ht_cents;
-            $dedit = $dedit || ($line->component === InvoiceLine::DEDIT && $line->total_ht_cents !== 0);
-        }
-        $vat = 0;
-        foreach ($byRate as $rate => $sum) {
-            $vat += BigInteger::of($sum)->toBigDecimal()->multipliedBy($rate)->dividedBy(100, 0, RoundingMode::HalfUp)->toInt();
-        }
+        $ht = (int) $lines->sum('total_ht_cents');
+        $vat = array_sum(array_column(self::byRate($lines), 'vat'));
+        $dedit = $lines->contains(fn (InvoiceLine $l) => $l->component === InvoiceLine::DEDIT && $l->total_ht_cents !== 0);
         $mentions = array_values(array_filter([
-            $company->vat_regime === VatRegime::Exempt ? self::EXEMPTION : null,
+            self::exempt($invoice, $company) ? self::EXEMPTION : null,
             $dedit ? self::DEDIT_OUT_OF_SCOPE : null,
         ]));
 

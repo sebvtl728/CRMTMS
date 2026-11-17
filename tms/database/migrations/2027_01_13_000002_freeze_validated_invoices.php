@@ -14,8 +14,9 @@ return new class extends Migration
      *    change (status validated → sent, sent_at, email_status,
      *    email_error_code, and the technical updated_at); never deleted;
      *  - invoice_lines: no line is added to, changed on or removed from an
-     *    invoice that is not a draft (a line whose invoice is not visible
-     *    any more — the cascade of a deleted draft — goes);
+     *    invoice that is not a draft, nor written onto an invoice that is
+     *    not visible (another organisme's); only a delete goes when the
+     *    invoice is not visible any more (the cascade of a deleted draft);
      *  - invoice_journal: append-only, as audit_logs; position = the order
      *    of the chain in the organisme (1, 2, …), unique.
      */
@@ -53,7 +54,15 @@ return new class extends Migration
                 if tg_op = 'UPDATE' and new.invoice_id is distinct from old.invoice_id then
                     raise exception 'the invoice of a line never changes';
                 end if;
-                if invoice_status is not null and invoice_status <> 'draft' then
+                if invoice_status is null then
+                    -- Not visible: the cascade of a deleted draft may remove its lines; nothing else goes
+                    -- (a line written onto another organisme's invoice).
+                    if tg_op = 'DELETE' then
+                        return old;
+                    end if;
+                    raise exception 'the invoice of this line is not found: immutable';
+                end if;
+                if invoice_status <> 'draft' then
                     raise exception 'lines of a validated invoice are immutable';
                 end if;
                 return case when tg_op = 'DELETE' then old else new end;

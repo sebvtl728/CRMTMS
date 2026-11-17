@@ -5,12 +5,9 @@ namespace App\Modules\Finance\Invoices;
 use App\Modules\Core\Companies\Company;
 use App\Modules\Core\Companies\CompanyBranding;
 use App\Modules\Core\Companies\LegalMentions;
-use App\Modules\Core\Companies\VatRegime;
 use App\Modules\Core\Documents\PdfRenderer;
 use App\Modules\Core\Documents\PdfRenderingFailed;
 use App\Modules\Core\Tenancy\TenantStorage;
-use Brick\Math\BigInteger;
-use Brick\Math\RoundingMode;
 use Illuminate\Support\Facades\Storage;
 use RuntimeException;
 
@@ -33,6 +30,9 @@ class InvoicePdf
 
     public const NO_DISCOUNT = 'Pas d\'escompte pour paiement anticipé.';
 
+    /** Required on the documents of a training body (Code du travail R6351-6). */
+    public const NOT_AN_APPROVAL = 'Cet enregistrement ne vaut pas agrément de l\'État.';
+
     public function __construct(
         private readonly PdfRenderer $renderer,
         private readonly CompanyBranding $branding,
@@ -47,11 +47,14 @@ class InvoicePdf
     }
 
     /**
-     * Renders the final document and stores it; returns its path.
+     * Renders the final document and stores it; returns its path and the
+     * SHA-256 of its bytes.
+     *
+     * @return array{path: string, sha256: string}
      *
      * @throws PdfRenderingFailed
      */
-    public function archive(Invoice $invoice): string
+    public function archive(Invoice $invoice): array
     {
         $bytes = $this->render($invoice);
         $path = self::archivePath($invoice);
@@ -59,7 +62,7 @@ class InvoicePdf
             throw new RuntimeException('The invoice PDF could not be written to the private disk.');
         }
 
-        return $path;
+        return ['path' => $path, 'sha256' => hash('sha256', $bytes)];
     }
 
     /**
@@ -92,16 +95,9 @@ class InvoicePdf
     {
         $company = Company::withTrashed()->findOrFail($invoice->company_id);
         $lines = $invoice->lines()->get();
-        $exempt = $company->vat_regime === VatRegime::Exempt;
+        $exempt = InvoiceTotals::exempt($invoice, $company);
         $credit = $invoice->kind === Invoice::CREDIT_NOTE;
         $corrected = $invoice->corrected_invoice_id === null ? null : Invoice::query()->find($invoice->corrected_invoice_id);
-
-        /** @var array<string, int> $bases */
-        $bases = [];
-        foreach ($lines as $line) {
-            $bases[(string) $line->vat_rate] = ($bases[(string) $line->vat_rate] ?? 0) + $line->total_ht_cents;
-        }
-        ksort($bases, SORT_STRING);
 
         return view('documents.invoice', [
             'watermark' => $invoice->isDraft(),
@@ -119,6 +115,7 @@ class InvoicePdf
                 'siret' => $company->siret,
                 'vat_number' => $company->vat_number,
                 'nda_number' => $company->nda_number,
+                'nda_notice' => self::NOT_AN_APPROVAL,
                 'legal' => LegalMentions::for($company),
                 'footer' => $company->invoice_footer,
             ],
@@ -145,11 +142,11 @@ class InvoicePdf
                 'vat_rate' => self::percent((string) $l->vat_rate),
                 'total_ht' => self::money($l->total_ht_cents),
             ])->values()->all(),
-            'vatByRate' => array_map(fn (string $rate, int $base) => [
-                'rate' => self::percent($rate),
-                'base' => self::money($base),
-                'vat' => self::money(BigInteger::of($base)->toBigDecimal()->multipliedBy($rate)->dividedBy(100, 0, RoundingMode::HalfUp)->toInt()),
-            ], array_keys($bases), array_values($bases)),
+            'vatByRate' => array_map(fn (array $r) => [
+                'rate' => self::percent($r['rate']),
+                'base' => self::money($r['base']),
+                'vat' => self::money($r['vat']),
+            ], InvoiceTotals::byRate($lines)),
             'totals' => [
                 'ht' => self::money($invoice->total_ht_cents),
                 'vat' => self::money($invoice->total_vat_cents),
@@ -160,7 +157,8 @@ class InvoicePdf
                     ? 'Paiement à réception de la facture.'
                     : 'Paiement à '.$company->payment_terms_days.' jours'.($invoice->due_on !== null ? ', au plus tard le '.$invoice->due_on->format('d/m/Y') : '').'.',
                 'no_discount' => self::NO_DISCOUNT,
-                'penalties' => self::PENALTIES,
+                // Late penalties and the 40 € indemnity concern professionals only (Code de commerce).
+                'penalties' => $invoice->recipient_type === 'organisation' ? self::PENALTIES : null,
             ],
         ])->render();
     }

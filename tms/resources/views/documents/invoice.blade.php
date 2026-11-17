@@ -170,7 +170,7 @@
     <section class="block">
         <h2>Conditions de paiement</h2>
         <div class="small">{{ $payment['terms'] }} {{ $payment['no_discount'] }}</div>
-        <div class="small">{{ $payment['penalties'] }}</div>
+        @if ($payment['penalties'])<div class="small">{{ $payment['penalties'] }}</div>@endif
     </section>
 @endif
 
@@ -181,7 +181,7 @@
         <div>
             @if ($company['vat_number'])N° TVA intracommunautaire : {{ $company['vat_number'] }}@endif
             @if ($company['vat_number'] && $company['nda_number']) – @endif
-            @if ($company['nda_number'])Déclaration d'activité enregistrée sous le n° {{ $company['nda_number'] }}@endif
+            @if ($company['nda_number'])Déclaration d'activité enregistrée sous le n° {{ $company['nda_number'] }}. {{ $company['nda_notice'] }}@endif
         </div>
     @endif
 </footer>

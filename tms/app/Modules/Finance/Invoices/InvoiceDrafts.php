@@ -137,6 +137,7 @@ final class InvoiceDrafts
         return DB::transaction(function () use ($draft, $data): Invoice {
             $invoice = $this->lockedDraft($draft, self::VALIDATED);
             $company = Company::withTrashed()->findOrFail($invoice->company_id);
+            $exempt = InvoiceTotals::exempt($invoice, $company);
             /** @var \Illuminate\Database\Eloquent\Collection<string, InvoiceLine> $current */
             $current = $invoice->lines()->get()->keyBy('id');
             $lines = $this->validated($data, $current);
@@ -153,7 +154,7 @@ final class InvoiceDrafts
                     'quantity' => $quantity,
                     'unit' => $input['unit'],
                     'unit_price_cents' => $price,
-                    'vat_rate' => InvoiceTotals::rateFor($company, $line->component, $input['vat_rate']),
+                    'vat_rate' => InvoiceTotals::rateFor($exempt, $line->component, $input['vat_rate']),
                     'total_ht_cents' => InvoiceTotals::line($quantity, $price),
                 ]);
                 $line->save();
@@ -292,7 +293,7 @@ final class InvoiceDrafts
                 ...$line,
                 'invoice_id' => $invoice->id,
                 'position' => $from + $i,
-                'vat_rate' => InvoiceTotals::rateFor($company, $line['component']),
+                'vat_rate' => InvoiceTotals::rateFor(InvoiceTotals::exempt($invoice, $company), $line['component']),
                 'computed_cents' => $line['total_ht_cents'],
             ]);
         }
