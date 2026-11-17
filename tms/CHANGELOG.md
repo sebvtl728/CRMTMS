@@ -5,6 +5,35 @@ Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) ; ve
 
 ## [Non publié]
 
+## [0.8.1] - 2026-11-17
+
+Écrans de la formation : la page d'une session se lit en étapes avec une Synthèse d'avancement, les sessions se suivent
+en colonnes par état, la fiche d'une formation montre ses sessions, et les séances partent dans l'agenda Outlook du
+formateur.
+
+### Ajouté
+
+- **Page de la session en étapes** (Synthèse, Configuration, Planning, Stagiaires, Suivi), l'étape figurant dans
+  l'adresse (`?etape=`) ; les anciennes adresses `?tab=` sont comprises.
+- **Synthèse** : cartes d'avancement (heures planifiées, formateurs, salles, conflits, inscriptions, financements,
+  stages, présences, clôture des mois), chacune avec un état en texte et en icône et un lien vers la section à traiter,
+  selon le périmètre de l'utilisateur (`Summary\SessionChecklist`).
+- **Tâches et notes d'une session** (tables `session_tasks` et `session_notes`) : tâches avec échéance et responsable,
+  notes de 5 000 caractères, journalisées sans leur texte.
+- **Sessions en colonnes** : vue kanban par état (planifiée, confirmée, en cours, terminée, annulée à la demande),
+  bascule Liste / Colonnes mémorisée, glisser-déposer ou menu au clavier entre planifiée et confirmée
+  (`POST sessions/{session}/status`), heures et points à régler sur chaque carte.
+- **Séances dans Outlook** : les séances planifiées sont créées, déplacées et retirées dans l'agenda Outlook du
+  formateur connecté, sans stagiaire, note ni prix (`Connectors\Calendar\OutlookSources`, `PushSourceToOutlook`).
+- **Fiche formation** (`catalogue/{formation}`) : informations, plaquettes et bloc Sessions (indicateurs, liste,
+  **Créer une session** avec la formation préremplie), par le registre `Catalogue\TrainingBlocks`.
+
+### Modifié
+
+- `calendar_link_events` : `activity_id` devient `source_id` et reçoit une colonne `source` (`crm.activity` pour les
+  actions du CRM, `sessions.seance` pour les séances) ; migration réversible.
+- Dans la liste du catalogue, l'intitulé d'une formation mène à sa page ; **Modifier** reste une action.
+
 ## [0.8.0] - 2026-11-17
 
 Planning des séances, formateurs, présences et heures réalisées : une session se découpe en modules, se planifie en
