@@ -371,3 +371,70 @@ SH
 
     psql_owner "alter default privileges for role tms_owner in schema public grant delete on tables to tms_app" >/dev/null
 }
+
+@test "a requested backup that cannot take the lock puts the request back and fails" {
+    enable_backup_requests
+    # The unit removed the request before starting backup.sh (ExecStartPre).
+    compose exec -T app rm -f storage/ops/backup-request.json
+    before=$(backup_status)
+    # exec: the killed process is the one holding the lock (fd 9), no orphan keeps it.
+    bash -c 'source "$1/ops/lib.sh"; tms_lock 0; echo verrouillé; exec sleep 60' _ "$TMS_ROOT" >"$BATS_TEST_TMPDIR/holder" 2>&1 3>&- &
+    local holder=$!
+    until grep -q verrouillé "$BATS_TEST_TMPDIR/holder"; do sleep 0.2; done
+
+    TMS_BACKUP_LOCK_WAIT=2 run "$TMS_ROOT/ops/backup.sh" --tag manuel
+    kill "$holder"
+    wait "$holder" 2>/dev/null || true
+    [ "$status" -ne 0 ]
+    [[ "$output" == *"Une autre opération de maintenance"* ]] || false
+    [[ "$output" == *"Demande de sauvegarde remise en attente"* ]] || false
+
+    # Back for the application (pending, written by the app user) and for the unit (next run).
+    run compose exec -T app cat storage/ops/backup-request.json
+    [ "$status" -eq 0 ]
+    [[ "$(jq -r .requested_at <<<"$output")" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$ ]] || false
+    [ "$(jq -r .requested_by_id <<<"$output")" = "null" ]
+    compose exec -T app sh -c 'rm storage/ops/backup-request.json'
+    # Nothing ran: no status written, no running marker left.
+    [ "$(backup_status)" = "$before" ]
+    run compose exec -T app test -e storage/ops/backup-running.json
+    [ "$status" -ne 0 ]
+
+    # Any other backup that cannot take the lock creates no request.
+    bash -c 'source "$1/ops/lib.sh"; tms_lock 0; echo verrouillé; exec sleep 60' _ "$TMS_ROOT" >"$BATS_TEST_TMPDIR/holder2" 2>&1 3>&- &
+    holder=$!
+    until grep -q verrouillé "$BATS_TEST_TMPDIR/holder2"; do sleep 0.2; done
+    TMS_BACKUP_LOCK_WAIT=1 run "$TMS_ROOT/ops/backup.sh" --tag nightly
+    kill "$holder"
+    wait "$holder" 2>/dev/null || true
+    [ "$status" -ne 0 ]
+    run compose exec -T app test -e storage/ops/backup-request.json
+    [ "$status" -ne 0 ]
+}
+
+@test "sftp remote copy: a failure is recorded without ever showing the SSH key" {
+    local key="$STACK_DIR/tms_nas" known="$STACK_DIR/tms_nas_known_hosts"
+    printf -- '-----BEGIN OPENSSH PRIVATE KEY-----\ncle-privee-bats-ne-jamais-afficher\n-----END OPENSSH PRIVATE KEY-----\n' >"$key"
+    chmod 600 "$key"
+    echo "127.0.0.1 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIbats" >"$known"
+    cp "$TMS_ENV_FILE" "$STACK_DIR/env.sftp"
+    printf 'RESTIC_REMOTE_REPOSITORY=sftp:bats@127.0.0.1:/depot\nRESTIC_REMOTE_SSH_KEY=%s\nRESTIC_REMOTE_SSH_KNOWN_HOSTS=%s\n' "$key" "$known" >>"$STACK_DIR/env.sftp"
+
+    TMS_ENV_FILE="$STACK_DIR/env.sftp" run "$TMS_ROOT/ops/backup.sh" --tag test
+    [ "$status" -ne 0 ]
+    [[ "$output" == *"Échec de la copie vers le dépôt distant."* ]] || false
+    [[ "$output" != *"cle-privee-bats"* ]] || false
+    json=$(backup_status)
+    [ "$(jq -c .remote <<<"$json")" = '{"configured":true,"success":false}' ]
+    [ "$(jq -r .error <<<"$json")" = "Échec de la copie vers le dépôt distant." ]
+    [[ "$json" != *"cle-privee-bats"* ]] || false
+    refute_secrets "$json"
+
+    # Without the known hosts file: refused before any connection, French message recorded.
+    sed -i.bak '/^RESTIC_REMOTE_SSH_KNOWN_HOSTS=/d' "$STACK_DIR/env.sftp"
+    TMS_ENV_FILE="$STACK_DIR/env.sftp" run "$TMS_ROOT/ops/backup.sh" --tag test
+    [ "$status" -ne 0 ]
+    json=$(backup_status)
+    [[ "$(jq -r .error <<<"$json")" == "Copie SFTP : RESTIC_REMOTE_SSH_KNOWN_HOSTS (empreintes du serveur distant, ssh-keyscan) manquant"* ]] || false
+    [[ "$output$json" != *"cle-privee-bats"* ]] || false
+}

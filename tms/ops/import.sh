@@ -114,13 +114,7 @@ if version_lt "$INSTALLED_VERSION" "$EXPORT_VERSION"; then
 fi
 INSTALLED_MODE="$(env_get TMS_MODE)"
 INSTALLED_MODE="${INSTALLED_MODE:-single}"
-if [[ "$EXPORT_MODE" == "multi" && "$INSTALLED_MODE" != "multi" ]]; then
-    [[ "$EXPORT_TENANTS" =~ ^[0-9]+$ && "$EXPORT_TENANTS" -le 1 ]] \
-        || die "Cet export contient plusieurs organismes : installez en mode multi-organismes."
-    log_error "Attention : cet export vient d'une installation multi-organismes et ce serveur est en mode mono-organisme ; son unique organisme deviendra l'organisme par défaut."
-elif [[ "$EXPORT_MODE" != "multi" && "$INSTALLED_MODE" == "multi" ]]; then
-    log_error "Attention : cet export vient d'une installation mono-organisme et ce serveur est en mode multi-organismes : après l'import, associez un nom de domaine à l'organisme (sinon il reste inaccessible)."
-fi
+import_mode_check "$EXPORT_MODE" "$EXPORT_TENANTS" "$INSTALLED_MODE" || exit 1
 log_info "Export valide : version ${EXPORT_VERSION} (installée : ${INSTALLED_VERSION})."
 
 # --- 2. Safety backup --------------------------------------------------------------------

@@ -485,6 +485,73 @@ consume_backup_request() {
     ops_remove "$1" backup-request.json
 }
 
+# restore_backup_request <volume>: writes ops/backup-request.json back ({requested_at,
+# requested_by_id: null}) when the requested backup could not start (lock held by another
+# operation): the unit consumed it before the run, the click must not be lost.
+restore_backup_request() {
+    # shellcheck disable=SC2016  # jq program
+    S_REQUESTED_AT="$(date -u '+%Y-%m-%dT%H:%M:%SZ')" \
+        ops_json_write "$1" backup-request.json '{requested_at: $ENV.S_REQUESTED_AT, requested_by_id: null}' S_REQUESTED_AT </dev/null
+}
+
+# restic_remote_copy <snapshot id>: copies the snapshot of RESTIC_REPOSITORY (RESTIC_PASSWORD) to
+# RESTIC_REMOTE_REPOSITORY (RESTIC_REMOTE_PASSWORD, default RESTIC_PASSWORD; backend credentials
+# in RESTIC_REMOTE_ENV_FILE), created on the first run with the chunker parameters of the local
+# one, then applies the retention there.
+# sftp: repositories: restic runs in a container without the SSH configuration of the host. The
+# dedicated key RESTIC_REMOTE_SSH_KEY and the host keys RESTIC_REMOTE_SSH_KNOWN_HOSTS (both
+# required) are mounted read-only; ssh never asks anything and refuses an unknown or changed host
+# key (StrictHostKeyChecking=yes). Only their paths are ever printed. Errors of the configuration
+# are logged (LAST_ERROR); those of restic only fail.
+restic_remote_copy() {
+    local snapshot="$1" key="${RESTIC_REMOTE_SSH_KEY:-}" known="${RESTIC_REMOTE_SSH_KNOWN_HOSTS:-}"
+    local -a docker_args=() opts=()
+    [[ -z "${RESTIC_REMOTE_ENV_FILE:-}" ]] || docker_args+=(--env-file "$RESTIC_REMOTE_ENV_FILE")
+    if [[ "$RESTIC_REMOTE_REPOSITORY" == sftp:* ]]; then
+        [[ -n "$key" ]] || { log_error "Copie SFTP : RESTIC_REMOTE_SSH_KEY (chemin de la clé SSH dédiée) manquant dans ${TMS_ENV_FILE}."; return 1; }
+        [[ -f "$key" && -r "$key" ]] || { log_error "Copie SFTP : clé SSH introuvable ou illisible (RESTIC_REMOTE_SSH_KEY=${key})."; return 1; }
+        [[ -n "$known" ]] || { log_error "Copie SFTP : RESTIC_REMOTE_SSH_KNOWN_HOSTS (empreintes du serveur distant, ssh-keyscan) manquant dans ${TMS_ENV_FILE}."; return 1; }
+        [[ -f "$known" && -r "$known" ]] || { log_error "Copie SFTP : fichier d'empreintes introuvable ou illisible (RESTIC_REMOTE_SSH_KNOWN_HOSTS=${known})."; return 1; }
+        docker_args+=(-v "$key:/run/tms/ssh_key:ro" -v "$known:/run/tms/known_hosts:ro")
+        opts+=(-o "sftp.args=-i /run/tms/ssh_key -o IdentitiesOnly=yes -o UserKnownHostsFile=/run/tms/known_hosts -o StrictHostKeyChecking=yes -o BatchMode=yes")
+    fi
+    if ! restic_remote_run cat config >/dev/null 2>&1; then
+        restic_remote_run init --from-repo "$RESTIC_REPOSITORY" --copy-chunker-params >/dev/null || return 1
+    fi
+    restic_remote_run copy "$snapshot" >/dev/null || return 1
+    restic_remote_run forget --prune --host tms --keep-daily 14 --keep-weekly 8 --keep-monthly 12 >/dev/null
+}
+
+# restic_remote_run <restic args...>: restic against the remote repository, the local one as the
+# source of copy (variables set for that call only); docker_args and opts of restic_remote_copy.
+restic_remote_run() {
+    local from_repo="$RESTIC_REPOSITORY" from_password="$RESTIC_PASSWORD"
+    RESTIC_FROM_REPOSITORY="$from_repo" RESTIC_FROM_PASSWORD="$from_password" \
+        RESTIC_REPOSITORY="$RESTIC_REMOTE_REPOSITORY" RESTIC_PASSWORD="${RESTIC_REMOTE_PASSWORD:-$from_password}" \
+        restic_run ${docker_args[@]+"${docker_args[@]}"} -- ${opts[@]+"${opts[@]}"} "$@"
+}
+
+# import_mode_check <export mode> <export tenants> <installed mode>: a multi-organismes export
+# goes into a single installation only when it holds one organisme (known count); other mode
+# changes are allowed with a warning. Returns 1 (log_error) when refused.
+import_mode_check() {
+    local export_mode="$1" tenants="$2" installed_mode="$3"
+    if [[ "$export_mode" == "multi" && "$installed_mode" != "multi" ]]; then
+        if [[ ! "$tenants" =~ ^[0-9]+$ ]]; then
+            log_error "Nombre d'organismes de l'export inconnu : installez en mode multi-organismes ou vérifiez l'export."
+            return 1
+        fi
+        if ((tenants > 1)); then
+            log_error "Cet export contient plusieurs organismes : installez en mode multi-organismes."
+            return 1
+        fi
+        log_error "Attention : cet export vient d'une installation multi-organismes et ce serveur est en mode mono-organisme ; son unique organisme deviendra l'organisme par défaut."
+    elif [[ "$export_mode" != "multi" && "$installed_mode" == "multi" ]]; then
+        log_error "Attention : cet export vient d'une installation mono-organisme et ce serveur est en mode multi-organismes : après l'import, associez un nom de domaine à l'organisme (sinon il reste inaccessible)."
+    fi
+    return 0
+}
+
 # enable_backup_requests: « Sauvegarder maintenant » of the application. Creates storage/ops and,
 # on a systemd host where the backup timer is installed, tms-backup-request.path (watches the
 # request file through the volume mount point on the host) and tms-backup-request.service

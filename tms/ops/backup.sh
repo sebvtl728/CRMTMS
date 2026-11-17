@@ -14,9 +14,14 @@
 # .env: RESTIC_PASSWORD (required), RESTIC_REPOSITORY (default /var/backups/tms),
 # RESTIC_REMOTE_REPOSITORY, RESTIC_REMOTE_PASSWORD (default RESTIC_PASSWORD),
 # RESTIC_REMOTE_ENV_FILE (credentials of the remote backend, e.g. AWS_ACCESS_KEY_ID),
+# RESTIC_REMOTE_SSH_KEY and RESTIC_REMOTE_SSH_KNOWN_HOSTS (sftp: remote only, both required: path
+# of the dedicated private key, root-owned mode 600, and of the remote host keys from ssh-keyscan;
+# mounted read-only in the restic container, host key checked strictly; see restic_remote_copy),
 # TMS_ALERT_EMAIL, TMS_BACKUP_TMPDIR (staging directory, default /var/tmp).
 # Takes the maintenance lock (shared with update.sh and restore.sh), waiting up to
-# TMS_BACKUP_LOCK_WAIT seconds (default 900) for a running operation to finish.
+# TMS_BACKUP_LOCK_WAIT seconds (default 900) for a running operation to finish. --tag manuel: the
+# unit removed the request before starting; when the lock cannot be taken, the request is written
+# back (the next attempt starts at once) and the run fails without a status (nothing ran).
 set -euo pipefail
 
 # shellcheck source=lib.sh
@@ -46,7 +51,19 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
+# put_request_back: EXIT trap while waiting for the lock of a requested backup (--tag manuel).
+put_request_back() {
+    local status=$? volume
+    ((status != 0)) || return 0
+    if volume="$(storage_volume)" && restore_backup_request "$volume"; then
+        log_info "Demande de sauvegarde remise en attente (ops/backup-request.json) : elle sera relancée."
+    else
+        log_error "Demande de sauvegarde perdue : relancez « Sauvegarder maintenant » une fois l'opération en cours terminée."
+    fi
+}
+[[ "$TAG" != "manuel" ]] || trap put_request_back EXIT
 tms_lock "${TMS_BACKUP_LOCK_WAIT:-900}"
+trap - EXIT
 
 send_alert() {
     local message="$1"
@@ -155,17 +172,8 @@ restic_run -- forget --prune --host tms --keep-daily 14 --keep-weekly 8 --keep-m
 if [[ -n "${RESTIC_REMOTE_REPOSITORY:-}" ]]; then
     log_info "Copie vers le dépôt distant."
     REMOTE_SUCCESS=false
-    remote_args=()
-    [[ -z "${RESTIC_REMOTE_ENV_FILE:-}" ]] || remote_args+=(--env-file "$RESTIC_REMOTE_ENV_FILE")
-    (
-        export RESTIC_FROM_REPOSITORY="$RESTIC_REPOSITORY" RESTIC_FROM_PASSWORD="$RESTIC_PASSWORD"
-        export RESTIC_REPOSITORY="$RESTIC_REMOTE_REPOSITORY" RESTIC_PASSWORD="${RESTIC_REMOTE_PASSWORD:-$RESTIC_PASSWORD}"
-        if ! restic_run ${remote_args[@]+"${remote_args[@]}"} -- cat config >/dev/null 2>&1; then
-            restic_run ${remote_args[@]+"${remote_args[@]}"} -- init --from-repo "$RESTIC_FROM_REPOSITORY" --copy-chunker-params >/dev/null
-        fi
-        restic_run ${remote_args[@]+"${remote_args[@]}"} -- copy "$snapshot_id" >/dev/null
-        restic_run ${remote_args[@]+"${remote_args[@]}"} -- forget --prune --host tms --keep-daily 14 --keep-weekly 8 --keep-monthly 12 >/dev/null
-    ) || die "Échec de la copie vers le dépôt distant."
+    LAST_ERROR=""
+    restic_remote_copy "$snapshot_id" || die "${LAST_ERROR:-Échec de la copie vers le dépôt distant.}"
     REMOTE_SUCCESS=true
 fi
 
