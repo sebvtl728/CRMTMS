@@ -72,13 +72,24 @@ class CalendarLink extends Model
      */
     public static function usableFor(?string $userId): ?self
     {
+        $link = self::activeFor($userId);
+
+        return $link?->user?->can(Permissions::ACTIVITIES_VIEW) ? $link : null;
+    }
+
+    /**
+     * The active link of $userId when his account is active, else null
+     * (the source decides who receives its items: OutlookSources).
+     */
+    public static function activeFor(?string $userId): ?self
+    {
         if ($userId === null) {
             return null;
         }
         $link = self::query()->where('user_id', $userId)->where('status', self::ACTIVE)->first();
         $user = $link?->user;
 
-        return $link !== null && $user !== null && $user->isActive() && $user->can(Permissions::ACTIVITIES_VIEW) ? $link : null;
+        return $link !== null && $user !== null && $user->isActive() ? $link : null;
     }
 
     public function isActive(): bool

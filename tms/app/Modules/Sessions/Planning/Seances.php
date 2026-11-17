@@ -30,7 +30,8 @@ use Illuminate\Validation\ValidationException;
  * locks the module and the séance (order session → module → séance).
  * Every write on a day goes through assertMonthOpen() first: the one guard
  * of a closed month (task 4 wires Closures::isClosed there, 409).
- * Alerts (Conflicts) never block a write.
+ * Alerts (Conflicts) never block a write. Every write updates the Outlook
+ * copy of the séance after commit (SeanceOutlook).
  */
 final class Seances
 {
@@ -69,6 +70,7 @@ final class Seances
             self::assertMonthOpen($session, $values['date']);
             self::assertFree($values, null);
             $seance = self::insert(new Seance([...$values, 'training_session_id' => $session->id, 'session_module_id' => $module->id]));
+            SeanceOutlook::touch($seance->id);
 
             return $seance;
         });
@@ -123,6 +125,7 @@ final class Seances
             self::assertFree($values, $locked->id);
             $locked->fill($values);
             $locked = self::insert($locked);
+            SeanceOutlook::touch($locked->id);
             if ($moved) {
                 // The attendance is reviewed in this transaction, under the séance's lock.
                 self::runScheduleHooks($locked, SeanceChanged::RESCHEDULED);
@@ -164,6 +167,7 @@ final class Seances
             $locked->save();
             self::runScheduleHooks($locked, SeanceChanged::CANCELLED);
             SeanceChanged::dispatch($locked->id, SeanceChanged::CANCELLED);
+            SeanceOutlook::touch($locked->id);
             $seance->setRawAttributes($locked->getAttributes(), true);
 
             return $locked;
@@ -184,6 +188,7 @@ final class Seances
                 throw new UserFacingHttpException(409, self::HAS_ATTENDANCE);
             }
             $locked->delete();
+            SeanceOutlook::touch($locked->id);
         });
     }
 

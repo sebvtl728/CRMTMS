@@ -78,7 +78,7 @@ class PushActivityToOutlook implements ShouldQueue
         $event = $this->currentEvent();
         $target = $event === null ? null : CalendarLink::usableFor($event->responsibleUserId);
         /** @var Collection<int, CalendarLinkEvent> $copies */
-        $copies = CalendarLinkEvent::query()->where('activity_id', $this->activityId)->with('link')->get();
+        $copies = CalendarLinkEvent::query()->of(CalendarLinkEvent::SOURCE_ACTIVITY, $this->activityId)->with('link')->get();
         $stale = $copies->filter(fn (CalendarLinkEvent $c) => $c->calendar_link_id !== $target?->id && $c->link?->isActive());
 
         if ($target === null && $stale->isEmpty()) {
@@ -133,7 +133,8 @@ class PushActivityToOutlook implements ShouldQueue
     {
         $copy ??= CalendarLinkEvent::query()->create([
             'calendar_link_id' => $link->id,
-            'activity_id' => $this->activityId,
+            'source' => CalendarLinkEvent::SOURCE_ACTIVITY,
+            'source_id' => $this->activityId,
             'transaction_id' => (string) Str::uuid7(),
         ]);
 

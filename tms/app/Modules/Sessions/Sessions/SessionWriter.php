@@ -12,6 +12,7 @@ use App\Modules\Sessions\Enrolments\Enrolment;
 use App\Modules\Sessions\Enrolments\Enrolments;
 use App\Modules\Sessions\Enrolments\EnrolmentStatus;
 use App\Modules\Sessions\Modules\SessionModules;
+use App\Modules\Sessions\Planning\SeanceOutlook;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -161,6 +162,7 @@ final class SessionWriter
                 throw new UserFacingHttpException(409, self::ENROLLED);
             }
             $locked->delete();
+            SeanceOutlook::touchSession($locked->id);
         });
     }
 
@@ -204,6 +206,8 @@ final class SessionWriter
             $locked->save();
             // Its trainees are unenrolled (shares of their lines computed again).
             $enrolments->cancelAllOfSession($locked);
+            // Its séances leave the trainers' Outlook.
+            SeanceOutlook::touchSession($locked->id);
 
             return $locked;
         });
@@ -221,6 +225,7 @@ final class SessionWriter
                 throw new UserFacingHttpException(409, self::ORGANISATION_GONE);
             }
             $locked->restore();
+            SeanceOutlook::touchSession($locked->id);
             $session->setRawAttributes($locked->getAttributes(), true);
 
             return $locked;

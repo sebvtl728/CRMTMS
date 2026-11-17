@@ -9,6 +9,7 @@ use App\Modules\Core\Tenancy\TenantContext;
 use App\Modules\Core\Users\User;
 use App\Modules\Crm\Public\Fiches;
 use App\Modules\Sessions\Permissions;
+use App\Modules\Sessions\Planning\SeanceOutlook;
 use Carbon\CarbonImmutable;
 use Closure;
 use Illuminate\Database\Eloquent\Builder;
@@ -280,7 +281,13 @@ final class Trainers
 
     public static function update(Trainer $trainer, TrainerStatus $status, bool $active): void
     {
-        DB::transaction(fn () => $trainer->update(['status' => $status->value, 'active' => $active]));
+        DB::transaction(function () use ($trainer, $status, $active): void {
+            $wasActive = $trainer->active;
+            $trainer->update(['status' => $status->value, 'active' => $active]);
+            if ($wasActive !== $active) {
+                SeanceOutlook::touchTrainer($trainer->id);
+            }
+        });
     }
 
     /**
@@ -314,7 +321,12 @@ final class Trainers
                     throw ValidationException::withMessages(['user_id' => self::USER_TAKEN]);
                 }
             }
+            $before = $trainer->user_id;
             $trainer->update(['user_id' => $user?->getKey()]);
+            if ($before !== $trainer->user_id) {
+                // His séances to come follow the account (Outlook).
+                SeanceOutlook::touchTrainer($trainer->id);
+            }
         });
     }
 

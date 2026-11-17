@@ -107,7 +107,11 @@ final class SeanceCalendar
         return $events;
     }
 
-    private static function location(?Room $room, Seance $seance, ?TrainingSession $session): ?string
+    /**
+     * The room (and its address), else the free place, else the address of
+     * a session that is not individual (also the place of the Outlook copy).
+     */
+    public static function location(?Room $room, Seance $seance, ?TrainingSession $session): ?string
     {
         if ($room !== null) {
             return $room->address === null || trim($room->address) === '' ? $room->name : $room->name.', '.$room->address;
