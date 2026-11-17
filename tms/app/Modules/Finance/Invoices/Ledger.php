@@ -30,6 +30,12 @@ final class Ledger
     /** @var array<string, Invoice> recipient => its latest validated invoice (not a credit note) */
     public array $latestInvoice = [];
 
+    /** @var array<string, list<Invoice>> recipient => its validated invoices (not credit notes), in order of validation */
+    public array $invoices = [];
+
+    /** @var array<string, int> invoice id => Σ HT of the validated credit notes correcting it (negative) */
+    public array $credited = [];
+
     /** Some invoice or credit note of the dossier is validated. */
     public bool $issued = false;
 
@@ -58,6 +64,9 @@ final class Ledger
             $ledger->issued = true;
             if ($invoice->kind === Invoice::INVOICE) {
                 $ledger->latestInvoice[$key] = $invoice;
+                $ledger->invoices[$key][] = $invoice;
+            } elseif ($invoice->corrected_invoice_id !== null) {
+                $ledger->credited[$invoice->corrected_invoice_id] = ($ledger->credited[$invoice->corrected_invoice_id] ?? 0) + $invoice->total_ht_cents;
             }
             if ($invoice->cut_off !== null && $invoice->cut_off > ($ledger->lastCut[$key] ?? '')) {
                 $ledger->lastCut[$key] = $invoice->cut_off;
@@ -85,6 +94,27 @@ final class Ledger
     public static function keyOf(Invoice $invoice): string
     {
         return $invoice->funding_id === null ? Invoice::CONTRACTOR : 'funding:'.$invoice->funding_id;
+    }
+
+    /**
+     * The most recent validated invoice of the recipient that a credit note
+     * may still correct, with what is left of it (its HT net of its
+     * validated credit notes, > 0); null when none is left.
+     *
+     * @return array{invoice: Invoice, capacity: int}|null
+     */
+    public function creditable(string $key): ?array
+    {
+        $invoices = $this->invoices[$key] ?? [];
+        usort($invoices, fn (Invoice $a, Invoice $b) => [$b->validated_at, $b->issued_on, $b->number] <=> [$a->validated_at, $a->issued_on, $a->number]);
+        foreach ($invoices as $invoice) {
+            $capacity = $invoice->total_ht_cents + ($this->credited[$invoice->id] ?? 0);
+            if ($capacity > 0) {
+                return ['invoice' => $invoice, 'capacity' => $capacity];
+            }
+        }
+
+        return null;
     }
 
     public function invoiced(string $key, string $component): int

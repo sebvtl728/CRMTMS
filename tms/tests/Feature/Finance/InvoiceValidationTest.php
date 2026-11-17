@@ -21,6 +21,8 @@ use App\Modules\Finance\Invoices\InvoiceTotals;
 use App\Modules\Finance\Invoices\InvoiceValidator;
 use App\Modules\Finance\Permissions;
 use App\Modules\Finance\Plans\BillingPlans;
+use App\Modules\Sessions\Attendance\Attendances;
+use App\Modules\Sessions\Attendance\Closures;
 use App\Modules\Sessions\Dossiers\Dossier;
 use App\Modules\Sessions\Fundings\Funding;
 use App\Modules\Sessions\Permissions as SessionsPermissions;
@@ -723,4 +725,54 @@ it('never writes a line onto an invoice it cannot see (another organisme)', func
         'invoice_id' => $draft->id, 'position' => 0, 'kind' => 'free', 'label' => 'Intrus', 'quantity' => '1', 'unit' => 'forfait',
         'unit_price_cents' => 100, 'vat_rate' => '0', 'total_ht_cents' => 100,
     ])))->toContain('not found');
+});
+
+it('splits a proposed credit note over the invoices it corrects, never beyond what is left of each', function () {
+    // 3 500 € on 21 h: each 6 h month bills 1 000 €.
+    $dossier = l2Dossier(null, null, ['lines' => [[
+        'kind' => 'training', 'training_id' => l2Training()->id, 'label' => 'HACCP 3 jours', 'quantity' => '1',
+        'unit' => 'forfait', 'unit_price' => '3500', 'discount_percent' => '', 'pricing_mode' => 'per_trainee',
+    ]]]);
+    $session = plSession('2026-09-01', '2026-10-31');
+    $module = plModule($session);
+    $lea = l2Enrol($dossier, $session, makePerson('Durand', ['first_name' => 'Léa']));
+    $seances = [];
+    foreach (['2026-09-02', '2026-09-03', '2026-10-01', '2026-10-02'] as $day) {
+        $seances[] = $s = plSeance($module, $day, '09:00', '12:00');
+        app(Attendances::class)->record($s, $lea->id, 'present', null, null);
+    }
+    app(Closures::class)->close($session->refresh(), '2026-09');
+    app(Closures::class)->close($session->refresh(), '2026-10');
+    app(BillingPlans::class)->save($dossier->id, ['rhythm' => 'monthly', 'basis' => 'realised']);
+    $user = fvAccountant();
+    $x = ['dossier' => $dossier];
+
+    $f1 = fvValidate(fvDraft($x, 'contractor', $user), $user);
+    $f2 = fvValidate(fvDraft($x, 'contractor', $user), $user);
+    expect([$f1->number, $f1->total_ht_cents, $f2->number, $f2->total_ht_cents])->toBe(['F-2026-00001', 100000, 'F-2026-00002', 100000]);
+
+    // Léa was absent but for one séance: 3 h realised, 500 € in all, −1 500 € to give back.
+    foreach (['2026-09', '2026-10'] as $month) {
+        app(Closures::class)->reopen($session->refresh(), $month, 'Feuilles corrigées');
+    }
+    foreach ([0, 1, 2] as $i) {
+        app(Attendances::class)->record($seances[$i], $lea->id, 'absent', null, null);
+    }
+    foreach (['2026-09', '2026-10'] as $month) {
+        app(Closures::class)->close($session->refresh(), $month);
+    }
+
+    $row = fiDue($dossier->id)['contractor'];
+    expect($row)->toMatchArray(['kind' => 'credit_note', 'total_cents' => -100000, 'unsettled_cents' => -50000, 'corrected_invoice_id' => $f2->id]);
+    fiDrafts()->prepare($user, [$row['key']]);
+    $first = fvValidate(Invoice::query()->where('kind', 'credit_note')->where('status', 'draft')->sole(), $user);
+    expect([$first->number, $first->total_ht_cents, $first->corrected_invoice_id])->toBe(['AV-2026-00001', -100000, $f2->id]);
+
+    $row = fiDue($dossier->id)['contractor'];
+    expect($row)->toMatchArray(['kind' => 'credit_note', 'total_cents' => -50000, 'unsettled_cents' => 0, 'corrected_invoice_id' => $f1->id]);
+    fiDrafts()->prepare($user, [$row['key']]);
+    $second = fvValidate(Invoice::query()->where('kind', 'credit_note')->where('status', 'draft')->sole(), $user);
+    expect([$second->number, $second->total_ht_cents, $second->corrected_invoice_id])->toBe(['AV-2026-00002', -50000, $f1->id])
+        ->and(fiDue($dossier->id))->toBe([])
+        ->and(Integrity::verify())->toBe(['count' => 4, 'broken' => null]);
 });

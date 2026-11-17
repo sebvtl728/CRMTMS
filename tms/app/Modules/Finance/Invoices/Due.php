@@ -17,9 +17,11 @@ use Carbon\CarbonImmutable;
  * § 4 bis 2–6): the share of each recipient cumulated up to a cut-off
  * (BillingCalculator) minus what was already invoiced to it (Ledger), per
  * component (training, dédit, absences). Positive: an invoice to prepare;
- * negative: a credit note (corrected_invoice_id: the recipient's latest
- * validated invoice). A share billed outside the TMS never gets a row: a
- * mention « Part réglée par <financeur> » on the contractor's.
+ * negative: a credit note on the recipient's most recent validated invoice
+ * with something left to credit, within what is left of it (the rest:
+ * « unsettled_cents », proposed again once it is validated). A share
+ * billed outside the TMS never gets a row: a mention « Part réglée par
+ * <financeur> » on the contractor's.
  *
  * Cut-offs, oldest first (each recipient gets the first one where
  * something is due, from its latest invoiced cut-off on — a late change of
@@ -232,6 +234,20 @@ final class Due
             }
         }
 
+        // A credit note corrects one invoice, within what is left of it (the most recent one with
+        // something left): beyond, the rest stays « à régulariser », proposed again on the next one.
+        $unsettled = 0;
+        $corrected = null;
+        if ($kind === Invoice::CREDIT_NOTE) {
+            $creditable = $ledger->creditable($key);
+            $corrected = $creditable['invoice'] ?? null;
+            if ($creditable !== null && -$total > $creditable['capacity']) {
+                $lines = self::capCredit($lines, $creditable['capacity']);
+                $unsettled = $total - array_sum(array_column($lines, 'total_ht_cents'));
+                $total -= $unsettled;
+            }
+        }
+
         return [
             'key' => $dossier['id'].'|'.$key,
             'dossier' => $head,
@@ -259,7 +275,9 @@ final class Due
             ], $shares->detail),
             'modified_cents' => $ledger->modified[$key] ?? 0,
             'draft' => $draft === null ? null : ['id' => $draft->id, 'url' => '/finance/invoices/'.$draft->id],
-            'corrected_invoice_id' => $kind === Invoice::CREDIT_NOTE ? ($ledger->latestInvoice[$key] ?? null)?->id : null,
+            'corrected_invoice_id' => $corrected?->id,
+            // The part of a negative due left for a later credit note (on another invoice).
+            'unsettled_cents' => $unsettled,
         ];
     }
 
@@ -361,6 +379,33 @@ final class Due
         }
 
         return $lines;
+    }
+
+    /**
+     * The lines of a credit note given back within $capacity (cents > 0):
+     * positive lines kept, negative ones taken in order until the credit
+     * reaches −$capacity; a line brought to 0 goes (a mention stays).
+     *
+     * @param  list<array<string, mixed>>  $lines
+     * @return list<array<string, mixed>>
+     */
+    private static function capCredit(array $lines, int $capacity): array
+    {
+        $budget = $capacity + array_sum(array_filter(array_column($lines, 'total_ht_cents'), fn (int $c) => $c > 0));
+        $capped = [];
+        foreach ($lines as $line) {
+            if ($line['total_ht_cents'] < 0) {
+                $amount = max($line['total_ht_cents'], -$budget);
+                $budget += $amount;
+                if ($amount === 0) {
+                    continue;
+                }
+                $line = [...$line, 'quantity' => '1.00', 'unit_price_cents' => $amount, 'total_ht_cents' => $amount];
+            }
+            $capped[] = $line;
+        }
+
+        return $capped;
     }
 
     /**
