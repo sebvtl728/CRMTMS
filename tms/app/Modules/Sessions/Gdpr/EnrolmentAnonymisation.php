@@ -44,6 +44,7 @@ final class EnrolmentAnonymisation
 
         // The signed sheets are a proof shared by the whole session: kept, except
         // on an individual session, where the only trainee they concern is her.
+        AttendanceScans::neutraliseNames($enrolments->clone()->distinct()->pluck('training_session_id')->all());
         AttendanceScans::purgeOfSessions(DB::table('training_sessions')->where('kind', SessionKind::Individual->value)
             ->whereIn('id', $enrolments->clone()->select('training_session_id'))->pluck('id')->all());
 

@@ -9,6 +9,7 @@ use App\Modules\Sessions\Attendance\MonthlyHour;
 use App\Modules\Sessions\Attendance\Months;
 use App\Modules\Sessions\Enrolments\Enrolment;
 use App\Modules\Sessions\Modules\SessionModule;
+use App\Modules\Sessions\Modules\SessionModules;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
@@ -25,12 +26,16 @@ use InvalidArgumentException;
  *  - planned: the planned minutes of the session's modules (a module without
  *    planned hours counts 0), for the whole session: a month never splits
  *    them;
+ *  - enrolment_planned_minutes: the planned minutes of the enrolment itself
+ *    (its planned hours, integer minutes; empty = the session's total): what
+ *    the trainee is due, to bill against (0.9 bills on the realised hours);
+ *    planned_minutes stays the total of the session's modules;
  *  - closed_months: the closed months of the session (« 2026-09 »), only
  *    the asked one when a month is given.
  *
  * A fixed number of queries whatever the number of trainees.
  *
- * @phpstan-type Hours array{planned_minutes: int, realised_minutes: int, by_module: list<array{module_id: string, planned: int, realised: int}>, closed_months: list<string>}
+ * @phpstan-type Hours array{planned_minutes: int, enrolment_planned_minutes: int, realised_minutes: int, by_module: list<array{module_id: string, planned: int, realised: int}>, closed_months: list<string>}
  */
 final class RealisedHours
 {
@@ -50,7 +55,7 @@ final class RealisedHours
      * Every trainee of the session who attends (enrolled, confirmed,
      * abandoned) or has hours entered, in order of entry.
      *
-     * @return list<array{enrolment_id: string, planned_minutes: int, realised_minutes: int, by_module: list<array{module_id: string, planned: int, realised: int}>, closed_months: list<string>}>
+     * @return list<array{enrolment_id: string, planned_minutes: int, enrolment_planned_minutes: int, realised_minutes: int, by_module: list<array{module_id: string, planned: int, realised: int}>, closed_months: list<string>}>
      */
     public static function forSession(string $sessionId, string $month): array
     {
@@ -131,6 +136,7 @@ final class RealisedHours
             }
             $result[$enrolment->id] = [
                 'planned_minutes' => $planned,
+                'enrolment_planned_minutes' => SessionModules::minutesOf($enrolment->planned_hours) ?? $planned,
                 'realised_minutes' => $total,
                 'by_module' => $byModule,
                 'closed_months' => $closed[$enrolment->training_session_id] ?? [],

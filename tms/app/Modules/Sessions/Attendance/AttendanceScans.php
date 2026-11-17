@@ -2,6 +2,7 @@
 
 namespace App\Modules\Sessions\Attendance;
 
+use App\Exceptions\UserFacingHttpException;
 use App\Modules\Core\Companies\CompanyBranding;
 use App\Modules\Core\Tenancy\TenantStorage;
 use App\Modules\Sessions\Planning\Seance;
@@ -29,6 +30,8 @@ final class AttendanceScans
     public const FIELD = 'file';
 
     public const TYPE_MESSAGE = 'Le scan doit être un fichier PDF ou une image (PNG, JPEG).';
+
+    public const CANCELLED = 'Cette séance est annulée : on ne dépose plus de scan.';
 
     public const EMPTY_MESSAGE = 'Le fichier est vide.';
 
@@ -92,6 +95,9 @@ final class AttendanceScans
      */
     public function store(Seance $seance, bool $day, UploadedFile $file, ?string $userId): AttendanceSheetScan
     {
+        if ($seance->isCancelled()) {
+            throw new UserFacingHttpException(409, self::CANCELLED);
+        }
         $type = self::detectedType($file) ?? throw ValidationException::withMessages([self::FIELD => self::TYPE_MESSAGE]);
         $date = $seance->date->toDateString();
         $path = TenantStorage::path('attendance_sheets', $seance->training_session_id.'/'.$date.'/'.Str::uuid7().'.'.$type);
@@ -109,7 +115,8 @@ final class AttendanceScans
                 'seance_id' => $day ? null : $seance->id,
                 'date' => $date,
                 'path' => $path,
-                'original_name' => mb_substr(basename($file->getClientOriginalName()), 0, 200),
+                // Neutral: the name typed by the sender may hold a trainee's name.
+                'original_name' => self::neutralName($date, $type),
                 'mime' => self::MIMES[$type],
                 'size_bytes' => (int) $file->getSize(),
                 'uploaded_by' => $userId,
@@ -134,8 +141,17 @@ final class AttendanceScans
             ->orderBy('created_at')->orderBy('id');
     }
 
+    public static function neutralName(string $date, string $type): string
+    {
+        return 'emargement-'.$date.'.'.$type;
+    }
+
+    /**
+     * @throws UserFacingHttpException 409 when the month of the scan is closed
+     */
     public function delete(AttendanceSheetScan $scan): void
     {
+        Closures::assertOpen($scan->training_session_id, $scan->date->toDateString());
         DB::transaction(function () use ($scan): void {
             $scan->delete();
             $path = $scan->path;
@@ -159,5 +175,19 @@ final class AttendanceScans
         DB::afterCommit(function () use ($paths): void {
             Storage::disk(TenantStorage::DISK)->delete($paths);
         });
+    }
+
+    /**
+     * Gives the scans of the sessions their neutral name again (anonymisation).
+     *
+     * @param  list<string>  $sessionIds
+     */
+    public static function neutraliseNames(array $sessionIds): void
+    {
+        if ($sessionIds === []) {
+            return;
+        }
+        DB::table('attendance_sheet_scans')->whereIn('training_session_id', $sessionIds)
+            ->update(['original_name' => DB::raw("'emargement-' || date::text || '.' || regexp_replace(path, '^.*\\.', '')")]);
     }
 }

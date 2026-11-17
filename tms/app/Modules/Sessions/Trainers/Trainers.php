@@ -5,6 +5,7 @@ namespace App\Modules\Sessions\Trainers;
 use App\Exceptions\UserFacingHttpException;
 use App\Modules\Core\Access\AccessScope;
 use App\Modules\Core\Access\Scopes;
+use App\Modules\Core\Tenancy\TenantContext;
 use App\Modules\Core\Users\User;
 use App\Modules\Crm\Public\Fiches;
 use App\Modules\Sessions\Permissions;
@@ -245,7 +246,7 @@ final class Trainers
      */
     private static function lockEmail(string $email): void
     {
-        DB::select('select pg_advisory_xact_lock(hashtext(?))', ['trainer-email:'.mb_strtolower(trim($email))]);
+        DB::select('select pg_advisory_xact_lock(hashtext(?))', ['trainer-email:'.app(TenantContext::class)->id().':'.mb_strtolower(trim($email))]);
     }
 
     /**

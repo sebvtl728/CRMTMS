@@ -32,7 +32,7 @@ use Illuminate\Validation\ValidationException;
  *
  * A séance moved to other hours puts its attendance « à revoir »: present
  * recomputed at the new duration, partial above it capped; a cancelled
- * séance takes its attendance to 0 minute (kept, journaled): onSeanceChanged.
+ * séance takes its attendance to 0 minute (kept, journaled): review(), run by Seances in its transaction.
  */
 final class Attendances
 {

@@ -226,7 +226,9 @@ Un nouvel organisme reçoit ces droits (identiques au comportement de la version
 
 Dossiers et sessions (`tms:permissions:sync` les accorde une fois aux rôles existants lors de la mise à jour) : l'administrateur a tous les droits ; la direction consulte ; le commercial, le chargé de relations et l'assistant consultent, créent et modifient ; le Responsable DAS consulte « Ses DAS ».
 
-Planning (0.8.0, accordé une fois de la même façon, rôle Formateur créé dans chaque organisme) : l'administrateur et la direction ont les six droits ; le commercial, le chargé de relations et l'assistant ont tout sauf « Clôturer les présences » ; le Responsable DAS consulte les séances « Ses DAS » ; le **Formateur** a « Consulter les séances » et « Saisir les présences » sur « Ses séances », rien d'autre. Un utilisateur qui n'a que des droits « Ses séances » voit un menu réduit à **Mon planning** (l'accueil l'y renvoie).
+Planning (0.8.0, accordé une fois de la même façon, rôle Formateur créé dans chaque organisme) : l'administrateur et la direction ont les six droits ; le commercial, le chargé de relations et l'assistant ont tout sauf « Clôturer les présences » ; le Responsable DAS consulte les séances et gère les formateurs (`sessions.trainers.manage`, droit à périmètre) sur « Ses DAS » ; le **Formateur** a « Consulter les séances » et « Saisir les présences » sur « Ses séances », rien d'autre. Un utilisateur qui n'a que des droits « Ses séances » voit un menu réduit à **Mon planning** (l'accueil l'y renvoie).
+
+**Mise à jour vers la 0.8.0** : le septième rôle système « Formateur » est créé dans chaque organisme. Si un rôle **personnalisé** s'appelle déjà « Formateur », deux rôles porteront ce libellé : renommez le rôle personnalisé (Rôles et droits › Renommer).
 
 Le comportement de la 0.4 est conservé : le Commercial modifie toutes les fiches. Pour qu'il ne modifie que les siennes, réglez le périmètre de « Créer et modifier » sur « Ses fiches ».
 

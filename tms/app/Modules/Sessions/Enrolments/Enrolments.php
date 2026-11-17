@@ -7,6 +7,7 @@ use App\Modules\Core\References\ReferenceList;
 use App\Modules\Core\Tenancy\TenantContext;
 use App\Modules\Crm\Public\Fiches;
 use App\Modules\Sessions\Amounts;
+use App\Modules\Sessions\Attendance\Closures;
 use App\Modules\Sessions\Dossiers\Dossier;
 use App\Modules\Sessions\Dossiers\DossierLine;
 use App\Modules\Sessions\Sessions\SessionKind;
@@ -216,6 +217,8 @@ final class Enrolments
             if ($locked->entered_on !== null && $leftOn->toDateString() < $locked->entered_on->toDateString()) {
                 throw ValidationException::withMessages(['left_on' => 'La date de sortie ne peut pas précéder la date d\'entrée.']);
             }
+            // The days after the leaving day stop counting: no closed month from there on.
+            Closures::assertOpenBetween($locked->training_session_id, $leftOn->toDateString());
             $locked->status = EnrolmentStatus::Abandoned;
             $locked->left_on = $leftOn;
             $locked->abandon_reason_id = $reasonId;
@@ -273,6 +276,11 @@ final class Enrolments
             $entered = $values['entered_on'] ?? $locked->entered_on?->toDateString();
             if ($locked->left_on !== null && $entered !== null && $entered > $locked->left_on->toDateString()) {
                 throw ValidationException::withMessages(['entered_on' => 'La date d\'entrée ne peut pas suivre la date de sortie.']);
+            }
+            if (isset($values['entered_on']) && $locked->entered_on !== null && $values['entered_on'] !== $locked->entered_on->toDateString()) {
+                // Hours between the old and the new entry day change: none of those months may be closed.
+                [$from, $to] = [$values['entered_on'], $locked->entered_on->toDateString()];
+                Closures::assertOpenBetween($locked->training_session_id, min($from, $to), max($from, $to));
             }
             $locked->fill($values)->save();
         });

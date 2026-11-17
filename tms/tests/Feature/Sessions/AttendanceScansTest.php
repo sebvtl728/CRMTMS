@@ -2,7 +2,10 @@
 
 use App\Modules\Core\Access\Role;
 use App\Modules\Sessions\Attendance\AttendanceSheetScan;
+use App\Modules\Sessions\Attendance\Closures;
 use App\Modules\Sessions\Planning\Seance;
+use App\Modules\Sessions\Planning\Seances;
+use App\Modules\Sessions\Sessions\TrainingSession;
 use App\Modules\Sessions\Trainers\Trainers;
 use Illuminate\Foundation\Auth\User;
 use Illuminate\Http\UploadedFile;
@@ -99,4 +102,22 @@ it('lets a manager delete a scan, never the trainer', function () {
     expect(AttendanceSheetScan::query()->count())->toBe(0)->and(Storage::disk('local')->exists($scan->path))->toBeFalse();
     // Journaled without the file name.
     expect(DB::table('audit_logs')->where('new_values', 'like', '%emargement.pdf%')->orWhere('old_values', 'like', '%emargement.pdf%')->exists())->toBeFalse();
+});
+
+it('stores a neutral file name, refuses a scan on a cancelled séance and deletion in a closed month', function () {
+    [, $own] = scanSetup();
+    $manager = atManager();
+    $this->actingAs($manager)->post("/seances/{$own->id}/scans", ['file' => scanPdf('Durand-Lea.pdf')], ['Accept' => 'application/json'])->assertCreated()
+        ->assertJsonPath('scans.0.name', 'emargement-2026-09-10.pdf');
+    $scan = AttendanceSheetScan::query()->firstOrFail();
+
+    $session = TrainingSession::query()->findOrFail($own->training_session_id);
+    app(Closures::class)->close($session, '2026-09');
+    $this->actingAs($manager)->deleteJson("/seances/{$own->id}/scans/{$scan->id}")->assertStatus(409);
+    expect(AttendanceSheetScan::query()->count())->toBe(1);
+    app(Closures::class)->reopen($session, '2026-09', 'Erreur');
+
+    // Cancelled séance: no new scan.
+    app(Seances::class)->cancel($own, 'Intempéries');
+    $this->actingAs($manager)->post("/seances/{$own->id}/scans", ['file' => scanPdf()], ['Accept' => 'application/json'])->assertStatus(409);
 });

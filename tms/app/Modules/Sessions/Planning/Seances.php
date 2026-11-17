@@ -136,7 +136,7 @@ final class Seances
 
     /**
      * Cancels with a reason (≤ 300): the séance stays, struck through; its
-     * attendance falls to 0 minute (task 4, SeanceChanged cancelled).
+     * attendance falls to 0 minute (Attendances::review, in the same transaction).
      *
      * @throws ValidationException
      */

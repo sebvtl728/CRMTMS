@@ -51,8 +51,16 @@ une feuille d'émargement imprimable.
   motifs ; les scans sont gardés, sauf sur une session individuelle ; l'export RGPD de la personne contient ses
   présences et ses heures du mois.
 
+### Mise à jour
+
+- Un organisme qui a déjà un rôle **personnalisé** nommé « Formateur » verra deux rôles de ce libellé : renommez le rôle personnalisé.
+
 ### Modifié
 
+- **Mois clôturé** : changer la date d'entrée d'un stagiaire, ou enregistrer son abandon, est refusé (409) quand cela
+  touche un mois clôturé de la session ; les heures réalisées exposent aussi `enrolment_planned_minutes`. Supprimer un
+  scan d'un mois clôturé, ou en déposer un sur une séance annulée, est refusé. Les scans portent un nom neutre
+  (`emargement-<date>.<ext>`), jamais le nom envoyé.
 - Les heures prévues d'un stagiaire restent plafonnées par celles de la session (somme des modules) ; un module qui
   ferait passer la session sous une inscription existante avertit sans rien modifier.
 - Les alertes et le registre de calendrier du module Connecteurs acceptent désormais plusieurs sources (le CRM et les

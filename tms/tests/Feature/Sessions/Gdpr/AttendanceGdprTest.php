@@ -41,6 +41,7 @@ it('clears the reasons but keeps the attendance and the hours of an anonymised t
     $interval = atIntervalModule($session);
     app(MonthlyHours::class)->record($lea->id, $interval, '2026-09', 300, null);
     $scan = gdprScan($session->id, '2026-09-10', $seance->id);
+    AttendanceSheetScan::query()->whereKey($scan->id)->update(['original_name' => 'Durand-Lea.pdf']);
 
     app(Anonymiser::class)->anonymise(Person::query()->findOrFail($lea->person_id), 'request');
 
@@ -48,6 +49,7 @@ it('clears the reasons but keeps the attendance and the hours of an anonymised t
     expect($attendance->reason)->toBeNull()->and($attendance->status)->toBe('absent')
         ->and(Attendance::query()->where('enrolment_id', $marc->id)->firstOrFail()->reason)->toBe('Voiture en panne')
         ->and(MonthlyHour::query()->where('enrolment_id', $lea->id)->value('minutes'))->toBe(300)
+        ->and(AttendanceSheetScan::query()->whereKey($scan->id)->value('original_name'))->toBe('emargement-2026-09-10.pdf')
         ->and(AttendanceSheetScan::query()->whereKey($scan->id)->exists())->toBeTrue()
         ->and(Storage::disk('local')->exists($scan->path))->toBeTrue();
 });

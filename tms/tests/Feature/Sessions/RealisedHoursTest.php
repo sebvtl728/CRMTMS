@@ -58,6 +58,7 @@ it('gives the exact realised and planned minutes of an enrolment, séances and m
 
     expect(RealisedHours::forEnrolment($lea->id))->toBe([
         'planned_minutes' => 1860,
+        'enrolment_planned_minutes' => 1260,
         'realised_minutes' => 1190,
         'by_module' => [
             ['module_id' => $a->id, 'planned' => 1260, 'realised' => 380],
@@ -69,6 +70,7 @@ it('gives the exact realised and planned minutes of an enrolment, séances and m
 
     expect(RealisedHours::forEnrolment($lea->id, '2026-09'))->toBe([
         'planned_minutes' => 1860,
+        'enrolment_planned_minutes' => 1260,
         'realised_minutes' => 830,
         'by_module' => [
             ['module_id' => $a->id, 'planned' => 1260, 'realised' => 380],
@@ -135,4 +137,14 @@ it('never counts a cancelled séance, even with minutes left on its attendance',
 
     expect(RealisedHours::forEnrolment($lea->id)['realised_minutes'])->toBe(1190)
         ->and(RealisedHours::forEnrolment($lea->id, '2026-10')['realised_minutes'])->toBe(360);
+});
+
+it('exposes the planned minutes of the enrolment next to the session total', function () {
+    $session = plSession('2026-09-01', '2026-09-30');
+    plModule($session);
+    $lea = atEnrol($session, 'Durand', ['planned_hours' => '10.33']);
+
+    $hours = RealisedHours::forEnrolment($lea->id);
+
+    expect($hours['enrolment_planned_minutes'])->toBe(620)->and($hours['planned_minutes'])->toBe(1260);
 });

@@ -2,17 +2,20 @@
 
 use App\Exceptions\UserFacingHttpException;
 use App\Modules\Core\Access\AccessScope;
+use App\Modules\Core\References\ReferenceList;
 use App\Modules\Sessions\Attendance\Attendance;
 use App\Modules\Sessions\Attendance\AttendanceClosure;
 use App\Modules\Sessions\Attendance\Attendances;
 use App\Modules\Sessions\Attendance\Closures;
 use App\Modules\Sessions\Attendance\MonthlyHours;
+use App\Modules\Sessions\Enrolments\Enrolments;
 use App\Modules\Sessions\Modules\SessionModule;
 use App\Modules\Sessions\Permissions;
 use App\Modules\Sessions\Planning\GenerationRequest;
 use App\Modules\Sessions\Planning\Seance;
 use App\Modules\Sessions\Planning\SeanceGenerator;
 use App\Modules\Sessions\Planning\Seances;
+use App\Modules\Sessions\Public\RealisedHours;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
@@ -156,4 +159,23 @@ it('sends the « Présences » tab of a session: months, séances, monthly grid 
         ->assertJsonPath('realised.0.realised', '13 h')
         ->assertJsonPath('can.close', true);
     expect(SessionModule::query()->count())->toBe(2);
+});
+
+it('freezes the dates of a trainee in a closed month: entry day and abandon refused (409), realised hours unchanged', function () {
+    $session = plSession('2026-09-01', '2026-11-30');
+    $seance = plSeance(plModule($session), '2026-09-10', '09:00', '12:00');
+    $lea = atEnrol($session, 'Durand', ['entered_on' => '2026-09-01']);
+    app(Attendances::class)->record($seance, $lea->id, 'present', null, null);
+    $before = RealisedHours::forEnrolment($lea->id, '2026-09')['realised_minutes'];
+    app(Closures::class)->close($session, '2026-09');
+
+    // Moving the entry day over September (closed), or abandoning from September on.
+    expect(fn () => app(Enrolments::class)->update($lea, ['entered_on' => '2026-09-20']))->toThrow(UserFacingHttpException::class, 'clôturé');
+    expect(fn () => app(Enrolments::class)->abandon($lea, CarbonImmutable::parse('2026-09-05'), crmItem(ReferenceList::AbandonReason, 'Maladie')->id))
+        ->toThrow(UserFacingHttpException::class, 'clôturé');
+    // Abandoning in October still cuts the (open) later months only when none is closed after it: allowed here.
+    expect(RealisedHours::forEnrolment($lea->id, '2026-09')['realised_minutes'])->toBe($before)->and($lea->refresh()->left_on)->toBeNull();
+
+    app(Enrolments::class)->abandon($lea, CarbonImmutable::parse('2026-10-05'), crmItem(ReferenceList::AbandonReason, 'Maladie')->id);
+    expect($lea->refresh()->left_on?->toDateString())->toBe('2026-10-05')->and(RealisedHours::forEnrolment($lea->id, '2026-09')['realised_minutes'])->toBe($before);
 });

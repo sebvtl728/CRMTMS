@@ -107,6 +107,23 @@ final class Closures
         }
     }
 
+    /**
+     * 409 when a month between the Paris months of $from and $to (« Y-m-d »;
+     * null = the end of the session) is closed: the dates of a trainee
+     * decide which hours count, so moving them there changes closed hours.
+     */
+    public static function assertOpenBetween(string $sessionId, string $from, ?string $to = null): void
+    {
+        $first = Months::of($from);
+        $closed = AttendanceClosure::query()->where('training_session_id', $sessionId)->whereNotNull('closed_at')
+            ->where('month', '>=', $first->toDateString())
+            ->when($to !== null, fn ($q) => $q->where('month', '<=', Months::of((string) $to)->toDateString()))
+            ->orderBy('month')->first(['month']);
+        if ($closed !== null) {
+            throw new UserFacingHttpException(409, sprintf(self::CLOSED, Months::label($closed->month)));
+        }
+    }
+
     private static function closed(string $sessionId, CarbonImmutable $first): bool
     {
         return AttendanceClosure::query()->where('training_session_id', $sessionId)->where('month', $first->toDateString())
