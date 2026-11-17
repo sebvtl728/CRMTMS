@@ -364,6 +364,35 @@ it('gives every company invoicing defaults, edited in the company form', functio
     expect($company->fresh()->invoice_prefix)->toBe('FC');
 });
 
+it('refuses an invoice or credit-note prefix that already numbered the other kind of piece of the company', function () {
+    $dossier = fpDossier();
+    $company = Company::query()->findOrFail($dossier->company_id);
+    $piece = fn (string $kind, string $number, ?string $corrects = null) => tap((string) Str::uuid7(), fn (string $id) => DB::table('invoices')->insert([
+        'id' => $id, 'tenant_id' => tenant()->id, 'company_id' => $company->id, 'kind' => $kind, 'number' => $number, 'status' => 'validated',
+        'dossier_id' => $dossier->id, 'recipient_type' => 'organisation', 'recipient_id' => $dossier->account_organisation_id, 'issued_on' => '2026-11-17',
+        'rhythm' => 'end', 'basis' => 'realised', 'total_ht_cents' => $kind === 'invoice' ? 1000 : -1000, 'corrected_invoice_id' => $corrects,
+        'created_at' => now(), 'updated_at' => now(),
+    ]));
+    $piece('credit_note', 'AV-2026-00001', $piece('invoice', 'F-2026-00001'));
+    $admin = l2User([CorePermissions::COMPANIES_MANAGE => null]);
+    $used = 'Ce préfixe a déjà servi pour un autre type de pièce.';
+
+    // Swapped: each prefix numbered the other kind.
+    $this->actingAs($admin)->put("/admin/companies/{$company->id}", fpCompanyPayload(['invoice_prefix' => 'AV', 'credit_note_prefix' => 'F']))
+        ->assertSessionHasErrors(['invoice_prefix' => $used, 'credit_note_prefix' => $used]);
+    $this->actingAs($admin)->put("/admin/companies/{$company->id}", fpCompanyPayload(['invoice_prefix' => 'AV', 'credit_note_prefix' => 'AVR']))
+        ->assertSessionHasErrors(['invoice_prefix' => $used])->assertSessionDoesntHaveErrors('credit_note_prefix');
+    expect($company->fresh()->only(['invoice_prefix', 'credit_note_prefix']))->toBe(['invoice_prefix' => 'F', 'credit_note_prefix' => 'AV']);
+
+    // New prefixes, then back to the former ones of the same kind: accepted.
+    $this->actingAs($admin)->put("/admin/companies/{$company->id}", fpCompanyPayload(['invoice_prefix' => 'FAC', 'credit_note_prefix' => 'AVR']))->assertSessionDoesntHaveErrors();
+    $this->actingAs($admin)->put("/admin/companies/{$company->id}", fpCompanyPayload(['invoice_prefix' => 'F', 'credit_note_prefix' => 'AV']))->assertSessionDoesntHaveErrors();
+
+    // Another company numbers apart: « AV » may be its invoices' prefix.
+    $other = Company::factory()->create();
+    $this->actingAs($admin)->put("/admin/companies/{$other->id}", fpCompanyPayload(['invoice_prefix' => 'AV', 'credit_note_prefix' => 'F']))->assertSessionDoesntHaveErrors();
+});
+
 // ---------------------------------------------------------------- RLS
 
 it('keeps plans and settings inside their organisme', function () {

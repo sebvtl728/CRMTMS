@@ -108,6 +108,7 @@ final class DossierWriter
                 throw new UserFacingHttpException(409, self::CANCELLED);
             }
             $this->checkLines($locked, $lines);
+            $this->checkParties($locked, $values);
             $locked->update($values);
             $this->writeLines($locked, $lines);
 
@@ -283,6 +284,24 @@ final class DossierWriter
         if (is_string($person) && ! $v->errors()->has('account_person_id')
             && $person !== $current?->account_person_id && $this->fiches->individual($person) === null) {
             $v->errors()->add('account_person_id', 'Choisissez une personne « Particulier » du CRM.');
+        }
+    }
+
+    /**
+     * The issuing company and the contractor stay once the invoicing refuses
+     * it (a validated invoice: a credit note first, BillingGuards).
+     *
+     * @param  array<string, mixed>  $values
+     *
+     * @throws ValidationException
+     */
+    private function checkParties(Dossier $dossier, array $values): void
+    {
+        $company = $values['company_id'] !== $dossier->company_id;
+        $contractor = $values['account_organisation_id'] !== $dossier->account_organisation_id
+            || $values['account_person_id'] !== $dossier->account_person_id;
+        if (($company || $contractor) && ($refusal = BillingGuards::partiesLocked($dossier->id)) !== null) {
+            throw ValidationException::withMessages([$company ? 'company_id' : 'account' => $refusal]);
         }
     }
 

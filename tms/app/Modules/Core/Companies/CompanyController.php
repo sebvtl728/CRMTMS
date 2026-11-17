@@ -5,6 +5,7 @@ namespace App\Modules\Core\Companies;
 use App\Http\Controllers\Controller;
 use App\Modules\Core\Tenancy\TenantContext;
 use App\Rules\Siret;
+use Closure;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -76,7 +77,7 @@ class CompanyController extends Controller
         $request->validate([
             'logo' => [
                 'required', 'file', 'max:'.CompanyBranding::MAX_KILOBYTES,
-                function (string $attribute, mixed $value, \Closure $fail): void {
+                function (string $attribute, mixed $value, Closure $fail): void {
                     if ($value instanceof UploadedFile && CompanyBranding::detectedType($value) === null) {
                         $fail(CompanyBranding::TYPE_MESSAGE);
                     }
@@ -175,6 +176,21 @@ class CompanyController extends Controller
     }
 
     /**
+     * The rule refusing a $kind prefix (PrefixUsage::INVOICE|CREDIT_NOTE)
+     * that already numbered the other kind of piece of the company edited.
+     */
+    private function unusedPrefix(Request $request, string $kind): Closure
+    {
+        $company = $request->route('company');
+
+        return function (string $attribute, mixed $value, Closure $fail) use ($company, $kind): void {
+            if ($company instanceof Company && is_string($value) && PrefixUsage::usedByOtherKind($company->id, $kind, $value)) {
+                $fail('Ce préfixe a déjà servi pour un autre type de pièce.');
+            }
+        };
+    }
+
+    /**
      * @return array<string, mixed>
      */
     private function normalise(Request $request): array
@@ -250,10 +266,11 @@ class CompanyController extends Controller
             'quote_terms' => ['nullable', 'string', 'max:5000'],
             'quote_footer' => ['nullable', 'string', 'max:5000'],
             // Invoices (absent from a request: unchanged, or the defaults on creation).
-            'invoice_prefix' => ['sometimes', 'required', 'string', 'regex:/^[A-Z0-9]{1,10}$/'],
+            // Never a prefix that already numbered the other kind of piece of the company (PrefixUsage).
+            'invoice_prefix' => ['sometimes', 'required', 'string', 'regex:/^[A-Z0-9]{1,10}$/', $this->unusedPrefix($request, PrefixUsage::INVOICE)],
             // Other than the invoices' one (sent, else stored): the two numberings never meet.
             'credit_note_prefix' => ['sometimes', 'required', 'string', 'regex:/^[A-Z0-9]{1,10}$/', Rule::notIn([(string) $request->input('invoice_prefix',
-                $request->route('company') instanceof Company ? $request->route('company')->invoice_prefix : 'F')])],
+                $request->route('company') instanceof Company ? $request->route('company')->invoice_prefix : 'F')]), $this->unusedPrefix($request, PrefixUsage::CREDIT_NOTE)],
             'payment_terms_days' => ['sometimes', 'required', 'integer', 'between:0,60'],
             'invoice_footer' => ['nullable', 'string', 'max:2000'],
         ], [

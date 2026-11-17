@@ -21,10 +21,13 @@ use App\Modules\Finance\Invoices\InvoiceTotals;
 use App\Modules\Finance\Invoices\InvoiceValidator;
 use App\Modules\Finance\Permissions;
 use App\Modules\Finance\Plans\BillingPlans;
+use App\Modules\Finance\Settings\FinanceSettings;
 use App\Modules\Sessions\Attendance\Attendances;
 use App\Modules\Sessions\Attendance\Closures;
 use App\Modules\Sessions\Dossiers\Dossier;
+use App\Modules\Sessions\Dossiers\DossierWriter;
 use App\Modules\Sessions\Fundings\Funding;
+use App\Modules\Sessions\Fundings\FundingWriter;
 use App\Modules\Sessions\Permissions as SessionsPermissions;
 use App\Modules\Sessions\Public\BillingGuards;
 use Carbon\CarbonImmutable;
@@ -871,4 +874,139 @@ it('proposes nothing to prepare when no invoice is left to correct, and never va
     $credit->forceFill(['corrected_invoice_id' => $invoice->id])->save();
     expect(fn () => fvValidate($credit, $user))->toThrow(UserFacingHttpException::class, InvoiceValidator::NO_CORRECTED)
         ->and(fvRefused(fn () => $credit->forceFill(['corrected_invoice_id' => null])->save()))->toContain('invoices_credit_note_corrects_check');
+});
+
+// ---------------------------------------------------------------- the parties of a credit note
+
+/** The form of $dossier as stored (its lines by id), with $overrides. */
+function fvDossierPayload(Dossier $dossier, array $overrides = []): array
+{
+    return [
+        'company_id' => $dossier->company_id, 'account_organisation_id' => $dossier->account_organisation_id,
+        'account_person_id' => $dossier->account_person_id, 'das_id' => $dossier->das_id, 'notes' => $dossier->notes,
+        'lines' => $dossier->lines()->get()->map(fn ($l) => [
+            'id' => $l->id, 'kind' => $l->kind, 'training_id' => $l->training_id, 'label' => $l->label, 'quantity' => (string) $l->quantity,
+            'unit' => $l->unit, 'unit_price' => (string) $l->unit_price, 'discount_percent' => (string) $l->discount_percent, 'pricing_mode' => $l->pricing_mode,
+        ])->all(),
+        ...$overrides,
+    ];
+}
+
+it('addresses a credit note from the company to the recipient of the invoice it corrects, even once changed on the dossier', function () {
+    $x = fiSeed();
+    fvIdentities();
+    $user = fvAccountant();
+    $invoice = fvValidate(fvDraft($x, 'contractor', $user), $user);
+    $hotel = $invoice->recipient_id;
+    // Changed behind the guards (fiches merged, data fixed by hand): another company and contractor.
+    $other = Company::factory()->create(['invoice_prefix' => 'FB', 'credit_note_prefix' => 'AVB']);
+    $newcomer = Organisation::query()->create(['name' => 'Nouvelle SA']);
+    Dossier::query()->whereKey($x['dossier']->id)->update(['company_id' => $other->id, 'account_organisation_id' => $newcomer->id]);
+    fiLateAttendance($x, 0, 'absent');
+
+    $row = fiDue($x['dossier']->id)['contractor'];
+    expect($row)->toMatchArray(['kind' => 'credit_note', 'corrected_invoice_id' => $invoice->id, 'company_id' => $invoice->company_id])
+        ->and($row['recipient'])->toMatchArray(['type' => 'organisation', 'id' => $hotel, 'label' => 'Hôtel du Parc']);
+
+    fiDrafts()->prepare($user, [$row['key']]);
+    $credit = fvCreditDraft($x);
+    $parties = ['company_id' => $invoice->company_id, 'recipient_type' => 'organisation', 'recipient_id' => $hotel];
+    expect($credit->only(array_keys($parties)))->toBe($parties);
+
+    // Recalculated: back to the parties of the corrected invoice.
+    $credit->forceFill(['company_id' => $other->id, 'recipient_id' => $newcomer->id])->save();
+    $credit = fiDrafts()->recompute($credit)->refresh();
+    expect($credit->only(array_keys($parties)))->toBe($parties);
+
+    $validated = fvValidate($credit, $user);
+    expect($validated->number)->toBe('AV-2026-00001')
+        ->and($validated->recipient_snapshot['name'])->toBe('Hôtel du Parc');
+});
+
+it('refuses a credit note issued by another company or to another recipient than the invoice it corrects', function () {
+    $x = fiSeed();
+    $user = fvAccountant();
+    $invoice = fvValidate(fvDraft($x, 'contractor', $user), $user);
+    $credit = app(CreditNotes::class)->create($user, $invoice);
+    $other = Company::factory()->create(['invoice_prefix' => 'FB', 'credit_note_prefix' => 'AVB']);
+
+    $credit->forceFill(['company_id' => $other->id])->save();
+    expect(fn () => fvValidate($credit, $user))->toThrow(UserFacingHttpException::class, InvoiceValidator::OTHER_PARTIES);
+    $credit->forceFill(['company_id' => $invoice->company_id, 'recipient_id' => Organisation::query()->create(['name' => 'Autre SA'])->id])->save();
+    expect(fn () => fvValidate($credit, $user))->toThrow(UserFacingHttpException::class, InvoiceValidator::OTHER_PARTIES);
+    expect(InvoiceValidator::OTHER_PARTIES)->toBe('Un avoir doit être émis par la même société et au même destinataire que la facture corrigée.');
+
+    $credit->forceFill(['recipient_id' => $invoice->recipient_id])->save();
+    expect(fvValidate($credit, $user)->number)->toBe('AV-2026-00001');
+});
+
+it('refuses to change the company or the contractor of an invoiced dossier, and the funder of an invoiced funding', function () {
+    $x = fiSeed();
+    $user = fvAccountant();
+    $dossiers = app(DossierWriter::class);
+    $fundings = app(FundingWriter::class);
+    $other = Company::factory()->create(['invoice_prefix' => 'FB', 'credit_note_prefix' => 'AVB']);
+    $newcomer = Organisation::query()->create(['name' => 'Nouvelle SA']);
+    $region = Organisation::query()->create(['name' => 'Région']);
+    $second = l2Funding($x['dossier'], ['amount' => '100,00']);
+    $refusal = function (Closure $change): array {
+        try {
+            $change();
+        } catch (ValidationException $e) {
+            return $e->errors();
+        }
+
+        return [];
+    };
+
+    // Not invoiced yet: free to change (and back).
+    $dossier = Dossier::query()->findOrFail($x['dossier']->id);
+    $dossiers->update($dossier, fvDossierPayload($dossier, ['company_id' => $other->id]));
+    $dossier = $dossier->refresh();
+    $dossiers->update($dossier, fvDossierPayload($dossier, ['company_id' => $x['dossier']->company_id]));
+    $fundings->update($second, ['funder_organisation_id' => $region->id]);
+
+    fvValidate(fvDraft($x, 'contractor', $user), $user);
+    fvValidate(fvDraft($x, 'funding:'.$x['funding']->id, $user), $user);
+    expect(BillingPlans::HAS_INVOICES)->toBe('Ce dossier a des factures validées : faites d\'abord un avoir.');
+
+    $dossier = Dossier::query()->findOrFail($x['dossier']->id);
+    expect($refusal(fn () => $dossiers->update($dossier, fvDossierPayload($dossier, ['company_id' => $other->id]))))
+        ->toBe(['company_id' => [BillingPlans::HAS_INVOICES]])
+        ->and($refusal(fn () => $dossiers->update($dossier, fvDossierPayload($dossier, ['account_organisation_id' => $newcomer->id]))))
+        ->toBe(['account' => [BillingPlans::HAS_INVOICES]])
+        ->and($refusal(fn () => $fundings->update(Funding::query()->findOrFail($x['funding']->id), ['funder_organisation_id' => $region->id])))
+        ->toBe(['funder' => [BillingPlans::HAS_INVOICES]]);
+    expect($dossier->refresh()->only(['company_id', 'account_organisation_id']))->toBe(['company_id' => $x['dossier']->company_id, 'account_organisation_id' => $x['dossier']->account_organisation_id])
+        ->and(Funding::query()->findOrFail($x['funding']->id)->funder_organisation_id)->not->toBe($region->id);
+
+    // Anything else still changes; a funding never invoiced changes its funder.
+    $dossiers->update($dossier, fvDossierPayload($dossier, ['notes' => 'Relancer en janvier']));
+    $fundings->update($second->refresh(), ['funder_organisation_id' => $newcomer->id]);
+    expect($dossier->refresh()->notes)->toBe('Relancer en janvier')
+        ->and($second->refresh()->funder_organisation_id)->toBe($newcomer->id);
+});
+
+// ---------------------------------------------------------------- the absences rule, frozen
+
+it('freezes the absences rule of a dossier at its first validated invoice', function () {
+    $x = fiSeed();
+    $user = fvAccountant();
+    // Léa absent on the fourth séance: not billed (the organisme's default).
+    fiLateAttendance($x, 3, 'absent');
+    fvValidate(fvDraft($x, 'contractor', $user), $user);
+    fvValidate(fvDraft($x, 'funding:'.$x['funding']->id, $user), $user);
+    expect(app(BillingPlans::class)->for($x['dossier']->id))->toMatchArray(['unjustified_absences' => 'not_billed', 'absences' => 'not_billed', 'locked' => true]);
+
+    // The organisme now bills them: the dossier already invoiced keeps its rule, nothing new is due.
+    FinanceSettings::saveAbsences('bill_contractor');
+    $later = l2Dossier();
+    expect(fiDue($x['dossier']->id))->toBe([])
+        ->and(app(BillingPlans::class)->for($x['dossier']->id)['absences'])->toBe('not_billed')
+        ->and(app(BillingPlans::class)->for($later->id)['absences'])->toBe('bill_contractor');
+
+    // Choosing « the organisme's rule » on an invoiced dossier takes it as it is now, frozen again.
+    app(BillingPlans::class)->save($x['dossier']->id, ['rhythm' => 'end', 'basis' => 'realised', 'unjustified_absences' => null]);
+    FinanceSettings::saveAbsences('not_billed');
+    expect(app(BillingPlans::class)->for($x['dossier']->id))->toMatchArray(['unjustified_absences' => 'bill_contractor', 'absences' => 'bill_contractor']);
 });

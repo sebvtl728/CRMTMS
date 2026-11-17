@@ -1,13 +1,16 @@
 <?php
 
+use App\Exceptions\UserFacingHttpException;
 use App\Modules\Core\Access\AccessScope;
 use App\Modules\Core\References\ReferenceList;
 use App\Modules\Core\Tenancy\Tenant;
 use App\Modules\Core\Tenancy\TenantContext;
 use App\Modules\Core\Users\User;
 use App\Modules\Crm\Organisations\Organisation;
+use App\Modules\Finance\Invoices\CreditNotes;
 use App\Modules\Finance\Invoices\Due;
 use App\Modules\Finance\Invoices\Invoice;
+use App\Modules\Finance\Invoices\InvoiceDrafts;
 use App\Modules\Finance\Invoices\InvoiceLine;
 use App\Modules\Finance\Invoices\InvoiceStatus;
 use App\Modules\Finance\Permissions;
@@ -361,6 +364,54 @@ it('recalculates a draft from what is due now, keeping its free lines', function
     $this->actingAs(fiManager())->post("/finance/invoices/{$draft->id}/recompute")->assertStatus(409);
     $this->actingAs(l2User([SessionsPermissions::DOSSIERS_VIEW => null, Permissions::VIEW => null]))
         ->post("/finance/invoices/{$draft->id}/recompute")->assertForbidden();
+});
+
+/** The kinds and amounts of the lines of $draft, in order. */
+function fdLines(Invoice $draft): array
+{
+    return $draft->lines()->get()->map(fn (InvoiceLine $l) => [$l->kind, $l->total_ht_cents])->all();
+}
+
+it('never changes the kind of a draft when recalculating it: 409, its lines untouched', function () {
+    $x = fiSeed(opco: false);
+    $manager = fiManager();
+    fiDrafts()->prepare($manager, [fiDue($x['dossier']->id)['contractor']['key']]);
+    fiValidate(Invoice::query()->sole());
+    expect(InvoiceDrafts::KIND_CHANGED)->toBe('Le montant dû a changé de sens : supprimez ce brouillon et préparez-en un nouveau.');
+
+    // An invoice draft made by hand (nothing due: a free line); then Léa absent: a credit note is due.
+    $draft = fiDrafts()->manual($manager, $x['dossier']->id, 'contractor');
+    fiDrafts()->update($draft, ['lines' => [['label' => 'Repas', 'quantity' => '1', 'unit' => 'forfait', 'unit_price' => '15,00', 'vat_rate' => '0']]]);
+    fiLateAttendance($x, 0, 'absent');
+    expect(fiDue($x['dossier']->id)['contractor']['kind'])->toBe('credit_note')
+        ->and(fn () => fiDrafts()->recompute($draft))->toThrow(UserFacingHttpException::class, InvoiceDrafts::KIND_CHANGED);
+    expect($draft->refresh()->kind)->toBe('invoice')->and(fdLines($draft))->toBe([['free', 1500]]);
+
+    // A credit-note draft open beside it: the same 409, never the unique index of the drafts (was a 500).
+    fiDrafts()->prepare($manager, [fiDue($x['dossier']->id)['contractor']['key']]);
+    $credit = Invoice::query()->where('kind', 'credit_note')->where('status', 'draft')->sole();
+    $this->actingAs($manager)->post("/finance/invoices/{$draft->id}/recompute")->assertStatus(409);
+    expect($draft->refresh()->kind)->toBe('invoice');
+
+    // Léa came after all, and to the fourth séance: an invoice is due, the credit note stays one.
+    $before = fdLines($credit);
+    fiLateAttendance($x, 0, 'present');
+    fiLateAttendance($x, 3, 'present');
+    expect(fiDue($x['dossier']->id)['contractor']['kind'])->toBe('invoice')
+        ->and(fn () => fiDrafts()->recompute($credit))->toThrow(UserFacingHttpException::class, InvoiceDrafts::KIND_CHANGED);
+    expect($credit->refresh()->kind)->toBe('credit_note')->and(fdLines($credit))->toBe($before);
+});
+
+it('refuses to recalculate a credit note made by hand when no credit note is due', function () {
+    $x = fiSeed(opco: false);
+    $manager = fiManager();
+    fiDrafts()->prepare($manager, [fiDue($x['dossier']->id)['contractor']['key']]);
+    $invoice = fiValidate(Invoice::query()->sole());
+    $credit = app(CreditNotes::class)->create($manager, $invoice);
+
+    expect(fiDue($x['dossier']->id))->toBe([])
+        ->and(fn () => fiDrafts()->recompute($credit))->toThrow(UserFacingHttpException::class, InvoiceDrafts::KIND_CHANGED);
+    expect(fdLines($credit->refresh()))->toBe([['computed', -42857]]);
 });
 
 it('proposes a credit note on a dossier cancelled after its invoices, still listed', function () {

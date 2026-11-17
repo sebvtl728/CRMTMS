@@ -36,6 +36,9 @@ final class InvoiceDrafts
 
     public const COMPUTED_KEPT = 'Une ligne calculée ne se supprime pas : mettez son montant à 0.';
 
+    /** « Recalculer » never turns an invoice into a credit note, nor back. */
+    public const KIND_CHANGED = 'Le montant dû a changé de sens : supprimez ce brouillon et préparez-en un nouveau.';
+
     public const UNITS = ['forfait', 'heure', 'jour', 'stagiaire', 'session'];
 
     public const MAX_LINES = 100;
@@ -201,12 +204,10 @@ final class InvoiceDrafts
             if ($row === null || $this->openDraft($dossierId, $recipient, $row['kind']) !== null) {
                 return null;
             }
-            $company = Company::withTrashed()->findOrFail($dossier['company_id']);
+            // A credit note: from the company of the invoice it corrects, to its recipient (the row says so).
+            $company = Company::withTrashed()->findOrFail($row['company_id']);
             $invoice = Invoice::query()->create([
-                'company_id' => $company->id,
                 'dossier_id' => $dossierId,
-                'recipient_type' => $row['recipient']['type'],
-                'recipient_id' => $row['recipient']['id'],
                 'funding_id' => $row['recipient']['funding_id'],
                 'created_by' => $user->id,
                 'updated_by' => $user->id,
@@ -221,10 +222,12 @@ final class InvoiceDrafts
 
     /**
      * Rebuilds the computed lines of a draft from what is due now (under the
-     * lock of the dossier), its free lines kept after them; nothing due: no
-     * computed line left.
+     * lock of the dossier), its free lines kept after them; nothing due on
+     * an invoice: no computed line left. The kind never changes: an invoice
+     * now due as a credit note (or back), or a credit note with no credit
+     * note due, is a 409, the draft untouched (delete it, prepare anew).
      *
-     * @throws UserFacingHttpException 409 not a draft
+     * @throws UserFacingHttpException 409 not a draft, or the kind of what is due changed
      */
     public function recompute(Invoice $draft): Invoice
     {
@@ -233,12 +236,15 @@ final class InvoiceDrafts
             $invoice = $this->lockedDraft($draft, self::VALIDATED);
             $dossier = Billing::dossier($invoice->dossier_id) ?? throw new NotFoundHttpException;
             $row = $this->rowFor($dossier, Ledger::keyOf($invoice));
-            $company = Company::withTrashed()->findOrFail($invoice->company_id);
+            if ($row !== null ? $row['kind'] !== $invoice->kind : $invoice->kind === Invoice::CREDIT_NOTE) {
+                throw new UserFacingHttpException(409, self::KIND_CHANGED);
+            }
 
-            // The header first: the lines' VAT follows the invoice a credit note now corrects.
+            // The header first: the lines' VAT follows the invoice a credit note now corrects (its company, its recipient).
             if ($row !== null) {
                 $invoice->forceFill(self::header($row));
             }
+            $company = Company::withTrashed()->findOrFail($invoice->company_id);
             $lines = $invoice->lines()->get();
             $lines->where('kind', InvoiceLine::COMPUTED)->each(fn (InvoiceLine $l) => $l->delete());
             $computed = $row['lines'] ?? [];
@@ -282,6 +288,9 @@ final class InvoiceDrafts
     {
         return [
             'kind' => $row['kind'],
+            'company_id' => $row['company_id'],
+            'recipient_type' => $row['recipient']['type'],
+            'recipient_id' => $row['recipient']['id'],
             'period_from' => $row['period']['from'],
             'period_to' => $row['period']['to'],
             'cut_off' => $row['cut_off'],

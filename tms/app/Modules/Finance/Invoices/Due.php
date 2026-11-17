@@ -19,7 +19,8 @@ use Carbon\CarbonImmutable;
  * component (training, dédit, absences). Positive: an invoice to prepare;
  * negative: a credit note on the recipient's most recent validated invoice
  * with something left to credit, within what is left of it (the rest:
- * « unsettled_cents », proposed again once it is validated). A share
+ * « unsettled_cents », proposed again once it is validated), from the
+ * company of that invoice to its recipient (company_id, recipient). A share
  * billed outside the TMS never gets a row: a mention « Part réglée par
  * <financeur> » on the contractor's.
  *
@@ -248,6 +249,10 @@ final class Due
                 $unsettled = $total - array_sum(array_column($lines, 'total_ht_cents'));
                 $total -= $unsettled;
             }
+            // Issued by the company of the invoice it corrects, to its recipient (the dossier's may have changed since).
+            if ($corrected !== null) {
+                $recipient = [...$recipient, 'type' => $corrected->recipient_type, 'id' => $corrected->recipient_id];
+            }
         }
 
         return [
@@ -261,6 +266,7 @@ final class Due
             'cut_off' => $cut['key'],
             'period' => ['from' => $cut['from'], 'to' => $cut['to'], 'label' => $cut['label']],
             'kind' => $kind,
+            'company_id' => $corrected->company_id ?? $dossier['company_id'],
             'total_cents' => $total,
             'components' => $components,
             'lines' => $lines,
@@ -557,6 +563,12 @@ final class Due
         }
         foreach ($ledger->recipients as $r) {
             $fiches[$r['type']][] = $r['id'];
+        }
+        // The recipients of the invoices a credit note may correct.
+        foreach ($ledger->invoices as $invoices) {
+            foreach ($invoices as $invoice) {
+                $fiches[$invoice->recipient_type][] = $invoice->recipient_id;
+            }
         }
         $names = $this->fiches->personLabels(array_values(array_unique([...$fiches['person'] ?? [], ...array_column($dossier['enrolments'], 'person_id')])));
 

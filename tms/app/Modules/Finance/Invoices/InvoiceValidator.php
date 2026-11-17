@@ -26,7 +26,8 @@ use Illuminate\Validation\ValidationException;
  *     paying directly, not billed outside the TMS) with the agreement number
  *     of its funding, and its computed lines never exceed what is due to
  *     that recipient now (Due, recomputed under the locks); a credit note
- *     never gives back more than is left of the invoice it corrects (its
+ *     is issued by the company of the invoice it corrects, to its
+ *     recipient, and never gives back more than is left of that invoice (its
  *     HT minus its validated credit notes), nor more than was invoiced to
  *     that recipient on the dossier (all lines; computed lines alone); an
  *     invoice is positive, a credit note negative;
@@ -70,6 +71,8 @@ final class InvoiceValidator
     public const OVER_INVOICED = 'L\'avoir dépasse ce qui a été facturé à ce destinataire.';
 
     public const NO_CORRECTED = 'Un avoir corrige une facture validée du même destinataire : celle-ci est introuvable.';
+
+    public const OTHER_PARTIES = 'Un avoir doit être émis par la même société et au même destinataire que la facture corrigée.';
 
     /** %s: the number of the corrected invoice. */
     public const OVER_CORRECTED = 'Cet avoir dépasse le montant restant de la facture %s.';
@@ -162,6 +165,11 @@ final class InvoiceValidator
             $corrected = $invoice->corrected_invoice_id === null ? null : Invoice::query()->find($invoice->corrected_invoice_id);
             if ($corrected === null || $corrected->isDraft() || $corrected->kind !== Invoice::INVOICE || Ledger::keyOf($corrected) !== Ledger::keyOf($invoice)) {
                 throw new UserFacingHttpException(409, self::NO_CORRECTED);
+            }
+            // Issued by the company that issued the invoice, to whom it was addressed (never the dossier's of today).
+            if ($corrected->company_id !== $invoice->company_id
+                || $corrected->recipient_type !== $invoice->recipient_type || $corrected->recipient_id !== $invoice->recipient_id) {
+                throw new UserFacingHttpException(409, self::OTHER_PARTIES);
             }
             $credited = (int) Invoice::query()->where('corrected_invoice_id', $invoice->corrected_invoice_id)
                 ->whereIn('status', InvoiceStatus::values(InvoiceStatus::ISSUED))->sum('total_ht_cents');

@@ -4,6 +4,7 @@ namespace App\Modules\Finance;
 
 use App\Modules\Core\Access\Permissions as CorePermissions;
 use App\Modules\Core\Audit\MorphAliases;
+use App\Modules\Core\Companies\PrefixUsage;
 use App\Modules\Core\Users\User;
 use App\Modules\Crm\Public\FicheLinks;
 use App\Modules\Finance\Invoices\FinanceMailTemplates;
@@ -11,6 +12,7 @@ use App\Modules\Finance\Invoices\Invoice;
 use App\Modules\Finance\Invoices\InvoiceAnonymisation;
 use App\Modules\Finance\Invoices\InvoiceLine;
 use App\Modules\Finance\Invoices\InvoiceSending;
+use App\Modules\Finance\Invoices\InvoiceStatus;
 use App\Modules\Finance\Plans\BillingBlock;
 use App\Modules\Finance\Plans\BillingPlan;
 use App\Modules\Finance\Plans\BillingPlans;
@@ -54,10 +56,18 @@ class FinanceServiceProvider extends ServiceProvider
         // « Facturation » block of the dossier page.
         DossierBlocks::register('finance.billing', fn (string $dossierId, User $viewer) => BillingBlock::for($dossierId, $viewer));
 
-        // A validated invoice freezes who pays directly and keeps the dossier out of the trash.
+        // A validated invoice freezes who pays directly, the issuing company and the contractor,
+        // and keeps the dossier out of the trash; an invoiced funding keeps its funder.
         $hasInvoices = fn (string $dossierId): ?string => app(BillingPlans::class)->isLocked($dossierId) ? BillingPlans::HAS_INVOICES : null;
         BillingGuards::register(BillingGuards::FUNDING_LOCKED, 'finance.invoices', $hasInvoices);
         BillingGuards::register(BillingGuards::DOSSIER_TRASHABLE, 'finance.invoices', $hasInvoices);
+        BillingGuards::register(BillingGuards::PARTIES_LOCKED, 'finance.invoices', $hasInvoices);
+        BillingGuards::register(BillingGuards::FUNDER_LOCKED, 'finance.invoices', fn (string $fundingId): ?string => Invoice::query()
+            ->where('funding_id', $fundingId)->whereIn('status', InvoiceStatus::values(InvoiceStatus::ISSUED))->exists() ? BillingPlans::HAS_INVOICES : null);
+
+        // A prefix that numbered invoices never numbers credit notes of the company, nor the reverse.
+        PrefixUsage::register('finance.invoices', fn (string $companyId, string $kind, string $prefix): bool => Invoice::query()
+            ->where('company_id', $companyId)->where('kind', $kind)->whereNotNull('number')->where('number', 'like', $prefix.'-%')->exists());
 
         // Anonymising a person: her drafts go (addressed to her, or naming her as a trainee);
         // validated invoices are accounting records kept 10 years, never changed (spec § 4.7).

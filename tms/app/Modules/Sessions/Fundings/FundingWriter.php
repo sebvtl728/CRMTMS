@@ -81,6 +81,11 @@ final class FundingWriter
             if ($values['pays_directly'] !== $current->pays_directly && ($refusal = BillingGuards::fundingLocked($locked->id)) !== null) {
                 throw ValidationException::withMessages(['pays_directly' => $refusal]);
             }
+            // Nor the funder of a funding invoiced (its invoices and credit notes go to that funder).
+            $funder = $values['funder_organisation_id'] !== $current->funder_organisation_id || $values['funder_person_id'] !== $current->funder_person_id;
+            if ($funder && ($refusal = BillingGuards::funderLocked($current->id)) !== null) {
+                throw ValidationException::withMessages(['funder' => $refusal]);
+            }
             $current->fill($values)->save();
             $funding->setRawAttributes($current->getAttributes(), true);
 
