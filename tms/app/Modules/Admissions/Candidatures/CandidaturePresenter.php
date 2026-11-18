@@ -3,6 +3,7 @@
 namespace App\Modules\Admissions\Candidatures;
 
 use App\Modules\Admissions\AdmissionsVisibility;
+use App\Modules\Admissions\Alternance\AlternanceWriter;
 use App\Modules\Catalogue\Trainings;
 use App\Modules\Core\References\ReferenceItem;
 use App\Modules\Core\Users\User;
@@ -68,6 +69,7 @@ final class CandidaturePresenter
             'decision_reason_id' => $c->decision_reason_id,
             'decision_reason_label' => $c->decision_reason_id !== null ? ($labels[$c->decision_reason_id] ?? null) : null,
             'dossier_id' => $c->dossier_id,
+            'alternance' => AlternanceWriter::forPage($c),
             'files' => CandidatureFile::query()->where('candidature_id', $c->id)->orderBy('created_at')->get()
                 ->map(fn (CandidatureFile $f) => [
                     'id' => $f->id, 'kind' => $f->kind, 'name' => $f->name, 'size' => $f->size,
