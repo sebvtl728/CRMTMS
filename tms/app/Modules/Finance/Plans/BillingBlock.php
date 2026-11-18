@@ -40,9 +40,12 @@ final class BillingBlock
         $invoices = Invoice::query()->where('dossier_id', $dossierId)->orderBy('created_at')->orderBy('id')->get();
         $rows = app(InvoiceRows::class);
         $direct = array_values(array_filter($dossier['fundings'], fn (array $f) => $f['pays_directly'] && ! $f['external_billing']));
-        $funders = app(Fiches::class)->organisationLabels(array_values(array_map(fn (array $f) => $f['funder']['id'], array_filter($direct, fn (array $f) => $f['funder']['type'] === 'organisation'))))
-            + app(Fiches::class)->personLabels(array_values(array_map(fn (array $f) => $f['funder']['id'], array_filter($direct, fn (array $f) => $f['funder']['type'] === 'person'))));
-        $funder = fn (array $f) => $funders[$f['funder']['id']]['label'] ?? '—';
+        // The contractor and the funders paying directly, named in one read per type.
+        $parties = [$dossier['contractor'], ...array_map(fn (array $f) => $f['funder'], $direct)];
+        $ids = fn (string $type) => array_values(array_unique(array_map(fn (array $p) => $p['id'], array_filter($parties, fn (array $p) => $p['type'] === $type))));
+        $labels = app(Fiches::class)->organisationLabels($ids('organisation')) + app(Fiches::class)->personLabels($ids('person'));
+        $label = fn (array $party) => $labels[$party['id']]['label'] ?? '—';
+        $funder = fn (array $f) => $label($f['funder']);
 
         return [
             'title' => 'Facturation',
@@ -72,7 +75,7 @@ final class BillingBlock
                 // A draft made by hand, for the contractor or a funder paying directly.
                 'create_url' => $canManage ? route('finance.invoices.store', $dossierId, absolute: false) : null,
                 'recipients' => [
-                    ['value' => Invoice::CONTRACTOR, 'label' => 'Contractant'],
+                    ['value' => Invoice::CONTRACTOR, 'label' => 'Contractant : '.$label($dossier['contractor'])],
                     ...array_map(fn (array $f) => ['value' => 'funding:'.$f['id'], 'label' => 'Financeur : '.$funder($f)], $direct),
                 ],
             ],

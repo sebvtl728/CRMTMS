@@ -521,6 +521,8 @@ it('lists the invoices of the dossier in its billing block', function () {
         ->where('blocks.0.rows.1.badge', 'Brouillon')
         ->where('blocks.0.props.create_url', "/finance/dossiers/{$x['dossier']->id}/invoices")
         ->has('blocks.0.props.recipients', 2)
+        ->where('blocks.0.props.recipients.0.label', 'Contractant : Hôtel du Parc')
+        ->where('blocks.0.props.recipients.1.label', 'Financeur : OPCO EP')
         ->has('blocks.0.props.direct_fundings', 1)
         ->where('blocks.0.props.due_url', "/finance/dossiers/{$x['dossier']->id}/due"));
 
