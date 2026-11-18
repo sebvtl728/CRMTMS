@@ -14,6 +14,7 @@ use App\Modules\Crm\People\Person;
 use App\Modules\Sessions\Dossiers\Dossier;
 use App\Modules\Sessions\Dossiers\DossierWriter;
 use App\Modules\Sessions\Enrolments\Enrolment;
+use App\Modules\Sessions\Enrolments\EnrolmentOptions;
 use App\Modules\Sessions\Enrolments\Enrolments;
 use App\Modules\Sessions\Enrolments\EnrolmentStatus;
 use App\Modules\Sessions\Enrolments\GroupEnrolment;
@@ -258,6 +259,37 @@ it('lets an individual session take one trainee of a group only, and an intra se
     $intra = grpSession(['kind' => 'intra', 'capacity' => null, 'organisation_id' => Organisation::query()->create(['name' => 'Autre'])->id]);
     $this->post("/sessions/{$intra->id}/enrolments/group", grpPayload($dossier, [['person_id' => makePerson('C')->id]]))
         ->assertSessionHasErrors(['training_session_id']);
+});
+
+it('enrols the particulier of a particulier dossier only, on as many sessions as he follows', function () {
+    $session = grpSession();
+    $particulier = makePerson('Martin', ['first_name' => 'Paul']);
+    $dossier = grpDossier();
+    $dossier->forceFill(['account_organisation_id' => null, 'account_person_id' => $particulier->id])->save();
+    $this->actingAs(admin(true));
+
+    // Someone else, alone or in a group, and a person created on the spot: refused, nothing written.
+    $this->post("/sessions/{$session->id}/enrolments/group", grpPayload($dossier, [
+        ['person_id' => $particulier->id],
+        ['person_id' => makePerson('Autre')->id],
+        ['new_person' => ['last_name' => 'Nouveau', 'ref' => 'n1']],
+    ]))->assertSessionHasErrors([
+        'trainees.1' => 'Un dossier de particulier n\'inscrit que ce particulier.',
+        'trainees.2' => 'Un dossier de particulier n\'inscrit que ce particulier.',
+    ]);
+    expect(Enrolment::query()->count())->toBe(0)
+        ->and(Person::query()->where('last_name', 'Nouveau')->count())->toBe(0);
+
+    // The particulier himself: enrolled, on a second session too.
+    $this->post("/sessions/{$session->id}/enrolments/group", grpPayload($dossier, [['person_id' => $particulier->id]]))
+        ->assertSessionHasNoErrors();
+    $second = grpSession(['starts_on' => '2027-02-01', 'ends_on' => '2027-02-05']);
+    app(Enrolments::class)->enrol($dossier, $dossier->lines()->firstOrFail(), $second, $particulier->id);
+    expect(Enrolment::query()->where('person_id', $particulier->id)->count())->toBe(2);
+
+    // Offered on a session page with its particulier, for the dialog.
+    expect(collect(EnrolmentOptions::dossiersFor($session, admin(true)))->firstWhere('id', $dossier->id))
+        ->toMatchArray(['account' => 'Paul Martin', 'account_organisation_id' => null, 'account_person_id' => $particulier->id]);
 });
 
 it('enrols a group within the rights: update right on the session, a dossier the user sees', function () {

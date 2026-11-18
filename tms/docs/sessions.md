@@ -134,7 +134,7 @@ La page du dossier montre l'en-tête (état et actions), les étapes, les lignes
 
 ## 3. Inscrire des stagiaires
 
-**Inscrire des stagiaires** (page du dossier ou de la session ; droit « Créer et modifier les sessions et inscriptions » sur la session et droit de consulter le dossier) inscrit **un ou plusieurs** stagiaires d'un même dossier en une fois — tout un groupe, ou une vague arrivée plus tard :
+**Inscrire des stagiaires** (page du dossier ou de la session ; droit « Créer et modifier les sessions et inscriptions » sur la session et droit de consulter le dossier) inscrit **un ou plusieurs** stagiaires d'un même dossier en une fois (un dossier de **particulier** n'inscrit que ce particulier : il est présélectionné, sans recherche ni création ; toute autre personne est refusée, « Un dossier de particulier n'inscrit que ce particulier. », y compris à la création d'un dossier depuis un devis) — tout un groupe, ou une vague arrivée plus tard :
 
 1. choisissez le dossier (depuis la session) ou la ligne de formation et la session (depuis le dossier ; seules les sessions de cette formation ouvertes au dossier sont proposées, avec leur intitulé) ;
 2. **Date d'entrée commune** : vide, le début de la session ; chaque stagiaire peut avoir la sienne (un stagiaire arrivé une semaine après) et ses **heures prévues** ;

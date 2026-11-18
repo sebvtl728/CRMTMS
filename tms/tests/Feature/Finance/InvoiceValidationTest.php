@@ -695,7 +695,7 @@ it('deletes the drafts addressed to an anonymised particulier', function () {
     $person = makePerson('Martin', ['first_name' => 'Paul', 'is_individual' => true]);
     $dossier = l2Dossier($person);
     $session = plSession('2026-09-01', '2026-09-30');
-    l2Enrol($dossier, $session, makePerson('Durand', ['first_name' => 'Léa']));
+    l2Enrol($dossier, $session, $person);
     $user = fvAccountant();
     $draft = fiDrafts()->manual($user, $dossier->id, 'contractor');
     expect($draft->recipient_type)->toBe('person');
@@ -708,7 +708,7 @@ it('deletes the drafts addressed to an anonymised particulier', function () {
 it('prints the late penalties and the 40 € indemnity for a professional only, never for a particulier', function () {
     $person = makePerson('Martin', ['first_name' => 'Paul', 'is_individual' => true, 'address_line1' => '3 rue des Lilas', 'postal_code' => '74000', 'city' => 'Annecy']);
     $dossier = l2Dossier($person);
-    l2Enrol($dossier, plSession('2026-09-01', '2026-09-30'), makePerson('Durand', ['first_name' => 'Léa']));
+    l2Enrol($dossier, plSession('2026-09-01', '2026-09-30'), $person);
     $user = fvAccountant();
     $draft = fiDrafts()->manual($user, $dossier->id, 'contractor');
     fiDrafts()->update($draft, ['notes' => null, 'lines' => [['label' => 'Frais de dossier', 'description' => null, 'quantity' => '1', 'unit' => 'forfait', 'unit_price' => '50', 'vat_rate' => '0']]]);

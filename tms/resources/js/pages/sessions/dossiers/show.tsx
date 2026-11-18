@@ -436,6 +436,8 @@ export default function DossierShow({
                         dossierId: dossier.id,
                         organisationId: dossier.account.type === 'organisation' ? dossier.account.id : null,
                         organisationLabel: dossier.account.type === 'organisation' ? dossier.account.label : null,
+                        particulier:
+                            dossier.account.type === 'person' ? { id: dossier.account.id, label: dossier.account.label ?? 'Particulier' } : null,
                         lines: trainingLines.map((l) => ({ id: l.id, label: l.label })),
                         sessions: enrol.sessions,
                     }}
