@@ -179,6 +179,7 @@ class CandidatureController extends Controller
             'origins' => $items(ReferenceList::ContactOrigin),
             'education_levels' => $items(ReferenceList::EducationLevel),
             'situations' => $items(ReferenceList::ProfessionalSituation),
+            'funding_types' => $items(ReferenceList::FundingType),
             'users' => User::query()->whereNull('deactivated_at')->orderBy('name')->get(['id', 'name'])
                 ->map(fn (User $u) => ['value' => $u->id, 'label' => $u->name])->values()->all(),
             'training_options' => array_map(fn (TrainingData $t) => ['value' => $t->id, 'label' => $t->title, 'rncp_code' => $t->rncp_code], app(Trainings::class)->options()),

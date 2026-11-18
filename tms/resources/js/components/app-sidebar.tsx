@@ -32,8 +32,10 @@ import {
     Settings2,
     ShieldAlert,
     ShieldCheck,
+    SlidersHorizontal,
     Upload,
     UserMinus,
+    UserRoundCheck,
     Users,
 } from 'lucide-react';
 import AppLogo from './app-logo';
@@ -52,6 +54,7 @@ const commercialNavItems: (NavItem & { permission: string })[] = [
     { title: 'Catalogue', url: '/catalogue', icon: BookOpen, permission: 'catalogue.view' },
     { title: 'Entreprises', url: '/crm/organisations', icon: Factory, permission: 'crm.fiches.view' },
     { title: 'Interlocuteurs', url: '/crm/people', icon: Contact, permission: 'crm.fiches.view' },
+    { title: 'Candidats', url: '/admissions/candidatures', icon: UserRoundCheck, permission: 'admissions.candidatures.view' },
     { title: 'Imports', url: '/crm/import', icon: Upload, permission: 'crm.import' },
     { title: 'RGPD', url: '/crm/gdpr', icon: ShieldAlert, permission: 'crm.gdpr' },
 ];
@@ -82,6 +85,7 @@ const adminNavItems: (NavItem & { permission: string })[] = [
     { title: 'Connecteurs', url: '/admin/connectors', icon: Plug, permission: 'connectors.manage' },
     { title: "Journal d'audit", url: '/admin/audit', icon: History, permission: 'audit.view' },
     { title: 'Sécurité', url: '/admin/security', icon: ShieldCheck, permission: 'settings.manage' },
+    { title: 'Champs personnalisés', url: '/admin/custom-fields', icon: SlidersHorizontal, permission: 'settings.manage' },
     { title: 'Sauvegardes', url: '/admin/backups', icon: DatabaseBackup, permission: 'settings.manage' },
     { title: "Règle d'abandon", url: '/admin/abandon-rule', icon: UserMinus, permission: 'settings.manage' },
     { title: 'Salles et fermetures', url: '/admin/sessions-settings', icon: DoorOpen, permission: 'sessions.rooms.manage' },
