@@ -359,19 +359,22 @@ function PlanForm({ plan, organisme_absences, starts_on, can_manage, update_url 
                             checked={data.unjustified_absences === ''}
                             onChange={() => setData('unjustified_absences', '')}
                         />
-                        Réglage de l'organisme ({ABSENCES[organisme_absences].toLowerCase()})
+                        Comme l'organisme : {ABSENCES[organisme_absences].toLowerCase()}
                     </label>
-                    {(Object.keys(ABSENCES) as Absences[]).map((value) => (
-                        <label key={value} className="flex items-center gap-2 text-sm">
-                            <input
-                                type="radio"
-                                name="unjustified_absences"
-                                checked={data.unjustified_absences === value}
-                                onChange={() => setData('unjustified_absences', value)}
-                            />
-                            {ABSENCES[value]}
-                        </label>
-                    ))}
+                    {/* Only the other choice, unless the dossier already holds the organisme's one. */}
+                    {(Object.keys(ABSENCES) as Absences[])
+                        .filter((value) => value !== organisme_absences || plan.unjustified_absences === value)
+                        .map((value) => (
+                            <label key={value} className="flex items-center gap-2 text-sm">
+                                <input
+                                    type="radio"
+                                    name="unjustified_absences"
+                                    checked={data.unjustified_absences === value}
+                                    onChange={() => setData('unjustified_absences', value)}
+                                />
+                                Pour ce dossier : {ABSENCES[value].toLowerCase()}
+                            </label>
+                        ))}
                 </div>
                 <p className="text-muted-foreground text-xs">
                     Facturées, elles le sont au seul contractant, sur une ligne distincte, jamais aux financeurs.
