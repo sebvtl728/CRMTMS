@@ -57,6 +57,12 @@ final class CandidaturesBlock
             return null;
         }
 
+        return self::kindOf($hasContract);
+    }
+
+    /** The badge of a candidature whose dossier lives. */
+    public static function kindOf(bool $hasContract): string
+    {
         return $hasContract ? 'Alternant' : 'Apprenant';
     }
 }

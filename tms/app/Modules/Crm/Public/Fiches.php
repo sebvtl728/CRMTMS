@@ -107,10 +107,11 @@ final class Fiches
 
     /**
      * Names of these people keyed by id, trashed ones included (anonymised:
-     * their anonymised name). Unknown ids are left out.
+     * their anonymised name). Unknown ids are left out. The last and first
+     * names apart too (exports).
      *
      * @param  list<string>  $ids
-     * @return array<string, array{label: string, trashed: bool}>
+     * @return array<string, array{label: string, trashed: bool, last_name: string, first_name: ?string}>
      */
     public function personLabels(array $ids): array
     {
@@ -120,7 +121,7 @@ final class Fiches
         }
 
         return Person::withTrashed()->whereKey($ids)->get()
-            ->mapWithKeys(fn (Person $p) => [$p->id => ['label' => $p->fullName(), 'trashed' => $p->trashed()]])->all();
+            ->mapWithKeys(fn (Person $p) => [$p->id => ['label' => $p->fullName(), 'trashed' => $p->trashed(), 'last_name' => $p->last_name, 'first_name' => $p->first_name]])->all();
     }
 
     /**

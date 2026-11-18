@@ -9,6 +9,9 @@ use App\Modules\Admissions\CustomFields\CustomFieldValues;
 use App\Modules\Admissions\Permissions;
 use App\Modules\Catalogue\TrainingData;
 use App\Modules\Catalogue\Trainings;
+use App\Modules\Core\Audit\AuditRecorder;
+use App\Modules\Core\Exports\CsvExporter;
+use App\Modules\Core\Exports\XlsxExporter;
 use App\Modules\Core\References\ReferenceItem;
 use App\Modules\Core\References\ReferenceList;
 use App\Modules\Core\Users\User;
@@ -18,6 +21,7 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 /**
  * Page, creation, change, trash and restore of a candidature. The route
@@ -26,6 +30,46 @@ use Inertia\Response;
  */
 class CandidatureController extends Controller
 {
+    public function index(Request $request): Response
+    {
+        $user = self::user($request);
+        $filters = CandidatureListQuery::filters($request->query());
+        $page = CandidatureListQuery::build($user, $filters)->paginate(25)->withQueryString();
+        $rows = new CandidatureRows;
+        $rows->prefetch($page->items());
+
+        return Inertia::render('admissions/candidatures/index', [
+            'rows' => [
+                'data' => array_map(fn (Candidature $c) => $rows->row($c), $page->items()),
+                'current_page' => $page->currentPage(),
+                'last_page' => $page->lastPage(),
+                'total' => $page->total(),
+                'links' => $page->linkCollection()->toArray(),
+            ],
+            'filters' => $filters,
+            'counts' => CandidatureListQuery::counts($user, $filters),
+            'options' => self::options(null),
+            'can' => ['create' => $user->can(Permissions::CANDIDATURES_UPDATE), 'export' => $user->can('crm.export')],
+        ]);
+    }
+
+    /**
+     * CSV export (« ; ») of the list as filtered, every column; audited with
+     * the filters and the row count, never the content.
+     */
+    public function export(Request $request, XlsxExporter $counter, CsvExporter $exporter, AuditRecorder $audit): StreamedResponse
+    {
+        $user = self::user($request);
+        $resource = new CandidatureExport;
+        $filters = CandidatureListQuery::filters($request->query());
+        /** @var \Illuminate\Database\Eloquent\Builder<\Illuminate\Database\Eloquent\Model> $query */
+        $query = CandidatureListQuery::build($user, $filters);
+        $rows = $counter->count($query);
+        $audit->export('admissions.candidatures', ['filters' => array_filter($filters, fn ($v) => $v !== null), 'columns' => $resource->defaults(), 'rows' => $rows]);
+
+        return $exporter->export($query, $resource, $user, $resource->defaults(), $resource->fileName().'-'.now()->format('Ymd-Hi').'.csv');
+    }
+
     public function create(Request $request): Response
     {
         $personId = (string) $request->query('person', '');

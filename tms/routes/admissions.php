@@ -14,7 +14,8 @@ use Illuminate\Support\Facades\Route;
  * and the custom fields of the organisme (settings.manage).
  */
 Route::middleware(['auth'])->prefix('admissions/candidatures')->name('admissions.candidatures.')->group(function () {
-    Route::get('/', fn () => redirect('/dashboard'))->middleware('can:admissions.candidatures.view')->name('index');
+    Route::get('/', [CandidatureController::class, 'index'])->middleware('can:admissions.candidatures.view')->name('index');
+    Route::get('export', [CandidatureController::class, 'export'])->middleware(['can:admissions.candidatures.view', 'can:crm.export', 'throttle:crm-export'])->name('export');
     Route::get('create', [CandidatureController::class, 'create'])->middleware('can:admissions.candidatures.update')->name('create');
     Route::post('/', [CandidatureController::class, 'store'])->middleware('can:admissions.candidatures.update')->name('store');
     Route::get('{candidature}', [CandidatureController::class, 'show'])->middleware('can:admissions.candidatures.view')->name('show');

@@ -13,6 +13,7 @@ use App\Modules\Sessions\Permissions;
 use App\Modules\Sessions\Sessions\SessionStatus;
 use App\Modules\Sessions\Sessions\TrainingSession;
 use App\Modules\Sessions\SessionsVisibility;
+use Illuminate\Database\Query\Builder;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
@@ -73,6 +74,14 @@ final class Admission
     public static function mayCreateDossier(User $user, string $dasId): bool
     {
         return SessionsVisibility::allowsDas($user, Permissions::DOSSIERS_UPDATE, $dasId);
+    }
+
+    /**
+     * Ids of the dossiers out of the trash, as a subquery (whereIn).
+     */
+    public static function liveDossierIds(): Builder
+    {
+        return Dossier::query()->select('id')->toBase();
     }
 
     /**
