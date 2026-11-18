@@ -121,7 +121,7 @@ setup_file() {
     DB_OWNER_USERNAME=tms_owner DB_OWNER_PASSWORD="$(env_get POSTGRES_OWNER_PASSWORD)" \
         compose run --rm --no-deps -T -e DB_OWNER_USERNAME -e DB_OWNER_PASSWORD \
         app php artisan migrate:rollback --step=1 --database=pgsql_owner --force >&2
-    psql_su "select count(*) from information_schema.columns where table_name = 'calendar_link_events' and column_name = 'source'" >"$dir/a-old-source-column"
+    psql_su "select count(*) from migrations where migration = '$(last_migration)'" >"$dir/a-old-last-migration"
     # Exported with --stop: systemctl stubbed, units of the backups present.
     mkdir -p "$dir/bin" "$dir/systemd" "$dir/older"
     printf '#!/usr/bin/env bash\nprintf "%%s\\n" "$*" >>"%s/systemctl.log"\n' "$dir" >"$dir/bin/systemctl"
@@ -140,6 +140,9 @@ setup_file() {
 teardown_file() {
     stack_down
 }
+
+# The newest migration of the repository: the one the « older » export lacks.
+last_migration() { basename "$(find "$TMS_ROOT/database/migrations" -name '*.php' | sort | tail -n 1)" .php; }
 
 good_export() { tail -n 1 "$BATS_FILE_TMPDIR/export.out"; }
 
@@ -166,7 +169,7 @@ good_export() { tail -n 1 "$BATS_FILE_TMPDIR/export.out"; }
     # The « newer » and « older » exports carry their version in their name.
     [[ "$(tail -n 1 "$BATS_FILE_TMPDIR/newer.out")" == *-v0.9.0.tar ]] || false
     [[ "$(tail -n 1 "$BATS_FILE_TMPDIR/older.out")" == *-v0.8.1.tar ]] || false
-    [ "$(cat "$BATS_FILE_TMPDIR/a-old-source-column")" = "0" ]
+    [ "$(cat "$BATS_FILE_TMPDIR/a-old-last-migration")" = "0" ]
 }
 
 @test "export --stop: old server stopped, backup units disabled, restart commands printed; restarted on failure" {
@@ -356,7 +359,7 @@ good_export() { tail -n 1 "$BATS_FILE_TMPDIR/export.out"; }
     [ "$status" -eq 0 ]
     [[ "$output" == *"(version 0.8.1)"* ]] || false
     # The migration rolled back on A before this export ran during the import.
-    [ "$(psql_su "select count(*) from information_schema.columns where table_name = 'calendar_link_events' and column_name = 'source'")" = "1" ]
+    [ "$(psql_su "select count(*) from migrations where migration = '$(last_migration)'")" = "1" ]
     run compose exec -T app php artisan migrate:status
     [ "$status" -eq 0 ]
     [[ "$output" != *"Pending"* ]] || false
