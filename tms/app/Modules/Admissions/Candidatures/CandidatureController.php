@@ -5,6 +5,7 @@ namespace App\Modules\Admissions\Candidatures;
 use App\Http\Controllers\Controller;
 use App\Modules\Admissions\AdmissionsVisibility;
 use App\Modules\Admissions\Alternance\ContractType;
+use App\Modules\Admissions\CustomFields\CustomFieldValues;
 use App\Modules\Admissions\Permissions;
 use App\Modules\Catalogue\TrainingData;
 use App\Modules\Catalogue\Trainings;
@@ -31,6 +32,7 @@ class CandidatureController extends Controller
         $person = $personId !== '' ? app(Fiches::class)->person($personId) : null;
 
         return Inertia::render('admissions/candidatures/create', [
+            'custom_fields' => CustomFieldValues::forPage(new Candidature),
             'person' => $person === null ? null : ['id' => $person['id'], 'label' => $person['label']],
             'options' => self::options(null),
         ]);
@@ -55,6 +57,7 @@ class CandidatureController extends Controller
 
         return Inertia::render('admissions/candidatures/show', [
             'candidature' => CandidaturePresenter::show($candidature, $user),
+            'custom_fields' => CustomFieldValues::forPage($candidature),
             'can' => [
                 'update' => AdmissionsVisibility::allows($user, Permissions::CANDIDATURES_UPDATE, $candidature) && ! $candidature->trashed(),
                 'delete' => AdmissionsVisibility::allows($user, Permissions::CANDIDATURES_DELETE, $candidature),

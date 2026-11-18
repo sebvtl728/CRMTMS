@@ -3,6 +3,8 @@
 namespace App\Modules\Admissions\Candidatures;
 
 use App\Modules\Admissions\AdmissionsVisibility;
+use App\Modules\Admissions\CustomFields\CustomFieldDefinition;
+use App\Modules\Admissions\CustomFields\CustomFieldValues;
 use App\Modules\Admissions\Support\Rules;
 use App\Modules\Catalogue\Trainings;
 use App\Modules\Core\References\ReferenceList;
@@ -150,6 +152,13 @@ final class CandidatureWriter
             }
         });
         $validated = $validator->validate();
+        $custom = null;
+        if (array_key_exists('custom_values', $data)) {
+            if (! is_array($data['custom_values'])) {
+                throw ValidationException::withMessages(['custom_values' => 'Valeur invalide.']);
+            }
+            $custom = CustomFieldValues::merge($current?->custom_values ?? [], CustomFieldValues::validate(CustomFieldDefinition::CANDIDATURE, $data['custom_values']));
+        }
 
         $profile = array_intersect_key($validated, array_flip(self::PROFILE));
         $values = array_intersect_key($validated, array_flip(self::FIELDS));
@@ -180,6 +189,10 @@ final class CandidatureWriter
         if (array_key_exists('legal_representative', $values) && is_array($values['legal_representative'])) {
             $rep = array_filter($values['legal_representative'], fn ($v) => $v !== null && $v !== '');
             $values['legal_representative'] = $rep === [] ? null : $rep;
+        }
+
+        if ($custom !== null) {
+            $values['custom_values'] = $custom;
         }
 
         return [$values, $profile];

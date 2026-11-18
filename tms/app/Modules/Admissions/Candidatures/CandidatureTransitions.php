@@ -3,6 +3,7 @@
 namespace App\Modules\Admissions\Candidatures;
 
 use App\Exceptions\UserFacingHttpException;
+use App\Modules\Admissions\CustomFields\CustomFieldValues;
 use App\Modules\Admissions\Support\Rules;
 use App\Modules\Core\References\ReferenceList;
 use App\Modules\Core\Users\User;
@@ -42,6 +43,9 @@ final class CandidatureTransitions
             $changes = ['status' => $to->value];
             if ($to === CandidatureStatus::Admitted && $locked->training_id === null) {
                 throw ValidationException::withMessages(['training_id' => 'Choisissez la formation visée avant d\'admettre le candidat.']);
+            }
+            if ($to === CandidatureStatus::Admitted && ($missing = CustomFieldValues::missingForAdmission($locked)) !== []) {
+                throw ValidationException::withMessages(['custom_values' => 'À remplir avant l\'admission : '.implode(', ', $missing).'.']);
             }
             if ($to === CandidatureStatus::Rejected) {
                 Validator::make(['decision_reason_id' => $reasonId], ['decision_reason_id' => ['required', ...Rules::item(ReferenceList::CandidatureRefusalReason)]], [
