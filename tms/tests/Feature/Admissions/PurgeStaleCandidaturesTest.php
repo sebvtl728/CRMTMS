@@ -11,6 +11,8 @@ use App\Modules\Core\Tenancy\Tenant;
 use App\Modules\Core\Tenancy\TenantContext;
 use App\Modules\Crm\People\Person;
 use Carbon\CarbonImmutable;
+use Illuminate\Console\Scheduling\Event;
+use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Http\UploadedFile;
 
 require_once __DIR__.'/Support/admissions.php';
@@ -75,8 +77,8 @@ it('purges every organisme', function () {
 });
 
 it('runs every day at 03:50 Paris time', function () {
-    $event = collect(app(Illuminate\Console\Scheduling\Schedule::class)->events())
-        ->first(fn (Illuminate\Console\Scheduling\Event $e) => str_contains((string) $e->command, 'tms:admissions:purge'));
+    $event = collect(app(Schedule::class)->events())
+        ->first(fn (Event $e) => str_contains((string) $e->command, 'tms:admissions:purge'));
 
     expect($event)->not->toBeNull()
         ->and($event->expression)->toBe('50 3 * * *')

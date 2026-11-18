@@ -2,7 +2,7 @@
 
 Ce guide s'adresse aux personnes qui utilisent le TMS au quotidien (commerciaux, chargés de relations, assistants, direction, responsables de DAS). Les écrans sont désignés par leur libellé à l'écran. Ce que vous voyez dépend de votre rôle : les boutons auxquels vous n'avez pas droit n'apparaissent pas (voir `admin.md` pour la liste des droits par rôle).
 
-Le menu de gauche, section **Commercial**, donne accès, dans cet ordre, à **Pipeline**, **Opportunités**, **Devis**, **À faire** (avec le nombre d'actions en retard ou du jour), **Planning**, **Compte rendu de RDV**, **Catalogue**, **Entreprises**, **Interlocuteurs**, **Imports** et **RGPD**. Le mot « entreprise » désigne ici toute organisation cliente ou prospect : entreprise, association, collectivité.
+Le menu de gauche, section **Commercial**, donne accès, dans cet ordre, à **Pipeline**, **Opportunités**, **Devis**, **À faire** (avec le nombre d'actions en retard ou du jour), **Planning**, **Compte rendu de RDV**, **Catalogue**, **Entreprises**, **Interlocuteurs**, **Candidats** (voir `admissions.md`), **Imports** et **RGPD**. Le mot « entreprise » désigne ici toute organisation cliente ou prospect : entreprise, association, collectivité.
 
 ## 1. L'écran d'accueil
 
@@ -33,7 +33,7 @@ Tous ces chiffres respectent votre périmètre : un Responsable de DAS n'y compt
 
 ### Interlocuteurs (personnes)
 
-Écran **Interlocuteurs** (menu anciennement « Personnes »). Une personne peut être :
+Écran **Interlocuteurs** (menu anciennement « Personnes » ; particuliers compris). L'onglet **Candidatures** de la fiche liste ses candidatures (badges « Apprenant », « Alternant ») et propose **Ouvrir une candidature** : l'interlocuteur devient candidat (voir `admissions.md`). Une personne peut être :
 
 - un **particulier** (stagiaire à titre individuel, financement personnel…) : case « Particulier » cochée ;
 - un **interlocuteur** : personne rattachée à une ou plusieurs entreprises, avec sa fonction et son **rôle dans la décision** ;
@@ -415,8 +415,8 @@ La section **RGPD** de la fiche affiche :
 - la **Base légale** du traitement (intérêt légitime par défaut ; consentement, contrat ou obligation légale) ;
 - les **Consentements** par canal (e-mail, SMS, téléphone, prospection) : **Enregistrer un consentement** ajoute un choix daté (**Accordé** ou **Refusé ou retiré**) avec sa source. L'historique est conservé : un nouveau choix s'ajoute sans effacer les précédents ;
 - **Opposition à la prospection** : enregistre que la personne ne veut plus être sollicitée ; une mention **Opposé à la prospection** apparaît sur la fiche, dans les listes et la recherche ;
-- **Exporter ses données** : fichier contenant toutes les données que le TMS détient sur la personne, y compris ses opportunités, ses actions, ses devis, les **plaquettes** envoyées (date, plaquettes, état, adresse, objet, message) et ses **formations d'intérêt**, ses **inscriptions** (session, formation, dates, état, motif d'abandon, besoins d'adaptation) et les **dossiers** dont elle est contractante ou contact (droit d'accès). L'export étant toujours complet, il est réservé aux personnes qui voient tout l'organisme, y compris les dossiers et les sessions ;
-- **Anonymiser maintenant** : efface définitivement les données personnelles de la fiche (nom, coordonnées, notes, pièces jointes, formations d'intérêt, comptes rendus et lieux des actions, commentaire de perte des opportunités, destinataire et PDF archivé des devis, adresse, objet et message des plaquettes envoyées, besoins d'adaptation et notes de ses inscriptions, notes des financements qui la concernent et de ses dossiers de particulier…). Ses inscriptions et ses dossiers restent (dates, états, montants : statistiques, bilan pédagogique et financier). Pour confirmer, tapez le nom de la personne. Seules des données statistiques (statut, DAS, rattachements, montants et étapes des opportunités, types et dates des actions) restent. **Cette opération est irréversible.**
+- **Exporter ses données** : fichier contenant toutes les données que le TMS détient sur la personne, y compris ses opportunités, ses actions, ses devis, les **plaquettes** envoyées (date, plaquettes, état, adresse, objet, message) et ses **formations d'intérêt**, ses **inscriptions** (session, formation, dates, état, motif d'abandon, besoins d'adaptation), les **dossiers** dont elle est contractante ou contact et ses **candidatures** (droit d'accès). L'export étant toujours complet, il est réservé aux personnes qui voient tout l'organisme, y compris les dossiers, les sessions, les candidatures et leurs données sensibles ;
+- **Anonymiser maintenant** : efface définitivement les données personnelles de la fiche (nom, coordonnées, notes, pièces jointes, formations d'intérêt, comptes rendus et lieux des actions, commentaire de perte des opportunités, destinataire et PDF archivé des devis, adresse, objet et message des plaquettes envoyées, besoins d'adaptation et notes de ses inscriptions, notes des financements qui la concernent et de ses dossiers de particulier, données personnelles, sensibles et fichiers de ses candidatures…). Ses inscriptions et ses dossiers restent (dates, états, montants : statistiques, bilan pédagogique et financier). Pour confirmer, tapez le nom de la personne. Seules des données statistiques (statut, DAS, rattachements, montants et étapes des opportunités, types et dates des actions) restent. **Cette opération est irréversible.**
 
 > **Objet des opportunités d'un particulier** : il est **conservé** après l'anonymisation, pour les statistiques. S'il contient le nom de la personne, ce nom reste : ne mettez jamais de nom dans l'objet d'une opportunité.
 

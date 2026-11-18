@@ -143,6 +143,17 @@ Code dans `tms/app/Modules/Finance/` (`Billing`, `Plans`, `Invoices`, `Settings`
 - **RGPD** : une pièce validée est conservée 10 ans ; `InvoiceAnonymisation` (via `FicheLinks`) ne supprime que les brouillons. `notes`, `recipient_snapshot` et `description` de ligne sont dans `$auditPersonal`.
 - **Montants** : jamais de flottant ; `Money` formate et analyse les centimes ; pénalités et 40 € seulement pour un destinataire `organisation`.
 
+## Module Admissions : points d'architecture à connaître
+
+Code dans `tms/app/Modules/Admissions/` (Candidatures, Alternance, CustomFields, Crm, Gdpr, History). Guide : `tms/docs/admissions.md` ; réglages : `tms/docs/admin.md` (§ 19) ; tables : `tms/docs/data-dictionary.md`. Spec : `docs/superpowers/specs/2026-11-18-admissions-candidats-design.md`.
+
+- **Frontières** : Admissions n'atteint le CRM que par `Crm\Public\*` (`Fiches`, `Trainees::search|create|profile|updateProfile`, `FicheBlocks`, `FicheLinks`, `FicheHistory`), le catalogue par `Trainings`/`TrainingData`/`TrainingUsage`, Sessions par `Sessions\Public\Admission` (`sessionOptions`, `session`, `createDossier`, `dossierState`, `liveDossierIds`, `mayCreateDossier`), `Billing::numbers` et `DossierBlocks`. Aucun autre module n'importe Admissions ni ne nomme ses tables (`ModuleBoundariesArchTest`, `ADMISSIONS_TABLES`) ; d'où la clé d'options `training_options`.
+- **Candidature** : `CandidatureWriter` (clés présentes seulement, personne fixée à la création, code RNCP repris de la formation sauf saisie, situation et niveau écrits **sur la personne** par `Trainees::updateProfile`, données sensibles ignorées sans `admissions.sensitive.view`) ; `CandidatureTransitions` seule porte des étapes (verrou ; retour interdit si dossier vivant ; « Admis » exige formation et champs personnalisés requis ; « Non retenu » exige un motif). « Apprenant » / « Alternant » se lisent (dossier vivant, contrat), jamais stockés.
+- **Sensibles** : `Candidature::SENSITIVE` (`rqth`, `adaptation_needs`, `interview_report`) absentes des props Inertia sans le droit (`CandidaturePresenter`), jamais dans l'export CSV ; `$auditPersonal` couvre aussi représentant légal, valeurs personnalisées, etc.
+- **Champs personnalisés** : `custom_field_definitions` (colonne `entity`, `candidature` seulement), valeurs dans `candidatures.custom_values` (clé = id), fichiers dans `candidature_files` (`custom:<id>`) ; un champ utilisé se masque, son type ne change plus, un choix utilisé ne se retire pas (`CustomFieldDefinitions`).
+- **Dossier** : `DossierCreation` (verrou de la candidature, un dossier vivant par candidature, `Admission::createDossier` en une transaction : `DossierWriter`, `Enrolments::enrol`, `FundingWriter`) ; contractant par défaut = employeur du contrat, sinon la personne si particulier.
+- **RGPD** : `CandidatureAnonymisation` (via `FicheLinks` et la purge), export `PersonCandidaturesExport` (exige `admissions.candidatures.view` et `admissions.sensitive.view` sur « Tout »), `tms:admissions:purge` (`ForEachTenant`, 3 h 50) : non retenues et désistées anonymisées 2 ans après leur dernière modification (fichier ou contrat touchent la candidature).
+
 ## Conventions
 
 - Identifiants UUID v7 ; suppression logique sur les fiches métier.

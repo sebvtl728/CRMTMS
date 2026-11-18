@@ -375,3 +375,14 @@ Guide utilisateur : `finance.md`.
 - **PDF** : mêmes exigences que les devis (Gotenberg démarré, `GOTENBERG_URL`) ; une facture ne se valide pas si le PDF ne peut pas être produit. Les PDF validés sont archivés par organisme (zone `invoices`) et **font partie de la sauvegarde** : ne les excluez pas.
 - **Intégrité** : `docker compose exec app php artisan tms:finance:verify` (tous les organismes ; code de sortie 1 et numéro de la première pièce en cause en cas de rupture). À lancer après une restauration ou un déménagement (`ops/import.sh`), et à intervalles réguliers.
 - **Conservation** : une facture validée est une pièce comptable conservée **10 ans** ; elle n'est ni supprimée ni modifiée, même par l'anonymisation RGPD d'une personne (voir § 11).
+
+## 19. Admissions : candidats et champs personnalisés
+
+Guide utilisateur : `admissions.md`.
+
+- **Droits** (Rôles et droits, thèmes « Candidatures » et « Données sensibles des candidats ») : `admissions.candidatures.view`, `admissions.candidatures.update` (créer, modifier, changer d'étape, contrat, fichiers), `admissions.candidatures.delete` (corbeille), à périmètre (« Ses fiches » : responsable ou créateur ; « Ses DAS » : DAS de la candidature) ; `admissions.sensitive.view` (RQTH, besoins d'adaptation, compte rendu d'entretien), sans périmètre. Par défaut : administrateur tout ; direction consulter + données sensibles ; responsable DAS consulter et modifier sur ses DAS ; commercial, chargé de relations et assistant consulter et modifier ; formateur rien. « Créer le dossier » exige en plus `sessions.dossiers.update`. L'export CSV exige `crm.export`. L'**export RGPD** d'une personne exige désormais aussi `admissions.candidatures.view` et `admissions.sensitive.view` sur « Tout l'organisme ».
+- **Administration › Champs personnalisés** (droit `settings.manage`) : champs propres à l'organisme sur la fiche candidat (texte court ou long, nombre, date, oui/non, liste de choix, fichier joint), ordonnés, « obligatoire pour l'admission » au choix. Un champ rempli sur au moins une candidature ne se supprime pas : **masquez-le** (ses valeurs restent dans l'historique et l'export RGPD) ; son type ne change plus et un choix utilisé ne peut pas être retiré.
+- **Référentiel « Motifs de non-admission (candidatures) »** : Niveau insuffisant, Projet non adapté, Pas d'entreprise d'accueil, Places complètes, Autre (ajoutés à chaque organisme existant par la mise à jour).
+- **Catalogue** : champ **Code RNCP** sur la fiche formation (`RNCP` suivi de chiffres), repris par les candidatures.
+- **Fichiers** : zone `admissions` du disque privé de l'organisme (`TenantStorage`), comprise dans la sauvegarde.
+- **Conservation** : `tms:admissions:purge` (chaque nuit, 3 h 50, heure de Paris) anonymise les candidatures non retenues ou désistées sans modification depuis 2 ans.
