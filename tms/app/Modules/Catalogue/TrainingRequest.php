@@ -37,6 +37,11 @@ class TrainingRequest extends FormRequest
                 $clean[$key] = $value === '' ? null : $value;
             }
         }
+        if ($this->has('rncp_code')) {
+            $rncp = $this->input('rncp_code');
+            $rncp = is_string($rncp) ? mb_strtoupper((string) preg_replace('/\s+/', '', $rncp)) : $rncp;
+            $clean['rncp_code'] = $rncp === '' ? null : $rncp;
+        }
         if (is_string($clean['code'] ?? null)) {
             $clean['code'] = mb_strtoupper($clean['code']);
         }
@@ -150,6 +155,7 @@ class TrainingRequest extends FormRequest
             'code' => ['nullable', 'string', 'max:20', Rule::unique('trainings', 'code')
                 ->where('tenant_id', $tenantId)->whereNull('deleted_at')->ignore($current?->id)],
             'title' => ['required', 'string', 'max:200'],
+            'rncp_code' => ['nullable', 'string', 'regex:/^RNCP\d{1,6}$/'],
             'das_id' => ['required', ...self::reference(ReferenceList::Das, array_filter([$current?->das_id]))],
             'duration_hours' => ['nullable', 'numeric', 'decimal:0,2', 'min:0', 'max:9999.99'],
             'duration_days' => ['nullable', 'numeric', 'decimal:0,2', 'min:0', 'max:999.99'],
@@ -197,6 +203,7 @@ class TrainingRequest extends FormRequest
     {
         return [
             'required' => 'Ce champ est obligatoire.',
+            'rncp_code.regex' => 'Le code RNCP doit s\'écrire RNCP suivi de chiffres (ex. RNCP36004).',
             'max' => 'Ce champ est trop long.',
             'string' => 'Cette valeur n\'est pas valide.',
             'array' => 'Cette valeur n\'est pas valide.',

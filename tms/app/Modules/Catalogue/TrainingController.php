@@ -60,6 +60,7 @@ class TrainingController extends Controller
         return Inertia::render('catalogue/show', [
             'training' => [
                 ...self::row($training, new TrainingExport),
+                'rncp_code' => $training->rncp_code,
                 'modalities' => ReferenceItem::query()->withTrashed()->whereKey($modalityIds)->orderBy('position')->orderBy('label')->pluck('label')->values()->all(),
             ],
             'brochures' => $brochures,
@@ -126,6 +127,7 @@ class TrainingController extends Controller
                 'sanction' => $training->sanction,
                 'accessibility' => $training->accessibility,
                 'access_terms' => $training->access_terms,
+                'rncp_code' => $training->rncp_code,
                 'results' => $training->results,
                 'modules' => app(Trainings::class)->modules($training->id),
                 'modules_hours' => TrainingModules::hours($training),

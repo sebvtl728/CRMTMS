@@ -17,6 +17,7 @@ interface FormProps {
     training: {
         id: string;
         code: string | null;
+        rncp_code: string | null;
         title: string;
         das_id: string;
         duration_hours: string | null;
@@ -61,6 +62,7 @@ type TrainingForm = {
     results: string;
     modules: ModuleForm[];
     code: string;
+    rncp_code: string;
     title: string;
     das_id: string;
     duration_hours: string;
@@ -93,6 +95,7 @@ export default function TrainingFormPage({ training, options, assistant, brochur
 
     const { data, setData, post, put, processing, errors, isDirty } = useForm<TrainingForm>({
         code: training?.code ?? '',
+        rncp_code: training?.rncp_code ?? '',
         title: training?.title ?? '',
         das_id: training?.das_id ?? '',
         duration_hours: decimalInput(training?.duration_hours),
@@ -136,7 +139,7 @@ export default function TrainingFormPage({ training, options, assistant, brochur
     };
 
     const text = (
-        key: 'code' | 'duration_hours' | 'duration_days' | 'price_company' | 'price_individual',
+        key: 'code' | 'rncp_code' | 'duration_hours' | 'duration_days' | 'price_company' | 'price_individual',
         label: string,
         props: Record<string, unknown> = {},
     ) => (
@@ -258,6 +261,7 @@ export default function TrainingFormPage({ training, options, assistant, brochur
                                 <InputError message={errors.title} />
                             </div>
                             {text('code', 'Code', { maxLength: 20, placeholder: 'Ex. HACCP-3J' })}
+                            {text('rncp_code', 'Code RNCP', { maxLength: 20, placeholder: 'Ex. RNCP36004' })}
                             <div className="grid gap-2">
                                 <Label htmlFor="das_id">DAS *</Label>
                                 <Select value={data.das_id || undefined} onValueChange={(v) => setData('das_id', v)}>
