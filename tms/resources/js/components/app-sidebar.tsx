@@ -6,6 +6,7 @@ import { Link, usePage } from '@inertiajs/react';
 import {
     BookOpen,
     Building2,
+    Calculator,
     CalendarCheck,
     CalendarClock,
     CalendarDays,
@@ -27,6 +28,8 @@ import {
     ListChecks,
     Mail,
     Plug,
+    ReceiptEuro,
+    Settings2,
     ShieldAlert,
     ShieldCheck,
     Upload,
@@ -61,6 +64,13 @@ const trainingNavItems: (NavItem & { permission: string })[] = [
     { title: 'Formateurs', url: '/trainers', icon: GraduationCap, permission: 'sessions.trainers.manage' },
 ];
 
+// « Finance »: invoicing (0.9).
+const financeNavItems: (NavItem & { permission: string })[] = [
+    { title: 'À facturer', url: '/finance/to-invoice', icon: Calculator, permission: 'finance.invoices.view' },
+    { title: 'Factures', url: '/finance/invoices', icon: ReceiptEuro, permission: 'finance.invoices.view' },
+    { title: 'Réglages de facturation', url: '/finance/settings', icon: Settings2, permission: 'settings.manage' },
+];
+
 const myPlanningItem: NavItem = { title: 'Mon planning', url: '/mon-planning', icon: CalendarClock };
 
 // Each entry is shown only when the user holds the permission (the server stays the authority).
@@ -87,6 +97,7 @@ export function AppSidebar() {
         ...(auth.my_planning ? [myPlanningItem] : []),
         ...trainingNavItems.filter((item) => auth.permissions.includes(item.permission)),
     ];
+    const financeItems = financeNavItems.filter((item) => auth.permissions.includes(item.permission));
     const adminItems = adminNavItems
         .filter((item) => auth.permissions.includes(item.permission) && (item.url !== '/admin/backups' || backups_enabled))
         // Backup in trouble: a red dot on « Sauvegardes » for the administrator (never on the home page).
@@ -115,6 +126,7 @@ export function AppSidebar() {
                         <NavMain items={homeNavItems} label="Navigation" />
                         {commercialItems.length > 0 && <NavMain items={commercialItems} label="Commercial" />}
                         {trainingItems.length > 0 && <NavMain items={trainingItems} label="Formation" />}
+                        {financeItems.length > 0 && <NavMain items={financeItems} label="Finance" />}
                         {adminItems.length > 0 && <NavMain items={adminItems} label="Administration" />}
                     </>
                 )}

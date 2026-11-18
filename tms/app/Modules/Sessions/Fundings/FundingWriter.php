@@ -12,6 +12,7 @@ use App\Modules\Sessions\Dossiers\DossierLine;
 use App\Modules\Sessions\Dossiers\DossierWriter;
 use App\Modules\Sessions\Enrolments\Enrolment;
 use App\Modules\Sessions\Enrolments\EnrolmentStatus;
+use App\Modules\Sessions\Public\BillingGuards;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rule;
@@ -31,7 +32,9 @@ use Illuminate\Validation\ValidationException;
  *    waitlisted (not checked again for the target already stored); never
  *    both; another dossier's: 422; a « target »
  *    sent (dossier, line, enrolment) requires its id;
- *  - amount HT typed in French (« 2 100,50 »), integer cents, never a float.
+ *  - amount HT typed in French (« 2 100,50 »), integer cents, never a float;
+ *  - « paie directement l'organisme » (pays_directly, 0.9: the funder receives
+ *    its own invoice), refused when the funder is the contractant itself.
  *
  * A cancelled dossier no longer changes (409). A refused funding stays: the
  * user moves its amount to another funder himself (no automatic transfer).
@@ -42,6 +45,8 @@ final class FundingWriter
 {
     /** What the funding pays, as the form says it (« target »): the ids follow. */
     public const TARGETS = ['dossier', 'line', 'enrolment'];
+
+    public const CONTRACTOR_PAYS_DIRECTLY = 'Le contractant ne peut pas être un financeur payant directement.';
 
     public function __construct(private readonly Fiches $fiches) {}
 
@@ -71,17 +76,35 @@ final class FundingWriter
     {
         return $this->locked($funding->dossier_id, function (Dossier $locked) use ($funding, $data): Funding {
             $current = Funding::query()->where('dossier_id', $locked->id)->lockForUpdate()->findOrFail($funding->id);
-            $current->fill($this->validated($locked, [...self::input($current), ...$data], $current))->save();
+            $values = $this->validated($locked, [...self::input($current), ...$data], $current);
+            // The invoicing may have frozen who pays directly (a validated invoice: a credit note first).
+            if ($values['pays_directly'] !== $current->pays_directly && ($refusal = BillingGuards::fundingLocked($locked->id)) !== null) {
+                throw ValidationException::withMessages(['pays_directly' => $refusal]);
+            }
+            // Nor the funder of a funding invoiced (its invoices and credit notes go to that funder).
+            $funder = $values['funder_organisation_id'] !== $current->funder_organisation_id || $values['funder_person_id'] !== $current->funder_person_id;
+            if ($funder && ($refusal = BillingGuards::funderLocked($current->id)) !== null) {
+                throw ValidationException::withMessages(['funder' => $refusal]);
+            }
+            $current->fill($values)->save();
             $funding->setRawAttributes($current->getAttributes(), true);
 
             return $current;
         });
     }
 
+    /**
+     * @throws ValidationException the funding is invoiced (BillingGuards::FUNDER_LOCKED)
+     */
     public function delete(Funding $funding): void
     {
         $this->locked($funding->dossier_id, function (Dossier $locked) use ($funding): void {
-            Funding::query()->where('dossier_id', $locked->id)->lockForUpdate()->findOrFail($funding->id)->delete();
+            $current = Funding::query()->where('dossier_id', $locked->id)->lockForUpdate()->findOrFail($funding->id);
+            // A funding invoiced keeps its funder, and stays (its invoices and credit notes go to that funder).
+            if (($refusal = BillingGuards::funderLocked($current->id)) !== null) {
+                throw ValidationException::withMessages(['funder' => $refusal]);
+            }
+            $current->delete();
         });
     }
 
@@ -104,6 +127,7 @@ final class FundingWriter
             'agreement_number' => $funding->agreement_number,
             'agreed_on' => $funding->agreed_on?->toDateString(),
             'notes' => $funding->notes,
+            'pays_directly' => $funding->pays_directly,
         ];
     }
 
@@ -152,11 +176,17 @@ final class FundingWriter
             'agreement_number' => ['nullable', 'string', 'max:100'],
             'agreed_on' => ['nullable', 'date_format:Y-m-d'],
             'notes' => ['nullable', 'string', 'max:5000'],
+            'pays_directly' => ['boolean'],
         ], self::messages());
 
         $validator->after(function ($v) use ($data, $dossier, $current): void {
             $this->checkFunder($v, $data, $current);
             $this->checkTarget($v, $data, $dossier, $current);
+            $contractor = ($data['funder_organisation_id'] !== null && $data['funder_organisation_id'] === $dossier->account_organisation_id)
+                || ($data['funder_person_id'] !== null && $data['funder_person_id'] === $dossier->account_person_id);
+            if ($contractor && filter_var($data['pays_directly'], FILTER_VALIDATE_BOOLEAN)) {
+                $v->errors()->add('pays_directly', self::CONTRACTOR_PAYS_DIRECTLY);
+            }
         });
         $validator->validate();
 
@@ -171,6 +201,7 @@ final class FundingWriter
             'agreement_number' => $data['agreement_number'],
             'agreed_on' => $data['agreed_on'],
             'notes' => $data['notes'],
+            'pays_directly' => filter_var($data['pays_directly'], FILTER_VALIDATE_BOOLEAN),
         ];
     }
 
@@ -257,6 +288,7 @@ final class FundingWriter
             $data['amount'] = Amounts::normalise($data['amount']) ?? $data['amount'];
         }
         $data['status'] ??= FundingStatus::ToRequest->value;
+        $data['pays_directly'] ??= false;
         // A target chosen in the form: the id of the other kind is dropped.
         if ($data['target'] === 'dossier' || $data['target'] === 'enrolment') {
             $data['dossier_line_id'] = null;
@@ -289,6 +321,7 @@ final class FundingWriter
             'agreement_number.*' => 'Le n° de prise en charge ne doit pas dépasser 100 caractères.',
             'agreed_on.*' => 'Date d\'accord invalide.',
             'notes.*' => 'Les notes ne doivent pas dépasser 5 000 caractères.',
+            'pays_directly.*' => 'Cochez ou décochez la case.',
         ];
     }
 }

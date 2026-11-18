@@ -34,6 +34,7 @@ class ReferenceController extends Controller
                 'has_quote_stage' => $list->hasQuoteStage(),
                 'has_force_majeure' => $list->hasForceMajeure(),
                 'has_default_for' => $list->hasDefaultFor(),
+                'has_external_billing' => $list->hasExternalBilling(),
                 'items' => ($items[$list->value] ?? collect())->map(fn (ReferenceItem $i) => [
                     'id' => $i->id,
                     'code' => $i->code,
@@ -162,6 +163,7 @@ class ReferenceController extends Controller
             'meta.quote_stage' => ['nullable', 'boolean'],
             'meta.force_majeure' => ['nullable', 'boolean'],
             'meta.default_for' => ['nullable', Rule::in(array_keys(ReferenceItem::DEFAULT_FOR))],
+            'meta.external_billing' => ['nullable', 'boolean'],
         ], [
             'label.required' => 'Le libellé est obligatoire.',
             'label.unique' => 'Une valeur portant ce libellé existe déjà dans cette liste.',
@@ -173,6 +175,7 @@ class ReferenceController extends Controller
             'meta.quote_stage.boolean' => 'Cochez ou décochez la case.',
             'meta.force_majeure.boolean' => 'Cochez ou décochez la case.',
             'meta.default_for.in' => 'Choisissez Entreprise contractante, Particulier contractant ou rien.',
+            'meta.external_billing.boolean' => 'Cochez ou décochez la case.',
         ]);
     }
 
@@ -225,6 +228,14 @@ class ReferenceController extends Controller
             $meta['default_for'] = $input['default_for'];
             if ($meta['default_for'] === null) {
                 unset($meta['default_for']);
+            }
+        }
+        // Funding type billed outside the TMS (CPF…): kept unless the form sends it.
+        if ($list->hasExternalBilling() && array_key_exists('external_billing', $input)) {
+            if ((bool) $input['external_billing']) {
+                $meta['external_billing'] = true;
+            } else {
+                unset($meta['external_billing']);
             }
         }
         if (array_key_exists('color', $input)) {

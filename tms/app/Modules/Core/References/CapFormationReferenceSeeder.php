@@ -36,6 +36,9 @@ final class CapFormationReferenceSeeder
     /** Funding types funding a new dossier by default (meta.default_for), by code. */
     private const DEFAULT_FOR = ['entreprise' => 'organisation', 'personnel' => 'person'];
 
+    /** Funding types billed outside the TMS (meta.external_billing, 0.9: the CPF, through EDOF), by code. */
+    private const EXTERNAL_BILLING = ['cpf'];
+
     /** The stage a sent quote brings its opportunity to (meta.quote_stage). */
     private const QUOTE_STAGE = 'Proposition';
 
@@ -81,6 +84,9 @@ final class CapFormationReferenceSeeder
                     }
                     if ($list === ReferenceList::FundingType->value && isset(self::DEFAULT_FOR[$code])) {
                         $meta = ['default_for' => self::DEFAULT_FOR[$code]];
+                    }
+                    if ($list === ReferenceList::FundingType->value && in_array($code, self::EXTERNAL_BILLING, true)) {
+                        $meta = [...$meta ?? [], 'external_billing' => true];
                     }
                     self::ensure(ReferenceList::from($list), $code, $label, $i + 1, $meta);
                 }

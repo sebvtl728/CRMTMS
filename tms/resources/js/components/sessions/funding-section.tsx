@@ -27,6 +27,7 @@ interface FundingInput {
     agreement_number: string | null;
     agreed_on: string | null;
     notes: string | null;
+    pays_directly: boolean;
 }
 
 /** A funding as FundingRows sends it. */
@@ -42,6 +43,8 @@ export interface FundingRow {
     agreement_number: string | null;
     agreed_on: string | null;
     notes: string | null;
+    /** The funder pays the organisme and receives its own invoice. */
+    pays_directly: boolean;
     /** The stored values for the form; null without the right to change it. */
     input: FundingInput | null;
 }
@@ -127,6 +130,7 @@ function FundingDialog({
         agreement_number: input?.agreement_number ?? '',
         agreed_on: input?.agreed_on ?? '',
         notes: input?.notes ?? '',
+        pays_directly: input?.pays_directly ?? false,
     });
     const fieldErrors = errors as Record<string, string | undefined>;
 
@@ -274,6 +278,22 @@ function FundingDialog({
                         <InputError message={errors.agreement_number} />
                     </div>
 
+                    <div className="grid gap-1">
+                        <label className="flex items-center gap-2 text-sm">
+                            <input
+                                id="pays_directly"
+                                type="checkbox"
+                                checked={data.pays_directly}
+                                onChange={(e) => setData('pays_directly', e.target.checked)}
+                            />
+                            Paie directement l'organisme
+                        </label>
+                        <p className="text-muted-foreground text-xs">
+                            Le financeur règle l'organisme et reçoit sa propre facture pour sa part. Jamais le contractant lui-même.
+                        </p>
+                        <InputError message={fieldErrors.pays_directly} />
+                    </div>
+
                     <div className="grid gap-2">
                         <Label htmlFor="target">Finance</Label>
                         <Select value={targetKind} onValueChange={(v) => setTargetKind(v as typeof targetKind)}>
@@ -415,6 +435,11 @@ export function FundingSection({
                                                 </Link>
                                             ) : (
                                                 name
+                                            )}
+                                            {f.pays_directly && (
+                                                <Badge variant="outline" className="ml-2">
+                                                    Paie directement
+                                                </Badge>
                                             )}
                                             {f.notes && <div className="text-muted-foreground text-xs whitespace-pre-line">{f.notes}</div>}
                                         </td>

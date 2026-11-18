@@ -117,9 +117,13 @@ La colonne **Reste à financer** donne le prix du dossier moins ses financements
 
 Chaque dossier reçoit un numéro `D-2026-0001`.
 
+### Bloc Facturation (0.9)
+
+La page du dossier porte un bloc **Facturation** (droit « Consulter les factures ») : **rythme** (fin de formation, mensuel au réalisé, échéancier), **base** (au réalisé, au prévu), échéancier (dates et pourcentages, 100 % au total), règle des **absences non justifiées**, financeurs payant directement, **factures et avoirs du dossier** avec leur état, ce qui reste à facturer et « Bientôt à facturer ». Les réglages demandent « Préparer les factures » et se verrouillent à la première facture validée. Quand tout est facturé, le dossier passe à l'état **Facturé** ; un avoir qui fait revenir un dû le ramène à **Réalisé**. Un dossier qui a des factures validées ne va pas à la corbeille. Voir `finance.md`.
+
 ### Étapes du dossier
 
-*Créé* → *Convention envoyée* → *Convention signée* → *Convocations envoyées* → *En cours* → *Réalisé* ; *Annulé*.
+*Créé* → *Convention envoyée* → *Convention signée* → *Convocations envoyées* → *En cours* → *Réalisé* ; *Annulé*. Avec la facturation (0.9), le dossier réalisé passe à *Facturé* quand tout est facturé.
 
 - Les trois premières étapes se posent à la main, avec leur **date** (chacune pas avant la précédente).
 - *En cours* et *Réalisé* se calculent d'après les sessions de ses inscriptions (du premier jour de la première au dernier jour de la dernière) ; vous pouvez aussi les poser à la main, ils ne sont alors plus recalculés.
@@ -130,7 +134,7 @@ La page du dossier montre l'en-tête (état et actions), les étapes, les lignes
 
 ## 3. Inscrire des stagiaires
 
-**Inscrire des stagiaires** (page du dossier ou de la session ; droit « Créer et modifier les sessions et inscriptions » sur la session et droit de consulter le dossier) inscrit **un ou plusieurs** stagiaires d'un même dossier en une fois — tout un groupe, ou une vague arrivée plus tard :
+**Inscrire des stagiaires** (page du dossier ou de la session ; droit « Créer et modifier les sessions et inscriptions » sur la session et droit de consulter le dossier) inscrit **un ou plusieurs** stagiaires d'un même dossier en une fois (un dossier de **particulier** n'inscrit que ce particulier : il est présélectionné, sans recherche ni création ; toute autre personne est refusée, « Un dossier de particulier n'inscrit que ce particulier. », y compris à la création d'un dossier depuis un devis) — tout un groupe, ou une vague arrivée plus tard :
 
 1. choisissez le dossier (depuis la session) ou la ligne de formation et la session (depuis le dossier ; seules les sessions de cette formation ouvertes au dossier sont proposées, avec leur intitulé) ;
 2. **Date d'entrée commune** : vide, le début de la session ; chaque stagiaire peut avoir la sienne (un stagiaire arrivé une semaine après) et ses **heures prévues** ;
@@ -169,6 +173,8 @@ Section **Financements** de la page du dossier (droit de modifier le dossier) : 
 - **Type** (liste *Types de financeur* : OPCO, Entreprise, CPF, France Travail, Région, Personnel…) ;
 - **Montant HT** (au format français), **État** : *À demander*, *Demandé*, *Accordé*, *Refusé* ; **N° de prise en charge**, **date d'accord** ;
 - cible facultative : une **ligne** du dossier ou une **inscription** (sa part, pour une ligne au prix par stagiaire).
+
+- **Paie directement l'organisme** (0.9) : case à cocher. Le financeur, **si le financement est Accordé**, reçoit sa propre facture pour sa part (voir `finance.md`) tant qu'il n'est pas accordé, sa part reste sur la facture du contractant. Refusé quand le financeur est le contractant lui-même ; verrouillé dès la première facture validée du dossier (faites d'abord un avoir). Un type de financeur marqué **Facturé hors du TMS** (CPF…) retire sa part de la facture du contractant sans émettre de facture.
 
 L'alerte compare le prix et les financements **non refusés** : « Reste à financer : 900,00 € » ou « Financements supérieurs au prix : 100,00 € », pour le dossier et pour chaque ligne ou inscription visée. Un financement **refusé** ne compte plus : reportez son montant sur un autre financeur ou laissez-le à financer (aucun report automatique). Le financement d'une inscription annulée reste, signalé « Financement à reporter ».
 

@@ -69,6 +69,7 @@ final class FundingRows
                 'agreement_number' => $f->agreement_number,
                 'agreed_on' => $f->agreed_on?->toDateString(),
                 'notes' => $f->notes,
+                'pays_directly' => $f->pays_directly,
                 'input' => $canUpdate ? FundingWriter::input($f) : null,
             ];
         })->values()->all();

@@ -20,6 +20,7 @@ type ReferenceMeta = {
     quote_stage?: boolean;
     force_majeure?: boolean;
     default_for?: 'organisation' | 'person' | null;
+    external_billing?: boolean;
 };
 
 /** Place of an action type in the CRM planning (meta.planning). */
@@ -47,6 +48,7 @@ interface ReferenceListData {
     has_quote_stage: boolean;
     has_force_majeure: boolean;
     has_default_for: boolean;
+    has_external_billing: boolean;
     items: ReferenceItem[];
 }
 
@@ -64,6 +66,7 @@ interface EditorState {
     quoteStage: boolean;
     forceMajeure: boolean;
     defaultFor: string; // '' = none
+    externalBilling: boolean;
 }
 
 const breadcrumbs: BreadcrumbItem[] = [{ title: 'Référentiels', href: '/admin/references' }];
@@ -104,6 +107,7 @@ export default function ReferencesIndex({ lists, status }: ReferencesIndexProps)
             quoteStage: item?.meta.quote_stage === true,
             forceMajeure: item?.meta.force_majeure === true,
             defaultFor: item?.meta.default_for ?? '',
+            externalBilling: item?.meta.external_billing === true,
         });
 
     const closing = editor?.item?.meta.outcome != null; // won / lost: fixed probability
@@ -118,6 +122,7 @@ export default function ReferencesIndex({ lists, status }: ReferencesIndexProps)
         if (list.has_quote_stage && !closing) meta.quote_stage = editor.quoteStage;
         if (list.has_force_majeure) meta.force_majeure = editor.forceMajeure;
         if (list.has_default_for) meta.default_for = editor.defaultFor === '' ? null : (editor.defaultFor as 'organisation' | 'person');
+        if (list.has_external_billing) meta.external_billing = editor.externalBilling;
         const payload = { label: editor.label, meta };
         const options = {
             preserveScroll: true,
@@ -234,6 +239,7 @@ export default function ReferencesIndex({ lists, status }: ReferencesIndexProps)
                                 {list.has_default_for && item.meta.default_for && (
                                     <Badge variant="outline">Par défaut : {DEFAULT_FOR[item.meta.default_for]}</Badge>
                                 )}
+                                {list.has_external_billing && item.meta.external_billing && <Badge variant="outline">Facturé hors du TMS</Badge>}
                                 {item.is_system && <Badge variant="secondary">Système</Badge>}
                                 {item.in_use && <Badge variant="secondary">Utilisée</Badge>}
                                 {!item.is_active && (
@@ -365,7 +371,8 @@ export default function ReferencesIndex({ lists, status }: ReferencesIndexProps)
                                     Étape d'un devis envoyé
                                 </label>
                                 <p className="text-muted-foreground text-xs">
-                                    À l'envoi d'un devis, l'opportunité passe à cette étape si elle n'y est pas encore. Une seule étape : la cocher la retire des autres.
+                                    À l'envoi d'un devis, l'opportunité passe à cette étape si elle n'y est pas encore. Une seule étape : la cocher la
+                                    retire des autres.
                                 </p>
                                 <InputError message={errors['meta.quote_stage']} />
                             </div>
@@ -400,10 +407,28 @@ export default function ReferencesIndex({ lists, status }: ReferencesIndexProps)
                                     <option value="person">Par défaut quand le contractant est un particulier</option>
                                 </select>
                                 <p className="text-muted-foreground text-xs">
-                                    Un dossier créé depuis un devis accepté reçoit un financement de ce type pour tout son prix. Une seule valeur par cas
-                                    ; aucune : pas de financement initial.
+                                    Un dossier créé depuis un devis accepté reçoit un financement de ce type pour tout son prix. Une seule valeur par
+                                    cas ; aucune : pas de financement initial.
                                 </p>
                                 <InputError message={errors['meta.default_for']} />
+                            </div>
+                        )}
+
+                        {list.has_external_billing && (
+                            <div className="grid gap-1">
+                                <label className="flex items-center gap-2 text-sm">
+                                    <input
+                                        type="checkbox"
+                                        checked={editor?.externalBilling ?? false}
+                                        onChange={(e) => setEditor((s) => s && { ...s, externalBilling: e.target.checked })}
+                                    />
+                                    Facturé hors du TMS (ex. CPF)
+                                </label>
+                                <p className="text-muted-foreground text-xs">
+                                    La part d'un financement de ce type est retirée de la facture du contractant ; le TMS n'émet aucune facture pour
+                                    elle.
+                                </p>
+                                <InputError message={errors['meta.external_billing']} />
                             </div>
                         )}
 

@@ -24,7 +24,9 @@ use Illuminate\Validation\ValidationException;
  *  - « En cours » and « Réalisé » set by hand (then no longer computed from
  *    the sessions);
  *  - cancellation with a reason of the « Motifs d'annulation » list, from
- *    any state before « Réalisé ».
+ *    any state before « Réalisé »;
+ *  - « Facturé » set and taken back by the invoicing (0.9, through
+ *    Public\DossierStates): only from « Réalisé », back to « Réalisé ».
  *
  * A refused transition is a 409 with a French message.
  */
@@ -45,6 +47,8 @@ final class DossierTransitions
     public const ALREADY_RUNNING = 'Ce dossier est déjà en cours ou réalisé.';
 
     public const ALREADY_DONE = 'Ce dossier est déjà réalisé.';
+
+    public const NOT_DONE = 'Seul un dossier réalisé peut passer à l\'état « Facturé ».';
 
     public function sendConvention(Dossier $dossier, CarbonImmutable $on): Dossier
     {
@@ -85,6 +89,38 @@ final class DossierTransitions
             }
             $locked->status = DossierStatus::Done;
         });
+    }
+
+    /**
+     * « Facturé », from « Réalisé » only (stored, or computed from the dates
+     * of its sessions); already « Facturé »: unchanged. A dossier in the
+     * trash too: its invoices stay (Finance refuses to trash a dossier with
+     * a validated invoice, but one may be validated just before).
+     */
+    public function markInvoiced(Dossier $dossier): Dossier
+    {
+        return $this->transition($dossier, function (Dossier $locked): void {
+            if ($locked->status === DossierStatus::Invoiced) {
+                return;
+            }
+            if ($locked->effectiveStatus(Dossier::today()) !== DossierStatus::Done) {
+                throw new UserFacingHttpException(409, self::NOT_DONE);
+            }
+            $locked->status = DossierStatus::Invoiced;
+        }, withTrashed: true);
+    }
+
+    /**
+     * Back to « Réalisé » from « Facturé »; any other state: unchanged. A
+     * dossier in the trash too (a credit note on it).
+     */
+    public function unmarkInvoiced(Dossier $dossier): Dossier
+    {
+        return $this->transition($dossier, function (Dossier $locked): void {
+            if ($locked->status === DossierStatus::Invoiced) {
+                $locked->status = DossierStatus::Done;
+            }
+        }, withTrashed: true);
     }
 
     /**
@@ -149,11 +185,12 @@ final class DossierTransitions
 
     /**
      * @param  Closure(Dossier): void  $change
+     * @param  bool  $withTrashed  the invoicing states only: a dossier in the trash is found too
      */
-    private function transition(Dossier $dossier, Closure $change, bool $checkCancelled = true): Dossier
+    private function transition(Dossier $dossier, Closure $change, bool $checkCancelled = true, bool $withTrashed = false): Dossier
     {
-        return DB::transaction(function () use ($dossier, $change, $checkCancelled): Dossier {
-            $locked = Dossier::query()->lockForUpdate()->findOrFail($dossier->getKey());
+        return DB::transaction(function () use ($dossier, $change, $checkCancelled, $withTrashed): Dossier {
+            $locked = ($withTrashed ? Dossier::withTrashed() : Dossier::query())->lockForUpdate()->findOrFail($dossier->getKey());
             if ($checkCancelled && $locked->isCancelled()) {
                 throw new UserFacingHttpException(409, self::CANCELLED);
             }

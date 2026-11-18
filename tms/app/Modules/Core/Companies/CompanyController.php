@@ -5,6 +5,7 @@ namespace App\Modules\Core\Companies;
 use App\Http\Controllers\Controller;
 use App\Modules\Core\Tenancy\TenantContext;
 use App\Rules\Siret;
+use Closure;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -76,7 +77,7 @@ class CompanyController extends Controller
         $request->validate([
             'logo' => [
                 'required', 'file', 'max:'.CompanyBranding::MAX_KILOBYTES,
-                function (string $attribute, mixed $value, \Closure $fail): void {
+                function (string $attribute, mixed $value, Closure $fail): void {
                     if ($value instanceof UploadedFile && CompanyBranding::detectedType($value) === null) {
                         $fail(CompanyBranding::TYPE_MESSAGE);
                     }
@@ -149,6 +150,10 @@ class CompanyController extends Controller
                 'quote_validity_days' => $company->quote_validity_days,
                 'quote_terms' => $company->quote_terms,
                 'quote_footer' => $company->quote_footer,
+                'invoice_prefix' => $company->invoice_prefix,
+                'credit_note_prefix' => $company->credit_note_prefix,
+                'payment_terms_days' => $company->payment_terms_days,
+                'invoice_footer' => $company->invoice_footer,
                 'logo' => $this->branding->logoDataUri($company),
             ],
             // A new company: the first free prefix (one company per prefix).
@@ -171,6 +176,21 @@ class CompanyController extends Controller
     }
 
     /**
+     * The rule refusing a $kind prefix (PrefixUsage::INVOICE|CREDIT_NOTE)
+     * that already numbered the other kind of piece of the company edited.
+     */
+    private function unusedPrefix(Request $request, string $kind): Closure
+    {
+        $company = $request->route('company');
+
+        return function (string $attribute, mixed $value, Closure $fail) use ($company, $kind): void {
+            if ($company instanceof Company && is_string($value) && PrefixUsage::usedByOtherKind($company->id, $kind, $value)) {
+                $fail('Ce préfixe a déjà servi pour un autre type de pièce.');
+            }
+        };
+    }
+
+    /**
      * @return array<string, mixed>
      */
     private function normalise(Request $request): array
@@ -185,8 +205,10 @@ class CompanyController extends Controller
         if (is_string($input['vat_number'] ?? null)) {
             $input['vat_number'] = mb_strtoupper($input['vat_number']);
         }
-        if (is_string($input['quote_prefix'] ?? null)) {
-            $input['quote_prefix'] = mb_strtoupper(trim($input['quote_prefix']));
+        foreach (['quote_prefix', 'invoice_prefix', 'credit_note_prefix'] as $key) {
+            if (is_string($input[$key] ?? null)) {
+                $input[$key] = mb_strtoupper(trim($input[$key]));
+            }
         }
         if (is_string($input['capital_amount'] ?? null)) {
             $input['capital_amount'] = str_replace([' ', "\u{00A0}", ','], ['', '', '.'], $input['capital_amount']);
@@ -243,6 +265,14 @@ class CompanyController extends Controller
             'quote_validity_days' => ['sometimes', 'required', 'integer', 'between:1,365'],
             'quote_terms' => ['nullable', 'string', 'max:5000'],
             'quote_footer' => ['nullable', 'string', 'max:5000'],
+            // Invoices (absent from a request: unchanged, or the defaults on creation).
+            // Never a prefix that already numbered the other kind of piece of the company (PrefixUsage).
+            'invoice_prefix' => ['sometimes', 'required', 'string', 'regex:/^[A-Z0-9]{1,10}$/', $this->unusedPrefix($request, PrefixUsage::INVOICE)],
+            // Other than the invoices' one (sent, else stored): the two numberings never meet.
+            'credit_note_prefix' => ['sometimes', 'required', 'string', 'regex:/^[A-Z0-9]{1,10}$/', Rule::notIn([(string) $request->input('invoice_prefix',
+                $request->route('company') instanceof Company ? $request->route('company')->invoice_prefix : 'F')]), $this->unusedPrefix($request, PrefixUsage::CREDIT_NOTE)],
+            'payment_terms_days' => ['sometimes', 'required', 'integer', 'between:0,60'],
+            'invoice_footer' => ['nullable', 'string', 'max:2000'],
         ], [
             'capital_amount.required' => 'Le capital social est obligatoire pour cette forme juridique (sauf capital variable).',
             'capital_amount.gt' => 'Le capital doit être strictement supérieur à 0.',
@@ -260,6 +290,18 @@ class CompanyController extends Controller
             'quote_terms.max' => 'Les conditions ne peuvent pas dépasser 5 000 caractères.',
             'quote_footer.string' => 'Le pied de page doit être un texte.',
             'quote_footer.max' => 'Le pied de page ne peut pas dépasser 5 000 caractères.',
+            'invoice_prefix.required' => 'Le préfixe de numérotation des factures est obligatoire.',
+            'invoice_prefix.string' => 'Le préfixe ne peut contenir que des lettres majuscules et des chiffres (10 caractères au plus).',
+            'invoice_prefix.regex' => 'Le préfixe ne peut contenir que des lettres majuscules et des chiffres (10 caractères au plus).',
+            'credit_note_prefix.required' => 'Le préfixe de numérotation des avoirs est obligatoire.',
+            'credit_note_prefix.string' => 'Le préfixe ne peut contenir que des lettres majuscules et des chiffres (10 caractères au plus).',
+            'credit_note_prefix.regex' => 'Le préfixe ne peut contenir que des lettres majuscules et des chiffres (10 caractères au plus).',
+            'credit_note_prefix.not_in' => 'Le préfixe des avoirs doit être différent de celui des factures.',
+            'payment_terms_days.required' => 'Le délai de paiement doit être compris entre 0 et 60 jours.',
+            'payment_terms_days.integer' => 'Le délai de paiement doit être compris entre 0 et 60 jours.',
+            'payment_terms_days.between' => 'Le délai de paiement doit être compris entre 0 et 60 jours.',
+            'invoice_footer.string' => 'Les mentions de pied de facture doivent être un texte.',
+            'invoice_footer.max' => 'Les mentions de pied de facture ne peuvent pas dépasser 2 000 caractères.',
         ]);
 
         if (! (LegalForm::from($data['legal_form'])->isCooperative())) {

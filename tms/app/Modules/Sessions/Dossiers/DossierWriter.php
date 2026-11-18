@@ -15,6 +15,7 @@ use App\Modules\Sessions\Enrolments\Enrolment;
 use App\Modules\Sessions\Enrolments\EnrolmentStatus;
 use App\Modules\Sessions\Enrolments\PriceShares;
 use App\Modules\Sessions\Fundings\Funding;
+use App\Modules\Sessions\Public\BillingGuards;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -107,6 +108,7 @@ final class DossierWriter
                 throw new UserFacingHttpException(409, self::CANCELLED);
             }
             $this->checkLines($locked, $lines);
+            $this->checkParties($locked, $values);
             $locked->update($values);
             $this->writeLines($locked, $lines);
 
@@ -116,7 +118,8 @@ final class DossierWriter
 
     /**
      * Puts the dossier in the trash, unless trainees are still enrolled on
-     * it (cancelled enrolments aside): 409.
+     * it (cancelled enrolments aside) or the invoicing refuses it (a
+     * validated invoice, BillingGuards): 409.
      */
     public function trash(Dossier $dossier): void
     {
@@ -124,6 +127,9 @@ final class DossierWriter
             $locked = Dossier::query()->lockForUpdate()->findOrFail($dossier->id);
             if (Enrolment::query()->where('dossier_id', $locked->id)->where('status', '<>', EnrolmentStatus::Cancelled->value)->exists()) {
                 throw new UserFacingHttpException(409, self::ENROLLED);
+            }
+            if (($refusal = BillingGuards::dossierTrashable($locked->id)) !== null) {
+                throw new UserFacingHttpException(409, $refusal);
             }
             $locked->delete();
         });
@@ -278,6 +284,24 @@ final class DossierWriter
         if (is_string($person) && ! $v->errors()->has('account_person_id')
             && $person !== $current?->account_person_id && $this->fiches->individual($person) === null) {
             $v->errors()->add('account_person_id', 'Choisissez une personne « Particulier » du CRM.');
+        }
+    }
+
+    /**
+     * The issuing company and the contractor stay once the invoicing refuses
+     * it (a validated invoice: a credit note first, BillingGuards).
+     *
+     * @param  array<string, mixed>  $values
+     *
+     * @throws ValidationException
+     */
+    private function checkParties(Dossier $dossier, array $values): void
+    {
+        $company = $values['company_id'] !== $dossier->company_id;
+        $contractor = $values['account_organisation_id'] !== $dossier->account_organisation_id
+            || $values['account_person_id'] !== $dossier->account_person_id;
+        if (($company || $contractor) && ($refusal = BillingGuards::partiesLocked($dossier->id)) !== null) {
+            throw ValidationException::withMessages([$company ? 'company_id' : 'account' => $refusal]);
         }
     }
 

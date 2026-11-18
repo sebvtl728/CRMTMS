@@ -18,6 +18,8 @@ export interface EnrolDossierOption {
     number: string;
     account: string | null;
     account_organisation_id: string | null;
+    /** The particulier contractant: the only trainee of the dossier. */
+    account_person_id: string | null;
     lines: { id: string; label: string }[];
 }
 
@@ -136,6 +138,8 @@ type Source =
           dossierId: string;
           organisationId: string | null;
           organisationLabel: string | null;
+          /** The particulier contractant of the dossier: the only trainee possible. */
+          particulier: { id: string; label: string } | null;
           lines: { id: string; label: string }[];
           sessions: Record<string, EnrolSessionOption[]>;
       };
@@ -170,6 +174,18 @@ export function EnrolDialog({ source, onClose }: { source: Source; onClose: () =
     const employer = source.from === 'session' ? (dossier?.account_organisation_id ? dossier.account : null) : source.organisationLabel;
     const hours = source.from === 'session' ? source.sessionHours : (chosen?.planned_hours ?? null);
     const start = source.from === 'session' ? source.sessionStart : (chosen?.starts_on ?? '');
+    // A particulier signs for himself: he is the only trainee, chosen for the user.
+    const particulier =
+        source.from === 'session'
+            ? dossier?.account_person_id
+                ? { id: dossier.account_person_id, label: dossier.account ?? 'Particulier' }
+                : null
+            : source.particulier;
+    useEffect(() => {
+        setTrainees(particulier ? [{ key: nextKey++, person: particulier, entered_on: '', planned_hours: '' }] : []);
+        setDraft(null);
+        setErrors({});
+    }, [particulier?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
     const label = (t: Trainee) => ('person' in t ? t.person.label : newPersonLabel(newPeople[t.ref]));
     // The errors of the trainees are keyed by their position: a removal shifts it, so they go with it.
@@ -313,15 +329,17 @@ export function EnrolDialog({ source, onClose }: { source: Source; onClose: () =
                                             <li key={t.key} className="grid gap-2 rounded-md border px-3 py-2 text-sm">
                                                 <div className="flex items-center justify-between gap-2">
                                                     <span className="font-medium">{label(t)}</span>
-                                                    <Button
-                                                        type="button"
-                                                        variant="ghost"
-                                                        size="sm"
-                                                        aria-label={`Retirer ${label(t)}`}
-                                                        onClick={() => remove(t.key)}
-                                                    >
-                                                        <X className="h-4 w-4" />
-                                                    </Button>
+                                                    {!particulier && (
+                                                        <Button
+                                                            type="button"
+                                                            variant="ghost"
+                                                            size="sm"
+                                                            aria-label={`Retirer ${label(t)}`}
+                                                            onClick={() => remove(t.key)}
+                                                        >
+                                                            <X className="h-4 w-4" />
+                                                        </Button>
+                                                    )}
                                                 </div>
                                                 <div className="grid gap-2 sm:grid-cols-2">
                                                     <div className="grid gap-1">
@@ -371,36 +389,44 @@ export function EnrolDialog({ source, onClose }: { source: Source; onClose: () =
                                     </ul>
                                 )}
                                 <InputError message={errors.trainees} />
-                                <TraineeSearch
-                                    sessionId={sessionId}
-                                    organisationId={organisationId}
-                                    onPick={(p) => {
-                                        if (!trainees.some((t) => 'person' in t && t.person.id === p.id)) {
-                                            setTrainees((ts) => [...ts, { key: nextKey++, person: p, entered_on: '', planned_hours: '' }]);
-                                        }
-                                    }}
-                                />
-                                {draft === null ? (
-                                    <div>
-                                        <Button type="button" variant="outline" size="sm" onClick={() => setDraft(emptyPerson())}>
-                                            <Plus className="h-4 w-4" />
-                                            Créer un stagiaire
-                                        </Button>
-                                    </div>
+                                {particulier ? (
+                                    <p className="text-muted-foreground text-xs">
+                                        Dossier de particulier : seul {particulier.label} peut être inscrit.
+                                    </p>
                                 ) : (
-                                    <NewPersonFields
-                                        index={0}
-                                        value={draft}
-                                        employer={employer}
-                                        onChange={(c) => setDraft({ ...draft, ...c })}
-                                        onCancel={() => setDraft(null)}
-                                        onAdd={() => {
-                                            const ref = `n${nextKey++}`;
-                                            setNewPeople((p) => ({ ...p, [ref]: draft }));
-                                            setTrainees((ts) => [...ts, { key: nextKey++, ref, entered_on: '', planned_hours: '' }]);
-                                            setDraft(null);
-                                        }}
-                                    />
+                                    <>
+                                        <TraineeSearch
+                                            sessionId={sessionId}
+                                            organisationId={organisationId}
+                                            onPick={(p) => {
+                                                if (!trainees.some((t) => 'person' in t && t.person.id === p.id)) {
+                                                    setTrainees((ts) => [...ts, { key: nextKey++, person: p, entered_on: '', planned_hours: '' }]);
+                                                }
+                                            }}
+                                        />
+                                        {draft === null ? (
+                                            <div>
+                                                <Button type="button" variant="outline" size="sm" onClick={() => setDraft(emptyPerson())}>
+                                                    <Plus className="h-4 w-4" />
+                                                    Créer un stagiaire
+                                                </Button>
+                                            </div>
+                                        ) : (
+                                            <NewPersonFields
+                                                index={0}
+                                                value={draft}
+                                                employer={employer}
+                                                onChange={(c) => setDraft({ ...draft, ...c })}
+                                                onCancel={() => setDraft(null)}
+                                                onAdd={() => {
+                                                    const ref = `n${nextKey++}`;
+                                                    setNewPeople((p) => ({ ...p, [ref]: draft }));
+                                                    setTrainees((ts) => [...ts, { key: nextKey++, ref, entered_on: '', planned_hours: '' }]);
+                                                    setDraft(null);
+                                                }}
+                                            />
+                                        )}
+                                    </>
                                 )}
                             </div>
                         </>

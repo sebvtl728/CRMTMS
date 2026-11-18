@@ -1,3 +1,4 @@
+import { DossierBlockPanel, type DossierBlock } from '@/components/dossier-blocks';
 import Heading from '@/components/heading';
 import InputError from '@/components/input-error';
 import { EnrolDialog, type EnrolSessionOption } from '@/components/sessions/enrolment-dialog';
@@ -63,6 +64,8 @@ interface ShowProps {
     funding_options: FundingOptions | null;
     /** Creation, states, enrolments and fundings, most recent first (journal). */
     history: HistoryEntry[];
+    /** Blocks of other modules (« Facturation »…): the shape of the blocks of a fiche, and optionally a component. */
+    blocks: DossierBlock[];
     status?: string;
 }
 
@@ -191,6 +194,7 @@ export default function DossierShow({
     balance,
     funding_options,
     history,
+    blocks,
     status,
 }: ShowProps) {
     const [cancelling, setCancelling] = useState(false);
@@ -414,6 +418,13 @@ export default function DossierShow({
                     )}
                 </section>
 
+                {blocks.map((b) => (
+                    <section key={b.key} aria-label={b.title} className="grid gap-3">
+                        <h2 className="text-sm font-semibold">{b.title}</h2>
+                        <DossierBlockPanel block={b} />
+                    </section>
+                ))}
+
                 <HistoryList entries={history} />
             </div>
 
@@ -425,6 +436,8 @@ export default function DossierShow({
                         dossierId: dossier.id,
                         organisationId: dossier.account.type === 'organisation' ? dossier.account.id : null,
                         organisationLabel: dossier.account.type === 'organisation' ? dossier.account.label : null,
+                        particulier:
+                            dossier.account.type === 'person' ? { id: dossier.account.id, label: dossier.account.label ?? 'Particulier' } : null,
                         lines: trainingLines.map((l) => ({ id: l.id, label: l.label })),
                         sessions: enrol.sessions,
                     }}

@@ -44,6 +44,8 @@ use Illuminate\Validation\ValidationException;
  */
 final class Enrolments
 {
+    public const PARTICULIER_ONLY = 'Un dossier de particulier n\'inscrit que ce particulier.';
+
     public const DOSSIER_CLOSED = 'Ce dossier est annulé ou à la corbeille : il ne reçoit plus d\'inscription.';
 
     public const SESSION_CLOSED = 'Cette session est annulée ou à la corbeille : elle ne reçoit plus d\'inscription.';
@@ -130,6 +132,9 @@ final class Enrolments
             }
             if ($this->fiches->person($personId) === null) {
                 $errors['person_id'] = 'Stagiaire introuvable.';
+            } elseif ($dossier->account_person_id !== null && $personId !== $dossier->account_person_id) {
+                // A particulier signs his contract for himself: nobody else.
+                $errors['person_id'] = self::PARTICULIER_ONLY;
             } elseif (Enrolment::query()->where('training_session_id', $session->id)->where('person_id', $personId)
                 ->where('status', '<>', EnrolmentStatus::Cancelled->value)->exists()) {
                 $errors['person_id'] = 'Ce stagiaire est déjà inscrit à cette session.';

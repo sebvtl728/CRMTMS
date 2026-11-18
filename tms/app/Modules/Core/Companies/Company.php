@@ -46,6 +46,10 @@ use Illuminate\Support\Facades\DB;
  * @property int $quote_validity_days 1 to 365
  * @property string|null $quote_terms
  * @property string|null $quote_footer
+ * @property string $invoice_prefix ^[A-Z0-9]{1,10}$, numbering of the invoices (0.9)
+ * @property string $credit_note_prefix ^[A-Z0-9]{1,10}$, other than invoice_prefix
+ * @property int $payment_terms_days 0 to 60, due date of an invoice
+ * @property string|null $invoice_footer mentions of the invoices (penalties, 40 € indemnity, bank details)
  * @property Carbon|null $deleted_at
  */
 #[UseFactory(CompanyFactory::class)]
@@ -61,6 +65,7 @@ class Company extends Model
         'address_line1', 'address_line2', 'address_postal_code', 'address_city', 'address_country',
         'email', 'phone', 'is_default',
         'quote_prefix', 'quote_validity_days', 'quote_terms', 'quote_footer',
+        'invoice_prefix', 'credit_note_prefix', 'payment_terms_days', 'invoice_footer',
     ];
 
     /**
@@ -80,6 +85,9 @@ class Company extends Model
         'is_default' => false,
         'quote_prefix' => 'DEV',
         'quote_validity_days' => 30,
+        'invoice_prefix' => 'F',
+        'credit_note_prefix' => 'AV',
+        'payment_terms_days' => 30,
     ];
 
     protected static function booted(): void
@@ -148,6 +156,7 @@ class Company extends Model
             'capital_variable' => 'boolean',
             'is_default' => 'boolean',
             'quote_validity_days' => 'integer',
+            'payment_terms_days' => 'integer',
         ];
     }
 }

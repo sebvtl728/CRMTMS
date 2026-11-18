@@ -28,7 +28,7 @@ final class EnrolmentOptions
     public const LIMIT = 100;
 
     /**
-     * @return list<array{id: string, number: string, account: ?string, account_organisation_id: ?string, lines: list<array{id: string, label: string}>}>
+     * @return list<array{id: string, number: string, account: ?string, account_organisation_id: ?string, account_person_id: ?string, lines: list<array{id: string, label: string}>}>
      */
     public static function dossiersFor(TrainingSession $session, User $user): array
     {
@@ -47,6 +47,7 @@ final class EnrolmentOptions
             'number' => $d->number,
             'account' => $accounts[$d->accountId()]['label'] ?? null,
             'account_organisation_id' => $d->account_organisation_id,
+            'account_person_id' => $d->account_person_id,
             'lines' => $d->lines->map(fn (DossierLine $l) => ['id' => $l->id, 'label' => $l->label])->values()->all(),
         ])->values()->all();
     }
