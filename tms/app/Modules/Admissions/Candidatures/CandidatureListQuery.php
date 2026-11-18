@@ -73,7 +73,7 @@ final class CandidatureListQuery
             ->when($filters['responsable'], fn (Builder $q, string $v) => $q->where('candidatures.responsible_user_id', $v))
             ->when($filters['contrat'], fn (Builder $q, string $v) => $q->whereIn('candidatures.id', AlternanceContract::query()->where('contract_type', $v)->select('candidature_id')))
             ->when($filters['q'], function (Builder $q, string $v): void {
-                $people = array_column(app(Trainees::class)->search($v, null, 200), 'id');
+                $people = app(Trainees::class)->matchingIds($v);
                 $q->where(fn (Builder $w) => $w->where('candidatures.number', 'ilike', '%'.addcslashes($v, '\\%_').'%')->orWhereIn('candidatures.person_id', $people));
             });
 

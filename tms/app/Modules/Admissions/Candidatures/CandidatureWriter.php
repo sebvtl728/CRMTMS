@@ -5,6 +5,7 @@ namespace App\Modules\Admissions\Candidatures;
 use App\Modules\Admissions\AdmissionsVisibility;
 use App\Modules\Admissions\CustomFields\CustomFieldDefinition;
 use App\Modules\Admissions\CustomFields\CustomFieldValues;
+use App\Modules\Admissions\Permissions;
 use App\Modules\Admissions\Support\Rules;
 use App\Modules\Catalogue\Trainings;
 use App\Modules\Core\References\ReferenceList;
@@ -163,12 +164,9 @@ final class CandidatureWriter
         $profile = array_intersect_key($validated, array_flip(self::PROFILE));
         $values = array_intersect_key($validated, array_flip(self::FIELDS));
 
-        // The training brings its DAS (unless one is given) and its RNCP code (unless one is typed).
+        // The training brings its RNCP code (unless one is typed); with a training, the DAS is the training's.
         if (array_key_exists('training_id', $values) && $values['training_id'] !== ($current?->training_id)) {
             if ($training !== null) {
-                if (! array_key_exists('das_id', $values) || $values['das_id'] === null) {
-                    $values['das_id'] = $training->das_id;
-                }
                 if (! array_key_exists('rncp_code', $values)) {
                     $values['rncp_code'] = $training->rncp_code;
                 }
@@ -176,13 +174,36 @@ final class CandidatureWriter
                 $values['rncp_code'] = null;
             }
         }
-        if (array_key_exists('das_id', $values) && $values['das_id'] === null) {
+        $trainingId = array_key_exists('training_id', $values) ? $values['training_id'] : $current?->training_id;
+        if ($trainingId !== null) {
+            $values['das_id'] = ($training ?? app(Trainings::class)->find($trainingId))->das_id ?? $current?->das_id;
+        } elseif (array_key_exists('das_id', $values) && $values['das_id'] === null) {
             if ($current === null) {
                 unset($values['das_id']);
             } else {
                 $values['das_id'] = $current->das_id;
             }
         }
+        // Moving the candidature to another DAS needs that DAS in the scope of the update right
+        // (a creation is checked by the controller).
+        if ($current !== null && isset($values['das_id']) && $values['das_id'] !== $current->das_id
+            && ! AdmissionsVisibility::allowsDas($by, Permissions::CANDIDATURES_UPDATE, $values['das_id'])) {
+            throw ValidationException::withMessages([$trainingId !== null ? 'training_id' : 'das_id' => $trainingId !== null
+                ? 'Cette formation relève d\'un DAS que vous ne suivez pas.'
+                : 'Choisissez un DAS que vous suivez.']);
+        }
+
+        // Education level and situation live on the CRM person: only a real change is written there,
+        // never for a fiche in the trash or anonymised (refused then).
+        if ($profile !== []) {
+            $person = app(Trainees::class)->profile($current->person_id ?? (string) ($data['person_id'] ?? ''));
+            // An anonymised fiche keeps no profile: only a value counts as a change.
+            $profile = array_filter($profile, fn ($value, string $key) => $value !== ($person[$key] ?? null), ARRAY_FILTER_USE_BOTH);
+            if ($profile !== [] && $current !== null && ($person === null || $person['trashed'])) {
+                throw ValidationException::withMessages([array_key_first($profile) => 'La fiche de cette personne est à la corbeille ou anonymisée : son niveau et sa situation ne changent plus.']);
+            }
+        }
+
         if (array_key_exists('rqth', $values)) {
             $values['rqth'] = (bool) $values['rqth'];
         }

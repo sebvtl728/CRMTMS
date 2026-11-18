@@ -67,6 +67,25 @@ final class Trainees
     }
 
     /**
+     * Ids of the people (trash included, anonymised ones excluded) whose name
+     * or e-mail contains every word of $q, as a subquery without limit: for a
+     * module filtering its own records by person (whereIn).
+     */
+    public function matchingIds(string $q): \Illuminate\Database\Query\Builder
+    {
+        $query = Person::withTrashed()->whereNull('people.anonymised_at')->select('people.id');
+        $words = preg_split('/\s+/u', trim($q), -1, PREG_SPLIT_NO_EMPTY) ?: [];
+        if ($words === []) {
+            $query->whereRaw('false');
+        }
+        foreach ($words as $word) {
+            $query->whereRaw('people.search_vector like public.immutable_unaccent(lower(?))', ['%'.addcslashes($word, '\\%_').'%']);
+        }
+
+        return $query->toBase();
+    }
+
+    /**
      * Creates an ordinary person of the CRM (journaled), optionally employed
      * by $data['organisation_id'] and given the DAS $data['das_ids'] (active
      * DAS of the organisme: those of the training the trainee is enrolled
