@@ -2,7 +2,7 @@
 
 Ce guide s'adresse aux personnes qui utilisent le TMS au quotidien (commerciaux, chargés de relations, assistants, direction, responsables de DAS). Les écrans sont désignés par leur libellé à l'écran. Ce que vous voyez dépend de votre rôle : les boutons auxquels vous n'avez pas droit n'apparaissent pas (voir `admin.md` pour la liste des droits par rôle).
 
-Le menu de gauche, section **Commercial**, donne accès, dans cet ordre, à **Pipeline**, **Opportunités**, **Devis**, **À faire** (avec le nombre d'actions en retard ou du jour), **Planning**, **Compte rendu de RDV**, **Catalogue**, **Entreprises**, **Personnes**, **Imports** et **RGPD**. Le mot « entreprise » désigne ici toute organisation cliente ou prospect : entreprise, association, collectivité.
+Le menu de gauche, section **Commercial**, donne accès, dans cet ordre, à **Pipeline**, **Opportunités**, **Devis**, **À faire** (avec le nombre d'actions en retard ou du jour), **Planning**, **Compte rendu de RDV**, **Catalogue**, **Entreprises**, **Interlocuteurs**, **Imports** et **RGPD**. Le mot « entreprise » désigne ici toute organisation cliente ou prospect : entreprise, association, collectivité.
 
 ## 1. L'écran d'accueil
 
@@ -31,9 +31,9 @@ Tous ces chiffres respectent votre périmètre : un Responsable de DAS n'y compt
 - Un même SIRET ne peut pas servir à deux fiches : le formulaire vous propose d'ouvrir la fiche existante.
 - Sur une fiche, les onglets sont **Informations**, **Interlocuteurs**, **Opportunités**, **Devis** et **Historique**.
 
-### Personnes
+### Interlocuteurs (personnes)
 
-Écran **Personnes**. Une personne peut être :
+Écran **Interlocuteurs** (menu anciennement « Personnes »). Une personne peut être :
 
 - un **particulier** (stagiaire à titre individuel, financement personnel…) : case « Particulier » cochée ;
 - un **interlocuteur** : personne rattachée à une ou plusieurs entreprises, avec sa fonction et son **rôle dans la décision** ;
@@ -47,7 +47,7 @@ Sur l'onglet **Informations** d'une entreprise ou d'une personne, le bloc **Form
 
 - Une formation **désactivée** dans le catalogue reste affichée (grisée, « inactive ») sur les fiches qui l'avaient ; elle ne peut plus être ajoutée ailleurs. Une formation d'intérêt d'une fiche ne peut pas être supprimée du catalogue (seulement désactivée).
 - **Nouvelle opportunité** depuis la fiche : ses formations d'intérêt actives sont proposées dans les **Formations** de l'opportunité (quantité 1), à garder, retirer ou compléter avant d'enregistrer.
-- Les listes **Entreprises** et **Personnes** ont un filtre **Formation d'intérêt** (enregistrable dans un filtre) et une colonne d'export **Formations d'intérêt** (intitulés séparés par « ; »).
+- Les listes **Entreprises** et **Interlocuteurs** ont un filtre **Formation d'intérêt** (enregistrable dans un filtre) et une colonne d'export **Formations d'intérêt** (intitulés séparés par « ; »).
 - Chaque changement apparaît dans l'**Historique** de la fiche : « Formations d'intérêt modifiées ».
 - Une fiche dans la corbeille ne se modifie pas : restaurez-la d'abord.
 
@@ -296,7 +296,7 @@ Tout est enregistré ensemble ou rien ne l'est (par exemple si le motif de perte
 ## 9. Rechercher
 
 - **Recherche globale** : **Ctrl K** (ou **Cmd K** sur Mac, ou la touche **/** hors d'un champ) ouvre une fenêtre de recherche. Tapez au moins 2 caractères : nom, SIRET, e-mail ou téléphone, sans souci d'accents ni de majuscules ni d'espaces dans le SIRET ou le téléphone. Les résultats sont groupés **Entreprises** et **Personnes** ; **flèches** pour choisir, **Entrée** pour ouvrir.
-- **Recherche dans une liste** : le champ en haut de **Entreprises** ou **Personnes** filtre la liste en tapant. Les filtres (statut, DAS, secteur, responsable, origine…) se combinent.
+- **Recherche dans une liste** : le champ en haut de **Entreprises** ou **Interlocuteurs** filtre la liste en tapant. Les filtres (statut, DAS, secteur, responsable, origine…) se combinent.
 - **Mes fiches** : n'affiche que les fiches dont vous êtes le responsable.
 - **Filtres enregistrés** : **Enregistrer ce filtre** mémorise vos critères et les colonnes choisies sous un nom. Un filtre peut rester **privé** ou être **partagé** avec tout l'organisme (seul son auteur peut le modifier).
 - **Colonnes** : choisissez les colonnes de la liste et de l'export.

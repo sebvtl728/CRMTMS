@@ -77,7 +77,7 @@ test('pipeline: opportunity from an entreprise, kanban, loss reason, quick call,
         'Compte rendu de RDV',
         'Catalogue',
         'Entreprises',
-        'Personnes',
+        'Interlocuteurs',
         'Imports',
         'RGPD',
     ]);

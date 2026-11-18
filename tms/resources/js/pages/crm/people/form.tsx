@@ -102,7 +102,7 @@ export default function PersonFormPage({ person, options, duplicates, canMerge }
         civility: str('civility'),
         first_name: str('first_name'),
         last_name: str('last_name'),
-        // A person created from the « Personnes » menu is most often a particulier.
+        // A person created from the « Interlocuteurs » menu is most often a particulier.
         is_individual: person?.is_individual ?? true,
         status: str('status', 'prospect'),
         email: str('email'),
@@ -126,7 +126,7 @@ export default function PersonFormPage({ person, options, duplicates, canMerge }
     });
 
     const breadcrumbs: BreadcrumbItem[] = [
-        { title: 'Personnes', href: '/crm/people' },
+        { title: 'Interlocuteurs', href: '/crm/people' },
         { title: editing ? 'Modifier' : 'Nouvelle personne', href: '#' },
     ];
 

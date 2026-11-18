@@ -300,7 +300,7 @@ it('protects reference items used by a person or an affiliation', function () {
         ->and(ReferenceUsage::isInUse(crmItem(ReferenceList::FundingMode, 'CPF')))->toBeFalse();
 });
 
-it('shows Personnes in the navigation data of a commercial', function () {
+it('shows Interlocuteurs in the navigation data of a commercial', function () {
     $this->actingAs(commercial())->get('/crm/people')->assertInertia(fn (Assert $page) => $page
         ->component('crm/people/index')->where('auth.permissions', fn ($p) => collect($p)->contains('crm.fiches.view')));
 });

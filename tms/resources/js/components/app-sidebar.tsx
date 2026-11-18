@@ -51,7 +51,7 @@ const commercialNavItems: (NavItem & { permission: string })[] = [
     { title: 'Compte rendu de RDV', url: '/crm/report', icon: ClipboardPen, permission: 'crm.activities.update' },
     { title: 'Catalogue', url: '/catalogue', icon: BookOpen, permission: 'catalogue.view' },
     { title: 'Entreprises', url: '/crm/organisations', icon: Factory, permission: 'crm.fiches.view' },
-    { title: 'Personnes', url: '/crm/people', icon: Contact, permission: 'crm.fiches.view' },
+    { title: 'Interlocuteurs', url: '/crm/people', icon: Contact, permission: 'crm.fiches.view' },
     { title: 'Imports', url: '/crm/import', icon: Upload, permission: 'crm.import' },
     { title: 'RGPD', url: '/crm/gdpr', icon: ShieldAlert, permission: 'crm.gdpr' },
 ];
