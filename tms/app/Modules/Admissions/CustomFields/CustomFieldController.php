@@ -17,6 +17,7 @@ class CustomFieldController extends Controller
         $used = $definitions->usedAmong($fields);
 
         return Inertia::render('admin/custom-fields', [
+            'status' => request()->session()->get('status'),
             'fields' => $fields->map(fn (CustomFieldDefinition $f) => [
                 'id' => $f->id,
                 'label' => $f->label,

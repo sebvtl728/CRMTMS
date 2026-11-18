@@ -56,7 +56,8 @@ test('an interlocuteur becomes a candidate, signs an apprenticeship and becomes 
     await page.goto(personUrl);
     await page.getByRole('tab', { name: 'Candidatures' }).click();
     await page.getByRole('link', { name: 'Ouvrir une candidature' }).click();
-    await expect(page.getByText(`${CANDIDATE.first_name} ${CANDIDATE.last_name}`)).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Nouvelle candidature' })).toBeVisible();
+    await expect(page.getByText(`${CANDIDATE.first_name} ${CANDIDATE.last_name}`, { exact: true })).toBeVisible();
     await choose(page, page.getByLabel('Formation visée'), TRAINING);
     await page.getByRole('button', { name: 'Ouvrir la candidature' }).click();
     await expect(page.getByText('Candidature créée.')).toBeVisible();

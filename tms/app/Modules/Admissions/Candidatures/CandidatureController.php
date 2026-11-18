@@ -42,6 +42,7 @@ class CandidatureController extends Controller
         $rows->prefetch($page->items());
 
         return Inertia::render('admissions/candidatures/index', [
+            'status' => $request->session()->get('status'),
             'rows' => [
                 'data' => array_map(fn (Candidature $c) => $rows->row($c), $page->items()),
                 'from' => $page->firstItem(),
@@ -106,6 +107,7 @@ class CandidatureController extends Controller
         $user = self::user($request);
 
         return Inertia::render('admissions/candidatures/show', [
+            'status' => $request->session()->get('status'),
             'candidature' => CandidaturePresenter::show($candidature, $user),
             'custom_fields' => CustomFieldValues::forPage($candidature),
             'history' => CandidatureHistory::forCandidature($candidature),
