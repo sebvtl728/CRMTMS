@@ -5,7 +5,12 @@ namespace App\Modules\Admissions;
 use App\Modules\Admissions\Alternance\AlternanceContract;
 use App\Modules\Admissions\Candidatures\Candidature;
 use App\Modules\Admissions\Candidatures\CandidatureFile;
+use App\Modules\Admissions\Crm\CandidatureLinks;
+use App\Modules\Admissions\Crm\CandidaturesBlock;
 use App\Modules\Admissions\CustomFields\CustomFieldDefinition;
+use App\Modules\Admissions\Gdpr\CandidatureAnonymisation;
+use App\Modules\Admissions\Gdpr\PersonCandidaturesExport;
+use App\Modules\Admissions\History\CandidatureHistory;
 use App\Modules\Catalogue\TrainingUsage;
 use App\Modules\Core\Access\Permissions as CorePermissions;
 use App\Modules\Core\Access\Role;
@@ -14,7 +19,10 @@ use App\Modules\Core\Audit\MorphAliases;
 use App\Modules\Core\References\ReferenceList;
 use App\Modules\Core\References\ReferenceUsage;
 use App\Modules\Core\Users\User;
+use App\Modules\Crm\Public\FicheBlocks;
+use App\Modules\Crm\Public\FicheLinks;
 use App\Modules\Sessions\Public\DossierBlocks;
+use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\ServiceProvider;
@@ -55,6 +63,7 @@ class AdmissionsServiceProvider extends ServiceProvider
     {
         self::registerReferenceUsage();
         self::registerTrainingUsage();
+        self::registerCrm();
 
         // The dossier of an apprenant shows its candidature.
         DossierBlocks::register('admissions.candidature', function (string $dossierId, User $viewer): ?array {
@@ -85,6 +94,23 @@ class AdmissionsServiceProvider extends ServiceProvider
 
             return AdmissionsVisibility::candidatures($query, $user)->findOrFail($value);
         });
+    }
+
+    /**
+     * What the module adds to the CRM fiches: the block « Candidatures » of a
+     * person (with « Ouvrir une candidature »), her history, and what the
+     * fiches keep (import undo, merge, anonymisation, RGPD export and
+     * retention).
+     */
+    public static function registerCrm(): void
+    {
+        FicheBlocks::register('person', 'admissions.candidatures', fn (string $id, User $viewer) => CandidaturesBlock::for($id, $viewer));
+        CandidatureHistory::registerOnFiches();
+        FicheLinks::registerLinked('admissions.candidatures', fn (string $type, string $id): bool => CandidatureLinks::linked($type, $id));
+        FicheLinks::registerMerge('admissions.candidatures', fn (string $type, string $keepId, string $dropId) => CandidatureLinks::merge($type, $keepId, $dropId));
+        FicheLinks::registerAnonymisation('admissions.candidatures', fn (array $personIds) => app(CandidatureAnonymisation::class)->forPeople($personIds));
+        FicheLinks::registerRetentionHold('admissions.candidatures', fn (CarbonImmutable $threshold) => CandidatureLinks::retentionHold($threshold));
+        FicheLinks::registerExport('admissions', fn (string $personId): array => PersonCandidaturesExport::for($personId), [Permissions::CANDIDATURES_VIEW, Permissions::SENSITIVE_VIEW]);
     }
 
     public static function registerReferenceUsage(): void

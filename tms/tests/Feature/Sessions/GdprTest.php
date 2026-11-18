@@ -203,7 +203,9 @@ it('keeps the export to users who see the whole organisme in the dossiers and se
 
     $withoutSessions = l2User($crmAll);
     $dasSessions = l2User([...$crmAll, Permissions::DOSSIERS_VIEW => null, Permissions::SESSIONS_VIEW => AccessScope::Das]);
-    $everything = l2User([...$crmAll, Permissions::DOSSIERS_VIEW => null, Permissions::SESSIONS_VIEW => null]);
+    // The candidatures too (Admissions): their export holds the sensitive data.
+    $everything = l2User([...$crmAll, Permissions::DOSSIERS_VIEW => null, Permissions::SESSIONS_VIEW => null,
+        App\Modules\Admissions\Permissions::CANDIDATURES_VIEW => null, App\Modules\Admissions\Permissions::SENSITIVE_VIEW => null]);
 
     expect(PersonDataExport::allowedFor($withoutSessions))->toBeFalse()
         ->and(PersonDataExport::allowedFor($dasSessions))->toBeFalse()

@@ -1,4 +1,5 @@
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { Link } from '@inertiajs/react';
 
 /**
@@ -20,6 +21,8 @@ export interface FicheBlock {
         /** Detail lines (the planning of a trainee: next séances, placements). */
         details?: string[];
     }[];
+    /** A button above the rows (« Ouvrir une candidature »), for who may use it. */
+    action?: { label: string; href: string } | null;
 }
 
 /** The rows of a block (or its empty text), each a card, a link when it has one. */
@@ -68,6 +71,13 @@ export function BlockRows({ block }: { block: FicheBlock }) {
 export function FicheBlockPanel({ block }: { block: FicheBlock }) {
     return (
         <div role="tabpanel" id={`panel-${block.title}`} aria-labelledby={`tab-${block.title}`} className="grid gap-3">
+            {block.action && (
+                <div className="flex justify-end">
+                    <Button asChild size="sm">
+                        <Link href={block.action.href}>{block.action.label}</Link>
+                    </Button>
+                </div>
+            )}
             <BlockRows block={block} />
         </div>
     );
