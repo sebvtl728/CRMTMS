@@ -5,6 +5,7 @@ use App\Modules\Admissions\Candidatures\CandidatureController;
 use App\Modules\Admissions\Candidatures\CandidatureFileController;
 use App\Modules\Admissions\Candidatures\CandidatureStatusController;
 use App\Modules\Admissions\Candidatures\DossierCreationController;
+use App\Modules\Admissions\Candidatures\LookupController;
 use App\Modules\Admissions\CustomFields\CustomFieldController;
 use Illuminate\Support\Facades\Route;
 
@@ -16,6 +17,9 @@ use Illuminate\Support\Facades\Route;
 Route::middleware(['auth'])->prefix('admissions/candidatures')->name('admissions.candidatures.')->group(function () {
     Route::get('/', [CandidatureController::class, 'index'])->middleware('can:admissions.candidatures.view')->name('index');
     Route::get('export', [CandidatureController::class, 'export'])->middleware(['can:admissions.candidatures.view', 'can:crm.export', 'throttle:crm-export'])->name('export');
+    Route::get('lookup/organisations', [LookupController::class, 'organisations'])->middleware(['can:admissions.candidatures.update', 'throttle:sessions-trainees'])->name('lookup.organisations');
+    Route::get('lookup/people', [LookupController::class, 'people'])->middleware(['can:admissions.candidatures.update', 'throttle:sessions-trainees'])->name('lookup.people');
+    Route::post('people', [LookupController::class, 'storePerson'])->middleware(['can:admissions.candidatures.update', 'throttle:sessions-trainees'])->name('people.store');
     Route::get('create', [CandidatureController::class, 'create'])->middleware('can:admissions.candidatures.update')->name('create');
     Route::post('/', [CandidatureController::class, 'store'])->middleware('can:admissions.candidatures.update')->name('store');
     Route::get('{candidature}', [CandidatureController::class, 'show'])->middleware('can:admissions.candidatures.view')->name('show');

@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Modules\Admissions\AdmissionsVisibility;
 use App\Modules\Admissions\Alternance\ContractType;
 use App\Modules\Admissions\CustomFields\CustomFieldValues;
+use App\Modules\Admissions\History\CandidatureHistory;
 use App\Modules\Admissions\Permissions;
 use App\Modules\Catalogue\TrainingData;
 use App\Modules\Catalogue\Trainings;
@@ -17,6 +18,8 @@ use App\Modules\Core\References\ReferenceList;
 use App\Modules\Core\Users\User;
 use App\Modules\Crm\Public\Fiches;
 use App\Modules\Sessions\Public\Admission;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -41,10 +44,13 @@ class CandidatureController extends Controller
         return Inertia::render('admissions/candidatures/index', [
             'rows' => [
                 'data' => array_map(fn (Candidature $c) => $rows->row($c), $page->items()),
+                'from' => $page->firstItem(),
+                'to' => $page->lastItem(),
+                'prev_page_url' => $page->previousPageUrl(),
+                'next_page_url' => $page->nextPageUrl(),
                 'current_page' => $page->currentPage(),
                 'last_page' => $page->lastPage(),
                 'total' => $page->total(),
-                'links' => $page->linkCollection()->toArray(),
             ],
             'filters' => $filters,
             'counts' => CandidatureListQuery::counts($user, $filters),
@@ -62,7 +68,7 @@ class CandidatureController extends Controller
         $user = self::user($request);
         $resource = new CandidatureExport;
         $filters = CandidatureListQuery::filters($request->query());
-        /** @var \Illuminate\Database\Eloquent\Builder<\Illuminate\Database\Eloquent\Model> $query */
+        /** @var Builder<Model> $query */
         $query = CandidatureListQuery::build($user, $filters);
         $rows = $counter->count($query);
         $audit->export('admissions.candidatures', ['filters' => array_filter($filters, fn ($v) => $v !== null), 'columns' => $resource->defaults(), 'rows' => $rows]);
@@ -102,6 +108,7 @@ class CandidatureController extends Controller
         return Inertia::render('admissions/candidatures/show', [
             'candidature' => CandidaturePresenter::show($candidature, $user),
             'custom_fields' => CustomFieldValues::forPage($candidature),
+            'history' => CandidatureHistory::forCandidature($candidature),
             'can' => [
                 'update' => AdmissionsVisibility::allows($user, Permissions::CANDIDATURES_UPDATE, $candidature) && ! $candidature->trashed(),
                 'delete' => AdmissionsVisibility::allows($user, Permissions::CANDIDATURES_DELETE, $candidature),
