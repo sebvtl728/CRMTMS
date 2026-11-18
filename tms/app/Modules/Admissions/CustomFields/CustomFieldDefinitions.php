@@ -70,7 +70,7 @@ final class CustomFieldDefinitions
     public function reorder(array $ids): void
     {
         DB::transaction(function () use ($ids): void {
-            foreach (array_values($ids) as $i => $id) {
+            foreach ($ids as $i => $id) {
                 CustomFieldDefinition::query()->whereKey($id)->update(['position' => $i + 1]);
             }
         });
