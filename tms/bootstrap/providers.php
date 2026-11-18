@@ -1,5 +1,6 @@
 <?php
 
+use App\Modules\Admissions\AdmissionsServiceProvider;
 use App\Modules\Catalogue\CatalogueServiceProvider;
 use App\Modules\Connectors\ConnectorsServiceProvider;
 use App\Modules\Core\Access\AccessServiceProvider;
@@ -28,4 +29,5 @@ return [
     CatalogueServiceProvider::class,
     SessionsServiceProvider::class,
     FinanceServiceProvider::class,
+    AdmissionsServiceProvider::class,
 ];

@@ -28,6 +28,7 @@ enum ReferenceList: string
     case BpfCategory = 'bpf_category';
     case EducationLevel = 'education_level';
     case TrainingModality = 'training_modality';
+    case CandidatureRefusalReason = 'candidature_refusal_reason';
 
     public function label(): string
     {
@@ -52,6 +53,7 @@ enum ReferenceList: string
             self::BpfCategory => 'Catégories de stagiaires (BPF)',
             self::EducationLevel => 'Niveaux de diplôme',
             self::TrainingModality => 'Modalités de formation',
+            self::CandidatureRefusalReason => 'Motifs de non-admission (candidatures)',
         };
     }
 
