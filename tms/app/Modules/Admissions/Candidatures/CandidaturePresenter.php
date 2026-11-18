@@ -68,6 +68,11 @@ final class CandidaturePresenter
             'decision_reason_id' => $c->decision_reason_id,
             'decision_reason_label' => $c->decision_reason_id !== null ? ($labels[$c->decision_reason_id] ?? null) : null,
             'dossier_id' => $c->dossier_id,
+            'files' => CandidatureFile::query()->where('candidature_id', $c->id)->orderBy('created_at')->get()
+                ->map(fn (CandidatureFile $f) => [
+                    'id' => $f->id, 'kind' => $f->kind, 'name' => $f->name, 'size' => $f->size,
+                    'created_at' => $f->created_at?->toIso8601String(), 'href' => "/admissions/candidatures/{$c->id}/files/{$f->id}",
+                ])->values()->all(),
             'is_minor' => self::isMinor($c, $profile['birth_date'] ?? null, $session['starts_on'] ?? null),
             'deleted_at' => $c->deleted_at?->toIso8601String(),
         ];
