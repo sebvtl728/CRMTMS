@@ -10,6 +10,7 @@ use App\Modules\Core\Users\User;
 use App\Modules\Crm\Public\Fiches;
 use App\Modules\Crm\Public\Trainees;
 use App\Modules\Sessions\Public\Admission;
+use App\Modules\Sessions\Public\Billing;
 use Carbon\CarbonImmutable;
 
 /**
@@ -69,6 +70,7 @@ final class CandidaturePresenter
             'decision_reason_id' => $c->decision_reason_id,
             'decision_reason_label' => $c->decision_reason_id !== null ? ($labels[$c->decision_reason_id] ?? null) : null,
             'dossier_id' => $c->dossier_id,
+            'dossier' => self::dossier($c),
             'alternance' => AlternanceWriter::forPage($c),
             'files' => CandidatureFile::query()->where('candidature_id', $c->id)->orderBy('created_at')->get()
                 ->map(fn (CandidatureFile $f) => [
@@ -86,6 +88,18 @@ final class CandidaturePresenter
         }
 
         return $data;
+    }
+
+    /**
+     * The dossier of the candidature (number, link, in the trash or not), null without one.
+     *
+     * @return array{id: string, number: string, href: string, trashed: bool}|null
+     */
+    public static function dossier(Candidature $c): ?array
+    {
+        $found = $c->dossier_id !== null ? Billing::numbers([$c->dossier_id])[$c->dossier_id] ?? null : null;
+
+        return $found === null ? null : ['id' => (string) $c->dossier_id, 'number' => $found['number'], 'href' => "/dossiers/{$c->dossier_id}", 'trashed' => $found['trashed']];
     }
 
     /**

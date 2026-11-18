@@ -7,6 +7,7 @@ use App\Modules\Admissions\CustomFields\CustomFieldValues;
 use App\Modules\Admissions\Support\Rules;
 use App\Modules\Core\References\ReferenceList;
 use App\Modules\Core\Users\User;
+use App\Modules\Sessions\Public\Admission;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\ValidationException;
@@ -30,7 +31,7 @@ final class CandidatureTransitions
             if ($from === $to) {
                 throw new UserFacingHttpException(409, 'La candidature est déjà à cette étape.');
             }
-            if ($from === CandidatureStatus::Admitted && $locked->dossier_id !== null) {
+            if ($from === CandidatureStatus::Admitted && $locked->dossier_id !== null && Admission::dossierState($locked->dossier_id) === 'live') {
                 throw new UserFacingHttpException(409, 'Le dossier de formation est créé : la candidature ne peut plus revenir en arrière.');
             }
             if ($from === CandidatureStatus::Admitted && $to->isExit()) {

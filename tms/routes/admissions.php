@@ -4,6 +4,7 @@ use App\Modules\Admissions\Alternance\AlternanceController;
 use App\Modules\Admissions\Candidatures\CandidatureController;
 use App\Modules\Admissions\Candidatures\CandidatureFileController;
 use App\Modules\Admissions\Candidatures\CandidatureStatusController;
+use App\Modules\Admissions\Candidatures\DossierCreationController;
 use App\Modules\Admissions\CustomFields\CustomFieldController;
 use Illuminate\Support\Facades\Route;
 
@@ -24,6 +25,8 @@ Route::middleware(['auth'])->prefix('admissions/candidatures')->name('admissions
     Route::delete('{candidature}/files/{file}', [CandidatureFileController::class, 'destroy'])->middleware('can:admissions.candidatures.update')->name('files.destroy');
     Route::put('{candidature}/alternance', [AlternanceController::class, 'update'])->middleware('can:admissions.candidatures.update')->name('alternance.update');
     Route::delete('{candidature}/alternance', [AlternanceController::class, 'destroy'])->middleware('can:admissions.candidatures.update')->name('alternance.destroy');
+    Route::get('{candidature}/dossier/defaults', [DossierCreationController::class, 'defaults'])->middleware('can:admissions.candidatures.update')->name('dossier.defaults');
+    Route::post('{candidature}/dossier', [DossierCreationController::class, 'store'])->middleware('can:admissions.candidatures.update')->name('dossier.store');
     Route::delete('{candidature}', [CandidatureController::class, 'destroy'])->middleware('can:admissions.candidatures.delete')->name('destroy');
     Route::post('{candidature}/restore', [CandidatureController::class, 'restore'])->middleware('can:admissions.candidatures.delete')->name('restore');
 });

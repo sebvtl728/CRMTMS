@@ -14,6 +14,7 @@ use App\Modules\Core\Audit\MorphAliases;
 use App\Modules\Core\References\ReferenceList;
 use App\Modules\Core\References\ReferenceUsage;
 use App\Modules\Core\Users\User;
+use App\Modules\Sessions\Public\DossierBlocks;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\ServiceProvider;
@@ -54,6 +55,19 @@ class AdmissionsServiceProvider extends ServiceProvider
     {
         self::registerReferenceUsage();
         self::registerTrainingUsage();
+
+        // The dossier of an apprenant shows its candidature.
+        DossierBlocks::register('admissions.candidature', function (string $dossierId, User $viewer): ?array {
+            if (! $viewer->can(Permissions::CANDIDATURES_VIEW)) {
+                return null;
+            }
+            $rows = Candidature::query()->where('dossier_id', $dossierId)->get()
+                ->filter(fn (Candidature $c) => AdmissionsVisibility::allows($viewer, Permissions::CANDIDATURES_VIEW, $c))
+                ->map(fn (Candidature $c) => ['id' => $c->id, 'title' => $c->number, 'subtitle' => $c->status->label(), 'href' => "/admissions/candidatures/{$c->id}"])
+                ->values()->all();
+
+            return $rows === [] ? null : ['title' => 'Candidature', 'empty' => 'Aucune candidature.', 'rows' => $rows];
+        });
 
         // 404 outside the view scope; the trash too for who may restore.
         Route::bind('candidature', function (string $value): Candidature {

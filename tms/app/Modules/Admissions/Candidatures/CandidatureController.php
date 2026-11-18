@@ -62,6 +62,10 @@ class CandidatureController extends Controller
                 'update' => AdmissionsVisibility::allows($user, Permissions::CANDIDATURES_UPDATE, $candidature) && ! $candidature->trashed(),
                 'delete' => AdmissionsVisibility::allows($user, Permissions::CANDIDATURES_DELETE, $candidature),
                 'sensitive' => AdmissionsVisibility::sensitive($user),
+                'create_dossier' => $candidature->status === CandidatureStatus::Admitted && ! $candidature->trashed()
+                    && ($candidature->dossier_id === null || Admission::dossierState($candidature->dossier_id) !== 'live')
+                    && AdmissionsVisibility::allows($user, Permissions::CANDIDATURES_UPDATE, $candidature)
+                    && Admission::mayCreateDossier($user, $candidature->das_id),
             ],
             'options' => self::options($candidature),
         ]);

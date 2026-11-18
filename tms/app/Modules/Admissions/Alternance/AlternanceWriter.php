@@ -7,6 +7,7 @@ use App\Modules\Admissions\Candidatures\Candidature;
 use App\Modules\Admissions\Candidatures\CandidatureStatus;
 use App\Modules\Core\Users\User;
 use App\Modules\Crm\Public\Fiches;
+use App\Modules\Sessions\Public\Admission;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rule;
@@ -80,7 +81,7 @@ final class AlternanceWriter
 
     public function delete(Candidature $candidature): void
     {
-        if ($candidature->dossier_id !== null) {
+        if ($candidature->dossier_id !== null && Admission::dossierState($candidature->dossier_id) === 'live') {
             throw new UserFacingHttpException(409, 'Le dossier est créé : le contrat ne peut plus être retiré.');
         }
         DB::transaction(function () use ($candidature): void {
