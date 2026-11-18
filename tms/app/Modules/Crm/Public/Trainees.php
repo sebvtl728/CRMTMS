@@ -115,6 +115,33 @@ final class Trainees
     }
 
     /**
+     * Contact details and training profile of a person out of anonymisation
+     * (trashed included: a record that points to her keeps showing her);
+     * null when unknown or anonymised.
+     *
+     * @return array{id: string, label: string, email: ?string, phone: ?string, mobile: ?string, birth_date: ?string, education_level_id: ?string, professional_situation_id: ?string, trashed: bool}|null
+     */
+    public function profile(string $personId): ?array
+    {
+        $person = Str::isUuid($personId) ? Person::withTrashed()->whereNull('people.anonymised_at')->find($personId) : null;
+        if ($person === null) {
+            return null;
+        }
+
+        return [
+            'id' => $person->id,
+            'label' => $person->fullName(),
+            'email' => $person->email,
+            'phone' => $person->phone,
+            'mobile' => $person->mobile,
+            'birth_date' => $person->birth_date?->toDateString(),
+            'education_level_id' => $person->education_level_id,
+            'professional_situation_id' => $person->professional_situation_id,
+            'trashed' => $person->trashed(),
+        ];
+    }
+
+    /**
      * Updates the training profile of a person: only the keys present in
      * $changes (education_level_id, professional_situation_id, birth_date as
      * Y-m-d) are changed, a present null clears the value, an absent key is

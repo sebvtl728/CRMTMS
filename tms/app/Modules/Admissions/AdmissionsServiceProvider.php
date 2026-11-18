@@ -9,10 +9,15 @@ use App\Modules\Admissions\CustomFields\CustomFieldDefinition;
 use App\Modules\Catalogue\TrainingUsage;
 use App\Modules\Core\Access\Permissions as CorePermissions;
 use App\Modules\Core\Access\Role;
+use App\Modules\Core\Access\Scopes;
 use App\Modules\Core\Audit\MorphAliases;
 use App\Modules\Core\References\ReferenceList;
 use App\Modules\Core\References\ReferenceUsage;
+use App\Modules\Core\Users\User;
+use Illuminate\Database\Eloquent\ModelNotFoundException;
+use Illuminate\Support\Facades\Route;
 use Illuminate\Support\ServiceProvider;
+use Illuminate\Support\Str;
 
 /**
  * Module Admissions: candidatures of CRM people, their alternance contract
@@ -49,6 +54,23 @@ class AdmissionsServiceProvider extends ServiceProvider
     {
         self::registerReferenceUsage();
         self::registerTrainingUsage();
+
+        // 404 outside the view scope; the trash too for who may restore.
+        Route::bind('candidature', function (string $value): Candidature {
+            if (! Str::isUuid($value)) {
+                throw (new ModelNotFoundException)->setModel(Candidature::class, [$value]);
+            }
+            $user = request()->user();
+            $query = Candidature::query();
+            if (! $user instanceof User) {
+                return $query->findOrFail($value);
+            }
+            if (Scopes::of($user, Permissions::CANDIDATURES_DELETE) !== null) {
+                $query->withTrashed();
+            }
+
+            return AdmissionsVisibility::candidatures($query, $user)->findOrFail($value);
+        });
     }
 
     public static function registerReferenceUsage(): void
