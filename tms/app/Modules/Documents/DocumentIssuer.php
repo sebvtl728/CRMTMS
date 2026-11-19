@@ -4,6 +4,7 @@ namespace App\Modules\Documents;
 
 use App\Exceptions\UserFacingHttpException;
 use App\Modules\Core\Companies\Company;
+use App\Modules\Core\Signatures\Signatures;
 use App\Modules\Core\Tenancy\TenantStorage;
 use App\Modules\Core\Users\User;
 use App\Modules\Crm\Public\Fiches;
@@ -181,6 +182,7 @@ class DocumentIssuer
             }
             $locked->status = DocumentStatus::Cancelled;
             $locked->forceFill(['cancelled_at' => CarbonImmutable::now(), 'cancelled_by' => $by->id, 'cancel_reason' => $reason])->save();
+            Signatures::cancelFor(Document::MORPH_ALIAS, $locked->id);
 
             return $locked;
         });

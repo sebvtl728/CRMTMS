@@ -2,6 +2,7 @@
 
 namespace App\Modules\Documents\Gdpr;
 
+use App\Modules\Core\Signatures\SignatureRequest;
 use App\Modules\Documents\Document;
 use App\Modules\Documents\DocumentSending;
 use App\Modules\Documents\Texts\DocumentType;
@@ -37,6 +38,10 @@ final class DocumentAnonymisation
         }
         DocumentSending::query()->whereIn('document_id', $documents->pluck('id')->all())
             ->update(['email' => null, 'subject' => null, 'body' => null]);
+        // Their online signatures: the document and its proof stay, the signer's data go.
+        SignatureRequest::query()->where('subject_type', Document::MORPH_ALIAS)
+            ->where(fn ($q) => $q->whereIn('subject_id', $documents->pluck('id')->all())->orWhereIn('signer_person_id', $personIds))
+            ->update(['signer_name' => null, 'signer_email' => null, 'signed_ip' => null, 'signed_user_agent' => null, 'signer_person_id' => null]);
     }
 
     /**

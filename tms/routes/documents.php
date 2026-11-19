@@ -18,5 +18,7 @@ Route::middleware(['auth'])->group(function () {
     Route::post('sessions/{sessionId}/documents/send', [DocumentController::class, 'sendForSession'])->middleware('throttle:document-mail')->name('documents.session.send');
     Route::get('documents/{document}/pdf', [DocumentController::class, 'pdf'])->name('documents.pdf');
     Route::post('documents/{document}/send', [DocumentController::class, 'send'])->middleware('throttle:document-mail')->name('documents.send');
+    Route::post('documents/{document}/signature', [DocumentController::class, 'requestSignature'])->middleware('throttle:document-mail')->name('documents.signature');
+    Route::get('documents/{document}/signed', [DocumentController::class, 'signed'])->name('documents.signed');
     Route::post('documents/{document}/cancel', [DocumentController::class, 'cancel'])->name('documents.cancel');
 });

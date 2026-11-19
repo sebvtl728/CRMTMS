@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { formatDate } from '@/lib/crm';
 import { router, useForm } from '@inertiajs/react';
-import { Download, Eye, FileText, LoaderCircle, Send, XCircle } from 'lucide-react';
+import { Download, Eye, FileText, LoaderCircle, PenLine, Send, XCircle } from 'lucide-react';
 import { FormEventHandler, useState } from 'react';
 
 interface DocumentRow {
@@ -23,6 +23,8 @@ interface DocumentRow {
     email_error: string | null;
     cancel_reason: string | null;
     defaults: { to: string; subject: string; body: string } | null;
+    signature: { status: 'pending' | 'signed' | 'cancelled'; signed_at: string | null; email: string | null } | null;
+    can_sign: boolean;
 }
 
 interface Props {
@@ -81,6 +83,44 @@ function SendDialog({ doc, onClose }: { doc: DocumentRow; onClose: () => void })
     );
 }
 
+function SignDialog({ doc, onClose }: { doc: DocumentRow; onClose: () => void }) {
+    const { data, setData, post, processing, errors } = useForm({ email: doc.signature?.email ?? doc.defaults?.to ?? '' });
+    const submit: FormEventHandler = (e) => {
+        e.preventDefault();
+        post(`/documents/${doc.id}/signature`, { preserveScroll: true, onSuccess: onClose });
+    };
+
+    return (
+        <Dialog open onOpenChange={(o) => !o && onClose()}>
+            <DialogContent className="sm:max-w-lg">
+                <form onSubmit={submit} className="grid gap-3">
+                    <DialogHeader>
+                        <DialogTitle>Faire signer {doc.number} en ligne</DialogTitle>
+                        <DialogDescription>
+                            Le signataire reçoit un lien personnel (valable 30 jours), lit le document et signe avec un code reçu par e-mail. Une page
+                            de preuve est ajoutée au PDF signé. Un nouvel envoi remplace le lien précédent.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <div className="grid gap-1">
+                        <Label htmlFor="sign-email">Adresse du signataire</Label>
+                        <Input id="sign-email" type="email" value={data.email} onChange={(e) => setData('email', e.target.value)} />
+                        <InputError message={errors.email} />
+                    </div>
+                    <DialogFooter>
+                        <Button type="button" variant="outline" onClick={onClose}>
+                            Fermer
+                        </Button>
+                        <Button type="submit" disabled={processing}>
+                            {processing ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <PenLine className="h-4 w-4" />}
+                            Envoyer le lien
+                        </Button>
+                    </DialogFooter>
+                </form>
+            </DialogContent>
+        </Dialog>
+    );
+}
+
 function CancelDialog({ doc, onClose }: { doc: DocumentRow; onClose: () => void }) {
     const { data, setData, post, processing, errors } = useForm({ reason: '' });
     const submit: FormEventHandler = (e) => {
@@ -121,6 +161,7 @@ function CancelDialog({ doc, onClose }: { doc: DocumentRow; onClose: () => void 
 export function DocumentsBlock({ dossier_id, can_manage, issuable, documents }: Props) {
     const [sending, setSending] = useState<DocumentRow | null>(null);
     const [cancelling, setCancelling] = useState<DocumentRow | null>(null);
+    const [signing, setSigning] = useState<DocumentRow | null>(null);
     const [issuing, setIssuing] = useState(false);
     const issue = (type: string) =>
         router.post(
@@ -159,6 +200,14 @@ export function DocumentsBlock({ dossier_id, can_manage, issuable, documents }: 
                             {d.email_status === 'pending' && <p className="text-muted-foreground text-xs">Envoi en cours…</p>}
                             {d.email_status === 'failed' && <p className="text-xs text-red-600">L’e-mail n’est pas parti : {d.email_error}</p>}
                             {d.cancel_reason && <p className="text-muted-foreground text-xs">Motif de l’annulation : {d.cancel_reason}</p>}
+                            {d.signature?.status === 'pending' && (
+                                <p className="text-muted-foreground text-xs">
+                                    Lien de signature envoyé{d.signature.email ? ` à ${d.signature.email}` : ''} : en attente.
+                                </p>
+                            )}
+                            {d.signature?.status === 'signed' && (
+                                <p className="text-xs text-green-700 dark:text-green-400">Signé en ligne le {formatDate(d.signature.signed_at)}.</p>
+                            )}
                             <div className="flex flex-wrap gap-2">
                                 <Button asChild size="sm" variant="outline">
                                     <a href={`/documents/${d.id}/pdf?apercu=1`} target="_blank" rel="noopener">
@@ -172,6 +221,20 @@ export function DocumentsBlock({ dossier_id, can_manage, issuable, documents }: 
                                         Télécharger
                                     </a>
                                 </Button>
+                                {d.signature?.status === 'signed' && (
+                                    <Button asChild size="sm" variant="outline">
+                                        <a href={`/documents/${d.id}/signed`} target="_blank" rel="noopener">
+                                            <PenLine className="h-4 w-4" />
+                                            PDF signé
+                                        </a>
+                                    </Button>
+                                )}
+                                {d.can_sign && (
+                                    <Button size="sm" variant="outline" onClick={() => setSigning(d)}>
+                                        <PenLine className="h-4 w-4" />
+                                        {d.signature?.status === 'pending' ? 'Renvoyer le lien de signature' : 'Demander la signature'}
+                                    </Button>
+                                )}
                                 {can_manage && d.status !== 'cancelled' && (
                                     <>
                                         <Button size="sm" variant="outline" onClick={() => setSending(d)} disabled={d.email_status === 'pending'}>
@@ -191,6 +254,7 @@ export function DocumentsBlock({ dossier_id, can_manage, issuable, documents }: 
             )}
             {sending && <SendDialog doc={sending} onClose={() => setSending(null)} />}
             {cancelling && <CancelDialog doc={cancelling} onClose={() => setCancelling(null)} />}
+            {signing && <SignDialog doc={signing} onClose={() => setSigning(null)} />}
         </div>
     );
 }
