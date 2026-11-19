@@ -4,8 +4,13 @@ namespace App\Modules\Documents;
 
 use App\Modules\Core\Access\Permissions as CorePermissions;
 use App\Modules\Core\Audit\MorphAliases;
+use App\Modules\Core\Users\User;
 use App\Modules\Documents\Texts\DocumentText;
+use App\Modules\Sessions\Public\DossierBlocks;
+use App\Modules\Sessions\Public\Paperwork;
+use Illuminate\Support\Facades\Route;
 use Illuminate\Support\ServiceProvider;
+use Illuminate\Support\Str;
 
 /**
  * Module Documents (0.10): training documents of a dossier, issued from the
@@ -25,5 +30,15 @@ class DocumentsServiceProvider extends ServiceProvider
     public function boot(): void
     {
         DocumentMailTemplates::register();
+        DossierBlocks::register('documents.dossier', fn (string $dossierId, User $viewer) => DossierDocumentsBlock::for($dossierId, $viewer));
+
+        // A document out of the viewer's documents.view scope (read on its dossier) is a 404.
+        Route::bind('document', function (string $value): Document {
+            $user = auth()->user();
+            $document = Str::isUuid($value) ? Document::query()->find($value) : null;
+            abort_if($document === null || ! $user instanceof User || ! Paperwork::allows($user, Permissions::VIEW, $document->dossier_id), 404);
+
+            return $document;
+        });
     }
 }
