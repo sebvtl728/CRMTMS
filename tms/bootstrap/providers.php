@@ -9,6 +9,7 @@ use App\Modules\Core\Mail\MailServiceProvider;
 use App\Modules\Core\Tenancy\TenancyServiceProvider;
 use App\Modules\Core\Users\UsersServiceProvider;
 use App\Modules\Crm\CrmServiceProvider;
+use App\Modules\Documents\DocumentsServiceProvider;
 use App\Modules\Finance\FinanceServiceProvider;
 use App\Modules\Qualite\QualiteServiceProvider;
 use App\Modules\Sessions\SessionsServiceProvider;
@@ -32,4 +33,5 @@ return [
     FinanceServiceProvider::class,
     AdmissionsServiceProvider::class,
     QualiteServiceProvider::class,
+    DocumentsServiceProvider::class,
 ];

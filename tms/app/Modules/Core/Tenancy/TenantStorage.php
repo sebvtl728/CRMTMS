@@ -14,7 +14,7 @@ final class TenantStorage
 {
     public const DISK = 'local';
 
-    public const AREAS = ['imports', 'attachments', 'exports', 'gdpr', 'companies', 'quotes', 'brochures', 'attendance_sheets', 'invoices', 'admissions', 'quality'];
+    public const AREAS = ['imports', 'attachments', 'exports', 'gdpr', 'companies', 'quotes', 'brochures', 'attendance_sheets', 'invoices', 'admissions', 'quality', 'documents'];
 
     /**
      * @throws MissingTenantContext outside a tenant context

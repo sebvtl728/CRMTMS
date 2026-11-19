@@ -61,55 +61,28 @@ class CompanyBranding
      */
     public function storeLogo(Company $company, UploadedFile $file): void
     {
-        $extension = self::detectedType($file) ?? throw ValidationException::withMessages(['logo' => self::TYPE_MESSAGE]);
-
-        $directory = $this->directory($company);
-        $path = $directory.'/logo.'.$extension;
-        $previous = $company->logo_path;
-
-        // The new file under a temporary name: the current logo stays intact until the save is committed.
-        $staged = StagedFile::stage($directory, $file, $extension);
-        if ($staged === null) {
-            report(new RuntimeException('Company logo could not be written to the private disk.'));
-
-            throw ValidationException::withMessages(['logo' => "Le logo n'a pas pu être enregistré. Réessayez ou contactez l'administrateur."]);
-        }
-
-        try {
-            DB::transaction(function () use ($company, $path, $previous, $extension, $file, $staged): void {
-                $company->logo_path = $path;
-                $company->save();
-                $this->audit->record('company.logo_changed', $company, ['logo' => $previous === null ? null : pathinfo($previous, PATHINFO_BASENAME)], [
-                    'logo' => 'logo.'.$extension,
-                    'size' => $file->getSize(),
-                    'sha256' => hash_file('sha256', (string) $file->getRealPath()),
-                ]);
-                // The brand (sidebar) is recomputed once the new file is in place.
-                StagedFile::promote($staged, $path, $previous !== null && $this->isOwnPath($company, $previous) ? $previous : null, fn () => Brand::forget($company->tenant_id));
-            });
-        } catch (\Throwable $e) {
-            StagedFile::discard($staged);
-
-            throw $e;
-        }
+        $this->storeImage($company, $file, 'logo');
     }
 
     public function deleteLogo(Company $company): void
     {
-        $previous = $company->logo_path;
-        if ($previous === null) {
-            return;
-        }
+        $this->deleteImage($company, 'logo');
+    }
 
-        DB::transaction(function () use ($company, $previous): void {
-            $company->logo_path = null;
-            $company->save();
-            $this->audit->record('company.logo_deleted', $company, ['logo' => pathinfo($previous, PATHINFO_BASENAME)]);
-        });
+    /**
+     * The signature and stamp of the company, printed on the training
+     * documents it issues (0.10): same rules as the logo.
+     *
+     * @throws ValidationException when the file is not an accepted image or cannot be written
+     */
+    public function storeSignature(Company $company, UploadedFile $file): void
+    {
+        $this->storeImage($company, $file, 'signature');
+    }
 
-        if ($this->isOwnPath($company, $previous)) {
-            Storage::disk(TenantStorage::DISK)->delete($previous);
-        }
+    public function deleteSignature(Company $company): void
+    {
+        $this->deleteImage($company, 'signature');
     }
 
     /**
@@ -123,6 +96,14 @@ class CompanyBranding
         return $logo === null ? null : 'data:'.$logo['mime'].';base64,'.base64_encode($logo['content']);
     }
 
+    /** As logoDataUri(), for the signature and stamp. */
+    public function signatureDataUri(Company $company): ?string
+    {
+        $file = $this->imageFile($company, $company->signature_path);
+
+        return $file === null ? null : 'data:'.$file['mime'].';base64,'.base64_encode($file['content']);
+    }
+
     /**
      * The stored logo (content, MIME type, SHA-256), for the PDF and the
      * application's brand (BrandLogoController); null without a logo, when
@@ -132,7 +113,87 @@ class CompanyBranding
      */
     public function logoFile(Company $company): ?array
     {
-        $path = $company->logo_path;
+        return $this->imageFile($company, $company->logo_path);
+    }
+
+    /**
+     * Replaces an image ($kind: logo or signature): new file under a
+     * temporary name, then the column and the journal (type, size and
+     * SHA-256 of the file, never its content); once committed, the file
+     * takes its name and a previous file of another name is deleted
+     * (StagedFile). A failed save leaves the old image intact.
+     *
+     * @param  'logo'|'signature'  $kind
+     *
+     * @throws ValidationException
+     */
+    private function storeImage(Company $company, UploadedFile $file, string $kind): void
+    {
+        $extension = self::detectedType($file) ?? throw ValidationException::withMessages([$kind => self::typeMessage($kind)]);
+        $column = $kind.'_path';
+
+        $directory = $this->directory($company);
+        $path = $directory.'/'.$kind.'.'.$extension;
+        $previous = $company->getAttribute($column);
+
+        // The new file under a temporary name: the current image stays intact until the save is committed.
+        $staged = StagedFile::stage($directory, $file, $extension);
+        if ($staged === null) {
+            report(new RuntimeException("Company {$kind} could not be written to the private disk."));
+
+            throw ValidationException::withMessages([$kind => ($kind === 'logo' ? 'Le logo' : 'La signature')." n'a pas pu être enregistré".($kind === 'logo' ? '' : 'e').". Réessayez ou contactez l'administrateur."]);
+        }
+
+        try {
+            DB::transaction(function () use ($company, $path, $previous, $extension, $file, $staged, $kind, $column): void {
+                $company->setAttribute($column, $path);
+                $company->save();
+                $this->audit->record("company.{$kind}_changed", $company, [$kind => $previous === null ? null : pathinfo($previous, PATHINFO_BASENAME)], [
+                    $kind => $kind.'.'.$extension,
+                    'size' => $file->getSize(),
+                    'sha256' => hash_file('sha256', (string) $file->getRealPath()),
+                ]);
+                // The brand (sidebar) is recomputed once the new logo is in place.
+                StagedFile::promote($staged, $path, $previous !== null && $this->isOwnPath($company, $previous) ? $previous : null,
+                    fn () => $kind === 'logo' ? Brand::forget($company->tenant_id) : null);
+            });
+        } catch (\Throwable $e) {
+            StagedFile::discard($staged);
+
+            throw $e;
+        }
+    }
+
+    /** @param  'logo'|'signature'  $kind */
+    private function deleteImage(Company $company, string $kind): void
+    {
+        $column = $kind.'_path';
+        $previous = $company->getAttribute($column);
+        if ($previous === null) {
+            return;
+        }
+
+        DB::transaction(function () use ($company, $previous, $kind, $column): void {
+            $company->setAttribute($column, null);
+            $company->save();
+            $this->audit->record("company.{$kind}_deleted", $company, [$kind => pathinfo($previous, PATHINFO_BASENAME)]);
+        });
+
+        if ($this->isOwnPath($company, $previous)) {
+            Storage::disk(TenantStorage::DISK)->delete($previous);
+        }
+    }
+
+    public static function typeMessage(string $kind): string
+    {
+        return $kind === 'signature' ? 'La signature doit être une image PNG ou JPEG.' : self::TYPE_MESSAGE;
+    }
+
+    /**
+     * @return array{content: string, mime: string, sha256: string}|null
+     */
+    private function imageFile(Company $company, ?string $path): ?array
+    {
         if ($path === null || ! $this->isOwnPath($company, $path)) {
             return null;
         }

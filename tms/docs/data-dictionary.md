@@ -728,6 +728,24 @@ Clé (`tenant_id`, `year`) : `last_number` (année de Paris, incrémenté dans l
 ### Catalogue
 `trainings.rncp_code` (string(20), null) : code RNCP de la certification (`RNCP` + chiffres).
 
+## Module Documents (0.10)
+
+### `documents` — documents émis
+`type` (`convention`, `contract` ; `convocation`, `completion_certificate`, `realisation_certificate` réservés, CHECK) · `dossier_id` · `enrolment_id` (null) · `company_id` · `number` (`DOC-<année>-<NNNNN>`, unique par organisme) · `recipient_snapshot` (jsonb : nom, adresse, contact, e-mail, `person_id` ; `$auditPersonal`, effacé par l'anonymisation) · `pdf_path` (zone `documents`) · `pdf_sha256` · `status` (`issued`, `sent`, `signature_pending`, `signed`, `cancelled`) · `issued_at`, `issued_by` · `sent_at`, `email_status`, `email_error_code` · `cancelled_at`, `cancelled_by`, `cancel_reason`. Déclencheur `documents_immutable` : jamais supprimé ; seuls l'état, l'envoi, l'annulation et le destinataire figé (anonymisation) changent.
+
+### `document_sequences` — numérotation
+(`tenant_id`, `year`) unique · `last_number`.
+
+### `document_sendings` — e-mails des documents
+`document_id` · `email`, `subject`, `body` (effacés par l'anonymisation) · `status` (`pending`, `sent`, `failed`) · `error` (motif fixe), `error_code` · `sent_at` · `sent_by`.
+
+### `document_texts` — textes de l'organisme
+`company_id` (null = organisme) · `type` · `block` · `body` · `updated_by` ; unique par (organisme, société, type, bloc). Sans ligne : texte d'origine (`DocumentTexts`).
+
+`companies.signature_path` : image de signature et cachet (disque privé).
+
+Permissions : `documents.view`, `documents.manage` (à périmètre, celui du dossier).
+
 ## Module Qualité
 
 ### `quality_indicators` — suivi d'un indicateur Qualiopi

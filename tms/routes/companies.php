@@ -12,4 +12,6 @@ Route::middleware(['auth', 'can:companies.manage'])->prefix('admin/companies')->
     Route::put('{company}', [CompanyController::class, 'update'])->name('update');
     Route::post('{company}/logo', [CompanyController::class, 'storeLogo'])->name('logo.store');
     Route::delete('{company}/logo', [CompanyController::class, 'destroyLogo'])->name('logo.destroy');
+    Route::post('{company}/signature', [CompanyController::class, 'storeSignature'])->name('signature.store');
+    Route::delete('{company}/signature', [CompanyController::class, 'destroySignature'])->name('signature.destroy');
 });

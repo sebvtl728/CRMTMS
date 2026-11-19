@@ -389,3 +389,11 @@ Guide utilisateur : `admissions.md`.
 - **Catalogue** : champ **Code RNCP** sur la fiche formation (`RNCP` suivi de chiffres), repris par les candidatures.
 - **Fichiers** : zone `admissions` du disque privé de l'organisme (`TenantStorage`), comprise dans la sauvegarde.
 - **Conservation** : `tms:admissions:purge` (chaque nuit, 3 h 50, heure de Paris) anonymise les candidatures non retenues ou désistées sans modification depuis 2 ans.
+
+## 20. Documents de formation (0.10)
+
+- **Modèles de documents** (droit `settings.manage`) : textes de la convention et du contrat, pour l'organisme ou par
+  société, avec retour au texte d'origine ; détails dans `documents.md` § 4.
+- **Signature et cachet** : Administration › Sociétés, image PNG ou JPEG (1 Mo), imprimée sur les documents émis.
+- **Droits** : `documents.view` et `documents.manage`, à périmètre (celui du dossier) ; défauts dans `documents.md` § 1.
+- **Modèles d'e-mails** : « Envoi d'une convention de formation » et « Envoi d'un contrat de formation ».

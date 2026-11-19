@@ -1,4 +1,5 @@
 import { BlockRows, type FicheBlock } from '@/components/crm/fiche-blocks';
+import { DocumentsBlock } from '@/components/documents/documents-block';
 import { BillingBlock } from '@/components/finance/billing-block';
 import { type ComponentType } from 'react';
 
@@ -16,6 +17,7 @@ export interface DossierBlock extends FicheBlock {
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const COMPONENTS: Record<string, ComponentType<any>> = {
     'finance.billing': BillingBlock,
+    'documents.dossier': DocumentsBlock,
 };
 
 /** A block of the dossier page: its component (when known), then its rows. */
@@ -25,7 +27,8 @@ export function DossierBlockPanel({ block }: { block: DossierBlock }) {
     return (
         <div className="grid gap-3">
             {Component && <Component {...block.props} />}
-            <BlockRows block={block} />
+            {/* A component listing its own items sends no rows and an empty « empty » text: nothing more to show. */}
+            {(block.rows.length > 0 || block.empty !== '') && <BlockRows block={block} />}
         </div>
     );
 }

@@ -23,6 +23,7 @@ import {
     DoorOpen,
     Euro,
     Factory,
+    FileSignature,
     FileText,
     GraduationCap,
     Handshake,
@@ -102,6 +103,7 @@ const adminNavItems: (NavItem & { permission: string })[] = [
     { title: "Règle d'abandon", url: '/admin/abandon-rule', icon: UserMinus, permission: 'settings.manage' },
     { title: 'Salles et fermetures', url: '/admin/sessions-settings', icon: DoorOpen, permission: 'sessions.rooms.manage' },
     { title: "Modèles d'e-mails", url: '/admin/mail-templates', icon: Mail, permission: 'settings.manage' },
+    { title: 'Modèles de documents', url: '/admin/document-texts', icon: FileSignature, permission: 'settings.manage' },
 ];
 
 export function AppSidebar() {
