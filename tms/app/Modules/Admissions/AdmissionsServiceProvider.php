@@ -11,6 +11,7 @@ use App\Modules\Admissions\CustomFields\CustomFieldDefinition;
 use App\Modules\Admissions\Gdpr\CandidatureAnonymisation;
 use App\Modules\Admissions\Gdpr\PersonCandidaturesExport;
 use App\Modules\Admissions\History\CandidatureHistory;
+use App\Modules\Admissions\OnlineTests\OnlineTest;
 use App\Modules\Admissions\Positioning\PositioningSending;
 use App\Modules\Admissions\Positioning\PositioningSendings;
 use App\Modules\Catalogue\Brochures;
@@ -61,6 +62,7 @@ class AdmissionsServiceProvider extends ServiceProvider
             AlternanceContract::MORPH_ALIAS => AlternanceContract::class,
             CustomFieldDefinition::MORPH_ALIAS => CustomFieldDefinition::class,
             PositioningSending::MORPH_ALIAS => PositioningSending::class,
+            OnlineTest::MORPH_ALIAS => OnlineTest::class,
         ]);
 
         PositioningSendings::registerTemplate();
@@ -128,6 +130,7 @@ class AdmissionsServiceProvider extends ServiceProvider
         ReferenceUsage::register(ReferenceList::Das, 'candidatures', 'das_id');
         ReferenceUsage::register(ReferenceList::ContactOrigin, 'candidatures', 'origin_id');
         ReferenceUsage::register(ReferenceList::CandidatureRefusalReason, 'candidatures', 'decision_reason_id');
+        ReferenceUsage::register(ReferenceList::Das, 'online_test_das', 'das_id');
     }
 
     public static function registerTrainingUsage(): void
