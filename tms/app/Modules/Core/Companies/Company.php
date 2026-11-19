@@ -42,6 +42,7 @@ use Illuminate\Support\Facades\DB;
  * @property string|null $phone
  * @property bool $is_default
  * @property string|null $logo_path private disk, set by CompanyBranding only
+ * @property string|null $signature_path signature and stamp, private disk, set by CompanyBranding only
  * @property string $quote_prefix ^[A-Z0-9]{1,10}$
  * @property int $quote_validity_days 1 to 365
  * @property string|null $quote_terms
@@ -74,7 +75,7 @@ class Company extends Model
      *
      * @var list<string>
      */
-    protected array $auditIgnore = ['logo_path'];
+    protected array $auditIgnore = ['logo_path', 'signature_path'];
 
     /** @var array<string, mixed> */
     protected $attributes = [

@@ -60,6 +60,8 @@ interface CompanyData
     invoice_footer: string | null;
     /** data URI of the current logo, null without one */
     logo: string | null;
+    /** data URI of the signature and stamp printed on the training documents, null without one */
+    signature: string | null;
 }
 
 const MAX_LOGO_BYTES = 1024 * 1024;
@@ -154,6 +156,37 @@ export default function EditCompany({ company, mentions, legalForms, underlyingF
     const removeLogo = () => {
         if (!company || !window.confirm('Supprimer le logo ? Il n’apparaîtra plus sur les devis.')) return;
         router.delete(route('admin.companies.logo.destroy', company.id), { preserveScroll: true, preserveState: true });
+    };
+
+    const [signatureError, setSignatureError] = useState<string | undefined>();
+    const [signatureSaving, setSignatureSaving] = useState(false);
+
+    const uploadSignature = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        e.target.value = '';
+        if (!file || !company) return;
+        setSignatureError(undefined);
+        if (file.size > MAX_LOGO_BYTES) {
+            setSignatureError('La signature ne doit pas dépasser 1 Mo.');
+            return;
+        }
+        setSignatureSaving(true);
+        router.post(
+            route('admin.companies.signature.store', company.id),
+            { signature: file },
+            {
+                forceFormData: true,
+                preserveScroll: true,
+                preserveState: true,
+                onError: (errs) => setSignatureError(errs.signature ?? 'La signature n’a pas pu être enregistrée.'),
+                onFinish: () => setSignatureSaving(false),
+            },
+        );
+    };
+
+    const removeSignature = () => {
+        if (!company || !window.confirm('Supprimer la signature ? Elle n’apparaîtra plus sur les conventions et contrats émis ensuite.')) return;
+        router.delete(route('admin.companies.signature.destroy', company.id), { preserveScroll: true, preserveState: true });
     };
 
     const [preview, setPreview] = useState(mentions);
@@ -372,6 +405,43 @@ export default function EditCompany({ company, mentions, legalForms, underlyingF
                                 PNG ou JPEG, 1 Mo au maximum.
                             </p>
                             <InputError message={logoError} />
+                        </div>
+
+                        <div className="grid gap-2">
+                            <Label htmlFor="signature">Signature et cachet</Label>
+                            {company ? (
+                                <div className="flex flex-wrap items-center gap-4">
+                                    {company.signature ? (
+                                        <img
+                                            src={company.signature}
+                                            alt="Signature actuelle"
+                                            className="h-16 max-w-48 rounded border object-contain p-1"
+                                        />
+                                    ) : (
+                                        <span className="text-muted-foreground text-sm">Aucune signature</span>
+                                    )}
+                                    <Input
+                                        id="signature"
+                                        type="file"
+                                        accept="image/png,image/jpeg"
+                                        onChange={uploadSignature}
+                                        disabled={signatureSaving}
+                                        className="max-w-xs"
+                                        aria-describedby="signature-help"
+                                    />
+                                    {company.signature && (
+                                        <Button type="button" variant="outline" onClick={removeSignature}>
+                                            Supprimer la signature
+                                        </Button>
+                                    )}
+                                </div>
+                            ) : (
+                                <p className="text-muted-foreground text-sm">Enregistrez d’abord la société pour ajouter une signature.</p>
+                            )}
+                            <p id="signature-help" className="text-muted-foreground text-xs">
+                                Image de la signature et du cachet, apposée sur les conventions et contrats émis. PNG ou JPEG, 1 Mo au maximum.
+                            </p>
+                            <InputError message={signatureError} />
                         </div>
 
                         <div className="grid gap-6 sm:grid-cols-2">

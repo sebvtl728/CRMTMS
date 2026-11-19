@@ -97,6 +97,41 @@ class CompanyController extends Controller
         return back()->with('status', 'Logo enregistré.');
     }
 
+    /**
+     * Uploads (or replaces) the signature and stamp printed on the training documents.
+     */
+    public function storeSignature(Request $request, Company $company): RedirectResponse
+    {
+        $request->validate([
+            'signature' => [
+                'required', 'file', 'max:'.CompanyBranding::MAX_KILOBYTES,
+                function (string $attribute, mixed $value, Closure $fail): void {
+                    if ($value instanceof UploadedFile && CompanyBranding::detectedType($value) === null) {
+                        $fail(CompanyBranding::typeMessage('signature'));
+                    }
+                },
+            ],
+        ], [
+            'signature.required' => 'Choisissez une image.',
+            'signature.file' => 'Le fichier envoyé est invalide.',
+            'signature.uploaded' => 'La signature n\'a pas pu être envoyée (taille maximale : 1 Mo).',
+            'signature.max' => 'La signature ne doit pas dépasser 1 Mo.',
+        ]);
+
+        $file = $request->file('signature');
+        assert($file instanceof UploadedFile);
+        $this->branding->storeSignature($company, $file);
+
+        return back()->with('status', 'Signature enregistrée.');
+    }
+
+    public function destroySignature(Company $company): RedirectResponse
+    {
+        $this->branding->deleteSignature($company);
+
+        return back()->with('status', 'Signature supprimée.');
+    }
+
     public function destroyLogo(Company $company): RedirectResponse
     {
         $this->branding->deleteLogo($company);
@@ -155,6 +190,7 @@ class CompanyController extends Controller
                 'payment_terms_days' => $company->payment_terms_days,
                 'invoice_footer' => $company->invoice_footer,
                 'logo' => $this->branding->logoDataUri($company),
+                'signature' => $this->branding->signatureDataUri($company),
             ],
             // A new company: the first free prefix (one company per prefix).
             'nextPrefix' => $company === null ? Company::freePrefix() : $company->quote_prefix,
