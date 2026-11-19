@@ -32,7 +32,7 @@ export default function QualiopiIndex({ criteria, progress, decree, verify_notic
             <Head title="Qualiopi" />
             <div className="flex flex-col gap-4 p-4">
                 <div className="flex flex-wrap items-start justify-between gap-2">
-                    <Heading title="Qualiopi" description={`Référentiel national qualité — ${decree}`} />
+                    <Heading title="Qualiopi" description={`Référentiel national qualité - ${decree}`} />
                     <Button asChild variant="outline">
                         <a href="/qualite/qualiopi/export">
                             <Download className="h-4 w-4" />
@@ -76,7 +76,7 @@ export default function QualiopiIndex({ criteria, progress, decree, verify_notic
                     return (
                         <section key={c.number} className="grid gap-2">
                             <h2 className="text-base font-semibold">
-                                Critère {c.number} — {c.title}{' '}
+                                Critère {c.number} - {c.title}{' '}
                                 <span className="text-muted-foreground text-sm font-normal">
                                     ({ready} / {applicable} prêts)
                                 </span>
