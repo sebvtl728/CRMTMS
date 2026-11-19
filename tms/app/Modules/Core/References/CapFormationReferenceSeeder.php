@@ -66,6 +66,7 @@ final class CapFormationReferenceSeeder
         'abandon_reason' => ['Démission', 'Maladie', 'Accident', 'Licenciement', 'Convenance personnelle', 'Autre'],
         'cancel_reason' => ['Effectif insuffisant', 'Demande du client', 'Report', 'Formateur indisponible', 'Financement refusé', 'Autre'],
         'bpf_category' => ["Salariés d'employeurs privés", "Demandeurs d'emploi", 'Particuliers', 'Autres'],
+        'candidature_refusal_reason' => ['Niveau insuffisant', 'Projet non adapté', 'Pas d\'entreprise d\'accueil', 'Places complètes', 'Autre'],
         'education_level' => ['Sans diplôme', 'Niveau 3 (CAP, BEP)', 'Niveau 4 (baccalauréat)', 'Niveau 5 (bac +2)', 'Niveau 6 (bac +3, bac +4)', 'Niveau 7 (bac +5)', 'Niveau 8 (doctorat)'],
         'training_modality' => ['Présentiel', 'Distanciel (classe virtuelle)', 'FOAD / e-learning', 'Mixte'],
         'sector' => ['Hôtellerie-restauration', 'Commerce', 'Industrie', 'Services', 'Santé-social', 'Collectivité', 'Autre'],

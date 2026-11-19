@@ -30,7 +30,7 @@ test('mail templates: insert a variable, preview, save, then back to the default
     await subject.fill('Votre proposition {numero_devis}');
     await page.getByRole('button', { name: 'Enregistrer' }).click();
     await expect(page.getByText('Modèle enregistré.')).toBeVisible();
-    await expect(page.getByText('Personnalisé')).toBeVisible();
+    await expect(page.getByText('Personnalisé', { exact: true })).toBeVisible();
 
     page.once('dialog', (dialog) => dialog.accept());
     await page.getByRole('button', { name: 'Rétablir le modèle par défaut' }).click();

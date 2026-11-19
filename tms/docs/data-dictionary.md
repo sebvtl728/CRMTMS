@@ -682,8 +682,32 @@ Une ligne par « Envoyer » / « Renvoyer » : `invoice_id` (FK), `email`, `subj
 ### Conservation légale et RGPD
 Une facture ou un avoir validé est une **pièce comptable à conserver 10 ans** : le droit à l'effacement ne s'y applique pas. L'anonymisation d'une personne (`Finance\Invoices\InvoiceAnonymisation`, enregistrée dans `Crm\Public\FicheLinks`) **ne touche jamais** une pièce validée ou envoyée (le contenu haché et la chaîne restent intacts, même si une ligne nomme un stagiaire), et **supprime seulement les brouillons** adressés à la personne ou aux dossiers où elle est ou a été stagiaire. `invoice_sendings` (adresse, message) suit la pièce et n'est pas purgée.
 
+## Admissions (candidats, apprenants, alternants)
+
+Toutes les tables ont `tenant_id`, RLS et le trait `BelongsToTenant`. Le module ne lit les fiches du CRM, le catalogue et les dossiers que par leurs services publics.
+
+### `candidatures` — candidatures
+`id`, `tenant_id` · `number` (`C-<AAAA>-<NNNN>`, unique par organisme, `CandidatureNumbering`) · `person_id` (FK `people`) · `status` (`identified`, `positioning_sent`, `positioning_received`, `interview`, `admitted`, `rejected`, `withdrawn`, CHECK) · `training_id` (FK `trainings`, null) · `rncp_code` · `target_session_id` (FK `training_sessions`, null à la suppression) · `das_id` (FK `reference_items`, périmètre « Ses DAS ») · `responsible_user_id`, `created_by` (périmètre « Ses fiches ») · `origin_id` (référentiel `contact_origin`) · `prescriber_organisation_id` (FK `organisations`) · `france_travail_id`, `last_diploma`, `legal_representative` (jsonb) · `rqth`, `adaptation_needs`, `interview_report` (**sensibles** : droit `admissions.sensitive.view`) · `positioning_sent_on`, `positioning_received_on`, `positioning_result` · `interview_at`, `interviewer_user_id` · `decision_reason_id` (référentiel `candidature_refusal_reason`, si `rejected`) · `dossier_id` (FK `dossiers`, unique partiel) · `custom_values` (jsonb, clé = id du champ personnalisé) · `anonymised_at` · horodatages, corbeille. `$auditPersonal` : représentant légal, RQTH, besoins, compte rendu, résultat du test, identifiant France Travail, dernier diplôme, valeurs personnalisées. Situation professionnelle et niveau de diplôme restent sur `people`.
+
+### `candidature_sequences` — compteurs
+Clé (`tenant_id`, `year`) : `last_number` (année de Paris, incrémenté dans la transaction de création).
+
+### `candidature_files` — fichiers
+`candidature_id` (FK, cascade) · `kind` (`positioning`, `contract`, `custom:<id>`) · `name` (`$auditPersonal`) · `size` · `path` (zone `admissions`) · `uploaded_by`. PDF, JPG ou PNG vérifiés par leur contenu, 20 Mo au plus.
+
+### `alternance_contracts` — contrat d'alternance
+`candidature_id` (FK unique, cascade) · `contract_type` (`apprenticeship`, `professionalisation`, CHECK) · `employer_organisation_id` (FK `organisations`) · `tutor_person_id` (FK `people`, null) · `starts_on` ≤ `ends_on` (CHECK) · `opco_organisation_id` (FK `organisations`, null).
+
+### `custom_field_definitions` — champs personnalisés
+`entity` (`candidature` seulement aujourd'hui) · `label` · `type` (`text`, `textarea`, `number`, `date`, `boolean`, `choice`, `file`, CHECK) · `options` (jsonb, choix) · `required_for_admission` · `position` · `hidden_at` (un champ utilisé se masque, ne se supprime pas).
+
+### Catalogue
+`trainings.rncp_code` (string(20), null) : code RNCP de la certification (`RNCP` + chiffres).
+
 ## Permissions CRM (catalogue global `permissions`)
 
 CRM : `crm.fiches.view|update|delete`, `crm.opportunities.view|update|delete`, `crm.quotes.view|update|delete`, `crm.activities.view|update|delete`, `crm.activities.team`, `crm.revenue.view`, `crm.revenue.manage`, `crm.merge`, `crm.import`, `crm.export`, `crm.gdpr` ; catalogue : `catalogue.view`, `catalogue.manage`, `catalogue.delete`. Les anciens `crm.view|create|update|delete` sont supprimés par la migration 0.5.0 (convertis organisme par organisme). La matrice par rôle est dans `admin.md`. `role_permission_defaults_applied` (`tenant_id`, `role`, `permission`) mémorise les droits par défaut déjà accordés à chaque organisme, pour qu'une mise à jour n'ajoute que les nouveaux droits sans rétablir ceux qu'un administrateur a retirés. `role_permission_scopes` (`tenant_id`, `role_id`, `permission`, `scope` = `own`/`das`/`all`/`trainer`) : périmètre d'un rôle pour un droit à périmètre ; sans ligne, le périmètre vaut `all` ; `trainer` (« Ses séances », 0.8.0) n'est accepté que pour `sessions.seances.view` et `sessions.attendance.manage`.
 
 Finance (0.9) : `finance.invoices.view`, `finance.invoices.manage`, `finance.invoices.validate` (tous à périmètre, celui du dossier ; défauts dans `admin.md` § 10).
+
+Admissions : `admissions.candidatures.view|update|delete` (à périmètre), `admissions.sensitive.view` (défauts dans `admin.md` § 19).

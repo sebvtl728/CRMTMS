@@ -78,7 +78,7 @@ export default function MergePage({ type, keep, drop, fields, counts, canSwap }:
     const errors = usePage().props.errors as Record<string, string | undefined>;
 
     const breadcrumbs: BreadcrumbItem[] = [
-        { title: isOrg ? 'Entreprises' : 'Personnes', href: isOrg ? '/crm/organisations' : '/crm/people' },
+        { title: isOrg ? 'Entreprises' : 'Interlocuteurs', href: isOrg ? '/crm/organisations' : '/crm/people' },
         { title: keep.name, href: showRoute(type, keep.id) },
         { title: 'Fusionner', href: '#' },
     ];

@@ -13,8 +13,8 @@ use Illuminate\Support\Facades\DB;
 use Spatie\Permission\PermissionRegistrar;
 
 /**
- * Without $withSessions, the rights of the Sessions (lot 2a) and Finance
- * (0.9) modules are left out: these tests replay the CRM and catalogue offers.
+ * Without $withSessions, the rights of the Sessions (lot 2a), Finance (0.9)
+ * and Admissions modules are left out: these tests replay the CRM and catalogue offers.
  *
  * @return array<string, list<string>> role name => sorted permission names, in $tenant
  */
@@ -25,7 +25,7 @@ function matrixOf(Tenant $tenant, bool $withSessions = false): array
 
         return RoleModel::query()->with('permissions')->get()
             ->mapWithKeys(fn (RoleModel $r) => [$r->name => $r->permissions->pluck('name')
-                ->reject(fn (string $p) => ! $withSessions && (str_starts_with($p, 'sessions.') || str_starts_with($p, 'finance.')))->sort()->values()->all()])
+                ->reject(fn (string $p) => ! $withSessions && (str_starts_with($p, 'sessions.') || str_starts_with($p, 'finance.') || str_starts_with($p, 'admissions.')))->sort()->values()->all()])
             ->all();
     });
 }
@@ -67,9 +67,9 @@ it('gives a new tenant the full matrix, CRM included', function () {
     $matrix = matrixOf($tenant, withSessions: true);
 
     expect($matrix['admin_organisme'])->toBe(collect(Permissions::all())->sort()->values()->all())
-        ->and($matrix['direction'])->toBe(['audit.view', 'catalogue.delete', 'catalogue.manage', 'catalogue.view', 'crm.activities.team', 'crm.activities.view', 'crm.export', 'crm.fiches.view', 'crm.gdpr', 'crm.opportunities.view', 'crm.quotes.view', 'crm.revenue.manage', 'crm.revenue.view', 'exports.run', 'finance.invoices.manage', 'finance.invoices.validate', 'finance.invoices.view', 'sessions.attendance.close', 'sessions.attendance.manage', 'sessions.dossiers.view', 'sessions.rooms.manage', 'sessions.seances.manage', 'sessions.seances.view', 'sessions.sessions.view', 'sessions.trainers.manage'])
-        ->and($matrix['assistant'])->toBe(['catalogue.view', 'crm.activities.delete', 'crm.activities.update', 'crm.activities.view', 'crm.fiches.update', 'crm.fiches.view', 'crm.opportunities.update', 'crm.opportunities.view', 'crm.quotes.update', 'crm.quotes.view', 'finance.invoices.manage', 'finance.invoices.view', 'sessions.attendance.manage', 'sessions.dossiers.update', 'sessions.dossiers.view', 'sessions.rooms.manage', 'sessions.seances.manage', 'sessions.seances.view', 'sessions.sessions.update', 'sessions.sessions.view', 'sessions.trainers.manage'])
-        ->and($matrix['responsable_das'])->toBe(['catalogue.view', 'crm.activities.view', 'crm.export', 'crm.fiches.view', 'crm.opportunities.view', 'crm.quotes.view', 'crm.revenue.view', 'sessions.dossiers.view', 'sessions.seances.view', 'sessions.sessions.view', 'sessions.trainers.manage'])
+        ->and($matrix['direction'])->toBe(['admissions.candidatures.view', 'admissions.sensitive.view', 'audit.view', 'catalogue.delete', 'catalogue.manage', 'catalogue.view', 'crm.activities.team', 'crm.activities.view', 'crm.export', 'crm.fiches.view', 'crm.gdpr', 'crm.opportunities.view', 'crm.quotes.view', 'crm.revenue.manage', 'crm.revenue.view', 'exports.run', 'finance.invoices.manage', 'finance.invoices.validate', 'finance.invoices.view', 'sessions.attendance.close', 'sessions.attendance.manage', 'sessions.dossiers.view', 'sessions.rooms.manage', 'sessions.seances.manage', 'sessions.seances.view', 'sessions.sessions.view', 'sessions.trainers.manage'])
+        ->and($matrix['assistant'])->toBe(['admissions.candidatures.update', 'admissions.candidatures.view', 'catalogue.view', 'crm.activities.delete', 'crm.activities.update', 'crm.activities.view', 'crm.fiches.update', 'crm.fiches.view', 'crm.opportunities.update', 'crm.opportunities.view', 'crm.quotes.update', 'crm.quotes.view', 'finance.invoices.manage', 'finance.invoices.view', 'sessions.attendance.manage', 'sessions.dossiers.update', 'sessions.dossiers.view', 'sessions.rooms.manage', 'sessions.seances.manage', 'sessions.seances.view', 'sessions.sessions.update', 'sessions.sessions.view', 'sessions.trainers.manage'])
+        ->and($matrix['responsable_das'])->toBe(['admissions.candidatures.update', 'admissions.candidatures.view', 'catalogue.view', 'crm.activities.view', 'crm.export', 'crm.fiches.view', 'crm.opportunities.view', 'crm.quotes.view', 'crm.revenue.view', 'sessions.dossiers.view', 'sessions.seances.view', 'sessions.sessions.view', 'sessions.trainers.manage'])
         ->and($matrix['formateur'])->toBe(['sessions.attendance.manage', 'sessions.seances.view']);
 });
 

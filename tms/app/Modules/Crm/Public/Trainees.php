@@ -67,6 +67,25 @@ final class Trainees
     }
 
     /**
+     * Ids of the people (trash included, anonymised ones excluded) whose name
+     * or e-mail contains every word of $q, as a subquery without limit: for a
+     * module filtering its own records by person (whereIn).
+     */
+    public function matchingIds(string $q): \Illuminate\Database\Query\Builder
+    {
+        $query = Person::withTrashed()->whereNull('people.anonymised_at')->select('people.id');
+        $words = preg_split('/\s+/u', trim($q), -1, PREG_SPLIT_NO_EMPTY) ?: [];
+        if ($words === []) {
+            $query->whereRaw('false');
+        }
+        foreach ($words as $word) {
+            $query->whereRaw('people.search_vector like public.immutable_unaccent(lower(?))', ['%'.addcslashes($word, '\\%_').'%']);
+        }
+
+        return $query->toBase();
+    }
+
+    /**
      * Creates an ordinary person of the CRM (journaled), optionally employed
      * by $data['organisation_id'] and given the DAS $data['das_ids'] (active
      * DAS of the organisme: those of the training the trainee is enrolled
@@ -112,6 +131,33 @@ final class Trainees
 
             return $person->id;
         });
+    }
+
+    /**
+     * Contact details and training profile of a person out of anonymisation
+     * (trashed included: a record that points to her keeps showing her);
+     * null when unknown or anonymised.
+     *
+     * @return array{id: string, label: string, email: ?string, phone: ?string, mobile: ?string, birth_date: ?string, education_level_id: ?string, professional_situation_id: ?string, trashed: bool}|null
+     */
+    public function profile(string $personId): ?array
+    {
+        $person = Str::isUuid($personId) ? Person::withTrashed()->whereNull('people.anonymised_at')->find($personId) : null;
+        if ($person === null) {
+            return null;
+        }
+
+        return [
+            'id' => $person->id,
+            'label' => $person->fullName(),
+            'email' => $person->email,
+            'phone' => $person->phone,
+            'mobile' => $person->mobile,
+            'birth_date' => $person->birth_date?->toDateString(),
+            'education_level_id' => $person->education_level_id,
+            'professional_situation_id' => $person->professional_situation_id,
+            'trashed' => $person->trashed(),
+        ];
     }
 
     /**

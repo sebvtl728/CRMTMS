@@ -33,3 +33,4 @@ require __DIR__.'/crm-revenue.php';
 require __DIR__.'/catalogue.php';
 require __DIR__.'/sessions.php';
 require __DIR__.'/finance.php';
+require __DIR__.'/admissions.php';

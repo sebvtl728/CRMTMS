@@ -34,6 +34,7 @@ interface ShowProps {
     training: {
         id: string;
         code: string | null;
+        rncp_code: string | null;
         title: string;
         das: string | null;
         duration_hours: string | null;
@@ -115,6 +116,7 @@ export default function TrainingShowPage({ training, brochures, blocks, can, sta
         .join(' · ');
     const facts: [string, string][] = [
         ['Code', training.code ?? '—'],
+        ['Code RNCP', training.rncp_code ?? '—'],
         ['DAS', training.das ?? '—'],
         ['Durée', duration || '—'],
         ['Modalité', training.modalities.length > 0 ? training.modalities.join(', ') : '—'],

@@ -324,3 +324,73 @@ it('detects every way Finance could reach Sessions, the Crm, the catalogue or th
         expect(namesSessionsTables($code), $code)->toBeTrue();
     }
 });
+
+// ---------------------------------------------------------------- Admissions
+
+/**
+ * A reference to another module than Admissions and Core beyond their public
+ * services: Crm\Public, Sessions\Public and the catalogue's Trainings,
+ * TrainingData and TrainingUsage (a use line, a grouped use or an inline
+ * fully qualified name).
+ */
+const ADMISSIONS_FOREIGN_REFERENCE = '/App\\\\Modules\\\\(?!(?:Admissions|Core)\b|Sessions\\\\Public\b|Crm\\\\Public\b|Catalogue\\\\(?:Trainings|TrainingData|TrainingUsage)\b)\w+'
+    .'|App\\\\Modules\\\\\{[^}]*\b(?!(?:Admissions|Core)\\\\|Sessions\\\\Public\b|Crm\\\\Public\b|Catalogue\\\\(?:Trainings|TrainingData|TrainingUsage)\b)(?:Sessions|Crm|Catalogue|Connectors|Finance)\\\\/';
+
+const ADMISSIONS_TABLES_LIST = 'candidatures|candidature_sequences|candidature_files|alternance_contracts|custom_field_definitions';
+
+const ADMISSIONS_TABLES = '/[\'"`](?:public\.)?(?:'.ADMISSIONS_TABLES_LIST.')(?:[\'"`.]|\s+as\b)'
+    .'|\b(?:exists|unique):(?:public\.)?(?:'.ADMISSIONS_TABLES_LIST.')\b'
+    .'|\b(?:from|join|into|update)\s+(?:public\.)?["`]?(?:'.ADMISSIONS_TABLES_LIST.')\b/i';
+
+it('keeps every other module free of any reference to the Admissions module or its tables', function () {
+    foreach (['Crm', 'Catalogue', 'Core', 'Connectors', 'Sessions', 'Finance'] as $module) {
+        expect(moduleFilesMatching($module, '/App\\\\Modules\\\\Admissions\\\\|App\\\\Modules\\\\\{[^}]*\bAdmissions\\\\/'), $module)->toBe([])
+            ->and(moduleFilesMatching($module, ADMISSIONS_TABLES), $module)->toBe([]);
+    }
+});
+
+it('lets Admissions reach the other modules through their public services only, never their tables', function () {
+    expect(moduleFilesMatching('Admissions', ADMISSIONS_FOREIGN_REFERENCE))->toBe([]);
+
+    $offenders = [];
+    foreach (new RecursiveIteratorIterator(new RecursiveDirectoryIterator(app_path('Modules/Admissions'))) as $file) {
+        if ($file->getExtension() !== 'php') {
+            continue;
+        }
+        $code = (string) file_get_contents($file->getPathname());
+        if (namesCrmTables($code) || namesCatalogueTables($code) || namesSessionsTables($code)) {
+            $offenders[] = $file->getPathname();
+        }
+    }
+    expect($offenders)->toBe([]);
+});
+
+it('detects every way Admissions could reach another module beyond its public services', function () {
+    foreach ([
+        'use App\Modules\Crm\People\Person;',
+        'use App\Modules\Sessions\Dossiers\DossierWriter;',
+        'use App\Modules\Catalogue\Training;',
+        'use App\Modules\Finance\Invoices\Invoice;',
+        'use App\Modules\Connectors\Smtp\TenantMailer;',
+        'use App\Modules\{Crm\People\Person, Core\Access\Role};',
+        '$x = \App\Modules\Sessions\SessionsVisibility::class;',
+    ] as $code) {
+        expect(preg_match(ADMISSIONS_FOREIGN_REFERENCE, $code), $code)->toBe(1);
+    }
+    foreach ([
+        'use App\Modules\Crm\Public\Fiches;',
+        'use App\Modules\Sessions\Public\Admission;',
+        'use App\Modules\Catalogue\TrainingData;',
+        'use App\Modules\Core\Tenancy\TenantStorage;',
+        'use App\Modules\Admissions\Candidatures\Candidature;',
+        'use App\Modules\{Core\Access\Role, Crm\Public\Fiches};',
+    ] as $code) {
+        expect(preg_match(ADMISSIONS_FOREIGN_REFERENCE, $code), $code)->toBe(0);
+    }
+    foreach (["DB::table('candidatures')", "->join('alternance_contracts as a', 'x', 'y')", 'select 1 from custom_field_definitions', "'x' => 'exists:candidature_files,id'"] as $code) {
+        expect(preg_match(ADMISSIONS_TABLES, $code), $code)->toBe(1);
+    }
+    foreach (["'candidature_id'", "'admissions.candidatures.view'", '// the candidatures of a person'] as $code) {
+        expect(preg_match(ADMISSIONS_TABLES, $code), $code)->toBe(0);
+    }
+});

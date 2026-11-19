@@ -503,8 +503,9 @@ it('lists on the fiche of a particulier the dossiers she is the contractant of',
     $block = fn (Assert $page) => $page->where('blocks.1.key', 'sessions.dossiers')->has('blocks.1.rows', 1)
         ->where('blocks.1.rows.0.title', "Dossier {$dossier->number}")->where('blocks.1.rows.0.href', "/dossiers/{$dossier->id}");
     $this->actingAs(admin(true))->get("/crm/people/{$lea->id}")->assertInertia($block);
-    // An interlocuteur, contractant of nothing: no « Dossiers » block.
-    $this->get("/crm/people/{$interlocuteur->id}")->assertInertia(fn (Assert $page) => $page->has('blocks', 1)->where('blocks.0.key', 'sessions.enrolments'));
+    // An interlocuteur, contractant of nothing: no « Dossiers » block (the « Candidatures » block of Admissions follows).
+    $this->get("/crm/people/{$interlocuteur->id}")->assertInertia(fn (Assert $page) => $page->has('blocks', 2)
+        ->where('blocks.0.key', 'sessions.enrolments')->where('blocks.1.key', 'admissions.candidatures'));
 
     // Scoped by sessions.dossiers.view; without it, no block.
     $own = enrUser(['crm.fiches.view' => null, Permissions::DOSSIERS_VIEW => AccessScope::Own]);

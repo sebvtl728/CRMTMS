@@ -1,0 +1,48 @@
+<?php
+
+namespace App\Modules\Admissions\Gdpr;
+
+use App\Modules\Admissions\Candidatures\Candidature;
+use App\Modules\Admissions\Candidatures\CandidatureFiles;
+use Illuminate\Support\Facades\DB;
+
+/**
+ * Anonymisation of candidatures: personal, sensitive and custom values and
+ * every file go; the number, stage, training, dates and DAS stay (statistics).
+ * Called for an anonymised person (Crm\Public\FicheLinks) and by the
+ * two-year purge of rejected and withdrawn candidatures.
+ */
+final class CandidatureAnonymisation
+{
+    public function anonymise(Candidature $candidature): void
+    {
+        if ($candidature->anonymised_at !== null) {
+            return;
+        }
+        DB::transaction(function () use ($candidature): void {
+            app(CandidatureFiles::class)->purge($candidature);
+            $candidature->forceFill([
+                'legal_representative' => null,
+                'rqth' => false,
+                'adaptation_needs' => null,
+                'interview_report' => null,
+                'positioning_result' => null,
+                'france_travail_id' => null,
+                'last_diploma' => null,
+                'custom_values' => [],
+                'anonymised_at' => now(),
+            ])->save();
+        });
+    }
+
+    /**
+     * Every candidature (trashed ones included) of these people.
+     *
+     * @param  list<string>  $personIds
+     */
+    public function forPeople(array $personIds): void
+    {
+        Candidature::withTrashed()->whereIn('person_id', $personIds)->whereNull('anonymised_at')->get()
+            ->each(fn (Candidature $c) => $this->anonymise($c));
+    }
+}

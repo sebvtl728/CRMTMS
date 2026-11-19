@@ -74,7 +74,7 @@ interface IndexProps {
     status?: string;
 }
 
-const breadcrumbs: BreadcrumbItem[] = [{ title: 'Personnes', href: '/crm/people' }];
+const breadcrumbs: BreadcrumbItem[] = [{ title: 'Interlocuteurs', href: '/crm/people' }];
 
 export default function PeopleIndex({ people, filters, options, can, savedFilters, activeSavedId, columns, status }: IndexProps) {
     const [search, setSearch] = useState(filters.q);
@@ -128,11 +128,11 @@ export default function PeopleIndex({ people, filters, options, can, savedFilter
 
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
-            <Head title="Personnes" />
+            <Head title="Interlocuteurs" />
 
             <div className="flex flex-col gap-4 p-4">
                 <div className="flex flex-wrap items-start justify-between gap-4">
-                    <Heading title="Personnes" description="Particuliers et interlocuteurs de vos entreprises" />
+                    <Heading title="Interlocuteurs" description="Particuliers et interlocuteurs de vos entreprises" />
                     <div className="flex flex-wrap gap-2">
                         {can.import && (
                             <Button asChild variant="outline">

@@ -21,7 +21,9 @@ use InvalidArgumentException;
  * (each test) starts with only what the providers register.
  *
  * @phpstan-type BlockRow array{id: string, title: string, subtitle?: string|null, meta?: string|null, badge?: string|null, href?: string|null, details?: list<string>}
- * @phpstan-type Block array{key: string, title: string, empty: string, rows: list<BlockRow>}
+ * A block may carry an action (label, href): a button the fiche shows above
+ * its rows, for who may use it (« Ouvrir une candidature »).
+ * @phpstan-type Block array{key: string, title: string, empty: string, rows: list<BlockRow>, action?: array{label: string, href: string}|null}
  */
 final class FicheBlocks
 {

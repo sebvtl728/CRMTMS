@@ -140,7 +140,7 @@ export default function PersonShow({
     const [tab, setTab] = useState<string>('Informations');
 
     const breadcrumbs: BreadcrumbItem[] = [
-        { title: 'Personnes', href: '/crm/people' },
+        { title: 'Interlocuteurs', href: '/crm/people' },
         { title: p.name, href: route('crm.people.show', p.id) },
     ];
 
