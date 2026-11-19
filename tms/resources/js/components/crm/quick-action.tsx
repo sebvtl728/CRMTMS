@@ -203,10 +203,55 @@ type CreateFields = {
     next_type_id: string;
     next_due_at: string;
     responsible_user_id: string;
+    collaborator_ids: string[];
 };
 
+/**
+ * « Collaborateurs »: colleagues taking part besides the responsible (who
+ * is left out of the list); they see the action in their « À faire » and
+ * planning.
+ */
+function CollaboratorsField({
+    id,
+    options,
+    value,
+    responsibleId,
+    onChange,
+    error,
+}: {
+    id: string;
+    options: Option[];
+    value: string[];
+    responsibleId: string;
+    onChange: (ids: string[]) => void;
+    error?: string;
+}) {
+    const choices = options.filter((o) => o.value !== responsibleId);
+    if (choices.length === 0) return null;
+
+    return (
+        <fieldset className="grid gap-2" id={id}>
+            <legend className="text-sm font-medium">Collaborateurs</legend>
+            <div className="grid max-h-36 gap-1 overflow-y-auto rounded-md border p-2 sm:grid-cols-2">
+                {choices.map((o) => (
+                    <Label key={o.value} className="flex items-center gap-2 font-normal">
+                        <input
+                            type="checkbox"
+                            checked={value.includes(o.value)}
+                            onChange={(e) => onChange(e.target.checked ? [...value, o.value] : value.filter((v) => v !== o.value))}
+                        />
+                        {o.label}
+                    </Label>
+                ))}
+            </div>
+            <p className="text-muted-foreground text-xs">Ils voient l’action dans leur « À faire » et leur planning.</p>
+            <InputError message={error} />
+        </fieldset>
+    );
+}
+
 function CreateForm({ context, onDone }: { context: QuickActionContext; onDone: () => void }) {
-    const [choices, setChoices] = useState<(Choices & { responsibles: Option[] }) | null>(null);
+    const [choices, setChoices] = useState<(Choices & { responsibles: Option[]; collaborators: Option[] }) | null>(null);
     const [failed, setFailed] = useState(false);
     const [fiches, setFiches] = useState<{ organisation: Fiche | null; person: Fiche | null; opportunity: Fiche | null }>({
         organisation: null,
@@ -231,6 +276,7 @@ function CreateForm({ context, onDone }: { context: QuickActionContext; onDone: 
         next_type_id: '',
         next_due_at: '',
         responsible_user_id: '',
+        collaborator_ids: [],
     });
 
     useEffect(() => {
@@ -238,11 +284,11 @@ function CreateForm({ context, onDone }: { context: QuickActionContext; onDone: 
         if (context.organisation_id) params.set('organisation', context.organisation_id);
         if (context.person_id) params.set('person', context.person_id);
         if (context.opportunity_id) params.set('opportunity', context.opportunity_id);
-        getJson<Choices & { context: typeof fiches; responsibles: Option[]; responsible_user_id: string }>(
+        getJson<Choices & { context: typeof fiches; responsibles: Option[]; collaborators: Option[]; responsible_user_id: string }>(
             `${route('crm.activities.options')}?${params}`,
         )
             .then((json) => {
-                setChoices({ types: json.types, results: json.results, responsibles: json.responsibles });
+                setChoices({ types: json.types, results: json.results, responsibles: json.responsibles, collaborators: json.collaborators ?? [] });
                 setFiches(json.context);
                 const call = json.types.find((t) => t.code === 'appel') ?? json.types[0];
                 setData((current) => ({
@@ -457,6 +503,15 @@ function CreateForm({ context, onDone }: { context: QuickActionContext; onDone: 
                 <InputError message={errors.responsible_user_id} />
             </div>
 
+            <CollaboratorsField
+                id="qa-collaborators"
+                options={choices.collaborators}
+                value={data.collaborator_ids}
+                responsibleId={data.responsible_user_id}
+                onChange={(ids) => setData('collaborator_ids', ids)}
+                error={errors.collaborator_ids}
+            />
+
             {data.done && (
                 <NextFollowUp
                     types={choices.types}
@@ -494,6 +549,7 @@ interface ActivityData {
     next_steps: string | null;
     result_id: string | null;
     responsible_user_id: string | null;
+    collaborators?: { id: string; name: string }[];
     organisation: Fiche | null;
     person: Fiche | null;
     opportunity: Fiche | null;
@@ -632,6 +688,7 @@ type EditFields = {
     duration_minutes: string;
     location: string;
     responsible_user_id: string;
+    collaborator_ids: string[];
     purpose: string;
     result_id: string;
     report: string;
@@ -644,7 +701,7 @@ type EditFields = {
  * concerns are not changed (read-only).
  */
 function EditForm({ activityId, onDone }: { activityId: string; onDone: () => void }) {
-    const [loaded, setLoaded] = useState<(Choices & { activity: ActivityData; responsibles: Option[] }) | null>(null);
+    const [loaded, setLoaded] = useState<(Choices & { activity: ActivityData; responsibles: Option[]; collaborators: Option[] }) | null>(null);
     const [failed, setFailed] = useState(false);
     // Dates as loaded: sent back only when changed (no minute rounding of an untouched date).
     const [initialDates, setInitialDates] = useState({ due_at: '', done_at: '' });
@@ -656,6 +713,7 @@ function EditForm({ activityId, onDone }: { activityId: string; onDone: () => vo
         duration_minutes: '',
         location: '',
         responsible_user_id: '',
+        collaborator_ids: [],
         purpose: '',
         result_id: '',
         report: '',
@@ -663,9 +721,9 @@ function EditForm({ activityId, onDone }: { activityId: string; onDone: () => vo
     });
 
     useEffect(() => {
-        getJson<Choices & { activity: ActivityData; responsibles: Option[] }>(route('crm.activities.show', activityId))
+        getJson<Choices & { activity: ActivityData; responsibles: Option[]; collaborators: Option[] }>(route('crm.activities.show', activityId))
             .then((json) => {
-                setLoaded(json);
+                setLoaded({ ...json, collaborators: json.collaborators ?? [] });
                 const a = json.activity;
                 setInitialDates({ due_at: isoToLocal(a.due_at), done_at: isoToLocal(a.done_at) });
                 setData({
@@ -676,6 +734,7 @@ function EditForm({ activityId, onDone }: { activityId: string; onDone: () => vo
                     duration_minutes: a.duration_minutes === null ? '' : String(a.duration_minutes),
                     location: a.location ?? '',
                     responsible_user_id: a.responsible_user_id ?? '',
+                    collaborator_ids: (a.collaborators ?? []).map((u) => u.id),
                     purpose: a.purpose ?? '',
                     result_id: a.result_id ?? '',
                     report: a.report ?? '',
@@ -710,6 +769,7 @@ function EditForm({ activityId, onDone }: { activityId: string; onDone: () => vo
                 purpose: d.purpose,
                 next_steps: d.next_steps,
                 ...(d.responsible_user_id ? { responsible_user_id: d.responsible_user_id } : {}),
+                collaborator_ids: d.collaborator_ids.filter((id) => id !== d.responsible_user_id),
             };
 
             const doneAt = d.done_at !== initialDates.done_at ? { done_at: d.done_at } : {};
@@ -797,6 +857,14 @@ function EditForm({ activityId, onDone }: { activityId: string; onDone: () => vo
                     <InputError message={errors.responsible_user_id} />
                 </div>
             </div>
+            <CollaboratorsField
+                id="qa-edit-collaborators"
+                options={loaded.collaborators}
+                value={data.collaborator_ids}
+                responsibleId={data.responsible_user_id}
+                onChange={(ids) => setData('collaborator_ids', ids)}
+                error={errors.collaborator_ids}
+            />
 
             <div className="grid gap-2">
                 <Label htmlFor="qa-edit-subject">Objet *</Label>

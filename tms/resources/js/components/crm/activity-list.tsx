@@ -18,6 +18,7 @@ export interface ActivityRow {
     done_at: string | null;
     result: string | null;
     responsible: string | null;
+    collaborators?: { id: string; name: string }[];
     status: 'todo' | 'overdue' | 'done';
     status_label: string;
     /** The viewer's rights on this action (scope of crm.activities.update / delete). */
@@ -58,6 +59,7 @@ export function ActivityList({ activities }: { activities: ActivityRow[] }) {
                         <p className="text-muted-foreground text-xs">
                             {a.done_at ? `Faite le ${formatDateTime(a.done_at)}` : `Échéance : ${formatDateTime(a.due_at)}`}
                             {a.responsible && ` · ${a.responsible}`}
+                            {a.collaborators && a.collaborators.length > 0 && ` · avec ${a.collaborators.map((c) => c.name).join(', ')}`}
                             {a.location && ` · ${a.location}`}
                         </p>
                         {a.purpose && (

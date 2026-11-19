@@ -26,6 +26,7 @@ interface TodoRow {
     next_steps: string | null;
     due_at: string | null;
     responsible: string | null;
+    collaborators?: { id: string; name: string }[];
     status: 'todo' | 'overdue' | 'done';
     status_label: string;
     organisation: Fiche | null;
@@ -143,6 +144,7 @@ function TodoItem({ row, canEdit, team }: { row: TodoRow; canEdit: boolean; team
                     Échéance : {formatDateTime(row.due_at)}
                     {fiches.length > 0 && ` · ${fiches.map((f) => f.name).join(' · ')}`}
                     {team && row.responsible && ` · ${row.responsible}`}
+                    {row.collaborators && row.collaborators.length > 0 && ` · avec ${row.collaborators.map((c) => c.name).join(', ')}`}
                 </p>
                 <ActivityNotes purpose={row.purpose} nextSteps={row.next_steps} />
             </div>
