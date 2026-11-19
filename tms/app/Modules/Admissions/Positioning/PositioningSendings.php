@@ -206,7 +206,7 @@ final class PositioningSendings
                 'expires_at' => self::deadline(),
                 'created_by' => $by->id,
             ]);
-            foreach (array_values($versionIds) as $i => $versionId) {
+            foreach ($versionIds as $i => $versionId) {
                 DB::table('positioning_sending_versions')->insert([
                     'tenant_id' => $sending->tenant_id, 'positioning_sending_id' => $sending->id, 'brochure_version_id' => $versionId, 'position' => $i,
                 ]);
