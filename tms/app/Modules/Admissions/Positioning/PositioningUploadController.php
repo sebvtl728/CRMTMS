@@ -4,6 +4,7 @@ namespace App\Modules\Admissions\Positioning;
 
 use App\Http\Controllers\Controller;
 use App\Modules\Admissions\Candidatures\Candidature;
+use App\Modules\Admissions\OnlineTests\OnlinePassage;
 use App\Modules\Catalogue\Brochures;
 use App\Modules\Catalogue\Trainings;
 use App\Modules\Core\Tenancy\TenantContext;
@@ -36,6 +37,8 @@ class PositioningUploadController extends Controller
         $titles = app(Brochures::class)->sent($sending->versionIds());
 
         return Inertia::render('public/positioning-test', [
+            'mode' => $sending->online_test_version_id !== null ? 'online' : 'upload',
+            'online' => $sending->online_test_version_id !== null ? OnlinePassage::props($sending) : null,
             'state' => $sending->submitted_at !== null ? 'submitted' : 'open',
             'organisme' => (string) (app(TenantContext::class)->current()->name ?? ''),
             'first_name' => (string) ($person['first_name'] ?? ''),
@@ -78,7 +81,7 @@ class PositioningUploadController extends Controller
     public function store(Request $request, string $token, PositioningUploads $uploads): RedirectResponse
     {
         $sending = PositioningUploads::usable($token);
-        abort_if($sending === null, 404);
+        abort_if($sending === null || $sending->online_test_version_id !== null, 404);
         $uploads->submit($sending, ['files' => $request->file('files', []), 'done' => $request->input('done')]);
 
         return redirect()->route('positioning.show', $token)->with('status', 'Merci, votre copie a bien été reçue.');

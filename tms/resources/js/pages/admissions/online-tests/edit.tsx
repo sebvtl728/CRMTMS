@@ -22,7 +22,7 @@ interface EditProps {
         published_version: number | null;
         published_at: string | null;
     };
-    options: { das: Option[]; trainings: Option[] };
+    options: { das: Option[]; training_options: Option[] };
     status?: string;
 }
 
@@ -308,7 +308,7 @@ export default function OnlineTestEdit({ test, options, status }: EditProps) {
                     </fieldset>
                     <fieldset className="grid max-h-48 gap-1 overflow-y-auto">
                         <legend className="mb-1 text-sm font-medium">Formations concernées</legend>
-                        {options.trainings.map((t) => (
+                        {options.training_options.map((t) => (
                             <Label key={t.value} className="flex items-center gap-2 font-normal">
                                 <input
                                     type="checkbox"

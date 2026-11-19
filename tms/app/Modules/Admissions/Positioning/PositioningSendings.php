@@ -4,6 +4,7 @@ namespace App\Modules\Admissions\Positioning;
 
 use App\Modules\Admissions\Candidatures\Candidature;
 use App\Modules\Admissions\Candidatures\CandidatureStatus;
+use App\Modules\Admissions\OnlineTests\OnlineTests;
 use App\Modules\Catalogue\Brochures;
 use App\Modules\Catalogue\Trainings;
 use App\Modules\Core\Mail\MailTemplateDefinition;
@@ -102,9 +103,8 @@ final class PositioningSendings
      */
     public function send(Candidature $candidature, array $data, User $by): PositioningSending
     {
-        $offered = array_column($this->offered($candidature), 'version_id');
         $validator = Validator::make($data, [
-            'version_ids' => ['required', 'array', 'min:1', 'max:10'],
+            'version_ids' => ['sometimes', 'nullable', 'array', 'max:10'],
             'version_ids.*' => ['string', 'distinct'],
             'to' => ['required', 'email:rfc', 'max:254'],
             'subject' => ['required', 'string', 'max:200'],
@@ -118,21 +118,19 @@ final class PositioningSendings
             'max' => 'Ce champ est trop long.',
             'distinct' => 'Ce test est en double.',
         ]);
-        $validator->after(function ($v) use ($data, $offered): void {
-            $ids = is_array($data['version_ids'] ?? null) ? $data['version_ids'] : [];
-            if ($ids !== [] && array_diff($ids, $offered) !== []) {
-                $v->errors()->add('version_ids', 'Choisissez au moins un test proposé pour cette candidature.');
-            }
+        $validator->after(function ($v) use ($data): void {
             if (is_string($data['body'] ?? null) && ! str_contains($data['body'], self::LINK)) {
                 $v->errors()->add('body', 'Le message doit contenir {lien} (le lien du candidat).');
             }
         });
         $values = $validator->validate();
-        if (PositioningAttachments::size($values['version_ids']) > PositioningAttachments::MAX_BYTES) {
+        [$ids, $onlineVersion] = $this->chosen($candidature, $data, defaultAll: false);
+        if (PositioningAttachments::size($ids) > PositioningAttachments::MAX_BYTES) {
             throw ValidationException::withMessages(['version_ids' => 'Les tests choisis dépassent 20 Mo : envoyez-en moins à la fois.']);
         }
 
-        [$sending, $token] = $this->record($candidature, $values['version_ids'], $by, [
+        [$sending, $token] = $this->record($candidature, $ids, $by, [
+            'online_test_version_id' => $onlineVersion,
             'email' => mb_strtolower(trim($values['to'])),
             'subject' => trim($values['subject']),
             'message' => $values['body'],
@@ -151,13 +149,35 @@ final class PositioningSendings
      */
     public function link(Candidature $candidature, array $data, User $by): PositioningSending
     {
+        [$ids, $onlineVersion] = $this->chosen($candidature, $data, defaultAll: true);
+
+        return $this->record($candidature, $ids, $by, ['email_status' => PositioningSending::NO_EMAIL, 'online_test_version_id' => $onlineVersion])[0];
+    }
+
+    /**
+     * The PDF tests and/or the online test chosen for a link, checked
+     * against those offered for the candidature (at least one).
+     *
+     * @param  array<string, mixed>  $data  version_ids, online_test_id
+     * @return array{0: list<string>, 1: string|null} versions of PDF tests, version of the online test
+     */
+    private function chosen(Candidature $candidature, array $data, bool $defaultAll): array
+    {
+        $onlineVersion = null;
+        if (is_string($data['online_test_id'] ?? null) && $data['online_test_id'] !== '') {
+            $test = collect(app(OnlineTests::class)->offered($candidature->training_id, $candidature->das_id))->firstWhere('id', $data['online_test_id']);
+            if ($test === null) {
+                throw ValidationException::withMessages(['online_test_id' => 'Choisissez un test en ligne publié pour cette candidature.']);
+            }
+            $onlineVersion = $test['version_id'];
+        }
         $offered = array_column($this->offered($candidature), 'version_id');
-        $ids = is_array($data['version_ids'] ?? null) ? array_values($data['version_ids']) : $offered;
-        if ($ids === [] || array_diff($ids, $offered) !== [] || count($ids) !== count(array_unique($ids))) {
+        $ids = is_array($data['version_ids'] ?? null) ? array_values($data['version_ids']) : ($defaultAll && $onlineVersion === null ? $offered : []);
+        if (($ids === [] && $onlineVersion === null) || array_diff($ids, $offered) !== [] || count($ids) !== count(array_unique($ids))) {
             throw ValidationException::withMessages(['version_ids' => 'Choisissez au moins un test proposé pour cette candidature.']);
         }
 
-        return $this->record($candidature, $ids, $by, ['email_status' => PositioningSending::NO_EMAIL])[0];
+        return [array_map('strval', $ids), $onlineVersion];
     }
 
     /**

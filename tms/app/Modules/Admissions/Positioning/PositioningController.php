@@ -17,7 +17,7 @@ class PositioningController extends Controller
         $user = CandidatureController::user($request);
         CandidatureController::authorizeOn($user, Permissions::CANDIDATURES_UPDATE, $candidature);
         abort_if($candidature->trashed(), 404);
-        $sendings->send($candidature, $request->only(['version_ids', 'to', 'subject', 'body']), $user);
+        $sendings->send($candidature, $request->only(['version_ids', 'online_test_id', 'to', 'subject', 'body']), $user);
 
         return back()->with('status', 'Test de positionnement en cours d\'envoi.');
     }
@@ -27,7 +27,7 @@ class PositioningController extends Controller
         $user = CandidatureController::user($request);
         CandidatureController::authorizeOn($user, Permissions::CANDIDATURES_UPDATE, $candidature);
         abort_if($candidature->trashed(), 404);
-        $sendings->link($candidature, $request->only(['version_ids']), $user);
+        $sendings->link($candidature, $request->only(['version_ids', 'online_test_id']), $user);
 
         return back()->with('status', 'Lien du test généré : copiez-le et transmettez-le au candidat.');
     }

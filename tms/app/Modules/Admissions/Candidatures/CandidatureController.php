@@ -7,6 +7,7 @@ use App\Modules\Admissions\AdmissionsVisibility;
 use App\Modules\Admissions\Alternance\ContractType;
 use App\Modules\Admissions\CustomFields\CustomFieldValues;
 use App\Modules\Admissions\History\CandidatureHistory;
+use App\Modules\Admissions\OnlineTests\OnlineTests;
 use App\Modules\Admissions\Permissions;
 use App\Modules\Admissions\Positioning\PositioningSendings;
 use App\Modules\Catalogue\TrainingData;
@@ -124,6 +125,7 @@ class CandidatureController extends Controller
             'options' => self::options($candidature),
             'positioning' => [
                 'tests' => app(PositioningSendings::class)->offered($candidature),
+                'online_tests' => app(OnlineTests::class)->offered($candidature->training_id, $candidature->das_id),
                 'defaults' => app(PositioningSendings::class)->defaults($candidature),
                 'sendings' => PositioningSendings::forPage($candidature),
                 // The link to copy: only for who may change the candidature.

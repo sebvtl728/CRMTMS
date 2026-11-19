@@ -63,7 +63,7 @@ class OnlineTestController extends Controller
             ],
             'options' => [
                 'das' => ReferenceItem::options(ReferenceList::Das)->map(fn (ReferenceItem $i) => ['value' => $i->id, 'label' => $i->label])->values()->all(),
-                'trainings' => array_map(fn ($t) => ['value' => $t->id, 'label' => $t->title], app(Trainings::class)->options()),
+                'training_options' => array_map(fn ($t) => ['value' => $t->id, 'label' => $t->title], app(Trainings::class)->options()),
             ],
             'status' => $request->session()->get('status'),
         ]);

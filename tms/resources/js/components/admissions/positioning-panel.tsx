@@ -30,6 +30,8 @@ export interface PositioningSendingRow {
 
 export interface PositioningProps {
     tests: PositioningTest[];
+    /** Published online tests of the training or DAS. */
+    online_tests: { id: string; title: string; total_points: number; time_limit_minutes: number | null }[];
     defaults: { to: string; subject: string; body: string };
     sendings: PositioningSendingRow[];
     can_send: boolean;
@@ -51,12 +53,30 @@ const EMAIL_STATUS: Record<PositioningSendingRow['email_status'], string> = {
  */
 export function PositioningPanel({ candidatureId, positioning }: { candidatureId: string; positioning: PositioningProps }) {
     const [open, setOpen] = useState(false);
+    const online = positioning.online_tests ?? [];
+    // What the link leads to: an online test (by id) or the PDF tests to download and send back.
+    const [choice, setChoice] = useState<string>(online[0]?.id ?? 'pdf');
+    const hasSomething = positioning.tests.length > 0 || online.length > 0;
+    const linkData = choice === 'pdf' ? { version_ids: positioning.tests.map((t) => t.version_id) } : { online_test_id: choice };
 
     return (
         <div className="grid gap-2">
-            {positioning.tests.length === 0 ? (
+            {online.length > 0 && (
+                <ul className="grid gap-1 text-sm">
+                    {online.map((t) => (
+                        <li key={t.id}>
+                            En ligne : <strong>{t.title}</strong>{' '}
+                            <span className="text-muted-foreground text-xs">
+                                {t.total_points} points · {t.time_limit_minutes ? `${t.time_limit_minutes} min` : 'durée libre'}
+                            </span>
+                        </li>
+                    ))}
+                </ul>
+            )}
+            {positioning.tests.length === 0 && online.length === 0 ? (
                 <p className="text-muted-foreground text-xs">
-                    Aucun test de positionnement pour cette formation ou ce DAS (Catalogue › Plaquettes et tests).
+                    Aucun test de positionnement pour cette formation ou ce DAS (Formation › Tests en ligne, ou Catalogue › Plaquettes et tests pour
+                    un PDF).
                 </p>
             ) : (
                 <ul className="grid gap-1 text-sm">
@@ -75,19 +95,28 @@ export function PositioningPanel({ candidatureId, positioning }: { candidatureId
                 </ul>
             )}
             {positioning.link && <LinkBox link={positioning.link} />}
-            {positioning.can_send && positioning.tests.length > 0 && (
-                <div className="flex flex-wrap gap-2">
+            {positioning.can_send && hasSomething && (
+                <div className="flex flex-wrap items-center gap-2">
+                    {online.length > 0 && (
+                        <select
+                            aria-label="Test à faire passer"
+                            className="border-input bg-background h-8 rounded-md border px-2 text-sm"
+                            value={choice}
+                            onChange={(e) => setChoice(e.target.value)}
+                        >
+                            {online.map((t) => (
+                                <option key={t.id} value={t.id}>
+                                    En ligne : {t.title}
+                                </option>
+                            ))}
+                            {positioning.tests.length > 0 && <option value="pdf">PDF à télécharger et renvoyer</option>}
+                        </select>
+                    )}
                     <Button
                         type="button"
                         size="sm"
                         variant="outline"
-                        onClick={() =>
-                            router.post(
-                                `/admissions/candidatures/${candidatureId}/positioning/link`,
-                                { version_ids: positioning.tests.map((t) => t.version_id) },
-                                { preserveScroll: true },
-                            )
-                        }
+                        onClick={() => router.post(`/admissions/candidatures/${candidatureId}/positioning/link`, linkData, { preserveScroll: true })}
                     >
                         <LinkIcon className="h-4 w-4" />
                         {positioning.link ? 'Générer un nouveau lien' : 'Générer le lien'}
@@ -109,7 +138,7 @@ export function PositioningPanel({ candidatureId, positioning }: { candidatureId
                     ))}
                 </ul>
             )}
-            <SendDialog candidatureId={candidatureId} positioning={positioning} open={open} onClose={() => setOpen(false)} />
+            <SendDialog candidatureId={candidatureId} positioning={positioning} choice={choice} open={open} onClose={() => setOpen(false)} />
         </div>
     );
 }
@@ -143,16 +172,19 @@ function LinkBox({ link }: { link: { url: string; expires_on: string } }) {
 function SendDialog({
     candidatureId,
     positioning,
+    choice,
     open,
     onClose,
 }: {
     candidatureId: string;
     positioning: PositioningProps;
+    choice: string;
     open: boolean;
     onClose: () => void;
 }) {
     const { data, setData, post, processing, errors, reset, clearErrors } = useForm({
-        version_ids: positioning.tests.map((t) => t.version_id),
+        online_test_id: choice === 'pdf' ? '' : choice,
+        version_ids: choice === 'pdf' ? positioning.tests.map((t) => t.version_id) : ([] as string[]),
         to: positioning.defaults.to,
         subject: positioning.defaults.subject,
         body: positioning.defaults.body,
@@ -185,8 +217,14 @@ function SendDialog({
                             nouvel envoi remplace le lien précédent.
                         </DialogDescription>
                     </DialogHeader>
+                    {data.online_test_id && (
+                        <p className="text-sm">
+                            Test en ligne : <strong>{(positioning.online_tests ?? []).find((t) => t.id === data.online_test_id)?.title}</strong> — le
+                            lien ouvre le test à l’écran (ordinateur seulement).
+                        </p>
+                    )}
                     <fieldset className="grid gap-1">
-                        <legend className="mb-1 text-sm font-medium">Tests *</legend>
+                        <legend className="mb-1 text-sm font-medium">{data.online_test_id ? 'PDF à joindre (facultatif)' : 'Tests *'}</legend>
                         {positioning.tests.map((t) => (
                             <Label key={t.version_id} className="flex items-center gap-2 font-normal">
                                 <input

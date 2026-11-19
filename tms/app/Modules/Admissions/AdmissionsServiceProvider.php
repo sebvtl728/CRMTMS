@@ -11,6 +11,7 @@ use App\Modules\Admissions\CustomFields\CustomFieldDefinition;
 use App\Modules\Admissions\Gdpr\CandidatureAnonymisation;
 use App\Modules\Admissions\Gdpr\PersonCandidaturesExport;
 use App\Modules\Admissions\History\CandidatureHistory;
+use App\Modules\Admissions\OnlineTests\OnlineAttempt;
 use App\Modules\Admissions\OnlineTests\OnlineTest;
 use App\Modules\Admissions\Positioning\PositioningSending;
 use App\Modules\Admissions\Positioning\PositioningSendings;
@@ -63,6 +64,7 @@ class AdmissionsServiceProvider extends ServiceProvider
             CustomFieldDefinition::MORPH_ALIAS => CustomFieldDefinition::class,
             PositioningSending::MORPH_ALIAS => PositioningSending::class,
             OnlineTest::MORPH_ALIAS => OnlineTest::class,
+            OnlineAttempt::MORPH_ALIAS => OnlineAttempt::class,
         ]);
 
         PositioningSendings::registerTemplate();

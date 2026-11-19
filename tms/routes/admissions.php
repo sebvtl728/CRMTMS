@@ -7,6 +7,7 @@ use App\Modules\Admissions\Candidatures\CandidatureStatusController;
 use App\Modules\Admissions\Candidatures\DossierCreationController;
 use App\Modules\Admissions\Candidatures\LookupController;
 use App\Modules\Admissions\CustomFields\CustomFieldController;
+use App\Modules\Admissions\OnlineTests\OnlinePassage;
 use App\Modules\Admissions\OnlineTests\OnlineTestController;
 use App\Modules\Admissions\Positioning\PositioningController;
 use App\Modules\Admissions\Positioning\PositioningUploadController;
@@ -53,10 +54,15 @@ Route::middleware(['auth', 'can:settings.manage'])->prefix('admin/custom-fields'
 
 // The candidate's personal link to a positioning test (no account): the host
 // gives the organisme, the token the sending; any invalid link, the same page.
-Route::middleware('throttle:positioning-upload')->prefix('test-positionnement')->name('positioning.')->group(function () {
+Route::middleware('throttle:positioning-test')->prefix('test-positionnement')->name('positioning.')->group(function () {
     Route::get('{token}', [PositioningUploadController::class, 'show'])->where('token', '[0-9a-f]{64}')->name('show');
     Route::get('{token}/tests/{version}', [PositioningUploadController::class, 'download'])->where('token', '[0-9a-f]{64}')->name('download');
-    Route::post('{token}', [PositioningUploadController::class, 'store'])->where('token', '[0-9a-f]{64}')->name('store');
+    Route::post('{token}', [PositioningUploadController::class, 'store'])->middleware('throttle:positioning-upload')->where('token', '[0-9a-f]{64}')->name('store');
+    // Online test: start, answers saved as typed, traces, submission.
+    Route::post('{token}/start', [OnlinePassage::class, 'start'])->where('token', '[0-9a-f]{64}')->name('online.start');
+    Route::put('{token}/answers', [OnlinePassage::class, 'answers'])->where('token', '[0-9a-f]{64}')->name('online.answers');
+    Route::post('{token}/events', [OnlinePassage::class, 'event'])->where('token', '[0-9a-f]{64}')->name('online.events');
+    Route::post('{token}/submit', [OnlinePassage::class, 'submit'])->where('token', '[0-9a-f]{64}')->name('online.submit');
 });
 
 // Online positioning tests (as the library: catalogue.manage).

@@ -20,6 +20,7 @@ use Illuminate\Support\Facades\DB;
  * @property string $id
  * @property string $tenant_id
  * @property string $candidature_id
+ * @property string|null $online_test_version_id the online test of the link (null: PDF tests)
  * @property string|null $email
  * @property string|null $subject
  * @property string|null $message
@@ -56,7 +57,7 @@ class PositioningSending extends Model
     protected array $auditIgnore = ['created_by', 'token_hash', 'token_encrypted', 'email_error'];
 
     /** @var list<string> */
-    protected $fillable = ['candidature_id', 'email', 'subject', 'message', 'token_hash', 'token_encrypted', 'expires_at', 'email_status', 'created_by'];
+    protected $fillable = ['candidature_id', 'online_test_version_id', 'email', 'subject', 'message', 'token_hash', 'token_encrypted', 'expires_at', 'email_status', 'created_by'];
 
     /** @var list<string> */
     protected $hidden = ['token_hash', 'token_encrypted'];
