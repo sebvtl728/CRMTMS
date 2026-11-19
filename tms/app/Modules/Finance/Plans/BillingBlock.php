@@ -7,6 +7,7 @@ use App\Modules\Crm\Public\Fiches;
 use App\Modules\Finance\Invoices\Invoice;
 use App\Modules\Finance\Invoices\InvoiceRows;
 use App\Modules\Finance\Invoices\Money;
+use App\Modules\Finance\Payments\Balances;
 use App\Modules\Finance\Permissions;
 use App\Modules\Finance\Settings\FinanceSettings;
 use App\Modules\Sessions\Public\Billing;
@@ -46,6 +47,10 @@ final class BillingBlock
         $labels = app(Fiches::class)->organisationLabels($ids('organisation')) + app(Fiches::class)->personLabels($ids('person'));
         $label = fn (array $party) => $labels[$party['id']]['label'] ?? '—';
         $funder = fn (array $f) => $label($f['funder']);
+        $balances = Balances::of($invoices->pluck('id')->all());
+        $left = fn (string $id): string => ! isset($balances[$id]) ? '' : ($balances[$id]['remaining_cents'] <= 0
+            ? ' · Soldée'
+            : ' · Reste dû '.Money::format($balances[$id]['remaining_cents']).($balances[$id]['overdue'] ? ' (en retard)' : ''));
 
         return [
             'title' => 'Facturation',
@@ -54,13 +59,19 @@ final class BillingBlock
                 'id' => $r['id'],
                 'title' => $r['title'],
                 'subtitle' => $r['recipient'],
-                'meta' => Money::format($r['total_ht_cents']).' HT · '.Money::format($r['total_ttc_cents']).' TTC',
+                'meta' => Money::format($r['total_ht_cents']).' HT · '.Money::format($r['total_ttc_cents']).' TTC'.$left($r['id']),
                 'badge' => $r['status_label'],
                 'href' => $r['url'],
             ], $rows->rows($invoices)),
             'component' => self::COMPONENT,
             'props' => [
                 'plan' => app(BillingPlans::class)->for($dossierId),
+                // What the issued invoices of the dossier have been paid, and what is left (0.9.1); null: none issued.
+                'payments' => $balances === [] ? null : [
+                    'paid_cents' => array_sum(array_column($balances, 'paid_cents')),
+                    'remaining_cents' => array_sum(array_map(fn (array $b) => max(0, $b['remaining_cents']), $balances)),
+                    'overdue' => in_array(true, array_column($balances, 'overdue'), true),
+                ],
                 'organisme_absences' => FinanceSettings::absencesDefault(),
                 // No instalment before it (null: no session yet).
                 'starts_on' => $starts === [] ? null : min($starts),

@@ -40,6 +40,8 @@ export interface BillingBlockProps {
     direct_fundings: { id: string; funder: string; amount_cents: number; status: string; agreement_number: string | null }[];
     /** What is due now (« À facturer »), read apart: { due, soon } (null: a dossier in the trash). */
     due_url: string | null;
+    /** What the issued invoices were paid and what is left (0.9.1); null: none issued. */
+    payments: { paid_cents: number; remaining_cents: number; overdue: boolean } | null;
     /** A draft made by hand (null: not allowed). */
     create_url: string | null;
     recipients: { value: string; label: string }[];
@@ -89,7 +91,7 @@ interface DueSummary {
     soon: string | null;
 }
 
-function BillingSummary({ direct_fundings, due_url, create_url, recipients }: BillingBlockProps) {
+function BillingSummary({ direct_fundings, due_url, create_url, recipients, payments }: BillingBlockProps) {
     const [recipient, setRecipient] = useState(recipients[0]?.value ?? 'contractor');
     const [busy, setBusy] = useState(false);
     const [summary, setSummary] = useState<DueSummary | null>(null);
@@ -112,6 +114,13 @@ function BillingSummary({ direct_fundings, due_url, create_url, recipients }: Bi
 
     return (
         <div className="grid gap-3 rounded-xl border p-4 text-sm">
+            {payments && (
+                <p>
+                    Réglé : <span className="tabular-nums">{formatCents(payments.paid_cents)}</span> · Reste à encaisser :{' '}
+                    <span className="font-medium tabular-nums">{formatCents(payments.remaining_cents)}</span>
+                    {payments.overdue && <span className="text-destructive"> (factures en retard)</span>}
+                </p>
+            )}
             {direct_fundings.length > 0 && (
                 <div>
                     <p className="font-medium">Financements payés directement</p>

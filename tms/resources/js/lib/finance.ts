@@ -19,6 +19,12 @@ export interface InvoiceRow {
     dossier: { id: string; number: string; url: string };
     total_ht_cents: number;
     total_ttc_cents: number;
+    /** Issued invoices only (0.9.1); null for a draft or a credit note. */
+    paid_cents: number | null;
+    remaining_cents: number | null;
+    payment_status: 'unpaid' | 'partial' | 'paid' | null;
+    payment_status_label: string | null;
+    overdue: boolean;
     url: string;
 }
 

@@ -62,6 +62,7 @@ class InvoiceController extends Controller
                 'status' => InvoiceStatus::options(),
                 'kind' => [['value' => Invoice::INVOICE, 'label' => 'Facture'], ['value' => Invoice::CREDIT_NOTE, 'label' => 'Avoir']],
                 'company' => Company::query()->orderBy('name')->get(['id', 'name'])->map(fn (Company $c) => ['value' => $c->id, 'label' => $c->name])->values()->all(),
+                'payment' => [['value' => 'open', 'label' => 'Non soldées'], ['value' => 'overdue', 'label' => 'En retard']],
             ],
             'can' => [
                 'export' => $user->can(Permissions::VIEW),
@@ -105,11 +106,12 @@ class InvoiceController extends Controller
     }
 
     /**
-     * @return array{status: string|null, kind: string|null, company: string|null}
+     * @return array{status: string|null, kind: string|null, company: string|null, payment: string|null}
      */
     private function filters(Request $request): array
     {
         return [
+            'payment' => in_array($p = $request->query('payment'), ['open', 'overdue'], true) ? $p : null,
             'status' => in_array($s = $request->query('status'), InvoiceStatus::values(InvoiceStatus::cases()), true) ? $s : null,
             'kind' => in_array($k = $request->query('kind'), [Invoice::INVOICE, Invoice::CREDIT_NOTE], true) ? $k : null,
             'company' => is_string($c = $request->query('company')) && Str::isUuid($c) ? $c : null,
@@ -120,7 +122,7 @@ class InvoiceController extends Controller
      * The invoices of the list: the dossiers of the scope of finance.invoices.view
      * (in the trash too: their validated invoices stay findable), newest first.
      *
-     * @param  array{status: string|null, kind: string|null, company: string|null}  $filters
+     * @param  array{status: string|null, kind: string|null, company: string|null, payment: string|null}  $filters
      * @return Builder<Invoice>
      */
     private function listQuery(User $user, array $filters): Builder
@@ -130,6 +132,11 @@ class InvoiceController extends Controller
             ->when($filters['status'], fn ($q, string $s) => $q->where('status', $s))
             ->when($filters['kind'], fn ($q, string $k) => $q->where('kind', $k))
             ->when($filters['company'], fn ($q, string $id) => $q->where('company_id', $id))
+            // « Non soldées » / « En retard »: issued invoices with something left to pay (0.9.1).
+            ->when($filters['payment'], fn ($q) => $q->where('kind', Invoice::INVOICE)
+                ->whereIn('status', InvoiceStatus::values(InvoiceStatus::ISSUED))
+                ->whereRaw(Balances::remainingSql().' > 0'))
+            ->when($filters['payment'] === 'overdue', fn ($q) => $q->where('due_on', '<', Balances::today()))
             ->orderByRaw('issued_on desc nulls first')->orderByDesc('created_at')->orderByDesc('id');
     }
 
