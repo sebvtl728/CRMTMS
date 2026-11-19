@@ -1,5 +1,6 @@
 <?php
 
+use App\Modules\Core\Access\Scopes;
 use App\Modules\Core\References\CapFormationReferenceSeeder;
 use App\Modules\Core\References\ReferenceList;
 use App\Modules\Core\Users\User;
@@ -7,6 +8,7 @@ use App\Modules\Crm\Activities\Activity;
 use App\Modules\Crm\CrmServiceProvider;
 use App\Modules\Crm\Dashboard\ActivityStats;
 use App\Modules\Crm\Organisations\Organisation;
+use App\Modules\Crm\Permissions;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\DB;
 
@@ -39,12 +41,12 @@ function statAction(User $responsible, Organisation $org, string $type, string $
 /** A user who sees his own actions only (« Ses fiches »). */
 function statOwnUser(): User
 {
-    $user = userWithPermissions([App\Modules\Crm\Permissions::ACTIVITIES_VIEW, App\Modules\Crm\Permissions::ACTIVITIES_UPDATE, App\Modules\Crm\Permissions::FICHES_VIEW]);
+    $user = userWithPermissions([Permissions::ACTIVITIES_VIEW, Permissions::ACTIVITIES_UPDATE, Permissions::FICHES_VIEW]);
     $role = $user->roles()->firstOrFail();
-    foreach ([App\Modules\Crm\Permissions::ACTIVITIES_VIEW, App\Modules\Crm\Permissions::FICHES_VIEW] as $permission) {
-        DB::table(App\Modules\Core\Access\Scopes::TABLE)->insert(['tenant_id' => tenant()->id, 'role_id' => $role->id, 'permission' => $permission, 'scope' => 'own']);
+    foreach ([Permissions::ACTIVITIES_VIEW, Permissions::FICHES_VIEW] as $permission) {
+        DB::table(Scopes::TABLE)->insert(['tenant_id' => tenant()->id, 'role_id' => $role->id, 'permission' => $permission, 'scope' => 'own']);
     }
-    App\Modules\Core\Access\Scopes::forget();
+    Scopes::forget();
 
     return $user;
 }

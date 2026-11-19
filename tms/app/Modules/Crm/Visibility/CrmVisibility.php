@@ -114,6 +114,11 @@ final class CrmVisibility
         if ($scope === AccessScope::All) {
             return true;
         }
+        // A collaborator sees the action (CrmVisibility::activities).
+        if ($record instanceof Activity && $permission === Permissions::ACTIVITIES_VIEW
+            && DB::table('activity_collaborators')->where('activity_id', $record->getKey())->where('user_id', $user->getKey())->exists()) {
+            return true;
+        }
 
         return self::scoped($record::class, $user, $scope, $permission)->whereKey($record->getKey())->exists();
     }

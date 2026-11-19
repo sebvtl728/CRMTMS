@@ -109,7 +109,8 @@ final class TodoQuery
         $query = CrmVisibility::activities(Activity::query(), $user)
             ->whereNull('done_at')
             ->whereNotNull('due_at')
-            ->when(! $team, fn (Builder $q) => $q->where('responsible_user_id', $user->id));
+            ->when(! $team, fn (Builder $q) => $q->where(fn (Builder $w) => $w->where('responsible_user_id', $user->id)
+                ->orWhereIn('activities.id', ActivityCollaborators::idsOf($user->id))));
 
         return self::onLiveFiches($query);
     }

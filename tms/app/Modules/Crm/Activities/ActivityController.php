@@ -47,6 +47,7 @@ class ActivityController extends Controller
             // « Attribuer à »: active users, the author by default.
             'responsibles' => FormOptions::responsible(),
             'responsible_user_id' => $user->id,
+            'collaborators' => ActivityCollaborators::options(),
             'context' => [
                 'organisation' => $organisation === null ? null : ['id' => $organisation->id, 'name' => $organisation->name],
                 'person' => $person === null ? null : ['id' => $person->id, 'name' => $person->fullName()],
@@ -74,7 +75,7 @@ class ActivityController extends Controller
 
     public function store(ActivityRequest $request): RedirectResponse
     {
-        [, $next] = $this->recorder->create($request->values(), $request->next());
+        [, $next] = $this->recorder->create($request->values(), $request->next(), $request->collaborators() ?? []);
 
         return back()->with('status', $next === null ? 'Action enregistrée.' : 'Action enregistrée, prochaine relance prévue.');
     }
@@ -92,13 +93,14 @@ class ActivityController extends Controller
             ...self::choices($activity->result_id, $activity->type_id),
             // « Modifier »: active users (the current one kept, even deactivated).
             'responsibles' => $canUpdate ? FormOptions::responsible($activity->responsible_user_id) : [],
+            'collaborators' => $canUpdate ? ActivityCollaborators::options($activity->collaborators()->pluck('users.id')->map(fn ($id) => (string) $id)->all()) : [],
             'can' => ['update' => $canUpdate, 'delete' => $user->can('delete', $activity)],
         ])->header('Cache-Control', 'no-store, private');
     }
 
     public function update(ActivityRequest $request, Activity $activity): RedirectResponse
     {
-        $this->recorder->update($activity, $request->values());
+        $this->recorder->update($activity, $request->values(), $request->collaborators());
 
         return back()->with('status', 'Action modifiée.');
     }

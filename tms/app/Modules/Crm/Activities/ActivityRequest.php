@@ -92,6 +92,19 @@ class ActivityRequest extends FormRequest
             'duration_minutes' => ['nullable', 'integer', 'between:1,1440'],
             'result_id' => ['nullable', ...ReferenceRules::item(ReferenceList::ActionResult, $current?->result_id)],
             'responsible_user_id' => ['nullable', ...ReferenceRules::responsible($current?->responsible_user_id)],
+            'collaborator_ids' => ['sometimes', 'nullable', 'array', 'max:'.ActivityCollaborators::MAX, function (string $attribute, mixed $value, Closure $fail) use ($current): void {
+                $responsible = $this->input('responsible_user_id', ($current !== null ? $current->responsible_user_id : $this->user()?->getAuthIdentifier()));
+                $kept = $current === null ? [] : $current->collaborators()->pluck('users.id')->map(fn ($id) => (string) $id)->all();
+                $eligible = ActivityCollaborators::eligibleIds();
+                foreach ((array) $value as $id) {
+                    if (! is_string($id) || $id === $responsible || (! in_array($id, $eligible, true) && ! in_array($id, $kept, true))) {
+                        $fail(ActivityCollaborators::INVALID);
+
+                        return;
+                    }
+                }
+            }],
+            'collaborator_ids.*' => ['distinct'],
         ];
 
         if ($current === null) {
@@ -199,7 +212,7 @@ class ActivityRequest extends FormRequest
      */
     public function values(): array
     {
-        $data = $this->safe()->except(['done', 'next_type_id', 'next_due_at']);
+        $data = $this->safe()->except(['done', 'next_type_id', 'next_due_at', 'collaborator_ids']);
 
         if (array_key_exists('due_at', $data)) {
             $data['due_at'] = self::instant($data['due_at'], true);
@@ -212,6 +225,20 @@ class ActivityRequest extends FormRequest
         }
 
         return $data;
+    }
+
+    /**
+     * The collaborators asked (null: the field was not sent, unchanged).
+     *
+     * @return list<string>|null
+     */
+    public function collaborators(): ?array
+    {
+        if (! $this->has('collaborator_ids')) {
+            return null;
+        }
+
+        return array_values(array_map('strval', (array) ($this->validated('collaborator_ids') ?? [])));
     }
 
     /**
