@@ -153,7 +153,8 @@ it('needs both the candidature and the dossier rights through the route', functi
         ->post("/admissions/candidatures/{$c->id}/dossier", adDossierData($c))->assertForbidden();
 
     $this->actingAs(commercial())->get("/admissions/candidatures/{$c->id}/dossier/defaults")->assertOk()->assertJsonPath('account.type', 'person');
-    $this->post("/admissions/candidatures/{$c->id}/dossier", adDossierData($c))->assertRedirect();
+    $this->post("/admissions/candidatures/{$c->id}/dossier", adDossierData($c))->assertRedirect()
+        ->assertSessionHas('status', 'Dossier de formation créé : '.$c->number.' est stagiaire.');
     expect($c->fresh()->dossier_id)->not->toBeNull();
 
     expect(commercial()->can(SessionsPermissions::DOSSIERS_UPDATE))->toBeTrue();

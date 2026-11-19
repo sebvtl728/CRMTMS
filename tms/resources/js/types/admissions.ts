@@ -4,6 +4,7 @@ import { type Option } from '@/lib/crm';
 export interface AdmissionOptions {
     statuses: Option[];
     contract_types: Option[];
+    pathways: Option[];
     refusal_reasons: Option[];
     das: Option[];
     origins: Option[];
@@ -40,6 +41,8 @@ export interface Candidature {
     number: string;
     status: string;
     status_label: string;
+    pathway: 'alternance' | 'trainee' | null;
+    pathway_label: string | null;
     person: {
         id: string;
         label: string;
@@ -101,13 +104,15 @@ export interface CandidatureRow {
     rncp_code: string | null;
     das: string | null;
     responsible: string | null;
+    pathway: 'alternance' | 'trainee' | null;
+    pathway_label: string | null;
     has_contract: boolean;
     contract_type: string | null;
     employer: string | null;
     contract_starts_on: string | null;
     contract_ends_on: string | null;
     dossier: string | null;
-    kind: 'Apprenant' | 'Alternant' | null;
+    kind: 'Stagiaire' | 'Alternant' | null;
 }
 
 /** Place of a stage on the path (CandidatureStatus::rank), -1 for the exits. */

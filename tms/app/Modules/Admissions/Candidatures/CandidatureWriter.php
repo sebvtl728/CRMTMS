@@ -3,6 +3,7 @@
 namespace App\Modules\Admissions\Candidatures;
 
 use App\Modules\Admissions\AdmissionsVisibility;
+use App\Modules\Admissions\Alternance\AlternanceContract;
 use App\Modules\Admissions\CustomFields\CustomFieldDefinition;
 use App\Modules\Admissions\CustomFields\CustomFieldValues;
 use App\Modules\Admissions\Permissions;
@@ -16,6 +17,7 @@ use App\Modules\Sessions\Public\Admission;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 
 /**
@@ -33,7 +35,7 @@ final class CandidatureWriter
         'training_id', 'rncp_code', 'target_session_id', 'das_id', 'responsible_user_id', 'origin_id',
         'prescriber_organisation_id', 'france_travail_id', 'last_diploma', 'legal_representative', 'rqth',
         'adaptation_needs', 'positioning_sent_on', 'positioning_received_on', 'positioning_result', 'interview_at',
-        'interviewer_user_id', 'interview_report',
+        'interviewer_user_id', 'interview_report', 'pathway',
     ];
 
     /** Kept on the CRM person. */
@@ -122,6 +124,7 @@ final class CandidatureWriter
             'interview_at' => ['nullable', 'date'],
             'interviewer_user_id' => ['nullable', ...Rules::user($current?->interviewer_user_id)],
             'interview_report' => ['nullable', 'string', 'max:10000'],
+            'pathway' => ['nullable', Rule::enum(Pathway::class)],
             'education_level_id' => ['nullable', 'uuid'],
             'professional_situation_id' => ['nullable', 'uuid'],
         ];
@@ -148,6 +151,11 @@ final class CandidatureWriter
             }
             $dasId = array_key_exists('das_id', $present) ? $present['das_id'] : $current?->das_id;
             $trainingId = array_key_exists('training_id', $present) ? $present['training_id'] : $current?->training_id;
+            // A candidature with an alternance contract stays on the alternance pathway.
+            if (array_key_exists('pathway', $present) && $present['pathway'] !== Pathway::Alternance->value
+                && $current !== null && AlternanceContract::query()->where('candidature_id', $current->id)->exists()) {
+                $v->errors()->add('pathway', 'Retirez d\'abord le contrat d\'alternance.');
+            }
             if ($dasId === null && $trainingId === null) {
                 $v->errors()->add('das_id', 'Choisissez la formation visée ou un DAS.');
             }
@@ -258,6 +266,7 @@ final class CandidatureWriter
             'date_format' => 'Date invalide.',
             'boolean' => 'Valeur invalide.',
             'array' => 'Valeur invalide.',
+            'pathway.enum' => 'Parcours inconnu.',
             'rncp_code.regex' => 'Le code RNCP doit s\'écrire RNCP suivi de chiffres (ex. RNCP36004).',
         ];
     }

@@ -5,8 +5,16 @@ Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) ; ve
 
 ## [Non publié]
 
+### Ajouté
+
+- **Admissions — parcours du candidat** (carte Orientation) : *À définir*, *Alternance* ou *Stagiaire* (formation
+  continue sans contrat). La carte Alternance n'apparaît que pour le parcours Alternance ; un contrat met le parcours à
+  Alternance et le garde ; filtre **Parcours** et colonne de l'export.
+
 ### Modifié
 
+- Menu : **Candidats** passe dans **Formation**, au-dessus de Dossiers.
+- Admissions : l'onglet **Apprenants** devient **Stagiaires**, le badge « Apprenant » devient « Stagiaire ».
 - **Mention d'exonération de TVA** des devis et factures, alignée sur l'expert-comptable : « Exonération de TVA, art. 261,
   4-4° a du CGI » jusqu'au 31 décembre 2026, « Exonération de TVA, art. L. 213-93 du CIBS » à partir du 1er janvier 2027
   (selon la date du devis ou de validation de la facture ; un avoir garde l'exonération de la facture qu'il corrige).
