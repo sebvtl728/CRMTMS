@@ -12,7 +12,7 @@ Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) ; ve
   limite ; **Créer depuis un PDF** par l'intelligence artificielle (brouillon à relire) ; versions figées à la
   publication. Le candidat passe le test **sur ordinateur** par son lien (réponses enregistrées au fil de l'eau,
   chronomètre, copier-coller bloqué, sorties de la page relevées) ; correction automatique des questions fermées, notation
-  à la main des réponses rédigées sur la candidature, note dans « Score ou niveau ».
+  à la main des réponses rédigées sur la candidature, note dans « Score ou niveau » ; **copie du candidat en PDF**.
 - **Test de positionnement — Générer le lien** : le lien personnel du candidat s'affiche sur la candidature avec
   **Copier**, sans e-mail obligatoire ; « Envoyer par e-mail » reste possible.
 - **Accueil (CRM)** : cartes **Actions** (créées et réalisées dans le mois) et **Rendez-vous pris** (fixés dans le mois),

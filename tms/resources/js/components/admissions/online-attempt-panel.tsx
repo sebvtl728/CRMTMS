@@ -2,6 +2,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { formatDate } from '@/lib/crm';
 import { router, usePage } from '@inertiajs/react';
+import { Download } from 'lucide-react';
 import { useState } from 'react';
 
 export interface OnlineAttemptView {
@@ -77,6 +78,14 @@ export function OnlineAttemptPanel({ candidatureId, attempt }: { candidatureId: 
                         ? `${attempt.score} / ${attempt.max_score}`
                         : `${attempt.auto_score ?? 0} / ${attempt.max_score} (à compléter)`}
                 </span>
+            </div>
+            <div>
+                <Button asChild type="button" size="sm" variant="outline">
+                    <a href={`/admissions/candidatures/${candidatureId}/online-attempts/${attempt.id}/pdf`}>
+                        <Download className="h-4 w-4" />
+                        Télécharger le PDF
+                    </a>
+                </Button>
             </div>
             <p className="text-muted-foreground text-xs">
                 Envoyé le {formatDate(attempt.submitted_at)} · {attempt.minutes} min ·{' '}

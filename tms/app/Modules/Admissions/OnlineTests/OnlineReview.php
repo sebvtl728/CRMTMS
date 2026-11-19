@@ -25,9 +25,17 @@ final class OnlineReview
     public static function forPage(Candidature $c, bool $canGrade): ?array
     {
         $attempt = OnlineAttempt::query()->where('candidature_id', $c->id)->latest('started_at')->first();
-        if ($attempt === null) {
-            return null;
-        }
+
+        return $attempt === null ? null : self::view($attempt, $canGrade);
+    }
+
+    /**
+     * An attempt as shown (page and PDF).
+     *
+     * @return array<string, mixed>
+     */
+    public static function view(OnlineAttempt $attempt, bool $canGrade = false): array
+    {
         $version = OnlineTestVersion::query()->findOrFail($attempt->online_test_version_id);
         $test = OnlineTest::withTrashed()->find($version->online_test_id);
         $grade = OnlineGrading::grade($version->content, $attempt->answers, $attempt->manual_scores);

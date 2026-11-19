@@ -3,8 +3,11 @@
 use App\Modules\Admissions\Gdpr\CandidatureAnonymisation;
 use App\Modules\Admissions\OnlineTests\OnlineAttempt;
 use App\Modules\Admissions\Permissions;
+use App\Modules\Core\Access\AccessScope;
 use Carbon\CarbonImmutable;
+use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Http;
 use Inertia\Testing\AssertableInertia as Assert;
 
 require_once __DIR__.'/../Support/admissions.php';
@@ -70,4 +73,50 @@ it('anonymisation clears the answers and the traces of the attempts', function (
     app(CandidatureAnonymisation::class)->anonymise($c->fresh());
 
     expect($attempt->fresh()->answers)->toBe([])->and($attempt->fresh()->events)->toBe([]);
+});
+
+/** The HTML sent to Gotenberg. */
+function otPdfHtml(): string
+{
+    $html = '';
+    Http::assertSent(function (Request $request) use (&$html) {
+        foreach ($request->data() as $part) {
+            if (($part['filename'] ?? null) === 'index.html') {
+                $html = (string) $part['contents'];
+            }
+        }
+
+        return true;
+    });
+
+    return $html;
+}
+
+it('downloads the copy of the candidate as a pdf: answers, right answers, points, traces, score', function () {
+    [$c, $attempt] = otSubmitted();
+    config(['documents.gotenberg_url' => 'http://gotenberg:3000']);
+    Http::fake(['gotenberg:3000/*' => Http::response('%PDF-1.7 copie', 200, ['Content-Type' => 'application/pdf'])]);
+    $this->actingAs(admin(twoFactor: true));
+
+    $response = $this->get("/admissions/candidatures/{$c->id}/online-attempts/{$attempt->id}/pdf")->assertOk();
+    expect($response->headers->get('Content-Type'))->toContain('application/pdf')
+        ->and($response->headers->get('Content-Disposition'))->toContain('test-'.$c->number.'.pdf');
+
+    expect(otPdfHtml())->toContain('Test tertiaire')->toContain('Léa Durand')->toContain($c->number)
+        ->toContain('Que signifie TVA ?')->toContain('Taxe sur la valeur ajoutée')
+        ->toContain('30 jours ouvrables')->toContain('8 / 20')->toContain('1 sortie de la page');
+
+    // Not for who cannot see the candidature; not before the answers are sent.
+    $this->actingAs(adUser([Permissions::CANDIDATURES_VIEW => AccessScope::Own]))
+        ->get("/admissions/candidatures/{$c->id}/online-attempts/{$attempt->id}/pdf")->assertNotFound();
+});
+
+it('escapes what the candidate typed in the pdf', function () {
+    [$c, $attempt] = otSubmitted();
+    $attempt->forceFill(['answers' => [...$attempt->answers, 'q-open' => '<script>alert(1)</script>']])->save();
+    config(['documents.gotenberg_url' => 'http://gotenberg:3000']);
+    Http::fake(['gotenberg:3000/*' => Http::response('%PDF-1.7', 200)]);
+
+    $this->actingAs(admin(twoFactor: true))->get("/admissions/candidatures/{$c->id}/online-attempts/{$attempt->id}/pdf")->assertOk();
+    expect(otPdfHtml())->not->toContain('<script>alert')->toContain('&lt;script&gt;');
 });

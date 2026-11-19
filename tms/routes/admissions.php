@@ -33,6 +33,7 @@ Route::middleware(['auth'])->prefix('admissions/candidatures')->name('admissions
     Route::post('{candidature}/files', [CandidatureFileController::class, 'store'])->middleware('can:admissions.candidatures.update')->name('files.store');
     Route::get('{candidature}/files/{file}', [CandidatureFileController::class, 'show'])->middleware('can:admissions.candidatures.view')->name('files.show');
     Route::delete('{candidature}/files/{file}', [CandidatureFileController::class, 'destroy'])->middleware('can:admissions.candidatures.update')->name('files.destroy');
+    Route::get('{candidature}/online-attempts/{attempt}/pdf', [OnlineReviewController::class, 'pdf'])->middleware('can:admissions.candidatures.view')->name('online.pdf');
     Route::put('{candidature}/online-attempts/{attempt}/grades', [OnlineReviewController::class, 'grade'])->middleware('can:admissions.candidatures.update')->name('online.grade');
     Route::post('{candidature}/positioning/link', [PositioningController::class, 'link'])->middleware(['can:admissions.candidatures.update', 'throttle:positioning-send'])->name('positioning.link');
     Route::post('{candidature}/positioning/send', [PositioningController::class, 'send'])->middleware(['can:admissions.candidatures.update', 'throttle:positioning-send'])->name('positioning.send');
