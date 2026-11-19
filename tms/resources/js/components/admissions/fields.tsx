@@ -23,6 +23,7 @@ export function OptionSelect({
     onChange,
     error,
     disabled,
+    noneLabel = '—',
 }: {
     id: string;
     label: string;
@@ -31,6 +32,8 @@ export function OptionSelect({
     onChange: (value: string | null) => void;
     error?: string;
     disabled?: boolean;
+    /** Label of the empty choice. */
+    noneLabel?: string;
 }) {
     return (
         <div className="grid gap-1">
@@ -40,7 +43,7 @@ export function OptionSelect({
                     <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                    <SelectItem value={NONE}>—</SelectItem>
+                    <SelectItem value={NONE}>{noneLabel}</SelectItem>
                     {options.map((o) => (
                         <SelectItem key={o.value} value={o.value}>
                             {o.label}

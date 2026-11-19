@@ -5,7 +5,7 @@ namespace App\Modules\Admissions\Candidatures;
 /**
  * Stages of a candidature, fixed in the code. The path runs identified →
  * positioning_sent → positioning_received → interview → admitted; rejected
- * and withdrawn leave it. « Apprenant » and « Alternant » are not stages:
+ * and withdrawn leave it. « Stagiaire » and « Alternant » are not stages:
  * they are read from the dossier and the contract.
  */
 enum CandidatureStatus: string

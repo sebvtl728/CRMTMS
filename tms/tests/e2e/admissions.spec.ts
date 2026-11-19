@@ -35,7 +35,12 @@ async function moveTo(page: Page, stage: string): Promise<void> {
 
 test('an interlocuteur becomes a candidate, signs an apprenticeship and becomes an alternant', async ({ browser }) => {
     expect(existsSync(ADMIN_STATE), 'run admin.spec.ts first (it signs the administrator in)').toBe(true);
-    const context = await browser.newContext({ storageState: ADMIN_STATE, locale: 'fr-FR', timezoneId: 'Europe/Paris', viewport: { width: 1400, height: 1000 } });
+    const context = await browser.newContext({
+        storageState: ADMIN_STATE,
+        locale: 'fr-FR',
+        timezoneId: 'Europe/Paris',
+        viewport: { width: 1400, height: 1000 },
+    });
     const page = await context.newPage();
 
     // A training with its RNCP code; the employer and the person in the CRM.
@@ -63,12 +68,23 @@ test('an interlocuteur becomes a candidate, signs an apprenticeship and becomes 
     await expect(page.getByText('Candidature créée.')).toBeVisible();
     await expect(page.getByLabel('Code RNCP')).toHaveValue('RNCP36004');
 
+    // The cards open one after the other: the test (training saved), then the interview once the test is back.
+    await expect(page.getByRole('region', { name: 'Test de positionnement' })).toBeVisible();
+    await expect(page.getByRole('region', { name: 'Entretien' })).toHaveCount(0);
+    await page.getByLabel('Reçu le').fill('2026-11-18');
+    await page.getByRole('region', { name: 'Test de positionnement' }).getByRole('button', { name: 'Enregistrer' }).click();
+    await expect(page.getByRole('region', { name: 'Entretien' })).toBeVisible();
+    await expect(page.getByRole('region', { name: 'Alternance' })).toHaveCount(0);
+
     // The path: test sent, test received, interview.
     await moveTo(page, 'Test envoyé');
     await moveTo(page, 'Test reçu');
     await moveTo(page, 'Entretien');
 
-    // The apprenticeship contract.
+    // The alternance pathway, then the apprenticeship contract.
+    await choose(page, page.getByLabel('Parcours'), 'Alternance');
+    await page.getByRole('button', { name: 'Enregistrer' }).first().click();
+    await expect(page.getByText('Candidature enregistrée.')).toBeVisible();
     await page.getByLabel("Entreprise d'accueil").fill('Brasserie du Port');
     await page.getByRole('button', { name: EMPLOYER }).click();
     await page.getByLabel('Début du contrat').fill('2027-01-04');
@@ -76,13 +92,14 @@ test('an interlocuteur becomes a candidate, signs an apprenticeship and becomes 
     await page.getByRole('button', { name: 'Enregistrer le contrat' }).click();
     await expect(page.getByText('Contrat enregistré.')).toBeVisible();
 
-    // Admitted, then the dossier with the employer as contractant.
-    await moveTo(page, 'Admis');
+    // Admitted (the next step is offered on the page), then the dossier with the employer as contractant.
+    await page.getByRole('button', { name: "Passer à l'étape « Admis »" }).click();
+    await expect(page.getByText('Étape : Admis.')).toBeVisible();
     await page.getByRole('button', { name: 'Créer le dossier' }).click();
     const dialog = page.getByRole('dialog');
     await expect(dialog.getByText(EMPLOYER)).toBeVisible();
     await dialog.getByRole('button', { name: 'Créer le dossier' }).click();
-    await expect(page.getByText(/est apprenant\./)).toBeVisible();
+    await expect(page.getByText(/est alternant\./)).toBeVisible();
     await expect(page).toHaveURL(/\/dossiers\//);
 
     // In the « Alternants » tab.

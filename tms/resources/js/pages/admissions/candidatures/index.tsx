@@ -12,7 +12,7 @@ import { Head, Link, router } from '@inertiajs/react';
 import { ChevronLeft, ChevronRight, Download, Plus } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 
-type Tab = 'candidats' | 'apprenants' | 'alternants' | 'tous';
+type Tab = 'candidats' | 'stagiaires' | 'alternants' | 'tous';
 
 interface Filters {
     onglet: Tab;
@@ -21,6 +21,7 @@ interface Filters {
     das: string | null;
     responsable: string | null;
     contrat: string | null;
+    parcours: string | null;
     q: string | null;
 }
 
@@ -35,7 +36,7 @@ interface IndexProps {
 
 const TABS: { value: Tab; label: string }[] = [
     { value: 'candidats', label: 'Candidats' },
-    { value: 'apprenants', label: 'Apprenants' },
+    { value: 'stagiaires', label: 'Stagiaires' },
     { value: 'alternants', label: 'Alternants' },
     { value: 'tous', label: 'Tous' },
 ];
@@ -69,7 +70,9 @@ export default function CandidaturesIndex({ rows, filters, counts, options, can,
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [search]);
 
-    const filtered = Boolean(filters.q || filters.etape || filters.formation || filters.das || filters.responsable || filters.contrat);
+    const filtered = Boolean(
+        filters.q || filters.etape || filters.formation || filters.das || filters.responsable || filters.contrat || filters.parcours,
+    );
     const exportUrl = `/admissions/candidatures/export?${new URLSearchParams(listQuery(filters))}`;
 
     return (
@@ -78,7 +81,7 @@ export default function CandidaturesIndex({ rows, filters, counts, options, can,
 
             <div className="flex flex-col gap-4 p-4">
                 <div className="flex flex-wrap items-start justify-between gap-4">
-                    <Heading title="Candidats" description="Candidatures, apprenants et alternants" />
+                    <Heading title="Candidats" description="Candidatures, stagiaires et alternants" />
                     <div className="flex flex-wrap gap-2">
                         {can.export && (
                             <Button asChild variant="outline">
@@ -143,6 +146,12 @@ export default function CandidaturesIndex({ rows, filters, counts, options, can,
                         options={options.users}
                         onChange={(v) => visit({ responsable: v })}
                     />
+                    <FilterSelect
+                        label="Parcours"
+                        value={filters.parcours}
+                        options={[...options.pathways, { value: 'a_definir', label: 'À définir' }]}
+                        onChange={(v) => visit({ parcours: v })}
+                    />
                     <FilterSelect label="Contrat" value={filters.contrat} options={options.contract_types} onChange={(v) => visit({ contrat: v })} />
                     {filtered && (
                         <div className="flex items-end">
@@ -153,7 +162,16 @@ export default function CandidaturesIndex({ rows, filters, counts, options, can,
                                 onClick={() =>
                                     router.get(
                                         '/admissions/candidatures',
-                                        listQuery({ ...filters, etape: null, formation: null, das: null, responsable: null, contrat: null, q: null }),
+                                        listQuery({
+                                            ...filters,
+                                            etape: null,
+                                            formation: null,
+                                            das: null,
+                                            responsable: null,
+                                            contrat: null,
+                                            parcours: null,
+                                            q: null,
+                                        }),
                                     )
                                 }
                             >
@@ -176,7 +194,7 @@ export default function CandidaturesIndex({ rows, filters, counts, options, can,
                                         <th className="px-3 py-2 font-medium">Numéro</th>
                                         <th className="px-3 py-2 font-medium">Candidat</th>
                                         <th className="px-3 py-2 font-medium">Formation</th>
-                                        <th className="px-3 py-2 font-medium">Contrat</th>
+                                        <th className="px-3 py-2 font-medium">Parcours</th>
                                         <th className="px-3 py-2 font-medium">Responsable</th>
                                         <th className="px-3 py-2 font-medium">Étape</th>
                                     </tr>
@@ -212,7 +230,7 @@ export default function CandidaturesIndex({ rows, filters, counts, options, can,
                                                         </div>
                                                     </>
                                                 ) : (
-                                                    '—'
+                                                    (r.pathway_label ?? '—')
                                                 )}
                                             </td>
                                             <td className="px-3 py-2">{r.responsible ?? '—'}</td>

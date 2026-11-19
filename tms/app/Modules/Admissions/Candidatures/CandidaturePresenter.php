@@ -37,6 +37,8 @@ final class CandidaturePresenter
             'number' => $c->number,
             'status' => $c->status->value,
             'status_label' => $c->status->label(),
+            'pathway' => $c->pathway?->value,
+            'pathway_label' => $c->pathway?->label(),
             'person' => [
                 'id' => $c->person_id,
                 'label' => $profile['label'] ?? 'Personne anonymisée',

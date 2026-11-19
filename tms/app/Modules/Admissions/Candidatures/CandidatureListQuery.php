@@ -17,16 +17,19 @@ use Illuminate\Support\Str;
  *
  * Tabs (onglet): « candidats » (default: not admitted yet, or admitted
  * without a live dossier; rejected and withdrawn only when the stage filter
- * asks for them), « apprenants » (a live dossier, no contract),
+ * asks for them), « stagiaires » (a live dossier, no contract),
  * « alternants » (a live dossier and a contract), « tous ».
  */
 final class CandidatureListQuery
 {
-    public const TABS = ['candidats', 'apprenants', 'alternants', 'tous'];
+    public const TABS = ['candidats', 'stagiaires', 'alternants', 'tous'];
+
+    /** Pathway filter: a Pathway value, or « a_definir » (undecided). */
+    public const UNDECIDED = 'a_definir';
 
     /**
      * @param  array<string, mixed>  $input
-     * @return array{onglet: string, etape: ?string, formation: ?string, das: ?string, responsable: ?string, contrat: ?string, q: ?string}
+     * @return array{onglet: string, etape: ?string, formation: ?string, das: ?string, responsable: ?string, contrat: ?string, parcours: ?string, q: ?string}
      */
     public static function filters(array $input): array
     {
@@ -35,6 +38,9 @@ final class CandidatureListQuery
         $tab = $text('onglet');
         $stage = $text('etape');
         $contract = $text('contrat');
+        $pathway = $text('parcours');
+        // « apprenants » was the tab of the trainees before 0.9.2.
+        $tab = $tab === 'apprenants' ? 'stagiaires' : $tab;
 
         return [
             'onglet' => in_array($tab, self::TABS, true) ? $tab : 'candidats',
@@ -43,12 +49,13 @@ final class CandidatureListQuery
             'das' => $uuid('das'),
             'responsable' => $uuid('responsable'),
             'contrat' => $contract !== null && ContractType::tryFrom($contract) !== null ? $contract : null,
+            'parcours' => $pathway !== null && ($pathway === self::UNDECIDED || Pathway::tryFrom($pathway) !== null) ? $pathway : null,
             'q' => $text('q'),
         ];
     }
 
     /**
-     * @param  array{onglet: string, etape: ?string, formation: ?string, das: ?string, responsable: ?string, contrat: ?string, q: ?string}  $filters
+     * @param  array{onglet: string, etape: ?string, formation: ?string, das: ?string, responsable: ?string, contrat: ?string, parcours: ?string, q: ?string}  $filters
      * @return Builder<Candidature>
      */
     public static function build(User $user, array $filters): Builder
@@ -61,7 +68,7 @@ final class CandidatureListQuery
             'candidats' => $query
                 ->when($filters['etape'] === null, fn (Builder $q) => $q->whereNotIn('candidatures.status', [CandidatureStatus::Rejected->value, CandidatureStatus::Withdrawn->value]))
                 ->where(fn (Builder $q) => $q->whereNull('candidatures.dossier_id')->orWhereNotIn('candidatures.dossier_id', $live)),
-            'apprenants' => $query->whereIn('candidatures.dossier_id', $live)
+            'stagiaires' => $query->whereIn('candidatures.dossier_id', $live)
                 ->whereNotIn('candidatures.id', AlternanceContract::query()->select('candidature_id')),
             'alternants' => $hasContract($query->whereIn('candidatures.dossier_id', $live)),
             default => $query,
@@ -72,6 +79,9 @@ final class CandidatureListQuery
             ->when($filters['das'], fn (Builder $q, string $v) => $q->where('candidatures.das_id', $v))
             ->when($filters['responsable'], fn (Builder $q, string $v) => $q->where('candidatures.responsible_user_id', $v))
             ->when($filters['contrat'], fn (Builder $q, string $v) => $q->whereIn('candidatures.id', AlternanceContract::query()->where('contract_type', $v)->select('candidature_id')))
+            ->when($filters['parcours'], fn (Builder $q, string $v) => $v === self::UNDECIDED
+                ? $q->whereNull('candidatures.pathway')
+                : $q->where('candidatures.pathway', $v))
             ->when($filters['q'], function (Builder $q, string $v): void {
                 $people = app(Trainees::class)->matchingIds($v);
                 $q->where(fn (Builder $w) => $w->where('candidatures.number', 'ilike', '%'.addcslashes($v, '\\%_').'%')->orWhereIn('candidatures.person_id', $people));
@@ -83,7 +93,7 @@ final class CandidatureListQuery
     /**
      * Number of candidatures of each tab under the same filters.
      *
-     * @param  array{onglet: string, etape: ?string, formation: ?string, das: ?string, responsable: ?string, contrat: ?string, q: ?string}  $filters
+     * @param  array{onglet: string, etape: ?string, formation: ?string, das: ?string, responsable: ?string, contrat: ?string, parcours: ?string, q: ?string}  $filters
      * @return array<string, int>
      */
     public static function counts(User $user, array $filters): array

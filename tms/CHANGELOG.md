@@ -11,6 +11,14 @@ Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) ; ve
   comparées au mois précédent, avec les 12 derniers mois, dans le périmètre de chacun.
 - **Attribuer à plusieurs personnes** une action ou un rendez-vous (champ « Attribuer à », le premier choisi est le
   responsable) : chacune la voit dans son « À faire » et son planning et peut la modifier et la terminer.
+- **Admissions — parcours du candidat** (carte Orientation) : *À définir*, *Alternance* ou *Stagiaire* (formation
+  continue sans contrat). La carte Alternance n'apparaît que pour le parcours Alternance ; un contrat met le parcours à
+  Alternance et le garde ; filtre **Parcours** et colonne de l'export.
+
+### Modifié
+
+- Menu : **Candidats** passe dans **Formation**, au-dessus de Dossiers.
+- Admissions : l'onglet **Apprenants** devient **Stagiaires**, le badge « Apprenant » devient « Stagiaire ».
 
 ## [0.9.1] - 2026-11-19
 

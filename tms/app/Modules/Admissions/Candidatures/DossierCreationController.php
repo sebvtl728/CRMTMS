@@ -31,7 +31,9 @@ class DossierCreationController extends Controller
         $user = self::authorize($request, $candidature);
         $dossierId = $creation->create($candidature, $request->all(), $user);
 
-        return redirect("/dossiers/{$dossierId}")->with('status', 'Dossier de formation créé : '.$candidature->number.' est apprenant.');
+        $kind = $candidature->contract()->exists() ? 'alternant' : 'stagiaire';
+
+        return redirect("/dossiers/{$dossierId}")->with('status', 'Dossier de formation créé : '.$candidature->number.' est '.$kind.'.');
     }
 
     private static function authorize(Request $request, Candidature $candidature): User

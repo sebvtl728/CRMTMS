@@ -38,7 +38,7 @@ final class CandidatureExport implements ExportResource, PrefetchesRows
     public function columns(): array
     {
         return [
-            'number' => 'Numéro', 'last_name' => 'Nom', 'first_name' => 'Prénom', 'status' => 'Étape', 'training' => 'Formation',
+            'number' => 'Numéro', 'last_name' => 'Nom', 'first_name' => 'Prénom', 'status' => 'Étape', 'pathway_label' => 'Parcours', 'training' => 'Formation',
             'rncp_code' => 'Code RNCP', 'das' => 'DAS', 'responsible' => 'Responsable', 'contract_type' => 'Type de contrat',
             'employer' => 'Employeur', 'contract_starts_on' => 'Début contrat', 'contract_ends_on' => 'Fin contrat', 'dossier' => 'Dossier',
         ];
