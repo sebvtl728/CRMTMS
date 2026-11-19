@@ -21,4 +21,9 @@ class DocumentsServiceProvider extends ServiceProvider
 
         MorphAliases::register([DocumentText::MORPH_ALIAS => DocumentText::class, Document::MORPH_ALIAS => Document::class]);
     }
+
+    public function boot(): void
+    {
+        DocumentMailTemplates::register();
+    }
 }

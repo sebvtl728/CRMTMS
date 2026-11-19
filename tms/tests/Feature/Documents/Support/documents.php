@@ -1,8 +1,14 @@
 <?php
 
+use App\Modules\Connectors\Core\ConnectorConfig;
+use App\Modules\Connectors\Smtp\SmtpTransportFactory;
 use App\Modules\Sessions\Dossiers\Dossier;
 use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\Http;
+use Symfony\Component\Mailer\Envelope;
+use Symfony\Component\Mailer\SentMessage;
+use Symfony\Component\Mailer\Transport\TransportInterface;
+use Symfony\Component\Mime\RawMessage;
 
 /*
  * Helpers of the Documents tests (require_once: Pest loads only *Test.php).
@@ -57,4 +63,41 @@ function docIndividualDossier(): Dossier
     l2Enrol($dossier, $session, $ana);
 
     return $dossier->fresh();
+}
+
+/** The organisme's SMTP connector, its transport replaced: $send receives every message (and may throw). */
+function docSmtp(Closure $send): ConnectorConfig
+{
+    $transport = new class($send) implements TransportInterface
+    {
+        public function __construct(private readonly Closure $send) {}
+
+        public function send(RawMessage $message, ?Envelope $envelope = null): ?SentMessage
+        {
+            ($this->send)($message);
+
+            return null;
+        }
+
+        public function __toString(): string
+        {
+            return 'document://';
+        }
+    };
+    app()->instance(SmtpTransportFactory::class, new class($transport) extends SmtpTransportFactory
+    {
+        public function __construct(private readonly TransportInterface $fake) {}
+
+        public function make(array $settings, array $secrets): TransportInterface
+        {
+            return $this->fake;
+        }
+    });
+
+    return ConnectorConfig::create([
+        'connector_key' => 'smtp',
+        'enabled' => true,
+        'settings' => ['host' => 'smtp.example.test', 'port' => 587, 'encryption' => 'tls', 'from_address' => 'documents@cap.test', 'from_name' => 'CAP'],
+        'secrets' => ['username' => 'cap-user', 'password' => 's3cret'],
+    ]);
 }
