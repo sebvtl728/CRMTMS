@@ -104,3 +104,12 @@ it('closes the test at its time limit: answers refused, attempt submitted', func
     expect(OnlineAttempt::query()->sole()->submitted_at)->not->toBeNull()
         ->and(OnlineAttempt::query()->sole()->answers)->toBe(['q-tf' => true]);
 });
+
+it('refuses a malformed answer cleanly, never an error 500', function () {
+    [, $token] = otLink();
+    $this->postJson("/test-positionnement/{$token}/start");
+
+    $this->putJson("/test-positionnement/{$token}/answers", ['answers' => ['q-many' => [['x'], 'z']]])->assertUnprocessable();
+    $this->putJson("/test-positionnement/{$token}/answers", ['answers' => ['q-open' => ['texte']]])->assertUnprocessable();
+    $this->putJson("/test-positionnement/{$token}/answers", ['answers' => 'texte'])->assertUnprocessable();
+});

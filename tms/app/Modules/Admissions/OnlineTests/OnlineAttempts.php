@@ -203,7 +203,8 @@ final class OnlineAttempts
             'short_text', 'long_text', 'number' => is_string($value) || is_int($value) || is_float($value) ? mb_substr((string) $value, 0, 20000) : throw $invalid(),
             'true_false', 'yes_no' => is_bool($value) ? $value : throw $invalid(),
             'single_choice' => is_string($value) && in_array($value, array_column($question['choices'] ?? [], 'id'), true) ? $value : throw $invalid(),
-            'multiple_choice' => is_array($value) && array_diff($value, array_column($question['choices'] ?? [], 'id')) === [] ? array_values(array_unique(array_map('strval', $value))) : throw $invalid(),
+            'multiple_choice' => is_array($value) && array_filter($value, fn ($v) => ! is_string($v)) === [] && array_diff($value, array_column($question['choices'] ?? [], 'id')) === []
+                ? array_values(array_unique($value)) : throw $invalid(),
             default => throw $invalid(),
         };
     }
