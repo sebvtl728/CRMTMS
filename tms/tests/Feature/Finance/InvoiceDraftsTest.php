@@ -148,7 +148,7 @@ it('prepares one draft per recipient, and never twice (Review Focus 1)', functio
         ->recipient_type->toBe('organisation')->recipient_id->toBe($x['dossier']->account_organisation_id)
         ->dossier_id->toBe($x['dossier']->id)->cut_off->toBe('2026-11-17')
         ->total_ht_cents->toBe(17143)->total_vat_cents->toBe(0)->total_ttc_cents->toBe(17143)
-        ->vat_mention->toBe('Exonération de TVA, article 261-4-4° du CGI')
+        ->vat_mention->toBe('Exonération de TVA, art. 261, 4-4° a du CGI')
         ->and($contractor->lines()->sole())->kind->toBe('computed')->component->toBe('training')->total_ht_cents->toBe(17143)->computed_cents->toBe(17143);
     $funder = Invoice::query()->whereNotNull('funding_id')->sole();
     expect($funder)->funding_id->toBe($x['funding']->id)->total_ht_cents->toBe(25714);

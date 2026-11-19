@@ -143,7 +143,7 @@ it('an exempt company gives 0 % on every line and no rate to choose', function (
     $this->get("/crm/quotes/{$quote->id}/edit")->assertInertia(fn (Assert $page) => $page->where('vat_exempt', true));
     $this->get("/crm/quotes/{$quote->id}")->assertInertia(fn (Assert $page) => $page
         ->where('quote.vat_exempt', true)
-        ->where('quote.vat_notice', 'TVA non applicable, art. 261-4-4° a du CGI'));
+        ->where('quote.vat_notice', 'Exonération de TVA, art. 261, 4-4° a du CGI'));
 
     // A draft follows the company: once subject to VAT, the next save applies the rates.
     $company->update(['vat_regime' => VatRegime::Subject]);

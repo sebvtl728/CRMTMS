@@ -4,6 +4,7 @@ use App\Modules\Core\Companies\Company;
 use App\Modules\Core\Companies\LegalForm;
 use App\Modules\Core\Companies\LegalMentions;
 use App\Rules\Siret;
+use Carbon\CarbonImmutable;
 
 // Numbers are printed with U+00A0 (no-break space) as thousands separator so a
 // SIREN or an amount is never split across lines: the expectations spell it out.
@@ -51,8 +52,17 @@ it('degrades gracefully without siret or rcs', function () {
     expect(LegalMentions::for($noRcs))->toBe('ASSO – Association – SIRET 732'.NB.'829'.NB.'320'.NB.'00074');
 });
 
-it('has the VAT exemption notice', function () {
-    expect(LegalMentions::vatExemptionNotice())->toBe('TVA non applicable, art. 261-4-4° a du CGI');
+it('has the VAT exemption notice of the CGI until 2026, of the CIBS from 2027', function () {
+    expect(LegalMentions::vatExemptionNotice(CarbonImmutable::parse('2026-12-31')))->toBe('Exonération de TVA, art. 261, 4-4° a du CGI')
+        ->and(LegalMentions::vatExemptionNotice(CarbonImmutable::parse('2027-01-01')))->toBe('Exonération de TVA, art. L. 213-93 du CIBS');
+});
+
+it('recognises an exemption notice, the former wordings too', function () {
+    foreach (['Exonération de TVA, art. 261, 4-4° a du CGI', 'Exonération de TVA, art. L. 213-93 du CIBS', 'Exonération de TVA, article 261-4-4° du CGI', "Exonération de TVA, art. 261, 4-4° a du CGI\nIndemnité hors champ de la TVA"] as $text) {
+        expect(LegalMentions::isVatExemption($text))->toBeTrue();
+    }
+    expect(LegalMentions::isVatExemption('Indemnité hors champ de la TVA'))->toBeFalse()
+        ->and(LegalMentions::isVatExemption(null))->toBeFalse();
 });
 
 it('labels the legal forms', function () {

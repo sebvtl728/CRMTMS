@@ -17,7 +17,6 @@ use App\Modules\Finance\Invoices\InvoiceJournalEntry;
 use App\Modules\Finance\Invoices\InvoiceLine;
 use App\Modules\Finance\Invoices\InvoiceNumbering;
 use App\Modules\Finance\Invoices\InvoiceStatus;
-use App\Modules\Finance\Invoices\InvoiceTotals;
 use App\Modules\Finance\Invoices\InvoiceValidator;
 use App\Modules\Finance\Permissions;
 use App\Modules\Finance\Plans\BillingPlans;
@@ -219,6 +218,22 @@ it('restarts the numbers at 00001 on the first validation of a new year', functi
     expect($opco->number)->toBe('F-2027-00001')
         ->and($opco->issued_on->toDateString())->toBe('2027-01-04')
         ->and($opco->due_on->toDateString())->toBe('2027-02-03');
+});
+
+it('prints the exemption notice of the validation day: the CIBS from 2027, a credit note too', function () {
+    $x = fiSeed();
+    $user = fvAccountant();
+    $draft = fvDraft($x, 'contractor', $user);
+    // Prepared in 2026, validated in 2027: the notice of the validation day.
+    expect($draft->refresh()->vat_mention)->toBe('Exonération de TVA, art. 261, 4-4° a du CGI');
+    $this->travelTo(CarbonImmutable::parse('2027-01-04 09:00', 'Europe/Paris'));
+    $invoice = fvValidate($draft, $user);
+    expect($invoice->vat_mention)->toBe('Exonération de TVA, art. L. 213-93 du CIBS')
+        ->and(fvSentText())->toContain('Exonération de TVA, art. L. 213-93 du CIBS');
+
+    $this->travelTo(CarbonImmutable::parse('2027-01-05 09:00', 'Europe/Paris'));
+    $credit = fvValidate(fvCreditPrices(app(CreditNotes::class)->create($user, $invoice), ['-171,43']), $user);
+    expect($credit->vat_mention)->toBe('Exonération de TVA, art. L. 213-93 du CIBS')->and($credit->total_vat_cents)->toBe(0);
 });
 
 /**
@@ -475,7 +490,7 @@ it('gives a credit note the VAT regime of the invoice it corrects, not the compa
     $x = fiSeed();
     $user = fvAccountant();
     $invoice = fvValidate(fvDraft($x, 'contractor', $user), $user);
-    expect($invoice->vat_mention)->toBe(InvoiceTotals::EXEMPTION);
+    expect($invoice->vat_mention)->toBe('Exonération de TVA, art. 261, 4-4° a du CGI');
 
     // The company became subject to VAT since.
     Company::query()->whereKey($invoice->company_id)->update(['vat_regime' => 'subject']);
@@ -487,9 +502,9 @@ it('gives a credit note the VAT regime of the invoice it corrects, not the compa
     $credit = fvValidate($credit->refresh(), $user);
 
     expect($credit->total_vat_cents)->toBe(0)
-        ->and($credit->vat_mention)->toBe(InvoiceTotals::EXEMPTION)
+        ->and($credit->vat_mention)->toBe('Exonération de TVA, art. 261, 4-4° a du CGI')
         ->and($credit->lines()->pluck('vat_rate')->map(fn ($r) => (string) $r)->all())->toBe(['0.00'])
-        ->and(fvSentText())->toContain('Exonération de TVA, article 261-4-4° du CGI')->not->toContain('Taux de TVA');
+        ->and(fvSentText())->toContain('Exonération de TVA, art. 261, 4-4° a du CGI')->not->toContain('Taux de TVA');
 });
 
 // ---------------------------------------------------------------- the dossier
@@ -563,7 +578,7 @@ it('prints every mandatory mention, the funding and the VAT exemption', function
         'Période de formation : du 01/09/2026 au 30/09/2026',
         'HACCP 3 jours — du 01/09/2026 au 30/09/2026 — 9 h réalisées / 21 h prévues', 'Stagiaires : Léa Durand',
         'Prix unitaire HT', '257,14 €', 'Total HT', 'Net à payer',
-        'Exonération de TVA, article 261-4-4° du CGI',
+        'Exonération de TVA, art. 261, 4-4° a du CGI',
         'Paiement à 30 jours, au plus tard le 17/12/2026.', "Pas d'escompte pour paiement anticipé.",
         'pénalités de retard', 'indemnité forfaitaire pour frais de recouvrement de 40 €', 'IBAN FR76 1234 5678 9012',
     ] as $mention) {
@@ -628,7 +643,7 @@ it('renders the mandatory mentions in a real PDF read back by pdftotext', functi
     foreach ([
         'FACTURE', 'F-2026-00001', 'CAP FORMATION', '732 829 320 00074', 'FR40732829320', '84740123474',
         'OPCO EP', 'PEC-42', $x['dossier']->number, '17/11/2026', '17/12/2026', '01/09/2026', '30/09/2026',
-        'Stagiaires : Léa Durand', '257,14 €', 'Exonération de TVA, article 261-4-4° du CGI', '40 €', 'pénalités de retard',
+        'Stagiaires : Léa Durand', '257,14 €', 'Exonération de TVA, art. 261, 4-4° a du CGI', '40 €', 'pénalités de retard',
     ] as $mention) {
         expect($text)->toContain($mention);
     }

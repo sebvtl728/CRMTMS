@@ -2,6 +2,8 @@
 
 namespace App\Modules\Core\Companies;
 
+use Carbon\CarbonImmutable;
+use Carbon\CarbonInterface;
 use NumberFormatter;
 
 /**
@@ -32,9 +34,29 @@ final class LegalMentions
         return implode(' – ', $segments);
     }
 
-    public static function vatExemptionNotice(): string
+    /** First day of the CIBS wording (recodification of the CGI, 1 January 2027). */
+    public const CIBS_FROM = '2027-01-01';
+
+    /**
+     * The VAT exemption notice of a document dated $on (Paris day; today by
+     * default) for continuing vocational training: art. 261, 4-4° a of the
+     * CGI until 31 December 2026, art. L. 213-93 of the CIBS from 1 January
+     * 2027 (wording given by the accountant; to check against the 2027
+     * finance law).
+     */
+    public static function vatExemptionNotice(?CarbonInterface $on = null): string
     {
-        return 'TVA non applicable, art. 261-4-4° a du CGI';
+        $day = ($on ?? CarbonImmutable::now('Europe/Paris'))->toDateString();
+
+        return $day < self::CIBS_FROM
+            ? 'Exonération de TVA, art. 261, 4-4° a du CGI'
+            : 'Exonération de TVA, art. L. 213-93 du CIBS';
+    }
+
+    /** Whether a printed VAT mention is an exemption notice (any wording, former ones too). */
+    public static function isVatExemption(?string $mention): bool
+    {
+        return $mention !== null && (str_contains($mention, 'Exonération de TVA') || str_contains($mention, 'TVA non applicable'));
     }
 
     private static function form(Company $c): string
