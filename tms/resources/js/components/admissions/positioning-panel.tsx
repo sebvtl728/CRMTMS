@@ -1,3 +1,4 @@
+import { OnlineAttemptPanel, type OnlineAttemptView } from '@/components/admissions/online-attempt-panel';
 import InputError from '@/components/input-error';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -30,6 +31,8 @@ export interface PositioningSendingRow {
 
 export interface PositioningProps {
     tests: PositioningTest[];
+    /** The candidate's latest online test (answers, scores, traces). */
+    attempt?: OnlineAttemptView | null;
     /** Published online tests of the training or DAS. */
     online_tests: { id: string; title: string; total_points: number; time_limit_minutes: number | null }[];
     defaults: { to: string; subject: string; body: string };
@@ -94,6 +97,7 @@ export function PositioningPanel({ candidatureId, positioning }: { candidatureId
                     ))}
                 </ul>
             )}
+            {positioning.attempt && <OnlineAttemptPanel candidatureId={candidatureId} attempt={positioning.attempt} />}
             {positioning.link && <LinkBox link={positioning.link} />}
             {positioning.can_send && hasSomething && (
                 <div className="flex flex-wrap items-center gap-2">

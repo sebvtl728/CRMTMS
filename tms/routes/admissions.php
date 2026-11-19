@@ -8,6 +8,7 @@ use App\Modules\Admissions\Candidatures\DossierCreationController;
 use App\Modules\Admissions\Candidatures\LookupController;
 use App\Modules\Admissions\CustomFields\CustomFieldController;
 use App\Modules\Admissions\OnlineTests\OnlinePassage;
+use App\Modules\Admissions\OnlineTests\OnlineReviewController;
 use App\Modules\Admissions\OnlineTests\OnlineTestController;
 use App\Modules\Admissions\Positioning\PositioningController;
 use App\Modules\Admissions\Positioning\PositioningUploadController;
@@ -32,6 +33,7 @@ Route::middleware(['auth'])->prefix('admissions/candidatures')->name('admissions
     Route::post('{candidature}/files', [CandidatureFileController::class, 'store'])->middleware('can:admissions.candidatures.update')->name('files.store');
     Route::get('{candidature}/files/{file}', [CandidatureFileController::class, 'show'])->middleware('can:admissions.candidatures.view')->name('files.show');
     Route::delete('{candidature}/files/{file}', [CandidatureFileController::class, 'destroy'])->middleware('can:admissions.candidatures.update')->name('files.destroy');
+    Route::put('{candidature}/online-attempts/{attempt}/grades', [OnlineReviewController::class, 'grade'])->middleware('can:admissions.candidatures.update')->name('online.grade');
     Route::post('{candidature}/positioning/link', [PositioningController::class, 'link'])->middleware(['can:admissions.candidatures.update', 'throttle:positioning-send'])->name('positioning.link');
     Route::post('{candidature}/positioning/send', [PositioningController::class, 'send'])->middleware(['can:admissions.candidatures.update', 'throttle:positioning-send'])->name('positioning.send');
     Route::put('{candidature}/alternance', [AlternanceController::class, 'update'])->middleware('can:admissions.candidatures.update')->name('alternance.update');
