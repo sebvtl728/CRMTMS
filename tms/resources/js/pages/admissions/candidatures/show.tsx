@@ -241,6 +241,7 @@ export default function CandidatureShow({ candidature: c, custom_fields, history
                                       : `Candidat admis : créez son dossier pour qu'il devienne ${c.alternance ? 'alternant' : 'stagiaire'}.`}
                             </p>
                         )}
+                        {!c.dossier && c.status === 'interview' && <Suggest c={c} to="admitted" label="Admis" canUpdate={can.update} />}
                     </Card>
 
                     <Card title="Orientation">

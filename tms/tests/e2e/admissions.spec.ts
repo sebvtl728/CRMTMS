@@ -35,7 +35,12 @@ async function moveTo(page: Page, stage: string): Promise<void> {
 
 test('an interlocuteur becomes a candidate, signs an apprenticeship and becomes an alternant', async ({ browser }) => {
     expect(existsSync(ADMIN_STATE), 'run admin.spec.ts first (it signs the administrator in)').toBe(true);
-    const context = await browser.newContext({ storageState: ADMIN_STATE, locale: 'fr-FR', timezoneId: 'Europe/Paris', viewport: { width: 1400, height: 1000 } });
+    const context = await browser.newContext({
+        storageState: ADMIN_STATE,
+        locale: 'fr-FR',
+        timezoneId: 'Europe/Paris',
+        viewport: { width: 1400, height: 1000 },
+    });
     const page = await context.newPage();
 
     // A training with its RNCP code; the employer and the person in the CRM.
@@ -79,8 +84,9 @@ test('an interlocuteur becomes a candidate, signs an apprenticeship and becomes 
     await page.getByRole('button', { name: 'Enregistrer le contrat' }).click();
     await expect(page.getByText('Contrat enregistré.')).toBeVisible();
 
-    // Admitted, then the dossier with the employer as contractant.
-    await moveTo(page, 'Admis');
+    // Admitted (the next step is offered on the page), then the dossier with the employer as contractant.
+    await page.getByRole('button', { name: "Passer à l'étape « Admis »" }).click();
+    await expect(page.getByText('Étape : Admis.')).toBeVisible();
     await page.getByRole('button', { name: 'Créer le dossier' }).click();
     const dialog = page.getByRole('dialog');
     await expect(dialog.getByText(EMPLOYER)).toBeVisible();
