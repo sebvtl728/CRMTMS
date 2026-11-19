@@ -140,7 +140,7 @@ class SendInvoice implements ShouldQueue
                 'updated_at' => $now,
             ]);
         });
-        $audit->record('invoice.email_sent', $invoice, [], ['sending' => $sending->id], self::sender($sending));
+        $audit->record($sending->purpose === InvoiceSending::REMINDER ? 'invoice.reminder_sent' : 'invoice.email_sent', $invoice, [], ['sending' => $sending->id, ...($sending->reminder_level === null ? [] : ['level' => $sending->reminder_level])], self::sender($sending));
     }
 
     /**

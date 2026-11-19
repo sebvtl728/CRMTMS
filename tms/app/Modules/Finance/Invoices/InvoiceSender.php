@@ -33,9 +33,25 @@ final class InvoiceSender
      */
     public function send(User $user, Invoice $invoice, array $message): InvoiceSending
     {
-        return DB::transaction(function () use ($user, $invoice, $message): InvoiceSending {
+        return $this->queue($user, $invoice, $message);
+    }
+
+    /**
+     * Queues one sending of the archived PDF under the lock of the invoice:
+     * the invoice itself, or a reminder of $level (0.9.1; $check runs under
+     * the lock and may refuse). $user null: an automatic reminder.
+     *
+     * @param  array{to: string, subject: string, body: string}  $message
+     * @param  (callable(Invoice): void)|null  $check
+     */
+    public function queue(?User $user, Invoice $invoice, array $message, ?int $level = null, ?callable $check = null): InvoiceSending
+    {
+        return DB::transaction(function () use ($user, $invoice, $message, $level, $check): InvoiceSending {
             $locked = Invoice::query()->lockForUpdate()->findOrFail($invoice->getKey());
             $this->guard($locked);
+            if ($check !== null) {
+                $check($locked);
+            }
 
             $sending = InvoiceSending::query()->create([
                 'invoice_id' => $locked->id,
@@ -43,11 +59,13 @@ final class InvoiceSender
                 'subject' => $message['subject'],
                 'body' => $message['body'],
                 'status' => 'pending',
-                'sent_by' => $user->id,
+                'sent_by' => $user?->id,
+                'purpose' => $level === null ? InvoiceSending::INVOICE : InvoiceSending::REMINDER,
+                'reminder_level' => $level,
             ]);
             Invoice::query()->whereKey($locked->id)->toBase()
                 ->update(['email_status' => 'pending', 'email_error_code' => null, 'updated_at' => CarbonImmutable::now()]);
-            $this->audit->record('invoice.email_queued', $locked, [], ['sending' => $sending->id], $user);
+            $this->audit->record($level === null ? 'invoice.email_queued' : 'invoice.reminder_queued', $locked, [], ['sending' => $sending->id, ...($level === null ? [] : ['level' => $level])], $user);
             SendInvoice::dispatch($sending->id)->afterCommit();
 
             $invoice->setRawAttributes(Invoice::query()->findOrFail($locked->id)->getAttributes(), true);
@@ -64,7 +82,7 @@ final class InvoiceSender
             throw new UserFacingHttpException(409, self::NOTHING_TO_RESEND);
         }
 
-        return $this->send($user, $invoice, ['to' => $last->email, 'subject' => $last->subject, 'body' => $last->body]);
+        return $this->queue($user, $invoice, ['to' => $last->email, 'subject' => $last->subject, 'body' => $last->body], $last->purpose === InvoiceSending::REMINDER ? $last->reminder_level : null);
     }
 
     private function guard(Invoice $invoice): void
