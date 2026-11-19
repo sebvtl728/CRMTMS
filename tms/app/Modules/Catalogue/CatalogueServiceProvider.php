@@ -40,6 +40,7 @@ class CatalogueServiceProvider extends ServiceProvider
     public function boot(): void
     {
         self::registerReferenceUsage();
+        Quality\CatalogueMeasures::register();
 
         RateLimiter::for('catalogue-export', fn (Request $request) => Limit::perMinute(10)->by('catalogue-export:'.($request->user()?->getAuthIdentifier() ?? $request->ip()))
             ->response(fn (Request $request, array $headers) => response()->json(['message' => 'Trop d\'exports en peu de temps. Réessayez dans une minute.'], 429, $headers)));

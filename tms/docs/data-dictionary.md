@@ -728,6 +728,16 @@ Clé (`tenant_id`, `year`) : `last_number` (année de Paris, incrémenté dans l
 ### Catalogue
 `trainings.rncp_code` (string(20), null) : code RNCP de la certification (`RNCP` + chiffres).
 
+## Module Qualité
+
+### `quality_indicators` — suivi d'un indicateur Qualiopi
+`referential_version` (`2026`) · `number` (1–33) · unique (`tenant_id`, `referential_version`, `number`) · `applicable` · `not_applicable_reason` (obligatoire si non applicable, CHECK) · `status` (`todo`, `in_progress`, `ready`, `to_review`, CHECK) · `responsible_user_id` (FK `users`, null) · `review_on` · `notes` · `updated_by`. Ligne créée à la première modification ; sans ligne : applicable, à faire. Le texte des indicateurs est dans le code (`QualiopiReferential`), jamais en base.
+
+### `quality_proofs` — preuves
+`referential_version` · `number` · `kind` (`file`, `link`, `note`, CHECK) · `title` · `url` (http/https) · `note` · `path` (zone `quality` de `TenantStorage`), `original_name`, `size` · `created_by`. Supprimée par qui tient le dossier (fichier effacé).
+
+Permissions : `qualite.view`, `qualite.manage` (sans périmètre ; défauts : administrateur et direction).
+
 ## Permissions CRM (catalogue global `permissions`)
 
 CRM : `crm.fiches.view|update|delete`, `crm.opportunities.view|update|delete`, `crm.quotes.view|update|delete`, `crm.activities.view|update|delete`, `crm.activities.team`, `crm.revenue.view`, `crm.revenue.manage`, `crm.merge`, `crm.import`, `crm.export`, `crm.gdpr` ; catalogue : `catalogue.view`, `catalogue.manage`, `catalogue.delete`. Les anciens `crm.view|create|update|delete` sont supprimés par la migration 0.5.0 (convertis organisme par organisme). La matrice par rôle est dans `admin.md`. `role_permission_defaults_applied` (`tenant_id`, `role`, `permission`) mémorise les droits par défaut déjà accordés à chaque organisme, pour qu'une mise à jour n'ajoute que les nouveaux droits sans rétablir ceux qu'un administrateur a retirés. `role_permission_scopes` (`tenant_id`, `role_id`, `permission`, `scope` = `own`/`das`/`all`/`trainer`) : périmètre d'un rôle pour un droit à périmètre ; sans ligne, le périmètre vaut `all` ; `trainer` (« Ses séances », 0.8.0) n'est accepté que pour `sessions.seances.view` et `sessions.attendance.manage`.

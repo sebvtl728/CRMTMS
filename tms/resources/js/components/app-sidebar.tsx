@@ -4,6 +4,7 @@ import { Sidebar, SidebarContent, SidebarFooter, SidebarHeader, SidebarMenu, Sid
 import { type NavItem, type SharedData } from '@/types';
 import { Link, usePage } from '@inertiajs/react';
 import {
+    BadgeCheck,
     Banknote,
     BellRing,
     BookOpen,
@@ -80,6 +81,11 @@ const financeNavItems: (NavItem & { permission: string })[] = [
     { title: 'Réglages de facturation', url: '/finance/settings', icon: Settings2, permission: 'settings.manage' },
 ];
 
+// « Qualité »: the Qualiopi file.
+const qualityNavItems: (NavItem & { permission: string })[] = [
+    { title: 'Qualiopi', url: '/qualite/qualiopi', icon: BadgeCheck, permission: 'qualite.view' },
+];
+
 const myPlanningItem: NavItem = { title: 'Mon planning', url: '/mon-planning', icon: CalendarClock };
 
 // Each entry is shown only when the user holds the permission (the server stays the authority).
@@ -108,6 +114,7 @@ export function AppSidebar() {
         ...trainingNavItems.filter((item) => auth.permissions.includes(item.permission)),
     ];
     const financeItems = financeNavItems.filter((item) => auth.permissions.includes(item.permission));
+    const qualityItems = qualityNavItems.filter((item) => auth.permissions.includes(item.permission));
     const adminItems = adminNavItems
         .filter((item) => auth.permissions.includes(item.permission) && (item.url !== '/admin/backups' || backups_enabled))
         // Backup in trouble: a red dot on « Sauvegardes » for the administrator (never on the home page).
@@ -137,6 +144,7 @@ export function AppSidebar() {
                         {commercialItems.length > 0 && <NavMain items={commercialItems} label="Commercial" />}
                         {trainingItems.length > 0 && <NavMain items={trainingItems} label="Formation" />}
                         {financeItems.length > 0 && <NavMain items={financeItems} label="Finance" />}
+                        {qualityItems.length > 0 && <NavMain items={qualityItems} label="Qualité" />}
                         {adminItems.length > 0 && <NavMain items={adminItems} label="Administration" />}
                     </>
                 )}

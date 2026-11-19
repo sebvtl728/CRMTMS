@@ -75,6 +75,7 @@ class AdmissionsServiceProvider extends ServiceProvider
         self::registerReferenceUsage();
         self::registerTrainingUsage();
         self::registerCrm();
+        Quality\AdmissionsMeasures::register();
 
         // A test sent to a candidate stays downloadable from the history once trashed in the library.
         Brochures::registerSentCheck('admissions.positioning', fn (string $versionId): bool => DB::table('positioning_sending_versions')->where('brochure_version_id', $versionId)->exists());

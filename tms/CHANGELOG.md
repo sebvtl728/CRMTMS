@@ -5,6 +5,13 @@ Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) ; ve
 
 ## [Non publié]
 
+### Ajouté
+
+- Qualité : module **Qualiopi** (menu Qualité › Qualiopi, droits `qualite.view` et `qualite.manage`) sur le référentiel
+  2026 (décret n° 2026-728, 33 indicateurs) : suivi par indicateur (applicabilité justifiée, statut, responsable, date
+  de revue, notes), preuves (fichier, lien, note), mesures automatiques (indicateurs 1, 5, 8, 12 et 13) et export du
+  dossier d'audit (ZIP : sommaire PDF et fichiers par indicateur, journalisé).
+
 ### Corrigé
 
 - Admissions : le bloc « Informations complémentaires » (champs personnalisés) s'affiche dès l'ouverture de la

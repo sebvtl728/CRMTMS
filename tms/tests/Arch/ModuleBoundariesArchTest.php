@@ -334,7 +334,7 @@ it('detects every way Finance could reach Sessions, the Crm, the catalogue or th
  * Connectors (as Finance) (a use line, a grouped use or an inline
  * fully qualified name).
  */
-const ADMISSIONS_FOREIGN_REFERENCE = '/App\\\\Modules\\\\(?!(?:Admissions|Core)\b|Sessions\\\\Public\b|Crm\\\\Public\b|Catalogue\\\\(?:Trainings|TrainingData|TrainingUsage|Brochures|Assistant\\\\PdfText)\b|Connectors\\\\(?:Smtp\\\\(?:TenantMailer|SmtpHostRefused)|Core\\\\(?:ConnectorRun|PermanentDeliveryFailure)|Ai\\\\(?:Ai|AiUnavailable|AiInvalidResponse))\b)\w+'
+const ADMISSIONS_FOREIGN_REFERENCE = '/App\\\\Modules\\\\(?!(?:Admissions|Core)\b|Sessions\\\\Public\b|Crm\\\\Public\b|Qualite\\\\Public\b|Catalogue\\\\(?:Trainings|TrainingData|TrainingUsage|Brochures|Assistant\\\\PdfText)\b|Connectors\\\\(?:Smtp\\\\(?:TenantMailer|SmtpHostRefused)|Core\\\\(?:ConnectorRun|PermanentDeliveryFailure)|Ai\\\\(?:Ai|AiUnavailable|AiInvalidResponse))\b)\w+'
     .'|App\\\\Modules\\\\\{[^}]*\b(?!(?:Admissions|Core)\\\\|Sessions\\\\Public\b|Crm\\\\Public\b|Catalogue\\\\(?:Trainings|TrainingData|TrainingUsage|Brochures|Assistant\\\\PdfText)\b|Connectors\\\\(?:Smtp\\\\(?:TenantMailer|SmtpHostRefused)|Core\\\\(?:ConnectorRun|PermanentDeliveryFailure)|Ai\\\\(?:Ai|AiUnavailable|AiInvalidResponse))\b)(?:Sessions|Crm|Catalogue|Connectors|Finance)\\\\/';
 
 const ADMISSIONS_TABLES_LIST = 'candidatures|candidature_sequences|candidature_files|alternance_contracts|custom_field_definitions|positioning_sendings|positioning_sending_versions|online_tests|online_test_versions|online_test_das|online_test_trainings|online_test_attempts';
@@ -381,6 +381,7 @@ it('detects every way Admissions could reach another module beyond its public se
     foreach ([
         'use App\Modules\Crm\Public\Fiches;',
         'use App\Modules\Sessions\Public\Admission;',
+        'use App\Modules\Qualite\Public\Measures;',
         'use App\Modules\Catalogue\TrainingData;',
         'use App\Modules\Core\Tenancy\TenantStorage;',
         'use App\Modules\Admissions\Candidatures\Candidature;',
@@ -394,4 +395,8 @@ it('detects every way Admissions could reach another module beyond its public se
     foreach (["'candidature_id'", "'admissions.candidatures.view'", '// the candidatures of a person'] as $code) {
         expect(preg_match(ADMISSIONS_TABLES, $code), $code)->toBe(0);
     }
+});
+
+it('keeps the Qualité module apart: it reads no other module, they declare their measures through Qualite\\Public', function () {
+    expect(moduleFilesMatching('Qualite', '/App\\\\Modules\\\\(?!(?:Qualite|Core)\\b)\\w+/'))->toBe([]);
 });
