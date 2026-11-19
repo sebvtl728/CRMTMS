@@ -34,13 +34,16 @@ class BrochureController extends Controller
     {
         $user = $this->user($request);
         $q = mb_substr(trim((string) $request->query('q', '')), 0, 100);
+        $type = is_string($request->query('type')) && array_key_exists($request->query('type'), Brochure::KINDS) ? (string) $request->query('type') : null;
 
         $brochures = Brochure::query()->with(['currentVersion', 'trainings:id,title', 'das'])->withCount('versions')
-            ->titleMatches($q)->orderBy('title')->orderBy('id')
+            ->titleMatches($q)->when($type !== null, fn ($query) => $query->where('kind', $type))->orderBy('title')->orderBy('id')
             ->paginate(25)->withQueryString()
             ->through(fn (Brochure $b) => [
                 'id' => $b->id,
                 'title' => $b->title,
+                'kind' => $b->kind,
+                'kind_label' => $b->kindLabel(),
                 'original_name' => $b->currentVersion?->original_name,
                 'size' => $b->currentVersion?->size,
                 'versions_count' => $b->versions_count,
@@ -51,19 +54,22 @@ class BrochureController extends Controller
 
         return Inertia::render('catalogue/brochures/index', [
             'brochures' => $brochures,
-            'filters' => ['q' => $q],
+            'filters' => ['q' => $q, 'type' => $type],
+            'kinds' => self::kinds(),
             'can' => ['manage' => $user->can(Permissions::MANAGE), 'delete' => $user->can(Permissions::DELETE)],
             'status' => $request->session()->get('status'),
         ]);
     }
 
-    public function create(): Response
+    public function create(Request $request): Response
     {
         Gate::authorize('create', Brochure::class);
 
         return Inertia::render('catalogue/brochures/form', [
             'brochure' => null,
+            'default_kind' => $request->query('type') === Brochure::POSITIONING_TEST ? Brochure::POSITIONING_TEST : Brochure::BROCHURE,
             'options' => self::options([], []),
+            'kinds' => self::kinds(),
         ]);
     }
 
@@ -73,9 +79,10 @@ class BrochureController extends Controller
 
         $file = $request->file(BrochureFile::FIELD);
         assert($file instanceof UploadedFile);
-        $this->store->create((string) $request->validated('title'), $file, $request->ids('training_ids') ?? [], $request->ids('das_ids') ?? []);
+        $kind = (string) ($request->validated('kind') ?? Brochure::BROCHURE);
+        $this->store->create((string) $request->validated('title'), $file, $request->ids('training_ids') ?? [], $request->ids('das_ids') ?? [], $kind);
 
-        return to_route('catalogue.brochures.index')->with('status', 'Plaquette ajoutée.');
+        return to_route('catalogue.brochures.index')->with('status', $kind === Brochure::POSITIONING_TEST ? 'Test de positionnement ajouté.' : 'Plaquette ajoutée.');
     }
 
     public function edit(Brochure $brochure): Response
@@ -89,6 +96,7 @@ class BrochureController extends Controller
             'brochure' => [
                 'id' => $brochure->id,
                 'title' => $brochure->title,
+                'kind' => $brochure->kind,
                 'training_ids' => $trainingIds,
                 'das_ids' => $dasIds,
                 'versions' => $brochure->versions()->get()->map(fn (BrochureVersion $v) => [
@@ -100,6 +108,7 @@ class BrochureController extends Controller
                 ])->values()->all(),
             ],
             'options' => self::options($trainingIds, $dasIds),
+            'kinds' => self::kinds(),
         ]);
     }
 
@@ -108,9 +117,9 @@ class BrochureController extends Controller
         Gate::authorize('update', $brochure);
 
         $file = $request->file(BrochureFile::FIELD);
-        $this->store->update($brochure, (string) $request->validated('title'), $file instanceof UploadedFile ? $file : null, $request->ids('training_ids'), $request->ids('das_ids'));
+        $this->store->update($brochure, (string) $request->validated('title'), $file instanceof UploadedFile ? $file : null, $request->ids('training_ids'), $request->ids('das_ids'), $request->validated('kind'));
 
-        return to_route('catalogue.brochures.index')->with('status', 'Plaquette enregistrée.');
+        return to_route('catalogue.brochures.index')->with('status', 'Document enregistré.');
     }
 
     public function destroy(Brochure $brochure): RedirectResponse
@@ -201,6 +210,14 @@ class BrochureController extends Controller
                     'label' => ($t->code !== null ? $t->code.' · ' : '').$t->title.($t->is_active ? '' : ' (inactive)'),
                 ])->values()->all(),
         ];
+    }
+
+    /**
+     * @return list<array{value: string, label: string}>
+     */
+    private static function kinds(): array
+    {
+        return array_map(fn (string $k) => ['value' => $k, 'label' => Brochure::KINDS[$k]], array_keys(Brochure::KINDS));
     }
 
     private function user(Request $request): User

@@ -1,3 +1,4 @@
+import { FilterSelect } from '@/components/crm/filter-select';
 import Heading from '@/components/heading';
 import InputError from '@/components/input-error';
 import { Button } from '@/components/ui/button';
@@ -13,6 +14,8 @@ import { useEffect, useRef, useState } from 'react';
 interface BrochureRow {
     id: string;
     title: string;
+    kind: string;
+    kind_label: string;
     original_name: string | null;
     size: number | null;
     versions_count: number;
@@ -23,15 +26,20 @@ interface BrochureRow {
 
 interface IndexProps {
     brochures: Paginated<BrochureRow>;
-    filters: { q: string };
+    filters: { q: string; type: string | null };
+    kinds: { value: string; label: string }[];
     can: { manage: boolean; delete: boolean };
     status?: string;
 }
 
 const breadcrumbs: BreadcrumbItem[] = [
     { title: 'Catalogue', href: '/catalogue' },
-    { title: 'Plaquettes', href: '/catalogue/brochures' },
+    { title: 'Plaquettes et tests', href: '/catalogue/brochures' },
 ];
+
+function query(q: string, type: string | null): Record<string, string> {
+    return { ...(q ? { q } : {}), ...(type ? { type } : {}) };
+}
 
 function concerns(row: BrochureRow): string {
     const parts = [...row.das.map((d) => `DAS ${d}`), ...row.trainings];
@@ -39,7 +47,7 @@ function concerns(row: BrochureRow): string {
     return parts.length > 0 ? parts.join(', ') : '—';
 }
 
-export default function BrochuresIndex({ brochures, filters, can, status }: IndexProps) {
+export default function BrochuresIndex({ brochures, filters, kinds, can, status }: IndexProps) {
     const errors = usePage().props.errors as Record<string, string | undefined>;
     const [search, setSearch] = useState(filters.q);
     const first = useRef(true);
@@ -50,7 +58,7 @@ export default function BrochuresIndex({ brochures, filters, can, status }: Inde
             return;
         }
         const timer = setTimeout(
-            () => router.get(route('catalogue.brochures.index'), search ? { q: search } : {}, { preserveState: true, replace: true }),
+            () => router.get(route('catalogue.brochures.index'), query(search, filters.type), { preserveState: true, replace: true }),
             300,
         );
         return () => clearTimeout(timer);
@@ -90,7 +98,10 @@ export default function BrochuresIndex({ brochures, filters, can, status }: Inde
 
             <div className="flex flex-col gap-4 p-4">
                 <div className="flex flex-wrap items-start justify-between gap-4">
-                    <Heading title="Plaquettes" description="Plaquettes PDF des formations, à joindre aux devis ou à envoyer à un contact" />
+                    <Heading
+                        title="Plaquettes et tests"
+                        description="Plaquettes PDF des formations (devis, envoi à un contact) et tests de positionnement (envoyés aux candidats)"
+                    />
                     <div className="flex flex-wrap items-start gap-2">
                         <Button asChild variant="outline">
                             <Link href={route('catalogue.index')}>Formations</Link>
@@ -103,26 +114,42 @@ export default function BrochuresIndex({ brochures, filters, can, status }: Inde
                                 </Link>
                             </Button>
                         )}
+                        {can.manage && (
+                            <Button asChild variant="outline">
+                                <Link href={route('catalogue.brochures.create', { type: 'positioning_test' })}>
+                                    <Plus className="h-4 w-4" />
+                                    Nouveau test de positionnement
+                                </Link>
+                            </Button>
+                        )}
                     </div>
                 </div>
 
                 {status && <div className="text-sm font-medium text-green-600">{status}</div>}
                 <InputError message={errors.brochure} />
 
-                <div className="grid max-w-md gap-1">
-                    <Label htmlFor="q" className="text-xs">
-                        Recherche (titre)
-                    </Label>
-                    <Input id="q" type="search" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Ex. HACCP" />
+                <div className="flex flex-wrap items-end gap-3">
+                    <div className="grid w-full max-w-md gap-1">
+                        <Label htmlFor="q" className="text-xs">
+                            Recherche (titre)
+                        </Label>
+                        <Input id="q" type="search" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Ex. HACCP" />
+                    </div>
+                    <FilterSelect
+                        label="Type"
+                        value={filters.type}
+                        options={kinds}
+                        onChange={(v) => router.get(route('catalogue.brochures.index'), query(search, v), { preserveState: true, replace: true })}
+                    />
                 </div>
 
                 <p className="text-sm">
-                    {brochures.total} plaquette{brochures.total > 1 ? 's' : ''}
+                    {brochures.total} document{brochures.total > 1 ? 's' : ''}
                 </p>
 
                 {brochures.data.length === 0 ? (
                     <div className="text-muted-foreground rounded-xl border p-8 text-center text-sm">
-                        {filters.q ? 'Aucune plaquette ne correspond à cette recherche.' : 'Aucune plaquette pour le moment.'}
+                        {filters.q || filters.type ? 'Aucun document ne correspond à cette recherche.' : 'Aucun document pour le moment.'}
                     </div>
                 ) : (
                     <>
@@ -131,6 +158,7 @@ export default function BrochuresIndex({ brochures, filters, can, status }: Inde
                                 <thead className="bg-muted/50 text-left">
                                     <tr>
                                         <th className="px-3 py-2 font-medium">Titre</th>
+                                        <th className="px-3 py-2 font-medium">Type</th>
                                         <th className="px-3 py-2 font-medium">Concerne</th>
                                         <th className="px-3 py-2 font-medium">Fichier</th>
                                         <th className="px-3 py-2 font-medium">Mise à jour</th>
@@ -141,10 +169,13 @@ export default function BrochuresIndex({ brochures, filters, can, status }: Inde
                                     {brochures.data.map((b) => (
                                         <tr key={b.id} className="hover:bg-muted/30 border-t align-top">
                                             <td className="px-3 py-2 font-medium">{b.title}</td>
+                                            <td className="px-3 py-2">{b.kind_label}</td>
                                             <td className="px-3 py-2">{concerns(b)}</td>
                                             <td className="px-3 py-2">
                                                 {b.original_name ?? '—'} <span className="text-muted-foreground">{formatSize(b.size)}</span>
-                                                {b.versions_count > 1 && <span className="text-muted-foreground"> · {b.versions_count} versions</span>}
+                                                {b.versions_count > 1 && (
+                                                    <span className="text-muted-foreground"> · {b.versions_count} versions</span>
+                                                )}
                                             </td>
                                             <td className="px-3 py-2 whitespace-nowrap">{formatDate(b.updated_at)}</td>
                                             <td className="px-3 py-2">{actions(b)}</td>
@@ -158,7 +189,9 @@ export default function BrochuresIndex({ brochures, filters, can, status }: Inde
                             {brochures.data.map((b) => (
                                 <li key={b.id} className="grid gap-1 rounded-xl border p-3 text-sm">
                                     <div className="font-medium">{b.title}</div>
-                                    <div className="text-muted-foreground text-xs">{concerns(b)}</div>
+                                    <div className="text-muted-foreground text-xs">
+                                        {b.kind_label} · {concerns(b)}
+                                    </div>
                                     <div className="text-xs">
                                         {b.original_name} {formatSize(b.size)}
                                     </div>

@@ -25,6 +25,7 @@ use Illuminate\Support\Facades\Auth;
  * @property string $id
  * @property string $tenant_id
  * @property string $title
+ * @property string $kind brochure | positioning_test
  * @property string|null $current_version_id
  * @property string|null $created_by
  * @property string|null $updated_by
@@ -41,7 +42,19 @@ class Brochure extends Model
     protected array $auditIgnore = ['created_by', 'updated_by'];
 
     /** @var list<string> */
-    protected $fillable = ['title'];
+    protected $fillable = ['title', 'kind'];
+
+    public const BROCHURE = 'brochure';
+
+    public const POSITIONING_TEST = 'positioning_test';
+
+    /** The kinds of documents of the library and their labels. */
+    public const KINDS = [self::BROCHURE => 'Plaquette', self::POSITIONING_TEST => 'Test de positionnement'];
+
+    public function kindLabel(): string
+    {
+        return self::KINDS[$this->kind] ?? self::KINDS[self::BROCHURE];
+    }
 
     protected static function booted(): void
     {
