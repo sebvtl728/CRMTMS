@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Modules\Core\Tenancy\TenantStorage;
 use App\Modules\Core\Users\User;
 use App\Modules\Qualite\Permissions;
+use App\Modules\Qualite\Public\Measures;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
@@ -55,6 +56,7 @@ class QualiopiController extends Controller
                     'original_name' => $p->original_name, 'size' => $p->size, 'created_at' => $p->created_at?->toIso8601String(),
                 ])->values()->all(),
             'users' => User::query()->whereNull('deactivated_at')->orderBy('name')->get(['id', 'name'])->map(fn (User $u) => ['value' => $u->id, 'label' => $u->name])->values()->all(),
+            'measures' => Measures::for($number),
             'statuses' => QualityIndicator::STATUSES,
             'verify_notice' => QualiopiReferential::VERIFY_NOTICE,
             'can' => ['manage' => self::user($request)->can(Permissions::MANAGE)],

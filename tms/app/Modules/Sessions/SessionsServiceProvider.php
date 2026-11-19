@@ -123,6 +123,7 @@ class SessionsServiceProvider extends ServiceProvider
         self::registerReferenceUsage();
         self::registerTrainingUsage();
         self::registerFicheBlocks();
+        Quality\SessionsMeasures::register();
         // « Sessions » block of the training page.
         TrainingBlocks::register('sessions', fn (string $trainingId, User $viewer) => TrainingSessionsBlock::for($trainingId, $viewer));
         self::registerFicheLinks();
