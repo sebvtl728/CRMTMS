@@ -646,7 +646,8 @@ export default function CandidatureShow({ candidature: c, custom_fields, history
                         </Card>
                     )}
 
-                    {showAfterInterview && custom_fields.length > 0 && (
+                    {/* Not a step: the organisme's own fields are open from the start. */}
+                    {custom_fields.length > 0 && (
                         <Card title="Informations complémentaires">
                             <div className="grid gap-3 sm:grid-cols-2">
                                 {custom_fields.map((f) => {
