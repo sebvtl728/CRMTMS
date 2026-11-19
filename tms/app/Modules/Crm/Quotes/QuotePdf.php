@@ -114,7 +114,7 @@ class QuotePdf
                 'subject' => $quote->opportunity?->title,
                 'notes' => $quote->notes,
                 'vat_exempt' => $quote->vat_exempt,
-                'vat_notice' => $quote->vat_exempt ? LegalMentions::vatExemptionNotice() : null,
+                'vat_notice' => $quote->vat_exempt ? LegalMentions::vatExemptionNotice($quote->issued_on) : null,
             ],
             'recipient' => QuoteRecipient::of($quote),
             'hasDiscount' => $quote->lines->contains(fn (QuoteLine $l) => (float) $l->discount_percent > 0),
