@@ -20,6 +20,9 @@ Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) ; ve
 
 - Menu : **Candidats** passe dans **Formation**, au-dessus de Dossiers.
 - Admissions : l'onglet **Apprenants** devient **Stagiaires**, le badge « Apprenant » devient « Stagiaire ».
+- **Mention d'exonération de TVA** des devis et factures, alignée sur l'expert-comptable : « Exonération de TVA, art. 261,
+  4-4° a du CGI » jusqu'au 31 décembre 2026, « Exonération de TVA, art. L. 213-93 du CIBS » à partir du 1er janvier 2027
+  (selon la date du devis ou de validation de la facture ; un avoir garde l'exonération de la facture qu'il corrige).
 
 ## [0.9.1] - 2026-11-19
 

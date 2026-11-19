@@ -101,7 +101,7 @@ class QuoteController extends Controller
                 'contact' => $quote->contact === null ? null : ['id' => $quote->contact->id, 'name' => $quote->contact->fullName()],
                 'notes' => $quote->notes,
                 'vat_exempt' => $quote->vat_exempt,
-                'vat_notice' => $quote->vat_exempt ? LegalMentions::vatExemptionNotice() : null,
+                'vat_notice' => $quote->vat_exempt ? LegalMentions::vatExemptionNotice($quote->issued_on) : null,
                 'sent_at' => $quote->sent_at?->toIso8601String(),
                 'reminded_at' => $quote->reminded_at?->toIso8601String(),
                 'accepted_on' => $quote->accepted_on?->toDateString(),

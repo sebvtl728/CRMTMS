@@ -3,6 +3,7 @@
 namespace App\Modules\Finance\Invoices;
 
 use App\Modules\Core\Companies\Company;
+use App\Modules\Core\Companies\LegalMentions;
 use App\Modules\Core\Companies\VatRegime;
 use Brick\Math\BigDecimal;
 use Brick\Math\BigInteger;
@@ -17,8 +18,6 @@ use Brick\Math\RoundingMode;
  */
 final class InvoiceTotals
 {
-    public const EXEMPTION = 'Exonération de TVA, article 261-4-4° du CGI';
-
     public const DEDIT_OUT_OF_SCOPE = 'Indemnité hors champ de la TVA';
 
     /** Rate of a line of a company subject to VAT, unless changed. */
@@ -42,7 +41,7 @@ final class InvoiceTotals
         if ($invoice->corrected_invoice_id !== null) {
             $corrected = Invoice::query()->find($invoice->corrected_invoice_id);
             if ($corrected !== null && ! $corrected->isDraft()) {
-                return str_contains((string) $corrected->vat_mention, self::EXEMPTION);
+                return LegalMentions::isVatExemption($corrected->vat_mention);
             }
         }
 
@@ -94,7 +93,8 @@ final class InvoiceTotals
         $vat = array_sum(array_column(self::byRate($lines), 'vat'));
         $dedit = $lines->contains(fn (InvoiceLine $l) => $l->component === InvoiceLine::DEDIT && $l->total_ht_cents !== 0);
         $mentions = array_values(array_filter([
-            self::exempt($invoice, $company) ? self::EXEMPTION : null,
+            // The notice of the invoice's day (its validation day; today for a draft).
+            self::exempt($invoice, $company) ? LegalMentions::vatExemptionNotice($invoice->issued_on ?? null) : null,
             $dedit ? self::DEDIT_OUT_OF_SCOPE : null,
         ]));
 
