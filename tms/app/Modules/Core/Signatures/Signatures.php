@@ -11,6 +11,7 @@ use App\Modules\Core\Tenancy\TenantContext;
 use App\Modules\Core\Tenancy\TenantStorage;
 use App\Modules\Core\Users\User;
 use Carbon\CarbonImmutable;
+use Closure;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
@@ -37,6 +38,30 @@ final class Signatures
     public const MAIL_FAILED = 'L\'e-mail n\'est pas parti : le serveur d\'envoi est injoignable ou a refusé le message.';
 
     public function __construct(private readonly PdfRenderer $renderer, private readonly MailTemplates $templates) {}
+
+    /**
+     * The module owning a kind of subject may refuse a signature (a quote
+     * that no longer awaits an answer…): its closure returns the French
+     * reason, or null when the subject may be signed. Kept in the container.
+     *
+     * @param  Closure(string): ?string  $guard  subject id => refusal or null
+     */
+    public static function registerGuard(string $subjectType, Closure $guard): void
+    {
+        $app = app();
+        $guards = $app->bound('signatures.guards') ? $app->make('signatures.guards') : [];
+        $guards[$subjectType] = $guard;
+        $app->instance('signatures.guards', $guards);
+    }
+
+    /** The refusal of the subject's module, null when it may be signed. */
+    public static function refusal(SignatureRequest $request): ?string
+    {
+        $guards = app()->bound('signatures.guards') ? app()->make('signatures.guards') : [];
+        $guard = $guards[$request->subject_type] ?? null;
+
+        return $guard === null ? null : $guard($request->subject_id);
+    }
 
     /**
      * Creates the request (cancelling a pending one of the same subject) and
@@ -83,7 +108,7 @@ final class Signatures
         }
         $request = SignatureRequest::query()->where('token_hash', hash('sha256', $token))->first();
 
-        return $request !== null && $request->status === 'pending' && $request->expires_at->isFuture() ? $request : null;
+        return $request !== null && $request->status === 'pending' && $request->expires_at->isFuture() && self::refusal($request) === null ? $request : null;
     }
 
     /** The request of a link once signed (its page and signed PDF stay open until the link expires), else null. */
@@ -231,6 +256,10 @@ final class Signatures
     {
         if ($request->status !== 'pending' || ! $request->expires_at->isFuture()) {
             throw new UserFacingHttpException(409, 'Ce lien de signature n\'est plus valable.');
+        }
+        $refusal = self::refusal($request);
+        if ($refusal !== null) {
+            throw new UserFacingHttpException(409, $refusal);
         }
     }
 

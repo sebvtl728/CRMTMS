@@ -2,6 +2,7 @@ import { decimalInput, rateLabel } from '@/components/crm/quote-lines';
 import { QuoteStatusBadge, type QuoteRow } from '@/components/crm/quote-list';
 import { QuoteAnswerDialog, QuoteOutcomeDialog, type ProposeWon, type QuotePipeline } from '@/components/crm/quote-outcome-dialog';
 import { QuoteSendDialog, type BrochureChoice, type QuoteMessageDefaults, type SentBrochure } from '@/components/crm/quote-send-dialog';
+import { QuoteSignatureButton, type QuoteSignature } from '@/components/crm/quote-signature';
 import { QuoteSignedButton, type SignedCopy } from '@/components/crm/quote-signed';
 import InputError from '@/components/input-error';
 import { Badge } from '@/components/ui/badge';
@@ -41,6 +42,7 @@ interface QuoteData extends QuoteRow {
     refusal_reason: string | null;
     /** Signed copy sent back by the customer (accepted quote). */
     signed: SignedCopy | null;
+    signature: QuoteSignature | null;
     replaced_by: { id: string; number: string } | null;
     email: { status: 'pending' | 'sent' | 'failed'; error: string | null; sent_at: string | null } | null;
     created_at: string | null;
@@ -59,6 +61,7 @@ interface ShowProps {
         resend: boolean;
         answer: boolean;
         attachSigned: boolean;
+        sign: boolean;
     };
     brochure_choices: BrochureChoice[];
     brochures_sent: SentBrochure[];
@@ -193,6 +196,7 @@ export default function QuoteShow({
                                 </Button>
                             </>
                         )}
+                        {can.sign && <QuoteSignatureButton quoteId={q.id} number={q.number} signature={q.signature} />}
                         {can.attachSigned && <QuoteSignedButton quoteId={q.id} number={q.number} signed={q.signed} />}
                         {can.update && (
                             <Button asChild variant="outline">
