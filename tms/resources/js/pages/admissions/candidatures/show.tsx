@@ -398,127 +398,141 @@ export default function CandidatureShow({ candidature: c, custom_fields, history
                             </div>
                         )}
                         {can.update && <SaveButton onClick={() => orientation.save()} processing={orientation.processing} />}
-                        {!showTest && <p className="text-muted-foreground text-xs">Enregistrez la formation visée pour ouvrir le test de positionnement.</p>}
+                        {!showTest && (
+                            <p className="text-muted-foreground text-xs">Enregistrez la formation visée pour ouvrir le test de positionnement.</p>
+                        )}
                     </Card>
 
                     {showTest && (
-                    <Card title="Test de positionnement">
-                        <div className="grid gap-3 sm:grid-cols-3">
-                            <TextField
-                                id="positioning_sent_on"
-                                type="date"
-                                label="Envoyé le"
-                                value={positioning.str('positioning_sent_on')}
-                                onChange={(v) => positioning.set('positioning_sent_on', v)}
-                                error={errors.positioning_sent_on}
-                                disabled={disabled}
-                            />
-                            <TextField
-                                id="positioning_received_on"
-                                type="date"
-                                label="Reçu le"
-                                value={positioning.str('positioning_received_on')}
-                                onChange={(v) => positioning.set('positioning_received_on', v)}
-                                error={errors.positioning_received_on}
-                                disabled={disabled}
-                            />
-                            <TextField
-                                id="positioning_result"
-                                label="Score ou niveau"
-                                value={positioning.str('positioning_result')}
-                                onChange={(v) => positioning.set('positioning_result', v)}
-                                disabled={disabled}
-                            />
-                        </div>
-                        {can.update && <SaveButton onClick={() => positioning.save()} processing={positioning.processing} />}
-                        {c.positioning_received_on ? (
-                            <Suggest c={c} to="positioning_received" label="Test reçu" canUpdate={can.update} />
-                        ) : (
-                            c.positioning_sent_on && <Suggest c={c} to="positioning_sent" label="Test envoyé" canUpdate={can.update} />
-                        )}
-                        <CandidatureFiles candidatureId={c.id} kind="positioning" files={c.files} canUpdate={can.update} label="Joindre le test" />
-                        {!showInterview && (
-                            <div className="flex flex-wrap items-center gap-2">
-                                <p className="text-muted-foreground text-xs">Enregistrez la date de réception pour ouvrir l'entretien, ou</p>
-                                {can.update && (
-                                    <Button
-                                        type="button"
-                                        variant="ghost"
-                                        size="sm"
-                                        onClick={() => router.post(`/admissions/candidatures/${c.id}/status`, { status: 'interview' }, { preserveScroll: true })}
-                                    >
-                                        Passer le test
-                                    </Button>
-                                )}
+                        <Card title="Test de positionnement">
+                            <div className="grid gap-3 sm:grid-cols-3">
+                                <TextField
+                                    id="positioning_sent_on"
+                                    type="date"
+                                    label="Envoyé le"
+                                    value={positioning.str('positioning_sent_on')}
+                                    onChange={(v) => positioning.set('positioning_sent_on', v)}
+                                    error={errors.positioning_sent_on}
+                                    disabled={disabled}
+                                />
+                                <TextField
+                                    id="positioning_received_on"
+                                    type="date"
+                                    label="Reçu le"
+                                    value={positioning.str('positioning_received_on')}
+                                    onChange={(v) => positioning.set('positioning_received_on', v)}
+                                    error={errors.positioning_received_on}
+                                    disabled={disabled}
+                                />
+                                <TextField
+                                    id="positioning_result"
+                                    label="Score ou niveau"
+                                    value={positioning.str('positioning_result')}
+                                    onChange={(v) => positioning.set('positioning_result', v)}
+                                    disabled={disabled}
+                                />
                             </div>
-                        )}
-                    </Card>
+                            {can.update && <SaveButton onClick={() => positioning.save()} processing={positioning.processing} />}
+                            {c.positioning_received_on ? (
+                                <Suggest c={c} to="positioning_received" label="Test reçu" canUpdate={can.update} />
+                            ) : (
+                                c.positioning_sent_on && <Suggest c={c} to="positioning_sent" label="Test envoyé" canUpdate={can.update} />
+                            )}
+                            <CandidatureFiles
+                                candidatureId={c.id}
+                                kind="positioning"
+                                files={c.files}
+                                canUpdate={can.update}
+                                label="Joindre le test"
+                            />
+                            {!showInterview && (
+                                <div className="flex flex-wrap items-center gap-2">
+                                    <p className="text-muted-foreground text-xs">Enregistrez la date de réception pour ouvrir l'entretien, ou</p>
+                                    {can.update && (
+                                        <Button
+                                            type="button"
+                                            variant="ghost"
+                                            size="sm"
+                                            onClick={() =>
+                                                router.post(
+                                                    `/admissions/candidatures/${c.id}/status`,
+                                                    { status: 'interview' },
+                                                    { preserveScroll: true },
+                                                )
+                                            }
+                                        >
+                                            Passer le test
+                                        </Button>
+                                    )}
+                                </div>
+                            )}
+                        </Card>
                     )}
 
                     {showInterview && (
-                    <Card title="Entretien">
-                        <div className="grid gap-3 sm:grid-cols-2">
-                            <TextField
-                                id="interview_at"
-                                type="datetime-local"
-                                label="Date et heure"
-                                value={interview.str('interview_at')}
-                                onChange={(v) => interview.set('interview_at', v)}
-                                error={errors.interview_at}
-                                disabled={disabled}
-                            />
-                            <OptionSelect
-                                id="interviewer_user_id"
-                                label="Mené par"
-                                value={interview.str('interviewer_user_id') || null}
-                                options={options.users}
-                                onChange={(v) => interview.set('interviewer_user_id', v)}
-                                disabled={disabled}
-                            />
-                        </div>
-                        {can.sensitive ? (
-                            <div className="grid gap-3">
-                                <div className="grid gap-1">
-                                    <Label htmlFor="interview_report">Compte rendu</Label>
-                                    <textarea
-                                        id="interview_report"
-                                        rows={4}
-                                        className={textareaClass}
-                                        value={interview.str('interview_report')}
-                                        onChange={(e) => interview.set('interview_report', e.target.value)}
-                                        disabled={disabled}
-                                    />
-                                </div>
-                                <Label className="flex items-center gap-2 font-normal">
-                                    <input
-                                        type="checkbox"
-                                        checked={Boolean(interview.values.rqth)}
-                                        onChange={(e) => interview.set('rqth', e.target.checked)}
-                                        disabled={disabled}
-                                    />
-                                    Reconnaissance de travailleur handicapé (RQTH)
-                                </Label>
-                                <div className="grid gap-1">
-                                    <Label htmlFor="adaptation_needs">Besoins d'adaptation</Label>
-                                    <textarea
-                                        id="adaptation_needs"
-                                        rows={2}
-                                        className={textareaClass}
-                                        value={interview.str('adaptation_needs')}
-                                        onChange={(e) => interview.set('adaptation_needs', e.target.value)}
-                                        disabled={disabled}
-                                    />
-                                </div>
+                        <Card title="Entretien">
+                            <div className="grid gap-3 sm:grid-cols-2">
+                                <TextField
+                                    id="interview_at"
+                                    type="datetime-local"
+                                    label="Date et heure"
+                                    value={interview.str('interview_at')}
+                                    onChange={(v) => interview.set('interview_at', v)}
+                                    error={errors.interview_at}
+                                    disabled={disabled}
+                                />
+                                <OptionSelect
+                                    id="interviewer_user_id"
+                                    label="Mené par"
+                                    value={interview.str('interviewer_user_id') || null}
+                                    options={options.users}
+                                    onChange={(v) => interview.set('interviewer_user_id', v)}
+                                    disabled={disabled}
+                                />
                             </div>
-                        ) : (
-                            <p className="text-muted-foreground text-xs">
-                                Le compte rendu, la RQTH et les besoins d'adaptation sont réservés au droit « Voir les données sensibles des candidats
-                                ».
-                            </p>
-                        )}
-                        {can.update && <SaveButton onClick={() => interview.save()} processing={interview.processing} />}
-                        {c.interview_at && <Suggest c={c} to="interview" label="Entretien" canUpdate={can.update} />}
-                    </Card>
+                            {can.sensitive ? (
+                                <div className="grid gap-3">
+                                    <div className="grid gap-1">
+                                        <Label htmlFor="interview_report">Compte rendu</Label>
+                                        <textarea
+                                            id="interview_report"
+                                            rows={4}
+                                            className={textareaClass}
+                                            value={interview.str('interview_report')}
+                                            onChange={(e) => interview.set('interview_report', e.target.value)}
+                                            disabled={disabled}
+                                        />
+                                    </div>
+                                    <Label className="flex items-center gap-2 font-normal">
+                                        <input
+                                            type="checkbox"
+                                            checked={Boolean(interview.values.rqth)}
+                                            onChange={(e) => interview.set('rqth', e.target.checked)}
+                                            disabled={disabled}
+                                        />
+                                        Reconnaissance de travailleur handicapé (RQTH)
+                                    </Label>
+                                    <div className="grid gap-1">
+                                        <Label htmlFor="adaptation_needs">Besoins d'adaptation</Label>
+                                        <textarea
+                                            id="adaptation_needs"
+                                            rows={2}
+                                            className={textareaClass}
+                                            value={interview.str('adaptation_needs')}
+                                            onChange={(e) => interview.set('adaptation_needs', e.target.value)}
+                                            disabled={disabled}
+                                        />
+                                    </div>
+                                </div>
+                            ) : (
+                                <p className="text-muted-foreground text-xs">
+                                    Le compte rendu, la RQTH et les besoins d'adaptation sont réservés au droit « Voir les données sensibles des
+                                    candidats ».
+                                </p>
+                            )}
+                            {can.update && <SaveButton onClick={() => interview.save()} processing={interview.processing} />}
+                            {c.interview_at && <Suggest c={c} to="interview" label="Entretien" canUpdate={can.update} />}
+                        </Card>
                     )}
 
                     {showAfterInterview && c.pathway !== 'trainee' && (
