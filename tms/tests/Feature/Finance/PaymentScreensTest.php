@@ -48,6 +48,9 @@ it('records a payment from an invoice and goes back to it', function () {
         'received_on' => '2026-11-17', 'amount' => '171,43', 'method_id' => payMethod(), 'reference' => 'VIR 1',
         'allocations' => [['invoice_id' => $invoice->id, 'amount' => '171,43']],
     ])->assertRedirect('/finance/invoices/'.$invoice->id)->assertSessionHas('status', 'Règlement enregistré.');
+    // The invoice page shows the message (the flash is passed to it).
+    $this->actingAs($user)->withSession(['status' => 'Règlement enregistré.'])->get('/finance/invoices/'.$invoice->id)
+        ->assertInertia(fn (Assert $p) => $p->where('status', 'Règlement enregistré.')->where('balance.status_label', 'Soldée'));
 
     $this->actingAs($user)->post('/finance/payments', [
         'payer_type' => 'organisation', 'payer_id' => $invoice->recipient_id, 'company_id' => $invoice->company_id,

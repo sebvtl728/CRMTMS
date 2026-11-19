@@ -61,3 +61,12 @@ it('totals the payments of the dossier in its billing block', function () {
     expect($block['props']['payments'])->toBe(['paid_cents' => 10000, 'remaining_cents' => 7143, 'overdue' => false])
         ->and($block['rows'][0]['meta'])->toContain('Reste dû');
 });
+
+it('shows the message of the last action on the invoices list and « À facturer »', function () {
+    [, , $user] = payInvoice();
+
+    $this->actingAs($user)->withSession(['status' => 'Intégrité vérifiée.'])->get('/finance/invoices')
+        ->assertInertia(fn (Assert $p) => $p->where('status', 'Intégrité vérifiée.'));
+    $this->actingAs($user)->withSession(['status' => '2 brouillons prêts.'])->get('/finance/to-invoice')
+        ->assertInertia(fn (Assert $p) => $p->where('status', '2 brouillons prêts.'));
+});

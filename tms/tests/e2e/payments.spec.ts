@@ -19,11 +19,13 @@ async function send(
     url: string,
     data: Record<string, unknown>,
 ): Promise<string> {
+    // A PUT answered by back() redirects to itself: never follow it (the request would be replayed).
     const response = await request[method](url, {
         data,
         headers: { 'X-XSRF-TOKEN': await xsrf(context), 'X-Requested-With': 'XMLHttpRequest', Accept: 'text/html' },
+        ...(method === 'put' ? { maxRedirects: 0 } : {}),
     });
-    expect(response.ok(), `${url}: ${response.status()}`).toBe(true);
+    expect(response.status() < 400, `${url}: ${response.status()}`).toBe(true);
 
     return response.url();
 }
@@ -89,7 +91,7 @@ test('a validated invoice is paid from its page and becomes « Soldée »', asyn
     await page.goto(draftUrl);
     page.once('dialog', (dialog) => dialog.accept());
     await page.getByRole('button', { name: /^Valider/ }).click();
-    await expect(page.getByText(/Facture validée : /)).toBeVisible();
+    await expect(page.getByRole('heading', { name: /^Facture F-\d{4}-\d{5}$/ })).toBeVisible();
     const payments = page.getByRole('region', { name: 'Règlements' });
     await expect(payments.getByText('Non réglée')).toBeVisible();
     await payments.getByRole('link', { name: 'Enregistrer un règlement' }).click();

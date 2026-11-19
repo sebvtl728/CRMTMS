@@ -58,6 +58,7 @@ class InvoiceController extends Controller
         $page = $this->listQuery($user, $filters)->paginate(25)->withQueryString();
 
         return Inertia::render('finance/invoices/index', [
+            'status' => $request->session()->get('status'),
             'invoices' => [...$page->toArray(), 'data' => $this->rows->rows($page->getCollection())],
             'filters' => $filters,
             'options' => [
@@ -165,6 +166,8 @@ class InvoiceController extends Controller
             'balance' => $this->balance($invoice),
             'reminders' => ReminderController::forPage($invoice, $canSend),
             'warnings' => $this->warnings($invoice),
+            // The message of the last action (validated, sent, payment recorded…): Inertia does not share it.
+            'status' => $request->session()->get('status'),
             'payments' => $this->payments($invoice),
             'email' => $invoice->isDraft() ? null : [
                 'status' => $invoice->email_status,
