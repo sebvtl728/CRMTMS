@@ -17,6 +17,11 @@ Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) ; ve
   de revue, notes), preuves (fichier, lien, note), mesures automatiques (indicateurs 1, 5, 8, 12 et 13) et export du
   dossier d'audit (ZIP : sommaire PDF et fichiers par indicateur, journalisé).
 
+### Corrigé
+
+- Admissions : le bloc « Informations complémentaires » (champs personnalisés) s'affiche dès l'ouverture de la
+  candidature, et non plus seulement à partir de l'entretien.
+
 ## [0.9.2] - 2026-11-19
 
 Admissions : parcours Alternance / Stagiaire, tests de positionnement (PDF par DAS ou formation, lien personnel, test en
