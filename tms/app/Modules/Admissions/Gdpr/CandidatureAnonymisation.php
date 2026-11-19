@@ -4,11 +4,12 @@ namespace App\Modules\Admissions\Gdpr;
 
 use App\Modules\Admissions\Candidatures\Candidature;
 use App\Modules\Admissions\Candidatures\CandidatureFiles;
+use App\Modules\Admissions\Positioning\PositioningSending;
 use Illuminate\Support\Facades\DB;
 
 /**
  * Anonymisation of candidatures: personal, sensitive and custom values and
- * every file go; the number, stage, training, dates and DAS stay (statistics).
+ * every file and the positioning e-mails (links closed) go; the number, stage, training, dates and DAS stay (statistics).
  * Called for an anonymised person (Crm\Public\FicheLinks) and by the
  * two-year purge of rejected and withdrawn candidatures.
  */
@@ -21,6 +22,9 @@ final class CandidatureAnonymisation
         }
         DB::transaction(function () use ($candidature): void {
             app(CandidatureFiles::class)->purge($candidature);
+            // The positioning e-mails go; a link still open closes.
+            PositioningSending::query()->where('candidature_id', $candidature->id)->toBase()
+                ->update(['email' => null, 'subject' => null, 'message' => null, 'revoked_at' => DB::raw('coalesce(revoked_at, now())'), 'updated_at' => now()]);
             $candidature->forceFill([
                 'legal_representative' => null,
                 'rqth' => false,

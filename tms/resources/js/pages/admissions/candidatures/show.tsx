@@ -1,5 +1,6 @@
 import { DossierDialog } from '@/components/admissions/dossier-dialog';
 import { CandidatureFiles, OptionSelect, TextField, textareaClass } from '@/components/admissions/fields';
+import { PositioningPanel, type PositioningProps } from '@/components/admissions/positioning-panel';
 import Heading from '@/components/heading';
 import InputError from '@/components/input-error';
 import { FichePicker, type Picked } from '@/components/sessions/fiche-picker';
@@ -22,6 +23,7 @@ interface ShowProps {
     history: { at: string; title: string; author: string | null }[];
     options: AdmissionOptions;
     can: { update: boolean; delete: boolean; sensitive: boolean; create_dossier: boolean };
+    positioning: PositioningProps;
     status?: string;
 }
 
@@ -79,7 +81,7 @@ function Suggest({ c, to, label, canUpdate }: { c: Candidature; to: string; labe
     );
 }
 
-export default function CandidatureShow({ candidature: c, custom_fields, history, options, can, status }: ShowProps) {
+export default function CandidatureShow({ candidature: c, custom_fields, history, options, can, positioning: positioningTests, status }: ShowProps) {
     const errors = usePage().props.errors as Record<string, string | undefined>;
     const [stage, setStage] = useState<string | null>(null);
     const [reason, setReason] = useState<string | null>(null);
@@ -405,6 +407,7 @@ export default function CandidatureShow({ candidature: c, custom_fields, history
 
                     {showTest && (
                         <Card title="Test de positionnement">
+                            <PositioningPanel candidatureId={c.id} positioning={positioningTests} />
                             <div className="grid gap-3 sm:grid-cols-3">
                                 <TextField
                                     id="positioning_sent_on"

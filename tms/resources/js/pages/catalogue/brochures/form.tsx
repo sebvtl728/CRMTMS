@@ -20,18 +20,21 @@ interface Version {
 }
 
 interface FormProps {
-    brochure: { id: string; title: string; training_ids: string[]; das_ids: string[]; versions: Version[] } | null;
+    brochure: { id: string; title: string; kind: string; training_ids: string[]; das_ids: string[]; versions: Version[] } | null;
     options: { das: Option[]; trainings: Option[] };
+    kinds: Option[];
+    default_kind?: string;
 }
 
 type BrochureForm = {
     title: string;
+    kind: string;
     file: File | null;
     training_ids: string[];
     das_ids: string[];
 };
 
-export default function BrochureFormPage({ brochure, options }: FormProps) {
+export default function BrochureFormPage({ brochure, options, kinds, default_kind }: FormProps) {
     const editing = brochure !== null;
     const [filter, setFilter] = useState('');
 
@@ -39,16 +42,24 @@ export default function BrochureFormPage({ brochure, options }: FormProps) {
     const { data, setData, post, processing, errors } = useForm<BrochureForm & { _method?: string }>({
         ...(brochure ? { _method: 'put' } : {}),
         title: brochure?.title ?? '',
+        kind: brochure?.kind ?? default_kind ?? 'brochure',
         file: null,
         training_ids: brochure?.training_ids ?? [],
         das_ids: brochure?.das_ids ?? [],
     });
 
-    const title = editing ? 'Modifier la plaquette' : 'Nouvelle plaquette';
+    const isTest = data.kind === 'positioning_test';
+    const title = editing
+        ? isTest
+            ? 'Modifier le test de positionnement'
+            : 'Modifier la plaquette'
+        : isTest
+          ? 'Nouveau test de positionnement'
+          : 'Nouvelle plaquette';
     const breadcrumbs: BreadcrumbItem[] = [
         { title: 'Catalogue', href: '/catalogue' },
-        { title: 'Plaquettes', href: '/catalogue/brochures' },
-        { title: editing ? 'Modifier' : 'Nouvelle plaquette', href: '#' },
+        { title: 'Plaquettes et tests', href: '/catalogue/brochures' },
+        { title: editing ? 'Modifier' : title, href: '#' },
     ];
 
     const submit: FormEventHandler = (e) => {
@@ -75,7 +86,30 @@ export default function BrochureFormPage({ brochure, options }: FormProps) {
 
                 <form onSubmit={submit} className="flex flex-col gap-6" noValidate>
                     <fieldset className="grid gap-4 rounded-xl border p-4">
-                        <legend className="px-2 text-sm font-semibold">Plaquette</legend>
+                        <legend className="px-2 text-sm font-semibold">Document</legend>
+                        <div className="grid gap-2">
+                            <Label>Type</Label>
+                            <div className="flex flex-wrap gap-4">
+                                {kinds.map((k) => (
+                                    <Label key={k.value} className="flex items-center gap-2 font-normal">
+                                        <input
+                                            type="radio"
+                                            name="kind"
+                                            value={k.value}
+                                            checked={data.kind === k.value}
+                                            onChange={() => setData('kind', k.value)}
+                                        />
+                                        {k.label}
+                                    </Label>
+                                ))}
+                            </div>
+                            {isTest && (
+                                <p className="text-muted-foreground text-xs">
+                                    Proposé aux candidats dont la formation ou le DAS visé correspond ; jamais joint à un devis.
+                                </p>
+                            )}
+                            <InputError message={errors.kind} />
+                        </div>
                         <div className="grid gap-2">
                             <Label htmlFor="title">Titre *</Label>
                             <Input
@@ -91,7 +125,12 @@ export default function BrochureFormPage({ brochure, options }: FormProps) {
                         </div>
                         <div className="grid gap-2">
                             <Label htmlFor="file">{editing ? 'Remplacer le fichier (nouvelle version)' : 'Fichier PDF *'}</Label>
-                            <Input id="file" type="file" accept="application/pdf,.pdf" onChange={(e) => setData('file', e.target.files?.[0] ?? null)} />
+                            <Input
+                                id="file"
+                                type="file"
+                                accept="application/pdf,.pdf"
+                                onChange={(e) => setData('file', e.target.files?.[0] ?? null)}
+                            />
                             <InputError message={errors.file} />
                         </div>
                     </fieldset>

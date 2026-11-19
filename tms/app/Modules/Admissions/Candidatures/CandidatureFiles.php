@@ -33,7 +33,7 @@ final class CandidatureFiles
     /** Kinds holding one file only (a new one replaces it). */
     private const SINGLE = ['contract'];
 
-    public function store(Candidature $candidature, string $kind, UploadedFile $file, User $by): CandidatureFile
+    public function store(Candidature $candidature, string $kind, UploadedFile $file, ?User $by): CandidatureFile
     {
         self::checkKind($kind);
         if (($file->getSize() ?: 0) > self::MAX_BYTES) {
@@ -67,7 +67,7 @@ final class CandidatureFiles
                     'name' => mb_substr($file->getClientOriginalName(), 0, 255),
                     'size' => (int) $file->getSize(),
                     'path' => $path,
-                    'uploaded_by' => $by->id,
+                    'uploaded_by' => $by?->id, // null: deposited by the candidate (positioning link)
                 ]);
                 $candidature->touch();
 

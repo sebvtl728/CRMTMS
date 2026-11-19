@@ -28,12 +28,12 @@ class BrochureStore
      * @param  list<string>  $trainingIds
      * @param  list<string>  $dasIds
      */
-    public function create(string $title, UploadedFile $file, array $trainingIds, array $dasIds): Brochure
+    public function create(string $title, UploadedFile $file, array $trainingIds, array $dasIds, string $kind = Brochure::BROCHURE): Brochure
     {
         $brochureId = (string) Str::uuid7();
 
-        return $this->withStagedFile($brochureId, $file, function (string $staged, string $versionId, string $path) use ($title, $file, $brochureId, $trainingIds, $dasIds): Brochure {
-            $brochure = new Brochure(['title' => $title]);
+        return $this->withStagedFile($brochureId, $file, function (string $staged, string $versionId, string $path) use ($title, $file, $brochureId, $trainingIds, $dasIds, $kind): Brochure {
+            $brochure = new Brochure(['title' => $title, 'kind' => $kind]);
             $brochure->id = $brochureId;
             $brochure->save();
             $this->addVersion($brochure, $file, $versionId, $path, $staged);
@@ -50,11 +50,11 @@ class BrochureStore
      * @param  list<string>|null  $trainingIds
      * @param  list<string>|null  $dasIds
      */
-    public function update(Brochure $brochure, string $title, ?UploadedFile $file, ?array $trainingIds, ?array $dasIds): Brochure
+    public function update(Brochure $brochure, string $title, ?UploadedFile $file, ?array $trainingIds, ?array $dasIds, ?string $kind = null): Brochure
     {
-        $save = function (?string $staged = null, ?string $versionId = null, ?string $path = null) use ($brochure, $title, $file, $trainingIds, $dasIds): Brochure {
+        $save = function (?string $staged = null, ?string $versionId = null, ?string $path = null) use ($brochure, $title, $file, $trainingIds, $dasIds, $kind): Brochure {
             $locked = Brochure::query()->lockForUpdate()->findOrFail($brochure->getKey());
-            $locked->update(['title' => $title]);
+            $locked->update(['title' => $title, 'kind' => $kind ?? $locked->kind]);
             if ($file !== null && $staged !== null && $versionId !== null && $path !== null) {
                 $this->addVersion($locked, $file, $versionId, $path, $staged);
             }
