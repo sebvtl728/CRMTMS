@@ -128,6 +128,24 @@ final class Paperwork
             ->orderByRaw('entered_on asc nulls first')->orderBy('created_at')->orderBy('id')->pluck('id')->map(fn ($id) => (string) $id)->all();
     }
 
+    /**
+     * The trainees (sessionEnrolments) and last day of these sessions, for
+     * the summary cards of the documents, in two queries.
+     *
+     * @param  list<string>  $sessionIds
+     * @return array<string, array{ends_on: string, enrolment_ids: list<string>}>
+     */
+    public static function sessionsOverview(array $sessionIds): array
+    {
+        $enrolments = Enrolment::query()->whereIn('training_session_id', $sessionIds)
+            ->whereIn('status', EnrolmentStatus::values(EnrolmentStatus::SHARING_THE_PRICE))->get(['id', 'training_session_id'])->groupBy('training_session_id');
+
+        return TrainingSession::query()->whereKey($sessionIds)->get(['id', 'ends_on'])->mapWithKeys(fn (TrainingSession $s) => [$s->id => [
+            'ends_on' => $s->ends_on->toDateString(),
+            'enrolment_ids' => ($enrolments[$s->id] ?? collect())->pluck('id')->map(fn ($id) => (string) $id)->values()->all(),
+        ]])->all();
+    }
+
     public static function allows(User $user, string $permission, string $dossierId): bool
     {
         return Billing::allows($user, $permission, $dossierId);

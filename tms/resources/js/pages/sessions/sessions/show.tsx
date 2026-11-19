@@ -1,5 +1,6 @@
 import Heading from '@/components/heading';
 import InputError from '@/components/input-error';
+import { SessionBlocks, type SessionBlock } from '@/components/session-blocks';
 import { EnrolDialog, type EnrolDossierOption } from '@/components/sessions/enrolment-dialog';
 import { EnrolmentList, type EnrolmentReferences, type EnrolmentRow } from '@/components/sessions/enrolment-list';
 import { SessionAttendance } from '@/components/sessions/session-attendance';
@@ -44,6 +45,8 @@ interface ShowProps {
     attendance_tab: boolean;
     /** Steps shown to the user (synthese, configuration, planning, stagiaires[, suivi]). */
     steps: string[];
+    /** Blocks of other modules (documents…), on the « Stagiaires » step. */
+    blocks: SessionBlock[];
     /** Cards of the « Synthèse » (none once cancelled). */
     checklist: CardRow[];
     /** Tasks and notes of the « Synthèse » (spec § 4.5). */
@@ -117,6 +120,7 @@ export default function SessionShow({
     planning,
     attendance_tab,
     steps,
+    blocks,
     checklist,
     notes_panel,
     status,
@@ -301,6 +305,8 @@ export default function SessionShow({
                                 <EnrolmentList rows={waiting} context="session" references={enrolment_references} />
                             </section>
                         )}
+
+                        <SessionBlocks blocks={blocks} />
                     </div>
                 )}
             </div>

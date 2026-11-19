@@ -23,6 +23,7 @@ use App\Modules\Sessions\Planning\Conflicts;
 use App\Modules\Sessions\Planning\PlacementPeriod;
 use App\Modules\Sessions\Planning\PlacementPeriodHost;
 use App\Modules\Sessions\Planning\Seance;
+use App\Modules\Sessions\Public\SessionCards;
 use App\Modules\Sessions\Sessions\TrainingSession;
 use App\Modules\Sessions\SessionsVisibility;
 use Carbon\CarbonImmutable;
@@ -161,6 +162,13 @@ final class SessionChecklist
                 $cards[] = self::closures($session, $closed[$id] ?? [], $today);
             }
             $out[$id] = $cards;
+        }
+
+        // The cards of the other modules (SessionCards: documents…), after Sessions' own.
+        foreach (SessionCards::for($ids, $user) as $sessionId => $extra) {
+            foreach ($extra as $card) {
+                $out[$sessionId][] = new Card($card['key'], $card['title'], $card['value'], $card['state'], $card['text'], $card['step'], $card['anchor']);
+            }
         }
 
         return $out;

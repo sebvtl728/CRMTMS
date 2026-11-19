@@ -20,6 +20,7 @@ use App\Modules\Sessions\Planning\PublicHolidays;
 use App\Modules\Sessions\Planning\SeanceRows;
 use App\Modules\Sessions\Planning\SessionDays;
 use App\Modules\Sessions\Planning\WorkingDays;
+use App\Modules\Sessions\Public\SessionBlocks;
 use App\Modules\Sessions\Resources\ClosurePeriods;
 use App\Modules\Sessions\SessionsVisibility;
 use App\Modules\Sessions\Summary\Card;
@@ -188,6 +189,8 @@ class SessionController extends Controller
             // Cards of the « Synthèse » (none once cancelled).
             'checklist' => array_map(fn (Card $card) => $card->toArray(), SessionChecklist::for($session, $user)),
             'notes_panel' => app(SessionNotes::class)->panel($session, $user),
+            // Blocks of the other modules (SessionBlocks: documents…), on the « Stagiaires » step.
+            'blocks' => SessionBlocks::for($session->id, $user),
             'status' => $request->session()->get('status'),
             'warning' => $request->session()->get('warning'),
         ]);
