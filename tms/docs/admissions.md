@@ -14,7 +14,7 @@ Une **candidature** relie une personne du CRM à une formation visée. Elle avan
 
 On peut sauter une étape (admettre sans test) et revenir en arrière tant que le dossier de formation n'existe pas. Saisir une date (envoi ou retour du test, entretien) **propose** de passer à l'étape correspondante, sans le faire tout seul.
 
-Une fois admis, **Créer le dossier** fait du candidat un **apprenant** (dossier de formation, inscription à la session visée) ; avec un contrat d'alternance, un **apprenant alternant**. Ces deux mots ne sont pas des étapes : ils se lisent dans le dossier et le contrat.
+Une fois admis, **Créer le dossier** fait du candidat un **stagiaire** de la formation continue (dossier de formation, inscription à la session visée) ou, avec un contrat d'alternance, un **alternant**. Ces deux mots ne sont pas des étapes : ils se lisent dans le dossier et le contrat.
 
 ## 2. Ouvrir une candidature
 
@@ -26,10 +26,10 @@ Une personne peut avoir plusieurs candidatures (autre formation, autre année) :
 ## 3. La fiche candidature
 
 - **Identité** : lue dans le CRM (nom, naissance, coordonnées). **Modifier dans le CRM** n'apparaît que si vos droits sur le CRM le permettent. Un candidat **mineur** (à la date de début du contrat, sinon de la session visée, sinon aujourd'hui) affiche un avertissement : renseignez le **représentant légal**.
-- **Orientation** : formation visée et son **code RNCP** (repris de la fiche formation du catalogue, modifiable), session visée, DAS, responsable, origine, identifiant France Travail, situation avant la formation et niveau de diplôme (enregistrés **sur la fiche du CRM** de la personne), dernier diplôme.
+- **Orientation** : **parcours** (*À définir*, *Alternance* ou *Stagiaire* — formation continue sans contrat), formation visée et son **code RNCP** (repris de la fiche formation du catalogue, modifiable), session visée, DAS, responsable, origine, identifiant France Travail, situation avant la formation et niveau de diplôme (enregistrés **sur la fiche du CRM** de la personne), dernier diplôme.
 - **Test de positionnement** : dates d'envoi et de retour, score ou niveau, fichier joint (PDF, JPG ou PNG, 20 Mo au plus).
 - **Entretien** : date, personne qui l'a mené ; **compte rendu, RQTH et besoins d'adaptation** sont réservés au droit « Voir les données sensibles des candidats » (ils ne sont même pas envoyés à l'écran des autres).
-- **Alternance** (à partir de l'entretien) : contrat d'apprentissage ou de professionnalisation, entreprise d'accueil, maître d'apprentissage ou tuteur, dates, OPCO, contrat signé (fichier). Le contrat ne se retire plus une fois le dossier créé.
+- **Alternance** (parcours *Alternance*, à partir de l'entretien ; carte masquée pour un stagiaire) : contrat d'apprentissage ou de professionnalisation, entreprise d'accueil, maître d'apprentissage ou tuteur, dates, OPCO, contrat signé (fichier). Le contrat ne se retire plus une fois le dossier créé. Enregistrer un contrat met le parcours à *Alternance* ; il ne change plus tant que le contrat existe, et un contrat est refusé à un candidat au parcours *Stagiaire*.
 - **Informations complémentaires** : les champs personnalisés de votre organisme (`admin.md` § 19). Un champ « requis pour l'admission » vide empêche de passer à **Admis**.
 - **Historique** : ouverture et changements d'étape.
 
@@ -48,7 +48,7 @@ Une candidature n'a qu'un dossier ; mis à la corbeille, il peut être recréé.
 
 ## 5. Liste « Candidats »
 
-Onglets **Candidats** (pas encore apprenants ; non retenus et désistés seulement avec le filtre d'étape), **Apprenants**, **Alternants**, **Tous** ; filtres étape, formation, DAS, responsable, type de contrat ; recherche par nom ou numéro. **Exporter (.csv)** (droit « Exporter ») : numéro, nom, prénom, étape, formation, code RNCP, DAS, responsable, contrat, employeur, dates, dossier — jamais de donnée sensible.
+Onglets **Candidats** (sans dossier en cours ; non retenus et désistés seulement avec le filtre d'étape), **Stagiaires** (dossier sans contrat), **Alternants** (dossier et contrat), **Tous** ; filtres étape, formation, DAS, responsable, **parcours** (dont *À définir*), type de contrat ; recherche par nom ou numéro. **Exporter (.csv)** (droit « Exporter ») : numéro, nom, prénom, étape, parcours, formation, code RNCP, DAS, responsable, contrat, employeur, dates, dossier — jamais de donnée sensible.
 
 ## 6. Données personnelles
 

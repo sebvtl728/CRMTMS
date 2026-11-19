@@ -12,7 +12,7 @@ use App\Modules\Sessions\Public\Admission;
 
 /**
  * Block « Candidatures » of a person's CRM fiche (Crm\Public\FicheBlocks):
- * her candidatures within the viewer's scope, badged « Apprenant » or
+ * her candidatures within the viewer's scope, badged « Stagiaire » or
  * « Alternant », and the action « Ouvrir une candidature » (the transformation
  * of an interlocuteur into a candidate) for who may create one.
  */
@@ -50,7 +50,7 @@ final class CandidaturesBlock
         ];
     }
 
-    /** « Alternant », « Apprenant » or null: read from the live dossier and the contract. */
+    /** « Alternant », « Stagiaire » or null: read from the live dossier and the contract. */
     public static function kind(Candidature $c, bool $hasContract): ?string
     {
         if ($c->dossier_id === null || Admission::dossierState($c->dossier_id) !== 'live') {
@@ -63,6 +63,6 @@ final class CandidaturesBlock
     /** The badge of a candidature whose dossier lives. */
     public static function kindOf(bool $hasContract): string
     {
-        return $hasContract ? 'Alternant' : 'Apprenant';
+        return $hasContract ? 'Alternant' : 'Stagiaire';
     }
 }

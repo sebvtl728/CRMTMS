@@ -77,6 +77,8 @@ final class CandidatureRows
             'rncp_code' => $c->rncp_code,
             'das' => $this->labels[$c->das_id] ?? null,
             'responsible' => $c->responsible_user_id !== null ? ($this->users[$c->responsible_user_id] ?? null) : null,
+            'pathway' => $c->pathway?->value,
+            'pathway_label' => $c->pathway?->label(),
             'has_contract' => $contract !== null,
             'contract_type' => $contract?->contract_type->label(),
             'employer' => $contract !== null ? ($this->employers[$contract->employer_organisation_id]['label'] ?? null) : null,

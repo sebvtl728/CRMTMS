@@ -98,6 +98,7 @@ export default function CandidatureShow({ candidature: c, custom_fields, history
         das_id: c.das.id,
         responsible_user_id: c.responsible_user_id,
         origin_id: c.origin_id,
+        pathway: c.pathway,
         france_travail_id: c.france_travail_id,
         last_diploma: c.last_diploma,
         education_level_id: c.person.education_level_id,
@@ -157,7 +158,7 @@ export default function CandidatureShow({ candidature: c, custom_fields, history
                         <Heading title={c.person.label} description={`Candidature ${c.number}${c.training ? ` · ${c.training.title}` : ''}`} />
                         <div className="flex flex-wrap items-center gap-2">
                             <Badge variant={stageVariant(c.status)}>{c.status_label}</Badge>
-                            {c.dossier && !c.dossier.trashed && <Badge variant="secondary">{c.alternance ? 'Alternant' : 'Apprenant'}</Badge>}
+                            {c.dossier && !c.dossier.trashed && <Badge variant="secondary">{c.alternance ? 'Alternant' : 'Stagiaire'}</Badge>}
                             {c.decision_reason_label && <span className="text-muted-foreground text-sm">Motif : {c.decision_reason_label}</span>}
                             {c.deleted_at && <Badge variant="outline">Corbeille</Badge>}
                         </div>
@@ -233,9 +234,11 @@ export default function CandidatureShow({ candidature: c, custom_fields, history
                             </p>
                         ) : (
                             <p className="text-muted-foreground text-sm">
-                                {c.status === 'admitted'
-                                    ? "Candidat admis : créez son dossier pour qu'il devienne apprenant."
-                                    : 'Le dossier se crée une fois le candidat admis.'}
+                                {c.status !== 'admitted'
+                                    ? 'Le dossier se crée une fois le candidat admis.'
+                                    : c.pathway === 'alternance' && c.alternance === null
+                                      ? 'Candidat admis en alternance sans contrat : saisissez le contrat avant de créer son dossier.'
+                                      : `Candidat admis : créez son dossier pour qu'il devienne ${c.alternance ? 'alternant' : 'stagiaire'}.`}
                             </p>
                         )}
                     </Card>
@@ -273,6 +276,23 @@ export default function CandidatureShow({ candidature: c, custom_fields, history
                                 error={errors.target_session_id}
                                 disabled={disabled || orientation.values.training_id !== (c.training?.id ?? null)}
                             />
+                            <div className="grid gap-1">
+                                <OptionSelect
+                                    id="pathway"
+                                    label="Parcours"
+                                    value={orientation.str('pathway') || null}
+                                    options={options.pathways}
+                                    noneLabel="À définir"
+                                    onChange={(v) => orientation.set('pathway', v)}
+                                    error={errors.pathway}
+                                    disabled={disabled || c.alternance !== null}
+                                />
+                                {c.alternance !== null && (
+                                    <p className="text-muted-foreground text-xs">
+                                        Un contrat d'alternance est saisi : le parcours reste « Alternance ».
+                                    </p>
+                                )}
+                            </div>
                             <OptionSelect
                                 id="das_id"
                                 label="DAS"
@@ -474,127 +494,133 @@ export default function CandidatureShow({ candidature: c, custom_fields, history
                         {c.interview_at && <Suggest c={c} to="interview" label="Entretien" canUpdate={can.update} />}
                     </Card>
 
-                    <Card title="Alternance">
-                        {STAGE_RANK[c.status] < 3 && !c.alternance ? (
-                            <p className="text-muted-foreground text-sm">Le contrat se saisit à partir de l'entretien.</p>
-                        ) : (
-                            <div className="grid gap-3">
-                                <OptionSelect
-                                    id="contract_type"
-                                    label="Type de contrat"
-                                    value={contract.contract_type}
-                                    options={options.contract_types}
-                                    onChange={(v) => setContract({ ...contract, contract_type: v ?? 'apprenticeship' })}
-                                    error={errors.contract_type}
-                                    disabled={disabled}
-                                />
-                                <div className="grid gap-1">
-                                    <Label htmlFor="employer">Entreprise d'accueil</Label>
-                                    <FichePicker
-                                        id="employer"
-                                        kind="organisation"
-                                        value={employer}
-                                        onPick={setEmployer}
-                                        placeholder="Rechercher l'entreprise"
-                                        searchUrl="/admissions/candidatures/lookup/organisations"
-                                    />
-                                    <InputError message={errors.employer_organisation_id} />
-                                </div>
-                                <div className="grid gap-1">
-                                    <Label htmlFor="tutor">Maître d'apprentissage ou tuteur</Label>
-                                    <FichePicker
-                                        id="tutor"
-                                        kind="person"
-                                        organisationId={employer?.id}
-                                        value={tutor}
-                                        onPick={setTutor}
-                                        placeholder="Rechercher une personne"
-                                        searchUrl="/admissions/candidatures/lookup/people"
-                                    />
-                                    <InputError message={errors.tutor_person_id} />
-                                </div>
-                                <div className="grid gap-3 sm:grid-cols-2">
-                                    <TextField
-                                        id="starts_on"
-                                        type="date"
-                                        label="Début du contrat"
-                                        value={contract.starts_on}
-                                        onChange={(v) => setContract({ ...contract, starts_on: v })}
-                                        error={errors.starts_on}
+                    {c.pathway !== 'trainee' && (
+                        <Card title="Alternance">
+                            {c.pathway === null && !c.alternance ? (
+                                <p className="text-muted-foreground text-sm">
+                                    Choisissez le parcours « Alternance » (carte Orientation) pour saisir le contrat.
+                                </p>
+                            ) : STAGE_RANK[c.status] < 3 && !c.alternance ? (
+                                <p className="text-muted-foreground text-sm">Le contrat se saisit à partir de l'entretien.</p>
+                            ) : (
+                                <div className="grid gap-3">
+                                    <OptionSelect
+                                        id="contract_type"
+                                        label="Type de contrat"
+                                        value={contract.contract_type}
+                                        options={options.contract_types}
+                                        onChange={(v) => setContract({ ...contract, contract_type: v ?? 'apprenticeship' })}
+                                        error={errors.contract_type}
                                         disabled={disabled}
                                     />
-                                    <TextField
-                                        id="ends_on"
-                                        type="date"
-                                        label="Fin du contrat"
-                                        value={contract.ends_on}
-                                        onChange={(v) => setContract({ ...contract, ends_on: v })}
-                                        error={errors.ends_on}
-                                        disabled={disabled}
-                                    />
-                                </div>
-                                <div className="grid gap-1">
-                                    <Label htmlFor="opco">OPCO</Label>
-                                    <FichePicker
-                                        id="opco"
-                                        kind="organisation"
-                                        value={opco}
-                                        onPick={setOpco}
-                                        placeholder="Rechercher l'OPCO"
-                                        searchUrl="/admissions/candidatures/lookup/organisations"
-                                    />
-                                    <InputError message={errors.opco_organisation_id} />
-                                </div>
-                                {can.update && (
-                                    <div className="flex gap-2">
-                                        <Button
-                                            type="button"
-                                            size="sm"
-                                            onClick={() =>
-                                                router.put(
-                                                    `/admissions/candidatures/${c.id}/alternance`,
-                                                    {
-                                                        ...contract,
-                                                        employer_organisation_id: employer?.id ?? null,
-                                                        tutor_person_id: tutor?.id ?? null,
-                                                        opco_organisation_id: opco?.id ?? null,
-                                                    },
-                                                    { preserveScroll: true },
-                                                )
-                                            }
-                                        >
-                                            Enregistrer le contrat
-                                        </Button>
-                                        {c.alternance && (
+                                    <div className="grid gap-1">
+                                        <Label htmlFor="employer">Entreprise d'accueil</Label>
+                                        <FichePicker
+                                            id="employer"
+                                            kind="organisation"
+                                            value={employer}
+                                            onPick={setEmployer}
+                                            placeholder="Rechercher l'entreprise"
+                                            searchUrl="/admissions/candidatures/lookup/organisations"
+                                        />
+                                        <InputError message={errors.employer_organisation_id} />
+                                    </div>
+                                    <div className="grid gap-1">
+                                        <Label htmlFor="tutor">Maître d'apprentissage ou tuteur</Label>
+                                        <FichePicker
+                                            id="tutor"
+                                            kind="person"
+                                            organisationId={employer?.id}
+                                            value={tutor}
+                                            onPick={setTutor}
+                                            placeholder="Rechercher une personne"
+                                            searchUrl="/admissions/candidatures/lookup/people"
+                                        />
+                                        <InputError message={errors.tutor_person_id} />
+                                    </div>
+                                    <div className="grid gap-3 sm:grid-cols-2">
+                                        <TextField
+                                            id="starts_on"
+                                            type="date"
+                                            label="Début du contrat"
+                                            value={contract.starts_on}
+                                            onChange={(v) => setContract({ ...contract, starts_on: v })}
+                                            error={errors.starts_on}
+                                            disabled={disabled}
+                                        />
+                                        <TextField
+                                            id="ends_on"
+                                            type="date"
+                                            label="Fin du contrat"
+                                            value={contract.ends_on}
+                                            onChange={(v) => setContract({ ...contract, ends_on: v })}
+                                            error={errors.ends_on}
+                                            disabled={disabled}
+                                        />
+                                    </div>
+                                    <div className="grid gap-1">
+                                        <Label htmlFor="opco">OPCO</Label>
+                                        <FichePicker
+                                            id="opco"
+                                            kind="organisation"
+                                            value={opco}
+                                            onPick={setOpco}
+                                            placeholder="Rechercher l'OPCO"
+                                            searchUrl="/admissions/candidatures/lookup/organisations"
+                                        />
+                                        <InputError message={errors.opco_organisation_id} />
+                                    </div>
+                                    {can.update && (
+                                        <div className="flex gap-2">
                                             <Button
                                                 type="button"
                                                 size="sm"
-                                                variant="ghost"
                                                 onClick={() =>
-                                                    confirm('Retirer le contrat ?') &&
-                                                    router.delete(`/admissions/candidatures/${c.id}/alternance`, { preserveScroll: true })
+                                                    router.put(
+                                                        `/admissions/candidatures/${c.id}/alternance`,
+                                                        {
+                                                            ...contract,
+                                                            employer_organisation_id: employer?.id ?? null,
+                                                            tutor_person_id: tutor?.id ?? null,
+                                                            opco_organisation_id: opco?.id ?? null,
+                                                        },
+                                                        { preserveScroll: true },
+                                                    )
                                                 }
                                             >
-                                                Retirer
+                                                Enregistrer le contrat
                                             </Button>
-                                        )}
-                                    </div>
-                                )}
-                                {c.alternance && (
-                                    <div className="grid gap-1">
-                                        <Label>Contrat signé</Label>
-                                        <CandidatureFiles
-                                            candidatureId={c.id}
-                                            kind="contract"
-                                            files={c.files}
-                                            canUpdate={can.update}
-                                            label="Joindre le contrat signé"
-                                        />
-                                    </div>
-                                )}
-                            </div>
-                        )}
-                    </Card>
+                                            {c.alternance && (
+                                                <Button
+                                                    type="button"
+                                                    size="sm"
+                                                    variant="ghost"
+                                                    onClick={() =>
+                                                        confirm('Retirer le contrat ?') &&
+                                                        router.delete(`/admissions/candidatures/${c.id}/alternance`, { preserveScroll: true })
+                                                    }
+                                                >
+                                                    Retirer
+                                                </Button>
+                                            )}
+                                        </div>
+                                    )}
+                                    {c.alternance && (
+                                        <div className="grid gap-1">
+                                            <Label>Contrat signé</Label>
+                                            <CandidatureFiles
+                                                candidatureId={c.id}
+                                                kind="contract"
+                                                files={c.files}
+                                                canUpdate={can.update}
+                                                label="Joindre le contrat signé"
+                                            />
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+                        </Card>
+                    )}
 
                     {custom_fields.length > 0 && (
                         <Card title="Informations complémentaires">

@@ -68,7 +68,10 @@ test('an interlocuteur becomes a candidate, signs an apprenticeship and becomes 
     await moveTo(page, 'Test reçu');
     await moveTo(page, 'Entretien');
 
-    // The apprenticeship contract.
+    // The alternance pathway, then the apprenticeship contract.
+    await choose(page, page.getByLabel('Parcours'), 'Alternance');
+    await page.getByRole('button', { name: 'Enregistrer' }).first().click();
+    await expect(page.getByText('Candidature enregistrée.')).toBeVisible();
     await page.getByLabel("Entreprise d'accueil").fill('Brasserie du Port');
     await page.getByRole('button', { name: EMPLOYER }).click();
     await page.getByLabel('Début du contrat').fill('2027-01-04');
@@ -82,7 +85,7 @@ test('an interlocuteur becomes a candidate, signs an apprenticeship and becomes 
     const dialog = page.getByRole('dialog');
     await expect(dialog.getByText(EMPLOYER)).toBeVisible();
     await dialog.getByRole('button', { name: 'Créer le dossier' }).click();
-    await expect(page.getByText(/est apprenant\./)).toBeVisible();
+    await expect(page.getByText(/est alternant\./)).toBeVisible();
     await expect(page).toHaveURL(/\/dossiers\//);
 
     // In the « Alternants » tab.

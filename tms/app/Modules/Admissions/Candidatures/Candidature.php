@@ -24,6 +24,7 @@ use Illuminate\Support\Facades\Auth;
  * @property string $number C-<AAAA>-<NNNN>
  * @property string $person_id
  * @property CandidatureStatus $status
+ * @property Pathway|null $pathway null: undecided
  * @property string|null $training_id
  * @property string|null $rncp_code
  * @property string|null $target_session_id
@@ -78,7 +79,7 @@ class Candidature extends Model
         'person_id', 'number', 'training_id', 'rncp_code', 'target_session_id', 'das_id', 'responsible_user_id',
         'origin_id', 'prescriber_organisation_id', 'france_travail_id', 'last_diploma', 'legal_representative', 'rqth',
         'adaptation_needs', 'positioning_sent_on', 'positioning_received_on', 'positioning_result', 'interview_at',
-        'interviewer_user_id', 'interview_report', 'decision_reason_id', 'custom_values',
+        'interviewer_user_id', 'interview_report', 'decision_reason_id', 'custom_values', 'pathway',
     ];
 
     /** @var array<string, mixed> */
@@ -99,6 +100,7 @@ class Candidature extends Model
     {
         return [
             'status' => CandidatureStatus::class,
+            'pathway' => Pathway::class,
             'legal_representative' => 'array',
             'rqth' => 'boolean',
             'positioning_sent_on' => 'immutable_date',
