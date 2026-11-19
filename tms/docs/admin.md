@@ -396,4 +396,8 @@ Guide utilisateur : `admissions.md`.
   société, avec retour au texte d'origine ; détails dans `documents.md` § 4.
 - **Signature et cachet** : Administration › Sociétés, image PNG ou JPEG (1 Mo), imprimée sur les documents émis.
 - **Droits** : `documents.view` et `documents.manage`, à périmètre (celui du dossier) ; défauts dans `documents.md` § 1.
-- **Modèles d'e-mails** : « Envoi d'une convention de formation » et « Envoi d'un contrat de formation ».
+- **Modèles d'e-mails** : envoi de chaque document (convention, contrat, convocation, attestation, certificat) et
+  signature en ligne (« Demande de signature en ligne » avec `{lien}`, « Code de signature » avec `{code}`,
+  « Confirmation de signature »).
+- **Signature en ligne** : lien personnel de 30 jours, code e-mail de 10 minutes (5 essais), page de preuve ajoutée au
+  PDF (signature électronique simple) ; aucun prestataire externe.

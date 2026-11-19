@@ -15,6 +15,9 @@ Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) ; ve
 - Documents (0.10, livraison 2) : **convocation**, **attestation de fin de formation** et **certificat de réalisation**
   (modèle du ministère) par stagiaire, émis et envoyés un par un ou pour toute la session (page de la session), cartes
   « Convocations » et « Attestations » de la synthèse ; le dossier passe à « Convocations envoyées ».
+- Signature en ligne (0.10, livraison 3) : convention, contrat et devis (« Bon pour accord ») signés par un lien
+  personnel et un code reçu par e-mail, PDF signé avec page de preuve (signature électronique simple) ; le dossier passe
+  à « Convention signée », le devis à « Accepté » avec son exemplaire signé.
 - Qualité : module **Qualiopi** (menu Qualité › Qualiopi, droits `qualite.view` et `qualite.manage`) sur le référentiel
   2026 (décret n° 2026-728, 33 indicateurs) : suivi par indicateur (applicabilité justifiée, statut, responsable, date
   de revue, notes), preuves (fichier, lien, note), mesures automatiques (indicateurs 1, 5, 8, 12 et 13) et export du

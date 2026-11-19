@@ -63,8 +63,8 @@ services:
       "--chromium-deny-private-ips=true",
       "--api-disable-download-from=true",
       "--webhook-disable=true",
-      "--libreoffice-disable-routes=true",
-      "--pdfengines-disable-routes=true"]
+      "--libreoffice-disable-routes=true"]
+    # PDF engines routes stay on: the online signature merges a document and its proof page (0.10).
 
   worker:
     <<: *app

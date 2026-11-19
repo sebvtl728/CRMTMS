@@ -1,10 +1,23 @@
 import { expect, test } from '@playwright/test';
+import { execFileSync } from 'node:child_process';
 import { existsSync } from 'node:fs';
 
 // Named to run after admin.spec.ts and dossier.spec.ts (files run in alphabetical order) (same stack, one worker): reuses the administrator
 // session and the dossier of « E2E Imprimerie des Alpes » (company contractor, an intra session).
 const ADMIN_STATE = 'tests/e2e/.auth/admin.json';
 const CLIENT = 'E2E Imprimerie des Alpes';
+
+/** The last match of $pattern in the e-mails of the e2e stack (MAIL_MAILER=log; quoted-printable soft breaks removed). */
+function lastInMails(pattern: RegExp): string {
+    const log = execFileSync('docker', ['compose', '-f', 'compose.yaml', '-f', 'compose.e2e.yaml', 'exec', '-T', 'app-e2e', 'cat', 'storage/logs/laravel.log'], {
+        encoding: 'utf8',
+        maxBuffer: 64 * 1024 * 1024,
+    }).replace(/=\r?\n/g, '');
+    const all = [...log.matchAll(new RegExp(pattern.source, 'g'))];
+    expect(all.length, `nothing like ${pattern} in the e-mails`).toBeGreaterThan(0);
+
+    return all[all.length - 1][1];
+}
 
 test('convention: issued from the dossier, previewed, sent, then cancelled with a reason', async ({ browser }) => {
     expect(existsSync(ADMIN_STATE), 'run admin.spec.ts first (it signs the administrator in)').toBe(true);
@@ -45,6 +58,27 @@ test('convention: issued from the dossier, previewed, sent, then cancelled with 
     await expect(page.getByText(/Envoi de DOC-\d{4}-\d{5} en cours\./)).toBeVisible();
     await page.reload();
     await expect(page.getByText(/envoyé le/)).toBeVisible();
+
+    // Online signature: the contact receives a link, asks for a code, signs.
+    await page.getByRole('button', { name: 'Demander la signature' }).click();
+    const sign = page.getByRole('dialog');
+    await sign.getByLabel('Adresse du signataire').fill('rh@imprimerie-des-alpes.test');
+    await sign.getByRole('button', { name: 'Envoyer le lien' }).click();
+    await expect(page.getByText(/Lien de signature envoyé pour DOC-/)).toBeVisible();
+    const token = lastInMails(/\/signature\/([A-Za-z0-9]{40})/);
+    const signer = await browser.newContext({ locale: 'fr-FR', timezoneId: 'Europe/Paris' });
+    const signerPage = await signer.newPage();
+    await signerPage.goto(`/signature/${token}`);
+    await signerPage.getByLabel("J'ai lu le document et j'accepte de le signer électroniquement.").check();
+    await signerPage.getByRole('button', { name: 'Recevoir mon code par e-mail' }).click();
+    await expect(signerPage.getByText(/Code envoyé à/)).toBeVisible();
+    await signerPage.getByLabel('Code à 6 chiffres').fill(lastInMails(/code de signature[^0-9]*(\d{6})/i));
+    await signerPage.getByRole('button', { name: 'Signer' }).click();
+    await expect(signerPage.getByText(/Document signé le/)).toBeVisible();
+    await signer.close();
+    await page.reload();
+    await expect(page.getByText(/Signé en ligne le/)).toBeVisible();
+    await expect(page.getByRole('link', { name: 'PDF signé' })).toBeVisible();
 
     await page.getByRole('button', { name: 'Annuler', exact: true }).click();
     const cancel = page.getByRole('dialog');
