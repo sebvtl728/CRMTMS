@@ -62,7 +62,8 @@ final class QuoteSignatures
         }
         $request = SignatureRequest::query()->find($event->requestId);
         $quote = Quote::query()->find($event->subjectId);
-        if ($request === null || $quote === null) {
+        // Answered meanwhile (the guard refuses the signature, but a race may remain): nothing to accept.
+        if ($request === null || $quote === null || ! $quote->isAwaitingAnswer()) {
             return;
         }
         DB::transaction(function () use ($quote, $request, $event, $transitions, $copies): void {
