@@ -8,7 +8,7 @@
 <head>
     <meta charset="utf-8">
     <meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src data:; style-src 'unsafe-inline'; font-src data:">
-    <title>Dossier Qualiopi — {{ $organisme }}</title>
+    <title>Dossier Qualiopi - {{ $organisme }}</title>
     <style>
         @page { size: A4; margin: 16mm 14mm; }
         * { box-sizing: border-box; }
@@ -31,17 +31,17 @@
 </head>
 <body>
     <h1>Dossier Qualiopi</h1>
-    <div>{{ $organisme }} — édité le {{ $date }}</div>
+    <div>{{ $organisme }} - édité le {{ $date }}</div>
     <div class="muted">Référentiel : {{ $decree }}</div>
     <div class="notice">{{ $notice }}</div>
     <p><strong>Avancement :</strong> {{ $progress['ready'] }} indicateur(s) prêt(s) sur {{ $progress['applicable'] }} applicable(s).</p>
 
     @foreach ($criteria as $criterion => $indicators)
-        <h2>Critère {{ $criterion }} — {{ $criteriaTitles[$criterion] }}</h2>
+        <h2>Critère {{ $criterion }} - {{ $criteriaTitles[$criterion] }}</h2>
         @foreach ($indicators as $i)
             <div class="indicator">
                 <div class="head">
-                    <span class="title">Indicateur {{ $i['number'] }} — {{ $i['title'] }}</span>
+                    <span class="title">Indicateur {{ $i['number'] }} - {{ $i['title'] }}</span>
                     <span>@if ($i['applicable']){{ $i['status_label'] }}@else<span class="na">Non applicable</span>@endif</span>
                 </div>
                 <div class="text">{{ $i['text'] }}</div>
@@ -55,7 +55,7 @@
                     <div class="label">Mesures automatiques</div>
                     <ul>
                         @foreach ($i['measures'] as $m)
-                            <li>{{ $m['label'] }} : <span class="{{ $m['tone'] }}">{{ $m['value'] }}</span>@if ($m['detail']) <span class="muted">— {{ $m['detail'] }}</span>@endif</li>
+                            <li>{{ $m['label'] }} : <span class="{{ $m['tone'] }}">{{ $m['value'] }}</span>@if ($m['detail']) <span class="muted">- {{ $m['detail'] }}</span>@endif</li>
                         @endforeach
                     </ul>
                 @endif
@@ -68,9 +68,9 @@
                             <li>
                                 {{ $p['title'] }} <span class="muted">({{ $p['date'] }})</span>
                                 @if ($p['kind'] === 'file')
-                                    — @if ($p['entry']) fichier {{ $p['entry'] }} @else <span class="warn">fichier introuvable</span> @endif
+                                    - @if ($p['entry']) fichier {{ $p['entry'] }} @else <span class="warn">fichier introuvable</span> @endif
                                 @elseif ($p['kind'] === 'link')
-                                    — {{ $p['url'] }}
+                                    - {{ $p['url'] }}
                                 @else
                                     <div class="text">{{ $p['note'] }}</div>
                                 @endif

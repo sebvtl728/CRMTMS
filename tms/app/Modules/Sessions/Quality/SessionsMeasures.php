@@ -37,7 +37,7 @@ final class SessionsMeasures
 
         return [
             'label' => 'Taux d\'abandon (12 derniers mois)',
-            'value' => $rate === null ? '—' : $rate.' %',
+            'value' => $rate === null ? '-' : $rate.' %',
             'detail' => sprintf('%d abandon%s sur %d inscription%s (sessions commencées depuis le %s)',
                 $abandoned, $abandoned > 1 ? 's' : '', $total, $total > 1 ? 's' : '', $from->format('d/m/Y')),
             'tone' => 'neutral',

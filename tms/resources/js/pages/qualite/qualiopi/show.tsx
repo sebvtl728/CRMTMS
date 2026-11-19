@@ -112,7 +112,7 @@ function StateForm({ indicator, users, statuses, can }: Pick<Props, 'indicator' 
                         disabled={disabled}
                         onChange={(e) => setData('responsible_user_id', e.target.value)}
                     >
-                        <option value="">—</option>
+                        <option value="">-</option>
                         {users.map((u) => (
                             <option key={u.value} value={u.value}>
                                 {u.label}
@@ -256,12 +256,12 @@ export default function QualiopiShow({ indicator, criterion, proofs, measures, u
 
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
-            <Head title={`Qualiopi — indicateur ${indicator.number}`} />
+            <Head title={`Qualiopi - indicateur ${indicator.number}`} />
             <div className="flex max-w-4xl flex-col gap-4 p-4">
                 <div className="flex flex-wrap items-center gap-2">
                     <Heading
-                        title={`Indicateur ${indicator.number} — ${indicator.title}`}
-                        description={`Critère ${criterion.number} — ${criterion.title}`}
+                        title={`Indicateur ${indicator.number} - ${indicator.title}`}
+                        description={`Critère ${criterion.number} - ${criterion.title}`}
                     />
                 </div>
                 {status && <p className="text-sm font-medium text-green-600">{status}</p>}
@@ -288,7 +288,7 @@ export default function QualiopiShow({ indicator, criterion, proofs, measures, u
                             {measures.map((m) => (
                                 <li key={m.key}>
                                     {m.label} : <strong className={TONES[m.tone]}>{m.value}</strong>
-                                    {m.detail && <span className="text-muted-foreground"> — {m.detail}</span>}
+                                    {m.detail && <span className="text-muted-foreground"> - {m.detail}</span>}
                                 </li>
                             ))}
                         </ul>
@@ -331,7 +331,7 @@ export default function QualiopiShow({ indicator, criterion, proofs, measures, u
                                         )}
                                         <span className="text-muted-foreground text-xs">
                                             {' '}
-                                            — {formatDate(p.created_at)}
+                                            - {formatDate(p.created_at)}
                                             {p.kind === 'file' && p.original_name ? ` · ${p.original_name} · ${formatSize(p.size)}` : ''}
                                         </span>
                                         {p.kind === 'note' && <p className="whitespace-pre-wrap">{p.note}</p>}
