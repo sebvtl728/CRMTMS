@@ -13,6 +13,7 @@ use App\Modules\Core\Tenancy\Tenant;
 use App\Modules\Core\Tenancy\TenantAwareJob;
 use App\Modules\Core\Tenancy\TenantContext;
 use App\Modules\Core\Users\User;
+use App\Modules\Documents\Texts\DocumentType;
 use App\Modules\Sessions\Public\Paperwork;
 use Carbon\CarbonImmutable;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -112,7 +113,12 @@ class SendDocument implements ShouldQueue
                 'updated_at' => $now,
             ]);
         });
-        $paperwork->markConventionSent($document->dossier_id, $now);
+        if (in_array($document->type, [DocumentType::Convention->value, DocumentType::Contract->value], true)) {
+            $paperwork->markConventionSent($document->dossier_id, $now);
+        }
+        if ($document->type === DocumentType::Convocation->value && self::everyTraineeConvened($document->dossier_id)) {
+            $paperwork->markConvocationsSent($document->dossier_id, $now);
+        }
         $audit->record('document.email_sent', $document, [], ['sending' => $sending->id], self::sender($sending));
     }
 
@@ -134,6 +140,20 @@ class SendDocument implements ShouldQueue
                 ->update(['email_status' => 'failed', 'email_error_code' => $code, 'updated_at' => CarbonImmutable::now()]);
             app(AuditRecorder::class)->record('document.email_failed', Document::query()->find($sending->document_id), [], ['sending' => $sending->id, 'code' => $code], self::sender($sending));
         });
+    }
+
+    /** Every trainee of the dossier who is still expected has a convocation that left. */
+    private static function everyTraineeConvened(string $dossierId): bool
+    {
+        $dossier = Paperwork::dossier($dossierId);
+        $expected = array_column(array_filter($dossier['trainees'] ?? [], fn (array $t) => $t['left_on'] === null), 'enrolment_id');
+        if ($expected === []) {
+            return false;
+        }
+        $convened = Document::query()->whereIn('enrolment_id', $expected)->where('type', DocumentType::Convocation->value)
+            ->where('status', '!=', DocumentStatus::Cancelled->value)->whereNotNull('sent_at')->distinct()->count('enrolment_id');
+
+        return $convened === count($expected);
     }
 
     private static function sender(DocumentSending $sending): ?User

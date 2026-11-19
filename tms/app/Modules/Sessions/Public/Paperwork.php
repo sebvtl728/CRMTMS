@@ -142,6 +142,15 @@ final class Paperwork
         }
     }
 
+    /** « Convocations envoyées » from « Convention signée » only; any other state stays as it is. */
+    public function markConvocationsSent(string $dossierId, CarbonImmutable $on): void
+    {
+        $dossier = Dossier::query()->find($dossierId);
+        if ($dossier !== null && $dossier->status === DossierStatus::ConventionSigned) {
+            $this->transitions->sendConvocations($dossier, $on);
+        }
+    }
+
     /** « Convention signée » from « Créé » (both steps) or « Convention envoyée »; later states stay. */
     public function markConventionSigned(string $dossierId, CarbonImmutable $on): void
     {

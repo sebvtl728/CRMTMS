@@ -3,6 +3,8 @@
 use App\Modules\Connectors\Core\ConnectorConfig;
 use App\Modules\Connectors\Smtp\SmtpTransportFactory;
 use App\Modules\Sessions\Dossiers\Dossier;
+use App\Modules\Sessions\Enrolments\Enrolment;
+use App\Modules\Sessions\Sessions\TrainingSession;
 use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\Http;
 use Symfony\Component\Mailer\Envelope;
@@ -106,7 +108,7 @@ function docSmtp(Closure $send): ConnectorConfig
  * A finished session (2–4 November 2026, two séances of 3 h 30) of the
  * « Hôtel du Parc » dossier with Léa (who has an e-mail) and Tom.
  *
- * @return array{dossier: App\Modules\Sessions\Dossiers\Dossier, session: App\Modules\Sessions\Sessions\TrainingSession, lea: App\Modules\Sessions\Enrolments\Enrolment, tom: App\Modules\Sessions\Enrolments\Enrolment}
+ * @return array{dossier: Dossier, session: TrainingSession, lea: Enrolment, tom: Enrolment}
  */
 function docFinishedSession(): array
 {
