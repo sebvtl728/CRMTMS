@@ -329,14 +329,15 @@ it('detects every way Finance could reach Sessions, the Crm, the catalogue or th
 
 /**
  * A reference to another module than Admissions and Core beyond their public
- * services: Crm\Public, Sessions\Public and the catalogue's Trainings,
- * TrainingData and TrainingUsage (a use line, a grouped use or an inline
+ * services: Crm\Public, Sessions\Public, the catalogue's Trainings,
+ * TrainingData, TrainingUsage and Brochures, and the mailer pieces of
+ * Connectors (as Finance) (a use line, a grouped use or an inline
  * fully qualified name).
  */
-const ADMISSIONS_FOREIGN_REFERENCE = '/App\\\\Modules\\\\(?!(?:Admissions|Core)\b|Sessions\\\\Public\b|Crm\\\\Public\b|Catalogue\\\\(?:Trainings|TrainingData|TrainingUsage)\b)\w+'
-    .'|App\\\\Modules\\\\\{[^}]*\b(?!(?:Admissions|Core)\\\\|Sessions\\\\Public\b|Crm\\\\Public\b|Catalogue\\\\(?:Trainings|TrainingData|TrainingUsage)\b)(?:Sessions|Crm|Catalogue|Connectors|Finance)\\\\/';
+const ADMISSIONS_FOREIGN_REFERENCE = '/App\\\\Modules\\\\(?!(?:Admissions|Core)\b|Sessions\\\\Public\b|Crm\\\\Public\b|Catalogue\\\\(?:Trainings|TrainingData|TrainingUsage|Brochures)\b|Connectors\\\\(?:Smtp\\\\(?:TenantMailer|SmtpHostRefused)|Core\\\\(?:ConnectorRun|PermanentDeliveryFailure))\b)\w+'
+    .'|App\\\\Modules\\\\\{[^}]*\b(?!(?:Admissions|Core)\\\\|Sessions\\\\Public\b|Crm\\\\Public\b|Catalogue\\\\(?:Trainings|TrainingData|TrainingUsage|Brochures)\b|Connectors\\\\(?:Smtp\\\\(?:TenantMailer|SmtpHostRefused)|Core\\\\(?:ConnectorRun|PermanentDeliveryFailure))\b)(?:Sessions|Crm|Catalogue|Connectors|Finance)\\\\/';
 
-const ADMISSIONS_TABLES_LIST = 'candidatures|candidature_sequences|candidature_files|alternance_contracts|custom_field_definitions';
+const ADMISSIONS_TABLES_LIST = 'candidatures|candidature_sequences|candidature_files|alternance_contracts|custom_field_definitions|positioning_sendings|positioning_sending_versions';
 
 const ADMISSIONS_TABLES = '/[\'"`](?:public\.)?(?:'.ADMISSIONS_TABLES_LIST.')(?:[\'"`.]|\s+as\b)'
     .'|\b(?:exists|unique):(?:public\.)?(?:'.ADMISSIONS_TABLES_LIST.')\b'
@@ -371,7 +372,7 @@ it('detects every way Admissions could reach another module beyond its public se
         'use App\Modules\Sessions\Dossiers\DossierWriter;',
         'use App\Modules\Catalogue\Training;',
         'use App\Modules\Finance\Invoices\Invoice;',
-        'use App\Modules\Connectors\Smtp\TenantMailer;',
+        'use App\Modules\Connectors\Smtp\SmtpConnector;',
         'use App\Modules\{Crm\People\Person, Core\Access\Role};',
         '$x = \App\Modules\Sessions\SessionsVisibility::class;',
     ] as $code) {

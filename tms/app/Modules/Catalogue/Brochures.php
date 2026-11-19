@@ -71,7 +71,7 @@ final class Brochures
         }
 
         $brochures = Brochure::query()->with('currentVersion')
-            ->whereNotNull('current_version_id')
+            ->whereNotNull('current_version_id')->where('kind', Brochure::BROCHURE)
             ->where(fn ($q) => $q
                 ->whereIn('brochures.id', DB::table('brochure_trainings')->select('brochure_id')->whereIn('training_id', $ids))
                 ->orWhereIn('brochures.id', DB::table('brochure_das')->select('brochure_id')
@@ -93,7 +93,7 @@ final class Brochures
         $direct = DB::table('brochure_trainings')->where('training_id', $training->id)->pluck('brochure_id')->all();
         $viaDas = DB::table('brochure_das')->where('das_id', $training->das_id)->pluck('brochure_id')->all();
 
-        return Brochure::query()->with('currentVersion')->whereNotNull('current_version_id')
+        return Brochure::query()->with('currentVersion')->whereNotNull('current_version_id')->where('kind', Brochure::BROCHURE)
             ->whereIn('brochures.id', array_merge($direct, $viaDas))
             ->orderBy('title')->orderBy('id')->get()
             ->map(fn (Brochure $b) => [
@@ -151,7 +151,7 @@ final class Brochures
         if ($ids === []) {
             return [];
         }
-        $current = Brochure::query()->whereIn('current_version_id', $ids)->pluck('current_version_id')->all();
+        $current = Brochure::query()->where('kind', Brochure::BROCHURE)->whereIn('current_version_id', $ids)->pluck('current_version_id')->all();
 
         return array_values(array_filter($this->versions($ids), fn (array $v) => in_array($v['version_id'], $current, true)));
     }
@@ -185,11 +185,57 @@ final class Brochures
      */
     public function options(?string $search = null): array
     {
-        return Brochure::query()->whereNotNull('current_version_id')
+        return Brochure::query()->whereNotNull('current_version_id')->where('kind', Brochure::BROCHURE)
             ->when($search !== null && trim($search) !== '', fn ($q) => $q->titleMatches(mb_substr(trim((string) $search), 0, 100)))
             ->orderBy('title')->orderBy('id')->get(['id', 'title', 'current_version_id'])
             ->map(fn (Brochure $b) => ['brochure_id' => $b->id, 'version_id' => (string) $b->current_version_id, 'title' => $b->title])
             ->values()->all();
+    }
+
+    /**
+     * The positioning tests offered for a candidature: the current version
+     * of every test (not in the trash) attached to the training, to the DAS
+     * of the training, or to the DAS given (a candidature without training),
+     * each once, by title.
+     *
+     * @return list<array{brochure_id: string, version_id: string, title: string, original_name: string, size: int}>
+     */
+    public function positioningTests(?string $trainingId, ?string $dasId): array
+    {
+        $trainingId = $trainingId !== null && Str::isUuid($trainingId) ? $trainingId : null;
+        $dasIds = array_values(array_filter([
+            $dasId !== null && Str::isUuid($dasId) ? $dasId : null,
+            $trainingId !== null ? Training::query()->whereKey($trainingId)->value('das_id') : null,
+        ]));
+        if ($trainingId === null && $dasIds === []) {
+            return [];
+        }
+
+        return Brochure::query()->with('currentVersion')
+            ->whereNotNull('current_version_id')->where('kind', Brochure::POSITIONING_TEST)
+            ->where(fn ($q) => $q
+                ->when($trainingId !== null, fn ($w) => $w->orWhereIn('brochures.id', DB::table('brochure_trainings')->select('brochure_id')->where('training_id', $trainingId)))
+                ->when($dasIds !== [], fn ($w) => $w->orWhereIn('brochures.id', DB::table('brochure_das')->select('brochure_id')->whereIn('das_id', $dasIds))))
+            ->orderBy('title')->orderBy('id')->get()
+            ->map(fn (Brochure $b) => self::row($b))->filter()->values()->all();
+    }
+
+    /**
+     * Among these version ids, those still offered as positioning tests (the
+     * current version of a test not in the trash), in the order given.
+     *
+     * @param  list<string>  $versionIds
+     * @return list<array{version_id: string, path: string, original_name: string, size: int}>
+     */
+    public function positioningVersions(array $versionIds): array
+    {
+        $ids = self::uuids($versionIds);
+        if ($ids === []) {
+            return [];
+        }
+        $current = Brochure::query()->where('kind', Brochure::POSITIONING_TEST)->whereIn('current_version_id', $ids)->pluck('current_version_id')->all();
+
+        return array_values(array_filter($this->versions($ids), fn (array $v) => in_array($v['version_id'], $current, true)));
     }
 
     /**

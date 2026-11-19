@@ -11,6 +11,9 @@ use App\Modules\Admissions\CustomFields\CustomFieldDefinition;
 use App\Modules\Admissions\Gdpr\CandidatureAnonymisation;
 use App\Modules\Admissions\Gdpr\PersonCandidaturesExport;
 use App\Modules\Admissions\History\CandidatureHistory;
+use App\Modules\Admissions\Positioning\PositioningSending;
+use App\Modules\Admissions\Positioning\PositioningSendings;
+use App\Modules\Catalogue\Brochures;
 use App\Modules\Catalogue\TrainingUsage;
 use App\Modules\Core\Access\Permissions as CorePermissions;
 use App\Modules\Core\Access\Role;
@@ -24,6 +27,7 @@ use App\Modules\Crm\Public\FicheLinks;
 use App\Modules\Sessions\Public\DossierBlocks;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Support\Str;
@@ -56,7 +60,10 @@ class AdmissionsServiceProvider extends ServiceProvider
             CandidatureFile::MORPH_ALIAS => CandidatureFile::class,
             AlternanceContract::MORPH_ALIAS => AlternanceContract::class,
             CustomFieldDefinition::MORPH_ALIAS => CustomFieldDefinition::class,
+            PositioningSending::MORPH_ALIAS => PositioningSending::class,
         ]);
+
+        PositioningSendings::registerTemplate();
     }
 
     public function boot(): void
@@ -64,6 +71,9 @@ class AdmissionsServiceProvider extends ServiceProvider
         self::registerReferenceUsage();
         self::registerTrainingUsage();
         self::registerCrm();
+
+        // A test sent to a candidate stays downloadable from the history once trashed in the library.
+        Brochures::registerSentCheck('admissions.positioning', fn (string $versionId): bool => DB::table('positioning_sending_versions')->where('brochure_version_id', $versionId)->exists());
 
         // The dossier of an apprenant shows its candidature.
         DossierBlocks::register('admissions.candidature', function (string $dossierId, User $viewer): ?array {

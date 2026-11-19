@@ -1,0 +1,205 @@
+<?php
+
+namespace App\Modules\Admissions\Positioning;
+
+use App\Modules\Admissions\Candidatures\Candidature;
+use App\Modules\Admissions\Candidatures\CandidatureStatus;
+use App\Modules\Catalogue\Brochures;
+use App\Modules\Catalogue\Trainings;
+use App\Modules\Core\Mail\MailTemplateDefinition;
+use App\Modules\Core\Mail\MailTemplateRegistry;
+use App\Modules\Core\Mail\MailTemplates;
+use App\Modules\Core\Tenancy\TenantContext;
+use App\Modules\Core\Users\User;
+use App\Modules\Crm\Public\Fiches;
+use App\Modules\Crm\Public\Trainees;
+use Carbon\CarbonImmutable;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Validator;
+use Illuminate\Validation\ValidationException;
+
+/**
+ * Sends the positioning tests of the library to a candidate: the tests
+ * offered are those of the training or the DAS of the candidature
+ * (Brochures::positioningTests); a sending records the e-mail, the versions
+ * and a personal upload link valid LINK_DAYS days (end of the Paris day),
+ * revokes the previous link, fills « Envoyé le » when empty and moves the
+ * stage to « Test envoyé » from « Identifié » only (never back).
+ */
+final class PositioningSendings
+{
+    public const TEMPLATE = 'positioning_test';
+
+    public const LINK_DAYS = 14;
+
+    /** Placeholder of the link in the message, filled at sending time. */
+    public const LINK = '{lien}';
+
+    public static function registerTemplate(): void
+    {
+        MailTemplateRegistry::register(new MailTemplateDefinition(
+            key: self::TEMPLATE,
+            label: 'Envoi d\'un test de positionnement',
+            description: 'Proposé dans la fenêtre « Envoyer le test » d\'une candidature, toujours modifiable avant l\'envoi. Les tests choisis sont joints ; {lien} est le lien personnel où le candidat dépose sa copie.',
+            subject: 'Votre test de positionnement — {organisme}',
+            body: "Bonjour {prenom},\n\nDans le cadre de votre candidature à la formation « {formation} », vous trouverez ci-joint votre test de positionnement.\n\nUne fois complété, déposez votre copie (PDF ou photo) sur votre lien personnel, avant le {date_limite} :\n{lien}\n\nCordialement,\n{organisme}",
+            variables: [
+                'prenom' => ['prénom du candidat', 'Léa'],
+                'nom' => ['nom du candidat', 'Durand'],
+                'formation' => ['formation visée', 'CAP Cuisine'],
+                'lien' => ['lien personnel de dépôt de la copie', 'https://tms.exemple.fr/test-positionnement/…'],
+                'date_limite' => ['dernier jour du lien', '03/12/2026'],
+                'organisme' => ["nom de l'organisme", 'CAP FORMATION'],
+            ],
+            required: ['lien'],
+        ));
+    }
+
+    /**
+     * The tests offered for this candidature.
+     *
+     * @return list<array{brochure_id: string, version_id: string, title: string, original_name: string, size: int}>
+     */
+    public function offered(Candidature $c): array
+    {
+        return app(Brochures::class)->positioningTests($c->training_id, $c->das_id);
+    }
+
+    /** The day the link of a sending made now stops working (Paris). */
+    public static function deadline(?CarbonImmutable $from = null): CarbonImmutable
+    {
+        return ($from ?? CarbonImmutable::now('Europe/Paris'))->setTimezone('Europe/Paris')->addDays(self::LINK_DAYS)->endOfDay();
+    }
+
+    /**
+     * What the window proposes: the person's e-mail and the template filled
+     * in, {lien} kept for the link.
+     *
+     * @return array{to: string, subject: string, body: string}
+     */
+    public function defaults(Candidature $c): array
+    {
+        $person = app(Fiches::class)->personLabels([$c->person_id])[$c->person_id] ?? null;
+        $profile = app(Trainees::class)->profile($c->person_id);
+        $training = $c->training_id !== null ? app(Trainings::class)->find($c->training_id) : null;
+        $text = app(MailTemplates::class)->render(self::TEMPLATE, [
+            'prenom' => (string) ($person['first_name'] ?? ''),
+            'nom' => (string) ($person['last_name'] ?? ''),
+            'formation' => (string) ($training->title ?? ''),
+            'lien' => self::LINK,
+            'date_limite' => self::deadline()->format('d/m/Y'),
+            'organisme' => (string) (app(TenantContext::class)->current()->name ?? ''),
+        ]);
+
+        return ['to' => (string) ($profile['email'] ?? ''), 'subject' => $text['subject'], 'body' => $text['body']];
+    }
+
+    /**
+     * Records and queues a sending.
+     *
+     * @param  array<string, mixed>  $data  version_ids, to, subject, body
+     */
+    public function send(Candidature $candidature, array $data, User $by): PositioningSending
+    {
+        $offered = array_column($this->offered($candidature), 'version_id');
+        $validator = Validator::make($data, [
+            'version_ids' => ['required', 'array', 'min:1', 'max:10'],
+            'version_ids.*' => ['string', 'distinct'],
+            'to' => ['required', 'email:rfc', 'max:254'],
+            'subject' => ['required', 'string', 'max:200'],
+            'body' => ['required', 'string', 'max:5000'],
+        ], [
+            'version_ids.required' => 'Choisissez au moins un test proposé pour cette candidature.',
+            'version_ids.min' => 'Choisissez au moins un test proposé pour cette candidature.',
+            'to.required' => 'Indiquez l\'adresse du candidat.',
+            'to.email' => 'Adresse e-mail invalide.',
+            'required' => 'Ce champ est obligatoire.',
+            'max' => 'Ce champ est trop long.',
+            'distinct' => 'Ce test est en double.',
+        ]);
+        $validator->after(function ($v) use ($data, $offered): void {
+            $ids = is_array($data['version_ids'] ?? null) ? $data['version_ids'] : [];
+            if ($ids !== [] && array_diff($ids, $offered) !== []) {
+                $v->errors()->add('version_ids', 'Choisissez au moins un test proposé pour cette candidature.');
+            }
+            if (is_string($data['body'] ?? null) && ! str_contains($data['body'], self::LINK)) {
+                $v->errors()->add('body', 'Le message doit contenir {lien} (le lien du candidat).');
+            }
+        });
+        $values = $validator->validate();
+        if (PositioningAttachments::size($values['version_ids']) > PositioningAttachments::MAX_BYTES) {
+            throw ValidationException::withMessages(['version_ids' => 'Les tests choisis dépassent 20 Mo : envoyez-en moins à la fois.']);
+        }
+
+        $token = bin2hex(random_bytes(32));
+        $sending = DB::transaction(function () use ($candidature, $values, $by, $token): PositioningSending {
+            /** @var Candidature $locked */
+            $locked = Candidature::query()->lockForUpdate()->findOrFail($candidature->getKey());
+            $now = CarbonImmutable::now();
+            PositioningSending::query()->where('candidature_id', $locked->id)->whereNull('revoked_at')->whereNull('submitted_at')
+                ->toBase()->update(['revoked_at' => $now, 'updated_at' => $now]);
+
+            $sending = PositioningSending::query()->create([
+                'candidature_id' => $locked->id,
+                'email' => mb_strtolower(trim($values['to'])),
+                'subject' => trim($values['subject']),
+                'message' => $values['body'],
+                'token_hash' => PositioningSending::hashToken($token),
+                'expires_at' => self::deadline(),
+                'created_by' => $by->id,
+            ]);
+            foreach (array_values($values['version_ids']) as $i => $versionId) {
+                DB::table('positioning_sending_versions')->insert([
+                    'tenant_id' => $sending->tenant_id, 'positioning_sending_id' => $sending->id, 'brochure_version_id' => $versionId, 'position' => $i,
+                ]);
+            }
+
+            $changes = [];
+            if ($locked->positioning_sent_on === null) {
+                $changes['positioning_sent_on'] = CarbonImmutable::now('Europe/Paris')->toDateString();
+            }
+            if ($locked->status === CandidatureStatus::Identified) {
+                $changes['status'] = CandidatureStatus::PositioningSent->value;
+            }
+            if ($changes !== []) {
+                $locked->forceFill($changes)->save();
+            }
+
+            return $sending;
+        });
+
+        SendPositioningTest::dispatch($sending->id, $token)->afterCommit();
+
+        return $sending;
+    }
+
+    /**
+     * The sendings of a candidature for its page, newest first.
+     *
+     * @return list<array<string, mixed>>
+     */
+    public static function forPage(Candidature $c): array
+    {
+        $titles = [];
+        $sendings = PositioningSending::query()->where('candidature_id', $c->id)->orderByDesc('created_at')->orderByDesc('id')->get();
+        $versions = DB::table('positioning_sending_versions')->whereIn('positioning_sending_id', $sendings->pluck('id'))->orderBy('position')->get()->groupBy('positioning_sending_id');
+        $sent = app(Brochures::class)->sent($versions->flatten()->pluck('brochure_version_id')->map(fn ($id) => (string) $id)->unique()->values()->all());
+
+        return $sendings->map(fn (PositioningSending $s) => [
+            'id' => $s->id,
+            'created_at' => $s->created_at?->toIso8601String(),
+            'email' => $s->email,
+            'tests' => collect($versions->get($s->id, []))->map(fn ($v) => $sent[(string) $v->brochure_version_id]['title'] ?? '—')->values()->all(),
+            'email_status' => $s->email_status,
+            'email_error' => $s->email_error,
+            'expires_at' => $s->expires_at->toIso8601String(),
+            'submitted_at' => $s->submitted_at?->toIso8601String(),
+            'link' => match (true) {
+                $s->submitted_at !== null => 'Copie déposée',
+                $s->revoked_at !== null => 'Remplacé par un envoi plus récent',
+                ! $s->expires_at->isFuture() => 'Expiré',
+                default => 'Actif jusqu\'au '.$s->expires_at->setTimezone('Europe/Paris')->format('d/m/Y'),
+            },
+        ])->values()->all();
+    }
+}
