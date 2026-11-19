@@ -24,6 +24,12 @@ abstract class AiClient
 
     public const CONNECT_TIMEOUT_SECONDS = 10;
 
+    /** Longest wait of a background job (Ai::structured with a longer timeout). */
+    public const MAX_TIMEOUT_SECONDS = 600;
+
+    /** Wait of the next call: TIMEOUT_SECONDS, or longer for a background job. */
+    public int $timeoutSeconds = self::TIMEOUT_SECONDS;
+
     /** Upper bound of the answer (a training sheet with 30 modules fits). */
     public const MAX_OUTPUT_TOKENS = 16000;
 
@@ -60,7 +66,7 @@ abstract class AiClient
                 ->asJson()
                 ->withHeaders($headers)
                 ->withOptions([...HostPolicy::pinned($url, $ips), 'progress' => self::sizeLimit($tooLarge)])
-                ->timeout(self::TIMEOUT_SECONDS)
+                ->timeout($this->timeoutSeconds)
                 ->connectTimeout(self::CONNECT_TIMEOUT_SECONDS)
                 ->withoutRedirecting()
                 ->post($url, $body);

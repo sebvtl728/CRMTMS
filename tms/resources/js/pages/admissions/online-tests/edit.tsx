@@ -20,6 +20,8 @@ interface EditProps {
         training_ids: string[];
         content: TestContent;
         published_version: number | null;
+        import_status: 'importing' | 'failed' | null;
+        import_error: string | null;
         published_at: string | null;
     };
     options: { das: Option[]; training_options: Option[] };
@@ -219,7 +221,22 @@ function QuestionEditor({
     );
 }
 
-export default function OnlineTestEdit({ test, options, status }: EditProps) {
+/**
+ * The page: while the PDF import runs it reloads every 5 s; the editor is
+ * remounted once the draft arrives (keyed on the import state).
+ */
+export default function OnlineTestEdit(props: EditProps) {
+    const importing = props.test.import_status === 'importing';
+    useEffect(() => {
+        if (!importing) return;
+        const timer = setInterval(() => router.reload({ only: ['test'] }), 5000);
+        return () => clearInterval(timer);
+    }, [importing]);
+
+    return <Editor key={props.test.import_status ?? 'ready'} {...props} />;
+}
+
+function Editor({ test, options, status }: EditProps) {
     const [title, setTitle] = useState(test.title);
     const [limit, setLimit] = useState(test.time_limit_minutes === null ? '' : String(test.time_limit_minutes));
     const [das, setDas] = useState<string[]>(test.das_ids);
@@ -297,7 +314,20 @@ export default function OnlineTestEdit({ test, options, status }: EditProps) {
                             : `Version ${test.published_version} publiée. Vos modifications restent en brouillon jusqu’à la prochaine publication ; un candidat garde toujours la version qu’il a ouverte.`
                     }
                 />
-                {message && <div className="text-sm font-medium text-green-700">{message}</div>}
+                {test.import_status === 'importing' && (
+                    <div className="flex items-center gap-2 rounded-md border border-blue-300 bg-blue-50 p-3 text-sm text-blue-900 dark:bg-blue-950 dark:text-blue-100">
+                        <LoaderCircle className="h-4 w-4 animate-spin" />
+                        Import du PDF en cours : l’intelligence artificielle prépare les questions (jusqu’à 10 minutes avec une IA locale). Cette page
+                        se met à jour toute seule ; vous pouvez travailler ailleurs en attendant.
+                    </div>
+                )}
+                {test.import_status === 'failed' && (
+                    <div className="rounded-md border border-red-300 bg-red-50 p-3 text-sm text-red-900 dark:bg-red-950 dark:text-red-100">
+                        Import du PDF impossible : {test.import_error ?? 'erreur inconnue'} Vous pouvez saisir le test à la main ci-dessous, ou
+                        réessayer depuis la liste des tests.
+                    </div>
+                )}
+                {message && test.import_status !== 'importing' && <div className="text-sm font-medium text-green-700">{message}</div>}
                 <InputError message={errors.content ?? errors.sections} />
 
                 <section className="grid gap-4 rounded-xl border p-4 sm:grid-cols-2">

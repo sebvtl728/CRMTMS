@@ -25,22 +25,40 @@ final class OnlineTestFromPdf
 
     public function __construct(private readonly Ai $ai, private readonly PdfText $pdf, private readonly OnlineTests $tests) {}
 
-    public function create(UploadedFile $file, User $by): OnlineTest
+    /**
+     * Reads the PDF now (refused at once when it is not one or has no
+     * text), creates the test « Import de … » and lets the AI draft it in
+     * the background (ImportOnlineTestFromPdf): a local AI may take minutes.
+     */
+    public function start(UploadedFile $file, User $by): OnlineTest
     {
         if (! $this->ai->configured()) {
             throw ValidationException::withMessages(['file' => self::NOT_CONFIGURED]);
         }
+        $name = mb_substr(trim($file->getClientOriginalName()) ?: 'PDF', 0, 150);
         $text = $this->pdf->extract($file);
-        try {
-            $answer = $this->ai->structured(self::system(), "Test papier :\n\n".$text->text, self::schema(), self::PURPOSE);
-        } catch (AiUnavailable|AiInvalidResponse $e) {
-            throw ValidationException::withMessages(['file' => $e->getMessage()]);
-        }
+        $test = $this->tests->create(['title' => 'Import de '.$name], $by);
+        $test->forceFill(['import_status' => OnlineTest::IMPORTING, 'import_error' => null])->save();
+        ImportOnlineTestFromPdf::dispatch($test->id, $text->text)->onQueue('imports')->afterCommit();
 
-        return $this->tests->create([
+        return $test;
+    }
+
+    /**
+     * The AI's draft of a paper test (in the background job).
+     *
+     * @return array{title: string, content: array<string, mixed>}
+     *
+     * @throws AiUnavailable|AiInvalidResponse
+     */
+    public function draft(string $text): array
+    {
+        $answer = $this->ai->structured(self::system(), "Test papier :\n\n".$text, self::schema(), self::PURPOSE, ImportOnlineTestFromPdf::AI_TIMEOUT_SECONDS);
+
+        return [
             'title' => mb_substr(trim((string) ($answer['title'] ?? '')) ?: 'Test importé', 0, 200),
             'content' => self::content($answer),
-        ], $by);
+        ];
     }
 
     private static function system(): string
@@ -49,7 +67,7 @@ final class OnlineTestFromPdf
             .'Rends les sections du test dans l\'ordre, avec pour chacune ses questions. Types : short_text (réponse courte), '
             .'long_text (réponse rédigée, texte à corriger), single_choice (une case parmi plusieurs), multiple_choice (plusieurs cases), '
             .'true_false (vrai ou faux), number (nombre à compléter), yes_no (oui ou non). Mets dans support_text le texte d\'appui '
-            .'(article, texte à corriger, tableau décrit en texte). Pour un calcul à plusieurs cases, crée une question number par case. '
+            .'(article, texte à corriger, tableau décrit en texte) en 3 000 caractères au plus. Pour un calcul à plusieurs cases, crée une question number par case. '
             .'Ne donne jamais les bonnes réponses : answer vaut toujours null. Écris en français, sans inventer de question.';
     }
 
@@ -74,7 +92,7 @@ final class OnlineTestFromPdf
                             'properties' => [
                                 'type' => ['type' => 'string', 'maxLength' => 30],
                                 'label' => ['type' => 'string', 'maxLength' => 2000],
-                                'support_text' => $text(20000),
+                                'support_text' => $text(3000),
                                 'choices' => ['type' => 'array', 'maxItems' => 20, 'items' => ['type' => 'string', 'maxLength' => 500]],
                                 'answer' => ['type' => ['string', 'boolean', 'null']],
                             ],

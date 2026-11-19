@@ -21,6 +21,8 @@ use Illuminate\Support\Facades\Auth;
  * @property array<string, mixed> $draft_content
  * @property int|null $time_limit_minutes
  * @property string|null $current_version_id
+ * @property string|null $import_status importing | failed (drafted from a PDF in the background)
+ * @property string|null $import_error
  * @property string|null $created_by
  * @property string|null $updated_by
  * @property Carbon|null $created_at
@@ -33,11 +35,15 @@ class OnlineTest extends Model
 
     public const MORPH_ALIAS = 'online_test';
 
+    public const IMPORTING = 'importing';
+
+    public const IMPORT_FAILED = 'failed';
+
     /** @var list<string> */
     protected array $auditIgnore = ['created_by', 'updated_by', 'draft_content'];
 
     /** @var list<string> */
-    protected $fillable = ['title', 'draft_content', 'time_limit_minutes'];
+    protected $fillable = ['title', 'draft_content', 'time_limit_minutes', 'import_status', 'import_error'];
 
     protected function casts(): array
     {

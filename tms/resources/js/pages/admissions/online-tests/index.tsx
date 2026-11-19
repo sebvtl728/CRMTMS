@@ -13,6 +13,7 @@ interface Row {
     id: string;
     title: string;
     published_version: number | null;
+    import_status: 'importing' | 'failed' | null;
     total_points: number | null;
     time_limit_minutes: number | null;
     updated_at: string | null;
@@ -45,7 +46,7 @@ function FromPdf() {
                 </Button>
             </div>
             {errors.file && <p className="text-sm text-red-600">{errors.file}</p>}
-            {processing && <p className="text-muted-foreground text-xs">Lecture du PDF par l’IA… cela peut prendre une minute.</p>}
+            {processing && <p className="text-muted-foreground text-xs">Envoi du PDF…</p>}
         </form>
     );
 }
@@ -107,7 +108,15 @@ export default function OnlineTestsIndex({ tests, status }: { tests: Row[]; stat
                                                 {t.title}
                                             </Link>
                                         </td>
-                                        <td className="px-3 py-2">{t.published_version === null ? 'Brouillon' : `Version ${t.published_version}`}</td>
+                                        <td className="px-3 py-2">
+                                            {t.import_status === 'importing'
+                                                ? 'Import en cours…'
+                                                : t.import_status === 'failed'
+                                                  ? 'Import impossible'
+                                                  : t.published_version === null
+                                                    ? 'Brouillon'
+                                                    : `Version ${t.published_version}`}
+                                        </td>
                                         <td className="px-3 py-2">{t.total_points ?? '—'}</td>
                                         <td className="px-3 py-2">{t.time_limit_minutes ? `${t.time_limit_minutes} min` : 'Libre'}</td>
                                         <td className="px-3 py-2">{formatDate(t.updated_at)}</td>

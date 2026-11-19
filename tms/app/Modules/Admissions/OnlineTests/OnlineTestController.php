@@ -32,6 +32,7 @@ class OnlineTestController extends Controller
                 'id' => $t->id,
                 'title' => $t->title,
                 'published_version' => $versions->get($t->current_version_id)?->number,
+                'import_status' => $t->import_status,
                 'total_points' => $versions->get($t->current_version_id)?->total_points,
                 'time_limit_minutes' => $t->time_limit_minutes,
                 'updated_at' => $t->updated_at?->toIso8601String(),
@@ -52,10 +53,10 @@ class OnlineTestController extends Controller
         $request->validate(['file' => PdfText::rules()], PdfText::messages());
         $file = $request->file('file');
         assert($file instanceof UploadedFile);
-        $test = $import->create($file, self::user($request));
+        $test = $import->start($file, self::user($request));
 
         return redirect("/admissions/online-tests/{$test->id}/edit")
-            ->with('status', 'Brouillon créé depuis le PDF : relisez les questions et ajoutez les bonnes réponses avant de publier.');
+            ->with('status', 'Import du PDF en cours : le brouillon apparaît ici dans quelques minutes.');
     }
 
     public function edit(Request $request, string $test): Response
@@ -72,6 +73,8 @@ class OnlineTestController extends Controller
                 'training_ids' => DB::table('online_test_trainings')->where('online_test_id', $model->id)->pluck('training_id')->map(fn ($id) => (string) $id)->all(),
                 'content' => $model->draft_content,
                 'published_version' => $version?->number,
+                'import_status' => $model->import_status,
+                'import_error' => $model->import_error,
                 'published_at' => $version?->created_at?->toIso8601String(),
             ],
             'options' => [

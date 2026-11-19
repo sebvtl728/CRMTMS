@@ -39,7 +39,7 @@ Le CERFA, le calcul NPEC et les échanges avec les OPCO ne sont pas gérés par 
 
 Menu **Formation › Tests en ligne** (droit « Gérer le catalogue ») : des tests de positionnement passés **à l'écran** par le candidat.
 
-- **Nouveau test** (titre), ou **Créer depuis un PDF** : l'intelligence artificielle de l'organisme (Administration › Connecteurs) lit un test papier et prépare les sections et les questions en **brouillon** — jamais les bonnes réponses, absentes du papier. Relisez, complétez, puis publiez.
+- **Nouveau test** (titre), ou **Créer depuis un PDF** : l'intelligence artificielle de l'organisme (Administration › Connecteurs) lit un test papier et prépare les sections et les questions en **brouillon**, **en tâche de fond** (jusqu'à 10 minutes avec une IA locale : la page affiche « Import en cours… » et se met à jour seule ; en cas d'échec, le motif s'affiche et le test reste saisissable à la main) — jamais les bonnes réponses, absentes du papier. Relisez, complétez, puis publiez.
 - **Éditeur** : sections (titre, consigne), questions — réponse courte, réponse rédigée, choix unique, choix multiple, vrai / faux, nombre à compléter, oui / non —, texte d'appui (texte à corriger, article), **bonne réponse** et **points** ; DAS et formations concernés ; durée limite (5 à 240 minutes, ou libre). Une question à bonne réponse se corrige seule (choix multiple : tout ou rien ; nombre : à la tolérance près, 0,01 par défaut) ; une réponse rédigée ou une question sans bonne réponse mais avec des points se note à la main ; sans points, c'est une question de profil.
 - **Publier** fige une **version** : un candidat répond toujours à la version qu'il a ouverte ; vos modifications suivantes restent en brouillon jusqu'à la publication suivante.
 
