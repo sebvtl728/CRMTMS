@@ -1,5 +1,6 @@
 <?php
 
+use App\Modules\Finance\Invoices\Invoice;
 use App\Modules\Finance\Invoices\InvoiceSending;
 use App\Modules\Finance\Settings\FinanceSettings;
 use Carbon\CarbonImmutable;
@@ -38,7 +39,7 @@ it('sends the level due once a day, without author', function () {
 
     // Failed meanwhile: the same level is due again, but not twice the same day.
     $sending->forceFill(['status' => 'failed'])->save();
-    App\Modules\Finance\Invoices\Invoice::query()->whereKey($invoice->id)->toBase()->update(['email_status' => 'failed']);
+    Invoice::query()->whereKey($invoice->id)->toBase()->update(['email_status' => 'failed']);
     $this->artisan('tms:finance:remind')->expectsOutput('Relances envoyées : 0.')->assertSuccessful();
     $this->travelTo(CarbonImmutable::parse('2026-12-25 08:30', 'Europe/Paris'));
     $this->artisan('tms:finance:remind')->expectsOutput('Relances envoyées : 1.')->assertSuccessful();

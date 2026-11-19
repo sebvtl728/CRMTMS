@@ -1,6 +1,8 @@
 <?php
 
 use App\Exceptions\UserFacingHttpException;
+use App\Modules\Core\Users\User;
+use App\Modules\Crm\People\Person;
 use App\Modules\Finance\Invoices\Invoice;
 use App\Modules\Finance\Invoices\InvoiceDrafts;
 use App\Modules\Finance\Invoices\InvoiceStatus;
@@ -35,7 +37,7 @@ function partDossier(?string $signed, bool $particulier = true): Dossier
 }
 
 /** A contractor draft of one free line of 100 € on the dossier. */
-function partDraft(Dossier $dossier, App\Modules\Core\Users\User $user): Invoice
+function partDraft(Dossier $dossier, User $user): Invoice
 {
     $draft = app(InvoiceDrafts::class)->manual($user, $dossier->id, 'contractor');
 
@@ -44,7 +46,7 @@ function partDraft(Dossier $dossier, App\Modules\Core\Users\User $user): Invoice
     ]]]);
 }
 
-function partUser(): App\Modules\Core\Users\User
+function partUser(): User
 {
     return fiManager([Permissions::VALIDATE => null]);
 }
@@ -82,7 +84,7 @@ it('leaves an entreprise contractant alone', function () {
 it('caps the first instalment of a particulier at 30 %, after the withdrawal delay', function () {
     $dossier = partDossier('2026-11-10');
     $session = plSession('2026-12-01', '2027-03-31');
-    l2Enrol($dossier, $session, App\Modules\Crm\People\Person::query()->findOrFail($dossier->account_person_id));
+    l2Enrol($dossier, $session, Person::query()->findOrFail($dossier->account_person_id));
     $errors = function (array $schedule) use ($dossier): array {
         try {
             app(BillingPlans::class)->save($dossier->id, ['rhythm' => 'schedule', 'basis' => 'planned', 'schedule' => $schedule]);

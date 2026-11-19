@@ -1,5 +1,6 @@
 <?php
 
+use App\Modules\Core\Access\Role;
 use App\Modules\Core\References\ReferenceItem;
 use App\Modules\Core\References\ReferenceList;
 use App\Modules\Finance\Payments\Payment;
@@ -60,6 +61,6 @@ it('defaults the reminder levels to 7, 30 and 60 days, automatic reminders off',
 it('declares the unscoped payments right, granted to the administrator and the direction', function () {
     expect(Permissions::all())->toContain(Permissions::PAYMENTS)
         ->and(App\Modules\Core\Access\Permissions::isScoped(Permissions::PAYMENTS))->toBeFalse()
-        ->and(Permissions::defaultsFor(App\Modules\Core\Access\Role::Direction))->toContain(Permissions::PAYMENTS)
-        ->and(Permissions::defaultsFor(App\Modules\Core\Access\Role::Assistant))->not->toContain(Permissions::PAYMENTS);
+        ->and(Permissions::defaultsFor(Role::Direction))->toContain(Permissions::PAYMENTS)
+        ->and(Permissions::defaultsFor(Role::Assistant))->not->toContain(Permissions::PAYMENTS);
 });

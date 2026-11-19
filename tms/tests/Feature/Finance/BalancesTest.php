@@ -6,6 +6,7 @@ use App\Modules\Finance\Payments\Balances;
 use App\Modules\Finance\Payments\PaymentAllocation;
 use App\Modules\Finance\Payments\PaymentStatus;
 use Carbon\CarbonImmutable;
+use Illuminate\Support\Facades\DB;
 
 require_once __DIR__.'/../Sessions/Support/lot2a.php';
 require_once __DIR__.'/../Sessions/Support/planning.php';
@@ -80,8 +81,8 @@ it('reads the balances of many invoices in a fixed number of queries', function 
     $second = paySecondInvoice($invoice, $user, 5000);
     PaymentAllocation::query()->count();
 
-    Illuminate\Support\Facades\DB::enableQueryLog();
+    DB::enableQueryLog();
     $balances = Balances::of([$invoice->id, $second->id]);
-    expect(count(Illuminate\Support\Facades\DB::getQueryLog()))->toBeLessThanOrEqual(3)
+    expect(count(DB::getQueryLog()))->toBeLessThanOrEqual(3)
         ->and($balances[$second->id]['ttc_cents'])->toBe(5000);
 });

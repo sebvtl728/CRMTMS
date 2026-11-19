@@ -12,6 +12,8 @@ use App\Modules\Finance\Invoices\InvoiceValidator;
 use App\Modules\Finance\Payments\Payment;
 use App\Modules\Finance\Payments\Payments;
 use App\Modules\Finance\Permissions;
+use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Str;
 
 /*
  * Fixtures of the payments and reminders tests (0.9.1). Needs
@@ -23,7 +25,7 @@ use App\Modules\Finance\Permissions;
 function payGotenberg(): void
 {
     config(['documents.gotenberg_url' => 'http://gotenberg:3000']);
-    Illuminate\Support\Facades\Http::fake(['gotenberg:3000/*' => Illuminate\Support\Facades\Http::response('%PDF-1.7 facture', 200, ['Content-Type' => 'application/pdf'])]);
+    Http::fake(['gotenberg:3000/*' => Http::response('%PDF-1.7 facture', 200, ['Content-Type' => 'application/pdf'])]);
 }
 
 /**
@@ -71,7 +73,7 @@ function payPaymentRow(array $over = []): array
     return [
         'company_id' => Company::query()->where('is_default', true)->value('id'),
         'payer_type' => 'organisation',
-        'payer_id' => Organisation::query()->value('id') ?? (string) Illuminate\Support\Str::uuid7(),
+        'payer_id' => Organisation::query()->value('id') ?? (string) Str::uuid7(),
         'received_on' => '2026-11-18',
         'amount_cents' => 1000,
         'method_id' => payMethod(),

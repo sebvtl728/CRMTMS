@@ -1,7 +1,9 @@
 <?php
 
 use App\Modules\Core\Audit\AuditLog;
+use App\Modules\Core\Companies\Company;
 use App\Modules\Crm\Organisations\Organisation;
+use App\Modules\Crm\Public\FicheLinks;
 use App\Modules\Finance\Invoices\CreditNotes;
 use App\Modules\Finance\Invoices\Invoice;
 use App\Modules\Finance\Payments\Balances;
@@ -10,6 +12,7 @@ use App\Modules\Finance\Payments\PaymentAllocation;
 use App\Modules\Finance\Payments\Payments;
 use App\Modules\Finance\Payments\PaymentStatus;
 use Carbon\CarbonImmutable;
+use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 
 require_once __DIR__.'/../Sessions/Support/lot2a.php';
@@ -69,7 +72,7 @@ it('refuses an invoice of another payer', function () {
 
 it('refuses an invoice of another company', function () {
     [$invoice, , $user] = payInvoice();
-    $company = App\Modules\Core\Companies\Company::query()->create(['name' => 'Autre société', 'vat_regime' => 'exempt']);
+    $company = Company::query()->create(['name' => 'Autre société', 'vat_regime' => 'exempt']);
 
     expect(payError(fn () => payRecord($user, $invoice, 100, ['company_id' => $company->id]), 'allocations.0.invoice_id'))
         ->toBe(Payments::OTHER_COMPANY);
@@ -100,7 +103,7 @@ it('refuses a payment received in the future', function () {
 it('refuses an unknown payer', function () {
     [$invoice, , $user] = payInvoice();
 
-    expect(payError(fn () => payRecord($user, $invoice, 100, ['payer_id' => (string) Illuminate\Support\Str::uuid7(), 'allocations' => []]), 'payer_id'))
+    expect(payError(fn () => payRecord($user, $invoice, 100, ['payer_id' => (string) Str::uuid7(), 'allocations' => []]), 'payer_id'))
         ->toBe('Choisissez le payeur.');
 });
 
@@ -173,7 +176,7 @@ it('clears the notes and the reference of the payments of an anonymised person',
     $hisPayment = payRecord($user, $invoice, 5000, ['payer_type' => 'person', 'payer_id' => $paul->id, 'allocations' => [], 'notes' => 'Payé en deux fois', 'reference' => 'CHQ 123']);
     $company = payRecord($user, $invoice, 5000, ['notes' => 'Virement groupé']);
 
-    App\Modules\Crm\Public\FicheLinks::anonymise([$paul->id]);
+    FicheLinks::anonymise([$paul->id]);
 
     expect($hisPayment->refresh()->only(['notes', 'reference', 'amount_cents']))->toBe(['notes' => null, 'reference' => null, 'amount_cents' => 5000])
         ->and($company->refresh()->notes)->toBe('Virement groupé')

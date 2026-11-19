@@ -1,12 +1,14 @@
 <?php
 
 use App\Modules\Core\Audit\AuditLog;
+use App\Modules\Core\Users\User;
 use App\Modules\Finance\Invoices\InvoiceSending;
 use App\Modules\Finance\Permissions;
 use App\Modules\Finance\Reminders\ReminderPause;
 use App\Modules\Finance\Settings\FinanceSettings;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\Queue;
+use Illuminate\Testing\TestResponse;
 use Inertia\Testing\AssertableInertia as Assert;
 
 require_once __DIR__.'/../Sessions/Support/lot2a.php';
@@ -22,7 +24,7 @@ beforeEach(function () {
 });
 
 /** The page a month and a week later, with a fresh session. */
-function remindPage(App\Modules\Core\Users\User $user): Illuminate\Testing\TestResponse
+function remindPage(User $user): TestResponse
 {
     test()->travelTo(CarbonImmutable::parse('2026-12-24 10:00', 'Europe/Paris'));
 

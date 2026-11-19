@@ -29,14 +29,14 @@ it('prefills the form from an invoice', function () {
 
     $this->actingAs($user)->get('/finance/payments/create?invoice='.$invoice->id)
         ->assertOk()->assertInertia(fn (Assert $p) => $p->component('finance/payments/form')
-            ->where('payment.payer.id', $invoice->recipient_id)
-            ->where('payment.payer.label', 'Hôtel du Parc')
-            ->where('payment.company_id', $invoice->company_id)
-            ->where('payment.amount', '171,43')
-            ->where('payment.allocations.0.invoice_id', $invoice->id)
-            ->where('payment.allocations.0.amount', '171,43')
-            ->has('open_invoices', 1)
-            ->has('options.methods', 5));
+        ->where('payment.payer.id', $invoice->recipient_id)
+        ->where('payment.payer.label', 'Hôtel du Parc')
+        ->where('payment.company_id', $invoice->company_id)
+        ->where('payment.amount', '171,43')
+        ->where('payment.allocations.0.invoice_id', $invoice->id)
+        ->where('payment.allocations.0.amount', '171,43')
+        ->has('open_invoices', 1)
+        ->has('options.methods', 5));
 });
 
 it('records a payment from an invoice and goes back to it', function () {
@@ -63,13 +63,13 @@ it('shows the payments of an invoice to who reads it, without the notes', functi
 
     $this->actingAs($reader)->get('/finance/invoices/'.$invoice->id)
         ->assertOk()->assertInertia(fn (Assert $p) => $p
-            ->where('balance.paid_cents', 10000)
-            ->where('balance.remaining_cents', 7143)
-            ->where('balance.status_label', 'Partiellement réglée')
-            ->where('payments.0.amount_cents', 10000)
-            ->where('payments.0.method', 'Virement')
-            ->missing('payments.0.notes')
-            ->where('can.record_payment', false));
+        ->where('balance.paid_cents', 10000)
+        ->where('balance.remaining_cents', 7143)
+        ->where('balance.status_label', 'Partiellement réglée')
+        ->where('payments.0.amount_cents', 10000)
+        ->where('payments.0.method', 'Virement')
+        ->missing('payments.0.notes')
+        ->where('can.record_payment', false));
     $this->actingAs($user)->get('/finance/invoices/'.$invoice->id)
         ->assertInertia(fn (Assert $p) => $p->where('can.record_payment', true));
 });
@@ -80,8 +80,8 @@ it('edits and deletes a payment', function () {
 
     $this->actingAs($user)->get('/finance/payments/'.$payment->id.'/edit')
         ->assertOk()->assertInertia(fn (Assert $p) => $p->component('finance/payments/form')
-            ->where('payment.id', $payment->id)->where('payment.amount', '100,00')
-            ->where('open_invoices.0.remaining_cents', 17143));
+        ->where('payment.id', $payment->id)->where('payment.amount', '100,00')
+        ->where('open_invoices.0.remaining_cents', 17143));
 
     $this->actingAs($user)->delete('/finance/payments/'.$payment->id)
         ->assertRedirect('/finance/payments')->assertSessionHas('status', 'Règlement supprimé.');

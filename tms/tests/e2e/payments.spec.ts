@@ -12,7 +12,13 @@ async function xsrf(context: BrowserContext): Promise<string> {
 }
 
 /** A form request as the signed-in user; returns the final URL. */
-async function send(context: BrowserContext, request: APIRequestContext, method: 'post' | 'put', url: string, data: Record<string, unknown>): Promise<string> {
+async function send(
+    context: BrowserContext,
+    request: APIRequestContext,
+    method: 'post' | 'put',
+    url: string,
+    data: Record<string, unknown>,
+): Promise<string> {
     const response = await request[method](url, {
         data,
         headers: { 'X-XSRF-TOKEN': await xsrf(context), 'X-Requested-With': 'XMLHttpRequest', Accept: 'text/html' },
@@ -22,8 +28,15 @@ async function send(context: BrowserContext, request: APIRequestContext, method:
     return response.url();
 }
 
+/** What the test reads of the Inertia props (dossier form, invoice page). */
+interface PageProps {
+    defaults: { company_id: string };
+    options: { das: { value: string }[] };
+    invoice: { lines: Record<string, string>[] };
+}
+
 /** The Inertia props of the page shown. */
-async function props(page: Page): Promise<Record<string, any>> {
+async function props(page: Page): Promise<PageProps> {
     return page.evaluate(() => JSON.parse(document.getElementById('app')?.dataset.page ?? '{}').props);
 }
 
@@ -34,7 +47,12 @@ async function choose(page: Page, trigger: Locator, option: string): Promise<voi
 
 test('a validated invoice is paid from its page and becomes « Soldée »', async ({ browser }) => {
     expect(existsSync(ADMIN_STATE), 'run admin.spec.ts first (it signs the administrator in)').toBe(true);
-    const context = await browser.newContext({ storageState: ADMIN_STATE, locale: 'fr-FR', timezoneId: 'Europe/Paris', viewport: { width: 1400, height: 1000 } });
+    const context = await browser.newContext({
+        storageState: ADMIN_STATE,
+        locale: 'fr-FR',
+        timezoneId: 'Europe/Paris',
+        viewport: { width: 1400, height: 1000 },
+    });
     const page = await context.newPage();
 
     // A client, a dossier of one fee line, a draft invoice of 120 € made by hand.
@@ -55,7 +73,14 @@ test('a validated invoice is paid from its page and becomes « Soldée »', asyn
     await send(context, page.request, 'put', new URL(draftUrl).pathname, {
         notes: null,
         lines: [
-            ...draft.invoice.lines.map((l: Record<string, string>) => ({ id: l.id, label: l.label, quantity: l.quantity, unit: l.unit, unit_price: '0', vat_rate: l.vat_rate })),
+            ...draft.invoice.lines.map((l) => ({
+                id: l.id,
+                label: l.label,
+                quantity: l.quantity,
+                unit: l.unit,
+                unit_price: '0',
+                vat_rate: l.vat_rate,
+            })),
             { label: 'Frais de dossier E2E', quantity: '1', unit: 'forfait', unit_price: '120,00', vat_rate: '0' },
         ],
     });
