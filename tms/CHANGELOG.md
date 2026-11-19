@@ -5,6 +5,11 @@ Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) ; ve
 
 ## [Non publié]
 
+### Corrigé
+
+- Admissions : le bloc « Informations complémentaires » (champs personnalisés) s'affiche dès l'ouverture de la
+  candidature, et non plus seulement à partir de l'entretien.
+
 ## [0.9.2] - 2026-11-19
 
 Admissions : parcours Alternance / Stagiaire, tests de positionnement (PDF par DAS ou formation, lien personnel, test en
