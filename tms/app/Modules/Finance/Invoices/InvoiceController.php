@@ -11,7 +11,11 @@ use App\Modules\Core\Exports\CsvExporter;
 use App\Modules\Core\Exports\XlsxExporter;
 use App\Modules\Core\Tenancy\TenantStorage;
 use App\Modules\Core\Users\User;
+use App\Modules\Core\References\ReferenceItem;
 use App\Modules\Finance\Integrity;
+use App\Modules\Finance\Payments\Balances;
+use App\Modules\Finance\Payments\Payment;
+use App\Modules\Finance\Payments\PaymentAllocation;
 use App\Modules\Finance\Permissions;
 use App\Modules\Sessions\Public\Billing;
 use Illuminate\Database\Eloquent\Builder;
@@ -146,7 +150,10 @@ class InvoiceController extends Controller
                 'validate' => $invoice->isDraft() && $this->validates($request, $invoice),
                 'credit_note' => ! $invoice->isDraft() && $invoice->kind === Invoice::INVOICE && $this->manages($request, $invoice),
                 'send' => $canSend,
+                'record_payment' => $invoice->kind === Invoice::INVOICE && ! $invoice->isDraft() && $request->user()?->can(Permissions::PAYMENTS) === true,
             ],
+            'balance' => $this->balance($invoice),
+            'payments' => $this->payments($invoice),
             'email' => $invoice->isDraft() ? null : [
                 'status' => $invoice->email_status,
                 'sent_at' => $invoice->sent_at?->toIso8601String(),
@@ -154,6 +161,53 @@ class InvoiceController extends Controller
                 'sendings' => $this->sendings($invoice),
             ],
         ]);
+    }
+
+    /**
+     * What is paid and left on an issued invoice; null for a draft or a credit note.
+     *
+     * @return array<string, mixed>|null
+     */
+    private function balance(Invoice $invoice): ?array
+    {
+        $b = Balances::one($invoice);
+
+        return $b === null ? null : [
+            'ttc_cents' => $b['ttc_cents'],
+            'credited_cents' => $b['credited_cents'],
+            'paid_cents' => $b['paid_cents'],
+            'remaining_cents' => $b['remaining_cents'],
+            'status' => $b['status']->value,
+            'status_label' => $b['status']->label(),
+            'overdue' => $b['overdue'],
+            'overpaid' => $b['overpaid'],
+        ];
+    }
+
+    /**
+     * The payments settling an invoice, oldest first (never their notes).
+     *
+     * @return list<array<string, mixed>>
+     */
+    private function payments(Invoice $invoice): array
+    {
+        $allocations = PaymentAllocation::query()->where('invoice_id', $invoice->id)->get();
+        $payments = Payment::query()->whereKey($allocations->pluck('payment_id')->all())->get()->keyBy('id');
+        $methods = ReferenceItem::withTrashed()->whereKey($payments->pluck('method_id')->unique()->values()->all())->pluck('label', 'id');
+
+        return $allocations->map(function (PaymentAllocation $a) use ($payments, $methods): array {
+            $p = $payments[$a->payment_id];
+
+            return [
+                'id' => $p->id,
+                'received_on' => $p->received_on->toDateString(),
+                'method' => $methods[$p->method_id] ?? '—',
+                'reference' => $p->reference,
+                'amount_cents' => $a->amount_cents,
+                'payment_cents' => $p->amount_cents,
+                'url' => '/finance/payments/'.$p->id.'/edit',
+            ];
+        })->sortBy('received_on')->values()->all();
     }
 
     /**

@@ -1,4 +1,5 @@
 import { InvoiceSendDialog, type InvoiceMessageDefaults } from '@/components/finance/invoice-send-dialog';
+import { PaymentsPanel, type InvoiceBalance, type InvoicePayment } from '@/components/finance/payments-panel';
 import Heading from '@/components/heading';
 import InputError from '@/components/input-error';
 import { Badge } from '@/components/ui/badge';
@@ -64,8 +65,10 @@ interface EmailState {
 interface ShowProps {
     invoice: InvoicePage;
     options: { units: Option[]; vat_rates: Option[]; vat_exempt: boolean };
-    can: { update: boolean; validate: boolean; credit_note: boolean; send: boolean };
+    can: { update: boolean; validate: boolean; credit_note: boolean; send: boolean; record_payment: boolean };
     email: EmailState | null;
+    balance: InvoiceBalance | null;
+    payments: InvoicePayment[];
     status?: string;
 }
 
@@ -472,7 +475,7 @@ function EmailPanel({ invoice, email, canSend }: { invoice: InvoicePage; email: 
     );
 }
 
-export default function InvoiceShow({ invoice, options, can, email, status }: ShowProps) {
+export default function InvoiceShow({ invoice, options, can, email, balance, payments, status }: ShowProps) {
     const { errors } = usePage<{ errors: Record<string, string> }>().props;
     const breadcrumbs: BreadcrumbItem[] = [
         { title: 'Factures', href: '/finance/invoices' },
@@ -546,6 +549,8 @@ export default function InvoiceShow({ invoice, options, can, email, status }: Sh
                         </div>
                     )}
                 </dl>
+
+                {balance && <PaymentsPanel invoiceId={invoice.id} balance={balance} payments={payments} canRecord={can.record_payment} />}
 
                 {email && <EmailPanel invoice={invoice} email={email} canSend={can.send} />}
 

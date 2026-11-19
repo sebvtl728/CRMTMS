@@ -4,6 +4,7 @@ import { Sidebar, SidebarContent, SidebarFooter, SidebarHeader, SidebarMenu, Sid
 import { type NavItem, type SharedData } from '@/types';
 import { Link, usePage } from '@inertiajs/react';
 import {
+    Banknote,
     BookOpen,
     Building2,
     Calculator,
@@ -71,6 +72,7 @@ const trainingNavItems: (NavItem & { permission: string })[] = [
 const financeNavItems: (NavItem & { permission: string })[] = [
     { title: 'À facturer', url: '/finance/to-invoice', icon: Calculator, permission: 'finance.invoices.view' },
     { title: 'Factures', url: '/finance/invoices', icon: ReceiptEuro, permission: 'finance.invoices.view' },
+    { title: 'Règlements', url: '/finance/payments', icon: Banknote, permission: 'finance.payments.manage' },
     { title: 'Réglages de facturation', url: '/finance/settings', icon: Settings2, permission: 'settings.manage' },
 ];
 
