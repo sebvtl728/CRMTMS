@@ -441,13 +441,8 @@ export default function CandidatureShow({ candidature: c, custom_fields, history
                             ) : (
                                 c.positioning_sent_on && <Suggest c={c} to="positioning_sent" label="Test envoyé" canUpdate={can.update} />
                             )}
-                            <CandidatureFiles
-                                candidatureId={c.id}
-                                kind="positioning"
-                                files={c.files}
-                                canUpdate={can.update}
-                                label="Joindre le test"
-                            />
+                            {/* The copies the candidate deposited through his link (no manual upload here). */}
+                            <CandidatureFiles candidatureId={c.id} kind="positioning" files={c.files} canUpdate={can.update} allowUpload={false} />
                             {!showInterview && (
                                 <p className="text-muted-foreground text-xs">
                                     Le test est obligatoire : l’entretien s’ouvre une fois la date de réception enregistrée (ou la copie du candidat

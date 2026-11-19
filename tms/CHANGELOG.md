@@ -30,7 +30,7 @@ Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) ; ve
 ### Modifié
 
 - Admissions : le **test de positionnement est obligatoire** — Entretien et Admis exigent sa date de réception ; le
-  bouton « Passer le test » est retiré.
+  bouton « Passer le test » est retiré, comme « Joindre le test » (les copies déposées par le candidat restent affichées).
 - Menu : **Candidats** passe dans **Formation**, au-dessus de Dossiers.
 - Admissions : l'onglet **Apprenants** devient **Stagiaires**, le badge « Apprenant » devient « Stagiaire ».
 - **Mention d'exonération de TVA** des devis et factures, alignée sur l'expert-comptable : « Exonération de TVA, art. 261,

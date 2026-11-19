@@ -95,12 +95,15 @@ export function CandidatureFiles({
     files,
     canUpdate,
     label = 'Ajouter un fichier',
+    allowUpload = true,
 }: {
     candidatureId: string;
     kind: string;
     files: CandidatureFileRow[];
     canUpdate: boolean;
     label?: string;
+    /** false: the files are listed (and removable) but none is added here. */
+    allowUpload?: boolean;
 }) {
     const input = useRef<HTMLInputElement>(null);
     const [error, setError] = useState<string | undefined>();
@@ -147,7 +150,7 @@ export function CandidatureFiles({
                     ))}
                 </ul>
             )}
-            {canUpdate && (
+            {canUpdate && allowUpload && (
                 <div>
                     <input
                         ref={input}
