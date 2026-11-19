@@ -102,6 +102,10 @@ it('downloads the copy of the candidate as a pdf: answers, right answers, points
     expect($response->headers->get('Content-Type'))->toContain('application/pdf')
         ->and($response->headers->get('Content-Disposition'))->toContain('test-'.$c->number.'.pdf');
 
+    // The preview shows it in the page (inline), the download saves it.
+    $this->get("/admissions/candidatures/{$c->id}/online-attempts/{$attempt->id}/pdf?apercu=1")->assertOk()
+        ->assertHeader('Content-Disposition', 'inline; filename="test-'.$c->number.'.pdf"');
+
     expect(otPdfHtml())->toContain('Test tertiaire')->toContain('Léa Durand')->toContain($c->number)
         ->toContain('Que signifie TVA ?')->toContain('Taxe sur la valeur ajoutée')
         ->toContain('30 jours ouvrables')->toContain('8 / 20')->toContain('1 sortie de la page');

@@ -96,6 +96,11 @@ test('an online positioning test: written, published, passed on a computer, grad
     // Back on the candidature: the score.
     await page.reload();
     await expect(positioning.getByText('2 / 2').first()).toBeVisible();
+    // The preview opens the copy in a new tab; only then the download is offered.
+    await expect(positioning.getByRole('link', { name: 'Télécharger' })).toHaveCount(0);
+    const [preview] = await Promise.all([page.waitForEvent('popup'), positioning.getByRole('button', { name: 'Aperçu du PDF' }).click()]);
+    await preview.close();
+    await expect(positioning.getByRole('link', { name: 'Télécharger' })).toBeVisible();
 
     await context.close();
 });
