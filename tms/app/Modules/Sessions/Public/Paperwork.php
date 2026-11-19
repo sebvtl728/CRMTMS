@@ -106,7 +106,7 @@ final class Paperwork
                 'place' => self::place($session),
                 'cancelled' => $session->isCancelled(),
             ],
-            'seances' => $seances->map(fn (Seance $s) => [
+            'schedule' => $seances->map(fn (Seance $s) => [
                 'date' => $s->date->toDateString(),
                 'starts_at' => substr($s->starts_at, 0, 5),
                 'ends_at' => substr($s->ends_at, 0, 5),

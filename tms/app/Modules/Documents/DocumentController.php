@@ -25,7 +25,7 @@ class DocumentController extends Controller
         $user = self::user($request);
         abort_unless(Str::isUuid($dossierId) && Paperwork::allows($user, Permissions::VIEW, $dossierId), 404);
         abort_unless(Paperwork::allows($user, Permissions::MANAGE, $dossierId), 403);
-        $values = $request->validate(['type' => ['required', Rule::enum(DocumentType::class)]], ['type.*' => 'Type de document inconnu.']);
+        $values = $request->validate(['type' => ['required', Rule::in([DocumentType::Convention->value, DocumentType::Contract->value])]], ['type.*' => 'Type de document inconnu.']);
 
         $type = DocumentType::from($values['type']);
         $document = $issuer->issue($user, $type, $dossierId);

@@ -101,3 +101,22 @@ function docSmtp(Closure $send): ConnectorConfig
         'secrets' => ['username' => 'cap-user', 'password' => 's3cret'],
     ]);
 }
+
+/**
+ * A finished session (2–4 November 2026, two séances of 3 h 30) of the
+ * « Hôtel du Parc » dossier with Léa (who has an e-mail) and Tom.
+ *
+ * @return array{dossier: App\Modules\Sessions\Dossiers\Dossier, session: App\Modules\Sessions\Sessions\TrainingSession, lea: App\Modules\Sessions\Enrolments\Enrolment, tom: App\Modules\Sessions\Enrolments\Enrolment}
+ */
+function docFinishedSession(): array
+{
+    $dossier = l2Dossier();
+    $session = l2Session(null, ['starts_on' => '2026-11-02', 'ends_on' => '2026-11-04', 'planned_hours' => '7', 'location_kind' => 'address', 'location_text' => 'Salle B, Nantes']);
+    $module = plModule($session);
+    plSeance($module, '2026-11-02', '09:00', '12:30');
+    plSeance($module, '2026-11-03', '13:30', '17:00');
+    $lea = l2Enrol($dossier, $session, makePerson('Durand', ['first_name' => 'Léa', 'email' => 'lea.durand@example.test']));
+    $tom = l2Enrol($dossier, $session, makePerson('Petit', ['first_name' => 'Tom']));
+
+    return ['dossier' => $dossier->fresh(), 'session' => $session, 'lea' => $lea, 'tom' => $tom];
+}

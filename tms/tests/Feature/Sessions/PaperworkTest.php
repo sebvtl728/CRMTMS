@@ -74,7 +74,7 @@ it('gives an enrolment with its session, séances and realised hours for the doc
     expect($data)->toMatchArray(['id' => $lea->id, 'dossier_id' => $dossier->id, 'person_id' => $lea->person_id, 'entered_on' => '2026-11-02', 'left_on' => null, 'planned_minutes' => 420])
         ->and($data['realised_minutes'])->toBeInt()
         ->and($data['session'])->toMatchArray(['id' => $session->id, 'starts_on' => '2026-11-02', 'ends_on' => '2026-11-04', 'place' => 'Salle B, Nantes', 'cancelled' => false])
-        ->and($data['seances'])->toBe([
+        ->and($data['schedule'])->toBe([
             ['date' => '2026-11-02', 'starts_at' => '09:00', 'ends_at' => '12:30', 'place' => null],
             ['date' => '2026-11-03', 'starts_at' => '13:30', 'ends_at' => '17:00', 'place' => 'Atelier'],
         ]);

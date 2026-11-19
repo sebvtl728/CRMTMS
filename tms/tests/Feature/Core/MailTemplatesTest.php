@@ -25,7 +25,7 @@ it('lists the editable templates and the system ones, read only', function () {
 
     $this->get('/admin/mail-templates')->assertOk()->assertInertia(fn (Assert $page) => $page
         ->component('admin/mail-templates/index')
-        ->where('templates', fn ($t) => collect($t)->where('editable', true)->pluck('key')->sort()->values()->all() === ['activity_assigned', 'brochure', 'crm.daily_digest', 'document_contract', 'document_convention', 'invoice', 'invoice_reminder_1', 'invoice_reminder_2', 'invoice_reminder_3', 'positioning_test', 'quote.remind', 'quote.send', 'users.invitation'])
+        ->where('templates', fn ($t) => collect($t)->where('editable', true)->pluck('key')->sort()->values()->all() === ['activity_assigned', 'brochure', 'crm.daily_digest', 'document_completion_certificate', 'document_contract', 'document_convention', 'document_convocation', 'document_realisation_certificate', 'invoice', 'invoice_reminder_1', 'invoice_reminder_2', 'invoice_reminder_3', 'positioning_test', 'quote.remind', 'quote.send', 'users.invitation'])
         ->where('templates', fn ($t) => collect($t)->where('editable', false)->pluck('key')->contains('auth.password_reset')));
 
     $this->get('/admin/mail-templates/quote.send')->assertOk()->assertInertia(fn (Assert $page) => $page

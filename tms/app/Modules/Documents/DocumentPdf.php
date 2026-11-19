@@ -74,17 +74,7 @@ class DocumentPdf
             'title' => $type->label(),
             'number' => $number,
             'issued_on' => $issuedAt->setTimezone('Europe/Paris')->format('d/m/Y'),
-            'company' => [
-                'name' => $company->name,
-                'logo' => $this->branding->logoDataUri($company),
-                'signature' => $this->branding->signatureDataUri($company),
-                'address' => array_values(array_filter([$company->address_line1, $company->address_line2,
-                    trim(($company->address_postal_code ?? '').' '.($company->address_city ?? ''))], fn (?string $l) => $l !== null && trim($l) !== '')),
-                'siret' => $company->siret,
-                'nda_number' => $company->nda_number,
-                'legal' => LegalMentions::for($company),
-                'vat_notice' => $exempt ? LegalMentions::vatExemptionNotice($issuedAt) : null,
-            ],
+            'company' => $this->companyData($company, $issuedAt),
             'recipient' => $recipient,
             'dossier_number' => $dossier['number'],
             'lines' => array_map(fn (array $l) => ['label' => $l['label'], 'total' => self::euros((int) $l['total_cents'])], $dossier['lines']),
@@ -97,6 +87,101 @@ class DocumentPdf
                 'text' => DocumentTexts::fill($text, $values),
             ])->values()->all(),
         ])->render();
+    }
+
+    /**
+     * A per-trainee document (convocation, attestation, ministry certificate).
+     *
+     * @param  array<string, mixed>  $enrolment  Paperwork::enrolment()
+     * @param  array<string, mixed>  $dossier  Paperwork::dossier()
+     * @param  array<string, mixed>  $recipient
+     */
+    public function renderForEnrolment(DocumentType $type, array $enrolment, array $dossier, Company $company, string $number, CarbonImmutable $issuedAt, array $recipient): string
+    {
+        return $this->renderer->fromHtml(
+            $this->htmlForEnrolment($type, $enrolment, $dossier, $company, $number, $issuedAt, $recipient),
+            view('documents.document-footer', ['label' => $type->label().' '.$number])->render(),
+        );
+    }
+
+    /**
+     * @param  array<string, mixed>  $enrolment
+     * @param  array<string, mixed>  $dossier
+     * @param  array<string, mixed>  $recipient
+     */
+    public function htmlForEnrolment(DocumentType $type, array $enrolment, array $dossier, Company $company, string $number, CarbonImmutable $issuedAt, array $recipient): string
+    {
+        $session = $enrolment['session'];
+        $from = $enrolment['entered_on'] ?? $session['starts_on'];
+        $to = $enrolment['left_on'] ?? $session['ends_on'];
+        $training = implode(' ; ', array_map(fn (array $l) => $l['label'], array_filter($dossier['lines'], fn (array $l) => $l['kind'] === 'training' && $l['training_id'] === $session['training_id'])))
+            ?: $session['label'];
+        $contractor = $dossier['contractor']['type'] === 'organisation'
+            ? ($this->fiches->billingIdentity('organisation', $dossier['contractor']['id'])['name'] ?? null) : null;
+        $planned = $enrolment['planned_minutes'] === null ? null : self::hours((int) $enrolment['planned_minutes']);
+        $values = [
+            '{stagiaire}' => (string) $recipient['name'],
+            '{stagiaires}' => (string) $recipient['name'],
+            '{formation}' => $training,
+            '{dates}' => self::period($session['starts_on'], $session['ends_on']),
+            '{duree}' => $planned ?? 'la durée indiquée au programme',
+            '{lieu}' => $session['place'] ?? 'le lieu indiqué ci-dessous',
+            '{prix}' => '',
+            '{contractant}' => $contractor ?? (string) $recipient['name'],
+            '{societe}' => $company->name,
+            '{numero_dossier}' => (string) $dossier['number'],
+            '{heures_realisees}' => self::hours((int) $enrolment['realised_minutes']),
+            '{date_entree}' => CarbonImmutable::parse($from)->format('d/m/Y'),
+            '{date_sortie}' => CarbonImmutable::parse($to)->format('d/m/Y'),
+        ];
+
+        return view('documents.training-'.$type->value, [
+            'title' => $type->label(),
+            'number' => $number,
+            'issued_on' => $issuedAt->setTimezone('Europe/Paris')->format('d/m/Y'),
+            'company' => $this->companyData($company, $issuedAt),
+            'recipient' => $recipient,
+            'dossier_number' => $dossier['number'],
+            'training' => $training,
+            'employer' => $contractor,
+            'period' => self::period($from, $to),
+            'from' => $values['{date_entree}'],
+            'to' => $values['{date_sortie}'],
+            'realised' => $values['{heures_realisees}'],
+            'planned' => $planned,
+            'place' => $session['place'],
+            'session_label' => $session['label'],
+            'schedule' => array_map(fn (array $s) => [
+                'date' => CarbonImmutable::parse($s['date'])->locale('fr')->isoFormat('dddd D MMMM YYYY'),
+                'hours' => $s['starts_at'].' - '.$s['ends_at'],
+                'place' => $s['place'],
+            ], $enrolment['schedule']),
+            'city' => $company->address_city,
+            'blocks' => collect($this->texts->resolve($type, $company->id))->map(fn (string $text, string $key) => [
+                'title' => DocumentTexts::blocks($type)[$key]['label'],
+                'text' => DocumentTexts::fill($text, $values),
+            ])->values()->all(),
+        ])->render();
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function companyData(Company $company, CarbonImmutable $issuedAt): array
+    {
+        $exempt = $company->vat_regime === VatRegime::Exempt;
+
+        return [
+            'name' => $company->name,
+            'logo' => $this->branding->logoDataUri($company),
+            'signature' => $this->branding->signatureDataUri($company),
+            'address' => array_values(array_filter([$company->address_line1, $company->address_line2,
+                trim(($company->address_postal_code ?? '').' '.($company->address_city ?? ''))], fn (?string $l) => $l !== null && trim($l) !== '')),
+            'siret' => $company->siret,
+            'nda_number' => $company->nda_number,
+            'legal' => LegalMentions::for($company),
+            'vat_notice' => $exempt ? LegalMentions::vatExemptionNotice($issuedAt) : null,
+        ];
     }
 
     /**
