@@ -115,7 +115,7 @@ final class OnlineTests
             'das_ids.*' => ['uuid', 'distinct'],
             'training_ids' => ['sometimes', 'array'],
             'training_ids.*' => ['uuid', 'distinct'],
-            'content' => [$creating ? 'required' : 'sometimes', 'array'],
+            'content' => ['sometimes', 'array'],
         ];
         $values = Validator::make($data, $rules, [
             'title.required' => 'Donnez un titre au test.',
@@ -138,6 +138,8 @@ final class OnlineTests
         }
         if (array_key_exists('content', $values)) {
             $out['draft_content'] = OnlineTestContent::validate($values['content']);
+        } elseif ($creating) {
+            $out['draft_content'] = ['sections' => []];
         }
 
         return [$out, $das, $trainings];

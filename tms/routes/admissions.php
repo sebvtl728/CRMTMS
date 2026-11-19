@@ -7,6 +7,7 @@ use App\Modules\Admissions\Candidatures\CandidatureStatusController;
 use App\Modules\Admissions\Candidatures\DossierCreationController;
 use App\Modules\Admissions\Candidatures\LookupController;
 use App\Modules\Admissions\CustomFields\CustomFieldController;
+use App\Modules\Admissions\OnlineTests\OnlineTestController;
 use App\Modules\Admissions\Positioning\PositioningController;
 use App\Modules\Admissions\Positioning\PositioningUploadController;
 use Illuminate\Support\Facades\Route;
@@ -56,4 +57,14 @@ Route::middleware('throttle:positioning-upload')->prefix('test-positionnement')-
     Route::get('{token}', [PositioningUploadController::class, 'show'])->where('token', '[0-9a-f]{64}')->name('show');
     Route::get('{token}/tests/{version}', [PositioningUploadController::class, 'download'])->where('token', '[0-9a-f]{64}')->name('download');
     Route::post('{token}', [PositioningUploadController::class, 'store'])->where('token', '[0-9a-f]{64}')->name('store');
+});
+
+// Online positioning tests (as the library: catalogue.manage).
+Route::middleware(['auth', 'can:catalogue.manage'])->prefix('admissions/online-tests')->name('admissions.online-tests.')->group(function () {
+    Route::get('/', [OnlineTestController::class, 'index'])->name('index');
+    Route::post('/', [OnlineTestController::class, 'store'])->name('store');
+    Route::get('{test}/edit', [OnlineTestController::class, 'edit'])->name('edit');
+    Route::put('{test}', [OnlineTestController::class, 'update'])->name('update');
+    Route::post('{test}/publish', [OnlineTestController::class, 'publish'])->name('publish');
+    Route::delete('{test}', [OnlineTestController::class, 'destroy'])->name('destroy');
 });

@@ -13,6 +13,7 @@ import {
     CalendarClock,
     CalendarDays,
     CalendarRange,
+    ClipboardCheck,
     ClipboardList,
     ClipboardPen,
     Columns3,
@@ -67,6 +68,7 @@ const trainingNavItems: (NavItem & { permission: string })[] = [
     { title: 'Sessions', url: '/sessions', icon: CalendarDays, permission: 'sessions.sessions.view' },
     { title: 'Planning des séances', url: '/sessions/planning', icon: CalendarRange, permission: 'sessions.seances.view' },
     { title: 'Formateurs', url: '/trainers', icon: GraduationCap, permission: 'sessions.trainers.manage' },
+    { title: 'Tests en ligne', url: '/admissions/online-tests', icon: ClipboardCheck, permission: 'catalogue.manage' },
 ];
 
 // « Finance »: invoicing (0.9).

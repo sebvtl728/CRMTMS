@@ -1,0 +1,89 @@
+import Heading from '@/components/heading';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import AppLayout from '@/layouts/app-layout';
+import { formatDate } from '@/lib/crm';
+import { type BreadcrumbItem } from '@/types';
+import { Head, Link, useForm } from '@inertiajs/react';
+import { Plus } from 'lucide-react';
+import { FormEventHandler } from 'react';
+
+interface Row {
+    id: string;
+    title: string;
+    published_version: number | null;
+    total_points: number | null;
+    time_limit_minutes: number | null;
+    updated_at: string | null;
+}
+
+const breadcrumbs: BreadcrumbItem[] = [{ title: 'Tests en ligne', href: '/admissions/online-tests' }];
+
+export default function OnlineTestsIndex({ tests, status }: { tests: Row[]; status?: string }) {
+    const { data, setData, post, processing, errors } = useForm({ title: '' });
+    const submit: FormEventHandler = (e) => {
+        e.preventDefault();
+        post('/admissions/online-tests');
+    };
+
+    return (
+        <AppLayout breadcrumbs={breadcrumbs}>
+            <Head title="Tests en ligne" />
+            <div className="flex flex-col gap-4 p-4">
+                <Heading
+                    title="Tests en ligne"
+                    description="Tests de positionnement passés à l’écran par les candidats (ordinateur seulement), corrigés dans le TMS."
+                />
+                {status && <div className="text-sm font-medium text-green-600">{status}</div>}
+                <form onSubmit={submit} className="flex max-w-xl flex-wrap items-start gap-2">
+                    <div className="grid flex-1 gap-1">
+                        <Input
+                            aria-label="Titre du nouveau test"
+                            placeholder="Titre du nouveau test"
+                            value={data.title}
+                            onChange={(e) => setData('title', e.target.value)}
+                            maxLength={200}
+                        />
+                        {errors.title && <p className="text-sm text-red-600">{errors.title}</p>}
+                    </div>
+                    <Button type="submit" disabled={processing || data.title.trim() === ''}>
+                        <Plus className="h-4 w-4" />
+                        Nouveau test
+                    </Button>
+                </form>
+                {tests.length === 0 ? (
+                    <p className="text-muted-foreground rounded-xl border p-8 text-center text-sm">Aucun test en ligne pour le moment.</p>
+                ) : (
+                    <div className="overflow-x-auto rounded-xl border">
+                        <table className="w-full text-sm">
+                            <thead className="bg-muted/50 text-left">
+                                <tr>
+                                    <th className="px-3 py-2 font-medium">Titre</th>
+                                    <th className="px-3 py-2 font-medium">Version publiée</th>
+                                    <th className="px-3 py-2 font-medium">Points</th>
+                                    <th className="px-3 py-2 font-medium">Durée</th>
+                                    <th className="px-3 py-2 font-medium">Modifié</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {tests.map((t) => (
+                                    <tr key={t.id} className="hover:bg-muted/30 border-t">
+                                        <td className="px-3 py-2 font-medium">
+                                            <Link href={`/admissions/online-tests/${t.id}/edit`} className="hover:underline">
+                                                {t.title}
+                                            </Link>
+                                        </td>
+                                        <td className="px-3 py-2">{t.published_version === null ? 'Brouillon' : `Version ${t.published_version}`}</td>
+                                        <td className="px-3 py-2">{t.total_points ?? '—'}</td>
+                                        <td className="px-3 py-2">{t.time_limit_minutes ? `${t.time_limit_minutes} min` : 'Libre'}</td>
+                                        <td className="px-3 py-2">{formatDate(t.updated_at)}</td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                )}
+            </div>
+        </AppLayout>
+    );
+}
