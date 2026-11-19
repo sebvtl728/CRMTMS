@@ -85,6 +85,12 @@ export default function CandidatureShow({ candidature: c, custom_fields, history
     const [reason, setReason] = useState<string | null>(null);
     const [dossierOpen, setDossierOpen] = useState(false);
     const disabled = !can.update;
+    // Each card opens once the one before is saved (rejected or withdrawn: every card).
+    const rank = STAGE_RANK[c.status];
+    const exited = rank < 0;
+    const showTest = exited || rank >= 1 || c.training !== null || c.positioning_sent_on !== null;
+    const showInterview = exited || rank >= 2 || c.positioning_received_on !== null || c.interview_at !== null;
+    const showAfterInterview = exited || rank >= 3 || c.interview_at !== null;
 
     const breadcrumbs: BreadcrumbItem[] = [
         { title: 'Candidats', href: '/admissions/candidatures' },
@@ -98,6 +104,7 @@ export default function CandidatureShow({ candidature: c, custom_fields, history
         das_id: c.das.id,
         responsible_user_id: c.responsible_user_id,
         origin_id: c.origin_id,
+        pathway: c.pathway,
         france_travail_id: c.france_travail_id,
         last_diploma: c.last_diploma,
         education_level_id: c.person.education_level_id,
@@ -157,7 +164,7 @@ export default function CandidatureShow({ candidature: c, custom_fields, history
                         <Heading title={c.person.label} description={`Candidature ${c.number}${c.training ? ` · ${c.training.title}` : ''}`} />
                         <div className="flex flex-wrap items-center gap-2">
                             <Badge variant={stageVariant(c.status)}>{c.status_label}</Badge>
-                            {c.dossier && !c.dossier.trashed && <Badge variant="secondary">{c.alternance ? 'Alternant' : 'Apprenant'}</Badge>}
+                            {c.dossier && !c.dossier.trashed && <Badge variant="secondary">{c.alternance ? 'Alternant' : 'Stagiaire'}</Badge>}
                             {c.decision_reason_label && <span className="text-muted-foreground text-sm">Motif : {c.decision_reason_label}</span>}
                             {c.deleted_at && <Badge variant="outline">Corbeille</Badge>}
                         </div>
@@ -233,11 +240,14 @@ export default function CandidatureShow({ candidature: c, custom_fields, history
                             </p>
                         ) : (
                             <p className="text-muted-foreground text-sm">
-                                {c.status === 'admitted'
-                                    ? "Candidat admis : créez son dossier pour qu'il devienne apprenant."
-                                    : 'Le dossier se crée une fois le candidat admis.'}
+                                {c.status !== 'admitted'
+                                    ? 'Le dossier se crée une fois le candidat admis.'
+                                    : c.pathway === 'alternance' && c.alternance === null
+                                      ? 'Candidat admis en alternance sans contrat : saisissez le contrat avant de créer son dossier.'
+                                      : `Candidat admis : créez son dossier pour qu'il devienne ${c.alternance ? 'alternant' : 'stagiaire'}.`}
                             </p>
                         )}
+                        {!c.dossier && c.status === 'interview' && <Suggest c={c} to="admitted" label="Admis" canUpdate={can.update} />}
                     </Card>
 
                     <Card title="Orientation">
@@ -273,6 +283,23 @@ export default function CandidatureShow({ candidature: c, custom_fields, history
                                 error={errors.target_session_id}
                                 disabled={disabled || orientation.values.training_id !== (c.training?.id ?? null)}
                             />
+                            <div className="grid gap-1">
+                                <OptionSelect
+                                    id="pathway"
+                                    label="Parcours"
+                                    value={orientation.str('pathway') || null}
+                                    options={options.pathways}
+                                    noneLabel="À définir"
+                                    onChange={(v) => orientation.set('pathway', v)}
+                                    error={errors.pathway}
+                                    disabled={disabled || c.alternance !== null}
+                                />
+                                {c.alternance !== null && (
+                                    <p className="text-muted-foreground text-xs">
+                                        Un contrat d'alternance est saisi : le parcours reste « Alternance ».
+                                    </p>
+                                )}
+                            </div>
                             <OptionSelect
                                 id="das_id"
                                 label="DAS"
@@ -371,232 +398,272 @@ export default function CandidatureShow({ candidature: c, custom_fields, history
                             </div>
                         )}
                         {can.update && <SaveButton onClick={() => orientation.save()} processing={orientation.processing} />}
-                    </Card>
-
-                    <Card title="Test de positionnement">
-                        <div className="grid gap-3 sm:grid-cols-3">
-                            <TextField
-                                id="positioning_sent_on"
-                                type="date"
-                                label="Envoyé le"
-                                value={positioning.str('positioning_sent_on')}
-                                onChange={(v) => positioning.set('positioning_sent_on', v)}
-                                error={errors.positioning_sent_on}
-                                disabled={disabled}
-                            />
-                            <TextField
-                                id="positioning_received_on"
-                                type="date"
-                                label="Reçu le"
-                                value={positioning.str('positioning_received_on')}
-                                onChange={(v) => positioning.set('positioning_received_on', v)}
-                                error={errors.positioning_received_on}
-                                disabled={disabled}
-                            />
-                            <TextField
-                                id="positioning_result"
-                                label="Score ou niveau"
-                                value={positioning.str('positioning_result')}
-                                onChange={(v) => positioning.set('positioning_result', v)}
-                                disabled={disabled}
-                            />
-                        </div>
-                        {can.update && <SaveButton onClick={() => positioning.save()} processing={positioning.processing} />}
-                        {c.positioning_received_on ? (
-                            <Suggest c={c} to="positioning_received" label="Test reçu" canUpdate={can.update} />
-                        ) : (
-                            c.positioning_sent_on && <Suggest c={c} to="positioning_sent" label="Test envoyé" canUpdate={can.update} />
+                        {!showTest && (
+                            <p className="text-muted-foreground text-xs">Enregistrez la formation visée pour ouvrir le test de positionnement.</p>
                         )}
-                        <CandidatureFiles candidatureId={c.id} kind="positioning" files={c.files} canUpdate={can.update} label="Joindre le test" />
                     </Card>
 
-                    <Card title="Entretien">
-                        <div className="grid gap-3 sm:grid-cols-2">
-                            <TextField
-                                id="interview_at"
-                                type="datetime-local"
-                                label="Date et heure"
-                                value={interview.str('interview_at')}
-                                onChange={(v) => interview.set('interview_at', v)}
-                                error={errors.interview_at}
-                                disabled={disabled}
-                            />
-                            <OptionSelect
-                                id="interviewer_user_id"
-                                label="Mené par"
-                                value={interview.str('interviewer_user_id') || null}
-                                options={options.users}
-                                onChange={(v) => interview.set('interviewer_user_id', v)}
-                                disabled={disabled}
-                            />
-                        </div>
-                        {can.sensitive ? (
-                            <div className="grid gap-3">
-                                <div className="grid gap-1">
-                                    <Label htmlFor="interview_report">Compte rendu</Label>
-                                    <textarea
-                                        id="interview_report"
-                                        rows={4}
-                                        className={textareaClass}
-                                        value={interview.str('interview_report')}
-                                        onChange={(e) => interview.set('interview_report', e.target.value)}
-                                        disabled={disabled}
-                                    />
-                                </div>
-                                <Label className="flex items-center gap-2 font-normal">
-                                    <input
-                                        type="checkbox"
-                                        checked={Boolean(interview.values.rqth)}
-                                        onChange={(e) => interview.set('rqth', e.target.checked)}
-                                        disabled={disabled}
-                                    />
-                                    Reconnaissance de travailleur handicapé (RQTH)
-                                </Label>
-                                <div className="grid gap-1">
-                                    <Label htmlFor="adaptation_needs">Besoins d'adaptation</Label>
-                                    <textarea
-                                        id="adaptation_needs"
-                                        rows={2}
-                                        className={textareaClass}
-                                        value={interview.str('adaptation_needs')}
-                                        onChange={(e) => interview.set('adaptation_needs', e.target.value)}
-                                        disabled={disabled}
-                                    />
-                                </div>
-                            </div>
-                        ) : (
-                            <p className="text-muted-foreground text-xs">
-                                Le compte rendu, la RQTH et les besoins d'adaptation sont réservés au droit « Voir les données sensibles des candidats
-                                ».
-                            </p>
-                        )}
-                        {can.update && <SaveButton onClick={() => interview.save()} processing={interview.processing} />}
-                        {c.interview_at && <Suggest c={c} to="interview" label="Entretien" canUpdate={can.update} />}
-                    </Card>
-
-                    <Card title="Alternance">
-                        {STAGE_RANK[c.status] < 3 && !c.alternance ? (
-                            <p className="text-muted-foreground text-sm">Le contrat se saisit à partir de l'entretien.</p>
-                        ) : (
-                            <div className="grid gap-3">
-                                <OptionSelect
-                                    id="contract_type"
-                                    label="Type de contrat"
-                                    value={contract.contract_type}
-                                    options={options.contract_types}
-                                    onChange={(v) => setContract({ ...contract, contract_type: v ?? 'apprenticeship' })}
-                                    error={errors.contract_type}
+                    {showTest && (
+                        <Card title="Test de positionnement">
+                            <div className="grid gap-3 sm:grid-cols-3">
+                                <TextField
+                                    id="positioning_sent_on"
+                                    type="date"
+                                    label="Envoyé le"
+                                    value={positioning.str('positioning_sent_on')}
+                                    onChange={(v) => positioning.set('positioning_sent_on', v)}
+                                    error={errors.positioning_sent_on}
                                     disabled={disabled}
                                 />
-                                <div className="grid gap-1">
-                                    <Label htmlFor="employer">Entreprise d'accueil</Label>
-                                    <FichePicker
-                                        id="employer"
-                                        kind="organisation"
-                                        value={employer}
-                                        onPick={setEmployer}
-                                        placeholder="Rechercher l'entreprise"
-                                        searchUrl="/admissions/candidatures/lookup/organisations"
-                                    />
-                                    <InputError message={errors.employer_organisation_id} />
-                                </div>
-                                <div className="grid gap-1">
-                                    <Label htmlFor="tutor">Maître d'apprentissage ou tuteur</Label>
-                                    <FichePicker
-                                        id="tutor"
-                                        kind="person"
-                                        organisationId={employer?.id}
-                                        value={tutor}
-                                        onPick={setTutor}
-                                        placeholder="Rechercher une personne"
-                                        searchUrl="/admissions/candidatures/lookup/people"
-                                    />
-                                    <InputError message={errors.tutor_person_id} />
-                                </div>
-                                <div className="grid gap-3 sm:grid-cols-2">
-                                    <TextField
-                                        id="starts_on"
-                                        type="date"
-                                        label="Début du contrat"
-                                        value={contract.starts_on}
-                                        onChange={(v) => setContract({ ...contract, starts_on: v })}
-                                        error={errors.starts_on}
-                                        disabled={disabled}
-                                    />
-                                    <TextField
-                                        id="ends_on"
-                                        type="date"
-                                        label="Fin du contrat"
-                                        value={contract.ends_on}
-                                        onChange={(v) => setContract({ ...contract, ends_on: v })}
-                                        error={errors.ends_on}
-                                        disabled={disabled}
-                                    />
-                                </div>
-                                <div className="grid gap-1">
-                                    <Label htmlFor="opco">OPCO</Label>
-                                    <FichePicker
-                                        id="opco"
-                                        kind="organisation"
-                                        value={opco}
-                                        onPick={setOpco}
-                                        placeholder="Rechercher l'OPCO"
-                                        searchUrl="/admissions/candidatures/lookup/organisations"
-                                    />
-                                    <InputError message={errors.opco_organisation_id} />
-                                </div>
-                                {can.update && (
-                                    <div className="flex gap-2">
+                                <TextField
+                                    id="positioning_received_on"
+                                    type="date"
+                                    label="Reçu le"
+                                    value={positioning.str('positioning_received_on')}
+                                    onChange={(v) => positioning.set('positioning_received_on', v)}
+                                    error={errors.positioning_received_on}
+                                    disabled={disabled}
+                                />
+                                <TextField
+                                    id="positioning_result"
+                                    label="Score ou niveau"
+                                    value={positioning.str('positioning_result')}
+                                    onChange={(v) => positioning.set('positioning_result', v)}
+                                    disabled={disabled}
+                                />
+                            </div>
+                            {can.update && <SaveButton onClick={() => positioning.save()} processing={positioning.processing} />}
+                            {c.positioning_received_on ? (
+                                <Suggest c={c} to="positioning_received" label="Test reçu" canUpdate={can.update} />
+                            ) : (
+                                c.positioning_sent_on && <Suggest c={c} to="positioning_sent" label="Test envoyé" canUpdate={can.update} />
+                            )}
+                            <CandidatureFiles
+                                candidatureId={c.id}
+                                kind="positioning"
+                                files={c.files}
+                                canUpdate={can.update}
+                                label="Joindre le test"
+                            />
+                            {!showInterview && (
+                                <div className="flex flex-wrap items-center gap-2">
+                                    <p className="text-muted-foreground text-xs">Enregistrez la date de réception pour ouvrir l'entretien, ou</p>
+                                    {can.update && (
                                         <Button
                                             type="button"
+                                            variant="ghost"
                                             size="sm"
                                             onClick={() =>
-                                                router.put(
-                                                    `/admissions/candidatures/${c.id}/alternance`,
-                                                    {
-                                                        ...contract,
-                                                        employer_organisation_id: employer?.id ?? null,
-                                                        tutor_person_id: tutor?.id ?? null,
-                                                        opco_organisation_id: opco?.id ?? null,
-                                                    },
+                                                router.post(
+                                                    `/admissions/candidatures/${c.id}/status`,
+                                                    { status: 'interview' },
                                                     { preserveScroll: true },
                                                 )
                                             }
                                         >
-                                            Enregistrer le contrat
+                                            Passer le test
                                         </Button>
-                                        {c.alternance && (
+                                    )}
+                                </div>
+                            )}
+                        </Card>
+                    )}
+
+                    {showInterview && (
+                        <Card title="Entretien">
+                            <div className="grid gap-3 sm:grid-cols-2">
+                                <TextField
+                                    id="interview_at"
+                                    type="datetime-local"
+                                    label="Date et heure"
+                                    value={interview.str('interview_at')}
+                                    onChange={(v) => interview.set('interview_at', v)}
+                                    error={errors.interview_at}
+                                    disabled={disabled}
+                                />
+                                <OptionSelect
+                                    id="interviewer_user_id"
+                                    label="Mené par"
+                                    value={interview.str('interviewer_user_id') || null}
+                                    options={options.users}
+                                    onChange={(v) => interview.set('interviewer_user_id', v)}
+                                    disabled={disabled}
+                                />
+                            </div>
+                            {can.sensitive ? (
+                                <div className="grid gap-3">
+                                    <div className="grid gap-1">
+                                        <Label htmlFor="interview_report">Compte rendu</Label>
+                                        <textarea
+                                            id="interview_report"
+                                            rows={4}
+                                            className={textareaClass}
+                                            value={interview.str('interview_report')}
+                                            onChange={(e) => interview.set('interview_report', e.target.value)}
+                                            disabled={disabled}
+                                        />
+                                    </div>
+                                    <Label className="flex items-center gap-2 font-normal">
+                                        <input
+                                            type="checkbox"
+                                            checked={Boolean(interview.values.rqth)}
+                                            onChange={(e) => interview.set('rqth', e.target.checked)}
+                                            disabled={disabled}
+                                        />
+                                        Reconnaissance de travailleur handicapé (RQTH)
+                                    </Label>
+                                    <div className="grid gap-1">
+                                        <Label htmlFor="adaptation_needs">Besoins d'adaptation</Label>
+                                        <textarea
+                                            id="adaptation_needs"
+                                            rows={2}
+                                            className={textareaClass}
+                                            value={interview.str('adaptation_needs')}
+                                            onChange={(e) => interview.set('adaptation_needs', e.target.value)}
+                                            disabled={disabled}
+                                        />
+                                    </div>
+                                </div>
+                            ) : (
+                                <p className="text-muted-foreground text-xs">
+                                    Le compte rendu, la RQTH et les besoins d'adaptation sont réservés au droit « Voir les données sensibles des
+                                    candidats ».
+                                </p>
+                            )}
+                            {can.update && <SaveButton onClick={() => interview.save()} processing={interview.processing} />}
+                            {c.interview_at && <Suggest c={c} to="interview" label="Entretien" canUpdate={can.update} />}
+                        </Card>
+                    )}
+
+                    {showAfterInterview && c.pathway !== 'trainee' && (
+                        <Card title="Alternance">
+                            {c.pathway === null && !c.alternance ? (
+                                <p className="text-muted-foreground text-sm">
+                                    Choisissez le parcours « Alternance » (carte Orientation) pour saisir le contrat.
+                                </p>
+                            ) : STAGE_RANK[c.status] < 3 && !c.alternance ? (
+                                <p className="text-muted-foreground text-sm">Le contrat se saisit à partir de l'entretien.</p>
+                            ) : (
+                                <div className="grid gap-3">
+                                    <OptionSelect
+                                        id="contract_type"
+                                        label="Type de contrat"
+                                        value={contract.contract_type}
+                                        options={options.contract_types}
+                                        onChange={(v) => setContract({ ...contract, contract_type: v ?? 'apprenticeship' })}
+                                        error={errors.contract_type}
+                                        disabled={disabled}
+                                    />
+                                    <div className="grid gap-1">
+                                        <Label htmlFor="employer">Entreprise d'accueil</Label>
+                                        <FichePicker
+                                            id="employer"
+                                            kind="organisation"
+                                            value={employer}
+                                            onPick={setEmployer}
+                                            placeholder="Rechercher l'entreprise"
+                                            searchUrl="/admissions/candidatures/lookup/organisations"
+                                        />
+                                        <InputError message={errors.employer_organisation_id} />
+                                    </div>
+                                    <div className="grid gap-1">
+                                        <Label htmlFor="tutor">Maître d'apprentissage ou tuteur</Label>
+                                        <FichePicker
+                                            id="tutor"
+                                            kind="person"
+                                            organisationId={employer?.id}
+                                            value={tutor}
+                                            onPick={setTutor}
+                                            placeholder="Rechercher une personne"
+                                            searchUrl="/admissions/candidatures/lookup/people"
+                                        />
+                                        <InputError message={errors.tutor_person_id} />
+                                    </div>
+                                    <div className="grid gap-3 sm:grid-cols-2">
+                                        <TextField
+                                            id="starts_on"
+                                            type="date"
+                                            label="Début du contrat"
+                                            value={contract.starts_on}
+                                            onChange={(v) => setContract({ ...contract, starts_on: v })}
+                                            error={errors.starts_on}
+                                            disabled={disabled}
+                                        />
+                                        <TextField
+                                            id="ends_on"
+                                            type="date"
+                                            label="Fin du contrat"
+                                            value={contract.ends_on}
+                                            onChange={(v) => setContract({ ...contract, ends_on: v })}
+                                            error={errors.ends_on}
+                                            disabled={disabled}
+                                        />
+                                    </div>
+                                    <div className="grid gap-1">
+                                        <Label htmlFor="opco">OPCO</Label>
+                                        <FichePicker
+                                            id="opco"
+                                            kind="organisation"
+                                            value={opco}
+                                            onPick={setOpco}
+                                            placeholder="Rechercher l'OPCO"
+                                            searchUrl="/admissions/candidatures/lookup/organisations"
+                                        />
+                                        <InputError message={errors.opco_organisation_id} />
+                                    </div>
+                                    {can.update && (
+                                        <div className="flex gap-2">
                                             <Button
                                                 type="button"
                                                 size="sm"
-                                                variant="ghost"
                                                 onClick={() =>
-                                                    confirm('Retirer le contrat ?') &&
-                                                    router.delete(`/admissions/candidatures/${c.id}/alternance`, { preserveScroll: true })
+                                                    router.put(
+                                                        `/admissions/candidatures/${c.id}/alternance`,
+                                                        {
+                                                            ...contract,
+                                                            employer_organisation_id: employer?.id ?? null,
+                                                            tutor_person_id: tutor?.id ?? null,
+                                                            opco_organisation_id: opco?.id ?? null,
+                                                        },
+                                                        { preserveScroll: true },
+                                                    )
                                                 }
                                             >
-                                                Retirer
+                                                Enregistrer le contrat
                                             </Button>
-                                        )}
-                                    </div>
-                                )}
-                                {c.alternance && (
-                                    <div className="grid gap-1">
-                                        <Label>Contrat signé</Label>
-                                        <CandidatureFiles
-                                            candidatureId={c.id}
-                                            kind="contract"
-                                            files={c.files}
-                                            canUpdate={can.update}
-                                            label="Joindre le contrat signé"
-                                        />
-                                    </div>
-                                )}
-                            </div>
-                        )}
-                    </Card>
+                                            {c.alternance && (
+                                                <Button
+                                                    type="button"
+                                                    size="sm"
+                                                    variant="ghost"
+                                                    onClick={() =>
+                                                        confirm('Retirer le contrat ?') &&
+                                                        router.delete(`/admissions/candidatures/${c.id}/alternance`, { preserveScroll: true })
+                                                    }
+                                                >
+                                                    Retirer
+                                                </Button>
+                                            )}
+                                        </div>
+                                    )}
+                                    {c.alternance && (
+                                        <div className="grid gap-1">
+                                            <Label>Contrat signé</Label>
+                                            <CandidatureFiles
+                                                candidatureId={c.id}
+                                                kind="contract"
+                                                files={c.files}
+                                                canUpdate={can.update}
+                                                label="Joindre le contrat signé"
+                                            />
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+                        </Card>
+                    )}
 
-                    {custom_fields.length > 0 && (
+                    {showAfterInterview && custom_fields.length > 0 && (
                         <Card title="Informations complémentaires">
                             <div className="grid gap-3 sm:grid-cols-2">
                                 {custom_fields.map((f) => {

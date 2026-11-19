@@ -5,6 +5,17 @@ Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) ; ve
 
 ## [Non publié]
 
+### Ajouté
+
+- **Admissions — parcours du candidat** (carte Orientation) : *À définir*, *Alternance* ou *Stagiaire* (formation
+  continue sans contrat). La carte Alternance n'apparaît que pour le parcours Alternance ; un contrat met le parcours à
+  Alternance et le garde ; filtre **Parcours** et colonne de l'export.
+
+### Modifié
+
+- Menu : **Candidats** passe dans **Formation**, au-dessus de Dossiers.
+- Admissions : l'onglet **Apprenants** devient **Stagiaires**, le badge « Apprenant » devient « Stagiaire ».
+
 ## [0.9.1] - 2026-11-19
 
 Admissions (candidats, alternance) et suivi des paiements : règlements, factures soldées, relances, protection du

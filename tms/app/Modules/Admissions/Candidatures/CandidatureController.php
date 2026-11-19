@@ -176,6 +176,7 @@ class CandidatureController extends Controller
         return [
             'statuses' => CandidatureStatus::options(),
             'contract_types' => ContractType::options(),
+            'pathways' => Pathway::options(),
             'refusal_reasons' => $items(ReferenceList::CandidatureRefusalReason),
             'das' => $items(ReferenceList::Das),
             'origins' => $items(ReferenceList::ContactOrigin),

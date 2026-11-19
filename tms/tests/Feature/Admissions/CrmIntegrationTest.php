@@ -65,7 +65,7 @@ it('badges the apprenant', function () {
     $creation->create($c->fresh(), $creation->defaults($c->fresh()), admin());
 
     $this->actingAs(commercial())->get("/crm/people/{$lea->id}")->assertInertia(fn (Assert $p) => $p
-        ->where('blocks', fn ($blocks) => collect($blocks)->firstWhere('key', 'admissions.candidatures')['rows'][0]['badge'] === 'Apprenant'));
+        ->where('blocks', fn ($blocks) => collect($blocks)->firstWhere('key', 'admissions.candidatures')['rows'][0]['badge'] === 'Stagiaire'));
 });
 
 it('lists the changes of stage in the history of the person', function () {

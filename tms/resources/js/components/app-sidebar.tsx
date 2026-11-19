@@ -56,13 +56,13 @@ const commercialNavItems: (NavItem & { permission: string })[] = [
     { title: 'Catalogue', url: '/catalogue', icon: BookOpen, permission: 'catalogue.view' },
     { title: 'Entreprises', url: '/crm/organisations', icon: Factory, permission: 'crm.fiches.view' },
     { title: 'Interlocuteurs', url: '/crm/people', icon: Contact, permission: 'crm.fiches.view' },
-    { title: 'Candidats', url: '/admissions/candidatures', icon: UserRoundCheck, permission: 'admissions.candidatures.view' },
     { title: 'Imports', url: '/crm/import', icon: Upload, permission: 'crm.import' },
     { title: 'RGPD', url: '/crm/gdpr', icon: ShieldAlert, permission: 'crm.gdpr' },
 ];
 
-// « Formation »: the operational side (dossiers, sessions, then enrolments).
+// « Formation »: the operational side (candidates, dossiers, sessions, then enrolments).
 const trainingNavItems: (NavItem & { permission: string })[] = [
+    { title: 'Candidats', url: '/admissions/candidatures', icon: UserRoundCheck, permission: 'admissions.candidatures.view' },
     { title: 'Dossiers', url: '/dossiers', icon: ClipboardList, permission: 'sessions.dossiers.view' },
     { title: 'Sessions', url: '/sessions', icon: CalendarDays, permission: 'sessions.sessions.view' },
     { title: 'Planning des séances', url: '/sessions/planning', icon: CalendarRange, permission: 'sessions.seances.view' },

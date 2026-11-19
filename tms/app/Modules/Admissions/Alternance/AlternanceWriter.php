@@ -5,6 +5,7 @@ namespace App\Modules\Admissions\Alternance;
 use App\Exceptions\UserFacingHttpException;
 use App\Modules\Admissions\Candidatures\Candidature;
 use App\Modules\Admissions\Candidatures\CandidatureStatus;
+use App\Modules\Admissions\Candidatures\Pathway;
 use App\Modules\Core\Users\User;
 use App\Modules\Crm\Public\Fiches;
 use App\Modules\Sessions\Public\Admission;
@@ -27,6 +28,9 @@ final class AlternanceWriter
         $rank = $candidature->status->rank();
         if ($rank === null || $rank < CandidatureStatus::Interview->rank()) {
             throw new UserFacingHttpException(409, 'Le contrat se saisit à partir de l\'entretien.');
+        }
+        if ($candidature->pathway === Pathway::Trainee) {
+            throw new UserFacingHttpException(409, 'Ce candidat suit le parcours « Stagiaire » : changez son parcours pour saisir un contrat.');
         }
         $data = array_map(fn ($v) => is_string($v) && trim($v) === '' ? null : $v, $data);
 
@@ -64,7 +68,10 @@ final class AlternanceWriter
         $values = $validator->validate();
 
         return DB::transaction(function () use ($candidature, $values): AlternanceContract {
-            Candidature::query()->lockForUpdate()->findOrFail($candidature->getKey());
+            $locked = Candidature::query()->lockForUpdate()->findOrFail($candidature->getKey());
+            if ($locked->pathway === Pathway::Trainee) {
+                throw new UserFacingHttpException(409, 'Ce candidat suit le parcours « Stagiaire » : changez son parcours pour saisir un contrat.');
+            }
             $contract = AlternanceContract::query()->updateOrCreate(['candidature_id' => $candidature->id], [
                 'contract_type' => $values['contract_type'],
                 'employer_organisation_id' => $values['employer_organisation_id'],
@@ -73,7 +80,10 @@ final class AlternanceWriter
                 'ends_on' => $values['ends_on'],
                 'opco_organisation_id' => $values['opco_organisation_id'] ?? null,
             ]);
-            $candidature->touch();
+            // The contract sets the pathway (touches the candidature too).
+            $locked->pathway = Pathway::Alternance;
+            $locked->updated_at = now();
+            $locked->save();
 
             return $contract;
         });
