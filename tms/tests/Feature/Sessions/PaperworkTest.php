@@ -58,3 +58,26 @@ it('moves the dossier to convention sent then signed, never backwards', function
     $paperwork->markConventionSigned($other->id, CarbonImmutable::parse('2026-11-19'));
     expect($other->fresh()->status)->toBe(DossierStatus::ConventionSigned);
 });
+
+it('gives an enrolment with its session, séances and realised hours for the documents', function () {
+    $dossier = l2Dossier();
+    $session = l2Session(null, ['starts_on' => '2026-11-02', 'ends_on' => '2026-11-04', 'planned_hours' => '7', 'location_kind' => 'address', 'location_text' => 'Salle B, Nantes']);
+    $module = plModule($session);
+    plSeance($module, '2026-11-02', '09:00', '12:30');
+    plSeance($module, '2026-11-03', '13:30', '17:00', ['place_text' => 'Atelier']);
+    $lea = l2Enrol($dossier, $session, makePerson('Durand', ['first_name' => 'Léa']));
+    $tom = l2Enrol($dossier, $session, makePerson('Petit', ['first_name' => 'Tom']));
+    app(Enrolments::class)->cancel($tom);
+
+    $data = Paperwork::enrolment($lea->id);
+
+    expect($data)->toMatchArray(['id' => $lea->id, 'dossier_id' => $dossier->id, 'person_id' => $lea->person_id, 'entered_on' => '2026-11-02', 'left_on' => null, 'planned_minutes' => 420])
+        ->and($data['realised_minutes'])->toBeInt()
+        ->and($data['session'])->toMatchArray(['id' => $session->id, 'starts_on' => '2026-11-02', 'ends_on' => '2026-11-04', 'place' => 'Salle B, Nantes', 'cancelled' => false])
+        ->and($data['seances'])->toBe([
+            ['date' => '2026-11-02', 'starts_at' => '09:00', 'ends_at' => '12:30', 'place' => null],
+            ['date' => '2026-11-03', 'starts_at' => '13:30', 'ends_at' => '17:00', 'place' => 'Atelier'],
+        ]);
+    expect(Paperwork::sessionEnrolments($session->id))->toBe([$lea->id])
+        ->and(Paperwork::enrolment('nope'))->toBeNull();
+});

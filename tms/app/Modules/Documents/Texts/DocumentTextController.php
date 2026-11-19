@@ -21,13 +21,14 @@ class DocumentTextController extends Controller
 
     public function index(Request $request): Response
     {
-        $type = DocumentType::tryFrom((string) $request->query('type')) ?? DocumentType::Convention;
+        $type = DocumentType::tryFrom((string) $request->query('type'));
+        $type = $type !== null && $type->editable() ? $type : DocumentType::Convention;
         $companyId = self::companyId($request->query('company'));
         $stored = $this->texts->stored($type, $companyId);
         $effective = $this->texts->resolve($type, $companyId);
 
         return Inertia::render('admin/document-texts/index', [
-            'types' => DocumentType::options(),
+            'types' => DocumentType::options(array_values(array_filter(DocumentType::cases(), fn (DocumentType $t) => $t->editable()))),
             'type' => $type->value,
             'companies' => Company::query()->orderBy('name')->get(['id', 'name'])->map(fn (Company $c) => ['value' => $c->id, 'label' => $c->name])->values()->all(),
             'company_id' => $companyId,
@@ -63,6 +64,7 @@ class DocumentTextController extends Controller
     private static function type(string $type, string $block): DocumentType
     {
         $documentType = DocumentType::tryFrom($type) ?? abort(404);
+        abort_unless($documentType->editable(), 404);
         abort_unless(array_key_exists($block, DocumentTexts::blocks($documentType)), 404);
 
         return $documentType;

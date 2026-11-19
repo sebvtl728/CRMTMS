@@ -18,7 +18,7 @@ use Illuminate\Validation\ValidationException;
 final class DocumentTexts
 {
     /** The fields a text may hold. */
-    public const FIELDS = ['{stagiaire}', '{stagiaires}', '{formation}', '{dates}', '{duree}', '{lieu}', '{prix}', '{contractant}', '{societe}', '{numero_dossier}'];
+    public const FIELDS = ['{stagiaire}', '{stagiaires}', '{formation}', '{dates}', '{duree}', '{lieu}', '{prix}', '{contractant}', '{societe}', '{numero_dossier}', '{heures_realisees}', '{date_entree}', '{date_sortie}'];
 
     public const MAX_LENGTH = 5000;
 
@@ -52,6 +52,15 @@ final class DocumentTexts
                 'paiement' => self::block('Modalités de paiement', "Aucune somme ne peut être exigée du stagiaire avant l'expiration du délai de rétractation. À l'expiration de ce délai, il ne peut être payé une somme supérieure à 30 % du prix convenu ; le solde est échelonné au fur et à mesure du déroulement de l'action (article L6353-6 du Code du travail).", true),
                 'abandon' => self::block('Interruption de la formation', 'Si, par suite de force majeure dûment reconnue, le stagiaire est empêché de suivre la formation, il peut rompre le contrat : seules les prestations effectivement dispensées sont dues, au prorata de leur valeur (article L6353-7 du Code du travail).'),
             ],
+            DocumentType::Convocation => [
+                'message' => self::block('Message', "Madame, Monsieur,\n\nNous avons le plaisir de vous convier à la formation « {formation} », {dates}, d'une durée de {duree}, à l'adresse suivante : {lieu}. Les horaires figurent ci-dessous.", true),
+                'pratique' => self::block('Informations pratiques', "Merci de vous présenter dix minutes avant le début de la formation. Le règlement intérieur vous sera remis le premier jour. Pour toute question, ou si vous avez besoin d'une adaptation liée à une situation de handicap, contactez {societe}."),
+            ],
+            DocumentType::CompletionCertificate => [
+                'attestation' => self::block('Attestation', '{societe} atteste que {stagiaire} a suivi la formation « {formation} », {dates}.', true),
+                'assiduite' => self::block('Assiduité', "Présence du {date_entree} au {date_sortie} : {heures_realisees} réalisées sur {duree} prévues. Les objectifs et la nature de l'action figurent au programme de la formation."),
+            ],
+            DocumentType::RealisationCertificate => [],
         };
     }
 

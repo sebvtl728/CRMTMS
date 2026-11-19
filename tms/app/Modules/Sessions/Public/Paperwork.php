@@ -2,16 +2,20 @@
 
 namespace App\Modules\Sessions\Public;
 
+use App\Modules\Catalogue\Trainings;
 use App\Modules\Core\Users\User;
 use App\Modules\Sessions\Dossiers\Dossier;
 use App\Modules\Sessions\Dossiers\DossierStatus;
 use App\Modules\Sessions\Dossiers\DossierTransitions;
 use App\Modules\Sessions\Enrolments\Enrolment;
+use App\Modules\Sessions\Enrolments\EnrolmentStatus;
+use App\Modules\Sessions\Planning\Seance;
 use App\Modules\Sessions\Sessions\SessionLocation;
 use App\Modules\Sessions\Sessions\TrainingSession;
 use Brick\Math\BigDecimal;
 use Brick\Math\RoundingMode;
 use Carbon\CarbonImmutable;
+use Illuminate\Support\Str;
 
 /**
  * What the training documents (module Documents, 0.10) read of a dossier:
@@ -64,6 +68,64 @@ final class Paperwork
                 ];
             }, $billing['enrolments'])),
         ];
+    }
+
+    /**
+     * One trainee for the per-trainee documents (convocation, attestation,
+     * certificate): the session (cancelled or not), the planned séances
+     * (date order), the planned and realised minutes (RealisedHours).
+     *
+     * @return array<string, mixed>|null
+     */
+    public static function enrolment(string $enrolmentId): ?array
+    {
+        $enrolment = Str::isUuid($enrolmentId) ? Enrolment::query()->find($enrolmentId) : null;
+        if ($enrolment === null) {
+            return null;
+        }
+        $session = TrainingSession::withTrashed()->findOrFail($enrolment->training_session_id);
+        $hours = RealisedHours::forEnrolment($enrolment->id);
+        $seances = Seance::query()->where('training_session_id', $session->id)->where('status', 'planned')
+            ->orderBy('date')->orderBy('starts_at')->get();
+
+        return [
+            'id' => $enrolment->id,
+            'status' => $enrolment->status->value,
+            'person_id' => $enrolment->person_id,
+            'dossier_id' => $enrolment->dossier_id,
+            'entered_on' => $enrolment->entered_on?->toDateString(),
+            'left_on' => $enrolment->left_on?->toDateString(),
+            'planned_minutes' => self::minutes($enrolment->planned_hours ?? $session->planned_hours),
+            'realised_minutes' => (int) $hours['realised_minutes'],
+            'session' => [
+                'id' => $session->id,
+                'label' => $session->label(app(Trainings::class)->findMany([$session->training_id])[$session->training_id]->title ?? null),
+                'training_id' => $session->training_id,
+                'starts_on' => $session->starts_on->toDateString(),
+                'ends_on' => $session->ends_on->toDateString(),
+                'place' => self::place($session),
+                'cancelled' => $session->isCancelled(),
+            ],
+            'seances' => $seances->map(fn (Seance $s) => [
+                'date' => $s->date->toDateString(),
+                'starts_at' => substr($s->starts_at, 0, 5),
+                'ends_at' => substr($s->ends_at, 0, 5),
+                'place' => $s->place_text,
+            ])->values()->all(),
+        ];
+    }
+
+    /**
+     * The trainees of a session who receive documents (enrolled, confirmed,
+     * left), in order of entry.
+     *
+     * @return list<string>
+     */
+    public static function sessionEnrolments(string $sessionId): array
+    {
+        return Enrolment::query()->where('training_session_id', $sessionId)
+            ->whereIn('status', EnrolmentStatus::values(EnrolmentStatus::SHARING_THE_PRICE))
+            ->orderByRaw('entered_on asc nulls first')->orderBy('created_at')->orderBy('id')->pluck('id')->map(fn ($id) => (string) $id)->all();
     }
 
     public static function allows(User $user, string $permission, string $dossierId): bool
