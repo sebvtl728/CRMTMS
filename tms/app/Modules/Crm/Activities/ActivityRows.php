@@ -13,7 +13,7 @@ use Illuminate\Database\Eloquent\Collection;
 final class ActivityRows
 {
     /** Relations row() reads. */
-    public const WITH = ['type', 'result', 'responsible:id,name', 'organisation:id,name,deleted_at', 'person:id,first_name,last_name,deleted_at', 'opportunity:id,title,organisation_id,person_id,deleted_at'];
+    public const WITH = ['type', 'result', 'responsible:id,name', 'collaborators:id,name', 'organisation:id,name,deleted_at', 'person:id,first_name,last_name,deleted_at', 'opportunity:id,title,organisation_id,person_id,deleted_at'];
 
     /**
      * @return array<string, mixed>
@@ -38,6 +38,7 @@ final class ActivityRows
             'result_id' => $activity->result_id,
             'responsible' => $activity->responsible?->name,
             'responsible_user_id' => $activity->responsible_user_id,
+            'collaborators' => $activity->collaborators->map(fn (User $u) => ['id' => (string) $u->id, 'name' => $u->name])->values()->all(),
             'status' => $status,
             'status_label' => Activity::STATUS_LABELS[$status],
             'organisation' => $activity->organisation === null ? null : ['id' => $activity->organisation->id, 'name' => $activity->organisation->name],

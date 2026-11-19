@@ -16,6 +16,7 @@ use Carbon\CarbonInterface;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Auth;
@@ -242,6 +243,16 @@ class Activity extends Model
         $opportunity = $this->opportunity;
 
         return $opportunity?->organisation->name ?? $opportunity?->person?->fullName() ?? $opportunity->title ?? '';
+    }
+
+    /**
+     * Collaborators besides the responsible (activity_collaborators).
+     *
+     * @return BelongsToMany<User, $this>
+     */
+    public function collaborators(): BelongsToMany
+    {
+        return $this->belongsToMany(User::class, 'activity_collaborators', 'activity_id', 'user_id')->withPivot('tenant_id');
     }
 
     /**

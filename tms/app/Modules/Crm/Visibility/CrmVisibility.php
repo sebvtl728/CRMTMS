@@ -88,9 +88,17 @@ final class CrmVisibility
      * @param  Builder<TModel>  $query
      * @return Builder<TModel>
      */
-    public static function activities(Builder $query, User $user, string $permission = Permissions::ACTIVITIES_VIEW): Builder
+    public static function activities(Builder $query, User $user, string $permission = Permissions::ACTIVITIES_VIEW, bool $collaborators = true): Builder
     {
-        return self::activitiesIn($query, $user, Scopes::of($user, $permission), self::responsibleReaches($permission));
+        $scope = Scopes::of($user, $permission);
+        // A user the action is also assigned to sees and changes it (never deletes it through that alone).
+        if (! $collaborators || ! in_array($permission, [Permissions::ACTIVITIES_VIEW, Permissions::ACTIVITIES_UPDATE], true) || $scope === null || $scope === AccessScope::All) {
+            return self::activitiesIn($query, $user, $scope, self::responsibleReaches($permission));
+        }
+        $id = $query->getModel()->qualifyColumn('id');
+
+        return $query->where(fn (Builder $q) => self::activitiesIn($q, $user, $scope, self::responsibleReaches($permission))
+            ->orWhereIn($id, DB::table('activity_collaborators')->select('activity_id')->where('user_id', $user->getKey())));
     }
 
     /**
@@ -104,6 +112,11 @@ final class CrmVisibility
             return false;
         }
         if ($scope === AccessScope::All) {
+            return true;
+        }
+        // A user the action is also assigned to sees and changes it (CrmVisibility::activities).
+        if ($record instanceof Activity && in_array($permission, [Permissions::ACTIVITIES_VIEW, Permissions::ACTIVITIES_UPDATE], true)
+            && DB::table('activity_collaborators')->where('activity_id', $record->getKey())->where('user_id', $user->getKey())->exists()) {
             return true;
         }
 
