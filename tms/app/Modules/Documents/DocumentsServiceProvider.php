@@ -3,6 +3,8 @@
 namespace App\Modules\Documents;
 
 use App\Modules\Core\Access\Permissions as CorePermissions;
+use App\Modules\Core\Audit\MorphAliases;
+use App\Modules\Documents\Texts\DocumentText;
 use Illuminate\Support\ServiceProvider;
 
 /**
@@ -16,5 +18,7 @@ class DocumentsServiceProvider extends ServiceProvider
     {
         CorePermissions::registerModule('documents', Permissions::all(), Permissions::defaultsFor(...), Permissions::labels(), Permissions::GROUP,
             Permissions::scoped(), Permissions::defaultScopesFor(...));
+
+        MorphAliases::register([DocumentText::MORPH_ALIAS => DocumentText::class]);
     }
 }
