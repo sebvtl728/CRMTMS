@@ -357,8 +357,8 @@ it('exports the list as a French CSV within the scope and the filters, audited',
         ->and(str_starts_with($csv, "\xEF\xBB\xBF"))->toBeTrue();
     $lines = explode("\r\n", trim(substr($csv, 3)));
     expect($lines)->toHaveCount(2)
-        ->and($lines[0])->toBe('Numéro;Type;Date;Échéance;Destinataire;Dossier;HT;TVA;TTC;État')
-        ->and($lines[1])->toBe('F-2026-00001;Facture;17/11/2026;17/12/2026;"Hôtel du Parc";'.$x['dossier']->number.';171,43;0,00;171,43;Validée');
+        ->and($lines[0])->toBe('Numéro;Type;Date;Échéance;Destinataire;Dossier;HT;TVA;TTC;État;Réglé;"Reste dû";"État de paiement"')
+        ->and($lines[1])->toBe('F-2026-00001;Facture;17/11/2026;17/12/2026;"Hôtel du Parc";'.$x['dossier']->number.';171,43;0,00;171,43;Validée;0,00;171,43;"Non réglée"');
 
     // Without a filter the draft of the OPCO is listed too, without number.
     $all = explode("\r\n", trim(substr($this->get('/finance/invoices-export')->streamedContent(), 3)));

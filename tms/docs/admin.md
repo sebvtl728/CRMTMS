@@ -197,8 +197,9 @@ Les factures (0.9) ajoutent le thème *Factures*, à périmètre (celui du dossi
 | `finance.invoices.view` (« Consulter les factures ») | Menu **Finance** : À facturer, Factures ; voir factures, avoirs, PDF, export CSV ; bloc Facturation d'un dossier |
 | `finance.invoices.manage` (« Préparer les factures ») | Régler le rythme d'un dossier ; préparer et modifier les brouillons ; créer un brouillon d'avoir ; envoyer et renvoyer |
 | `finance.invoices.validate` (« Valider les factures ») | Valider une facture ou un avoir ; **Vérifier l'intégrité** |
+| `finance.payments.manage` (« Enregistrer les règlements », 0.9.1, **sans périmètre** : tout l'organisme) | Menu **Finance › Règlements** : saisir, modifier, supprimer un règlement et sa répartition sur les factures |
 
-**Défauts** (accordés une fois par `tms:permissions:sync` lors de la mise à jour vers la 0.9.0) : administrateur de l'organisme et direction, les trois droits ; commercial, chargé de relations et assistant, *Consulter* et *Préparer* ; Responsable DAS et Formateur, aucun. Seuls l'administrateur et la direction valident par défaut. Le menu **Finance › Réglages de facturation** exige `settings.manage`.
+**Défauts** (accordés une fois par `tms:permissions:sync` lors de la mise à jour vers la 0.9.0) : administrateur de l'organisme et direction, les trois droits ; commercial, chargé de relations et assistant, *Consulter* et *Préparer* ; Responsable DAS et Formateur, aucun. Seuls l'administrateur et la direction valident par défaut. Le menu **Finance › Réglages de facturation** exige `settings.manage`. **0.9.1** : `finance.payments.manage` est accordé une fois à l'administrateur et à la direction par `tms:permissions:sync` ; **Finance › À relancer** et l'envoi des relances suivent `finance.invoices.manage` et son périmètre.
 
 Le planning (0.8.0) ajoute les thèmes *Planning et présences* (droits à périmètre) et *Formateurs et salles* (organisme entier) :
 
@@ -374,7 +375,9 @@ Guide utilisateur : `finance.md`.
 - **Modèle d'e-mail « Facture »** : Administration › Modèles d'e-mails (variables : numéro, pièce, type, société, destinataire, montant TTC, échéance, règlement, organisme).
 - **PDF** : mêmes exigences que les devis (Gotenberg démarré, `GOTENBERG_URL`) ; une facture ne se valide pas si le PDF ne peut pas être produit. Les PDF validés sont archivés par organisme (zone `invoices`) et **font partie de la sauvegarde** : ne les excluez pas.
 - **Intégrité** : `docker compose exec app php artisan tms:finance:verify` (tous les organismes ; code de sortie 1 et numéro de la première pièce en cause en cas de rupture). À lancer après une restauration ou un déménagement (`ops/import.sh`), et à intervalles réguliers.
-- **Conservation** : une facture validée est une pièce comptable conservée **10 ans** ; elle n'est ni supprimée ni modifiée, même par l'anonymisation RGPD d'une personne (voir § 11).
+- **Conservation** : une facture validée est une pièce comptable conservée **10 ans** ; elle n'est ni supprimée ni modifiée, même par l'anonymisation RGPD d'une personne (voir § 11). Un **règlement** aussi (montant, date, mode, répartition) ; l'anonymisation de son payeur particulier efface seulement ses notes et sa référence.
+- **Relances (0.9.1)** : Finance › Réglages de facturation, 1 à 3 **niveaux** (jours après l'échéance, défaut 7, 30, 60) et **relance automatique** (désactivée par défaut). La commande `tms:finance:remind` tourne chaque jour à **8 h 30** (heure de Paris) et n'envoie rien pour un organisme qui ne l'a pas activée ; les e-mails partent par la messagerie de l'organisme (Connecteurs). Modèles : « Relance de facture — niveau 1, 2, 3 » (Administration › Modèles d'e-mails).
+- **Référentiel « Modes de règlement »** (0.9.1) : Virement, Chèque, Carte bancaire, Espèces, Prélèvement, créés à la mise à jour pour chaque organisme existant ; un mode utilisé par un règlement ne se supprime pas.
 
 ## 19. Admissions : candidats et champs personnalisés
 

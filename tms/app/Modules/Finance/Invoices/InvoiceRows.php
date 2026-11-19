@@ -3,6 +3,7 @@
 namespace App\Modules\Finance\Invoices;
 
 use App\Modules\Crm\Public\Fiches;
+use App\Modules\Finance\Payments\Balances;
 use App\Modules\Sessions\Public\Billing;
 use Illuminate\Support\Collection;
 
@@ -22,6 +23,7 @@ final class InvoiceRows
     {
         $labels = $this->recipients($invoices);
         $numbers = Billing::numbers($invoices->pluck('dossier_id')->unique()->values()->all());
+        $balances = Balances::of($invoices->pluck('id')->all());
 
         return $invoices->map(fn (Invoice $i) => [
             'id' => $i->id,
@@ -38,6 +40,12 @@ final class InvoiceRows
             'dossier' => ['id' => $i->dossier_id, 'number' => $numbers[$i->dossier_id]['number'] ?? '—', 'url' => '/dossiers/'.$i->dossier_id],
             'total_ht_cents' => $i->total_ht_cents,
             'total_ttc_cents' => $i->total_ttc_cents,
+            // Issued invoices only (never a draft nor a credit note): what is paid and left (0.9.1).
+            'paid_cents' => $balances[$i->id]['paid_cents'] ?? null,
+            'remaining_cents' => $balances[$i->id]['remaining_cents'] ?? null,
+            'payment_status' => isset($balances[$i->id]) ? $balances[$i->id]['status']->value : null,
+            'payment_status_label' => isset($balances[$i->id]) ? $balances[$i->id]['status']->label() : null,
+            'overdue' => $balances[$i->id]['overdue'] ?? false,
             'url' => '/finance/invoices/'.$i->id,
         ])->values()->all();
     }

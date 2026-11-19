@@ -4,6 +4,7 @@ namespace App\Modules\Finance\Plans;
 
 use App\Exceptions\UserFacingHttpException;
 use App\Modules\Core\Tenancy\TenantContext;
+use App\Modules\Finance\Billing\Particulier;
 use App\Modules\Finance\Settings\FinanceSettings;
 use App\Modules\Sessions\Public\Billing;
 use Carbon\CarbonImmutable;
@@ -46,6 +47,11 @@ final class BillingPlans
     public const MONTHLY = 'monthly';
 
     public const SCHEDULE = 'schedule';
+
+    public const PARTICULIER_ADVANCE = 'Un particulier ne peut pas verser plus de 30 % du prix avant le début du solde échelonné.';
+
+    /** %s: the first day a particulier may be invoiced. */
+    public const PARTICULIER_DELAY = 'Délai de rétractation du particulier : aucune échéance avant le %s.';
 
     public const RHYTHMS = [self::END, self::MONTHLY, self::SCHEDULE];
 
@@ -99,7 +105,10 @@ final class BillingPlans
         if ($dossier === null) {
             throw new NotFoundHttpException;
         }
-        $values = $this->validated($data, self::startsOn($dossier['sessions']));
+        // A particulier (0.9.1): checked unless the plan is already frozen by an invoice.
+        $locked = BillingPlan::query()->where('dossier_id', $dossierId)->whereNotNull('locked_at')->exists();
+        $particulier = ! $locked && Particulier::is($dossier) ? ['first_day' => Particulier::firstPayableDay($dossier)] : null;
+        $values = $this->validated($data, self::startsOn($dossier['sessions']), $particulier);
 
         $plan = DB::transaction(function () use ($dossierId, $values): BillingPlan {
             $plan = $this->lockedRow($dossierId);
@@ -168,11 +177,12 @@ final class BillingPlans
 
     /**
      * @param  array<string, mixed>  $data
+     * @param  array{first_day: ?string}|null  $particulier  the contractant is a particulier: first instalment ≤ 30 %, not before first_day
      * @return array{rhythm: string, basis: string, unjustified_absences: ?string, schedule: list<array{due_on: string, percent: int}>|null}
      *
      * @throws ValidationException
      */
-    private function validated(array $data, ?string $startsOn): array
+    private function validated(array $data, ?string $startsOn, ?array $particulier = null): array
     {
         $data = self::normalise($data);
         $schedule = $data['rhythm'] === self::SCHEDULE;
@@ -189,7 +199,7 @@ final class BillingPlans
             ] : []),
         ], self::messages());
 
-        $validator->after(function ($v) use ($data, $schedule, $startsOn): void {
+        $validator->after(function ($v) use ($data, $schedule, $startsOn, $particulier): void {
             if ($data['rhythm'] === self::MONTHLY && $data['basis'] === self::PLANNED && ! $v->errors()->has('basis')) {
                 $v->errors()->add('basis', self::MONTHLY_REALISED);
             }
@@ -209,6 +219,21 @@ final class BillingPlans
             $sum = array_sum(array_map(fn (array $i) => (int) $i['percent'], $data['schedule']));
             if ($sum !== 100) {
                 $v->errors()->add('schedule', "La somme des pourcentages de l'échéancier doit faire 100 % (actuellement {$sum} %).");
+            }
+            if ($particulier !== null && $v->errors()->isEmpty()) {
+                // The earliest instalment: at most 30 %, never during the withdrawal delay.
+                $first = (int) array_key_first($data['schedule']);
+                foreach ($data['schedule'] as $i => $instalment) {
+                    if ((string) $instalment['due_on'] < (string) $data['schedule'][$first]['due_on']) {
+                        $first = $i;
+                    }
+                }
+                if ((int) $data['schedule'][$first]['percent'] > Particulier::MAX_ADVANCE_PERCENT) {
+                    $v->errors()->add("schedule.{$first}.percent", self::PARTICULIER_ADVANCE);
+                }
+                if ($particulier['first_day'] !== null && (string) $data['schedule'][$first]['due_on'] < $particulier['first_day']) {
+                    $v->errors()->add("schedule.{$first}.due_on", sprintf(self::PARTICULIER_DELAY, Particulier::french($particulier['first_day'])));
+                }
             }
         });
         $validator->validate();

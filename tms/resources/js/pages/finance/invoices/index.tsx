@@ -1,4 +1,5 @@
 import { FilterSelect } from '@/components/crm/filter-select';
+import { paymentStatusVariant } from '@/components/finance/payments-panel';
 import Heading from '@/components/heading';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -15,12 +16,13 @@ interface Filters {
     status: string | null;
     kind: string | null;
     company: string | null;
+    payment: string | null;
 }
 
 interface InvoicesIndexProps {
     invoices: Paginated<InvoiceRow>;
     filters: Filters;
-    options: { status: Option[]; kind: Option[]; company: Option[] };
+    options: { status: Option[]; kind: Option[]; company: Option[]; payment: Option[] };
     can: { export: boolean; integrity: boolean };
     status?: string;
 }
@@ -39,7 +41,7 @@ export default function InvoicesIndex({ invoices, filters, options, can, status 
         router.get(route('finance.invoices.index'), query, { preserveState: true, replace: true });
     };
     const exportQuery = new URLSearchParams(Object.entries(filters).filter(([, v]) => v) as [string, string][]).toString();
-    const filtered = Boolean(filters.status || filters.kind || filters.company);
+    const filtered = Boolean(filters.status || filters.kind || filters.company || filters.payment);
 
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
@@ -91,6 +93,7 @@ export default function InvoicesIndex({ invoices, filters, options, can, status 
                     <FilterSelect label="État" value={filters.status} options={options.status} onChange={(v) => visit({ status: v })} />
                     <FilterSelect label="Type" value={filters.kind} options={options.kind} onChange={(v) => visit({ kind: v })} />
                     <FilterSelect label="Société" value={filters.company} options={options.company} onChange={(v) => visit({ company: v })} />
+                    <FilterSelect label="Paiement" value={filters.payment} options={options.payment} onChange={(v) => visit({ payment: v })} />
                     <div className="flex items-end">
                         {filtered && (
                             <Button type="button" variant="ghost" size="sm" onClick={() => router.get(route('finance.invoices.index'))}>
@@ -120,6 +123,7 @@ export default function InvoicesIndex({ invoices, filters, options, can, status 
                                         <th className="px-3 py-2 font-medium">Dossier</th>
                                         <th className="px-3 py-2 text-right font-medium">HT</th>
                                         <th className="px-3 py-2 text-right font-medium">TTC</th>
+                                        <th className="px-3 py-2 text-right font-medium">Reste dû</th>
                                         <th className="px-3 py-2 font-medium">État</th>
                                     </tr>
                                 </thead>
@@ -144,8 +148,18 @@ export default function InvoicesIndex({ invoices, filters, options, can, status 
                                             <td className="px-3 py-2 text-right whitespace-nowrap tabular-nums">
                                                 {formatCents(invoice.total_ttc_cents)}
                                             </td>
+                                            <td className="px-3 py-2 text-right whitespace-nowrap tabular-nums">
+                                                {invoice.remaining_cents === null ? '—' : formatCents(Math.max(0, invoice.remaining_cents))}
+                                            </td>
                                             <td className="px-3 py-2">
-                                                <Badge variant={invoiceStatusVariant(invoice.status)}>{invoice.status_label}</Badge>
+                                                <div className="flex flex-wrap gap-1">
+                                                    <Badge variant={invoiceStatusVariant(invoice.status)}>{invoice.status_label}</Badge>
+                                                    {invoice.payment_status && (
+                                                        <Badge variant={paymentStatusVariant(invoice.payment_status, invoice.overdue)}>
+                                                            {invoice.overdue ? 'En retard' : invoice.payment_status_label}
+                                                        </Badge>
+                                                    )}
+                                                </div>
                                             </td>
                                         </tr>
                                     ))}

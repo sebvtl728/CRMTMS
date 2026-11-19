@@ -24,3 +24,6 @@ Schedule::command('tms:crm:expire-quotes')->dailyAt('00:05')->timezone('Europe/P
 
 // Admissions: rejected and withdrawn candidatures anonymised two years after their last change.
 Schedule::command('tms:admissions:purge')->dailyAt('03:50')->timezone('Europe/Paris')->withoutOverlapping()->onOneServer();
+
+// Finance (0.9.1): automatic reminders of unpaid invoices, for the organismes that turned them on.
+Schedule::command('tms:finance:remind')->dailyAt('08:30')->timezone('Europe/Paris')->withoutOverlapping()->onOneServer();

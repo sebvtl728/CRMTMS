@@ -29,6 +29,7 @@ enum ReferenceList: string
     case EducationLevel = 'education_level';
     case TrainingModality = 'training_modality';
     case CandidatureRefusalReason = 'candidature_refusal_reason';
+    case PaymentMethod = 'payment_method';
 
     public function label(): string
     {
@@ -54,6 +55,7 @@ enum ReferenceList: string
             self::EducationLevel => 'Niveaux de diplôme',
             self::TrainingModality => 'Modalités de formation',
             self::CandidatureRefusalReason => 'Motifs de non-admission (candidatures)',
+            self::PaymentMethod => 'Modes de règlement (factures)',
         };
     }
 

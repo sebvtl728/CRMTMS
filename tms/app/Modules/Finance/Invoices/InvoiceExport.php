@@ -6,13 +6,15 @@ use App\Modules\Core\Exports\ExportCell;
 use App\Modules\Core\Exports\ExportResource;
 use App\Modules\Core\Exports\PrefetchesRows;
 use App\Modules\Core\Users\User;
+use App\Modules\Finance\Payments\Balances;
 use App\Modules\Sessions\Public\Billing;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Collection;
 
 /**
  * CSV export of the « Factures » list: the columns of the list, French dates
- * and amounts. Names and dossier numbers are read once per chunk. No notes,
+ * and amounts, what is paid and left (0.9.1). Names, dossier numbers and
+ * balances are read once per chunk. No notes,
  * no lines, no address nor e-mail.
  */
 final class InvoiceExport implements ExportResource, PrefetchesRows
@@ -22,6 +24,9 @@ final class InvoiceExport implements ExportResource, PrefetchesRows
 
     /** @var array<string, array{number: string}> */
     private array $dossiers = [];
+
+    /** @var array<string, array<string, mixed>> */
+    private array $balances = [];
 
     public function __construct(private readonly InvoiceRows $rows) {}
 
@@ -48,6 +53,9 @@ final class InvoiceExport implements ExportResource, PrefetchesRows
             'total_vat' => 'TVA',
             'total_ttc' => 'TTC',
             'status' => 'État',
+            'paid' => 'Réglé',
+            'remaining' => 'Reste dû',
+            'payment_status' => 'État de paiement',
         ];
     }
 
@@ -67,6 +75,7 @@ final class InvoiceExport implements ExportResource, PrefetchesRows
         $invoices = new Collection($models);
         $this->recipients = $this->rows->recipients($invoices);
         $this->dossiers = Billing::numbers($invoices->pluck('dossier_id')->unique()->values()->all());
+        $this->balances = Balances::of($invoices->pluck('id')->all());
     }
 
     public function value(Model $model, string $column): string|ExportCell|null
@@ -84,6 +93,11 @@ final class InvoiceExport implements ExportResource, PrefetchesRows
             'total_vat' => self::amount($model->total_vat_cents),
             'total_ttc' => self::amount($model->total_ttc_cents),
             'status' => $model->status->label(),
+            'paid' => isset($this->balances[$model->id]) ? self::amount($this->balances[$model->id]['paid_cents']) : null,
+            'remaining' => isset($this->balances[$model->id]) ? self::amount($this->balances[$model->id]['remaining_cents']) : null,
+            'payment_status' => isset($this->balances[$model->id])
+                ? ($this->balances[$model->id]['overdue'] ? 'En retard' : $this->balances[$model->id]['status']->label())
+                : null,
             default => null,
         };
     }

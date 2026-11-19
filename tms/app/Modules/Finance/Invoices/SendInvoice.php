@@ -12,6 +12,7 @@ use App\Modules\Core\Tenancy\TenantAwareJob;
 use App\Modules\Core\Tenancy\TenantContext;
 use App\Modules\Core\Tenancy\TenantStorage;
 use App\Modules\Core\Users\User;
+use App\Modules\Finance\Reminders\Reminders;
 use Carbon\CarbonImmutable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
@@ -51,6 +52,8 @@ class SendInvoice implements ShouldQueue
 
     public const ALTERED_DOCUMENT = 'Le PDF archivé ne correspond plus à son empreinte : l\'e-mail n\'est pas parti.';
 
+    public const NOT_DUE = 'La facture a été réglée ou ses relances suspendues entre-temps : la relance n\'est pas partie.';
+
     public int $tries = 3;
 
     public function __construct(public string $sendingId)
@@ -71,6 +74,13 @@ class SendInvoice implements ShouldQueue
         $sending = InvoiceSending::query()->find($this->sendingId);
         $invoice = $sending === null ? null : Invoice::query()->with('company')->find($sending->invoice_id);
         if ($sending === null || $invoice === null || $sending->status !== 'pending' || $invoice->isDraft()) {
+            return;
+        }
+
+        // A reminder paid or paused since it was queued (retries last minutes): nothing leaves.
+        if ($sending->purpose === InvoiceSending::REMINDER && ! Reminders::stillDue($invoice)) {
+            $this->failed(new InvoiceMailFailed(self::NOT_DUE, 0), 'not_due');
+
             return;
         }
 
@@ -140,7 +150,7 @@ class SendInvoice implements ShouldQueue
                 'updated_at' => $now,
             ]);
         });
-        $audit->record('invoice.email_sent', $invoice, [], ['sending' => $sending->id], self::sender($sending));
+        $audit->record($sending->purpose === InvoiceSending::REMINDER ? 'invoice.reminder_sent' : 'invoice.email_sent', $invoice, [], ['sending' => $sending->id, ...($sending->reminder_level === null ? [] : ['level' => $sending->reminder_level])], self::sender($sending));
     }
 
     /**
@@ -165,7 +175,7 @@ class SendInvoice implements ShouldQueue
             Invoice::query()->whereKey($sending->invoice_id)->toBase()
                 ->update(['email_status' => 'failed', 'email_error_code' => $code, 'updated_at' => CarbonImmutable::now()]);
             $invoice = Invoice::query()->find($sending->invoice_id);
-            app(AuditRecorder::class)->record('invoice.email_failed', $invoice, [], ['sending' => $sending->id, 'code' => $code], self::sender($sending));
+            app(AuditRecorder::class)->record($sending->purpose === InvoiceSending::REMINDER ? 'invoice.reminder_failed' : 'invoice.email_failed', $invoice, [], ['sending' => $sending->id, 'code' => $code], self::sender($sending));
         });
     }
 

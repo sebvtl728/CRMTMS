@@ -1,4 +1,6 @@
 import { InvoiceSendDialog, type InvoiceMessageDefaults } from '@/components/finance/invoice-send-dialog';
+import { PaymentsPanel, type InvoiceBalance, type InvoicePayment } from '@/components/finance/payments-panel';
+import { RemindersPanel, type InvoiceReminders } from '@/components/finance/reminders-panel';
 import Heading from '@/components/heading';
 import InputError from '@/components/input-error';
 import { Badge } from '@/components/ui/badge';
@@ -64,8 +66,12 @@ interface EmailState {
 interface ShowProps {
     invoice: InvoicePage;
     options: { units: Option[]; vat_rates: Option[]; vat_exempt: boolean };
-    can: { update: boolean; validate: boolean; credit_note: boolean; send: boolean };
+    can: { update: boolean; validate: boolean; credit_note: boolean; send: boolean; record_payment: boolean; remind: boolean };
     email: EmailState | null;
+    balance: InvoiceBalance | null;
+    payments: InvoicePayment[];
+    reminders: InvoiceReminders | null;
+    warnings: string[];
     status?: string;
 }
 
@@ -472,7 +478,7 @@ function EmailPanel({ invoice, email, canSend }: { invoice: InvoicePage; email: 
     );
 }
 
-export default function InvoiceShow({ invoice, options, can, email, status }: ShowProps) {
+export default function InvoiceShow({ invoice, options, can, email, balance, payments, reminders, warnings, status }: ShowProps) {
     const { errors } = usePage<{ errors: Record<string, string> }>().props;
     const breadcrumbs: BreadcrumbItem[] = [
         { title: 'Factures', href: '/finance/invoices' },
@@ -494,6 +500,14 @@ export default function InvoiceShow({ invoice, options, can, email, status }: Sh
 
                 {status && <div className="text-sm font-medium text-green-600">{status}</div>}
                 <InputError message={errors.invoice} />
+                {warnings.map((w) => (
+                    <p
+                        key={w}
+                        className="rounded-md border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900 dark:border-amber-700 dark:bg-amber-950 dark:text-amber-100"
+                    >
+                        {w}
+                    </p>
+                ))}
 
                 <div className="flex flex-wrap items-start gap-2">
                     {can.validate && <ValidateButton invoice={invoice} />}
@@ -546,6 +560,18 @@ export default function InvoiceShow({ invoice, options, can, email, status }: Sh
                         </div>
                     )}
                 </dl>
+
+                {balance && <PaymentsPanel invoiceId={invoice.id} balance={balance} payments={payments} canRecord={can.record_payment} />}
+
+                {reminders && balance && balance.remaining_cents > 0 && (
+                    <RemindersPanel
+                        invoiceId={invoice.id}
+                        title={invoice.title}
+                        reminders={reminders}
+                        canRemind={can.remind}
+                        deliversNowhere={email?.defaults?.delivers_nowhere ?? false}
+                    />
+                )}
 
                 {email && <EmailPanel invoice={invoice} email={email} canSend={can.send} />}
 

@@ -20,6 +20,7 @@ class FinanceSettingsController extends Controller
     {
         return Inertia::render('finance/settings', [
             'settings' => ['unjustified_absences' => FinanceSettings::absencesDefault()],
+            'reminders' => ['days' => FinanceSettings::reminderDays(), 'auto' => FinanceSettings::autoReminders()],
             'status' => $request->session()->get('status'),
         ]);
     }
@@ -35,5 +36,14 @@ class FinanceSettingsController extends Controller
         FinanceSettings::saveAbsences($validated['unjustified_absences']);
 
         return to_route('finance.settings.edit')->with('status', 'Réglages de facturation enregistrés.');
+    }
+
+    /** The reminder levels (days after the due date) and the automatic sending (0.9.1). */
+    public function reminders(Request $request): RedirectResponse
+    {
+        $days = $request->input('days');
+        FinanceSettings::saveReminders(is_array($days) ? array_values(array_filter($days, fn ($d) => $d !== null && $d !== '')) : $days, $request->boolean('auto'));
+
+        return to_route('finance.settings.edit')->with('status', 'Réglages des relances enregistrés.');
     }
 }

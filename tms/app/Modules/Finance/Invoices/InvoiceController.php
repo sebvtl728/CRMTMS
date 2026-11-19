@@ -9,10 +9,16 @@ use App\Modules\Core\Audit\AuditRecorder;
 use App\Modules\Core\Companies\Company;
 use App\Modules\Core\Exports\CsvExporter;
 use App\Modules\Core\Exports\XlsxExporter;
+use App\Modules\Core\References\ReferenceItem;
 use App\Modules\Core\Tenancy\TenantStorage;
 use App\Modules\Core\Users\User;
+use App\Modules\Finance\Billing\Particulier;
 use App\Modules\Finance\Integrity;
+use App\Modules\Finance\Payments\Balances;
+use App\Modules\Finance\Payments\Payment;
+use App\Modules\Finance\Payments\PaymentAllocation;
 use App\Modules\Finance\Permissions;
+use App\Modules\Finance\Reminders\ReminderController;
 use App\Modules\Sessions\Public\Billing;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
@@ -52,12 +58,14 @@ class InvoiceController extends Controller
         $page = $this->listQuery($user, $filters)->paginate(25)->withQueryString();
 
         return Inertia::render('finance/invoices/index', [
+            'status' => $request->session()->get('status'),
             'invoices' => [...$page->toArray(), 'data' => $this->rows->rows($page->getCollection())],
             'filters' => $filters,
             'options' => [
                 'status' => InvoiceStatus::options(),
                 'kind' => [['value' => Invoice::INVOICE, 'label' => 'Facture'], ['value' => Invoice::CREDIT_NOTE, 'label' => 'Avoir']],
                 'company' => Company::query()->orderBy('name')->get(['id', 'name'])->map(fn (Company $c) => ['value' => $c->id, 'label' => $c->name])->values()->all(),
+                'payment' => [['value' => 'open', 'label' => 'Non soldées'], ['value' => 'overdue', 'label' => 'En retard']],
             ],
             'can' => [
                 'export' => $user->can(Permissions::VIEW),
@@ -101,11 +109,12 @@ class InvoiceController extends Controller
     }
 
     /**
-     * @return array{status: string|null, kind: string|null, company: string|null}
+     * @return array{status: string|null, kind: string|null, company: string|null, payment: string|null}
      */
     private function filters(Request $request): array
     {
         return [
+            'payment' => in_array($p = $request->query('payment'), ['open', 'overdue'], true) ? $p : null,
             'status' => in_array($s = $request->query('status'), InvoiceStatus::values(InvoiceStatus::cases()), true) ? $s : null,
             'kind' => in_array($k = $request->query('kind'), [Invoice::INVOICE, Invoice::CREDIT_NOTE], true) ? $k : null,
             'company' => is_string($c = $request->query('company')) && Str::isUuid($c) ? $c : null,
@@ -116,7 +125,7 @@ class InvoiceController extends Controller
      * The invoices of the list: the dossiers of the scope of finance.invoices.view
      * (in the trash too: their validated invoices stay findable), newest first.
      *
-     * @param  array{status: string|null, kind: string|null, company: string|null}  $filters
+     * @param  array{status: string|null, kind: string|null, company: string|null, payment: string|null}  $filters
      * @return Builder<Invoice>
      */
     private function listQuery(User $user, array $filters): Builder
@@ -126,6 +135,11 @@ class InvoiceController extends Controller
             ->when($filters['status'], fn ($q, string $s) => $q->where('status', $s))
             ->when($filters['kind'], fn ($q, string $k) => $q->where('kind', $k))
             ->when($filters['company'], fn ($q, string $id) => $q->where('company_id', $id))
+            // « Non soldées » / « En retard »: issued invoices with something left to pay (0.9.1).
+            ->when($filters['payment'], fn ($q) => $q->where('kind', Invoice::INVOICE)
+                ->whereIn('status', InvoiceStatus::values(InvoiceStatus::ISSUED))
+                ->whereRaw(Balances::remainingSql().' > 0'))
+            ->when($filters['payment'] === 'overdue', fn ($q) => $q->where('due_on', '<', Balances::today()))
             ->orderByRaw('issued_on desc nulls first')->orderByDesc('created_at')->orderByDesc('id');
     }
 
@@ -146,7 +160,15 @@ class InvoiceController extends Controller
                 'validate' => $invoice->isDraft() && $this->validates($request, $invoice),
                 'credit_note' => ! $invoice->isDraft() && $invoice->kind === Invoice::INVOICE && $this->manages($request, $invoice),
                 'send' => $canSend,
+                'remind' => $canSend && $invoice->kind === Invoice::INVOICE,
+                'record_payment' => $invoice->kind === Invoice::INVOICE && ! $invoice->isDraft() && $request->user()?->can(Permissions::PAYMENTS) === true,
             ],
+            'balance' => $this->balance($invoice),
+            'reminders' => ReminderController::forPage($invoice, $canSend),
+            'warnings' => $this->warnings($invoice),
+            // The message of the last action (validated, sent, payment recorded…): Inertia does not share it.
+            'status' => $request->session()->get('status'),
+            'payments' => $this->payments($invoice),
             'email' => $invoice->isDraft() ? null : [
                 'status' => $invoice->email_status,
                 'sent_at' => $invoice->sent_at?->toIso8601String(),
@@ -154,6 +176,69 @@ class InvoiceController extends Controller
                 'sendings' => $this->sendings($invoice),
             ],
         ]);
+    }
+
+    /**
+     * What a draft should be checked for before its validation (0.9.1): a
+     * particulier whose contract signature is unknown (withdrawal delay).
+     *
+     * @return list<string>
+     */
+    private function warnings(Invoice $invoice): array
+    {
+        if (! $invoice->isDraft() || $invoice->kind !== Invoice::INVOICE || $invoice->funding_id !== null) {
+            return [];
+        }
+        $dossier = Billing::dossier($invoice->dossier_id);
+
+        return $dossier !== null && Particulier::is($dossier) && ($dossier['convention_signed_on'] ?? null) === null ? [Particulier::NO_SIGNATURE] : [];
+    }
+
+    /**
+     * What is paid and left on an issued invoice; null for a draft or a credit note.
+     *
+     * @return array<string, mixed>|null
+     */
+    private function balance(Invoice $invoice): ?array
+    {
+        $b = Balances::one($invoice);
+
+        return $b === null ? null : [
+            'ttc_cents' => $b['ttc_cents'],
+            'credited_cents' => $b['credited_cents'],
+            'paid_cents' => $b['paid_cents'],
+            'remaining_cents' => $b['remaining_cents'],
+            'status' => $b['status']->value,
+            'status_label' => $b['status']->label(),
+            'overdue' => $b['overdue'],
+            'overpaid' => $b['overpaid'],
+        ];
+    }
+
+    /**
+     * The payments settling an invoice, oldest first (never their notes).
+     *
+     * @return list<array<string, mixed>>
+     */
+    private function payments(Invoice $invoice): array
+    {
+        $allocations = PaymentAllocation::query()->where('invoice_id', $invoice->id)->get();
+        $payments = Payment::query()->whereKey($allocations->pluck('payment_id')->all())->get()->keyBy('id');
+        $methods = ReferenceItem::withTrashed()->whereKey($payments->pluck('method_id')->unique()->values()->all())->pluck('label', 'id');
+
+        return $allocations->map(function (PaymentAllocation $a) use ($payments, $methods): array {
+            $p = $payments[$a->payment_id];
+
+            return [
+                'id' => $p->id,
+                'received_on' => $p->received_on->toDateString(),
+                'method' => $methods[$p->method_id] ?? '—',
+                'reference' => $p->reference,
+                'amount_cents' => $a->amount_cents,
+                'payment_cents' => $p->amount_cents,
+                'url' => '/finance/payments/'.$p->id.'/edit',
+            ];
+        })->sortBy('received_on')->values()->all();
     }
 
     /**

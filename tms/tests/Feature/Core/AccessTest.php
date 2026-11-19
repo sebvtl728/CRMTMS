@@ -80,7 +80,7 @@ it('does not overwrite the matrix of an existing role when seeding again', funct
             'crm.revenue.view', 'crm.revenue.manage', 'crm.export', 'crm.gdpr', 'catalogue.view', 'catalogue.manage', 'catalogue.delete',
             'sessions.dossiers.view', 'sessions.sessions.view', 'sessions.seances.view', 'sessions.seances.manage', 'sessions.attendance.manage',
             'sessions.attendance.close', 'sessions.trainers.manage', 'sessions.rooms.manage',
-            'finance.invoices.view', 'finance.invoices.manage', 'finance.invoices.validate',
+            'finance.invoices.view', 'finance.invoices.manage', 'finance.invoices.validate', 'finance.payments.manage',
             'admissions.candidatures.view', 'admissions.sensitive.view']);
 });
 

@@ -41,6 +41,7 @@ class ToInvoiceController extends Controller
         ]);
 
         return Inertia::render('finance/to-invoice', [
+            'status' => $request->session()->get('status'),
             'rows' => $due['rows'],
             'soon' => $due['soon'],
             'filters' => $filters,
