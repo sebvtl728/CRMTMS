@@ -13,6 +13,7 @@ use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Inertia\Inertia;
 use Inertia\Response;
+use Symfony\Component\HttpFoundation\BinaryFileResponse;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 /** Qualité › Qualiopi: the 33 indicators by criterion, and one indicator. */
@@ -62,6 +63,14 @@ class QualiopiController extends Controller
             'can' => ['manage' => self::user($request)->can(Permissions::MANAGE)],
             'status' => $request->session()->get('status'),
         ]);
+    }
+
+    public function export(Request $request, QualityExport $export): BinaryFileResponse
+    {
+        $path = $export->build(self::user($request));
+
+        return response()->download($path, 'dossier-qualiopi-'.now('Europe/Paris')->format('Y-m-d').'.zip', ['Content-Type' => 'application/zip'])
+            ->deleteFileAfterSend();
     }
 
     public function addProof(Request $request, int $number, QualityProofs $proofs): RedirectResponse
