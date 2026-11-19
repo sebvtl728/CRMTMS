@@ -1,8 +1,9 @@
 # Documents de formation
 
 Depuis la 0.10, le TMS produit les documents d'un dossier avec ses données : **convention de formation** (contractant
-entreprise) et **contrat de formation** (particulier). Convocations, attestations, certificat de réalisation et
-signature en ligne arrivent dans les livraisons suivantes de la 0.10.
+entreprise) et **contrat de formation** (particulier) pour le dossier ; **convocation**, **attestation de fin de
+formation** et **certificat de réalisation** pour chaque stagiaire (§ 6). La signature en ligne arrive avec la
+livraison suivante de la 0.10.
 
 ## 1. Droits
 
@@ -57,6 +58,27 @@ travail.
 
 La **signature et le cachet** de la société se déposent dans Administration › Sociétés (image PNG ou JPEG) : ils
 s'impriment sur les documents émis ensuite.
+
+## 6. Documents des stagiaires (page de la session)
+
+Sur la page de la session, étape **Stagiaires**, bloc **Documents** : un tableau des stagiaires (inscrits, confirmés,
+sortis) avec, pour chacun, sa convocation, son attestation et son certificat.
+
+- **Émettre pour tous** émet le document de chaque stagiaire qui ne l'a pas encore (tout ou rien : si un document
+  échoue, aucun n'est émis) ; **Émettre** sur une ligne l'émet pour ce stagiaire seulement.
+- **Envoyer à tous** envoie les documents émis et pas encore envoyés aux stagiaires qui ont une adresse e-mail ; le
+  message indique combien n'en ont pas.
+- **Convocation** : formation, dates, durée, lieu et tableau des séances planifiées (date, horaires, lieu), textes
+  « Message » et « Informations pratiques » modifiables.
+- **Attestation de fin de formation** : stagiaire, entreprise, formation, période (de son entrée à sa sortie), heures
+  réalisées (présences et heures saisies) sur les heures prévues ; textes modifiables.
+- **Certificat de réalisation** : modèle du ministère du Travail, texte non modifiable, durée = heures réalisées.
+- L'attestation et le certificat s'émettent **à la fin de la formation**, ou plus tôt pour un stagiaire **sorti**
+  (abandon). Rien n'est émis pour une inscription annulée ou en liste d'attente, ni pour une session annulée.
+- Quand chaque stagiaire encore attendu d'un dossier a reçu sa convocation, le dossier passe de **Convention signée** à
+  **Convocations envoyées**.
+- La synthèse de la session porte deux cartes : **Convocations** (envoyées / stagiaires) et **Attestations** (émises /
+  stagiaires, à faire après la fin de la formation).
 
 ## 5. Données personnelles
 
