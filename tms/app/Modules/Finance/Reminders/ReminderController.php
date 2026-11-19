@@ -61,8 +61,15 @@ class ReminderController extends Controller
     {
         /** @var User $user */
         $user = $request->user();
-        $ids = array_values(array_unique(array_filter((array) $request->input('ids', []), fn ($id) => is_string($id) && Str::isUuid($id))));
-        $ids = array_slice($ids, 0, Reminders::LIMIT);
+        // [{id, level}]: the level each row showed; another level due meanwhile is skipped.
+        $levels = [];
+        foreach ((array) $request->input('reminders', []) as $row) {
+            if (is_array($row) && is_string($row['id'] ?? null) && Str::isUuid($row['id']) && is_numeric($row['level'] ?? null)) {
+                $levels[$row['id']] = (int) $row['level'];
+            }
+        }
+        $levels = array_slice($levels, 0, Reminders::LIMIT, true);
+        $ids = array_keys($levels);
         $sent = 0;
         $skipped = 0;
         foreach (Invoice::query()->whereKey($ids)->get() as $invoice) {
@@ -72,7 +79,7 @@ class ReminderController extends Controller
                 continue;
             }
             try {
-                $this->reminders->send($user, $invoice);
+                $this->reminders->send($user, $invoice, null, $levels[$invoice->id]);
                 $sent++;
             } catch (UserFacingHttpException) {
                 $skipped++;
@@ -81,7 +88,7 @@ class ReminderController extends Controller
         $skipped += count($ids) - $sent - $skipped;
 
         return back()->with('status', $sent.' relance'.($sent > 1 ? 's envoyées' : ' envoyée')
-            .($skipped > 0 ? ', '.$skipped.' ignorée'.($skipped > 1 ? 's' : '').' (déjà soldée, suspendue ou sans adresse).' : '.'));
+            .($skipped > 0 ? ', '.$skipped.' ignorée'.($skipped > 1 ? 's' : '').' (déjà soldée, suspendue, déjà relancée ou sans adresse).' : '.'));
     }
 
     /** « Relancer » from the invoice page: the message typed. */
@@ -90,7 +97,8 @@ class ReminderController extends Controller
         $invoice = $this->find($request, $invoiceId);
         /** @var User $user */
         $user = $request->user();
-        $sending = $this->reminders->send($user, $invoice, $request->message());
+        $level = $request->input('level');
+        $sending = $this->reminders->send($user, $invoice, $request->message(), is_numeric($level) ? (int) $level : null);
 
         return back()->with('status', 'Relance de niveau '.$sending->reminder_level.' en cours d\'envoi.');
     }

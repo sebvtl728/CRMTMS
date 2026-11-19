@@ -55,7 +55,7 @@ Route::middleware(['auth', 'can:finance.invoices.view'])->prefix('finance')->nam
 Route::middleware(['auth', 'can:finance.payments.manage'])->prefix('finance/payments')->name('finance.payments.')->group(function () {
     Route::get('/', [PaymentController::class, 'index'])->name('index');
     Route::get('create', [PaymentController::class, 'create'])->name('create');
-    Route::get('payers', [PaymentController::class, 'payers'])->middleware('throttle:60,1')->name('payers');
+    Route::get('payers', [PaymentController::class, 'payers'])->middleware('throttle:finance-lookup')->name('payers');
     Route::get('open-invoices', [PaymentController::class, 'openInvoices'])->name('open-invoices');
     Route::post('/', [PaymentController::class, 'store'])->name('store');
     Route::get('{paymentId}/edit', [PaymentController::class, 'edit'])->name('edit');

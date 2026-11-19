@@ -50,8 +50,8 @@ it('sends the reminders chosen, skipping an invoice paid meanwhile', function ()
     remindPage($user);
     payRecord($user, $second, 5000);
 
-    $this->post('/finance/reminders/send', ['ids' => [$invoice->id, $second->id]])
-        ->assertRedirect()->assertSessionHas('status', '1 relance envoyée, 1 ignorée (déjà soldée, suspendue ou sans adresse).');
+    $this->post('/finance/reminders/send', ['reminders' => [['id' => $invoice->id, 'level' => 1], ['id' => $second->id, 'level' => 1]]])
+        ->assertRedirect()->assertSessionHas('status', '1 relance envoyée, 1 ignorée (déjà soldée, suspendue, déjà relancée ou sans adresse).');
     expect(InvoiceSending::query()->where('purpose', 'reminder')->pluck('invoice_id')->all())->toBe([$invoice->id]);
 });
 
@@ -64,7 +64,9 @@ it('reminds one invoice with the message typed, never a paused one', function ()
     $this->post('/finance/invoices/'.$invoice->id.'/remind', ['to' => 'a@b.test', 'subject' => 'Relance', 'body' => 'Bonjour'])->assertStatus(409);
 
     $this->delete('/finance/invoices/'.$invoice->id.'/reminders/pause')->assertRedirect()->assertSessionHas('status', 'Relances reprises.');
-    $this->post('/finance/invoices/'.$invoice->id.'/remind', ['to' => 'a@b.test', 'subject' => 'Relance', 'body' => 'Bonjour'])
+    // The level shown is no longer the one due: refused.
+    $this->post('/finance/invoices/'.$invoice->id.'/remind', ['to' => 'a@b.test', 'subject' => 'Relance', 'body' => 'Bonjour', 'level' => 2])->assertStatus(409);
+    $this->post('/finance/invoices/'.$invoice->id.'/remind', ['to' => 'a@b.test', 'subject' => 'Relance', 'body' => 'Bonjour', 'level' => 1])
         ->assertRedirect()->assertSessionHas('status', 'Relance de niveau 1 en cours d\'envoi.');
     expect(InvoiceSending::query()->where('purpose', 'reminder')->sole()->email)->toBe('a@b.test')
         ->and(AuditLog::query()->where('event', 'invoice.reminder_queued')->count())->toBe(1);

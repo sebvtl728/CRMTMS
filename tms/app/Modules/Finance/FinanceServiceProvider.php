@@ -90,6 +90,8 @@ class FinanceServiceProvider extends ServiceProvider
         // Rendering a PDF (preview, archive at validation) costs a conversion.
         $by = fn (Request $request, string $name): string => $name.':'.($request->user()?->getAuthIdentifier() ?? $request->ip());
         RateLimiter::for('invoice-mail', fn (Request $request) => Limit::perMinute(20)->by($by($request, 'invoice-mail')));
+        // The search of a payer (Finance › Règlements), typed letter by letter.
+        RateLimiter::for('finance-lookup', fn (Request $request) => Limit::perMinute(60)->by($by($request, 'finance-lookup')));
         RateLimiter::for('finance-export', fn (Request $request) => Limit::perMinute(20)->by($by($request, 'finance-export')));
         // Recomputing the chain reads every archived PDF.
         RateLimiter::for('invoice-integrity', fn (Request $request) => Limit::perMinute(6)->by($by($request, 'invoice-integrity')));

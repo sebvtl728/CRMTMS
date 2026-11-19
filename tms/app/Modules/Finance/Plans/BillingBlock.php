@@ -49,7 +49,7 @@ final class BillingBlock
         $funder = fn (array $f) => $label($f['funder']);
         $balances = Balances::of($invoices->pluck('id')->all());
         $left = fn (string $id): string => ! isset($balances[$id]) ? '' : ($balances[$id]['remaining_cents'] <= 0
-            ? ' · Soldée'
+            ? ($balances[$id]['overpaid'] ? ' · Trop-perçu '.Money::format(-$balances[$id]['remaining_cents']) : ' · Soldée')
             : ' · Reste dû '.Money::format($balances[$id]['remaining_cents']).($balances[$id]['overdue'] ? ' (en retard)' : ''));
 
         return [

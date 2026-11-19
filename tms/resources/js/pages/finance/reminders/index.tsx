@@ -46,7 +46,7 @@ export default function RemindersIndex({ reminders, status }: { reminders: Remin
                         onClick={() =>
                             router.post(
                                 '/finance/reminders/send',
-                                { ids: chosen },
+                                { reminders: reminders.filter((r) => chosen.includes(r.id)).map((r) => ({ id: r.id, level: r.level })) },
                                 { preserveScroll: true, onStart: () => setSending(true), onFinish: () => setSending(false) },
                             )
                         }

@@ -37,6 +37,9 @@ final class Reminders
     /** At most this many invoices on the page (oldest due first). */
     public const LIMIT = 500;
 
+    /** At least this many days between two reminders of an invoice, whatever the levels. */
+    public const MIN_GAP_DAYS = 7;
+
     public function __construct(private readonly InvoiceSender $sender) {}
 
     /**
@@ -66,12 +69,16 @@ final class Reminders
      * Sends the reminder due now: the message typed, or the level's template.
      *
      * @param  array{to: string, subject: string, body: string}|null  $message
+     * @param  int|null  $expected  the level the user saw: refused when another one is due now
      *
      * @throws UserFacingHttpException 409 not to remind, no address, a sending under way
      */
-    public function send(?User $by, Invoice $invoice, ?array $message = null): InvoiceSending
+    public function send(?User $by, Invoice $invoice, ?array $message = null, ?int $expected = null): InvoiceSending
     {
         $level = $this->nextLevel($invoice) ?? throw new UserFacingHttpException(409, self::NOT_DUE);
+        if ($expected !== null && $expected !== $level) {
+            throw new UserFacingHttpException(409, self::NOT_DUE);
+        }
         $message ??= ReminderMail::defaults($invoice, $level);
         if (trim($message['to']) === '') {
             throw new UserFacingHttpException(409, self::NO_EMAIL);
@@ -110,6 +117,16 @@ final class Reminders
     }
 
     /**
+     * Whether a reminder of $level may still leave now: the invoice not
+     * settled nor paused (SendInvoice checks it again at the last moment).
+     */
+    public static function stillDue(Invoice $invoice): bool
+    {
+        return ReminderPause::query()->where('invoice_id', $invoice->id)->doesntExist()
+            && (Balances::one($invoice)['remaining_cents'] ?? 0) > 0;
+    }
+
+    /**
      * Issued invoices, not settled, past due, not paused.
      *
      * @return Builder<Invoice>
@@ -122,7 +139,12 @@ final class Reminders
             ->whereNotNull('due_on')
             ->where('due_on', '<', Balances::today())
             ->whereRaw(Balances::remainingSql().' > 0')
-            ->whereNotExists(fn ($q) => $q->selectRaw('1')->from('invoice_reminder_pauses as rp')->whereColumn('rp.invoice_id', 'invoices.id'));
+            ->whereNotExists(fn ($q) => $q->selectRaw('1')->from('invoice_reminder_pauses as rp')->whereColumn('rp.invoice_id', 'invoices.id'))
+            // In SQL, before the page limit: a reminder under way, or every level already sent (never crowding the page).
+            ->whereNotExists(fn ($q) => $q->selectRaw('1')->from('invoice_sendings as rs')->whereColumn('rs.invoice_id', 'invoices.id')
+                ->where('rs.purpose', InvoiceSending::REMINDER)
+                ->where(fn ($w) => $w->where('rs.status', 'pending')
+                    ->orWhere(fn ($x) => $x->where('rs.status', 'sent')->where('rs.reminder_level', '>=', count(FinanceSettings::reminderDays())))));
     }
 
     /**
@@ -155,6 +177,14 @@ final class Reminders
                 return null;
             }
             $last = $sent->sortByDesc('reminder_level')->first();
+            if ($last !== null) {
+                // Never two reminders the same day, and the levels spaced as configured (a backlog never gets 1, 2, 3 on three mornings).
+                $lastDay = CarbonImmutable::instance($last->sent_at ?? $last->created_at ?? $today)->setTimezone('Europe/Paris')->startOfDay();
+                $gap = max(self::MIN_GAP_DAYS, $days[$level - 1] - ($days[$level - 2] ?? 0));
+                if ((int) $lastDay->diffInDays($today) < $gap) {
+                    return null;
+                }
+            }
 
             return [
                 'invoice' => $invoice,

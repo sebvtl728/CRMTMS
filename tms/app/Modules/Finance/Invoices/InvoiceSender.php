@@ -5,6 +5,7 @@ namespace App\Modules\Finance\Invoices;
 use App\Exceptions\UserFacingHttpException;
 use App\Modules\Core\Audit\AuditRecorder;
 use App\Modules\Core\Users\User;
+use App\Modules\Finance\Reminders\Reminders;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\DB;
 
@@ -82,7 +83,13 @@ final class InvoiceSender
             throw new UserFacingHttpException(409, self::NOTHING_TO_RESEND);
         }
 
-        return $this->queue($user, $invoice, ['to' => $last->email, 'subject' => $last->subject, 'body' => $last->body], $last->purpose === InvoiceSending::REMINDER ? $last->reminder_level : null);
+        $message = ['to' => $last->email, 'subject' => $last->subject, 'body' => $last->body];
+        if ($last->purpose === InvoiceSending::REMINDER) {
+            // A reminder again only while that very level is still due (not paid, paused nor overtaken meanwhile).
+            return app(Reminders::class)->send($user, $invoice, $message, $last->reminder_level);
+        }
+
+        return $this->queue($user, $invoice, $message);
     }
 
     private function guard(Invoice $invoice): void

@@ -27,6 +27,7 @@ export function InvoiceSendDialog({
     onClose,
     action,
     heading,
+    level,
 }: {
     invoiceId: string;
     title: string;
@@ -36,11 +37,14 @@ export function InvoiceSendDialog({
     /** Where the message goes (default: « Envoyer » the invoice); a reminder posts elsewhere. */
     action?: string;
     heading?: string;
+    /** Sent with the message (a reminder: the level shown). */
+    level?: number;
 }) {
     const { data, setData, post, processing, errors, reset, clearErrors } = useForm({
         to: defaults.to,
         subject: defaults.subject,
         body: defaults.body,
+        level: level ?? null,
     });
 
     useEffect(() => {

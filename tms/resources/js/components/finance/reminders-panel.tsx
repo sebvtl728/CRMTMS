@@ -113,6 +113,7 @@ export function RemindersPanel({
                     open={open}
                     onClose={() => setOpen(false)}
                     action={`/finance/invoices/${invoiceId}/remind`}
+                    level={reminders.next_level ?? undefined}
                     heading={`Relancer ${title} (niveau ${reminders.next_level})`}
                 />
             )}

@@ -30,8 +30,9 @@ final class Particulier
     }
 
     /**
-     * The first day a particulier may be invoiced: the signature of the
-     * contract + 14 days; null when the contractant is not a particulier or
+     * The first day a particulier may be invoiced: the day after the delay
+     * expires (14 days counted from the day after the signature, so the
+     * signature + 15 days); null when the contractant is not a particulier or
      * the signature date is unknown.
      *
      * @param  array<string, mixed>  $dossier
@@ -43,7 +44,7 @@ final class Particulier
             return null;
         }
 
-        return CarbonImmutable::parse($signed, 'Europe/Paris')->addDays(self::WITHDRAWAL_DAYS)->toDateString();
+        return CarbonImmutable::parse($signed, 'Europe/Paris')->addDays(self::WITHDRAWAL_DAYS + 1)->toDateString();
     }
 
     /** « 24/11/2026 ». */

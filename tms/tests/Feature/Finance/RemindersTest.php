@@ -144,3 +144,59 @@ it('validates the reminder levels of the organisme', function () {
     FinanceSettings::saveReminders([5], true);
     expect(FinanceSettings::autoReminders())->toBeTrue();
 });
+
+it('spaces the levels of a backlog and never sends two the same day', function () {
+    Queue::fake();
+    [$invoice] = payInvoice();
+    $reminders = app(Reminders::class);
+
+    // 70 days late: level 1 first, whatever the delay.
+    remindOn('2027-02-25');
+    expect($reminders->nextLevel($invoice))->toBe(1);
+    $reminders->send(null, $invoice);
+    remindDelivered($invoice);
+    expect($reminders->nextLevel($invoice))->toBeNull();
+
+    // Level 2 only 23 days (30 − 7) after level 1.
+    remindOn('2027-03-19');
+    expect($reminders->nextLevel($invoice))->toBeNull();
+    remindOn('2027-03-20');
+    expect($reminders->nextLevel($invoice))->toBe(2);
+});
+
+it('refuses a level other than the one shown', function () {
+    Queue::fake();
+    [$invoice] = payInvoice();
+    remindOn('2026-12-24');
+
+    expect(fn () => app(Reminders::class)->send(null, $invoice, null, 2))->toThrow(UserFacingHttpException::class, Reminders::NOT_DUE);
+});
+
+it('never sends again a failed reminder of an invoice paid meanwhile', function () {
+    Queue::fake();
+    [$invoice, , $user] = payInvoice();
+    remindOn('2026-12-24');
+    app(Reminders::class)->send($user, $invoice);
+    remindDelivered($invoice, 'failed');
+    Invoice::query()->whereKey($invoice->id)->toBase()->update(['email_status' => 'failed']);
+    payRecord($user, $invoice, 17143, ['received_on' => '2026-12-24']);
+
+    expect(fn () => app(App\Modules\Finance\Invoices\InvoiceSender::class)->resend($user, $invoice->refresh()))
+        ->toThrow(UserFacingHttpException::class, Reminders::NOT_DUE);
+});
+
+it('does not send a reminder paid between its queueing and its sending', function () {
+    Queue::fake();
+    Illuminate\Support\Facades\Mail::fake();
+    [$invoice, , $user] = payInvoice();
+    remindOn('2026-12-24');
+    $sending = app(Reminders::class)->send($user, $invoice);
+    payRecord($user, $invoice, 17143, ['received_on' => '2026-12-24']);
+
+    app()->call([new SendInvoice($sending->id), 'handle']);
+
+    expect($sending->refresh()->status)->toBe('failed')
+        ->and($sending->error_code)->toBe('not_due')
+        ->and($sending->error)->toBe(SendInvoice::NOT_DUE);
+    Illuminate\Support\Facades\Mail::assertNothingSent();
+});

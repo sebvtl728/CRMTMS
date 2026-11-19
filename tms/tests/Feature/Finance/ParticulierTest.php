@@ -57,9 +57,12 @@ it('validates no invoice to a particulier during the withdrawal delay', function
     $draft = partDraft($dossier, $user);
 
     expect(fn () => app(InvoiceValidator::class)->validate($draft, $user))
-        ->toThrow(UserFacingHttpException::class, 'Délai de rétractation du particulier : aucune facture avant le 24/11/2026.');
+        ->toThrow(UserFacingHttpException::class, 'Délai de rétractation du particulier : aucune facture avant le 25/11/2026.');
 
-    $this->travelTo(CarbonImmutable::parse('2026-11-24 09:00', 'Europe/Paris'));
+    // The delay runs through 24/11 (14 days from the day after the signature).
+    $this->travelTo(CarbonImmutable::parse('2026-11-24 23:00', 'Europe/Paris'));
+    expect(fn () => app(InvoiceValidator::class)->validate($draft->refresh(), $user))->toThrow(UserFacingHttpException::class);
+    $this->travelTo(CarbonImmutable::parse('2026-11-25 09:00', 'Europe/Paris'));
     expect(app(InvoiceValidator::class)->validate($draft->refresh(), $user)->status)->toBe(InvoiceStatus::Validated);
 });
 
@@ -102,7 +105,7 @@ it('caps the first instalment of a particulier at 30 %, after the withdrawal del
     // The delay ends after the first day of the training: no instalment before it.
     DB::table('dossiers')->where('id', $dossier->id)->update(['convention_signed_on' => '2026-11-25']);
     expect($errors([['due_on' => '2026-12-01', 'percent' => 30], ['due_on' => '2027-01-01', 'percent' => 70]])['schedule.0.due_on'][0] ?? null)
-        ->toBe('Délai de rétractation du particulier : aucune échéance avant le 09/12/2026.');
+        ->toBe('Délai de rétractation du particulier : aucune échéance avant le 10/12/2026.');
 });
 
 it('leaves the schedule of an entreprise alone', function () {
