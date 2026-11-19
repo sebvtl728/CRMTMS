@@ -1,5 +1,6 @@
 import { InvoiceSendDialog, type InvoiceMessageDefaults } from '@/components/finance/invoice-send-dialog';
 import { PaymentsPanel, type InvoiceBalance, type InvoicePayment } from '@/components/finance/payments-panel';
+import { RemindersPanel, type InvoiceReminders } from '@/components/finance/reminders-panel';
 import Heading from '@/components/heading';
 import InputError from '@/components/input-error';
 import { Badge } from '@/components/ui/badge';
@@ -65,10 +66,11 @@ interface EmailState {
 interface ShowProps {
     invoice: InvoicePage;
     options: { units: Option[]; vat_rates: Option[]; vat_exempt: boolean };
-    can: { update: boolean; validate: boolean; credit_note: boolean; send: boolean; record_payment: boolean };
+    can: { update: boolean; validate: boolean; credit_note: boolean; send: boolean; record_payment: boolean; remind: boolean };
     email: EmailState | null;
     balance: InvoiceBalance | null;
     payments: InvoicePayment[];
+    reminders: InvoiceReminders | null;
     status?: string;
 }
 
@@ -475,7 +477,7 @@ function EmailPanel({ invoice, email, canSend }: { invoice: InvoicePage; email: 
     );
 }
 
-export default function InvoiceShow({ invoice, options, can, email, balance, payments, status }: ShowProps) {
+export default function InvoiceShow({ invoice, options, can, email, balance, payments, reminders, status }: ShowProps) {
     const { errors } = usePage<{ errors: Record<string, string> }>().props;
     const breadcrumbs: BreadcrumbItem[] = [
         { title: 'Factures', href: '/finance/invoices' },
@@ -551,6 +553,16 @@ export default function InvoiceShow({ invoice, options, can, email, balance, pay
                 </dl>
 
                 {balance && <PaymentsPanel invoiceId={invoice.id} balance={balance} payments={payments} canRecord={can.record_payment} />}
+
+                {reminders && balance && balance.remaining_cents > 0 && (
+                    <RemindersPanel
+                        invoiceId={invoice.id}
+                        title={invoice.title}
+                        reminders={reminders}
+                        canRemind={can.remind}
+                        deliversNowhere={email?.defaults?.delivers_nowhere ?? false}
+                    />
+                )}
 
                 {email && <EmailPanel invoice={invoice} email={email} canSend={can.send} />}
 

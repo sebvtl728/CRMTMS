@@ -25,12 +25,17 @@ export function InvoiceSendDialog({
     defaults,
     open,
     onClose,
+    action,
+    heading,
 }: {
     invoiceId: string;
     title: string;
     defaults: InvoiceMessageDefaults;
     open: boolean;
     onClose: () => void;
+    /** Where the message goes (default: « Envoyer » the invoice); a reminder posts elsewhere. */
+    action?: string;
+    heading?: string;
 }) {
     const { data, setData, post, processing, errors, reset, clearErrors } = useForm({
         to: defaults.to,
@@ -48,7 +53,7 @@ export function InvoiceSendDialog({
 
     const submit: FormEventHandler = (e) => {
         e.preventDefault();
-        post(route('finance.invoices.send', invoiceId), { preserveScroll: true, onSuccess: () => onClose() });
+        post(action ?? route('finance.invoices.send', invoiceId), { preserveScroll: true, onSuccess: () => onClose() });
     };
 
     const errs = errors as Record<string, string | undefined>;
@@ -58,7 +63,7 @@ export function InvoiceSendDialog({
             <DialogContent className="sm:max-w-xl">
                 <form onSubmit={submit} className="grid gap-4" noValidate>
                     <DialogHeader>
-                        <DialogTitle>Envoyer {title}</DialogTitle>
+                        <DialogTitle>{heading ?? `Envoyer ${title}`}</DialogTitle>
                         <DialogDescription>Le PDF archivé de la pièce est joint au message ; il n'est jamais produit de nouveau.</DialogDescription>
                     </DialogHeader>
 

@@ -17,6 +17,7 @@ use App\Modules\Finance\Payments\Balances;
 use App\Modules\Finance\Payments\Payment;
 use App\Modules\Finance\Payments\PaymentAllocation;
 use App\Modules\Finance\Permissions;
+use App\Modules\Finance\Reminders\ReminderController;
 use App\Modules\Sessions\Public\Billing;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
@@ -157,9 +158,11 @@ class InvoiceController extends Controller
                 'validate' => $invoice->isDraft() && $this->validates($request, $invoice),
                 'credit_note' => ! $invoice->isDraft() && $invoice->kind === Invoice::INVOICE && $this->manages($request, $invoice),
                 'send' => $canSend,
+                'remind' => $canSend && $invoice->kind === Invoice::INVOICE,
                 'record_payment' => $invoice->kind === Invoice::INVOICE && ! $invoice->isDraft() && $request->user()?->can(Permissions::PAYMENTS) === true,
             ],
             'balance' => $this->balance($invoice),
+            'reminders' => ReminderController::forPage($invoice, $canSend),
             'payments' => $this->payments($invoice),
             'email' => $invoice->isDraft() ? null : [
                 'status' => $invoice->email_status,
