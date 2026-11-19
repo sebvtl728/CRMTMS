@@ -119,7 +119,7 @@ class BrochureController extends Controller
         $file = $request->file(BrochureFile::FIELD);
         $this->store->update($brochure, (string) $request->validated('title'), $file instanceof UploadedFile ? $file : null, $request->ids('training_ids'), $request->ids('das_ids'), $request->validated('kind'));
 
-        return to_route('catalogue.brochures.index')->with('status', 'Document enregistré.');
+        return to_route('catalogue.brochures.index')->with('status', $brochure->refresh()->kind === Brochure::POSITIONING_TEST ? 'Test de positionnement enregistré.' : 'Plaquette enregistrée.');
     }
 
     public function destroy(Brochure $brochure): RedirectResponse

@@ -53,6 +53,19 @@ test('an interlocuteur becomes a candidate, signs an apprenticeship and becomes 
     await page.getByLabel('Tarif entreprise HT par stagiaire (€)').fill('6000,00');
     await page.getByRole('button', { name: 'Enregistrer' }).click();
     await expect(page.getByText('Formation créée.')).toBeVisible();
+    // A positioning test of that training in the library.
+    await page.goto('/catalogue/brochures/create?type=positioning_test');
+    await expect(page.getByRole('heading', { name: 'Nouveau test de positionnement' })).toBeVisible();
+    await page.getByLabel('Titre *').fill(`Test ${TRAINING}`);
+    await page.locator('#file').setInputFiles({
+        name: 'test.pdf',
+        mimeType: 'application/pdf',
+        buffer: Buffer.from('%PDF-1.4\n1 0 obj\n<< /Type /Catalog >>\nendobj\ntrailer\n<< /Root 1 0 R >>\n%%EOF\n'),
+    });
+    await page.getByLabel('Filtrer les formations').fill(TRAINING);
+    await page.getByRole('checkbox', { name: TRAINING }).click();
+    await page.getByRole('button', { name: 'Enregistrer' }).click();
+    await expect(page.getByText('Test de positionnement ajouté.')).toBeVisible();
     await send(context, page.request, '/crm/organisations', { name: EMPLOYER });
     const personUrl = await send(context, page.request, '/crm/people', CANDIDATE);
 
@@ -71,13 +84,21 @@ test('an interlocuteur becomes a candidate, signs an apprenticeship and becomes 
     // The cards open one after the other: the test (training saved), then the interview once the test is back.
     await expect(page.getByRole('region', { name: 'Test de positionnement' })).toBeVisible();
     await expect(page.getByRole('region', { name: 'Entretien' })).toHaveCount(0);
+
+    // The test of the training is offered and sent to the candidate with a personal link.
+    const positioning = page.getByRole('region', { name: 'Test de positionnement' });
+    await expect(positioning.getByRole('link', { name: `Test ${TRAINING}` })).toBeVisible();
+    await positioning.getByRole('button', { name: 'Envoyer le test' }).click();
+    await page.getByRole('dialog').getByLabel('Destinataire *').fill('candidat@example.test');
+    await page.getByRole('dialog').getByRole('button', { name: 'Envoyer' }).click();
+    await expect(page.getByText("Test de positionnement en cours d'envoi.")).toBeVisible();
+    await expect(positioning.getByText(/Actif jusqu'au/)).toBeVisible();
     await page.getByLabel('Reçu le').fill('2026-11-18');
     await page.getByRole('region', { name: 'Test de positionnement' }).getByRole('button', { name: 'Enregistrer' }).click();
     await expect(page.getByRole('region', { name: 'Entretien' })).toBeVisible();
     await expect(page.getByRole('region', { name: 'Alternance' })).toHaveCount(0);
 
-    // The path: test sent, test received, interview.
-    await moveTo(page, 'Test envoyé');
+    // The path (« Test envoyé » set by the sending): test received, interview.
     await moveTo(page, 'Test reçu');
     await moveTo(page, 'Entretien');
 
@@ -105,6 +126,10 @@ test('an interlocuteur becomes a candidate, signs an apprenticeship and becomes 
     // In the « Alternants » tab.
     await page.goto('/admissions/candidatures?onglet=alternants');
     await expect(page.getByRole('cell', { name: new RegExp(CANDIDATE.last_name) })).toBeVisible();
+
+    // A link that does not exist: the candidate's page says it plainly.
+    await page.goto(`/test-positionnement/${'a'.repeat(64)}`);
+    await expect(page.getByRole('heading', { name: 'Lien invalide ou expiré' })).toBeVisible();
 
     await context.close();
 });

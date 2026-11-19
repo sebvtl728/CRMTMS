@@ -3,6 +3,7 @@
 use App\Modules\Admissions\Candidatures\CandidatureFile;
 use App\Modules\Admissions\Candidatures\CandidatureStatus;
 use App\Modules\Admissions\Candidatures\CandidatureTransitions;
+use App\Modules\Admissions\Gdpr\CandidatureAnonymisation;
 use App\Modules\Admissions\Positioning\PositioningSending;
 use App\Modules\Admissions\Positioning\SendPositioningTest;
 use App\Modules\Core\Audit\AuditLog;
@@ -126,4 +127,14 @@ it('keeps the stage when it is already past the test', function () {
 
     $this->post("/test-positionnement/{$token}", ['files' => [posCopy()], 'done' => '1'])->assertRedirect();
     expect($c->fresh()->status)->toBe(CandidatureStatus::Interview);
+});
+
+it('anonymisation clears the e-mails of the sendings and closes the link', function () {
+    [$c, , $token] = posLink();
+    app(CandidatureAnonymisation::class)->anonymise($c->fresh());
+
+    $sending = PositioningSending::query()->sole();
+    expect([$sending->email, $sending->subject, $sending->message])->toBe([null, null, null])
+        ->and($sending->revoked_at)->not->toBeNull();
+    $this->get("/test-positionnement/{$token}")->assertNotFound();
 });
