@@ -71,6 +71,7 @@ Route::middleware('throttle:positioning-test')->prefix('test-positionnement')->n
 Route::middleware(['auth', 'can:catalogue.manage'])->prefix('admissions/online-tests')->name('admissions.online-tests.')->group(function () {
     Route::get('/', [OnlineTestController::class, 'index'])->name('index');
     Route::post('/', [OnlineTestController::class, 'store'])->name('store');
+    Route::post('from-pdf', [OnlineTestController::class, 'fromPdf'])->middleware('throttle:ai')->name('from-pdf');
     Route::get('{test}/edit', [OnlineTestController::class, 'edit'])->name('edit');
     Route::put('{test}', [OnlineTestController::class, 'update'])->name('update');
     Route::post('{test}/publish', [OnlineTestController::class, 'publish'])->name('publish');

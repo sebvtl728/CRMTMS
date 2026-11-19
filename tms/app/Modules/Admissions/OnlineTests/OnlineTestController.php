@@ -3,6 +3,7 @@
 namespace App\Modules\Admissions\OnlineTests;
 
 use App\Http\Controllers\Controller;
+use App\Modules\Catalogue\Assistant\PdfText;
 use App\Modules\Catalogue\Trainings;
 use App\Modules\Core\References\ReferenceItem;
 use App\Modules\Core\References\ReferenceList;
@@ -10,6 +11,7 @@ use App\Modules\Core\Users\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Inertia\Inertia;
@@ -43,6 +45,17 @@ class OnlineTestController extends Controller
         $test = $this->tests->create($request->only(['title']), self::user($request));
 
         return redirect("/admissions/online-tests/{$test->id}/edit")->with('status', 'Test créé : ajoutez ses sections et ses questions.');
+    }
+
+    public function fromPdf(Request $request, OnlineTestFromPdf $import): RedirectResponse
+    {
+        $request->validate(['file' => PdfText::rules()], PdfText::messages());
+        $file = $request->file('file');
+        assert($file instanceof UploadedFile);
+        $test = $import->create($file, self::user($request));
+
+        return redirect("/admissions/online-tests/{$test->id}/edit")
+            ->with('status', 'Brouillon créé depuis le PDF : relisez les questions et ajoutez les bonnes réponses avant de publier.');
     }
 
     public function edit(Request $request, string $test): Response

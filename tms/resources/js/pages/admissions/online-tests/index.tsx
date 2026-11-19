@@ -1,11 +1,12 @@
 import Heading from '@/components/heading';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import AppLayout from '@/layouts/app-layout';
 import { formatDate } from '@/lib/crm';
 import { type BreadcrumbItem } from '@/types';
 import { Head, Link, useForm } from '@inertiajs/react';
-import { Plus } from 'lucide-react';
+import { LoaderCircle, Plus, Sparkles } from 'lucide-react';
 import { FormEventHandler } from 'react';
 
 interface Row {
@@ -15,6 +16,38 @@ interface Row {
     total_points: number | null;
     time_limit_minutes: number | null;
     updated_at: string | null;
+}
+
+/** « Créer depuis un PDF »: the AI drafts the test from a paper one, to review before publishing. */
+function FromPdf() {
+    const { data, setData, post, processing, errors } = useForm<{ file: File | null }>({ file: null });
+    const submit: FormEventHandler = (e) => {
+        e.preventDefault();
+        post('/admissions/online-tests/from-pdf', { forceFormData: true });
+    };
+
+    return (
+        <form onSubmit={submit} className="grid max-w-xl gap-1 rounded-xl border p-3">
+            <Label htmlFor="pdf">
+                Créer depuis un PDF (l’intelligence artificielle prépare les questions, vous les relisez et ajoutez les bonnes réponses)
+            </Label>
+            <div className="flex flex-wrap gap-2">
+                <Input
+                    id="pdf"
+                    type="file"
+                    accept="application/pdf,.pdf"
+                    onChange={(e) => setData('file', e.target.files?.[0] ?? null)}
+                    className="flex-1"
+                />
+                <Button type="submit" variant="outline" disabled={processing || data.file === null}>
+                    {processing ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
+                    Créer depuis le PDF
+                </Button>
+            </div>
+            {errors.file && <p className="text-sm text-red-600">{errors.file}</p>}
+            {processing && <p className="text-muted-foreground text-xs">Lecture du PDF par l’IA… cela peut prendre une minute.</p>}
+        </form>
+    );
 }
 
 const breadcrumbs: BreadcrumbItem[] = [{ title: 'Tests en ligne', href: '/admissions/online-tests' }];
@@ -51,6 +84,7 @@ export default function OnlineTestsIndex({ tests, status }: { tests: Row[]; stat
                         Nouveau test
                     </Button>
                 </form>
+                <FromPdf />
                 {tests.length === 0 ? (
                     <p className="text-muted-foreground rounded-xl border p-8 text-center text-sm">Aucun test en ligne pour le moment.</p>
                 ) : (
