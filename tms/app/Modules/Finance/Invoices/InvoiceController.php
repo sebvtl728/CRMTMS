@@ -12,6 +12,7 @@ use App\Modules\Core\Exports\XlsxExporter;
 use App\Modules\Core\Tenancy\TenantStorage;
 use App\Modules\Core\Users\User;
 use App\Modules\Core\References\ReferenceItem;
+use App\Modules\Finance\Billing\Particulier;
 use App\Modules\Finance\Integrity;
 use App\Modules\Finance\Payments\Balances;
 use App\Modules\Finance\Payments\Payment;
@@ -163,6 +164,7 @@ class InvoiceController extends Controller
             ],
             'balance' => $this->balance($invoice),
             'reminders' => ReminderController::forPage($invoice, $canSend),
+            'warnings' => $this->warnings($invoice),
             'payments' => $this->payments($invoice),
             'email' => $invoice->isDraft() ? null : [
                 'status' => $invoice->email_status,
@@ -171,6 +173,22 @@ class InvoiceController extends Controller
                 'sendings' => $this->sendings($invoice),
             ],
         ]);
+    }
+
+    /**
+     * What a draft should be checked for before its validation (0.9.1): a
+     * particulier whose contract signature is unknown (withdrawal delay).
+     *
+     * @return list<string>
+     */
+    private function warnings(Invoice $invoice): array
+    {
+        if (! $invoice->isDraft() || $invoice->kind !== Invoice::INVOICE || $invoice->funding_id !== null) {
+            return [];
+        }
+        $dossier = Billing::dossier($invoice->dossier_id);
+
+        return $dossier !== null && Particulier::is($dossier) && ($dossier['convention_signed_on'] ?? null) === null ? [Particulier::NO_SIGNATURE] : [];
     }
 
     /**

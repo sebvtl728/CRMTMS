@@ -93,6 +93,8 @@ final class Billing
             'status' => $dossier->effectiveStatus($today)->value,
             'trashed' => $dossier->trashed(),
             'contractor' => ['type' => $dossier->accountType(), 'id' => $dossier->accountId()],
+            // The particulier's withdrawal delay runs from it (Finance 0.9.1).
+            'convention_signed_on' => $dossier->convention_signed_on?->toDateString(),
             'price_cents' => $dossier->priceCents(),
             'abandon' => ['mode' => $rule['mode'], 'dedit_percent' => $rule['dedit_percent']],
             'lines' => $dossier->lines->map(fn (DossierLine $l) => [

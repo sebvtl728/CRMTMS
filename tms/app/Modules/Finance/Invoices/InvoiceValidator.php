@@ -7,6 +7,7 @@ use App\Modules\Core\Companies\Company;
 use App\Modules\Core\Documents\PdfRenderingFailed;
 use App\Modules\Core\Tenancy\TenantContext;
 use App\Modules\Core\Users\User;
+use App\Modules\Finance\Billing\Particulier;
 use App\Modules\Finance\Integrity;
 use App\Modules\Finance\Plans\BillingPlans;
 use App\Modules\Sessions\Public\Billing;
@@ -75,6 +76,9 @@ final class InvoiceValidator
     public const COMPANY_CHANGED = 'La société du dossier a changé : recalculez le brouillon avant de le valider.';
 
     public const OTHER_PARTIES = 'Un avoir doit être émis par la même société et au même destinataire que la facture corrigée.';
+
+    /** %s: the first day a particulier may be invoiced (JJ/MM/AAAA). */
+    public const WITHDRAWAL = 'Délai de rétractation du particulier : aucune facture avant le %s.';
 
     /** %s: the number of the corrected invoice. */
     public const OVER_CORRECTED = 'Cet avoir dépasse le montant restant de la facture %s.';
@@ -199,6 +203,11 @@ final class InvoiceValidator
         // Issued by the dossier's company of today (Recalculer re-aligns a draft prepared before a change).
         if ($invoice->company_id !== $dossier['company_id']) {
             throw new UserFacingHttpException(409, self::COMPANY_CHANGED);
+        }
+        // A particulier is never invoiced during the withdrawal delay (0.9.1).
+        $payable = $invoice->funding_id === null ? Particulier::firstPayableDay($dossier) : null;
+        if ($payable !== null && CarbonImmutable::now('Europe/Paris')->toDateString() < $payable) {
+            throw new UserFacingHttpException(409, sprintf(self::WITHDRAWAL, Particulier::french($payable)));
         }
         $key = Ledger::keyOf($invoice);
         $who = InvoiceDrafts::recipientOf($dossier, $key);

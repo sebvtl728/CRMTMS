@@ -71,6 +71,7 @@ interface ShowProps {
     balance: InvoiceBalance | null;
     payments: InvoicePayment[];
     reminders: InvoiceReminders | null;
+    warnings: string[];
     status?: string;
 }
 
@@ -477,7 +478,7 @@ function EmailPanel({ invoice, email, canSend }: { invoice: InvoicePage; email: 
     );
 }
 
-export default function InvoiceShow({ invoice, options, can, email, balance, payments, reminders, status }: ShowProps) {
+export default function InvoiceShow({ invoice, options, can, email, balance, payments, reminders, warnings, status }: ShowProps) {
     const { errors } = usePage<{ errors: Record<string, string> }>().props;
     const breadcrumbs: BreadcrumbItem[] = [
         { title: 'Factures', href: '/finance/invoices' },
@@ -499,6 +500,14 @@ export default function InvoiceShow({ invoice, options, can, email, balance, pay
 
                 {status && <div className="text-sm font-medium text-green-600">{status}</div>}
                 <InputError message={errors.invoice} />
+                {warnings.map((w) => (
+                    <p
+                        key={w}
+                        className="rounded-md border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900 dark:border-amber-700 dark:bg-amber-950 dark:text-amber-100"
+                    >
+                        {w}
+                    </p>
+                ))}
 
                 <div className="flex flex-wrap items-start gap-2">
                     {can.validate && <ValidateButton invoice={invoice} />}
