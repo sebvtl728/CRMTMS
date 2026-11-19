@@ -2,6 +2,7 @@ import InputError from '@/components/input-error';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { DropdownMenu, DropdownMenuCheckboxItem, DropdownMenuContent, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -9,7 +10,7 @@ import { formatDateTime, todayIso, type Option } from '@/lib/crm';
 import { cn } from '@/lib/utils';
 import { type SharedData } from '@/types';
 import { useForm, usePage } from '@inertiajs/react';
-import { BellRing, CalendarDays, LoaderCircle, Mail, Phone, Plus, X } from 'lucide-react';
+import { BellRing, CalendarDays, ChevronDown, LoaderCircle, Mail, Phone, Plus, X } from 'lucide-react';
 import { FormEventHandler, useCallback, useEffect, useState } from 'react';
 
 /** Fiches an action is prefilled with (ids of the current page). */
@@ -203,10 +204,80 @@ type CreateFields = {
     next_type_id: string;
     next_due_at: string;
     responsible_user_id: string;
+    collaborator_ids: string[];
 };
 
+/**
+ * « Attribuer à »: one or several people. The first chosen is the
+ * responsible; the others see and do the action too (« À faire »,
+ * planning). The current responsible is offered even when not in the list.
+ */
+function AssigneesField({
+    id,
+    label,
+    options,
+    responsibles,
+    value,
+    onChange,
+    error,
+}: {
+    id: string;
+    label: string;
+    options: Option[];
+    responsibles: Option[];
+    value: string[];
+    onChange: (ids: string[]) => void;
+    error?: string;
+}) {
+    const all = [...options, ...responsibles.filter((r) => value.includes(r.value) && !options.some((o) => o.value === r.value))];
+    const name = (v: string) => all.find((o) => o.value === v)?.label ?? '—';
+    const toggle = (v: string, checked: boolean) => {
+        if (checked) onChange([...value, v]);
+        else if (value.length > 1) onChange(value.filter((x) => x !== v));
+    };
+
+    return (
+        <div className="grid gap-2">
+            <Label htmlFor={id}>{label}</Label>
+            <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                    <Button
+                        id={id}
+                        type="button"
+                        variant="outline"
+                        className="h-auto min-h-9 justify-between text-left font-normal whitespace-normal"
+                    >
+                        <span>
+                            {value.length === 0
+                                ? '—'
+                                : value.map((v, i) => (i === 0 && value.length > 1 ? `${name(v)} (responsable)` : name(v))).join(', ')}
+                        </span>
+                        <ChevronDown className="h-4 w-4 shrink-0 opacity-50" />
+                    </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="start" className="max-h-72 w-(--radix-dropdown-menu-trigger-width) overflow-y-auto">
+                    {all.map((o) => (
+                        <DropdownMenuCheckboxItem
+                            key={o.value}
+                            checked={value.includes(o.value)}
+                            onCheckedChange={(checked) => toggle(o.value, checked === true)}
+                            onSelect={(e) => e.preventDefault()}
+                        >
+                            {o.label}
+                        </DropdownMenuCheckboxItem>
+                    ))}
+                </DropdownMenuContent>
+            </DropdownMenu>
+            {value.length > 1 && (
+                <p className="text-muted-foreground text-xs">Le premier choisi est le responsable ; tous la voient et peuvent la faire.</p>
+            )}
+            <InputError message={error} />
+        </div>
+    );
+}
+
 function CreateForm({ context, onDone }: { context: QuickActionContext; onDone: () => void }) {
-    const [choices, setChoices] = useState<(Choices & { responsibles: Option[] }) | null>(null);
+    const [choices, setChoices] = useState<(Choices & { responsibles: Option[]; collaborators: Option[] }) | null>(null);
     const [failed, setFailed] = useState(false);
     const [fiches, setFiches] = useState<{ organisation: Fiche | null; person: Fiche | null; opportunity: Fiche | null }>({
         organisation: null,
@@ -231,6 +302,7 @@ function CreateForm({ context, onDone }: { context: QuickActionContext; onDone: 
         next_type_id: '',
         next_due_at: '',
         responsible_user_id: '',
+        collaborator_ids: [],
     });
 
     useEffect(() => {
@@ -238,11 +310,11 @@ function CreateForm({ context, onDone }: { context: QuickActionContext; onDone: 
         if (context.organisation_id) params.set('organisation', context.organisation_id);
         if (context.person_id) params.set('person', context.person_id);
         if (context.opportunity_id) params.set('opportunity', context.opportunity_id);
-        getJson<Choices & { context: typeof fiches; responsibles: Option[]; responsible_user_id: string }>(
+        getJson<Choices & { context: typeof fiches; responsibles: Option[]; collaborators: Option[]; responsible_user_id: string }>(
             `${route('crm.activities.options')}?${params}`,
         )
             .then((json) => {
-                setChoices({ types: json.types, results: json.results, responsibles: json.responsibles });
+                setChoices({ types: json.types, results: json.results, responsibles: json.responsibles, collaborators: json.collaborators ?? [] });
                 setFiches(json.context);
                 const call = json.types.find((t) => t.code === 'appel') ?? json.types[0];
                 setData((current) => ({
@@ -440,22 +512,15 @@ function CreateForm({ context, onDone }: { context: QuickActionContext; onDone: 
 
             <NextStepsField value={data.next_steps} onChange={(v) => setData('next_steps', v)} error={errors.next_steps} />
 
-            <div className="grid gap-2">
-                <Label htmlFor="qa-responsible">Attribuer à</Label>
-                <Select value={data.responsible_user_id} onValueChange={(v) => setData('responsible_user_id', v)}>
-                    <SelectTrigger id="qa-responsible">
-                        <SelectValue placeholder="—" />
-                    </SelectTrigger>
-                    <SelectContent>
-                        {choices.responsibles.map((u) => (
-                            <SelectItem key={u.value} value={u.value}>
-                                {u.label}
-                            </SelectItem>
-                        ))}
-                    </SelectContent>
-                </Select>
-                <InputError message={errors.responsible_user_id} />
-            </div>
+            <AssigneesField
+                id="qa-responsible"
+                label="Attribuer à"
+                options={choices.collaborators}
+                responsibles={choices.responsibles}
+                value={[data.responsible_user_id, ...data.collaborator_ids].filter((v) => v !== '')}
+                onChange={(ids) => setData((d) => ({ ...d, responsible_user_id: ids[0] ?? '', collaborator_ids: ids.slice(1) }))}
+                error={errors.responsible_user_id ?? errors.collaborator_ids}
+            />
 
             {data.done && (
                 <NextFollowUp
@@ -494,6 +559,7 @@ interface ActivityData {
     next_steps: string | null;
     result_id: string | null;
     responsible_user_id: string | null;
+    collaborators?: { id: string; name: string }[];
     organisation: Fiche | null;
     person: Fiche | null;
     opportunity: Fiche | null;
@@ -632,6 +698,7 @@ type EditFields = {
     duration_minutes: string;
     location: string;
     responsible_user_id: string;
+    collaborator_ids: string[];
     purpose: string;
     result_id: string;
     report: string;
@@ -644,7 +711,7 @@ type EditFields = {
  * concerns are not changed (read-only).
  */
 function EditForm({ activityId, onDone }: { activityId: string; onDone: () => void }) {
-    const [loaded, setLoaded] = useState<(Choices & { activity: ActivityData; responsibles: Option[] }) | null>(null);
+    const [loaded, setLoaded] = useState<(Choices & { activity: ActivityData; responsibles: Option[]; collaborators: Option[] }) | null>(null);
     const [failed, setFailed] = useState(false);
     // Dates as loaded: sent back only when changed (no minute rounding of an untouched date).
     const [initialDates, setInitialDates] = useState({ due_at: '', done_at: '' });
@@ -656,6 +723,7 @@ function EditForm({ activityId, onDone }: { activityId: string; onDone: () => vo
         duration_minutes: '',
         location: '',
         responsible_user_id: '',
+        collaborator_ids: [],
         purpose: '',
         result_id: '',
         report: '',
@@ -663,9 +731,9 @@ function EditForm({ activityId, onDone }: { activityId: string; onDone: () => vo
     });
 
     useEffect(() => {
-        getJson<Choices & { activity: ActivityData; responsibles: Option[] }>(route('crm.activities.show', activityId))
+        getJson<Choices & { activity: ActivityData; responsibles: Option[]; collaborators: Option[] }>(route('crm.activities.show', activityId))
             .then((json) => {
-                setLoaded(json);
+                setLoaded({ ...json, collaborators: json.collaborators ?? [] });
                 const a = json.activity;
                 setInitialDates({ due_at: isoToLocal(a.due_at), done_at: isoToLocal(a.done_at) });
                 setData({
@@ -676,6 +744,7 @@ function EditForm({ activityId, onDone }: { activityId: string; onDone: () => vo
                     duration_minutes: a.duration_minutes === null ? '' : String(a.duration_minutes),
                     location: a.location ?? '',
                     responsible_user_id: a.responsible_user_id ?? '',
+                    collaborator_ids: (a.collaborators ?? []).map((u) => u.id),
                     purpose: a.purpose ?? '',
                     result_id: a.result_id ?? '',
                     report: a.report ?? '',
@@ -710,6 +779,7 @@ function EditForm({ activityId, onDone }: { activityId: string; onDone: () => vo
                 purpose: d.purpose,
                 next_steps: d.next_steps,
                 ...(d.responsible_user_id ? { responsible_user_id: d.responsible_user_id } : {}),
+                collaborator_ids: d.collaborator_ids.filter((id) => id !== d.responsible_user_id),
             };
 
             const doneAt = d.done_at !== initialDates.done_at ? { done_at: d.done_at } : {};
@@ -780,22 +850,15 @@ function EditForm({ activityId, onDone }: { activityId: string; onDone: () => vo
                     </Select>
                     <InputError message={errors.type_id} />
                 </div>
-                <div className="grid gap-2">
-                    <Label htmlFor="qa-edit-responsible">Responsable</Label>
-                    <Select value={data.responsible_user_id} onValueChange={(v) => setData('responsible_user_id', v)}>
-                        <SelectTrigger id="qa-edit-responsible">
-                            <SelectValue placeholder="—" />
-                        </SelectTrigger>
-                        <SelectContent>
-                            {loaded.responsibles.map((u) => (
-                                <SelectItem key={u.value} value={u.value}>
-                                    {u.label}
-                                </SelectItem>
-                            ))}
-                        </SelectContent>
-                    </Select>
-                    <InputError message={errors.responsible_user_id} />
-                </div>
+                <AssigneesField
+                    id="qa-edit-responsible"
+                    label="Attribuer à"
+                    options={loaded.collaborators}
+                    responsibles={loaded.responsibles}
+                    value={[data.responsible_user_id, ...data.collaborator_ids].filter((v) => v !== '')}
+                    onChange={(ids) => setData((d) => ({ ...d, responsible_user_id: ids[0] ?? '', collaborator_ids: ids.slice(1) }))}
+                    error={errors.responsible_user_id ?? errors.collaborator_ids}
+                />
             </div>
 
             <div className="grid gap-2">

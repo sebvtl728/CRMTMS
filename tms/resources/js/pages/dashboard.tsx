@@ -1,3 +1,4 @@
+import { ActivityStatsCards, type ActivityStats } from '@/components/crm/activity-stats-cards';
 import { OPEN_EVENT } from '@/components/crm/global-search';
 import Heading from '@/components/heading';
 import { Button } from '@/components/ui/button';
@@ -55,6 +56,8 @@ interface Commercial {
         month: string;
         own: boolean;
     } | null;
+    /** Actions created and done, meetings fixed, per Paris month; null without the right to see the actions. */
+    activity_stats: ActivityStats | null;
 }
 
 interface StartingSession {
@@ -324,6 +327,8 @@ export default function Dashboard({ recent_views, counters, commercial, sessions
                         )}
                     </section>
                 )}
+
+                {commercial?.activity_stats && <ActivityStatsCards stats={commercial.activity_stats} />}
 
                 {commercial !== null && <NextMeetings meetings={commercial.meetings} />}
 

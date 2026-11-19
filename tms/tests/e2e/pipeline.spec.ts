@@ -106,6 +106,10 @@ test('pipeline: opportunity from an entreprise, kanban, loss reason, quick call,
     await page.goto('/dashboard');
     const pipeline = page.getByRole('region', { name: 'Pipeline pondéré du mois' });
     await expect(pipeline).toContainText(/1\s000,00\s€/);
+    // The cards of the month: actions created and done, meetings fixed.
+    const stats = page.getByRole('region', { name: 'Actions et rendez-vous du mois' });
+    await expect(stats).toContainText('Actions');
+    await expect(stats).toContainText('Rendez-vous pris');
 
     // 2. Kanban: drag it to « Proposition » (60 %).
     await page.goto('/crm/opportunities/kanban');
@@ -141,6 +145,11 @@ test('pipeline: opportunity from an entreprise, kanban, loss reason, quick call,
     await quick.getByRole('group', { name: 'Type *' }).getByRole('button', { name: 'Appel', exact: true }).click();
     await quick.getByRole('button', { name: 'Demain' }).click();
     await choose(page, quick.getByLabel('Type', { exact: true }), 'Appel');
+    // « Attribuer à » takes one or several people: the author is checked.
+    await quick.getByLabel('Attribuer à').click();
+    await expect(page.getByRole('menuitemcheckbox').first()).toBeVisible();
+    await expect(page.getByRole('menuitemcheckbox', { checked: true })).toHaveCount(1);
+    await page.keyboard.press('Escape');
     await quick.getByRole('button', { name: 'Enregistrer' }).click();
     await expect(quick).toBeHidden();
     await page.getByRole('tab', { name: 'Historique' }).click();

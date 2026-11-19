@@ -76,7 +76,7 @@ final class WeekPlanning
         $format = fn (CarbonImmutable $at): string => $at->format('Y-m-d H:i:sP');
 
         $rows = $types === [] ? new EloquentCollection : TodoQuery::onLiveFiches(CrmVisibility::activities(Activity::query(), $viewer))
-            ->where('responsible_user_id', $owner->id)
+            ->where(fn (Builder $q) => $q->where('responsible_user_id', $owner->id)->orWhereIn('activities.id', ActivityCollaborators::idsOf($owner->id)))
             ->whereIn('type_id', array_keys($types))
             ->where(fn (Builder $q) => $q->whereIn('type_id', $meetings)->orWhereNotNull('due_at'))
             ->whereRaw('coalesce(due_at, done_at) >= ?::timestamptz and coalesce(due_at, done_at) < ?::timestamptz', [$format($monday), $format($nextMonday)])

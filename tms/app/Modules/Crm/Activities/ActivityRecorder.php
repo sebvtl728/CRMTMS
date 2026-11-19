@@ -24,17 +24,21 @@ final class ActivityRecorder
     /**
      * @param  array<string, mixed>  $attributes  validated (ActivityRequest::values)
      * @param  array{type_id: string, due_at: CarbonImmutable}|null  $next
+     * @param  list<string>  $collaborators
      * @return array{0: Activity, 1: Activity|null} the action and its follow-up
      */
-    public function create(array $attributes, ?array $next = null): array
+    public function create(array $attributes, ?array $next = null, array $collaborators = []): array
     {
-        return DB::transaction(function () use ($attributes, $next): array {
+        return DB::transaction(function () use ($attributes, $next, $collaborators): array {
             $activity = new Activity($attributes);
             $this->fillFicheFromOpportunity($activity);
             if (($activity->subject ?? '') === '') {
                 $activity->subject = $this->defaultSubject($activity->type_id, $activity);
             }
             $activity->save();
+            if ($collaborators !== []) {
+                ActivityCollaborators::sync($activity, $collaborators);
+            }
             $this->announceAssignment($activity, null);
 
             return [$activity, $next === null || $activity->done_at === null ? null : $this->followUp($activity, $next['type_id'], $next['due_at'])];
@@ -45,12 +49,16 @@ final class ActivityRecorder
      * « Modifier »: validated values (ActivityRequest::values).
      *
      * @param  array<string, mixed>  $attributes
+     * @param  list<string>|null  $collaborators  null: unchanged
      */
-    public function update(Activity $activity, array $attributes): void
+    public function update(Activity $activity, array $attributes, ?array $collaborators = null): void
     {
-        DB::transaction(function () use ($activity, $attributes): void {
+        DB::transaction(function () use ($activity, $attributes, $collaborators): void {
             $before = $activity->responsible_user_id;
             $activity->fill($attributes)->save();
+            if ($collaborators !== null) {
+                ActivityCollaborators::sync($activity, array_values(array_diff($collaborators, [(string) $activity->responsible_user_id])));
+            }
             $this->announceAssignment($activity, $before);
         });
     }
