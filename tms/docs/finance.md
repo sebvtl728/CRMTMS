@@ -1,8 +1,8 @@
-# Guide utilisateur : factures et avoirs (0.9)
+# Guide utilisateur : factures, règlements et relances (0.9, 0.9.1)
 
 Le TMS **émet les factures officielles** de l'organisme, directement depuis le dossier de formation, **au réel des heures faites**. Ce guide s'adresse aux gestionnaires et à la direction. Les réglages (droits, sociétés, numérotation) sont dans `admin.md` (§ 3, § 10, § 18) ; les heures réalisées, dans `sessions.md`.
 
-Ce que la version 0.9 ne fait pas encore : enregistrer les règlements, marquer une facture « soldée », envoyer des relances (prévu en 0.9.1) ; export comptable et facture électronique (0.9.2).
+Règlements, factures soldées et relances : depuis la 0.9.1 (§ 12 à § 14). Pas encore : reçus d'encaissement, remises en banque, rapprochement bancaire, paiement en ligne, export comptable et facture électronique (0.9.2).
 
 ## 1. Qui est facturé
 
@@ -111,4 +111,45 @@ Avant la première facture réelle :
 - le **traitement du dédit** (ligne distincte, hors champ de la TVA, facturée au seul contractant) et des **absences non justifiées** facturées ;
 - le **CPF facturé hors du TMS** (réglé par EDOF, coché d'origine sur le type « CPF ») : sa part n'apparaît que comme mention sur la facture du contractant ;
 - les mentions de pied de facture (pénalités, indemnité de 40 €, RIB) et l'absence de n° de TVA et d'e-mail de facturation dédié dans les fiches du CRM (le TMS utilise l'e-mail de la fiche) ;
-- la **conservation 10 ans** des pièces (le TMS n'efface jamais une facture validée, l'anonymisation RGPD d'une personne non plus ; voir `admin.md` § 11).
+- la **conservation 10 ans** des pièces (le TMS n'efface jamais une facture validée, l'anonymisation RGPD d'une personne non plus ; voir `admin.md` § 11) ;
+- les **règles du particulier** (délai de rétractation de 14 jours, acompte de 30 % au plus, § 15) et le texte des **relances** (mention des pénalités et de l'indemnité de 40 € pour les seuls professionnels, § 14).
+
+## 12. Les règlements (0.9.1)
+
+**Finance › Règlements** (droit « Enregistrer les règlements », par défaut administrateur et direction, sur tout l'organisme) liste les sommes reçues : date, payeur, mode, référence, montant et part **non affectée**.
+
+- **Enregistrer un règlement** : depuis la page d'une facture (bouton du bloc **Règlements**, prérempli avec le payeur, la société et le reste dû) ou **Nouveau règlement** (choisissez le payeur, entreprise ou particulier, puis la société). Indiquez la date (jamais dans le futur), le montant, le **mode** (référentiel « Modes de règlement » : virement, chèque, carte bancaire, espèces, prélèvement) et la référence (n° de chèque, libellé du virement).
+- **Répartition** : un même règlement peut couvrir **plusieurs factures du même payeur et de la même société** (un OPCO qui vire une somme pour plusieurs dossiers). **Répartir** affecte le montant aux factures les plus anciennes d'abord ; chaque montant reste modifiable. Une affectation ne dépasse jamais le **reste dû** d'une facture, et la somme des affectations ne dépasse jamais le règlement. Le reste est **non affecté** : il s'affecte plus tard en modifiant le règlement (filtre « Avec un reste non affecté »).
+- Seule une **facture validée ou envoyée** reçoit un règlement, jamais un avoir ni un brouillon.
+- **Modifier** ou **Supprimer** un règlement est journalisé ; la facture, elle, ne change jamais (le règlement vit à côté).
+
+## 13. Factures soldées et en retard
+
+Le **reste dû** d'une facture = TTC − avoirs validés qui la corrigent − règlements affectés. La facture est :
+
+- **Non réglée** (rien de réglé), **Partiellement réglée**, ou **Soldée** (reste dû nul ; un avoir qui l'annule entièrement la solde aussi) ;
+- **En retard** quand elle n'est pas soldée et que son échéance est passée (jour de Paris).
+
+Un règlement suivi d'un avoir peut laisser un **trop-perçu** (affiché, jamais remboursé par le TMS : faites le remboursement hors du TMS).
+
+Où le voir : la liste **Finance › Factures** (colonne Reste dû, état de paiement, filtre **Paiement** : « Non soldées », « En retard »), la page de la facture (bloc **Règlements**), le bloc **Facturation** du dossier (réglé, reste à encaisser) et l'**export CSV** (colonnes Réglé, Reste dû, État de paiement).
+
+## 14. Les relances
+
+**Niveaux** : réglés dans **Finance › Réglages de facturation** (droit `settings.manage`) : 1 à 3 délais croissants, en jours après l'échéance (par défaut **7, 30 et 60 jours**). Le niveau suivant ne part qu'une fois le précédent **envoyé** ; une relance qui n'est pas partie (erreur d'envoi) est proposée de nouveau au même niveau. Après le dernier niveau, la facture reste « En retard » sans nouvelle relance.
+
+- **Finance › À relancer** (droit « Préparer les factures », sur son périmètre) : les factures dont un niveau est atteint, avec retard, reste dû, niveau et dernière relance. Cochez puis **Envoyer les relances** : chaque e-mail part avec le modèle de son niveau et le **PDF archivé** joint, à l'adresse du destinataire figée à la validation (une ligne sans adresse n'est pas cochable). Une facture soldée ou suspendue entre-temps est ignorée (le message l'indique).
+- **Depuis la page de la facture** : **Relancer (niveau n)** ouvre la fenêtre d'envoi préremplie (adresse, objet et message modifiables).
+- **Suspendre les relances** (litige, échéancier accordé), avec un motif ; **Reprendre les relances** les rétablit. Journalisé.
+- **Relance automatique** (case dans les réglages, désactivée par défaut) : chaque matin à 8 h 30, le niveau dû de chaque facture part tout seul (historique : « automatique »), jamais deux relances d'une facture le même jour.
+- **Modèles** : Administration › Modèles d'e-mails, « Relance de facture — niveau 1, 2, 3 ». Variables : numéro, société, destinataire, montant TTC, reste dû, échéance, jours de retard, niveau, et `{penalites}` : la mention des **pénalités de retard et de l'indemnité forfaitaire de 40 €**, remplie pour un **professionnel** et **toujours vide pour un particulier**.
+
+Les relances apparaissent dans l'historique d'envoi de la facture ; « Renvoyer » refait la dernière relance échouée.
+
+## 15. Le particulier (contractant personne)
+
+*Règles du Code du travail (art. L6353-5 et L6353-6) à faire confirmer par l'expert-comptable.*
+
+- **Délai de rétractation** : quand le dossier porte la **date de signature du contrat** (« Convention signée le »), aucune facture au particulier ne se valide avant **signature + 14 jours** (« Délai de rétractation du particulier : aucune facture avant le … »). Sans date de signature, le brouillon affiche un avertissement mais se valide.
+- **Échéancier** : la **première échéance** d'un particulier ne dépasse pas **30 %** du prix et ne tombe pas pendant le délai de rétractation. Contrôlé à l'enregistrement de l'échéancier (un échéancier déjà verrouillé par une facture n'est pas re-contrôlé).
+- Les factures d'un **financeur** du dossier ne sont pas concernées.

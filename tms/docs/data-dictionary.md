@@ -679,6 +679,21 @@ Une ligne par « Envoyer » / « Renvoyer » : `invoice_id` (FK), `email`, `subj
 - `invoice_journal_immutable` : aucune modification ni suppression (comme `audit_logs`).
 - Contrôle : `Integrity::verify` (commande `tms:finance:verify`, bouton « Vérifier l'intégrité ») recalcule `hash` = SHA-256(contenu canonique + `previous_hash`), recoupe chaque ligne du journal avec sa facture, vérifie la chaîne par `position` et détecte une pièce émise absente du journal ou un PDF remplacé (`pdf_sha256`).
 
+### `payments` — règlements (0.9.1)
+`company_id` (FK `companies`) · `payer_type` (`organisation` / `person`, CHECK), `payer_id` (uuid, sans FK : le destinataire des factures réglées) · `received_on` (date) · `amount_cents` (bigint, CHECK > 0) · `method_id` (FK `reference_items`, liste `payment_method`, `ReferenceUsage`) · `reference` (≤ 100), `notes` (`$auditPersonal`, effacées par l'anonymisation du payeur particulier) · `created_by`, `updated_by`, horodatages. Écrit par `Finance\Payments\Payments` (une transaction, verrous : règlement puis factures par id).
+
+### `payment_allocations` — répartition d'un règlement
+`payment_id` (FK, cascade) · `invoice_id` (FK `invoices`, index) · `amount_cents` (CHECK > 0) · unique (`payment_id`, `invoice_id`). Une facture (jamais un avoir) validée ou envoyée, du même destinataire et de la même société que le règlement, au plus son reste dû.
+
+**Reste dû** (calculé, jamais stocké : `Finance\Payments\Balances`) = `total_ttc_cents` − |TTC des avoirs validés qui la corrigent| − Σ `payment_allocations.amount_cents`. Soldée si ≤ 0, en retard si > 0 et `due_on` < aujourd'hui (Paris).
+
+### `invoice_reminder_pauses` — relances suspendues (0.9.1)
+`invoice_id` (FK, unique) · `reason` (`$auditPersonal`) · `paused_by` · horodatages. « Reprendre » supprime la ligne.
+
+### Colonnes ajoutées (0.9.1)
+- `invoice_sendings.purpose` (`invoice` / `reminder`, CHECK, défaut `invoice`) et `reminder_level` (smallint 1 à 3, non nul **si et seulement si** `purpose = reminder`, CHECK) : une relance est un envoi de la facture.
+- `finance_settings.reminder_days` (jsonb, défaut `[7, 30, 60]`) et `auto_reminders` (bool, défaut faux).
+
 ### Conservation légale et RGPD
 Une facture ou un avoir validé est une **pièce comptable à conserver 10 ans** : le droit à l'effacement ne s'y applique pas. L'anonymisation d'une personne (`Finance\Invoices\InvoiceAnonymisation`, enregistrée dans `Crm\Public\FicheLinks`) **ne touche jamais** une pièce validée ou envoyée (le contenu haché et la chaîne restent intacts, même si une ligne nomme un stagiaire), et **supprime seulement les brouillons** adressés à la personne ou aux dossiers où elle est ou a été stagiaire. `invoice_sendings` (adresse, message) suit la pièce et n'est pas purgée.
 

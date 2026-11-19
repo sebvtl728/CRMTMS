@@ -143,6 +143,16 @@ Code dans `tms/app/Modules/Finance/` (`Billing`, `Plans`, `Invoices`, `Settings`
 - **RGPD** : une pièce validée est conservée 10 ans ; `InvoiceAnonymisation` (via `FicheLinks`) ne supprime que les brouillons. `notes`, `recipient_snapshot` et `description` de ligne sont dans `$auditPersonal`.
 - **Montants** : jamais de flottant ; `Money` formate et analyse les centimes ; pénalités et 40 € seulement pour un destinataire `organisation`.
 
+## Règlements et relances (0.9.1) : points d'architecture à connaître
+
+Guide : `tms/docs/finance.md` (§ 12 à § 15) ; réglages : `tms/docs/admin.md` (§ 10, § 18). Spec : `docs/superpowers/specs/2026-11-19-0.9.1-reglements-relances-design.md`.
+
+- **Règlements** (`Finance/Payments/`) : `payments` + `payment_allocations`, écrits par `Payments` (une transaction ; verrous : règlement puis factures triées par id ; reste dû relu sous verrou). Une affectation règle une facture émise (jamais un avoir) du **même destinataire et de la même société**, au plus son reste dû. Droit `finance.payments.manage` **sans périmètre** (déclaré hors de `Permissions::scoped()`). Référentiel `payment_method`.
+- **État de paiement** : jamais stocké (la facture est figée par déclencheur) ; `Balances::of()` (deux requêtes par page) et `Balances::remainingSql()` pour filtrer en SQL. Reste dû = TTC − avoirs validés − affectations ; soldée ≤ 0, en retard si échéance < aujourd'hui (Paris).
+- **Relances** (`Finance/Reminders/`) : une relance est un `invoice_sendings` (`purpose = reminder`, `reminder_level`) mis en file par `InvoiceSender::queue()` et envoyé par `SendInvoice` (PDF archivé vérifié) ; `Reminders` calcule le niveau dû (niveau suivant seulement après un envoi **parti** ; un envoi en cours bloque), `ReminderMail` remplit le modèle `invoice_reminder_<n>` (`{penalites}` vide pour un particulier). Suspension : `invoice_reminder_pauses`. Automatique : `tms:finance:remind` (8 h 30 Paris, `ForEachTenant`, si `finance_settings.auto_reminders`), jamais deux relances d'une facture le même jour.
+- **Particulier** (`Finance/Billing/Particulier`) : `Billing::dossier` expose `convention_signed_on` ; `InvoiceValidator` refuse une facture au contractant particulier avant signature + 14 jours ; `BillingPlans` limite la première échéance à 30 % et après ce délai (échéancier non verrouillé seulement).
+- **RGPD** : `PaymentAnonymisation` (via `FicheLinks`) efface notes et référence des règlements d'un particulier ; montants gardés 10 ans.
+
 ## Module Admissions : points d'architecture à connaître
 
 Code dans `tms/app/Modules/Admissions/` (Candidatures, Alternance, CustomFields, Crm, Gdpr, History). Guide : `tms/docs/admissions.md` ; réglages : `tms/docs/admin.md` (§ 19) ; tables : `tms/docs/data-dictionary.md`. Spec : `docs/superpowers/specs/2026-11-18-admissions-candidats-design.md`.
