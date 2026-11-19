@@ -7,7 +7,11 @@ use Illuminate\Support\Facades\Http;
 
 const EXPORT_PDF = "%PDF-1.4\n1 0 obj\n<< /Type /Catalog >>\nendobj\ntrailer\n<< /Root 1 0 R >>\n%%EOF\n";
 
-beforeEach(fn () => fakeImportDisk());
+beforeEach(function () {
+    fakeImportDisk();
+    // The fakes below target this address, whatever GOTENBERG_URL says (CI: 127.0.0.1).
+    config(['documents.gotenberg_url' => 'http://gotenberg:3000']);
+});
 
 /** The HTML of the summary sent to Gotenberg. */
 function exportedSummaryHtml(): string
