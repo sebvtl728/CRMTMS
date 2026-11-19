@@ -5,6 +5,13 @@ Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) ; ve
 
 ## [Non publié]
 
+### Ajouté
+
+- **Accueil (CRM)** : cartes **Actions** (créées et réalisées dans le mois) et **Rendez-vous pris** (fixés dans le mois),
+  comparées au mois précédent, avec les 12 derniers mois, dans le périmètre de chacun.
+- **Collaborateurs** sur une action ou un rendez-vous : des collègues (droit « Consulter les actions ») en plus du
+  responsable, qui la voient dans leur « À faire » et leur planning.
+
 ## [0.9.1] - 2026-11-19
 
 Admissions (candidats, alternance) et suivi des paiements : règlements, factures soldées, relances, protection du

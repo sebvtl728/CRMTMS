@@ -103,6 +103,10 @@ test('pipeline: opportunity from an entreprise, kanban, loss reason, quick call,
     await page.goto('/dashboard');
     const pipeline = page.getByRole('region', { name: 'Pipeline pondéré du mois' });
     await expect(pipeline).toContainText(/1\s000,00\s€/);
+    // The cards of the month: actions created and done, meetings fixed.
+    const stats = page.getByRole('region', { name: 'Actions et rendez-vous du mois' });
+    await expect(stats).toContainText('Actions');
+    await expect(stats).toContainText('Rendez-vous pris');
 
     // 2. Kanban: drag it to « Proposition » (60 %).
     await page.goto('/crm/opportunities/kanban');

@@ -14,6 +14,7 @@ Le menu de gauche, section **Commercial**, donne accès, dans cet ordre, à **Pi
 - **Mes relances** : le nombre de vos actions **en retard** et à faire **aujourd'hui** (les mêmes que l'écran **À faire**) ; un clic ouvre **À faire** ;
 - **Pipeline pondéré** du mois : la somme des montants pondérés de vos opportunités **en cours** (ni gagnées, ni perdues) dont la **clôture prévue** tombe dans le mois en cours ; un clic ouvre la liste **Opportunités** filtrée sur ce mois ;
 - **Devis** du mois : le **taux de réussite** des devis envoyés dans le mois en cours (heure de Paris), avec le nombre d'envoyés et d'acceptés (« — » si aucun devis n'est parti) ; un clic ouvre la liste **Devis** ;
+- **Actions** et **Rendez-vous pris** du mois (droit « Consulter les actions », dans son périmètre) : actions **créées** et **réalisées** (cochées « faite ») dans le mois, rendez-vous **fixés** dans le mois (types d'action « rendez-vous » du référentiel, quelle que soit la date du rendez-vous), comparés au mois précédent, avec les 12 derniers mois ; une action ne compte jamais pour un collaborateur ;
 - **Prochains rendez-vous** : vos 5 prochains rendez-vous à faire, avec le jour, l'heure et le lieu ; un clic ouvre la fiche ;
 - **Sessions qui démarrent dans les 7 jours** (avec le droit « Consulter les sessions ») : les sessions de formation qui commencent d'aujourd'hui à dans 7 jours (jours de Paris), ni annulées ni à la corbeille, avec leurs dates, leur type et les places prises d'une session inter ; un clic ouvre la session (voir `sessions.md`) ;
 - **Dernières fiches consultées** : les 5 dernières fiches que vous avez ouvertes, les plus récentes en premier. Cette liste est personnelle ; elle ne garde que le fait que vous avez ouvert la fiche, pas son contenu. Une fiche supprimée, fusionnée ou hors de votre périmètre n'y figure plus.
@@ -254,6 +255,8 @@ Une action faite met à jour la date de **dernier contact** de la fiche. Une act
 Le nombre affiché à côté de **À faire** dans le menu (en retard + aujourd'hui) se met à jour dans la minute.
 
 ### Confier une action à un collègue
+
+**Collaborateurs** (création et **Modifier**) : ajoutez un ou plusieurs collègues en plus du responsable — tout utilisateur actif qui a le droit de **consulter les actions** (direction, chargés de relations…). Ils voient l'action (même hors de leur périmètre), la retrouvent dans leur **À faire** et leur **Planning** (« avec … » dans les listes), sans pouvoir la modifier à ce seul titre.
 
 **Confier à…** (dans **À faire**, l'historique des fiches et les actions d'une opportunité, sur une action à faire) ouvre une petite fenêtre : choisissez l'utilisateur (tout utilisateur actif de l'organisme) et, si vous le souhaitez, un **message** (500 caractères au plus). Il faut le droit de **modifier** l'action (`crm.activities.update` et son périmètre) ; le champ **Responsable** de **Modifier** et **Attribuer à** à la création font de même.
 
