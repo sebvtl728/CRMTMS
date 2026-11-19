@@ -126,6 +126,8 @@ class CandidatureController extends Controller
                 'tests' => app(PositioningSendings::class)->offered($candidature),
                 'defaults' => app(PositioningSendings::class)->defaults($candidature),
                 'sendings' => PositioningSendings::forPage($candidature),
+                // The link to copy: only for who may change the candidature.
+                'link' => AdmissionsVisibility::allows($user, Permissions::CANDIDATURES_UPDATE, $candidature) ? PositioningSendings::activeLink($candidature) : null,
                 'can_send' => AdmissionsVisibility::allows($user, Permissions::CANDIDATURES_UPDATE, $candidature) && ! $candidature->trashed(),
             ],
         ]);

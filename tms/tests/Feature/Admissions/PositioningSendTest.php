@@ -101,3 +101,44 @@ it('refuses a message without the link, a test not offered, a bad address, and a
     $this->actingAs($reader);
     posSend($c, $test)->assertForbidden();
 });
+
+it('generates a link to copy without any e-mail, shown on the card while it works', function () {
+    Queue::fake();
+    [$c, $test] = posCandidature();
+    $this->actingAs(admin(twoFactor: true));
+
+    $this->post("/admissions/candidatures/{$c->id}/positioning/link", ['version_ids' => [$test->current_version_id]])
+        ->assertRedirect()->assertSessionHas('status', 'Lien du test généré : copiez-le et transmettez-le au candidat.');
+    Queue::assertNothingPushed();
+
+    $sending = PositioningSending::query()->sole();
+    expect($sending->email)->toBeNull()
+        ->and($sending->email_status)->toBe(PositioningSending::NO_EMAIL)
+        ->and($c->fresh()->status)->toBe(CandidatureStatus::PositioningSent);
+
+    $link = $this->get("/admissions/candidatures/{$c->id}")->original->getData()['page']['props']['positioning']['link'];
+    expect($link['url'])->toMatch('#/test-positionnement/[0-9a-f]{64}$#')
+        ->and($link['expires_on'])->toBe('03/12/2026');
+    $url = $link['url'];
+    $token = substr((string) $url, -64);
+    expect(hash('sha256', $token))->toBe($sending->token_hash);
+
+    // The link opens for the candidate.
+    $this->get("/test-positionnement/{$token}")->assertOk();
+
+    // A reader of the candidature does not get it.
+    $this->actingAs(adUser([Permissions::CANDIDATURES_VIEW => null]))->get("/admissions/candidatures/{$c->id}")
+        ->assertInertia(fn (Assert $p) => $p->where('positioning.link', null));
+});
+
+it('shows the link of an e-mail sending too, the newest one only', function () {
+    Queue::fake();
+    [$c, $test] = posCandidature();
+    $this->actingAs(admin(twoFactor: true));
+    posSend($c, $test);
+    $this->post("/admissions/candidatures/{$c->id}/positioning/link", ['version_ids' => [$test->current_version_id]]);
+
+    $active = PositioningSending::query()->whereNull('revoked_at')->sole();
+    $this->get("/admissions/candidatures/{$c->id}")->assertInertia(fn (Assert $p) => $p
+        ->where('positioning.link.url', fn (string $url) => hash('sha256', substr($url, -64)) === $active->token_hash));
+});

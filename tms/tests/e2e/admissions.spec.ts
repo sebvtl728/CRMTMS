@@ -88,7 +88,17 @@ test('an interlocuteur becomes a candidate, signs an apprenticeship and becomes 
     // The test of the training is offered and sent to the candidate with a personal link.
     const positioning = page.getByRole('region', { name: 'Test de positionnement' });
     await expect(positioning.getByRole('link', { name: `Test ${TRAINING}` })).toBeVisible();
-    await positioning.getByRole('button', { name: 'Envoyer le test' }).click();
+    // A link to copy, without any e-mail; the candidate opens it.
+    await positioning.getByRole('button', { name: 'Générer le lien' }).click();
+    await expect(page.getByText('Lien du test généré : copiez-le et transmettez-le au candidat.')).toBeVisible();
+    const link = await positioning.getByLabel(/Lien du candidat/).inputValue();
+    expect(link).toMatch(/\/test-positionnement\/[0-9a-f]{64}$/);
+    const candidatePage = await context.newPage();
+    await candidatePage.goto(link);
+    await expect(candidatePage.getByRole('link', { name: `Test ${TRAINING}` })).toBeVisible();
+    await candidatePage.close();
+    // Or by e-mail (a new link replaces the previous one).
+    await positioning.getByRole('button', { name: 'Envoyer par e-mail' }).click();
     await page.getByRole('dialog').getByLabel('Destinataire *').fill('candidat@example.test');
     await page.getByRole('dialog').getByRole('button', { name: 'Envoyer' }).click();
     await expect(page.getByText("Test de positionnement en cours d'envoi.")).toBeVisible();

@@ -30,6 +30,7 @@ Route::middleware(['auth'])->prefix('admissions/candidatures')->name('admissions
     Route::post('{candidature}/files', [CandidatureFileController::class, 'store'])->middleware('can:admissions.candidatures.update')->name('files.store');
     Route::get('{candidature}/files/{file}', [CandidatureFileController::class, 'show'])->middleware('can:admissions.candidatures.view')->name('files.show');
     Route::delete('{candidature}/files/{file}', [CandidatureFileController::class, 'destroy'])->middleware('can:admissions.candidatures.update')->name('files.destroy');
+    Route::post('{candidature}/positioning/link', [PositioningController::class, 'link'])->middleware(['can:admissions.candidatures.update', 'throttle:positioning-send'])->name('positioning.link');
     Route::post('{candidature}/positioning/send', [PositioningController::class, 'send'])->middleware(['can:admissions.candidatures.update', 'throttle:positioning-send'])->name('positioning.send');
     Route::put('{candidature}/alternance', [AlternanceController::class, 'update'])->middleware('can:admissions.candidatures.update')->name('alternance.update');
     Route::delete('{candidature}/alternance', [AlternanceController::class, 'destroy'])->middleware('can:admissions.candidatures.update')->name('alternance.destroy');

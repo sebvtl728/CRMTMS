@@ -7,6 +7,9 @@ Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) ; ve
 
 ### Ajouté
 
+- **Test de positionnement — Générer le lien** : le lien personnel du candidat s'affiche sur la candidature avec
+  **Copier**, sans e-mail obligatoire ; « Envoyer par e-mail » reste possible.
+
 - **Tests de positionnement** : la bibliothèque (Catalogue › Plaquettes et tests) accueille les tests PDF, rattachés aux
   DAS et/ou aux formations ; la carte « Test de positionnement » d'une candidature propose ceux de sa formation ou de son
   DAS, **Envoyer le test** les envoie par e-mail avec un **lien personnel** (14 jours, sans compte) où le candidat dépose

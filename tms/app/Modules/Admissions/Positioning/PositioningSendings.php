@@ -10,6 +10,7 @@ use App\Modules\Core\Mail\MailTemplateDefinition;
 use App\Modules\Core\Mail\MailTemplateRegistry;
 use App\Modules\Core\Mail\MailTemplates;
 use App\Modules\Core\Tenancy\TenantContext;
+use App\Modules\Core\Tenancy\TenantUrl;
 use App\Modules\Core\Users\User;
 use App\Modules\Crm\Public\Fiches;
 use App\Modules\Crm\Public\Trainees;
@@ -131,8 +132,66 @@ final class PositioningSendings
             throw ValidationException::withMessages(['version_ids' => 'Les tests choisis dépassent 20 Mo : envoyez-en moins à la fois.']);
         }
 
+        [$sending, $token] = $this->record($candidature, $values['version_ids'], $by, [
+            'email' => mb_strtolower(trim($values['to'])),
+            'subject' => trim($values['subject']),
+            'message' => $values['body'],
+        ]);
+        SendPositioningTest::dispatch($sending->id, $token)->afterCommit();
+
+        return $sending;
+    }
+
+    /**
+     * « Générer le lien »: a link to copy and hand to the candidate, no
+     * e-mail; the same rules as a sending (tests offered, previous link
+     * revoked, date and stage).
+     *
+     * @param  array<string, mixed>  $data  version_ids (default: every test offered)
+     */
+    public function link(Candidature $candidature, array $data, User $by): PositioningSending
+    {
+        $offered = array_column($this->offered($candidature), 'version_id');
+        $ids = is_array($data['version_ids'] ?? null) ? array_values($data['version_ids']) : $offered;
+        if ($ids === [] || array_diff($ids, $offered) !== [] || count($ids) !== count(array_unique($ids))) {
+            throw ValidationException::withMessages(['version_ids' => 'Choisissez au moins un test proposé pour cette candidature.']);
+        }
+
+        return $this->record($candidature, $ids, $by, ['email_status' => PositioningSending::NO_EMAIL])[0];
+    }
+
+    /**
+     * The working link of the candidature (the newest one, neither revoked,
+     * used nor expired), to copy; null without one.
+     *
+     * @return array{url: string, expires_on: string}|null
+     */
+    public static function activeLink(Candidature $c): ?array
+    {
+        $sending = PositioningSending::query()->where('candidature_id', $c->id)->whereNull('revoked_at')->whereNull('submitted_at')
+            ->where('expires_at', '>', CarbonImmutable::now())->whereNotNull('token_encrypted')->latest('created_at')->first();
+        if ($sending === null || $sending->token_encrypted === null) {
+            return null;
+        }
+
+        return [
+            'url' => TenantUrl::route('positioning.show', $sending->token_encrypted),
+            'expires_on' => $sending->expires_at->setTimezone('Europe/Paris')->format('d/m/Y'),
+        ];
+    }
+
+    /**
+     * Records a sending (a new link) under the candidature's lock: previous
+     * link revoked, versions, « Envoyé le » and the stage.
+     *
+     * @param  list<string>  $versionIds
+     * @param  array<string, mixed>  $values  email, subject, message, or email_status none
+     * @return array{0: PositioningSending, 1: string} the sending and its plain token
+     */
+    private function record(Candidature $candidature, array $versionIds, User $by, array $values): array
+    {
         $token = bin2hex(random_bytes(32));
-        $sending = DB::transaction(function () use ($candidature, $values, $by, $token): PositioningSending {
+        $sending = DB::transaction(function () use ($candidature, $versionIds, $by, $values, $token): PositioningSending {
             /** @var Candidature $locked */
             $locked = Candidature::query()->lockForUpdate()->findOrFail($candidature->getKey());
             $now = CarbonImmutable::now();
@@ -140,15 +199,14 @@ final class PositioningSendings
                 ->toBase()->update(['revoked_at' => $now, 'updated_at' => $now]);
 
             $sending = PositioningSending::query()->create([
+                ...$values,
                 'candidature_id' => $locked->id,
-                'email' => mb_strtolower(trim($values['to'])),
-                'subject' => trim($values['subject']),
-                'message' => $values['body'],
                 'token_hash' => PositioningSending::hashToken($token),
+                'token_encrypted' => $token,
                 'expires_at' => self::deadline(),
                 'created_by' => $by->id,
             ]);
-            foreach (array_values($values['version_ids']) as $i => $versionId) {
+            foreach (array_values($versionIds) as $i => $versionId) {
                 DB::table('positioning_sending_versions')->insert([
                     'tenant_id' => $sending->tenant_id, 'positioning_sending_id' => $sending->id, 'brochure_version_id' => $versionId, 'position' => $i,
                 ]);
@@ -168,9 +226,7 @@ final class PositioningSendings
             return $sending;
         });
 
-        SendPositioningTest::dispatch($sending->id, $token)->afterCommit();
-
-        return $sending;
+        return [$sending, $token];
     }
 
     /**

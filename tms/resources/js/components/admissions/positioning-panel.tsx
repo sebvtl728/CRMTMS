@@ -4,8 +4,8 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { formatDate, formatSize } from '@/lib/crm';
-import { useForm } from '@inertiajs/react';
-import { Download, LoaderCircle, Send } from 'lucide-react';
+import { router, useForm } from '@inertiajs/react';
+import { Check, Copy, Download, Link as LinkIcon, LoaderCircle, Send } from 'lucide-react';
 import { FormEventHandler, useEffect, useState } from 'react';
 
 export interface PositioningTest {
@@ -21,7 +21,7 @@ export interface PositioningSendingRow {
     created_at: string | null;
     email: string | null;
     tests: string[];
-    email_status: 'pending' | 'sent' | 'failed';
+    email_status: 'pending' | 'sent' | 'failed' | 'none';
     email_error: string | null;
     expires_at: string;
     submitted_at: string | null;
@@ -33,9 +33,16 @@ export interface PositioningProps {
     defaults: { to: string; subject: string; body: string };
     sendings: PositioningSendingRow[];
     can_send: boolean;
+    /** The working link to copy (who may change the candidature only). */
+    link: { url: string; expires_on: string } | null;
 }
 
-const EMAIL_STATUS: Record<PositioningSendingRow['email_status'], string> = { pending: 'En cours d’envoi', sent: 'Envoyé', failed: 'Échec' };
+const EMAIL_STATUS: Record<PositioningSendingRow['email_status'], string> = {
+    pending: 'E-mail en cours d’envoi',
+    sent: 'E-mail envoyé',
+    failed: 'Échec de l’e-mail',
+    none: 'Lien généré',
+};
 
 /**
  * The positioning tests of the library offered for the candidature (its
@@ -67,11 +74,27 @@ export function PositioningPanel({ candidatureId, positioning }: { candidatureId
                     ))}
                 </ul>
             )}
+            {positioning.link && <LinkBox link={positioning.link} />}
             {positioning.can_send && positioning.tests.length > 0 && (
-                <div>
+                <div className="flex flex-wrap gap-2">
+                    <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        onClick={() =>
+                            router.post(
+                                `/admissions/candidatures/${candidatureId}/positioning/link`,
+                                { version_ids: positioning.tests.map((t) => t.version_id) },
+                                { preserveScroll: true },
+                            )
+                        }
+                    >
+                        <LinkIcon className="h-4 w-4" />
+                        {positioning.link ? 'Générer un nouveau lien' : 'Générer le lien'}
+                    </Button>
                     <Button type="button" size="sm" variant="outline" onClick={() => setOpen(true)}>
                         <Send className="h-4 w-4" />
-                        Envoyer le test
+                        Envoyer par e-mail
                     </Button>
                 </div>
             )}
@@ -87,6 +110,32 @@ export function PositioningPanel({ candidatureId, positioning }: { candidatureId
                 </ul>
             )}
             <SendDialog candidatureId={candidatureId} positioning={positioning} open={open} onClose={() => setOpen(false)} />
+        </div>
+    );
+}
+
+/** The candidate's link, to copy and hand over (SMS, e-mail…). */
+function LinkBox({ link }: { link: { url: string; expires_on: string } }) {
+    const [copied, setCopied] = useState(false);
+    const copy = () => {
+        void navigator.clipboard?.writeText(link.url).then(() => {
+            setCopied(true);
+            setTimeout(() => setCopied(false), 2000);
+        });
+    };
+
+    return (
+        <div className="grid gap-1 rounded-md border p-2">
+            <Label htmlFor="positioning-link" className="text-xs">
+                Lien du candidat (valable jusqu’au {link.expires_on})
+            </Label>
+            <div className="flex gap-2">
+                <Input id="positioning-link" readOnly value={link.url} onFocus={(e) => e.target.select()} className="font-mono text-xs" />
+                <Button type="button" size="sm" onClick={copy}>
+                    {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+                    {copied ? 'Copié' : 'Copier'}
+                </Button>
+            </div>
         </div>
     );
 }

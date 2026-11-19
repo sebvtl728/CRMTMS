@@ -21,4 +21,14 @@ class PositioningController extends Controller
 
         return back()->with('status', 'Test de positionnement en cours d\'envoi.');
     }
+
+    public function link(Request $request, Candidature $candidature, PositioningSendings $sendings): RedirectResponse
+    {
+        $user = CandidatureController::user($request);
+        CandidatureController::authorizeOn($user, Permissions::CANDIDATURES_UPDATE, $candidature);
+        abort_if($candidature->trashed(), 404);
+        $sendings->link($candidature, $request->only(['version_ids']), $user);
+
+        return back()->with('status', 'Lien du test généré : copiez-le et transmettez-le au candidat.');
+    }
 }
