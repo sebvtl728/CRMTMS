@@ -3,6 +3,7 @@
 use App\Exceptions\UserFacingHttpException;
 use App\Modules\Finance\Invoices\CreditNotes;
 use App\Modules\Finance\Invoices\Invoice;
+use App\Modules\Finance\Invoices\InvoiceSender;
 use App\Modules\Finance\Invoices\InvoiceSending;
 use App\Modules\Finance\Invoices\InvoiceValidator;
 use App\Modules\Finance\Invoices\SendInvoice;
@@ -10,6 +11,7 @@ use App\Modules\Finance\Reminders\ReminderMail;
 use App\Modules\Finance\Reminders\Reminders;
 use App\Modules\Finance\Settings\FinanceSettings;
 use Carbon\CarbonImmutable;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Validation\ValidationException;
 
@@ -181,13 +183,13 @@ it('never sends again a failed reminder of an invoice paid meanwhile', function 
     Invoice::query()->whereKey($invoice->id)->toBase()->update(['email_status' => 'failed']);
     payRecord($user, $invoice, 17143, ['received_on' => '2026-12-24']);
 
-    expect(fn () => app(App\Modules\Finance\Invoices\InvoiceSender::class)->resend($user, $invoice->refresh()))
+    expect(fn () => app(InvoiceSender::class)->resend($user, $invoice->refresh()))
         ->toThrow(UserFacingHttpException::class, Reminders::NOT_DUE);
 });
 
 it('does not send a reminder paid between its queueing and its sending', function () {
     Queue::fake();
-    Illuminate\Support\Facades\Mail::fake();
+    Mail::fake();
     [$invoice, , $user] = payInvoice();
     remindOn('2026-12-24');
     $sending = app(Reminders::class)->send($user, $invoice);
@@ -198,5 +200,5 @@ it('does not send a reminder paid between its queueing and its sending', functio
     expect($sending->refresh()->status)->toBe('failed')
         ->and($sending->error_code)->toBe('not_due')
         ->and($sending->error)->toBe(SendInvoice::NOT_DUE);
-    Illuminate\Support\Facades\Mail::assertNothingSent();
+    Mail::assertNothingSent();
 });

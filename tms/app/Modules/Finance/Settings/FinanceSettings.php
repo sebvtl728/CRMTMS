@@ -10,8 +10,8 @@ use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
-use Illuminate\Validation\ValidationException;
 use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
 
 /**
  * The invoicing defaults of the organisme (Finance › Réglages): one row per
@@ -22,10 +22,9 @@ use Illuminate\Support\Str;
  *
  * @property string $id
  * @property string $tenant_id
- *  - reminder_days: the reminder levels, days after the due date (1 to 3,
- *    increasing; default 7, 30, 60) and auto_reminders: the levels sent
- *    every morning by tms:finance:remind (default off) (spec 0.9.1 § 4.3).
- *
+ *                             - reminder_days: the reminder levels, days after the due date (1 to 3,
+ *                             increasing; default 7, 30, 60) and auto_reminders: the levels sent
+ *                             every morning by tms:finance:remind (default off) (spec 0.9.1 § 4.3).
  * @property string $unjustified_absences
  * @property list<int> $reminder_days
  * @property bool $auto_reminders
