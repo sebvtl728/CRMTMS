@@ -43,6 +43,39 @@ class PdfRenderer
      *
      * @throws PdfRenderingFailed
      */
+    /**
+     * The PDFs merged in this order (Gotenberg PDF engines), e.g. a document
+     * followed by its signature proof page.
+     *
+     * @param  list<string>  $pdfs
+     *
+     * @throws PdfRenderingFailed
+     */
+    public function merge(array $pdfs): string
+    {
+        $url = rtrim((string) config('documents.gotenberg_url'), '/').'/forms/pdfengines/merge';
+        $request = Http::timeout((int) config('documents.timeout', 30))->connectTimeout(5);
+        foreach ($pdfs as $i => $pdf) {
+            $request = $request->attach('files', $pdf, sprintf('%02d.pdf', $i + 1), ['Content-Type' => 'application/pdf']);
+        }
+        try {
+            /** @var Response $response */
+            $response = $request->post($url);
+        } catch (ConnectionException) {
+            Log::warning('PDF merge failed: Gotenberg unreachable.');
+
+            throw new PdfRenderingFailed;
+        }
+        $body = $response->body();
+        if (! $response->successful() || ! str_starts_with($body, '%PDF-')) {
+            Log::warning('PDF merge failed: Gotenberg answered an error.', ['status' => $response->status()]);
+
+            throw new PdfRenderingFailed;
+        }
+
+        return $body;
+    }
+
     public function fromHtml(string $html, ?string $footerHtml = null): string
     {
         $url = rtrim((string) config('documents.gotenberg_url'), '/').'/forms/chromium/convert/html';

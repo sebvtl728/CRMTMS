@@ -2,6 +2,7 @@
 
 namespace App\Modules\Core\Mail;
 
+use App\Modules\Core\Signatures\SignatureMailTemplates;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\RateLimiter;
@@ -49,6 +50,7 @@ class MailServiceProvider extends ServiceProvider
 
     public function boot(): void
     {
+        SignatureMailTemplates::register();
         // Saves, resets and previews: 60 a minute per administrator.
         RateLimiter::for('mail-templates-write', fn (Request $request) => Limit::perMinute(60)->by('mail-templates-write:'.($request->user()?->getAuthIdentifier() ?? $request->ip())));
         // « Envoyer un e-mail de test »: 10 a minute per administrator.
