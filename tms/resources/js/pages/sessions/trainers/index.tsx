@@ -74,8 +74,8 @@ function AddTrainerDialog({ statusOptions, userOptions, onClose }: { statusOptio
                     <DialogHeader>
                         <DialogTitle>Ajouter un formateur</DialogTitle>
                         <DialogDescription>
-                            Choisissez un utilisateur du TMS, ou saisissez un formateur qui n'a pas encore de compte : une invitation avec son e-mail le
-                            liera ensuite automatiquement.
+                            Choisissez un utilisateur du TMS, ou saisissez un formateur qui n'a pas encore de compte : une invitation avec son e-mail
+                            le liera ensuite automatiquement.
                         </DialogDescription>
                     </DialogHeader>
                     <div className="flex flex-wrap gap-4 text-sm" role="radiogroup" aria-label="Formateur">
@@ -198,7 +198,10 @@ export default function Trainers({ trainers, das, dasOptions, statusOptions, use
 
             <div className="flex flex-col gap-6 p-4">
                 <div className="flex flex-wrap items-start justify-between gap-2">
-                    <Heading title="Formateurs" description="Les formateurs salariés et indépendants de l'organisme, leurs indisponibilités et leur compte." />
+                    <Heading
+                        title="Formateurs"
+                        description="Les formateurs salariés et indépendants de l'organisme, leurs indisponibilités et leur compte."
+                    />
                     <Button onClick={() => setAdding(true)}>
                         <Plus className="mr-1 h-4 w-4" /> Ajouter un formateur
                     </Button>
@@ -210,7 +213,9 @@ export default function Trainers({ trainers, das, dasOptions, statusOptions, use
                     <Label htmlFor="trainers_das">DAS</Label>
                     <Select
                         value={das ?? ALL}
-                        onValueChange={(v) => router.get(route('trainers.index'), v === ALL ? {} : { das: v }, { preserveState: true, replace: true })}
+                        onValueChange={(v) =>
+                            router.get(route('trainers.index'), v === ALL ? {} : { das: v }, { preserveState: true, replace: true })
+                        }
                     >
                         <SelectTrigger id="trainers_das">
                             <SelectValue />
@@ -249,11 +254,17 @@ export default function Trainers({ trainers, das, dasOptions, statusOptions, use
                                                 {t.label}
                                             </Link>
                                         </td>
-                                        <td className="px-3 py-2">{t.email ?? '—'}</td>
+                                        <td className="px-3 py-2">{t.email ?? '-'}</td>
                                         <td className="px-3 py-2">{t.status_label}</td>
-                                        <td className="px-3 py-2">{t.das.length > 0 ? t.das.join(', ') : <span className="text-muted-foreground">Tous</span>}</td>
-                                        <td className="px-3 py-2">{t.user ? t.user.email : <span className="text-muted-foreground">Sans compte</span>}</td>
-                                        <td className="px-3 py-2">{t.active ? <Badge variant="secondary">Actif</Badge> : <Badge variant="outline">Inactif</Badge>}</td>
+                                        <td className="px-3 py-2">
+                                            {t.das.length > 0 ? t.das.join(', ') : <span className="text-muted-foreground">Tous</span>}
+                                        </td>
+                                        <td className="px-3 py-2">
+                                            {t.user ? t.user.email : <span className="text-muted-foreground">Sans compte</span>}
+                                        </td>
+                                        <td className="px-3 py-2">
+                                            {t.active ? <Badge variant="secondary">Actif</Badge> : <Badge variant="outline">Inactif</Badge>}
+                                        </td>
                                     </tr>
                                 ))}
                             </tbody>

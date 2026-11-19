@@ -111,7 +111,7 @@ it('proposes the e-mail of the frozen snapshot, the number, the amount and the d
         ->where('can.send', true)
         ->where('email.status', null)
         ->where('email.defaults.to', 'compta@hotel-du-parc.test')
-        ->where('email.defaults.subject', 'Facture F-2026-00001 — CAP FORMATION')
+        ->where('email.defaults.subject', 'Facture F-2026-00001 - CAP FORMATION')
         ->where('email.defaults.body', fn (string $body) => str_contains($body, 'notre facture F-2026-00001')
             && str_contains($body, "171,43\u{00A0}€ TTC") && str_contains($body, 'À régler avant le 17/12/2026.'))
         ->where('email.sendings', []));
@@ -326,7 +326,7 @@ it('sends a credit note too, without a due date in the message', function () {
     $this->post("/finance/invoices/{$credit->id}/validate")->assertSessionHasNoErrors();
 
     $this->get("/finance/invoices/{$credit->id}")->assertInertia(fn (Assert $page) => $page
-        ->where('email.defaults.subject', 'Avoir AV-2026-00001 — CAP FORMATION')
+        ->where('email.defaults.subject', 'Avoir AV-2026-00001 - CAP FORMATION')
         ->where('email.defaults.body', fn (string $b) => str_contains($b, 'notre avoir AV-2026-00001') && ! str_contains($b, 'À régler')));
     $this->post("/finance/invoices/{$credit->id}/send", fsMessage())->assertSessionHasNoErrors();
 
@@ -338,7 +338,7 @@ it('registers the editable e-mail template « invoice »', function () {
     fsInvoice();
     $text = app(MailTemplates::class)->render('invoice', ['numero' => 'F-1', 'piece' => 'Facture', 'type' => 'facture', 'societe' => 'CAP', 'montant_ttc' => '10 €', 'reglement' => '']);
 
-    expect($text['subject'])->toBe('Facture F-1 — CAP')
+    expect($text['subject'])->toBe('Facture F-1 - CAP')
         ->and($text['body'])->toContain('notre facture F-1 d\'un montant de 10 € TTC.');
 });
 

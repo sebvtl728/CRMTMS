@@ -273,7 +273,7 @@ export default function OrganisationFormPage({ organisation, options, duplicates
                         <div aria-live="polite">
                             {sirene.error && <p className="text-sm text-red-600 dark:text-red-400">{sirene.error}</p>}
                             {sirene.filled !== null && (
-                                <p className="text-sm text-muted-foreground">
+                                <p className="text-muted-foreground text-sm">
                                     {sirene.filled.length > 0
                                         ? `Champs complétés : ${sirene.filled.join(', ')}. Vérifiez avant d'enregistrer.`
                                         : 'Aucun champ à compléter : les champs concernés sont déjà renseignés.'}

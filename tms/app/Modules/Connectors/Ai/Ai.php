@@ -17,7 +17,7 @@ use Throwable;
  *    AiUnavailable (fixed French message, ->retryable) / AiInvalidResponse.
  *
  * Each call is journaled in connector_runs: purpose, provider, model,
- * duration, user id and outcome — never the prompt nor the answer. The
+ * duration, user id and outcome - never the prompt nor the answer. The
  * caller applies the named limiter « ai » (20 requests an hour per user).
  */
 class Ai

@@ -114,7 +114,7 @@ final class AlternanceWriter
         $fiches = app(Fiches::class);
         $orgs = $fiches->organisationLabels(array_values(array_filter([$contract->employer_organisation_id, $contract->opco_organisation_id])));
         $tutor = $contract->tutor_person_id !== null ? $fiches->personLabels([$contract->tutor_person_id])[$contract->tutor_person_id] ?? null : null;
-        $org = fn (?string $id) => $id === null ? null : ['id' => $id, 'label' => $orgs[$id]['label'] ?? '—'];
+        $org = fn (?string $id) => $id === null ? null : ['id' => $id, 'label' => $orgs[$id]['label'] ?? '-'];
 
         return [
             'contract_type' => $contract->contract_type->value,

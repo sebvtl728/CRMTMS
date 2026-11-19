@@ -14,7 +14,7 @@
                 <li>
                     {{ $item['subject'] }}
                     @if ($item['fiche'] !== '' && ! str_contains($item['subject'], $item['fiche']))
-                        — {{ $item['fiche'] }}
+                        - {{ $item['fiche'] }}
                     @endif
                     <span style="color: #6b7280;">
                         ({{ $key === 'overdue' ? $item['date'].' ' : '' }}{{ $item['time'] }})

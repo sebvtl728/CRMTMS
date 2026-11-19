@@ -28,7 +28,7 @@ final class InvoiceRecipient
         foreach (self::KEYS as $key) {
             $printed[$key] = isset($values[$key]) && is_scalar($values[$key]) && (string) $values[$key] !== '' ? (string) $values[$key] : null;
         }
-        $printed['name'] ??= '—';
+        $printed['name'] ??= '-';
 
         return $printed;
     }
@@ -40,7 +40,7 @@ final class InvoiceRecipient
      */
     public static function current(Invoice $invoice): array
     {
-        $identity = app(Fiches::class)->billingIdentity($invoice->recipient_type, $invoice->recipient_id) ?? ['name' => '—'];
+        $identity = app(Fiches::class)->billingIdentity($invoice->recipient_type, $invoice->recipient_id) ?? ['name' => '-'];
         $agreement = null;
         if ($invoice->funding_id !== null) {
             foreach (Billing::dossier($invoice->dossier_id)['fundings'] ?? [] as $funding) {

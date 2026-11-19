@@ -89,7 +89,7 @@
         <thead><tr><th>Session</th><th>Dates</th><th class="num" style="text-align: right">Durée</th><th>Lieu</th></tr></thead>
         <tbody>
         @foreach ($sessions as $s)
-            <tr><td>{{ $s['label'] }}</td><td>{{ $s['period'] }}</td><td class="num">{{ $s['hours'] ?? '—' }}</td><td>{{ $s['place'] ?? '—' }}</td></tr>
+            <tr><td>{{ $s['label'] }}</td><td>{{ $s['period'] }}</td><td class="num">{{ $s['hours'] ?? '-' }}</td><td>{{ $s['place'] ?? '-' }}</td></tr>
         @endforeach
         </tbody>
     </table>
@@ -100,7 +100,7 @@
 
 @foreach ($blocks as $i => $block)
     <section>
-        <h2>Article {{ $i + 1 }} — {{ $block['title'] }}</h2>
+        <h2>Article {{ $i + 1 }} - {{ $block['title'] }}</h2>
         <div class="text">{{ $block['text'] }}</div>
     </section>
 @endforeach

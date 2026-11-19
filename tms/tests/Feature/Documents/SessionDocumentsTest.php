@@ -2,6 +2,7 @@
 
 use App\Modules\Documents\Document;
 use App\Modules\Documents\DocumentStatus;
+use App\Modules\Documents\Permissions;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\Mail;
 use Inertia\Testing\AssertableInertia as Assert;
@@ -49,7 +50,7 @@ it('issues and sends the documents of the whole session, or of one trainee', fun
 
 it('refuses the session actions without the right to manage documents', function () {
     $x = docFinishedSession();
-    $reader = l2User([App\Modules\Documents\Permissions::VIEW => null, App\Modules\Sessions\Permissions::SESSIONS_VIEW => null, App\Modules\Sessions\Permissions::DOSSIERS_VIEW => null]);
+    $reader = l2User([Permissions::VIEW => null, App\Modules\Sessions\Permissions::SESSIONS_VIEW => null, App\Modules\Sessions\Permissions::DOSSIERS_VIEW => null]);
 
     $this->actingAs($reader)->post("/sessions/{$x['session']->id}/documents", ['type' => 'convocation'])->assertForbidden();
     $this->actingAs($reader)->post("/enrolments/{$x['lea']->id}/documents", ['type' => 'convocation'])->assertForbidden();

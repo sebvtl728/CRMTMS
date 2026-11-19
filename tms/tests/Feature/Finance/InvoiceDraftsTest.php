@@ -49,7 +49,7 @@ it('computes what is due to the contractor and to the direct funder, with labell
         ->and($rows['contractor']['draft'])->toBeNull()
         ->and($rows['contractor']['lines'])->toHaveCount(1)
         ->and($rows['contractor']['lines'][0])->toMatchArray([
-            'component' => 'training', 'label' => 'HACCP 3 jours — du 01/09/2026 au 30/09/2026 — 9 h réalisées / 21 h prévues',
+            'component' => 'training', 'label' => 'HACCP 3 jours - du 01/09/2026 au 30/09/2026 - 9 h réalisées / 21 h prévues',
             'total_ht_cents' => 17143, 'realised_minutes' => 540, 'planned_minutes' => 1260,
         ])
         ->and($rows[$opco]['total_cents'])->toBe(25714)
@@ -85,7 +85,7 @@ it('bills each closed month of a monthly plan, oldest first, one draft per month
     // 1 000 € × 180 / 1 260 for September.
     expect($rows['contractor'])->toMatchArray(['cut_off' => '2026-09', 'total_cents' => 14286])
         ->and($rows['contractor']['period'])->toMatchArray(['from' => '2026-09-01', 'to' => '2026-09-30'])
-        ->and($rows['contractor']['lines'][0]['label'])->toBe('HACCP 3 jours — septembre 2026 — 3 h réalisées / 21 h prévues');
+        ->and($rows['contractor']['lines'][0]['label'])->toBe('HACCP 3 jours - septembre 2026 - 3 h réalisées / 21 h prévues');
 
     $september = fiDrafts()->prepare(fiManager(), [$rows['contractor']['key']]);
     expect($september['created'])->toBe(1)
@@ -247,7 +247,7 @@ it('bills the dédit and the absences to the contractor on their own lines', fun
     // Absent 180 min: 1 000 € × 180 / 1 260.
     expect($row['components']['absences'])->toBe(['share' => 14286, 'invoiced' => 0, 'due' => 14286])
         ->and(collect($row['lines'])->firstWhere('component', 'absences'))->toMatchArray([
-            'label' => 'Absences non justifiées — non imputables sur les fonds de la formation professionnelle', 'total_ht_cents' => 14286,
+            'label' => 'Absences non justifiées - non imputables sur les fonds de la formation professionnelle', 'total_ht_cents' => 14286,
         ])
         ->and($row['total_cents'])->toBe(42857 + 14286);
 });
@@ -278,7 +278,7 @@ it('creates a draft by hand from the dossier, edits it and deletes it', function
 
     $computed = $draft->lines()->sole();
     $this->actingAs($manager)->put("/finance/invoices/{$draft->id}", ['notes' => 'Bon de commande 12', 'lines' => [
-        ['id' => $computed->id, 'label' => 'HACCP — septembre', 'description' => null, 'quantity' => '1', 'unit' => 'forfait', 'unit_price' => '171,43', 'vat_rate' => '0'],
+        ['id' => $computed->id, 'label' => 'HACCP - septembre', 'description' => null, 'quantity' => '1', 'unit' => 'forfait', 'unit_price' => '171,43', 'vat_rate' => '0'],
         ['label' => 'Supports', 'description' => null, 'quantity' => '1', 'unit' => 'forfait', 'unit_price' => '-12,00', 'vat_rate' => '0'],
     ]])->assertRedirect()->assertSessionHasNoErrors();
     expect($draft->refresh()->total_ht_cents)->toBe(17143 - 1200)

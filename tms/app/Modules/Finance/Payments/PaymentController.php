@@ -46,8 +46,8 @@ class PaymentController extends Controller
             'payments' => [...$page->toArray(), 'data' => $page->getCollection()->map(fn (Payment $p) => [
                 'id' => $p->id,
                 'received_on' => $p->received_on->toDateString(),
-                'payer' => $payers[$p->payer_type.':'.$p->payer_id] ?? '—',
-                'method' => $methods[$p->method_id] ?? '—',
+                'payer' => $payers[$p->payer_type.':'.$p->payer_id] ?? '-',
+                'method' => $methods[$p->method_id] ?? '-',
                 'reference' => $p->reference,
                 'amount_cents' => $p->amount_cents,
                 'allocated_cents' => (int) $p->getAttribute('allocated_cents'),
@@ -212,7 +212,7 @@ class PaymentController extends Controller
     {
         $labels = $type === 'organisation' ? $this->fiches->organisationLabels([$id]) : $this->fiches->personLabels([$id]);
 
-        return ['type' => $type, 'id' => $id, 'label' => $labels[$id]['label'] ?? '—'];
+        return ['type' => $type, 'id' => $id, 'label' => $labels[$id]['label'] ?? '-'];
     }
 
     /**

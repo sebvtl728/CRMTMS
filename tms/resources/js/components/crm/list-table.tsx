@@ -82,7 +82,7 @@ export function ListTable({
                                     {c === linked ? (
                                         <>
                                             <Link href={href(row.id)} className="hover:underline">
-                                                {row.cells[c] || '—'}
+                                                {row.cells[c] || '-'}
                                             </Link>
                                             {row.deleted && (
                                                 <Badge variant="destructive" className="ml-2">
@@ -96,7 +96,7 @@ export function ListTable({
                                             ))}
                                         </>
                                     ) : (
-                                        (row.cells[c] ?? '—')
+                                        (row.cells[c] ?? '-')
                                     )}
                                 </td>
                             ))}

@@ -191,7 +191,7 @@ export default function MailTemplateEdit({ template: t, status }: { template: Te
                                             title={`Exemple : ${v.example}`}
                                         >
                                             <code>{`{${v.name}}`}</code>
-                                            <span className="text-muted-foreground"> — {v.description}</span>
+                                            <span className="text-muted-foreground"> - {v.description}</span>
                                         </button>
                                     </li>
                                 ))}

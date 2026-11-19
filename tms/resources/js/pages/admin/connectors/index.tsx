@@ -110,10 +110,14 @@ export default function ConnectorsIndex({ connectors, runs, status }: IndexProps
                                         <td className="px-4 py-2">
                                             <Badge variant={statusVariant[run.status]}>{statusLabel[run.status]}</Badge>
                                         </td>
-                                        <td className="text-muted-foreground px-4 py-2">{run.error ?? run.summary ?? '—'}</td>
+                                        <td className="text-muted-foreground px-4 py-2">{run.error ?? run.summary ?? '-'}</td>
                                         <td className="px-4 py-2 text-right">
                                             {run.retryable && (
-                                                <Button variant="ghost" size="sm" onClick={() => router.post(route('admin.connectors.runs.retry', run.id))}>
+                                                <Button
+                                                    variant="ghost"
+                                                    size="sm"
+                                                    onClick={() => router.post(route('admin.connectors.runs.retry', run.id))}
+                                                >
                                                     <RotateCcw className="h-4 w-4" />
                                                     Relancer
                                                 </Button>

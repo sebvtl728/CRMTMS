@@ -64,7 +64,7 @@ export default function PositioningTest({
 
     return (
         <AuthLayout
-            title={`Test de positionnement${organisme ? ` — ${organisme}` : ''}`}
+            title={`Test de positionnement${organisme ? ` - ${organisme}` : ''}`}
             description={`Bonjour ${first_name ?? ''}${training ? `, pour la formation « ${training} »` : ''}.`}
         >
             <Head title="Test de positionnement" />

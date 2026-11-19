@@ -1,7 +1,7 @@
 import { ActivityList, type ActivityRow } from '@/components/crm/activity-list';
+import { BrochureSendButton, BrochureSendingList, type BrochureSendingRow, type BrochureSendProps } from '@/components/crm/brochure-send';
 import { StageBadge, type OpportunityRow } from '@/components/crm/opportunity-list';
 import { OpportunityTrainingsSummary, type TrainingEstimate, type TrainingLine } from '@/components/crm/opportunity-trainings';
-import { BrochureSendButton, BrochureSendingList, type BrochureSendingRow, type BrochureSendProps } from '@/components/crm/brochure-send';
 import { QuickActionFicheButton } from '@/components/crm/quick-action';
 import { QuoteCards, type QuoteRow } from '@/components/crm/quote-list';
 import { StageDialog, type StageOption } from '@/components/crm/stage-dialog';
@@ -45,7 +45,7 @@ function Item({ label, children }: { label: string; children: React.ReactNode })
     return (
         <div>
             <dt className="text-muted-foreground text-xs">{label}</dt>
-            <dd className="text-sm break-words">{children || '—'}</dd>
+            <dd className="text-sm break-words">{children || '-'}</dd>
         </div>
     );
 }
@@ -88,7 +88,7 @@ export default function OpportunityShow({
                         </div>
                         <p className="text-sm">
                             <Link href={accountHref} className="underline">
-                                {o.account.name ?? '—'}
+                                {o.account.name ?? '-'}
                             </Link>
                         </p>
                     </div>

@@ -311,7 +311,7 @@ export default function PaymentFormPage({ payment, open_invoices, options }: Pay
                         </div>
                     )}
                     <p className="text-sm">
-                        Affecté : <span className="tabular-nums">{formatCents(allocatedCents)}</span> — non affecté :{' '}
+                        Affecté : <span className="tabular-nums">{formatCents(allocatedCents)}</span> - non affecté :{' '}
                         <span className="tabular-nums">{formatCents(Math.max(0, amountCents - allocatedCents))}</span>
                     </p>
                     <InputError message={errors.allocations} />

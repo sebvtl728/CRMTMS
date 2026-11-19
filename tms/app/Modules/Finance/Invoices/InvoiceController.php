@@ -232,7 +232,7 @@ class InvoiceController extends Controller
             return [
                 'id' => $p->id,
                 'received_on' => $p->received_on->toDateString(),
-                'method' => $methods[$p->method_id] ?? '—',
+                'method' => $methods[$p->method_id] ?? '-',
                 'reference' => $p->reference,
                 'amount_cents' => $a->amount_cents,
                 'payment_cents' => $p->amount_cents,

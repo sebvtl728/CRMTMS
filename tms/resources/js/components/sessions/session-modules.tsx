@@ -47,7 +47,12 @@ export interface SessionPlanning {
     seances: SeanceRow[];
     seance_modules: Option[];
     placements: PlacementRow[];
-    calendar: { holidays: Record<string, string>; closures: ClosureRow[]; interval_days: Record<string, string[]>; placement_days: Record<string, string[]> };
+    calendar: {
+        holidays: Record<string, string>;
+        closures: ClosureRow[];
+        interval_days: Record<string, string[]>;
+        placement_days: Record<string, string[]>;
+    };
     options:
         | ({ modality: Option[]; dating_mode: Option[] } & Partial<{
               trainers: (Option & { das_match?: boolean })[];
@@ -354,7 +359,7 @@ export function SessionModules({
             <div className="flex flex-wrap items-center justify-between gap-2">
                 <h2 className="text-sm font-semibold">
                     Modules · {planning.modules.length}
-                    <span className="text-muted-foreground font-normal"> · total {planning.total ?? '—'}</span>
+                    <span className="text-muted-foreground font-normal"> · total {planning.total ?? '-'}</span>
                 </h2>
                 {planning.can_manage && planning.options && (
                     <div className="flex flex-wrap gap-2">
@@ -400,16 +405,16 @@ export function SessionModules({
                                     <td className="px-3 py-2">{m.title}</td>
                                     <td className="px-3 py-2">{m.dating_mode_label}</td>
                                     <td className="px-3 py-2 whitespace-nowrap">{m.planned}</td>
-                                    <td className="px-3 py-2 whitespace-nowrap">{m.dating_mode === 'seances' ? m.scheduled : '—'}</td>
+                                    <td className="px-3 py-2 whitespace-nowrap">{m.dating_mode === 'seances' ? m.scheduled : '-'}</td>
                                     <td className="px-3 py-2 whitespace-nowrap">
-                                        {m.starts_on ? `${formatDay(m.starts_on)} → ${formatDay(m.ends_on)}` : '—'}
+                                        {m.starts_on ? `${formatDay(m.starts_on)} → ${formatDay(m.ends_on)}` : '-'}
                                         {m.out_of_range && (
                                             <Badge variant="destructive" className="ml-2">
                                                 Hors des dates de la session
                                             </Badge>
                                         )}
                                     </td>
-                                    <td className="px-3 py-2">{m.modality ?? '—'}</td>
+                                    <td className="px-3 py-2">{m.modality ?? '-'}</td>
                                     {planning.can_manage && (
                                         <td className="px-3 py-2">
                                             <div className="flex flex-wrap gap-1">

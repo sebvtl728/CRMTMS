@@ -49,16 +49,16 @@ test('roles and rights: grant a right to a role, highlighted as changed, then ba
     await expect(page).toHaveURL(/\/admin\/roles$/);
 
     // The administrator's column and the locked rights cannot be changed.
-    await expect(page.getByLabel("Exporter vers Excel — Administrateur de l'organisme")).toBeDisabled();
-    await expect(page.getByLabel('Gérer les utilisateurs — Direction')).toBeDisabled();
+    await expect(page.getByLabel("Exporter vers Excel - Administrateur de l'organisme")).toBeDisabled();
+    await expect(page.getByLabel('Gérer les utilisateurs - Direction')).toBeDisabled();
     // The double authentification of the administrator and the direction cannot be switched off.
-    await expect(page.getByRole('switch', { name: "Double authentification obligatoire — Administrateur de l'organisme" })).toHaveAttribute(
+    await expect(page.getByRole('switch', { name: "Double authentification obligatoire - Administrateur de l'organisme" })).toHaveAttribute(
         'aria-disabled',
         'true',
     );
-    await expect(page.getByRole('switch', { name: 'Double authentification obligatoire — Direction' })).toHaveAttribute('aria-disabled', 'true');
+    await expect(page.getByRole('switch', { name: 'Double authentification obligatoire - Direction' })).toHaveAttribute('aria-disabled', 'true');
 
-    const cell = page.getByLabel('Exporter vers Excel — Assistant');
+    const cell = page.getByLabel('Exporter vers Excel - Assistant');
     await expect(cell).not.toBeChecked();
     await cell.click();
     await expect(page.getByText('Droit « Exporter vers Excel » accordé au rôle Assistant.')).toBeVisible();
@@ -103,14 +103,14 @@ test('custom role: created from Assistant, « Ses fiches » on the opportunities
     await dialog.getByRole('button', { name: 'Annuler' }).click();
 
     // 3. « Consulter les opportunités » restricted to « Ses fiches ».
-    const scope = page.getByLabel('Périmètre de Consulter les opportunités — Formateur externe');
+    const scope = page.getByLabel('Périmètre de Consulter les opportunités - Formateur externe');
     await expect(scope).toHaveText("Tout l'organisme");
     await scope.click();
     await page.getByRole('option', { name: 'Ses fiches', exact: true }).click();
     await expect(page.getByText('Périmètre de « Consulter les opportunités » pour le rôle Formateur externe : Ses fiches.')).toBeVisible();
     await expect(scope).toHaveText('Ses fiches');
     // A right that is not granted has no usable scope.
-    await expect(page.getByLabel('Périmètre de Supprimer des opportunités — Formateur externe')).toBeDisabled();
+    await expect(page.getByLabel('Périmètre de Supprimer des opportunités - Formateur externe')).toBeDisabled();
 
     // 4. Invite a user with this role and sign him in.
     await page.goto('/admin/users/invite');

@@ -104,7 +104,7 @@ export default function RemindersIndex({ reminders, status }: { reminders: Remin
                                         <td className="px-3 py-2 text-right whitespace-nowrap tabular-nums">{formatCents(r.remaining_cents)}</td>
                                         <td className="px-3 py-2">{r.level}</td>
                                         <td className="px-3 py-2 whitespace-nowrap">
-                                            {r.last ? `Niveau ${r.last.level}, ${formatDateTime(r.last.at)}` : '—'}
+                                            {r.last ? `Niveau ${r.last.level}, ${formatDateTime(r.last.at)}` : '-'}
                                         </td>
                                     </tr>
                                 ))}

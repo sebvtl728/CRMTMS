@@ -236,7 +236,7 @@ export default function OpportunityFormPage({ opportunity, account, defaults, co
                     title={editing ? "Modifier l'opportunité" : 'Nouvelle opportunité'}
                     description={
                         account
-                            ? `${account.type === 'organisation' ? 'Entreprise' : 'Personne'} : ${account.name ?? '—'}`
+                            ? `${account.type === 'organisation' ? 'Entreprise' : 'Personne'} : ${account.name ?? '-'}`
                             : 'Choisissez d’abord le compte.'
                     }
                 />
@@ -266,7 +266,7 @@ export default function OpportunityFormPage({ opportunity, account, defaults, co
                             {editing ? (
                                 <div className="grid gap-2">
                                     <Label>Étape</Label>
-                                    <p className="text-sm">{opportunity.stage ?? '—'} (changez-la depuis la fiche)</p>
+                                    <p className="text-sm">{opportunity.stage ?? '-'} (changez-la depuis la fiche)</p>
                                 </div>
                             ) : (
                                 pick('stage_id', 'Étape *', options.stage, null)

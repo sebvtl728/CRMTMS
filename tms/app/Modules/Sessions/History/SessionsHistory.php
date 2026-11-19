@@ -40,9 +40,9 @@ use Throwable;
  * and change of state is there, with its author and its instant; no table
  * of its own), never a personal value:
  *  - on a CRM fiche (Crm\Public\FicheHistory): the dossiers of an
- *    entreprise or a person (contractant, or contact for a person) —
+ *    entreprise or a person (contractant, or contact for a person) -
  *    creation and states, within the scope of sessions.dossiers.view; the
- *    enrolments of a person — enrolment, waiting list, confirmation,
+ *    enrolments of a person - enrolment, waiting list, confirmation,
  *    abandon, cancellation, within the scope of sessions.sessions.view;
  *  - on the page of a dossier (dossierPage): its creation and states, its
  *    enrolments and its fundings (added, changed, removed).
@@ -92,7 +92,7 @@ final class SessionsHistory
         $reasons = self::reasons($logs, 'cancelled_reason_id');
 
         return $logs->map(function (AuditLog $log) use ($numbers, $reasons): array {
-            $number = $numbers[$log->auditable_id] ?? '—';
+            $number = $numbers[$log->auditable_id] ?? '-';
 
             return [
                 'at' => CarbonImmutable::instance($log->created_at),
@@ -171,7 +171,7 @@ final class SessionsHistory
             $entry = $describe($log);
             $name = $names[$trainees[$log->auditable_id] ?? '']['label'] ?? 'Stagiaire';
 
-            return ['type' => 'enrolment', 'at' => $entry['at'], 'id' => $log->id, 'title' => "{$name} — {$entry['title']}", 'body' => $entry['body'], 'author' => $entry['author']];
+            return ['type' => 'enrolment', 'at' => $entry['at'], 'id' => $log->id, 'title' => "{$name} - {$entry['title']}", 'body' => $entry['body'], 'author' => $entry['author']];
         }));
 
         $entries = $entries->concat(self::fundingEntries($dossier));
@@ -226,7 +226,7 @@ final class SessionsHistory
             if ($seance === null || $name === null) {
                 continue;
             }
-            $what = "{$name} — Présence du ".$seance->date->format('d/m/Y');
+            $what = "{$name} - Présence du ".$seance->date->format('d/m/Y');
             $value = Attendance::label((string) ($current['status'] ?? '')).' ('.SessionModules::label((int) ($current['minutes'] ?? 0)).')';
             $new = $log->new_values ?? [];
             $title = match (true) {
@@ -256,7 +256,7 @@ final class SessionsHistory
             if ($name === null || ! is_string($current['month'] ?? null)) {
                 continue;
             }
-            $what = "{$name} — Heures de ".Months::label(substr($current['month'], 0, 7)).' ('.($modules[$current['session_module_id'] ?? ''] ?? 'module').')';
+            $what = "{$name} - Heures de ".Months::label(substr($current['month'], 0, 7)).' ('.($modules[$current['session_module_id'] ?? ''] ?? 'module').')';
             $value = SessionModules::label((int) ($current['minutes'] ?? 0));
             $title = match ($log->event) {
                 'created' => "{$what} : {$value}",
@@ -292,7 +292,7 @@ final class SessionsHistory
             if ($closure === null || ! array_key_exists('closed_at', $new)) {
                 return null;
             }
-            $what = 'Présences de '.Months::label($closure->month).' — session '.($numbers[$closure->training_session_id] ?? '');
+            $what = 'Présences de '.Months::label($closure->month).' - session '.($numbers[$closure->training_session_id] ?? '');
 
             return [
                 'type' => 'closure',
@@ -429,8 +429,8 @@ final class SessionsHistory
             $hours = $log->event === 'updated' && $status === '' && array_key_exists('planned_hours', $new);
             $title = match (true) {
                 $log->event === 'created' => ($status === EnrolmentStatus::Waitlisted->value ? 'Inscription en liste d\'attente à la ' : 'Inscription à la ').$where,
-                $hours => 'Heures prévues modifiées — '.$where,
-                default => (self::ENROLMENT_EVENTS[$status] ?? 'Inscription modifiée').' — '.$where,
+                $hours => 'Heures prévues modifiées - '.$where,
+                default => (self::ENROLMENT_EVENTS[$status] ?? 'Inscription modifiée').' - '.$where,
             };
             $body = $hours ? self::hoursBody($log->old_values['planned_hours'] ?? null, $new['planned_hours'] ?? null) : null;
             if ($log->event === 'updated' && $status === EnrolmentStatus::Abandoned->value) {
@@ -456,11 +456,11 @@ final class SessionsHistory
     }
 
     /**
-     * « 35,00 h → 28,00 h » (« — » for no hours).
+     * « 35,00 h → 28,00 h » (« - » for no hours).
      */
     private static function hoursBody(mixed $old, mixed $new): string
     {
-        $show = fn (mixed $h): string => is_string($h) || is_int($h) ? SessionRows::hours(Amounts::decimal(Amounts::cents((string) $h))).' h' : '—';
+        $show = fn (mixed $h): string => is_string($h) || is_int($h) ? SessionRows::hours(Amounts::decimal(Amounts::cents((string) $h))).' h' : '-';
 
         return $show($old).' → '.$show($new);
     }

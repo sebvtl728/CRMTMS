@@ -43,7 +43,7 @@ final class SeanceRows
         return $seances->map(fn (Seance $s) => [
             'id' => $s->id,
             'module_id' => $s->session_module_id,
-            'module' => $modules[$s->session_module_id] ?? '—',
+            'module' => $modules[$s->session_module_id] ?? '-',
             'date' => $s->date->toDateString(),
             'start' => $s->start(),
             'end' => $s->end(),

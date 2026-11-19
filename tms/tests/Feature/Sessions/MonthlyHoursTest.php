@@ -124,9 +124,9 @@ it('journals monthly hours with ids and minutes, and shows them in the history o
         ->and($logs->map(fn ($l) => $l->old_values.' '.$l->new_values)->implode(' '))->not->toContain('Durand');
 
     $titles = collect(SessionsHistory::dossierPage($lea->dossier()->firstOrFail()))->pluck('title')->all();
-    expect($titles)->toContain('Léa Durand — Heures de septembre 2026 (HACCP 3 jours) : 12 h 30')
-        ->toContain('Léa Durand — Heures de septembre 2026 (HACCP 3 jours) modifiées : 10 h')
-        ->toContain('Léa Durand — Heures de septembre 2026 (HACCP 3 jours) effacées');
+    expect($titles)->toContain('Léa Durand - Heures de septembre 2026 (HACCP 3 jours) : 12 h 30')
+        ->toContain('Léa Durand - Heures de septembre 2026 (HACCP 3 jours) modifiées : 10 h')
+        ->toContain('Léa Durand - Heures de septembre 2026 (HACCP 3 jours) effacées');
 });
 
 it('clears monthly hours of a trainee of the session on an interval module only', function () {

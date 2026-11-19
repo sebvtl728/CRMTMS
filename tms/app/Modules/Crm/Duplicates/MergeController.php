@@ -154,8 +154,8 @@ class MergeController extends Controller
             $field === 'is_individual' => $value ? 'Oui' : 'Non',
             $value instanceof OrganisationStatus => $value->label(),
             $value instanceof Carbon => $value->format('d/m/Y'),
-            $field === 'responsible_user_id' => User::query()->find($value)->name ?? '—',
-            str_ends_with($field, '_id') => ReferenceItem::query()->find($value)->label ?? '—',
+            $field === 'responsible_user_id' => User::query()->find($value)->name ?? '-',
+            str_ends_with($field, '_id') => ReferenceItem::query()->find($value)->label ?? '-',
             default => is_scalar($value) ? (string) $value : null,
         };
     }

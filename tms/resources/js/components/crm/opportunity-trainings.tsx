@@ -40,9 +40,9 @@ export interface TrainingEstimate {
 
 const euros = new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR', minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
-/** Cents as « 1 200,00 € », « — » when missing. */
+/** Cents as « 1 200,00 € », « - » when missing. */
 export function formatCents(cents: number | null | undefined): string {
-    return cents === null || cents === undefined ? '—' : euros.format(cents / 100);
+    return cents === null || cents === undefined ? '-' : euros.format(cents / 100);
 }
 
 /** Stored quantity (« 3.00 », « 1.50 ») as typed (« 3 », « 1,5 »). */

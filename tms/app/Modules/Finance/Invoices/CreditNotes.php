@@ -12,7 +12,7 @@ use Illuminate\Validation\ValidationException;
 /**
  * « Créer un avoir » (spec 0.9 § 4.4): a credit-note draft from a validated
  * invoice, total (every line with an amount) or partial (the chosen lines),
- * each line given back negative — same recipient, dossier and period,
+ * each line given back negative - same recipient, dossier and period,
  * corrected_invoice_id = the invoice. It is then edited like any draft
  * (amounts lowered for a partial credit) and validated by InvoiceValidator
  * (numbering AV, never more than was invoiced to the recipient). One open

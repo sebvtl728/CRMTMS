@@ -32,8 +32,8 @@ class ActivityAssignedMail extends Mailable
             'auteur' => $this->byName,
             'type' => $this->activity->type->label ?? 'Action',
             'objet' => $this->activity->subject,
-            'echeance' => $due === null ? '—' : $due->format('d/m/Y').' à '.$due->format('H:i'),
-            'motif' => $purpose === '' ? '—' : $purpose,
+            'echeance' => $due === null ? '-' : $due->format('d/m/Y').' à '.$due->format('H:i'),
+            'motif' => $purpose === '' ? '-' : $purpose,
             'message' => trim((string) $this->note),
             'lien' => $this->url,
         ]);

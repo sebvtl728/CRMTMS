@@ -118,7 +118,7 @@ function Detail({ row }: { row: DueRow }) {
                     {row.detail.map((d, i) => (
                         <tr key={i} className="border-t">
                             <td className="py-1 pr-2">{d.line_label}</td>
-                            <td className="py-1 pr-2">{d.trainee ?? '—'}</td>
+                            <td className="py-1 pr-2">{d.trainee ?? '-'}</td>
                             <td className="py-1 pr-2 text-right tabular-nums">{formatMinutes(d.planned)}</td>
                             <td className="py-1 pr-2 text-right tabular-nums">{formatMinutes(d.realised)}</td>
                             <td className="py-1 pr-2 text-right tabular-nums">{formatRatio(d.ratio)}</td>
@@ -288,7 +288,7 @@ export default function ToInvoice({ rows, soon, filters, options, can, status }:
                                                 <td className="px-3 py-2">
                                                     {row.draft === null && row.preparable && (
                                                         <Checkbox
-                                                            aria-label={`Sélectionner ${row.dossier.number} — ${row.recipient.label}`}
+                                                            aria-label={`Sélectionner ${row.dossier.number} - ${row.recipient.label}`}
                                                             checked={selected.includes(row.key)}
                                                             onCheckedChange={() => setSelected(toggle(selected, row.key))}
                                                         />

@@ -226,7 +226,7 @@ export default function OrganisationsIndex({ organisations, filters, options, ca
                                             <span className="font-medium">{o.name}</span>
                                             <Badge variant={statusVariant(o.status.value)}>{o.status.label}</Badge>
                                         </div>
-                                        <p className="text-muted-foreground mt-1 text-sm">{[o.city, o.sector].filter(Boolean).join(' · ') || '—'}</p>
+                                        <p className="text-muted-foreground mt-1 text-sm">{[o.city, o.sector].filter(Boolean).join(' · ') || '-'}</p>
                                         <p className="text-muted-foreground mt-1 text-xs">
                                             {o.responsible ?? 'Sans responsable'} · Dernier contact : {formatDate(o.last_contact_at)}
                                         </p>

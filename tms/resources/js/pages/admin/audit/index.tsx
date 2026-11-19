@@ -97,13 +97,13 @@ const TYPE_LABELS: Record<string, string> = {
     training_session: 'Session',
 };
 // Older journal rows hold the class name: show its last segment.
-const typeLabel = (type: string | null) => (type ? (TYPE_LABELS[type] ?? type.split('\\').pop() ?? type) : '—');
+const typeLabel = (type: string | null) => (type ? (TYPE_LABELS[type] ?? type.split('\\').pop() ?? type) : '-');
 
 function Values({ old, current }: { old: Record<string, unknown> | null; current: Record<string, unknown> | null }) {
     const keys = Array.from(new Set([...Object.keys(old ?? {}), ...Object.keys(current ?? {})]));
 
     if (keys.length === 0) {
-        return <span className="text-muted-foreground">—</span>;
+        return <span className="text-muted-foreground">-</span>;
     }
 
     return (
@@ -231,7 +231,7 @@ export default function AuditIndex({ logs, filters, users, events, types }: Audi
                             {logs.data.map((log) => (
                                 <tr key={log.id} className="border-t align-top">
                                     <td className="px-4 py-2 whitespace-nowrap">{dateTime.format(new Date(log.created_at))}</td>
-                                    <td className="px-4 py-2">{log.user ?? '—'}</td>
+                                    <td className="px-4 py-2">{log.user ?? '-'}</td>
                                     <td className="px-4 py-2">{eventLabel(log.event)}</td>
                                     <td className="px-4 py-2">
                                         {typeLabel(log.auditable_type)}
@@ -240,7 +240,7 @@ export default function AuditIndex({ logs, filters, users, events, types }: Audi
                                     <td className="px-4 py-2">
                                         <Values old={log.old_values} current={log.new_values} />
                                     </td>
-                                    <td className="px-4 py-2">{log.ip ?? '—'}</td>
+                                    <td className="px-4 py-2">{log.ip ?? '-'}</td>
                                 </tr>
                             ))}
                         </tbody>

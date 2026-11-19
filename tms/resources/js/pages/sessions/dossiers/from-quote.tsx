@@ -308,11 +308,11 @@ export default function DossierFromQuote({ existing, plan, options, can }: Props
                             </div>
                             <div>
                                 <dt className="text-muted-foreground text-xs">Contact</dt>
-                                <dd>{plan.quote.contact?.label ?? '—'}</dd>
+                                <dd>{plan.quote.contact?.label ?? '-'}</dd>
                             </div>
                             <div>
                                 <dt className="text-muted-foreground text-xs">DAS</dt>
-                                <dd>{plan.quote.das ?? '—'}</dd>
+                                <dd>{plan.quote.das ?? '-'}</dd>
                             </div>
                             <div>
                                 <dt className="text-muted-foreground text-xs">Montant HT</dt>

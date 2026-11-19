@@ -30,7 +30,7 @@ export interface InvoiceRow {
 
 /** Minutes as « 12 h 30 », « 9 h ». */
 export function formatMinutes(minutes: number | null | undefined): string {
-    if (minutes === null || minutes === undefined) return '—';
+    if (minutes === null || minutes === undefined) return '-';
     const h = Math.floor(minutes / 60);
     const m = minutes % 60;
 

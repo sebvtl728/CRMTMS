@@ -28,7 +28,7 @@ final class FinanceMailTemplates
             key: self::INVOICE,
             label: "Envoi d'une facture ou d'un avoir",
             description: 'Proposé dans la fenêtre « Envoyer », toujours modifiable avant l\'envoi. Le PDF archivé est joint automatiquement.',
-            subject: '{piece} {numero} — {societe}',
+            subject: '{piece} {numero} - {societe}',
             body: "Bonjour,\n\nVeuillez trouver ci-joint notre {type} {numero} d'un montant de {montant_ttc} TTC.{reglement}\n\nNous restons à votre disposition pour toute question.\n\nCordialement,\n{societe}",
             variables: [
                 'numero' => ['numéro de la facture ou de l\'avoir', 'F-2026-00042'],
@@ -56,17 +56,17 @@ final class FinanceMailTemplates
             'organisme' => ["nom de l'organisme", 'CAP FORMATION'],
         ];
         $texts = [
-            1 => ['Première relance', 'Rappel : facture {numero} — {societe}',
+            1 => ['Première relance', 'Rappel : facture {numero} - {societe}',
                 "Bonjour,\n\nSauf erreur de notre part, notre facture {numero} d'un montant de {montant_ttc} TTC, échue le {echeance}, n'est pas encore réglée (reste dû : {reste_du}).\n\nNous vous remercions de bien vouloir procéder à son règlement. Si celui-ci vient d'être effectué, merci de ne pas tenir compte de ce message.\n\nCordialement,\n{societe}"],
-            2 => ['Deuxième relance', 'Deuxième relance : facture {numero} — {societe}',
+            2 => ['Deuxième relance', 'Deuxième relance : facture {numero} - {societe}',
                 "Bonjour,\n\nMalgré notre précédent rappel, notre facture {numero}, échue le {echeance}, reste impayée depuis {jours_retard} jours (reste dû : {reste_du}).\n\nNous vous remercions de procéder à son règlement dans les meilleurs délais.{penalites}\n\nCordialement,\n{societe}"],
-            3 => ['Dernière relance', 'Dernière relance : facture {numero} — {societe}',
+            3 => ['Dernière relance', 'Dernière relance : facture {numero} - {societe}',
                 "Bonjour,\n\nNotre facture {numero}, échue le {echeance}, reste impayée malgré nos relances (reste dû : {reste_du}, {jours_retard} jours de retard).\n\nSans règlement de votre part sous huit jours, nous serons contraints d'engager une procédure de recouvrement.{penalites}\n\nCordialement,\n{societe}"],
         ];
         foreach ($texts as $level => [$label, $subject, $body]) {
             MailTemplateRegistry::register(new MailTemplateDefinition(
                 key: self::reminder($level),
-                label: 'Relance de facture — niveau '.$level.' ('.mb_strtolower($label).')',
+                label: 'Relance de facture - niveau '.$level.' ('.mb_strtolower($label).')',
                 description: 'Envoyée '.($level === 1 ? 'au premier' : ($level === 2 ? 'au deuxième' : 'au troisième')).' niveau de relance d\'une facture impayée (Finance › À relancer, ou automatiquement). Le PDF archivé est joint.',
                 subject: $subject,
                 body: $body,

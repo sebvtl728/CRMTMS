@@ -31,7 +31,7 @@ final class DocumentMailTemplates
             key: self::key(DocumentType::Convention),
             label: "Envoi d'une convention de formation",
             description: 'Proposé dans la fenêtre « Envoyer » du document, toujours modifiable avant l\'envoi. Le PDF est joint automatiquement.',
-            subject: '{document} {numero} — {societe}',
+            subject: '{document} {numero} - {societe}',
             body: "Bonjour,\n\nVeuillez trouver ci-jointe la convention de formation {numero} pour la formation « {formation} » ({dates}).\n\nMerci de nous la retourner signée.\n\nCordialement,\n{societe}",
             variables: $variables,
         ));
@@ -39,7 +39,7 @@ final class DocumentMailTemplates
             key: self::key(DocumentType::Contract),
             label: "Envoi d'un contrat de formation",
             description: 'Proposé dans la fenêtre « Envoyer » du document, toujours modifiable avant l\'envoi. Le PDF est joint automatiquement.',
-            subject: '{document} {numero} — {societe}',
+            subject: '{document} {numero} - {societe}',
             body: "Bonjour,\n\nVeuillez trouver ci-joint votre contrat de formation {numero} pour la formation « {formation} » ({dates}).\n\nVous disposez d'un délai de rétractation de 14 jours à compter de sa signature. Merci de nous le retourner signé.\n\nCordialement,\n{societe}",
             variables: $variables,
         ));

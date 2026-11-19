@@ -60,7 +60,7 @@ final class CandidaturePresenter
             'origin_id' => $c->origin_id,
             'origin_label' => $c->origin_id !== null ? ($labels[$c->origin_id] ?? null) : null,
             'prescriber' => $c->prescriber_organisation_id === null ? null
-                : ['id' => $c->prescriber_organisation_id, 'label' => app(Fiches::class)->organisationLabels([$c->prescriber_organisation_id])[$c->prescriber_organisation_id]['label'] ?? '—'],
+                : ['id' => $c->prescriber_organisation_id, 'label' => app(Fiches::class)->organisationLabels([$c->prescriber_organisation_id])[$c->prescriber_organisation_id]['label'] ?? '-'],
             'france_travail_id' => $c->france_travail_id,
             'last_diploma' => $c->last_diploma,
             'legal_representative' => $c->legal_representative,

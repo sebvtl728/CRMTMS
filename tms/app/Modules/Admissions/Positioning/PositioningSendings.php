@@ -43,7 +43,7 @@ final class PositioningSendings
             key: self::TEMPLATE,
             label: 'Envoi d\'un test de positionnement',
             description: 'Proposé dans la fenêtre « Envoyer le test » d\'une candidature, toujours modifiable avant l\'envoi. Les tests choisis sont joints ; {lien} est le lien personnel où le candidat dépose sa copie.',
-            subject: 'Votre test de positionnement — {organisme}',
+            subject: 'Votre test de positionnement - {organisme}',
             body: "Bonjour {prenom},\n\nDans le cadre de votre candidature à la formation « {formation} », vous trouverez ci-joint votre test de positionnement.\n\nUne fois complété, déposez votre copie (PDF ou photo) sur votre lien personnel, avant le {date_limite} :\n{lien}\n\nCordialement,\n{organisme}",
             variables: [
                 'prenom' => ['prénom du candidat', 'Léa'],
@@ -265,7 +265,7 @@ final class PositioningSendings
             'id' => $s->id,
             'created_at' => $s->created_at?->toIso8601String(),
             'email' => $s->email,
-            'tests' => collect($versions->get($s->id, []))->map(fn ($v) => $sent[(string) $v->brochure_version_id]['title'] ?? '—')->values()->all(),
+            'tests' => collect($versions->get($s->id, []))->map(fn ($v) => $sent[(string) $v->brochure_version_id]['title'] ?? '-')->values()->all(),
             'email_status' => $s->email_status,
             'email_error' => $s->email_error,
             'expires_at' => $s->expires_at->toIso8601String(),

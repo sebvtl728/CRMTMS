@@ -14,7 +14,7 @@ const NONE = 'none';
 export const textareaClass =
     'border-input bg-background focus:ring-ring w-full rounded-md border px-3 py-2 text-sm focus:ring-2 focus:outline-hidden';
 
-/** A select of options with an empty choice « — ». */
+/** A select of options with an empty choice « - ». */
 export function OptionSelect({
     id,
     label,
@@ -23,7 +23,7 @@ export function OptionSelect({
     onChange,
     error,
     disabled,
-    noneLabel = '—',
+    noneLabel = '-',
 }: {
     id: string;
     label: string;

@@ -51,7 +51,7 @@ interface ShowProps {
     status?: string | null;
 }
 
-const euros = (value: string | null) => (value ? `${value} €` : '—');
+const euros = (value: string | null) => (value ? `${value} €` : '-');
 
 function Tile({ label, value }: { label: string; value: number | string }) {
     return (
@@ -115,14 +115,14 @@ export default function TrainingShowPage({ training, brochures, blocks, can, sta
         .filter(Boolean)
         .join(' · ');
     const facts: [string, string][] = [
-        ['Code', training.code ?? '—'],
-        ['Code RNCP', training.rncp_code ?? '—'],
-        ['DAS', training.das ?? '—'],
-        ['Durée', duration || '—'],
-        ['Modalité', training.modalities.length > 0 ? training.modalities.join(', ') : '—'],
+        ['Code', training.code ?? '-'],
+        ['Code RNCP', training.rncp_code ?? '-'],
+        ['DAS', training.das ?? '-'],
+        ['Durée', duration || '-'],
+        ['Modalité', training.modalities.length > 0 ? training.modalities.join(', ') : '-'],
         ['Tarif entreprise HT', euros(training.price_company)],
         ['Tarif particulier HT', euros(training.price_individual)],
-        ['Financements', training.funding_modes.length > 0 ? training.funding_modes.join(', ') : '—'],
+        ['Financements', training.funding_modes.length > 0 ? training.funding_modes.join(', ') : '-'],
     ];
 
     return (

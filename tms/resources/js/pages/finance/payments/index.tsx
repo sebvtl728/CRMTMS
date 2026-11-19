@@ -95,10 +95,10 @@ export default function PaymentsIndex({ payments, filters, options, status }: Pa
                                             </td>
                                             <td className="px-3 py-2">{p.payer}</td>
                                             <td className="px-3 py-2">{p.method}</td>
-                                            <td className="px-3 py-2">{p.reference ?? '—'}</td>
+                                            <td className="px-3 py-2">{p.reference ?? '-'}</td>
                                             <td className="px-3 py-2 text-right whitespace-nowrap tabular-nums">{formatCents(p.amount_cents)}</td>
                                             <td className="px-3 py-2 text-right whitespace-nowrap tabular-nums">
-                                                {p.unallocated_cents > 0 ? formatCents(p.unallocated_cents) : '—'}
+                                                {p.unallocated_cents > 0 ? formatCents(p.unallocated_cents) : '-'}
                                             </td>
                                         </tr>
                                     ))}

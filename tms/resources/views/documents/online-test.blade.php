@@ -8,7 +8,7 @@
 <head>
     <meta charset="utf-8">
     <meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src data:; style-src 'unsafe-inline'; font-src data:">
-    <title>Test de positionnement — {{ $candidate }}</title>
+    <title>Test de positionnement - {{ $candidate }}</title>
     <style>
         @page { size: A4; margin: 16mm 14mm; }
         * { box-sizing: border-box; }

@@ -80,7 +80,7 @@ function Item({ label, children }: { label: string; children: React.ReactNode })
     return (
         <div>
             <dt className="text-muted-foreground text-xs">{label}</dt>
-            <dd className="text-sm break-words">{children || '—'}</dd>
+            <dd className="text-sm break-words">{children || '-'}</dd>
         </div>
     );
 }
@@ -134,15 +134,15 @@ export default function QuoteShow({
                         </div>
                         <p className="text-sm">
                             <Link href={route('crm.opportunities.show', q.opportunity.id)} className="underline">
-                                {q.opportunity.title ?? '—'}
+                                {q.opportunity.title ?? '-'}
                             </Link>
                             {' · '}
                             {accountHref ? (
                                 <Link href={accountHref} className="underline">
-                                    {q.account.name ?? '—'}
+                                    {q.account.name ?? '-'}
                                 </Link>
                             ) : (
-                                (q.account.name ?? '—')
+                                (q.account.name ?? '-')
                             )}
                         </p>
                     </div>
@@ -324,7 +324,7 @@ export default function QuoteShow({
                                         </td>
                                         <td className="px-3 py-2 text-right whitespace-nowrap">{formatAmount(l.unit_price)}</td>
                                         <td className="px-3 py-2 text-right whitespace-nowrap">
-                                            {Number(l.discount_percent) > 0 ? `${decimalInput(l.discount_percent)} %` : '—'}
+                                            {Number(l.discount_percent) > 0 ? `${decimalInput(l.discount_percent)} %` : '-'}
                                         </td>
                                         {!q.vat_exempt && <td className="px-3 py-2 text-right whitespace-nowrap">{rateLabel(l.vat_rate)}</td>}
                                         <td className="py-2 pl-3 text-right whitespace-nowrap tabular-nums">{formatAmount(l.total_ht)}</td>

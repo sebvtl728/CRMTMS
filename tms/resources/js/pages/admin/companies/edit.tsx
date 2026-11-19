@@ -254,7 +254,7 @@ export default function EditCompany({ company, mentions, legalForms, underlyingF
 
                 <div className="bg-muted/50 mb-6 rounded-xl border p-4" aria-live="polite">
                     <p className="text-muted-foreground mb-1 text-xs font-medium uppercase">Mentions légales</p>
-                    <p className="text-sm">{preview || '—'}</p>
+                    <p className="text-sm">{preview || '-'}</p>
                     {data.vat_regime === 'exempt' && <p className="mt-1 text-sm">{vatExemptionNotice}</p>}
                 </div>
 

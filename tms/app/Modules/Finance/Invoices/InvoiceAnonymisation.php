@@ -8,7 +8,7 @@ use App\Modules\Sessions\Public\Billing;
  * What the anonymisation of a person does to the invoicing (spec 0.9
  * § 4.7), called by the CRM Anonymiser in its transaction (FicheLinks):
  * the drafts addressed to her and the drafts of the dossiers where she is
- * a trainee (a funder's draft names its trainees) are deleted — they are
+ * a trainee (a funder's draft names its trainees) are deleted - they are
  * prepared again from what is due. A validated or sent invoice is an
  * accounting record kept 10 years: never changed (legal obligation).
  */

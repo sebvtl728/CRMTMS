@@ -12,15 +12,15 @@ const date = new Intl.DateTimeFormat('fr-FR', { dateStyle: 'short', timeZone: 'E
 const dateTime = new Intl.DateTimeFormat('fr-FR', { dateStyle: 'short', timeStyle: 'short', timeZone: 'Europe/Paris' });
 
 export function formatDate(value: string | null | undefined): string {
-    return value ? date.format(new Date(value)) : '—';
+    return value ? date.format(new Date(value)) : '-';
 }
 
 export function formatDateTime(value: string | null | undefined): string {
-    return value ? dateTime.format(new Date(value)) : '—';
+    return value ? dateTime.format(new Date(value)) : '-';
 }
 
 export function formatSiret(value: string | null | undefined): string {
-    if (!value) return '—';
+    if (!value) return '-';
 
     return value.replace(/^(\d{3})(\d{3})(\d{3})(\d{5})$/, '$1 $2 $3 $4');
 }
@@ -32,7 +32,7 @@ export function statusVariant(status: string): 'default' | 'secondary' | 'outlin
 
 /** Stored E.164 French number (+33612345678) shown as 06 12 34 56 78; anything else as stored. */
 export function formatPhone(value: string | null | undefined): string {
-    if (!value) return '—';
+    if (!value) return '-';
     const match = /^\+33([1-9])(\d{8})$/.exec(value);
     if (!match) return value;
     const digits = `0${match[1]}${match[2]}`;
@@ -89,7 +89,7 @@ const decimal = new Intl.NumberFormat('fr-FR', { minimumFractionDigits: 2, maxim
 
 /** Stored decimal (« 12500.00 ») shown as « 12 500,00 € ». */
 export function formatAmount(value: string | number | null | undefined): string {
-    if (value === null || value === undefined || value === '') return '—';
+    if (value === null || value === undefined || value === '') return '-';
 
     return euros.format(Number(value));
 }
@@ -103,7 +103,7 @@ export function amountInput(value: string | number | null | undefined): string {
 
 /** A date-only value (YYYY-MM-DD) as « 15/12/2026 », without time zone shift. */
 export function formatDay(value: string | null | undefined): string {
-    if (!value) return '—';
+    if (!value) return '-';
     const [y, m, d] = value.split('-');
 
     return `${d}/${m}/${y}`;

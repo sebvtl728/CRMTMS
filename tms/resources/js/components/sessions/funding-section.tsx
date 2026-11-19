@@ -443,13 +443,13 @@ export function FundingSection({
                                             )}
                                             {f.notes && <div className="text-muted-foreground text-xs whitespace-pre-line">{f.notes}</div>}
                                         </td>
-                                        <td className="px-3 py-2">{f.type ?? '—'}</td>
+                                        <td className="px-3 py-2">{f.type ?? '-'}</td>
                                         <td className="px-3 py-2">{f.target?.label ?? 'Le dossier'}</td>
                                         <td className="px-3 py-2">
                                             <Badge variant={statusVariant(f.status)}>{f.status_label}</Badge>
                                         </td>
                                         <td className="px-3 py-2">
-                                            {f.agreement_number ?? '—'}
+                                            {f.agreement_number ?? '-'}
                                             {f.agreed_on && <div className="text-muted-foreground text-xs">Accord du {formatDay(f.agreed_on)}</div>}
                                         </td>
                                         <td

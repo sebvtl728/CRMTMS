@@ -66,10 +66,10 @@ it('shows on the person\'s history her enrolments: enrolment, waiting list, conf
     $enrolments->cancel($waiting);
 
     expect(l2Feed("/crm/people/{$lea->id}/timeline", 'enrolment'))->toBe([
-        "Inscription annulée — session {$full->number} (HACCP 3 jours)",
+        "Inscription annulée - session {$full->number} (HACCP 3 jours)",
         "Inscription en liste d'attente à la session {$full->number} (HACCP 3 jours)",
-        "Abandon — session {$other->number} (HACCP 3 jours) | Sortie le 12/01/2027 · Motif : Maladie",
-        "Inscription confirmée — session {$other->number} (HACCP 3 jours)",
+        "Abandon - session {$other->number} (HACCP 3 jours) | Sortie le 12/01/2027 · Motif : Maladie",
+        "Inscription confirmée - session {$other->number} (HACCP 3 jours)",
         "Inscription à la session {$other->number} (HACCP 3 jours)",
     ]);
     $entry = collect($this->getJson("/crm/people/{$lea->id}/timeline")->json('entries'))->firstWhere('type', 'enrolment');
@@ -155,12 +155,12 @@ it('shows on the dossier page its creation, states, enrolments and fundings', fu
 
     $this->get("/dossiers/{$dossier->id}")->assertOk()->assertInertia(fn (Assert $page) => $page
         ->where('history', fn ($history) => collect($history)->map(fn (array $e) => $e['title'].($e['body'] !== null ? ' | '.$e['body'] : ''))->all() === [
-            "Léa Durand — Abandon — session {$session->number} (HACCP 3 jours) | Sortie le 08/12/2026 · Motif : Maladie",
+            "Léa Durand - Abandon - session {$session->number} (HACCP 3 jours) | Sortie le 08/12/2026 · Motif : Maladie",
             'Financement supprimé : OPCO EP',
             'Financement OPCO EP modifié (montant : 700,00 €)',
             'Financement OPCO EP : Accordé',
             'Financement ajouté : OPCO EP (OPCO), 600,00 €',
-            "Léa Durand — Inscription à la session {$session->number} (HACCP 3 jours)",
+            "Léa Durand - Inscription à la session {$session->number} (HACCP 3 jours)",
             'État du dossier : Convention envoyée',
             'Dossier créé',
         ]));

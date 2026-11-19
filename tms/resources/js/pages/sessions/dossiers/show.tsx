@@ -281,7 +281,7 @@ export default function DossierShow({
 
                 {dossier.status === 'cancelled' && (
                     <div className="border-destructive/40 bg-destructive/5 rounded-xl border p-3 text-sm">
-                        Annulé le {formatDay(dossier.cancelled_on)} · Motif : {dossier.cancel_reason ?? '—'}
+                        Annulé le {formatDay(dossier.cancelled_on)} · Motif : {dossier.cancel_reason ?? '-'}
                     </div>
                 )}
 
@@ -319,11 +319,11 @@ export default function DossierShow({
                         )}
                         {field(
                             'Contact',
-                            dossier.contact ? fiche('person', dossier.contact.id, dossier.contact.label, dossier.contact.can_open) : '—',
+                            dossier.contact ? fiche('person', dossier.contact.id, dossier.contact.label, dossier.contact.can_open) : '-',
                         )}
-                        {field('Société émettrice', dossier.company ?? '—')}
-                        {field('DAS', dossier.das ?? '—')}
-                        {field('Responsable', dossier.responsible ?? '—')}
+                        {field('Société émettrice', dossier.company ?? '-')}
+                        {field('DAS', dossier.das ?? '-')}
+                        {field('Responsable', dossier.responsible ?? '-')}
                         {field(
                             "Règle en cas d'abandon",
                             `${dossier.abandon_rule.label}${dossier.abandon_rule.overridden ? ' (propre au dossier)' : " (règle de l'organisme)"}`,
@@ -370,7 +370,7 @@ export default function DossierShow({
                                         </td>
                                         <td className="px-3 py-2 text-right whitespace-nowrap">{l.unit_price}</td>
                                         <td className="px-3 py-2 text-right whitespace-nowrap">
-                                            {l.discount_percent === '0,00' ? '—' : `${l.discount_percent} %`}
+                                            {l.discount_percent === '0,00' ? '-' : `${l.discount_percent} %`}
                                         </td>
                                         <td className="px-3 py-2 text-right whitespace-nowrap">{l.total_ht}</td>
                                     </tr>

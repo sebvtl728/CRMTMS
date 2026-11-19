@@ -19,7 +19,7 @@ use Illuminate\Validation\ValidationException;
 
 /**
  * Validates a draft invoice or credit note (spec 0.9 § 4.4), all in one
- * transaction — any failure (a check, the PDF converter) rolls everything
+ * transaction - any failure (a check, the PDF converter) rolls everything
  * back, the number included:
  *
  *  1. checks: still a draft; an invoice goes to a recipient still
@@ -50,8 +50,8 @@ use Illuminate\Validation\ValidationException;
  * drafts and of the Sessions writers), (b) the draft row, (c) the billing
  * plan row (BillingPlans::lock), (d) the invoice_sequences row of the
  * company, kind and year (InvoiceNumbering), (e) the journal of the
- * organisme — a transaction advisory lock, since the first validation has
- * no journal row to lock — before reading its last row.
+ * organisme - a transaction advisory lock, since the first validation has
+ * no journal row to lock - before reading its last row.
  */
 final class InvoiceValidator
 {

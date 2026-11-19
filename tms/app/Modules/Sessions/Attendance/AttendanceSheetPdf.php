@@ -78,7 +78,7 @@ final class AttendanceSheetPdf
             'slots' => $live->map(fn (Seance $s) => [
                 'start' => $s->start(),
                 'end' => $s->end(),
-                'module' => $modules[$s->session_module_id] ?? '—',
+                'module' => $modules[$s->session_module_id] ?? '-',
                 'trainer' => $s->trainer_id === null ? null : ($trainers[$s->trainer_id] ?? null),
             ])->all(),
             'trainers' => array_values(array_unique(array_filter($live->map(fn (Seance $s) => $s->trainer_id === null ? null : ($trainers[$s->trainer_id] ?? null))->all()))),

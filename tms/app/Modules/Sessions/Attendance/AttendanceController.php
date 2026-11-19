@@ -18,7 +18,7 @@ use Illuminate\Validation\ValidationException;
 /**
  * Attendance screens (JSON):
  *  - a séance's grid: sessions.attendance.manage within its scope on the
- *    séance — « Ses séances » for a trainer (his séances only), the
+ *    séance - « Ses séances » for a trainer (his séances only), the
  *    sessions of the scope for a manager; out of scope: 404 (the séance is
  *    bound within sessions.seances.view, 404 too);
  *  - the « Présences » tab of a session and its monthly hours:

@@ -139,7 +139,7 @@ export function PositioningPanel({ candidatureId, positioning }: { candidatureId
                 <ul className="grid gap-1 text-xs">
                     {positioning.sendings.map((s) => (
                         <li key={s.id} className="text-muted-foreground">
-                            {formatDate(s.created_at)} · {s.tests.join(', ')} · {s.email ?? '—'} · {EMAIL_STATUS[s.email_status]}
+                            {formatDate(s.created_at)} · {s.tests.join(', ')} · {s.email ?? '-'} · {EMAIL_STATUS[s.email_status]}
                             {s.email_error && ` (${s.email_error})`} · {s.link}
                             {s.submitted_at && ` le ${formatDate(s.submitted_at)}`}
                         </li>
@@ -227,7 +227,7 @@ function SendDialog({
                     </DialogHeader>
                     {data.online_test_id && (
                         <p className="text-sm">
-                            Test en ligne : <strong>{(positioning.online_tests ?? []).find((t) => t.id === data.online_test_id)?.title}</strong> — le
+                            Test en ligne : <strong>{(positioning.online_tests ?? []).find((t) => t.id === data.online_test_id)?.title}</strong> - le
                             lien ouvre le test à l’écran (ordinateur seulement).
                         </p>
                     )}

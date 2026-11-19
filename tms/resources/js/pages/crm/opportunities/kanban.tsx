@@ -73,7 +73,7 @@ function CardBody({ card }: { card: OpportunityRow }) {
                 {card.title}
             </Link>
             <p className="text-muted-foreground text-xs">
-                {card.account.name ?? '—'} · {card.target === 'individual' ? 'Particulier' : 'Entreprise'}
+                {card.account.name ?? '-'} · {card.target === 'individual' ? 'Particulier' : 'Entreprise'}
             </p>
             <p className="mt-1 text-sm">
                 {formatAmount(card.amount)} · {card.probability} %

@@ -60,12 +60,12 @@ function catalogueQuery(filters: Filters): Record<string, string> {
     return query;
 }
 
-const euros = (value: string | null) => (value ? `${value} €` : '—');
+const euros = (value: string | null) => (value ? `${value} €` : '-');
 
 function duration(row: TrainingRow): string {
     const parts = [row.duration_hours && `${row.duration_hours} h`, row.duration_days && `${row.duration_days} j`].filter(Boolean);
 
-    return parts.length > 0 ? parts.join(' · ') : '—';
+    return parts.length > 0 ? parts.join(' · ') : '-';
 }
 
 export default function CatalogueIndex({ trainings, filters, options, can, status }: IndexProps) {
@@ -213,18 +213,18 @@ export default function CatalogueIndex({ trainings, filters, options, can, statu
                                 <tbody>
                                     {trainings.data.map((t) => (
                                         <tr key={t.id} className="hover:bg-muted/30 border-t">
-                                            <td className="px-3 py-2 whitespace-nowrap">{t.code ?? '—'}</td>
+                                            <td className="px-3 py-2 whitespace-nowrap">{t.code ?? '-'}</td>
                                             <td className="px-3 py-2">
                                                 <Link className="font-medium hover:underline" href={route('catalogue.show', t.id)}>
                                                     {t.title}
                                                 </Link>{' '}
                                                 {!t.is_active && <Badge variant="outline">Désactivée</Badge>}
                                             </td>
-                                            <td className="px-3 py-2">{t.das ?? '—'}</td>
+                                            <td className="px-3 py-2">{t.das ?? '-'}</td>
                                             <td className="px-3 py-2 whitespace-nowrap">{duration(t)}</td>
                                             <td className="px-3 py-2 text-right whitespace-nowrap">{euros(t.price_company)}</td>
                                             <td className="px-3 py-2 text-right whitespace-nowrap">{euros(t.price_individual)}</td>
-                                            <td className="px-3 py-2">{t.funding_modes.length > 0 ? t.funding_modes.join(', ') : '—'}</td>
+                                            <td className="px-3 py-2">{t.funding_modes.length > 0 ? t.funding_modes.join(', ') : '-'}</td>
                                             {can.manage && <td className="px-3 py-2">{actions(t)}</td>}
                                         </tr>
                                     ))}

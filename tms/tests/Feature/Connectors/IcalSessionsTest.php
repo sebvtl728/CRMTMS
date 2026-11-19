@@ -79,7 +79,7 @@ it('publishes the séances of a trainer with their place, never a trainee', func
         ->and($ics)->not->toContain('Confidentiel')
         ->and($events[0])->toMatchArray([
             'UID' => 'seance-'.$inRoom->id,
-            'SUMMARY' => 'Commis de cuisine ('.$session->number.') — '.$module->title,
+            'SUMMARY' => 'Commis de cuisine ('.$session->number.') - '.$module->title,
             'DTSTART;TZID=Europe/Paris' => '20260902T090000',
             'DURATION' => 'PT210M',
             'LOCATION' => 'Salle A\\, 12 rue des Lilas\\, Annecy',

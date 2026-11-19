@@ -150,7 +150,7 @@ const sessionOptionLabel = (s: EnrolSessionOption) =>
 /**
  * « Inscrire des stagiaires »: from a session (choose the dossier and its
  * line) or from a dossier (choose the line and the session), then the
- * group — people of the CRM or created on the spot —, a common entry day
+ * group - people of the CRM or created on the spot -, a common entry day
  * that each trainee may change, and his hours. One request, one
  * transaction: the server checks every trainee again (places, waiting
  * list, intra entreprise, duplicates) and answers the errors per trainee.

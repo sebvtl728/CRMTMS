@@ -44,7 +44,7 @@ function query(q: string, type: string | null): Record<string, string> {
 function concerns(row: BrochureRow): string {
     const parts = [...row.das.map((d) => `DAS ${d}`), ...row.trainings];
 
-    return parts.length > 0 ? parts.join(', ') : '—';
+    return parts.length > 0 ? parts.join(', ') : '-';
 }
 
 export default function BrochuresIndex({ brochures, filters, kinds, can, status }: IndexProps) {
@@ -172,7 +172,7 @@ export default function BrochuresIndex({ brochures, filters, kinds, can, status 
                                             <td className="px-3 py-2">{b.kind_label}</td>
                                             <td className="px-3 py-2">{concerns(b)}</td>
                                             <td className="px-3 py-2">
-                                                {b.original_name ?? '—'} <span className="text-muted-foreground">{formatSize(b.size)}</span>
+                                                {b.original_name ?? '-'} <span className="text-muted-foreground">{formatSize(b.size)}</span>
                                                 {b.versions_count > 1 && (
                                                     <span className="text-muted-foreground"> · {b.versions_count} versions</span>
                                                 )}

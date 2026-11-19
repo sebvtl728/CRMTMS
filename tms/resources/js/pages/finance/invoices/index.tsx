@@ -149,7 +149,7 @@ export default function InvoicesIndex({ invoices, filters, options, can, status 
                                                 {formatCents(invoice.total_ttc_cents)}
                                             </td>
                                             <td className="px-3 py-2 text-right whitespace-nowrap tabular-nums">
-                                                {invoice.remaining_cents === null ? '—' : formatCents(Math.max(0, invoice.remaining_cents))}
+                                                {invoice.remaining_cents === null ? '-' : formatCents(Math.max(0, invoice.remaining_cents))}
                                             </td>
                                             <td className="px-3 py-2">
                                                 <div className="flex flex-wrap gap-1">

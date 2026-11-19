@@ -158,7 +158,7 @@ function NextMeetings({ meetings }: { meetings: Meeting[] }) {
                                     <CalendarClock className="text-muted-foreground mt-0.5 size-4 shrink-0" aria-hidden />
                                     <span className="min-w-0 flex-1">
                                         <span className="block font-medium break-words">
-                                            {meeting.person?.name ?? meeting.organisation?.name ?? meeting.opportunity?.name ?? '—'}
+                                            {meeting.person?.name ?? meeting.organisation?.name ?? meeting.opportunity?.name ?? '-'}
                                         </span>
                                         <span className="text-muted-foreground block text-sm break-words">
                                             {[meeting.type, meeting.location].filter(Boolean).join(' · ')}
@@ -289,7 +289,7 @@ export default function Dashboard({ recent_views, counters, commercial, sessions
                                         <CardHeader>
                                             <CardDescription>Devis · {commercial.quotes.month}</CardDescription>
                                             <CardTitle className="text-3xl">
-                                                {commercial.quotes.rate === null ? '—' : `${percentFormat.format(commercial.quotes.rate)} %`}
+                                                {commercial.quotes.rate === null ? '-' : `${percentFormat.format(commercial.quotes.rate)} %`}
                                             </CardTitle>
                                             <CardDescription>
                                                 {numberFormat.format(commercial.quotes.sent)} envoyé{commercial.quotes.sent > 1 ? 's' : ''},{' '}

@@ -66,14 +66,14 @@ final class QuotesProvider implements TimelineProvider
                 return new TimelineEntry(
                     self::TYPE,
                     CarbonImmutable::instance($log->created_at),
-                    'Devis signé ajouté ('.($numbers[$log->auditable_id] ?? '—').')',
+                    'Devis signé ajouté ('.($numbers[$log->auditable_id] ?? '-').')',
                     null,
                     $log->user?->name,
                     ['id' => $log->id, 'quote_id' => $log->auditable_id, 'event' => 'signed'],
                 );
             }
             $status = $log->event === 'created' ? QuoteStatus::Draft : (QuoteStatus::tryFrom((string) ($log->new_values['status'] ?? '')) ?? QuoteStatus::Draft);
-            $number = $numbers[$log->auditable_id] ?? '—';
+            $number = $numbers[$log->auditable_id] ?? '-';
 
             return new TimelineEntry(
                 self::TYPE,

@@ -64,13 +64,13 @@ final class OpportunitiesProvider implements TimelineProvider
 
     private function title(StageChange $change): string
     {
-        $title = '« '.($change->opportunity->title ?? '—').' »';
+        $title = '« '.($change->opportunity->title ?? '-').' »';
 
         return match ($this->event($change)) {
             'created' => "Opportunité créée : {$title}",
             'won' => "Opportunité gagnée : {$title}",
             'lost' => "Opportunité perdue : {$title}",
-            default => "Opportunité {$title} : ".($change->fromStage->label ?? '—').' → '.($change->toStage->label ?? '—'),
+            default => "Opportunité {$title} : ".($change->fromStage->label ?? '-').' → '.($change->toStage->label ?? '-'),
         };
     }
 }

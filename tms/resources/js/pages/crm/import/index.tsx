@@ -103,7 +103,7 @@ export default function ImportIndex({ batches, seesAll, flash }: IndexProps) {
                                                 </Link>
                                             </td>
                                             <td className="px-4 py-2">{b.target}</td>
-                                            {seesAll && <td className="px-4 py-2">{b.author ?? '—'}</td>}
+                                            {seesAll && <td className="px-4 py-2">{b.author ?? '-'}</td>}
                                             <td className="px-4 py-2">
                                                 <StatusBadge status={b.status} stuck={b.stuck} />
                                             </td>

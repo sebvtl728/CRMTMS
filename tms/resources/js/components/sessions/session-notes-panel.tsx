@@ -217,7 +217,7 @@ function NoteItem({ sessionId, note }: { sessionId: string; note: NoteRow }) {
             <p className="whitespace-pre-wrap">{note.body}</p>
             <div className="text-muted-foreground flex items-center justify-between gap-2 text-xs">
                 <span>
-                    {note.author ?? '—'} · {formatDateTime(note.created_at)}
+                    {note.author ?? '-'} · {formatDateTime(note.created_at)}
                 </span>
                 <span className="flex gap-1">
                     {note.can_edit && (
