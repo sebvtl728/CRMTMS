@@ -13,12 +13,11 @@ use App\Modules\Core\References\ReferenceList;
 use App\Modules\Core\References\ReferenceUsage;
 use App\Modules\Core\Tenancy\Tenant;
 use App\Modules\Core\Tenancy\TenantContext;
-use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Inertia\Testing\AssertableInertia as Assert;
 
-const BROCHURE_PDF = "%PDF-1.4\n1 0 obj\n<< /Type /Catalog >>\nendobj\ntrailer\n<< /Root 1 0 R >>\n%%EOF\n";
+require_once __DIR__.'/Support/brochures.php';
 
 beforeEach(function () {
     tenant();
@@ -26,42 +25,6 @@ beforeEach(function () {
     CatalogueServiceProvider::registerReferenceUsage();
     CapFormationReferenceSeeder::run(tenant());
 });
-
-function brochureFile(string $name = 'Plaquette été.pdf', string $content = BROCHURE_PDF): UploadedFile
-{
-    return UploadedFile::fake()->createWithContent($name, $content);
-}
-
-function brochureDas(string $label = 'Hôtellerie-restauration'): string
-{
-    return crmItem(ReferenceList::Das, $label)->id;
-}
-
-function brochureTraining(string $title, ?string $dasLabel = null): Training
-{
-    return Training::query()->create(['title' => $title, 'das_id' => brochureDas($dasLabel ?? 'Hôtellerie-restauration')]);
-}
-
-/**
- * Deposits a brochure through the screen (as an administrator unless a user
- * is already acting) and returns it.
- *
- * @param  array<string, mixed>  $payload
- */
-function depositBrochure(string $title = 'HACCP', array $payload = []): Brochure
-{
-    test()->post('/catalogue/brochures', ['title' => $title, 'file' => brochureFile(), ...$payload])->assertRedirect('/catalogue/brochures');
-
-    return Brochure::query()->where('title', $title)->latest('id')->firstOrFail();
-}
-
-/**
- * @return list<string> every file on the private disk
- */
-function brochureDiskFiles(): array
-{
-    return Storage::disk('local')->allFiles();
-}
 
 it('deposits a brochure: title, private pdf named by uuid, first version, journal', function () {
     $admin = admin(twoFactor: true);

@@ -8,6 +8,7 @@ use App\Modules\Admissions\Alternance\ContractType;
 use App\Modules\Admissions\CustomFields\CustomFieldValues;
 use App\Modules\Admissions\History\CandidatureHistory;
 use App\Modules\Admissions\Permissions;
+use App\Modules\Admissions\Positioning\PositioningSendings;
 use App\Modules\Catalogue\TrainingData;
 use App\Modules\Catalogue\Trainings;
 use App\Modules\Core\Audit\AuditRecorder;
@@ -121,6 +122,12 @@ class CandidatureController extends Controller
                     && Admission::mayCreateDossier($user, $candidature->das_id),
             ],
             'options' => self::options($candidature),
+            'positioning' => [
+                'tests' => app(PositioningSendings::class)->offered($candidature),
+                'defaults' => app(PositioningSendings::class)->defaults($candidature),
+                'sendings' => PositioningSendings::forPage($candidature),
+                'can_send' => AdmissionsVisibility::allows($user, Permissions::CANDIDATURES_UPDATE, $candidature) && ! $candidature->trashed(),
+            ],
         ]);
     }
 

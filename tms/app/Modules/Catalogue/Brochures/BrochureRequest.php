@@ -36,6 +36,7 @@ class BrochureRequest extends FormRequest
 
         return [
             'title' => ['required', 'string', 'max:200'],
+            'kind' => ['sometimes', 'string', Rule::in(array_keys(Brochure::KINDS))],
             ...BrochureFile::rules(required: ! $this->route('brochure') instanceof Brochure),
             'training_ids' => ['sometimes', 'nullable', 'array'],
             'training_ids.*' => ['bail', 'distinct', 'uuid', Rule::exists('trainings', 'id')->where('tenant_id', $tenantId)->whereNull('deleted_at')],
@@ -52,6 +53,7 @@ class BrochureRequest extends FormRequest
     {
         return [
             ...BrochureFile::messages(),
+            'kind.in' => 'Type inconnu.',
             'required' => 'Ce champ est obligatoire.',
             'max' => 'Ce champ est trop long.',
             'string' => 'Cette valeur n\'est pas valide.',

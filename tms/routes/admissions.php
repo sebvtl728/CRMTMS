@@ -7,6 +7,8 @@ use App\Modules\Admissions\Candidatures\CandidatureStatusController;
 use App\Modules\Admissions\Candidatures\DossierCreationController;
 use App\Modules\Admissions\Candidatures\LookupController;
 use App\Modules\Admissions\CustomFields\CustomFieldController;
+use App\Modules\Admissions\Positioning\PositioningController;
+use App\Modules\Admissions\Positioning\PositioningUploadController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -28,6 +30,7 @@ Route::middleware(['auth'])->prefix('admissions/candidatures')->name('admissions
     Route::post('{candidature}/files', [CandidatureFileController::class, 'store'])->middleware('can:admissions.candidatures.update')->name('files.store');
     Route::get('{candidature}/files/{file}', [CandidatureFileController::class, 'show'])->middleware('can:admissions.candidatures.view')->name('files.show');
     Route::delete('{candidature}/files/{file}', [CandidatureFileController::class, 'destroy'])->middleware('can:admissions.candidatures.update')->name('files.destroy');
+    Route::post('{candidature}/positioning/send', [PositioningController::class, 'send'])->middleware(['can:admissions.candidatures.update', 'throttle:positioning-send'])->name('positioning.send');
     Route::put('{candidature}/alternance', [AlternanceController::class, 'update'])->middleware('can:admissions.candidatures.update')->name('alternance.update');
     Route::delete('{candidature}/alternance', [AlternanceController::class, 'destroy'])->middleware('can:admissions.candidatures.update')->name('alternance.destroy');
     Route::get('{candidature}/dossier/defaults', [DossierCreationController::class, 'defaults'])->middleware('can:admissions.candidatures.update')->name('dossier.defaults');
@@ -44,4 +47,12 @@ Route::middleware(['auth', 'can:settings.manage'])->prefix('admin/custom-fields'
     Route::post('{customField}/hide', [CustomFieldController::class, 'hide'])->name('hide');
     Route::post('{customField}/unhide', [CustomFieldController::class, 'unhide'])->name('unhide');
     Route::delete('{customField}', [CustomFieldController::class, 'destroy'])->name('destroy');
+});
+
+// The candidate's personal link to a positioning test (no account): the host
+// gives the organisme, the token the sending; any invalid link, the same page.
+Route::middleware('throttle:positioning-upload')->prefix('test-positionnement')->name('positioning.')->group(function () {
+    Route::get('{token}', [PositioningUploadController::class, 'show'])->where('token', '[0-9a-f]{64}')->name('show');
+    Route::get('{token}/tests/{version}', [PositioningUploadController::class, 'download'])->where('token', '[0-9a-f]{64}')->name('download');
+    Route::post('{token}', [PositioningUploadController::class, 'store'])->where('token', '[0-9a-f]{64}')->name('store');
 });
