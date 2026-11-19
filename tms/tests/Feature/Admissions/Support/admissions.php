@@ -47,6 +47,8 @@ function adCandidature(array $data = [], ?User $by = null): Candidature
     return app(CandidatureWriter::class)->create([
         'person_id' => ($data['person_id'] ?? null) ?? adPerson()->id,
         'training_id' => adTraining()->id,
+        // The positioning test is compulsory before the interview: received by default.
+        'positioning_received_on' => '2026-11-02',
         ...$data,
     ], $by);
 }

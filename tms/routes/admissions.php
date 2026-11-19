@@ -7,6 +7,9 @@ use App\Modules\Admissions\Candidatures\CandidatureStatusController;
 use App\Modules\Admissions\Candidatures\DossierCreationController;
 use App\Modules\Admissions\Candidatures\LookupController;
 use App\Modules\Admissions\CustomFields\CustomFieldController;
+use App\Modules\Admissions\OnlineTests\OnlinePassage;
+use App\Modules\Admissions\OnlineTests\OnlineReviewController;
+use App\Modules\Admissions\OnlineTests\OnlineTestController;
 use App\Modules\Admissions\Positioning\PositioningController;
 use App\Modules\Admissions\Positioning\PositioningUploadController;
 use Illuminate\Support\Facades\Route;
@@ -30,6 +33,9 @@ Route::middleware(['auth'])->prefix('admissions/candidatures')->name('admissions
     Route::post('{candidature}/files', [CandidatureFileController::class, 'store'])->middleware('can:admissions.candidatures.update')->name('files.store');
     Route::get('{candidature}/files/{file}', [CandidatureFileController::class, 'show'])->middleware('can:admissions.candidatures.view')->name('files.show');
     Route::delete('{candidature}/files/{file}', [CandidatureFileController::class, 'destroy'])->middleware('can:admissions.candidatures.update')->name('files.destroy');
+    Route::get('{candidature}/online-attempts/{attempt}/pdf', [OnlineReviewController::class, 'pdf'])->middleware('can:admissions.candidatures.view')->name('online.pdf');
+    Route::put('{candidature}/online-attempts/{attempt}/grades', [OnlineReviewController::class, 'grade'])->middleware('can:admissions.candidatures.update')->name('online.grade');
+    Route::post('{candidature}/positioning/link', [PositioningController::class, 'link'])->middleware(['can:admissions.candidatures.update', 'throttle:positioning-send'])->name('positioning.link');
     Route::post('{candidature}/positioning/send', [PositioningController::class, 'send'])->middleware(['can:admissions.candidatures.update', 'throttle:positioning-send'])->name('positioning.send');
     Route::put('{candidature}/alternance', [AlternanceController::class, 'update'])->middleware('can:admissions.candidatures.update')->name('alternance.update');
     Route::delete('{candidature}/alternance', [AlternanceController::class, 'destroy'])->middleware('can:admissions.candidatures.update')->name('alternance.destroy');
@@ -51,8 +57,24 @@ Route::middleware(['auth', 'can:settings.manage'])->prefix('admin/custom-fields'
 
 // The candidate's personal link to a positioning test (no account): the host
 // gives the organisme, the token the sending; any invalid link, the same page.
-Route::middleware('throttle:positioning-upload')->prefix('test-positionnement')->name('positioning.')->group(function () {
+Route::middleware('throttle:positioning-test')->prefix('test-positionnement')->name('positioning.')->group(function () {
     Route::get('{token}', [PositioningUploadController::class, 'show'])->where('token', '[0-9a-f]{64}')->name('show');
     Route::get('{token}/tests/{version}', [PositioningUploadController::class, 'download'])->where('token', '[0-9a-f]{64}')->name('download');
-    Route::post('{token}', [PositioningUploadController::class, 'store'])->where('token', '[0-9a-f]{64}')->name('store');
+    Route::post('{token}', [PositioningUploadController::class, 'store'])->middleware('throttle:positioning-upload')->where('token', '[0-9a-f]{64}')->name('store');
+    // Online test: start, answers saved as typed, traces, submission.
+    Route::post('{token}/start', [OnlinePassage::class, 'start'])->where('token', '[0-9a-f]{64}')->name('online.start');
+    Route::put('{token}/answers', [OnlinePassage::class, 'answers'])->where('token', '[0-9a-f]{64}')->name('online.answers');
+    Route::post('{token}/events', [OnlinePassage::class, 'event'])->where('token', '[0-9a-f]{64}')->name('online.events');
+    Route::post('{token}/submit', [OnlinePassage::class, 'submit'])->where('token', '[0-9a-f]{64}')->name('online.submit');
+});
+
+// Online positioning tests (as the library: catalogue.manage).
+Route::middleware(['auth', 'can:catalogue.manage'])->prefix('admissions/online-tests')->name('admissions.online-tests.')->group(function () {
+    Route::get('/', [OnlineTestController::class, 'index'])->name('index');
+    Route::post('/', [OnlineTestController::class, 'store'])->name('store');
+    Route::post('from-pdf', [OnlineTestController::class, 'fromPdf'])->middleware('throttle:ai')->name('from-pdf');
+    Route::get('{test}/edit', [OnlineTestController::class, 'edit'])->name('edit');
+    Route::put('{test}', [OnlineTestController::class, 'update'])->name('update');
+    Route::post('{test}/publish', [OnlineTestController::class, 'publish'])->name('publish');
+    Route::delete('{test}', [OnlineTestController::class, 'destroy'])->name('destroy');
 });

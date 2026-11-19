@@ -21,6 +21,8 @@ use Illuminate\Validation\ValidationException;
  */
 final class CandidatureTransitions
 {
+    public const TEST_REQUIRED = 'Le test de positionnement est obligatoire : indiquez sa date de réception avant l\'entretien.';
+
     public function move(Candidature $candidature, CandidatureStatus $to, User $by, ?string $reasonId = null): void
     {
         DB::transaction(function () use ($candidature, $to, $reasonId): void {
@@ -48,6 +50,11 @@ final class CandidatureTransitions
             if ($to === CandidatureStatus::Admitted && ($missing = CustomFieldValues::missingForAdmission($locked)) !== []) {
                 throw ValidationException::withMessages(['custom_values' => 'À remplir avant l\'admission : '.implode(', ', $missing).'.']);
             }
+            // The positioning test is compulsory: back before the interview and the admission.
+            if (in_array($to, [CandidatureStatus::Interview, CandidatureStatus::Admitted], true) && $locked->positioning_received_on === null) {
+                throw ValidationException::withMessages(['positioning_received_on' => self::TEST_REQUIRED]);
+            }
+
             if ($to === CandidatureStatus::Rejected) {
                 Validator::make(['decision_reason_id' => $reasonId], ['decision_reason_id' => ['required', ...Rules::item(ReferenceList::CandidatureRefusalReason)]], [
                     'required' => 'Indiquez le motif.',

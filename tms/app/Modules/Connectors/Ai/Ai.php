@@ -35,11 +35,12 @@ class Ai
     /**
      * @param  array<string, mixed>  $jsonSchema  root type "object"
      * @param  string  $purpose  short machine name journaled (e.g. "training.from_pdf")
+     * @param  int|null  $timeoutSeconds  longer wait for a background job (at most AiClient::MAX_TIMEOUT_SECONDS); never in a web request
      * @return array<string, mixed>
      *
      * @throws AiUnavailable|AiInvalidResponse
      */
-    public function structured(string $system, string $user, array $jsonSchema, string $purpose): array
+    public function structured(string $system, string $user, array $jsonSchema, string $purpose, ?int $timeoutSeconds = null): array
     {
         if (! preg_match('/^[a-z0-9_.-]{1,64}$/', $purpose)) {
             throw new InvalidArgumentException('Purpose must be a short machine name ([a-z0-9_.-]).');
@@ -48,6 +49,7 @@ class Ai
         $config = AiConnector::activeConfig() ?? throw AiUnavailable::notConfigured();
         $provider = AiProvider::from((string) $config->settings['provider']);
         $client = $this->client($provider);
+        $client->timeoutSeconds = max(1, min($timeoutSeconds ?? AiClient::TIMEOUT_SECONDS, AiClient::MAX_TIMEOUT_SECONDS));
 
         $run = ConnectorRun::create([
             'connector_config_id' => $config->id,

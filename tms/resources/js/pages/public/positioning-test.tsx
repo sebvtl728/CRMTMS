@@ -1,3 +1,4 @@
+import { OnlineTestRunner, type OnlineProps } from '@/components/admissions/online-test-runner';
 import InputError from '@/components/input-error';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -10,6 +11,8 @@ import { FormEventHandler } from 'react';
 
 interface Props {
     state: 'open' | 'submitted' | 'invalid';
+    mode?: 'online' | 'upload';
+    online?: OnlineProps | null;
     organisme?: string;
     first_name?: string;
     training?: string | null;
@@ -26,6 +29,8 @@ interface Props {
  */
 export default function PositioningTest({
     state,
+    mode,
+    online,
     organisme,
     first_name,
     training,
@@ -63,58 +68,62 @@ export default function PositioningTest({
             description={`Bonjour ${first_name ?? ''}${training ? `, pour la formation « ${training} »` : ''}.`}
         >
             <Head title="Test de positionnement" />
-            <div className="grid gap-6">
-                {status && <p className="text-sm font-medium text-green-600">{status}</p>}
+            {mode === 'online' && online ? (
+                <OnlineTestRunner token={window.location.pathname.split('/').pop() ?? ''} online={online} submittedOn={submitted_on} />
+            ) : (
+                <div className="grid gap-6">
+                    {status && <p className="text-sm font-medium text-green-600">{status}</p>}
 
-                <section className="grid gap-2">
-                    <h2 className="text-sm font-semibold">1. Téléchargez votre test</h2>
-                    <ul className="grid gap-1 text-sm">
-                        {tests.map((t) => (
-                            <li key={t.href}>
-                                <a href={t.href} className="inline-flex items-center gap-1 underline">
-                                    <Download className="h-4 w-4" />
-                                    {t.title}
-                                </a>{' '}
-                                <span className="text-muted-foreground text-xs">{formatSize(t.size)}</span>
-                            </li>
-                        ))}
-                    </ul>
-                </section>
-
-                {state === 'submitted' ? (
-                    <p className="rounded-md border p-3 text-sm">
-                        Votre copie a été reçue le {submitted_on}. L'organisme reviendra vers vous ; vous n'avez rien d'autre à faire.
-                    </p>
-                ) : (
-                    <form onSubmit={submit} className="grid gap-4" noValidate>
-                        <h2 className="text-sm font-semibold">2. Déposez votre copie avant le {deadline}</h2>
-                        <div className="grid gap-2">
-                            <Label htmlFor="files">Fichiers (PDF ou photos JPG/PNG, {max_files} au plus, 20 Mo chacun)</Label>
-                            <Input
-                                id="files"
-                                type="file"
-                                multiple
-                                accept="application/pdf,image/jpeg,image/png,.pdf,.jpg,.jpeg,.png"
-                                onChange={(e) => setData('files', Array.from(e.target.files ?? []))}
-                            />
-                            <InputError message={errs.files ?? (errors as Record<string, string | undefined>).files} />
-                            {fileErrors.map((m) => (
-                                <InputError key={m} message={m} />
+                    <section className="grid gap-2">
+                        <h2 className="text-sm font-semibold">1. Téléchargez votre test</h2>
+                        <ul className="grid gap-1 text-sm">
+                            {tests.map((t) => (
+                                <li key={t.href}>
+                                    <a href={t.href} className="inline-flex items-center gap-1 underline">
+                                        <Download className="h-4 w-4" />
+                                        {t.title}
+                                    </a>{' '}
+                                    <span className="text-muted-foreground text-xs">{formatSize(t.size)}</span>
+                                </li>
                             ))}
-                        </div>
-                        <Label className="flex items-center gap-2 font-normal">
-                            <input type="checkbox" checked={data.done} onChange={(e) => setData('done', e.target.checked)} />
-                            J'ai terminé mon test et je dépose ma copie (un seul dépôt possible).
-                        </Label>
-                        <InputError message={errs.done ?? (errors as Record<string, string | undefined>).done} />
-                        {progress && <progress value={progress.percentage} max="100" className="w-full" />}
-                        <Button type="submit" disabled={processing || data.files.length === 0}>
-                            {processing && <LoaderCircle className="h-4 w-4 animate-spin" />}
-                            Envoyer ma copie
-                        </Button>
-                    </form>
-                )}
-            </div>
+                        </ul>
+                    </section>
+
+                    {state === 'submitted' ? (
+                        <p className="rounded-md border p-3 text-sm">
+                            Votre copie a été reçue le {submitted_on}. L'organisme reviendra vers vous ; vous n'avez rien d'autre à faire.
+                        </p>
+                    ) : (
+                        <form onSubmit={submit} className="grid gap-4" noValidate>
+                            <h2 className="text-sm font-semibold">2. Déposez votre copie avant le {deadline}</h2>
+                            <div className="grid gap-2">
+                                <Label htmlFor="files">Fichiers (PDF ou photos JPG/PNG, {max_files} au plus, 20 Mo chacun)</Label>
+                                <Input
+                                    id="files"
+                                    type="file"
+                                    multiple
+                                    accept="application/pdf,image/jpeg,image/png,.pdf,.jpg,.jpeg,.png"
+                                    onChange={(e) => setData('files', Array.from(e.target.files ?? []))}
+                                />
+                                <InputError message={errs.files ?? (errors as Record<string, string | undefined>).files} />
+                                {fileErrors.map((m) => (
+                                    <InputError key={m} message={m} />
+                                ))}
+                            </div>
+                            <Label className="flex items-center gap-2 font-normal">
+                                <input type="checkbox" checked={data.done} onChange={(e) => setData('done', e.target.checked)} />
+                                J'ai terminé mon test et je dépose ma copie (un seul dépôt possible).
+                            </Label>
+                            <InputError message={errs.done ?? (errors as Record<string, string | undefined>).done} />
+                            {progress && <progress value={progress.percentage} max="100" className="w-full" />}
+                            <Button type="submit" disabled={processing || data.files.length === 0}>
+                                {processing && <LoaderCircle className="h-4 w-4 animate-spin" />}
+                                Envoyer ma copie
+                            </Button>
+                        </form>
+                    )}
+                </div>
+            )}
         </AuthLayout>
     );
 }

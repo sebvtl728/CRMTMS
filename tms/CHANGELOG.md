@@ -5,8 +5,23 @@ Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) ; ve
 
 ## [Non publié]
 
+## [0.9.2] - 2026-11-19
+
+Admissions : parcours Alternance / Stagiaire, tests de positionnement (PDF par DAS ou formation, lien personnel, test en
+ligne corrigé dans le TMS, test obligatoire avant l'entretien) ; CRM : cartes Actions et Rendez-vous de l'accueil,
+« Attribuer à » plusieurs personnes ; mention d'exonération de TVA datée. L'export comptable et la facture électronique
+passent à une version suivante.
+
 ### Ajouté
 
+- **Tests de positionnement en ligne** (Formation › Tests en ligne) : éditeur de sections et de questions (réponse courte
+  ou rédigée, choix unique ou multiple, vrai / faux, nombre à compléter, oui / non) avec bonnes réponses, points et durée
+  limite ; **Créer depuis un PDF** par l'intelligence artificielle (brouillon à relire) ; versions figées à la
+  publication. Le candidat passe le test **sur ordinateur** par son lien (réponses enregistrées au fil de l'eau,
+  chronomètre, copier-coller bloqué, sorties de la page relevées) ; correction automatique des questions fermées, notation
+  à la main des réponses rédigées sur la candidature, note dans « Score ou niveau » ; **copie du candidat en PDF**.
+- **Test de positionnement — Générer le lien** : le lien personnel du candidat s'affiche sur la candidature avec
+  **Copier**, sans e-mail obligatoire ; « Envoyer par e-mail » reste possible.
 - **Accueil (CRM)** : cartes **Actions** (créées et réalisées dans le mois) et **Rendez-vous pris** (fixés dans le mois),
   comparées au mois précédent, avec les 12 derniers mois, dans le périmètre de chacun.
 - **Attribuer à plusieurs personnes** une action ou un rendez-vous (champ « Attribuer à », le premier choisi est le
@@ -21,6 +36,8 @@ Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) ; ve
 
 ### Modifié
 
+- Admissions : le **test de positionnement est obligatoire** — Entretien et Admis exigent sa date de réception ; le
+  bouton « Passer le test » est retiré, comme « Joindre le test » (les copies déposées par le candidat restent affichées).
 - Menu : **Candidats** passe dans **Formation**, au-dessus de Dossiers.
 - Admissions : l'onglet **Apprenants** devient **Stagiaires**, le badge « Apprenant » devient « Stagiaire ».
 - **Mention d'exonération de TVA** des devis et factures, alignée sur l'expert-comptable : « Exonération de TVA, art. 261,
@@ -674,7 +691,8 @@ Lot 1a : socle de l'application.
   mise à jour avec retour arrière automatique.
 - Publication : image multi-architecture signée (cosign), archive de version, sommes de contrôle.
 
-[Non publié]: https://github.com/sebvtl728/CRMTMS/compare/v0.9.1...HEAD
+[Non publié]: https://github.com/sebvtl728/CRMTMS/compare/v0.9.2...HEAD
+[0.9.2]: https://github.com/sebvtl728/CRMTMS/compare/v0.9.1...v0.9.2
 [0.9.1]: https://github.com/sebvtl728/CRMTMS/compare/v0.9.0...v0.9.1
 [0.8.0]: https://github.com/sebvtl728/CRMTMS/compare/v0.7.1...v0.8.0
 [0.7.1]: https://github.com/sebvtl728/CRMTMS/compare/v0.7.0...v0.7.1

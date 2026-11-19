@@ -20,14 +20,16 @@ use Illuminate\Support\Facades\DB;
  * @property string $id
  * @property string $tenant_id
  * @property string $candidature_id
+ * @property string|null $online_test_version_id the online test of the link (null: PDF tests)
  * @property string|null $email
  * @property string|null $subject
  * @property string|null $message
  * @property string $token_hash
+ * @property string|null $token_encrypted the plain token, encrypted (APP_KEY): the link shown on the candidature
  * @property CarbonImmutable $expires_at
  * @property CarbonImmutable|null $revoked_at
  * @property CarbonImmutable|null $submitted_at
- * @property string $email_status pending | sent | failed
+ * @property string $email_status pending | sent | failed | none (a link to copy, no e-mail)
  * @property string|null $email_error
  * @property CarbonImmutable|null $sent_at
  * @property string|null $created_by
@@ -45,21 +47,25 @@ class PositioningSending extends Model
 
     public const FAILED = 'failed';
 
+    /** A link generated to be copied, no e-mail. */
+    public const NO_EMAIL = 'none';
+
     /** @var list<string> */
     protected array $auditPersonal = ['email', 'subject', 'message'];
 
     /** @var list<string> */
-    protected array $auditIgnore = ['created_by', 'token_hash', 'email_error'];
+    protected array $auditIgnore = ['created_by', 'token_hash', 'token_encrypted', 'email_error'];
 
     /** @var list<string> */
-    protected $fillable = ['candidature_id', 'email', 'subject', 'message', 'token_hash', 'expires_at', 'created_by'];
+    protected $fillable = ['candidature_id', 'online_test_version_id', 'email', 'subject', 'message', 'token_hash', 'token_encrypted', 'expires_at', 'email_status', 'created_by'];
 
     /** @var list<string> */
-    protected $hidden = ['token_hash'];
+    protected $hidden = ['token_hash', 'token_encrypted'];
 
     protected function casts(): array
     {
         return [
+            'token_encrypted' => 'encrypted',
             'expires_at' => 'immutable_datetime',
             'revoked_at' => 'immutable_datetime',
             'submitted_at' => 'immutable_datetime',

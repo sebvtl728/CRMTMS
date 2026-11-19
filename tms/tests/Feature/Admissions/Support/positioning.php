@@ -21,7 +21,7 @@ function posCandidature(): array
 {
     $training = adTraining();
     $test = posTest('Test cuisine', [$training->das_id]);
-    $c = adCandidature(['person_id' => adPerson('Durand', ['email' => 'lea.durand@example.test'])->id, 'training_id' => $training->id]);
+    $c = adCandidature(['person_id' => adPerson('Durand', ['email' => 'lea.durand@example.test'])->id, 'training_id' => $training->id, 'positioning_received_on' => null]);
 
     return [$c, $test];
 }

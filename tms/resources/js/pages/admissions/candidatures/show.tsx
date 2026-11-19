@@ -202,9 +202,9 @@ export default function CandidatureShow({ candidature: c, custom_fields, history
                 </div>
 
                 {status && <div className="text-sm font-medium text-green-600">{status}</div>}
-                {(errors.training_id || errors.custom_values || errors.decision_reason_id) && stage === null && (
+                {(errors.training_id || errors.custom_values || errors.decision_reason_id || errors.positioning_received_on) && stage === null && (
                     <div role="alert" className="text-destructive text-sm">
-                        {errors.training_id ?? errors.custom_values ?? errors.decision_reason_id}
+                        {errors.training_id ?? errors.custom_values ?? errors.decision_reason_id ?? errors.positioning_received_on}
                     </div>
                 )}
 
@@ -441,33 +441,13 @@ export default function CandidatureShow({ candidature: c, custom_fields, history
                             ) : (
                                 c.positioning_sent_on && <Suggest c={c} to="positioning_sent" label="Test envoyé" canUpdate={can.update} />
                             )}
-                            <CandidatureFiles
-                                candidatureId={c.id}
-                                kind="positioning"
-                                files={c.files}
-                                canUpdate={can.update}
-                                label="Joindre le test"
-                            />
+                            {/* The copies the candidate deposited through his link (no manual upload here). */}
+                            <CandidatureFiles candidatureId={c.id} kind="positioning" files={c.files} canUpdate={can.update} allowUpload={false} />
                             {!showInterview && (
-                                <div className="flex flex-wrap items-center gap-2">
-                                    <p className="text-muted-foreground text-xs">Enregistrez la date de réception pour ouvrir l'entretien, ou</p>
-                                    {can.update && (
-                                        <Button
-                                            type="button"
-                                            variant="ghost"
-                                            size="sm"
-                                            onClick={() =>
-                                                router.post(
-                                                    `/admissions/candidatures/${c.id}/status`,
-                                                    { status: 'interview' },
-                                                    { preserveScroll: true },
-                                                )
-                                            }
-                                        >
-                                            Passer le test
-                                        </Button>
-                                    )}
-                                </div>
+                                <p className="text-muted-foreground text-xs">
+                                    Le test est obligatoire : l’entretien s’ouvre une fois la date de réception enregistrée (ou la copie du candidat
+                                    reçue).
+                                </p>
                             )}
                         </Card>
                     )}
@@ -777,7 +757,9 @@ export default function CandidatureShow({ candidature: c, custom_fields, history
                                 error={errors.decision_reason_id}
                             />
                         )}
-                        {(errors.training_id || errors.custom_values) && <InputError message={errors.training_id ?? errors.custom_values} />}
+                        {(errors.training_id || errors.custom_values || errors.positioning_received_on) && (
+                            <InputError message={errors.training_id ?? errors.custom_values ?? errors.positioning_received_on} />
+                        )}
                     </div>
                     <DialogFooter>
                         <Button type="button" variant="ghost" onClick={() => setStage(null)}>

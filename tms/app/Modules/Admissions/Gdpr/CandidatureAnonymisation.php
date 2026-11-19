@@ -4,6 +4,7 @@ namespace App\Modules\Admissions\Gdpr;
 
 use App\Modules\Admissions\Candidatures\Candidature;
 use App\Modules\Admissions\Candidatures\CandidatureFiles;
+use App\Modules\Admissions\OnlineTests\OnlineAttempt;
 use App\Modules\Admissions\Positioning\PositioningSending;
 use Illuminate\Support\Facades\DB;
 
@@ -22,9 +23,12 @@ final class CandidatureAnonymisation
         }
         DB::transaction(function () use ($candidature): void {
             app(CandidatureFiles::class)->purge($candidature);
+            // The answers and traces of the online tests go.
+            OnlineAttempt::query()->where('candidature_id', $candidature->id)->toBase()
+                ->update(['answers' => '{}', 'events' => '[]', 'updated_at' => now()]);
             // The positioning e-mails go; a link still open closes.
             PositioningSending::query()->where('candidature_id', $candidature->id)->toBase()
-                ->update(['email' => null, 'subject' => null, 'message' => null, 'revoked_at' => DB::raw('coalesce(revoked_at, now())'), 'updated_at' => now()]);
+                ->update(['email' => null, 'subject' => null, 'message' => null, 'token_encrypted' => null, 'revoked_at' => DB::raw('coalesce(revoked_at, now())'), 'updated_at' => now()]);
             $candidature->forceFill([
                 'legal_representative' => null,
                 'rqth' => false,

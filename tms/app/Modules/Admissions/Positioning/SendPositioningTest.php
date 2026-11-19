@@ -60,8 +60,9 @@ class SendPositioningTest implements ShouldBeEncrypted, ShouldQueue
 
             return;
         }
+        // An online test alone sends no file.
         $files = PositioningAttachments::read($sending->versionIds());
-        if ($files === null || $files === []) {
+        if ($files === null || ($files === [] && $sending->online_test_version_id === null)) {
             $this->failed(new PositioningMailFailed(self::MISSING));
 
             return;

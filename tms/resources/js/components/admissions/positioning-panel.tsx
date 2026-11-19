@@ -1,11 +1,12 @@
+import { OnlineAttemptPanel, type OnlineAttemptView } from '@/components/admissions/online-attempt-panel';
 import InputError from '@/components/input-error';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { formatDate, formatSize } from '@/lib/crm';
-import { useForm } from '@inertiajs/react';
-import { Download, LoaderCircle, Send } from 'lucide-react';
+import { router, useForm, usePage } from '@inertiajs/react';
+import { Check, Copy, Download, Link as LinkIcon, LoaderCircle, Send } from 'lucide-react';
 import { FormEventHandler, useEffect, useState } from 'react';
 
 export interface PositioningTest {
@@ -21,7 +22,7 @@ export interface PositioningSendingRow {
     created_at: string | null;
     email: string | null;
     tests: string[];
-    email_status: 'pending' | 'sent' | 'failed';
+    email_status: 'pending' | 'sent' | 'failed' | 'none';
     email_error: string | null;
     expires_at: string;
     submitted_at: string | null;
@@ -30,12 +31,23 @@ export interface PositioningSendingRow {
 
 export interface PositioningProps {
     tests: PositioningTest[];
+    /** The candidate's latest online test (answers, scores, traces). */
+    attempt?: OnlineAttemptView | null;
+    /** Published online tests of the training or DAS. */
+    online_tests: { id: string; title: string; total_points: number; time_limit_minutes: number | null }[];
     defaults: { to: string; subject: string; body: string };
     sendings: PositioningSendingRow[];
     can_send: boolean;
+    /** The working link to copy (who may change the candidature only). */
+    link: { url: string; expires_on: string } | null;
 }
 
-const EMAIL_STATUS: Record<PositioningSendingRow['email_status'], string> = { pending: 'En cours d’envoi', sent: 'Envoyé', failed: 'Échec' };
+const EMAIL_STATUS: Record<PositioningSendingRow['email_status'], string> = {
+    pending: 'E-mail en cours d’envoi',
+    sent: 'E-mail envoyé',
+    failed: 'Échec de l’e-mail',
+    none: 'Lien généré',
+};
 
 /**
  * The positioning tests of the library offered for the candidature (its
@@ -44,12 +56,31 @@ const EMAIL_STATUS: Record<PositioningSendingRow['email_status'], string> = { pe
  */
 export function PositioningPanel({ candidatureId, positioning }: { candidatureId: string; positioning: PositioningProps }) {
     const [open, setOpen] = useState(false);
+    const pageErrors = usePage().props.errors as Record<string, string | undefined>;
+    const online = positioning.online_tests ?? [];
+    // What the link leads to: an online test (by id) or the PDF tests to download and send back.
+    const [choice, setChoice] = useState<string>(online[0]?.id ?? 'pdf');
+    const hasSomething = positioning.tests.length > 0 || online.length > 0;
+    const linkData = choice === 'pdf' ? { version_ids: positioning.tests.map((t) => t.version_id) } : { online_test_id: choice };
 
     return (
         <div className="grid gap-2">
-            {positioning.tests.length === 0 ? (
+            {online.length > 0 && (
+                <ul className="grid gap-1 text-sm">
+                    {online.map((t) => (
+                        <li key={t.id}>
+                            En ligne : <strong>{t.title}</strong>{' '}
+                            <span className="text-muted-foreground text-xs">
+                                {t.total_points} points · {t.time_limit_minutes ? `${t.time_limit_minutes} min` : 'durée libre'}
+                            </span>
+                        </li>
+                    ))}
+                </ul>
+            )}
+            {positioning.tests.length === 0 && online.length === 0 ? (
                 <p className="text-muted-foreground text-xs">
-                    Aucun test de positionnement pour cette formation ou ce DAS (Catalogue › Plaquettes et tests).
+                    Aucun test de positionnement pour cette formation ou ce DAS (Formation › Tests en ligne, ou Catalogue › Plaquettes et tests pour
+                    un PDF).
                 </p>
             ) : (
                 <ul className="grid gap-1 text-sm">
@@ -67,13 +98,42 @@ export function PositioningPanel({ candidatureId, positioning }: { candidatureId
                     ))}
                 </ul>
             )}
-            {positioning.can_send && positioning.tests.length > 0 && (
-                <div>
+            {positioning.attempt && <OnlineAttemptPanel candidatureId={candidatureId} attempt={positioning.attempt} />}
+            {positioning.link && <LinkBox link={positioning.link} />}
+            {positioning.can_send && hasSomething && (
+                <div className="flex flex-wrap items-center gap-2">
+                    {online.length > 0 && (
+                        <select
+                            aria-label="Test à faire passer"
+                            className="border-input bg-background h-8 rounded-md border px-2 text-sm"
+                            value={choice}
+                            onChange={(e) => setChoice(e.target.value)}
+                        >
+                            {online.map((t) => (
+                                <option key={t.id} value={t.id}>
+                                    En ligne : {t.title}
+                                </option>
+                            ))}
+                            {positioning.tests.length > 0 && <option value="pdf">PDF à télécharger et renvoyer</option>}
+                        </select>
+                    )}
+                    <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        onClick={() => router.post(`/admissions/candidatures/${candidatureId}/positioning/link`, linkData, { preserveScroll: true })}
+                    >
+                        <LinkIcon className="h-4 w-4" />
+                        {positioning.link ? 'Générer un nouveau lien' : 'Générer le lien'}
+                    </Button>
                     <Button type="button" size="sm" variant="outline" onClick={() => setOpen(true)}>
                         <Send className="h-4 w-4" />
-                        Envoyer le test
+                        Envoyer par e-mail
                     </Button>
                 </div>
+            )}
+            {(pageErrors.online_test_id ?? pageErrors.version_ids) && !open && (
+                <p className="text-sm text-red-600">{pageErrors.online_test_id ?? pageErrors.version_ids}</p>
             )}
             {positioning.sendings.length > 0 && (
                 <ul className="grid gap-1 text-xs">
@@ -86,7 +146,33 @@ export function PositioningPanel({ candidatureId, positioning }: { candidatureId
                     ))}
                 </ul>
             )}
-            <SendDialog candidatureId={candidatureId} positioning={positioning} open={open} onClose={() => setOpen(false)} />
+            <SendDialog candidatureId={candidatureId} positioning={positioning} choice={choice} open={open} onClose={() => setOpen(false)} />
+        </div>
+    );
+}
+
+/** The candidate's link, to copy and hand over (SMS, e-mail…). */
+function LinkBox({ link }: { link: { url: string; expires_on: string } }) {
+    const [copied, setCopied] = useState(false);
+    const copy = () => {
+        void navigator.clipboard?.writeText(link.url).then(() => {
+            setCopied(true);
+            setTimeout(() => setCopied(false), 2000);
+        });
+    };
+
+    return (
+        <div className="grid gap-1 rounded-md border p-2">
+            <Label htmlFor="positioning-link" className="text-xs">
+                Lien du candidat (valable jusqu’au {link.expires_on})
+            </Label>
+            <div className="flex gap-2">
+                <Input id="positioning-link" readOnly value={link.url} onFocus={(e) => e.target.select()} className="font-mono text-xs" />
+                <Button type="button" size="sm" onClick={copy}>
+                    {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+                    {copied ? 'Copié' : 'Copier'}
+                </Button>
+            </div>
         </div>
     );
 }
@@ -94,16 +180,19 @@ export function PositioningPanel({ candidatureId, positioning }: { candidatureId
 function SendDialog({
     candidatureId,
     positioning,
+    choice,
     open,
     onClose,
 }: {
     candidatureId: string;
     positioning: PositioningProps;
+    choice: string;
     open: boolean;
     onClose: () => void;
 }) {
     const { data, setData, post, processing, errors, reset, clearErrors } = useForm({
-        version_ids: positioning.tests.map((t) => t.version_id),
+        online_test_id: choice === 'pdf' ? '' : choice,
+        version_ids: choice === 'pdf' ? positioning.tests.map((t) => t.version_id) : ([] as string[]),
         to: positioning.defaults.to,
         subject: positioning.defaults.subject,
         body: positioning.defaults.body,
@@ -136,8 +225,14 @@ function SendDialog({
                             nouvel envoi remplace le lien précédent.
                         </DialogDescription>
                     </DialogHeader>
+                    {data.online_test_id && (
+                        <p className="text-sm">
+                            Test en ligne : <strong>{(positioning.online_tests ?? []).find((t) => t.id === data.online_test_id)?.title}</strong> — le
+                            lien ouvre le test à l’écran (ordinateur seulement).
+                        </p>
+                    )}
                     <fieldset className="grid gap-1">
-                        <legend className="mb-1 text-sm font-medium">Tests *</legend>
+                        <legend className="mb-1 text-sm font-medium">{data.online_test_id ? 'PDF à joindre (facultatif)' : 'Tests *'}</legend>
                         {positioning.tests.map((t) => (
                             <Label key={t.version_id} className="flex items-center gap-2 font-normal">
                                 <input

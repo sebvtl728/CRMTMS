@@ -33,6 +33,8 @@ class RateLimitServiceProvider extends ServiceProvider
         'attendance-scan' => 30,
         // Upload link of a positioning test (candidate, no account: per address).
         'positioning-upload' => 20,
+        // Online test page: answers saved as typed (debounced) and traces.
+        'positioning-test' => 240,
         'positioning-send' => 20,
     ];
 
