@@ -86,7 +86,7 @@
 <section>
     <h2>Action de formation</h2>
     <table class="grid">
-        <thead><tr><th>Session</th><th>Dates</th><th class="num">Durée</th><th>Lieu</th></tr></thead>
+        <thead><tr><th>Session</th><th>Dates</th><th class="num" style="text-align: right">Durée</th><th>Lieu</th></tr></thead>
         <tbody>
         @foreach ($sessions as $s)
             <tr><td>{{ $s['label'] }}</td><td>{{ $s['period'] }}</td><td class="num">{{ $s['hours'] ?? '—' }}</td><td>{{ $s['place'] ?? '—' }}</td></tr>
@@ -108,7 +108,7 @@
 <section>
     <h2>Prix</h2>
     <table class="grid">
-        <thead><tr><th>Désignation</th><th class="num">Montant</th></tr></thead>
+        <thead><tr><th>Désignation</th><th class="num" style="text-align: right">Montant</th></tr></thead>
         <tbody>
         @foreach ($lines as $line)
             <tr><td>{{ $line['label'] }}</td><td class="num">{{ $line['total'] }}</td></tr>

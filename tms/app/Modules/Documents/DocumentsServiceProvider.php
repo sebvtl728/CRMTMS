@@ -5,6 +5,8 @@ namespace App\Modules\Documents;
 use App\Modules\Core\Access\Permissions as CorePermissions;
 use App\Modules\Core\Audit\MorphAliases;
 use App\Modules\Core\Users\User;
+use App\Modules\Crm\Public\FicheLinks;
+use App\Modules\Documents\Gdpr\DocumentAnonymisation;
 use App\Modules\Documents\Texts\DocumentText;
 use App\Modules\Sessions\Public\DossierBlocks;
 use App\Modules\Sessions\Public\Paperwork;
@@ -30,6 +32,8 @@ class DocumentsServiceProvider extends ServiceProvider
     public function boot(): void
     {
         DocumentMailTemplates::register();
+        FicheLinks::registerAnonymisation('documents', fn (array $personIds) => DocumentAnonymisation::clear($personIds));
+        FicheLinks::registerExport('documents', fn (string $personId): array => DocumentAnonymisation::export($personId), [Permissions::VIEW]);
         DossierBlocks::register('documents.dossier', fn (string $dossierId, User $viewer) => DossierDocumentsBlock::for($dossierId, $viewer));
 
         // A document out of the viewer's documents.view scope (read on its dossier) is a 404.

@@ -130,7 +130,9 @@ class DocumentIssuer
      * and address; for a convention, the dossier's contact (attention, e-mail).
      *
      * @param  array<string, mixed>  $dossier
-     * @return array{name: string, attention: ?string, address_line1: ?string, address_line2: ?string, postal_code: ?string, city: ?string, email: ?string}
+     *                                         person_id: the person named on it (the particulier, or the contact of
+     *                                         a convention), for the GDPR anonymisation and export.
+     * @return array{name: string, attention: ?string, address_line1: ?string, address_line2: ?string, postal_code: ?string, city: ?string, email: ?string, person_id: ?string}
      */
     private function recipient(DocumentType $type, array $dossier): array
     {
@@ -149,6 +151,7 @@ class DocumentIssuer
             'postal_code' => $identity['postal_code'],
             'city' => $identity['city'],
             'email' => $email ?? ($type === DocumentType::Convention ? $identity['email'] : null),
+            'person_id' => $contactId,
         ];
     }
 }

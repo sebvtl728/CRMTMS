@@ -117,6 +117,10 @@ La colonne **Reste à financer** donne le prix du dossier moins ses financements
 
 Chaque dossier reçoit un numéro `D-2026-0001`.
 
+### Bloc Documents (0.10)
+
+La page du dossier porte un bloc **Documents** (droit « Consulter les documents ») : convention (contractant entreprise) ou contrat (particulier), émis, archivés, envoyés et annulés depuis le dossier. Voir `documents.md`.
+
 ### Bloc Facturation (0.9)
 
 La page du dossier porte un bloc **Facturation** (droit « Consulter les factures ») : **rythme** (fin de formation, mensuel au réalisé, échéancier), **base** (au réalisé, au prévu), échéancier (dates et pourcentages, 100 % au total), règle des **absences non justifiées**, financeurs payant directement, **factures et avoirs du dossier** avec leur état, ce qui reste à facturer et « Bientôt à facturer ». Les réglages demandent « Préparer les factures » et se verrouillent à la première facture validée. Quand tout est facturé, le dossier passe à l'état **Facturé** ; un avoir qui fait revenir un dû le ramène à **Réalisé**. Un dossier qui a des factures validées ne va pas à la corbeille. Voir `finance.md`.

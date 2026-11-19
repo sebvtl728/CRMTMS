@@ -7,6 +7,11 @@ Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) ; ve
 
 ### Ajouté
 
+- Documents (0.10, livraison 1) : **convention de formation** (contractant entreprise) et **contrat de formation**
+  (particulier) émis depuis le dossier avec ses données, numérotés `DOC-<année>-<NNNNN>`, archivés et figés, envoyés par
+  e-mail, annulables avec motif ; textes modifiables par organisme ou par société (Administration › Modèles de
+  documents) ; signature et cachet de la société ; droits `documents.view` et `documents.manage` ; le dossier passe à
+  « Convention envoyée » à l'envoi.
 - Qualité : module **Qualiopi** (menu Qualité › Qualiopi, droits `qualite.view` et `qualite.manage`) sur le référentiel
   2026 (décret n° 2026-728, 33 indicateurs) : suivi par indicateur (applicabilité justifiée, statut, responsable, date
   de revue, notes), preuves (fichier, lien, note), mesures automatiques (indicateurs 1, 5, 8, 12 et 13) et export du

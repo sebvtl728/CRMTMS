@@ -178,6 +178,17 @@ Code dans `tms/app/Modules/Qualite/` (`Qualiopi`, `Public`). Guide : `tms/docs/q
 - **Dossier d'audit** : `QualityExport` (ZIP temporaire : `sommaire.pdf` par `PdfRenderer` + `indicateur-NN/<fichier>`, noms nettoyés et dédoublonnés ; journalisé `qualite.qualiopi.exported` ; Gotenberg en panne = 503).
 - **Écrans** : la fiche vide le cache de préchargement Inertia (`router.flushAll()`) après chaque modification, sinon la liste préchargée par le menu revient périmée.
 
+## Module Documents (0.10) : points d'architecture à connaître
+
+Code dans `tms/app/Modules/Documents/` (`Texts`, `Gdpr`). Guide : `tms/docs/documents.md` ; réglages : `tms/docs/admin.md` (§ 20) ; tables : `tms/docs/data-dictionary.md`. Spec : `docs/superpowers/specs/2026-11-19-0.10-documents-signature-design.md`.
+
+- **Frontières** : Documents lit Sessions par `Sessions\Public\Paperwork` (`dossier`, `allows`, `markConventionSent|Signed`) et `Billing::lockDossier`, le CRM par `Crm\Public\Fiches` / `FicheLinks`, et s'affiche par `DossierBlocks` (`documents.dossier`, composant `resources/js/components/documents/documents-block.tsx`) ; aucun module n'importe Documents (`ModuleBoundariesArchTest`, `DOCUMENTS_FOREIGN_REFERENCE`).
+- **Textes** : gabarits Blade dans le code (`documents/training-*.blade.php`, `{{ }}` seulement) ; blocs de texte d'origine dans `Texts\DocumentTexts::blocks()` (Code du travail L6353-1 à -7 ; blocs `required` jamais vides) ; surcharges `document_texts` (société > organisme > origine), champs fermés `DocumentTexts::FIELDS`, remplacés littéralement, aucune balise.
+- **Émission** (`DocumentIssuer`, une transaction sous `Billing::lockDossier`) : règles (convention = contractant organisation, contrat = particulier, une seule valide par dossier et type), numéro `DocumentNumbering` (`DOC-<année Paris>-<NNNNN>`), rendu `DocumentPdf` (échec Gotenberg = rollback, numéro rendu), archive zone `documents` + `pdf_sha256`. Déclencheur `documents_immutable` : seuls état, envoi, annulation et `recipient_snapshot` (anonymisation) changent ; une erreur = **Annuler** (motif) puis nouvelle émission. `DocumentPdf::archived()` sert toujours l'archive (410 si perdue ou modifiée).
+- **Envoi** : `DocumentSender` (verrou, 409 annulé / envoi en cours) → `SendDocument` (`TenantAwareJob`, après commit, `TenantMailer`, motif sans texte du serveur) ; modèles d'e-mails `document_<type>` ; succès = document « Envoyé » et dossier « Convention envoyée » (jamais en arrière).
+- **RGPD** : `Gdpr\DocumentAnonymisation` via `FicheLinks` (destinataire figé et e-mails effacés, PDF gardé ; `recipient_snapshot.person_id` désigne la personne) ; export « documents ».
+- **Signature et cachet** : `CompanyBranding::storeSignature|signatureDataUri` (`companies.signature_path`).
+
 ## Conventions
 
 - Identifiants UUID v7 ; suppression logique sur les fiches métier.
