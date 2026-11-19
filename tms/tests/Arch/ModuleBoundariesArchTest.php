@@ -400,3 +400,60 @@ it('detects every way Admissions could reach another module beyond its public se
 it('keeps the Qualité module apart: it reads no other module, they declare their measures through Qualite\\Public', function () {
     expect(moduleFilesMatching('Qualite', '/App\\\\Modules\\\\(?!(?:Qualite|Core)\\b)\\w+/'))->toBe([]);
 });
+
+// ---------------------------------------------------------------- Documents (0.10)
+
+it('keeps every other module free of any reference to the Documents module', function () {
+    foreach (['Sessions', 'Crm', 'Catalogue', 'Core', 'Connectors', 'Finance', 'Admissions', 'Qualite'] as $module) {
+        expect(moduleFilesMatching($module, '/App\\\\Modules\\\\Documents\\\\|App\\\\Modules\\\\\{[^}]*\bDocuments\\\\/'), $module)->toBe([]);
+    }
+});
+
+/**
+ * A reference to another module than Documents and Core beyond their public
+ * services: the same openings as Finance (Sessions\Public, Crm\Public, the
+ * catalogue's Trainings / TrainingData / TrainingUsage, the four connector
+ * classes an e-mail needs).
+ */
+const DOCUMENTS_FOREIGN_REFERENCE = '/App\\\\Modules\\\\(?!(?:Documents|Core)\b|Sessions\\\\Public\b|Crm\\\\Public\b|Catalogue\\\\(?:Trainings|TrainingData|TrainingUsage)\b|Connectors\\\\(?:Smtp\\\\(?:TenantMailer|SmtpHostRefused)|Core\\\\(?:ConnectorRun|PermanentDeliveryFailure))\b)\w+'
+    .'|App\\\\Modules\\\\\{[^}]*\b(?!(?:Documents|Core)\\\\|Sessions\\\\Public\b|Crm\\\\Public\b|Catalogue\\\\(?:Trainings|TrainingData|TrainingUsage)\b|Connectors\\\\(?:Smtp\\\\(?:TenantMailer|SmtpHostRefused)|Core\\\\(?:ConnectorRun|PermanentDeliveryFailure))\b)(?:Sessions|Crm|Catalogue|Connectors|Finance|Admissions|Qualite)\\\\/';
+
+it('lets Documents reach the other modules through their public services only, never their tables', function () {
+    expect(moduleFilesMatching('Documents', DOCUMENTS_FOREIGN_REFERENCE))->toBe([]);
+
+    $offenders = [];
+    foreach (new RecursiveIteratorIterator(new RecursiveDirectoryIterator(app_path('Modules/Documents'))) as $file) {
+        if ($file->getExtension() !== 'php') {
+            continue;
+        }
+        $code = (string) file_get_contents($file->getPathname());
+        if (namesCrmTables($code) || namesCatalogueTables($code) || namesSessionsTables($code)) {
+            $offenders[] = $file->getPathname();
+        }
+    }
+    expect($offenders)->toBe([]);
+});
+
+it('detects every way Documents could reach another module beyond its public services', function () {
+    foreach ([
+        'use App\Modules\Sessions\Dossiers\Dossier;',
+        'use App\Modules\Crm\People\Person;',
+        'use App\Modules\Catalogue\Training;',
+        'use App\Modules\Finance\Invoices\Invoice;',
+        'use App\Modules\Admissions\Candidatures\Candidature;',
+        'use App\Modules\Connectors\Smtp\SmtpTransportFactory;',
+        'use App\Modules\{Sessions\Dossiers\Dossier, Core\Access\Role};',
+    ] as $code) {
+        expect(preg_match(DOCUMENTS_FOREIGN_REFERENCE, $code), $code)->toBe(1);
+    }
+    foreach ([
+        'use App\Modules\Sessions\Public\Paperwork;',
+        'use App\Modules\Crm\Public\Fiches;',
+        'use App\Modules\Catalogue\Trainings;',
+        'use App\Modules\Core\Documents\PdfRenderer;',
+        'use App\Modules\Connectors\Smtp\TenantMailer;',
+        'namespace App\Modules\Documents;',
+    ] as $code) {
+        expect(preg_match(DOCUMENTS_FOREIGN_REFERENCE, $code), $code)->toBe(0);
+    }
+});

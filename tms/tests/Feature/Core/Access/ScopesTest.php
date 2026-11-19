@@ -184,7 +184,7 @@ it('exposes the scope options in French', function () {
         ['value' => 'trainer', 'label' => 'Ses séances'],
     ])->and(Permissions::isScoped(SCOPED))->toBeTrue()
         ->and(Permissions::isScoped(UNSCOPED))->toBeFalse()
-        ->and(Permissions::defaultScopesFor(Role::Commercial))->toBe(['crm.revenue.view' => AccessScope::Own, SCOPED => AccessScope::Own]);
+        ->and(Permissions::defaultScopesFor(Role::Commercial))->toEqual(['crm.revenue.view' => AccessScope::Own, SCOPED => AccessScope::Own, 'documents.view' => AccessScope::Own]);
 });
 
 it('keeps the default scope when a right is revoked then granted again', function () {
