@@ -28,7 +28,8 @@ use Carbon\CarbonImmutable;
  *   expected to close in the current Paris month (as the list filtered so);
  * - « Devis »: quotes sent this Paris month, accepted among them, the rate;
  * - « Prochains rendez-vous »: his next meetings to do (types flagged
- *   meta.planning « meeting »), without report.
+ *   meta.planning « meeting »), without report;
+ * - « Actions » and « Rendez-vous » of the month (ActivityStats).
  */
 final class CommercialSummary
 {
@@ -36,7 +37,7 @@ final class CommercialSummary
     public const MEETINGS = 5;
 
     /**
-     * @return array{follow_ups: array{overdue: int, today: int}, pipeline: array{weighted_amount: string, count: int, month: string, close_from: string, close_to: string}, quotes: array{sent: int, accepted: int, rate: float|null, month: string}, meetings: list<array<string, mixed>>, revenue: array{total_cents: int, target_cents: int|null, targeted_total_cents: int|null, rate: float|null, month: string, own: bool}|null}
+     * @return array{follow_ups: array{overdue: int, today: int}, pipeline: array{weighted_amount: string, count: int, month: string, close_from: string, close_to: string}, quotes: array{sent: int, accepted: int, rate: float|null, month: string}, meetings: list<array<string, mixed>>, revenue: array{total_cents: int, target_cents: int|null, targeted_total_cents: int|null, rate: float|null, month: string, own: bool}|null, activity_stats: array<string, mixed>|null}
      */
     public static function for(User $user, CarbonImmutable $now): array
     {
@@ -46,6 +47,7 @@ final class CommercialSummary
             'quotes' => self::quotes($user, $now),
             'meetings' => self::meetings($user, $now),
             'revenue' => self::revenue($user, $now),
+            'activity_stats' => $user->can(Permissions::ACTIVITIES_VIEW) ? ActivityStats::for($user, $now) : null,
         ];
     }
 
