@@ -172,7 +172,7 @@ it('enrols a group of four in one go, one created on the spot, then a second wav
     $created = Person::query()->where('last_name', 'Nouveau')->sole();
     expect($created->das()->pluck('reference_items.id')->all())->toBe([grpTraining()->das_id])
         ->and($created->affiliations()->pluck('organisation_id')->all())->toBe([$organisation->id]);
-    $first = Enrolment::query()->where('training_session_id', $session->id)->orderBy('created_at')->get();
+    $first = Enrolment::query()->where('training_session_id', $session->id)->get();
     expect($first)->toHaveCount(4)
         ->and($first->pluck('entered_on')->map->toDateString()->unique()->all())->toBe(['2026-11-30'])
         ->and($first->pluck('planned_hours')->unique()->all())->toBe(['35.00'])
@@ -184,9 +184,10 @@ it('enrols a group of four in one go, one created on the spot, then a second wav
         ['person_id' => makePerson('Simon')->id, 'entered_on' => '2026-12-09', 'planned_hours' => '28'],
     ], ['entered_on' => '2026-12-07']))->assertSessionHas('status', '2 stagiaires inscrits.');
 
-    $late = Enrolment::query()->where('training_session_id', $session->id)->orderBy('created_at')->get()->slice(4)->values();
+    // The second wave: the enrolments not in the first (same clock: no order between them).
+    $late = Enrolment::query()->where('training_session_id', $session->id)->whereNotIn('id', $first->pluck('id'))->get();
     expect($late->map(fn (Enrolment $e) => [$e->entered_on?->toDateString(), $e->planned_hours])->all())
-        ->toBe([['2026-12-07', '35.00'], ['2026-12-09', '28.00']])
+        ->toEqualCanonicalizing([['2026-12-07', '35.00'], ['2026-12-09', '28.00']])
         ->and(Enrolment::query()->where('dossier_id', $dossier->id)->pluck('price_share')->all())->toBe(array_fill(0, 6, '1000.00'));
 });
 

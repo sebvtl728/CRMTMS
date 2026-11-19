@@ -68,6 +68,14 @@ test('an interlocuteur becomes a candidate, signs an apprenticeship and becomes 
     await expect(page.getByText('Candidature créée.')).toBeVisible();
     await expect(page.getByLabel('Code RNCP')).toHaveValue('RNCP36004');
 
+    // The cards open one after the other: the test (training saved), then the interview once the test is back.
+    await expect(page.getByRole('region', { name: 'Test de positionnement' })).toBeVisible();
+    await expect(page.getByRole('region', { name: 'Entretien' })).toHaveCount(0);
+    await page.getByLabel('Reçu le').fill('2026-11-18');
+    await page.getByRole('region', { name: 'Test de positionnement' }).getByRole('button', { name: 'Enregistrer' }).click();
+    await expect(page.getByRole('region', { name: 'Entretien' })).toBeVisible();
+    await expect(page.getByRole('region', { name: 'Alternance' })).toHaveCount(0);
+
     // The path: test sent, test received, interview.
     await moveTo(page, 'Test envoyé');
     await moveTo(page, 'Test reçu');

@@ -1,6 +1,6 @@
 # Admissions : candidats, apprenants, alternants
 
-Le module **Admissions** suit le recrutement des candidats, de leur identification à leur entrée en formation. Menu **Commercial › Candidats**. Réglages : `admin.md` § 19 ; tables : `data-dictionary.md`.
+Le module **Admissions** suit le recrutement des candidats, de leur identification à leur entrée en formation. Menu **Formation › Candidats** (au-dessus de Dossiers). Réglages : `admin.md` § 19 ; tables : `data-dictionary.md`.
 
 ## 1. Le parcours
 

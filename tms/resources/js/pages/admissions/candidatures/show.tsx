@@ -85,6 +85,12 @@ export default function CandidatureShow({ candidature: c, custom_fields, history
     const [reason, setReason] = useState<string | null>(null);
     const [dossierOpen, setDossierOpen] = useState(false);
     const disabled = !can.update;
+    // Each card opens once the one before is saved (rejected or withdrawn: every card).
+    const rank = STAGE_RANK[c.status];
+    const exited = rank < 0;
+    const showTest = exited || rank >= 1 || c.training !== null || c.positioning_sent_on !== null;
+    const showInterview = exited || rank >= 2 || c.positioning_received_on !== null || c.interview_at !== null;
+    const showAfterInterview = exited || rank >= 3 || c.interview_at !== null;
 
     const breadcrumbs: BreadcrumbItem[] = [
         { title: 'Candidats', href: '/admissions/candidatures' },
@@ -392,8 +398,10 @@ export default function CandidatureShow({ candidature: c, custom_fields, history
                             </div>
                         )}
                         {can.update && <SaveButton onClick={() => orientation.save()} processing={orientation.processing} />}
+                        {!showTest && <p className="text-muted-foreground text-xs">Enregistrez la formation visée pour ouvrir le test de positionnement.</p>}
                     </Card>
 
+                    {showTest && (
                     <Card title="Test de positionnement">
                         <div className="grid gap-3 sm:grid-cols-3">
                             <TextField
@@ -429,8 +437,25 @@ export default function CandidatureShow({ candidature: c, custom_fields, history
                             c.positioning_sent_on && <Suggest c={c} to="positioning_sent" label="Test envoyé" canUpdate={can.update} />
                         )}
                         <CandidatureFiles candidatureId={c.id} kind="positioning" files={c.files} canUpdate={can.update} label="Joindre le test" />
+                        {!showInterview && (
+                            <div className="flex flex-wrap items-center gap-2">
+                                <p className="text-muted-foreground text-xs">Enregistrez la date de réception pour ouvrir l'entretien, ou</p>
+                                {can.update && (
+                                    <Button
+                                        type="button"
+                                        variant="ghost"
+                                        size="sm"
+                                        onClick={() => router.post(`/admissions/candidatures/${c.id}/status`, { status: 'interview' }, { preserveScroll: true })}
+                                    >
+                                        Passer le test
+                                    </Button>
+                                )}
+                            </div>
+                        )}
                     </Card>
+                    )}
 
+                    {showInterview && (
                     <Card title="Entretien">
                         <div className="grid gap-3 sm:grid-cols-2">
                             <TextField
@@ -494,8 +519,9 @@ export default function CandidatureShow({ candidature: c, custom_fields, history
                         {can.update && <SaveButton onClick={() => interview.save()} processing={interview.processing} />}
                         {c.interview_at && <Suggest c={c} to="interview" label="Entretien" canUpdate={can.update} />}
                     </Card>
+                    )}
 
-                    {c.pathway !== 'trainee' && (
+                    {showAfterInterview && c.pathway !== 'trainee' && (
                         <Card title="Alternance">
                             {c.pathway === null && !c.alternance ? (
                                 <p className="text-muted-foreground text-sm">
@@ -623,7 +649,7 @@ export default function CandidatureShow({ candidature: c, custom_fields, history
                         </Card>
                     )}
 
-                    {custom_fields.length > 0 && (
+                    {showAfterInterview && custom_fields.length > 0 && (
                         <Card title="Informations complémentaires">
                             <div className="grid gap-3 sm:grid-cols-2">
                                 {custom_fields.map((f) => {

@@ -13,6 +13,7 @@ Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) ; ve
 
 ### Modifié
 
+- Menu : **Candidats** passe dans **Formation**, au-dessus de Dossiers.
 - Admissions : l'onglet **Apprenants** devient **Stagiaires**, le badge « Apprenant » devient « Stagiaire ».
 
 ## [0.9.1] - 2026-11-19

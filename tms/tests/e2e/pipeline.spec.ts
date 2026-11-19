@@ -78,10 +78,13 @@ test('pipeline: opportunity from an entreprise, kanban, loss reason, quick call,
         'Catalogue',
         'Entreprises',
         'Interlocuteurs',
-        'Candidats',
         'Imports',
         'RGPD',
     ]);
+    // « Candidats » opens the « Formation » menu, above « Dossiers ».
+    const training = page.locator('[data-sidebar="group"]').filter({ has: page.getByText('Formation', { exact: true }) });
+    await expect(training.locator('[data-sidebar="menu-button"]').first()).toHaveText('Candidats');
+    await expect(training.locator('[data-sidebar="menu-button"]').nth(1)).toHaveText('Dossiers');
 
     // 1. An opportunity from the entreprise's « Opportunités » tab, closing this month.
     const organisationUrl = await send(context, page.request, '/crm/organisations', { name: ENTREPRISE });
