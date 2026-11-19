@@ -17,6 +17,7 @@ use App\Modules\Finance\Invoices\InvoiceSending;
 use App\Modules\Finance\Invoices\InvoiceStatus;
 use App\Modules\Finance\Payments\Payment;
 use App\Modules\Finance\Payments\PaymentAllocation;
+use App\Modules\Finance\Payments\PaymentAnonymisation;
 use App\Modules\Finance\Plans\BillingBlock;
 use App\Modules\Finance\Plans\BillingPlan;
 use App\Modules\Finance\Plans\BillingPlans;
@@ -83,6 +84,8 @@ class FinanceServiceProvider extends ServiceProvider
         // Anonymising a person: her drafts go (addressed to her, or naming her as a trainee);
         // validated invoices are accounting records kept 10 years, never changed (spec § 4.7).
         FicheLinks::registerAnonymisation('finance.invoices', fn (array $personIds) => InvoiceAnonymisation::deleteDrafts($personIds));
+        // Her payments are kept too (10 years): their notes and reference are cleared (0.9.1).
+        FicheLinks::registerAnonymisation('finance.payments', fn (array $personIds) => PaymentAnonymisation::clear($personIds));
 
         // Rendering a PDF (preview, archive at validation) costs a conversion.
         $by = fn (Request $request, string $name): string => $name.':'.($request->user()?->getAuthIdentifier() ?? $request->ip());

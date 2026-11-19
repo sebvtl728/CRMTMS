@@ -166,3 +166,16 @@ it('refuses a second payment racing for the same remaining due', function () {
     expect(payError(fn () => payRecord($user, Invoice::query()->findOrFail($invoice->id), 1), 'allocations.0.amount'))
         ->toBe('Le montant affecté dépasse le reste dû de la facture (0,00 €).');
 });
+
+it('clears the notes and the reference of the payments of an anonymised person', function () {
+    [$invoice, , $user] = payInvoice();
+    $paul = makePerson('Martin', ['first_name' => 'Paul', 'is_individual' => true]);
+    $hisPayment = payRecord($user, $invoice, 5000, ['payer_type' => 'person', 'payer_id' => $paul->id, 'allocations' => [], 'notes' => 'Payé en deux fois', 'reference' => 'CHQ 123']);
+    $company = payRecord($user, $invoice, 5000, ['notes' => 'Virement groupé']);
+
+    App\Modules\Crm\Public\FicheLinks::anonymise([$paul->id]);
+
+    expect($hisPayment->refresh()->only(['notes', 'reference', 'amount_cents']))->toBe(['notes' => null, 'reference' => null, 'amount_cents' => 5000])
+        ->and($company->refresh()->notes)->toBe('Virement groupé')
+        ->and($company->allocations()->count())->toBe(1);
+});
