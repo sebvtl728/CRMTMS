@@ -71,7 +71,7 @@ it('adds collaborators to a meeting: only active users who may work on the actio
         ->assertJsonPath('activity.collaborators.0.name', $relations->name);
 });
 
-it('lets a collaborator see the action, in « À faire » and the planning, without changing it', function () {
+it('lets a user the action is also assigned to see and change it, in « À faire » and the planning, never delete it', function () {
     $owner = colOwnUser();
     $helper = colOwnUser();
     $this->actingAs($owner);
@@ -83,8 +83,11 @@ it('lets a collaborator see the action, in « À faire » and the planning, with
     $activity = Activity::query()->sole();
 
     $this->actingAs($helper);
-    $this->getJson("/crm/activities/{$activity->id}")->assertOk()->assertJsonPath('can.update', false);
-    $this->put("/crm/activities/{$activity->id}", ['type_id' => colType(), 'subject' => 'Changé'])->assertForbidden();
+    $this->getJson("/crm/activities/{$activity->id}")->assertOk()->assertJsonPath('can.update', true)->assertJsonPath('can.delete', false);
+    $this->put("/crm/activities/{$activity->id}", ['type_id' => colType(), 'subject' => 'Changé'])->assertSessionHasNoErrors();
+    expect($activity->fresh()->subject)->toBe('Changé')
+        ->and($activity->fresh()->responsible_user_id)->toBe($owner->id)
+        ->and($activity->collaborators()->pluck('users.id')->all())->toBe([$helper->id]);
     $this->get('/crm/todo')->assertInertia(fn (Assert $p) => $p->where('sections', fn ($sections) => collect($sections)->flatten(1)->pluck('id')->contains($activity->id)));
     $this->get('/crm/planning?week=2026-11-16')->assertInertia(fn (Assert $p) => $p->where('days', fn ($days) => collect($days)->flatMap(fn ($d) => $d['items'])->pluck('id')->contains($activity->id)));
 });

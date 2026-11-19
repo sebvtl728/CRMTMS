@@ -2,6 +2,7 @@ import InputError from '@/components/input-error';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { DropdownMenu, DropdownMenuCheckboxItem, DropdownMenuContent, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -9,7 +10,7 @@ import { formatDateTime, todayIso, type Option } from '@/lib/crm';
 import { cn } from '@/lib/utils';
 import { type SharedData } from '@/types';
 import { useForm, usePage } from '@inertiajs/react';
-import { BellRing, CalendarDays, LoaderCircle, Mail, Phone, Plus, X } from 'lucide-react';
+import { BellRing, CalendarDays, ChevronDown, LoaderCircle, Mail, Phone, Plus, X } from 'lucide-react';
 import { FormEventHandler, useCallback, useEffect, useState } from 'react';
 
 /** Fiches an action is prefilled with (ids of the current page). */
@@ -207,46 +208,71 @@ type CreateFields = {
 };
 
 /**
- * « Collaborateurs »: colleagues taking part besides the responsible (who
- * is left out of the list); they see the action in their « À faire » and
- * planning.
+ * « Attribuer à »: one or several people. The first chosen is the
+ * responsible; the others see and do the action too (« À faire »,
+ * planning). The current responsible is offered even when not in the list.
  */
-function CollaboratorsField({
+function AssigneesField({
     id,
+    label,
     options,
+    responsibles,
     value,
-    responsibleId,
     onChange,
     error,
 }: {
     id: string;
+    label: string;
     options: Option[];
+    responsibles: Option[];
     value: string[];
-    responsibleId: string;
     onChange: (ids: string[]) => void;
     error?: string;
 }) {
-    const choices = options.filter((o) => o.value !== responsibleId);
-    if (choices.length === 0) return null;
+    const all = [...options, ...responsibles.filter((r) => value.includes(r.value) && !options.some((o) => o.value === r.value))];
+    const name = (v: string) => all.find((o) => o.value === v)?.label ?? '—';
+    const toggle = (v: string, checked: boolean) => {
+        if (checked) onChange([...value, v]);
+        else if (value.length > 1) onChange(value.filter((x) => x !== v));
+    };
 
     return (
-        <fieldset className="grid gap-2" id={id}>
-            <legend className="text-sm font-medium">Collaborateurs</legend>
-            <div className="grid max-h-36 gap-1 overflow-y-auto rounded-md border p-2 sm:grid-cols-2">
-                {choices.map((o) => (
-                    <Label key={o.value} className="flex items-center gap-2 font-normal">
-                        <input
-                            type="checkbox"
+        <div className="grid gap-2">
+            <Label htmlFor={id}>{label}</Label>
+            <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                    <Button
+                        id={id}
+                        type="button"
+                        variant="outline"
+                        className="h-auto min-h-9 justify-between text-left font-normal whitespace-normal"
+                    >
+                        <span>
+                            {value.length === 0
+                                ? '—'
+                                : value.map((v, i) => (i === 0 && value.length > 1 ? `${name(v)} (responsable)` : name(v))).join(', ')}
+                        </span>
+                        <ChevronDown className="h-4 w-4 shrink-0 opacity-50" />
+                    </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="start" className="max-h-72 w-(--radix-dropdown-menu-trigger-width) overflow-y-auto">
+                    {all.map((o) => (
+                        <DropdownMenuCheckboxItem
+                            key={o.value}
                             checked={value.includes(o.value)}
-                            onChange={(e) => onChange(e.target.checked ? [...value, o.value] : value.filter((v) => v !== o.value))}
-                        />
-                        {o.label}
-                    </Label>
-                ))}
-            </div>
-            <p className="text-muted-foreground text-xs">Ils voient l’action dans leur « À faire » et leur planning.</p>
+                            onCheckedChange={(checked) => toggle(o.value, checked === true)}
+                            onSelect={(e) => e.preventDefault()}
+                        >
+                            {o.label}
+                        </DropdownMenuCheckboxItem>
+                    ))}
+                </DropdownMenuContent>
+            </DropdownMenu>
+            {value.length > 1 && (
+                <p className="text-muted-foreground text-xs">Le premier choisi est le responsable ; tous la voient et peuvent la faire.</p>
+            )}
             <InputError message={error} />
-        </fieldset>
+        </div>
     );
 }
 
@@ -486,30 +512,14 @@ function CreateForm({ context, onDone }: { context: QuickActionContext; onDone: 
 
             <NextStepsField value={data.next_steps} onChange={(v) => setData('next_steps', v)} error={errors.next_steps} />
 
-            <div className="grid gap-2">
-                <Label htmlFor="qa-responsible">Attribuer à</Label>
-                <Select value={data.responsible_user_id} onValueChange={(v) => setData('responsible_user_id', v)}>
-                    <SelectTrigger id="qa-responsible">
-                        <SelectValue placeholder="—" />
-                    </SelectTrigger>
-                    <SelectContent>
-                        {choices.responsibles.map((u) => (
-                            <SelectItem key={u.value} value={u.value}>
-                                {u.label}
-                            </SelectItem>
-                        ))}
-                    </SelectContent>
-                </Select>
-                <InputError message={errors.responsible_user_id} />
-            </div>
-
-            <CollaboratorsField
-                id="qa-collaborators"
+            <AssigneesField
+                id="qa-responsible"
+                label="Attribuer à"
                 options={choices.collaborators}
-                value={data.collaborator_ids}
-                responsibleId={data.responsible_user_id}
-                onChange={(ids) => setData('collaborator_ids', ids)}
-                error={errors.collaborator_ids}
+                responsibles={choices.responsibles}
+                value={[data.responsible_user_id, ...data.collaborator_ids].filter((v) => v !== '')}
+                onChange={(ids) => setData((d) => ({ ...d, responsible_user_id: ids[0] ?? '', collaborator_ids: ids.slice(1) }))}
+                error={errors.responsible_user_id ?? errors.collaborator_ids}
             />
 
             {data.done && (
@@ -840,31 +850,16 @@ function EditForm({ activityId, onDone }: { activityId: string; onDone: () => vo
                     </Select>
                     <InputError message={errors.type_id} />
                 </div>
-                <div className="grid gap-2">
-                    <Label htmlFor="qa-edit-responsible">Responsable</Label>
-                    <Select value={data.responsible_user_id} onValueChange={(v) => setData('responsible_user_id', v)}>
-                        <SelectTrigger id="qa-edit-responsible">
-                            <SelectValue placeholder="—" />
-                        </SelectTrigger>
-                        <SelectContent>
-                            {loaded.responsibles.map((u) => (
-                                <SelectItem key={u.value} value={u.value}>
-                                    {u.label}
-                                </SelectItem>
-                            ))}
-                        </SelectContent>
-                    </Select>
-                    <InputError message={errors.responsible_user_id} />
-                </div>
+                <AssigneesField
+                    id="qa-edit-responsible"
+                    label="Attribuer à"
+                    options={loaded.collaborators}
+                    responsibles={loaded.responsibles}
+                    value={[data.responsible_user_id, ...data.collaborator_ids].filter((v) => v !== '')}
+                    onChange={(ids) => setData((d) => ({ ...d, responsible_user_id: ids[0] ?? '', collaborator_ids: ids.slice(1) }))}
+                    error={errors.responsible_user_id ?? errors.collaborator_ids}
+                />
             </div>
-            <CollaboratorsField
-                id="qa-edit-collaborators"
-                options={loaded.collaborators}
-                value={data.collaborator_ids}
-                responsibleId={data.responsible_user_id}
-                onChange={(ids) => setData('collaborator_ids', ids)}
-                error={errors.collaborator_ids}
-            />
 
             <div className="grid gap-2">
                 <Label htmlFor="qa-edit-subject">Objet *</Label>

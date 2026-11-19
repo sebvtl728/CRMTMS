@@ -142,6 +142,11 @@ test('pipeline: opportunity from an entreprise, kanban, loss reason, quick call,
     await quick.getByRole('group', { name: 'Type *' }).getByRole('button', { name: 'Appel', exact: true }).click();
     await quick.getByRole('button', { name: 'Demain' }).click();
     await choose(page, quick.getByLabel('Type', { exact: true }), 'Appel');
+    // « Attribuer à » takes one or several people: the author is checked.
+    await quick.getByLabel('Attribuer à').click();
+    await expect(page.getByRole('menuitemcheckbox').first()).toBeVisible();
+    await expect(page.getByRole('menuitemcheckbox', { checked: true })).toHaveCount(1);
+    await page.keyboard.press('Escape');
     await quick.getByRole('button', { name: 'Enregistrer' }).click();
     await expect(quick).toBeHidden();
     await page.getByRole('tab', { name: 'Historique' }).click();

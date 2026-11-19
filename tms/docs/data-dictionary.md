@@ -284,7 +284,7 @@ Index : partiel « À faire » (`tenant_id`, `responsible_user_id`, `due_at`) `w
 Module `Catalogue` : le Crm ne lit jamais ces tables directement (service `Catalogue\Trainings`, test d'architecture).
 
 ### `activity_collaborators` — collaborateurs d'une action
-(`activity_id` cascade, `user_id` cascade) clé primaire, `tenant_id` + RLS. Utilisateurs actifs ayant `crm.activities.view` (`ActivityCollaborators`) ; un collaborateur voit l'action (`CrmVisibility::activities`, `allows`), dans « À faire » et le planning, sans la modifier à ce seul titre ; jamais compté dans `ActivityStats`.
+(`activity_id` cascade, `user_id` cascade) clé primaire, `tenant_id` + RLS. Utilisateurs actifs ayant `crm.activities.view` (`ActivityCollaborators`) ; personnes à qui l'action est aussi attribuée (« Attribuer à » multiple, le premier choisi = `responsible_user_id`) : elles la voient et la modifient (`CrmVisibility::activities`, `allows` : droits « Consulter » et « Modifier », jamais « Supprimer »), dans « À faire » et le planning ; jamais comptées dans `ActivityStats`.
 
 ### `trainings` — formations
 | Colonne | Type | Rôle |

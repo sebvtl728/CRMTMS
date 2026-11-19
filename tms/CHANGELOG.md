@@ -9,8 +9,8 @@ Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) ; ve
 
 - **Accueil (CRM)** : cartes **Actions** (créées et réalisées dans le mois) et **Rendez-vous pris** (fixés dans le mois),
   comparées au mois précédent, avec les 12 derniers mois, dans le périmètre de chacun.
-- **Collaborateurs** sur une action ou un rendez-vous : des collègues (droit « Consulter les actions ») en plus du
-  responsable, qui la voient dans leur « À faire » et leur planning.
+- **Attribuer à plusieurs personnes** une action ou un rendez-vous (champ « Attribuer à », le premier choisi est le
+  responsable) : chacune la voit dans son « À faire » et son planning et peut la modifier et la terminer.
 
 ## [0.9.1] - 2026-11-19
 

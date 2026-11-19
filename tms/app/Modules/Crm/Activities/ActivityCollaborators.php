@@ -9,13 +9,13 @@ use Illuminate\Database\Query\Builder;
 use Illuminate\Support\Facades\DB;
 
 /**
- * Collaborators of an action or a meeting, besides its responsible: active
- * users of the organisme whose role lets them see the actions
- * (crm.activities.view, whatever its scope — never a role name; the
- * direction only reads them by default). A
- * collaborator sees the action (CrmVisibility), in « À faire » and the
- * planning too, without changing it through that alone; the statistics
- * never count it for him.
+ * The other people an action or a meeting is assigned to (« Attribuer à »
+ * with several people: the first is the responsible), besides its
+ * responsible: active users of the organisme whose role lets them see the
+ * actions (crm.activities.view, whatever its scope — never a role name; the
+ * direction only reads them by default). They see and change the action
+ * (CrmVisibility), in « À faire » and the planning too, never delete it
+ * through that alone; the statistics count it for the responsible only.
  */
 final class ActivityCollaborators
 {
