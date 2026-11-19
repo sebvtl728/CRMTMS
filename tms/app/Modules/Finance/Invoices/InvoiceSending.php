@@ -24,7 +24,9 @@ use Illuminate\Support\Carbon;
  * @property string $status pending|sent|failed
  * @property string|null $error_code
  * @property string|null $error fixed French reason, never the server's text
- * @property string|null $sent_by
+ * @property string|null $sent_by null: an automatic reminder
+ * @property string $purpose invoice|reminder
+ * @property int|null $reminder_level 1 to 3 for a reminder
  * @property Carbon|null $sent_at
  * @property Carbon|null $created_at
  */
@@ -34,11 +36,15 @@ class InvoiceSending extends Model
 
     public const MORPH_ALIAS = 'invoice_sending';
 
+    public const INVOICE = 'invoice';
+
+    public const REMINDER = 'reminder';
+
     /** @var list<string> */
-    protected $fillable = ['invoice_id', 'email', 'subject', 'body', 'status', 'sent_by'];
+    protected $fillable = ['invoice_id', 'email', 'subject', 'body', 'status', 'sent_by', 'purpose', 'reminder_level'];
 
     protected function casts(): array
     {
-        return ['sent_at' => 'datetime'];
+        return ['sent_at' => 'datetime', 'reminder_level' => 'integer'];
     }
 }
