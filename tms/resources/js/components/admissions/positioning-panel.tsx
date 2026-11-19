@@ -5,7 +5,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { formatDate, formatSize } from '@/lib/crm';
-import { router, useForm } from '@inertiajs/react';
+import { router, useForm, usePage } from '@inertiajs/react';
 import { Check, Copy, Download, Link as LinkIcon, LoaderCircle, Send } from 'lucide-react';
 import { FormEventHandler, useEffect, useState } from 'react';
 
@@ -56,6 +56,7 @@ const EMAIL_STATUS: Record<PositioningSendingRow['email_status'], string> = {
  */
 export function PositioningPanel({ candidatureId, positioning }: { candidatureId: string; positioning: PositioningProps }) {
     const [open, setOpen] = useState(false);
+    const pageErrors = usePage().props.errors as Record<string, string | undefined>;
     const online = positioning.online_tests ?? [];
     // What the link leads to: an online test (by id) or the PDF tests to download and send back.
     const [choice, setChoice] = useState<string>(online[0]?.id ?? 'pdf');
@@ -130,6 +131,9 @@ export function PositioningPanel({ candidatureId, positioning }: { candidatureId
                         Envoyer par e-mail
                     </Button>
                 </div>
+            )}
+            {(pageErrors.online_test_id ?? pageErrors.version_ids) && !open && (
+                <p className="text-sm text-red-600">{pageErrors.online_test_id ?? pageErrors.version_ids}</p>
             )}
             {positioning.sendings.length > 0 && (
                 <ul className="grid gap-1 text-xs">
