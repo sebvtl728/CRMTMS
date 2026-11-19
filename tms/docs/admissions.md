@@ -9,7 +9,7 @@ Une **candidature** relie une personne du CRM à une formation visée. Elle avan
 1. **Identifié** — la candidature est ouverte ;
 2. **Test envoyé** — le test de positionnement est parti (par **Envoyer le test**, ou hors du TMS) ;
 3. **Test reçu** — le candidat l'a renvoyé ;
-4. **Entretien** ;
+4. **Entretien** — le **test est obligatoire** : on ne passe à Entretien (ni à Admis) qu'une fois sa date de réception enregistrée (à la main, ou par la copie / les réponses du candidat) ;
 5. **Admis** — ou **Non retenu** (motif obligatoire, référentiel « Motifs de non-admission ») ou **Désisté**.
 
 On peut sauter une étape (admettre sans test) et revenir en arrière tant que le dossier de formation n'existe pas. Saisir une date (envoi ou retour du test, entretien) **propose** de passer à l'étape correspondante, sans le faire tout seul.

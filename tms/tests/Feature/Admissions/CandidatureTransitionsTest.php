@@ -76,3 +76,20 @@ it('journals the change of stage and moves through the route', function () {
 
     $this->post("/admissions/candidatures/{$c->id}/status", ['status' => 'nope'])->assertSessionHasErrors('status');
 });
+
+it('requires the positioning test back before the interview or the admission', function () {
+    $c = adCandidature(['positioning_received_on' => null]);
+    foreach ([CandidatureStatus::Interview, CandidatureStatus::Admitted] as $to) {
+        try {
+            app(CandidatureTransitions::class)->move($c->fresh(), $to, admin());
+            $this->fail('expected a validation error');
+        } catch (ValidationException $e) {
+            expect($e->errors()['positioning_received_on'][0])->toBe('Le test de positionnement est obligatoire : indiquez sa date de réception avant l\'entretien.');
+        }
+    }
+    // Sent is fine; once received, the interview opens.
+    app(CandidatureTransitions::class)->move($c->fresh(), CandidatureStatus::PositioningSent, admin());
+    app(CandidatureWriter::class)->update($c->fresh(), ['positioning_received_on' => '2026-11-18'], admin());
+    app(CandidatureTransitions::class)->move($c->fresh(), CandidatureStatus::Interview, admin());
+    expect($c->fresh()->status)->toBe(CandidatureStatus::Interview);
+});

@@ -19,7 +19,7 @@ beforeEach(function () {
 function otLink(): array
 {
     $test = otPublished();
-    $c = adCandidature(['person_id' => adPerson('Durand', ['email' => 'lea.durand@example.test'])->id]);
+    $c = adCandidature(['person_id' => adPerson('Durand', ['email' => 'lea.durand@example.test'])->id, 'positioning_received_on' => null]);
     test()->actingAs(admin(twoFactor: true));
     test()->post("/admissions/candidatures/{$c->id}/positioning/link", ['online_test_id' => $test->id])->assertSessionHasNoErrors();
     $link = test()->get("/admissions/candidatures/{$c->id}")->original->getData()['page']['props']['positioning']['link'];

@@ -123,6 +123,7 @@ it('never opens a link on the host of another organisme', function () {
 
 it('keeps the stage when it is already past the test', function () {
     [$c, , $token] = posLink();
+    $c->fresh()->forceFill(['positioning_received_on' => '2026-11-19'])->save(); // received on paper (compulsory before the interview)
     app(CandidatureTransitions::class)->move($c->fresh(), CandidatureStatus::Interview, admin());
 
     $this->post("/test-positionnement/{$token}", ['files' => [posCopy()], 'done' => '1'])->assertRedirect();

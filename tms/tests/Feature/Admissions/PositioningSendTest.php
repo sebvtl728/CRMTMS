@@ -78,6 +78,7 @@ it('revokes the previous link on a new sending, never moves the stage back', fun
     [$c, $test] = posCandidature();
     $this->actingAs(admin(twoFactor: true));
     posSend($c, $test);
+    $c->fresh()->forceFill(['positioning_received_on' => '2026-11-19'])->save(); // the test came back (compulsory before the interview)
     app(CandidatureTransitions::class)->move($c->fresh(), CandidatureStatus::Interview, admin());
     posSend($c, $test);
 
