@@ -5,6 +5,41 @@ Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) ; ve
 
 ## [Non publié]
 
+## [0.9.1] - 2026-11-19
+
+Admissions (candidats, alternance) et suivi des paiements : règlements, factures soldées, relances, protection du
+particulier. Export comptable et facture électronique en 0.9.2.
+
+### Ajouté
+
+- **Module Admissions** (menu **Admissions**, guide `docs/admissions.md`) : candidatures (étapes, motif de non-retenue,
+  formation, code RNCP repris de la formation), pièces jointes, **contrat d'alternance** (employeur, tuteur, dates),
+  **champs personnalisés** paramétrables par l'organisme ; données sensibles (RQTH, besoins d'adaptation, compte rendu
+  d'entretien) réservées au droit `admissions.sensitive.view` ; liste filtrée et export CSV ; bloc Candidatures sur la
+  fiche personne.
+- **Création du dossier** depuis une candidature admise (inscription à la session, financement, contractant par défaut =
+  employeur du contrat) ; « Apprenant » / « Alternant » se lisent du dossier et du contrat.
+- **Règlements** (menu Finance › **Règlements**, droit `finance.payments.manage`) : date, montant, mode (nouveau
+  référentiel « Modes de règlement »), référence ; un règlement couvre plusieurs factures du même payeur et de la même
+  société (**Répartir** : plus anciennes d'abord), reste non affecté réaffectable ; **Enregistrer un règlement** depuis
+  une facture.
+- **État de paiement** des factures : non réglée, partiellement réglée, **soldée**, en retard, trop-perçu ; dans la liste
+  (colonne **Reste dû**, filtre Paiement), sur la facture, dans le bloc Facturation du dossier et l'export CSV.
+- **Relances** (menu Finance › **À relancer**) : 1 à 3 niveaux (par défaut 7, 30 et 60 jours après l'échéance), modèles
+  d'e-mail `invoice_reminder_1` à `3`, PDF archivé joint, envoi groupé ou facture par facture, **Suspendre les
+  relances** ; relance automatique facultative chaque matin à 8 h 30 (`tms:finance:remind`, désactivée par défaut).
+- **Particulier** : aucune facture au contractant particulier pendant le délai de rétractation de 14 jours suivant la
+  signature du contrat ; première échéance d'un échéancier plafonnée à 30 %.
+
+### Modifié
+
+- Menu CRM : **Personnes** devient **Interlocuteurs**.
+
+### Corrigé
+
+- Le message de confirmation (« Facture validée »…) s'affiche à nouveau sur les pages Factures, À facturer et sur la
+  page d'une facture.
+
 ## [0.9.0] - 2026-11-18
 
 Factures : le TMS émet les factures et avoirs officiels depuis le dossier, au réel des heures faites, partagés entre le
@@ -617,7 +652,8 @@ Lot 1a : socle de l'application.
   mise à jour avec retour arrière automatique.
 - Publication : image multi-architecture signée (cosign), archive de version, sommes de contrôle.
 
-[Non publié]: https://github.com/sebvtl728/CRMTMS/compare/v0.8.0...HEAD
+[Non publié]: https://github.com/sebvtl728/CRMTMS/compare/v0.9.1...HEAD
+[0.9.1]: https://github.com/sebvtl728/CRMTMS/compare/v0.9.0...v0.9.1
 [0.8.0]: https://github.com/sebvtl728/CRMTMS/compare/v0.7.1...v0.8.0
 [0.7.1]: https://github.com/sebvtl728/CRMTMS/compare/v0.7.0...v0.7.1
 [0.7.0]: https://github.com/sebvtl728/CRMTMS/compare/v0.6.2...v0.7.0
