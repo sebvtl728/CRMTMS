@@ -64,8 +64,11 @@ test('« Attribuer à » and « Confier à… »: the colleague finds the action
     await dialog.getByLabel('Objet').fill('E2E Rappeler le brasseur');
     await dialog.getByLabel('Fait maintenant').click();
     await dialog.getByLabel('À faire le *').fill(`${today()}T23:00`);
+    // « Attribuer à » is a multiple choice (the first ticked is responsible): the colleague only.
     await dialog.getByLabel('Attribuer à').click();
-    await page.getByRole('option', { name: COLLEAGUE, exact: true }).click();
+    await page.getByRole('menuitemcheckbox', { name: 'Admin E2E' }).click();
+    await page.getByRole('menuitemcheckbox', { name: COLLEAGUE }).click();
+    await page.keyboard.press('Escape');
     await dialog.getByRole('button', { name: 'Enregistrer' }).click();
     await expect(dialog).toBeHidden();
 
