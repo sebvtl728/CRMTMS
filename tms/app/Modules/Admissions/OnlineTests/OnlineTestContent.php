@@ -66,7 +66,11 @@ final class OnlineTestContent
         return ['sections' => $out];
     }
 
-    /** Total of the points. @param array{sections: list<array<string, mixed>>} $content */
+    /**
+     * Total of the points.
+     *
+     * @param  array{sections: list<array<string, mixed>>}  $content
+     */
     public static function total(array $content): int
     {
         $total = 0;
