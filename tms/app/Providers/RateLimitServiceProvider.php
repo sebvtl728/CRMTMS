@@ -31,6 +31,9 @@ class RateLimitServiceProvider extends ServiceProvider
         'connector-test' => 5,
         'attendance-sheet' => 60,
         'attendance-scan' => 30,
+        // Upload link of a positioning test (candidate, no account: per address).
+        'positioning-upload' => 20,
+        'positioning-send' => 20,
     ];
 
     /**
