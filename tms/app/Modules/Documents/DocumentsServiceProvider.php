@@ -19,6 +19,6 @@ class DocumentsServiceProvider extends ServiceProvider
         CorePermissions::registerModule('documents', Permissions::all(), Permissions::defaultsFor(...), Permissions::labels(), Permissions::GROUP,
             Permissions::scoped(), Permissions::defaultScopesFor(...));
 
-        MorphAliases::register([DocumentText::MORPH_ALIAS => DocumentText::class]);
+        MorphAliases::register([DocumentText::MORPH_ALIAS => DocumentText::class, Document::MORPH_ALIAS => Document::class]);
     }
 }
