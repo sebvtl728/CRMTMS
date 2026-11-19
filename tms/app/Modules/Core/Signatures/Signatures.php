@@ -86,6 +86,17 @@ final class Signatures
         return $request !== null && $request->status === 'pending' && $request->expires_at->isFuture() ? $request : null;
     }
 
+    /** The request of a link once signed (its page and signed PDF stay open until the link expires), else null. */
+    public static function findSigned(string $token): ?SignatureRequest
+    {
+        if (preg_match('/^[A-Za-z0-9]{40}$/', $token) !== 1) {
+            return null;
+        }
+        $request = SignatureRequest::query()->where('token_hash', hash('sha256', $token))->first();
+
+        return $request !== null && $request->status === 'signed' && $request->expires_at->isFuture() ? $request : null;
+    }
+
     /** The last request of a subject (any state), for its page. */
     public static function latestFor(string $subjectType, string $subjectId): ?SignatureRequest
     {
@@ -190,6 +201,18 @@ final class Signatures
         }
 
         return $signed;
+    }
+
+    /** The PDF to sign, checked against its SHA-256 (410 when lost or altered). */
+    public static function original(SignatureRequest $request): string
+    {
+        $disk = Storage::disk(TenantStorage::DISK);
+        $content = $disk->exists($request->pdf_path) ? (string) $disk->get($request->pdf_path) : null;
+        if ($content === null || ! hash_equals($request->pdf_sha256, hash('sha256', $content))) {
+            throw new UserFacingHttpException(410, 'Le document à signer est introuvable ou a été modifié : il ne peut plus être signé.');
+        }
+
+        return $content;
     }
 
     /** The signed PDF, checked against its SHA-256 (410 when lost or altered). */
