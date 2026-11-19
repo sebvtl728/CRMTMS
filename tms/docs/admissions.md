@@ -35,6 +35,21 @@ Une personne peut avoir plusieurs candidatures (autre formation, autre année) :
 
 Le CERFA, le calcul NPEC et les échanges avec les OPCO ne sont pas gérés par le TMS.
 
+## 3 bis. Tests en ligne
+
+Menu **Formation › Tests en ligne** (droit « Gérer le catalogue ») : des tests de positionnement passés **à l'écran** par le candidat.
+
+- **Nouveau test** (titre), ou **Créer depuis un PDF** : l'intelligence artificielle de l'organisme (Administration › Connecteurs) lit un test papier et prépare les sections et les questions en **brouillon** — jamais les bonnes réponses, absentes du papier. Relisez, complétez, puis publiez.
+- **Éditeur** : sections (titre, consigne), questions — réponse courte, réponse rédigée, choix unique, choix multiple, vrai / faux, nombre à compléter, oui / non —, texte d'appui (texte à corriger, article), **bonne réponse** et **points** ; DAS et formations concernés ; durée limite (5 à 240 minutes, ou libre). Une question à bonne réponse se corrige seule (choix multiple : tout ou rien ; nombre : à la tolérance près, 0,01 par défaut) ; une réponse rédigée ou une question sans bonne réponse mais avec des points se note à la main ; sans points, c'est une question de profil.
+- **Publier** fige une **version** : un candidat répond toujours à la version qu'il a ouverte ; vos modifications suivantes restent en brouillon jusqu'à la publication suivante.
+
+Sur la candidature, la carte « Test de positionnement » propose les tests en ligne publiés de la formation ou du DAS : choisissez « En ligne : … » puis **Générer le lien** (ou **Envoyer par e-mail**). Le candidat :
+- ouvre le lien **sur un ordinateur** (écran d'au moins 1024 px et souris) ; sur un téléphone ou une tablette, la page dit « Ouvrez ce lien sur un ordinateur » ;
+- clique **Commencer** (le chronomètre démarre), répond partie par partie ; ses réponses sont **enregistrées au fur et à mesure** (il peut rouvrir le lien après une coupure) ; **Envoyer mes réponses** termine, la fin du temps envoie seule ;
+- ne peut ni coller, ni copier le texte des questions, ni ouvrir le menu du clic droit ; chaque **sortie de la page** (autre onglet, autre fenêtre) et chaque collage refusé sont relevés. Rien n'empêche une IA sur un second appareil : ces mesures rendent la triche plus difficile et visible.
+
+À l'envoi : « Reçu le » se remplit, l'étape passe à « Test reçu » (jamais en arrière), « Score ou niveau » affiche la note automatique (« 8 / 20 (réponses rédigées à corriger) »). La carte montre chaque réponse à côté de la bonne, le temps passé, les sorties de la page et les collages refusés ; notez les réponses rédigées (0 au barème de la question au plus) puis **Enregistrer la correction** : la note finale (« 17 / 20 ») remplace la note provisoire.
+
 ## 4. Créer le dossier de formation
 
 Sur une candidature **admise**, **Créer le dossier** (droits : modifier la candidature **et** créer des dossiers dans son DAS) propose :

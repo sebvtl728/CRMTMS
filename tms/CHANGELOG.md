@@ -7,6 +7,13 @@ Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) ; ve
 
 ### Ajouté
 
+- **Tests de positionnement en ligne** (Formation › Tests en ligne) : éditeur de sections et de questions (réponse courte
+  ou rédigée, choix unique ou multiple, vrai / faux, nombre à compléter, oui / non) avec bonnes réponses, points et durée
+  limite ; **Créer depuis un PDF** par l'intelligence artificielle (brouillon à relire) ; versions figées à la
+  publication. Le candidat passe le test **sur ordinateur** par son lien (réponses enregistrées au fil de l'eau,
+  chronomètre, copier-coller bloqué, sorties de la page relevées) ; correction automatique des questions fermées, notation
+  à la main des réponses rédigées sur la candidature, note dans « Score ou niveau ».
+
 - **Test de positionnement — Générer le lien** : le lien personnel du candidat s'affiche sur la candidature avec
   **Copier**, sans e-mail obligatoire ; « Envoyer par e-mail » reste possible.
 

@@ -9,7 +9,7 @@ import { type BreadcrumbItem } from '@/types';
 import { type Choice, newId, type Question, QUESTION_TYPES, type QuestionType, type Section, type TestContent } from '@/types/online-tests';
 import { Head, router } from '@inertiajs/react';
 import { ArrowDown, ArrowUp, LoaderCircle, Plus, Trash2 } from 'lucide-react';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 
 interface EditProps {
     test: {
@@ -65,8 +65,11 @@ function QuestionEditor({
         <div className="grid gap-3 rounded-lg border p-3">
             <div className="flex flex-wrap items-end gap-3">
                 <div className="grid gap-1">
-                    <Label className="text-xs">Type</Label>
+                    <Label className="text-xs" htmlFor={`type-${question.id}`}>
+                        Type
+                    </Label>
                     <select
+                        id={`type-${question.id}`}
                         className="border-input bg-background h-9 rounded-md border px-2 text-sm"
                         value={question.type}
                         onChange={(e) => set({ type: e.target.value as QuestionType, answer: null })}
@@ -79,8 +82,17 @@ function QuestionEditor({
                     </select>
                 </div>
                 <div className="grid w-24 gap-1">
-                    <Label className="text-xs">Points</Label>
-                    <Input type="number" min={0} max={100} value={question.points} onChange={(e) => set({ points: Number(e.target.value) || 0 })} />
+                    <Label className="text-xs" htmlFor={`points-${question.id}`}>
+                        Points
+                    </Label>
+                    <Input
+                        id={`points-${question.id}`}
+                        type="number"
+                        min={0}
+                        max={100}
+                        value={question.points}
+                        onChange={(e) => set({ points: Number(e.target.value) || 0 })}
+                    />
                 </div>
                 <Label className="flex items-center gap-2 pb-2 text-sm font-normal">
                     <input type="checkbox" checked={question.required} onChange={(e) => set({ required: e.target.checked })} />
@@ -99,13 +111,23 @@ function QuestionEditor({
                 </div>
             </div>
             <div className="grid gap-1">
-                <Label className="text-xs">Question *</Label>
-                <Input value={question.label} onChange={(e) => set({ label: e.target.value })} maxLength={2000} />
+                <Label className="text-xs" htmlFor={`label-${question.id}`}>
+                    Question *
+                </Label>
+                <Input id={`label-${question.id}`} value={question.label} onChange={(e) => set({ label: e.target.value })} maxLength={2000} />
                 <InputError message={errors[`${errorPrefix}.label`] ?? errors[`${errorPrefix}.type`] ?? errors[`${errorPrefix}.points`]} />
             </div>
             <div className="grid gap-1">
-                <Label className="text-xs">Texte d’appui (texte à corriger, article…)</Label>
-                <textarea className={textarea} rows={3} value={question.support_text ?? ''} onChange={(e) => set({ support_text: e.target.value })} />
+                <Label className="text-xs" htmlFor={`support-${question.id}`}>
+                    Texte d’appui (texte à corriger, article…)
+                </Label>
+                <textarea
+                    id={`support-${question.id}`}
+                    className={textarea}
+                    rows={3}
+                    value={question.support_text ?? ''}
+                    onChange={(e) => set({ support_text: e.target.value })}
+                />
             </div>
 
             {isChoice && (
@@ -207,6 +229,11 @@ export default function OnlineTestEdit({ test, options, status }: EditProps) {
     const [saving, setSaving] = useState(false);
     const [message, setMessage] = useState<string | undefined>(status);
     const [dirty, setDirty] = useState(false);
+
+    // A message from the server (« Test publié… ») replaces the local one.
+    useEffect(() => {
+        if (status) setMessage(status);
+    }, [status]);
 
     const breadcrumbs: BreadcrumbItem[] = [
         { title: 'Tests en ligne', href: '/admissions/online-tests' },
