@@ -19,6 +19,15 @@ Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) ; ve
   formation de chaque apprenant ; **besoins futurs** sur les fiches ; réglages du CRM (délais, étape des leads, fenêtre
   de rétention) ; résultats d'action « joint ». Le rôle Formateur voit et complète ses propres actions.
 
+### Modifié
+
+- Documents : l'attestation de fin de formation et le certificat de réalisation s'émettent dès le dernier jour de la
+  formation (et non plus le lendemain).
+
+### Corrigé
+
+- Dossiers : « Mettre à la corbeille » n'est plus proposé sur un dossier facturé (l'action était déjà refusée).
+
 ## [0.10.0] - 2026-11-20
 
 ### Ajouté

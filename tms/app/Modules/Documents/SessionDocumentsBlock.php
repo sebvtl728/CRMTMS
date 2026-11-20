@@ -91,7 +91,7 @@ final class SessionDocumentsBlock
             }
             $convened = count(array_filter($o['enrolment_ids'], fn (string $id) => isset($sent[$id])));
             $attested = count(array_filter($o['enrolment_ids'], fn (string $id) => isset($issued[$id])));
-            $over = $o['ends_on'] < $today;
+            $over = $o['ends_on'] <= $today; // from the last day of the training
             $out[$sessionId] = [
                 ['key' => 'documents.convocations', 'title' => 'Convocations', 'value' => "{$convened} / {$n}",
                     'state' => $convened === $n ? 'done' : 'todo',
