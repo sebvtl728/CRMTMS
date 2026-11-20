@@ -5,6 +5,11 @@ Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) ; ve
 
 ## [Non publié]
 
+### Corrigé
+
+- Local : page blanche sur les autres postes du réseau (lien de test de positionnement…). Le serveur Vite de
+  développement ne démarre plus avec `docker compose up -d` (profil `dev`) ; les pages utilisent les fichiers construits.
+
 ## [0.11.0] - 2026-11-20
 
 ### Ajouté
