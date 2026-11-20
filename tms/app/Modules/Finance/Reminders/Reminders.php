@@ -5,6 +5,7 @@ namespace App\Modules\Finance\Reminders;
 use App\Exceptions\UserFacingHttpException;
 use App\Modules\Core\Users\User;
 use App\Modules\Finance\Invoices\Invoice;
+use App\Modules\Finance\Invoices\InvoiceAccess;
 use App\Modules\Finance\Invoices\InvoiceSender;
 use App\Modules\Finance\Invoices\InvoiceSending;
 use App\Modules\Finance\Invoices\InvoiceStatus;
@@ -51,7 +52,7 @@ final class Reminders
     public function due(?User $user): array
     {
         $invoices = $this->candidates()
-            ->when($user, fn (Builder $q, User $u) => $q->whereIn('dossier_id', Billing::dossiersFor($u, [], Permissions::MANAGE)))
+            ->when($user, fn (Builder $q, User $u) => InvoiceAccess::scope($q, $u, Permissions::MANAGE))
             ->orderBy('due_on')->orderBy('number')->limit(self::LIMIT)->get();
 
         return array_values(array_filter($this->assess($invoices)));

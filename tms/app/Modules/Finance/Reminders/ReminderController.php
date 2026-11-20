@@ -6,6 +6,7 @@ use App\Exceptions\UserFacingHttpException;
 use App\Http\Controllers\Controller;
 use App\Modules\Core\Users\User;
 use App\Modules\Finance\Invoices\Invoice;
+use App\Modules\Finance\Invoices\InvoiceAccess;
 use App\Modules\Finance\Invoices\InvoiceMessageRequest;
 use App\Modules\Finance\Invoices\InvoiceRows;
 use App\Modules\Finance\Invoices\InvoiceSending;
@@ -73,7 +74,7 @@ class ReminderController extends Controller
         $sent = 0;
         $skipped = 0;
         foreach (Invoice::query()->whereKey($ids)->get() as $invoice) {
-            if (! Billing::allows($user, Permissions::MANAGE, $invoice->dossier_id)) {
+            if (! InvoiceAccess::allows($user, Permissions::MANAGE, $invoice)) {
                 $skipped++;
 
                 continue;
@@ -162,8 +163,8 @@ class ReminderController extends Controller
     {
         $user = $request->user();
         $invoice = Str::isUuid($invoiceId) ? Invoice::query()->find($invoiceId) : null;
-        abort_unless($user instanceof User && $invoice !== null && Billing::allows($user, Permissions::VIEW, $invoice->dossier_id, withTrashed: true), 404);
-        abort_unless(Billing::allows($user, Permissions::MANAGE, $invoice->dossier_id), 403);
+        abort_unless($user instanceof User && $invoice !== null && InvoiceAccess::allows($user, Permissions::VIEW, $invoice, withTrashed: true), 404);
+        abort_unless(InvoiceAccess::allows($user, Permissions::MANAGE, $invoice), 403);
 
         return $invoice;
     }

@@ -48,3 +48,19 @@ it('freezes the references of a validated free invoice', function () {
 
     expect(fn () => DB::table('invoices')->where('id', $invoice->id)->update(['buyer_reference' => 'EJ-2']))->toThrow(QueryException::class);
 });
+
+it('shows a free invoice to a scope « Tout » only', function () {
+    $invoice = frDraft(frRegion(), [['Composante', 120000, null]]);
+    $all = frAccountant();
+    $das = frAccountant(App\Modules\Core\Access\AccessScope::Das);
+
+    $this->actingAs($all)->get('/finance/invoices')->assertOk()
+        ->assertInertia(fn ($page) => $page->where('invoices.data.0.id', $invoice->id)->where('invoices.data.0.origin', 'free')->where('invoices.data.0.dossier', null));
+    $this->actingAs($all)->get('/finance/invoices/'.$invoice->id)->assertOk()
+        ->assertInertia(fn ($page) => $page->where('invoice.origin', 'free')->where('invoice.dossier', null));
+
+    $this->actingAs($das)->get('/finance/invoices')->assertOk()
+        ->assertInertia(fn ($page) => $page->where('invoices.data', []));
+    $this->actingAs($das)->get('/finance/invoices/'.$invoice->id)->assertNotFound();
+    $this->actingAs($das)->get('/finance/invoices/'.$invoice->id.'/pdf')->assertNotFound();
+});

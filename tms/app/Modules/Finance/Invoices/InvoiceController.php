@@ -134,8 +134,7 @@ class InvoiceController extends Controller
      */
     private function listQuery(User $user, array $filters): Builder
     {
-        return Invoice::query()
-            ->whereIn('dossier_id', Billing::dossiersFor($user, ['with_trashed' => true], Permissions::VIEW))
+        return InvoiceAccess::scope(Invoice::query(), $user, Permissions::VIEW, ['with_trashed' => true])
             ->when($filters['status'], fn ($q, string $s) => $q->where('status', $s))
             ->when($filters['kind'], fn ($q, string $k) => $q->where('kind', $k))
             ->when($filters['company'], fn ($q, string $id) => $q->where('company_id', $id))
@@ -192,7 +191,7 @@ class InvoiceController extends Controller
      */
     private function warnings(Invoice $invoice): array
     {
-        if (! $invoice->isDraft() || $invoice->kind !== Invoice::INVOICE) {
+        if (! $invoice->isDraft() || $invoice->kind !== Invoice::INVOICE || $invoice->dossier_id === null) {
             return [];
         }
         $warnings = [];
@@ -452,7 +451,7 @@ class InvoiceController extends Controller
     {
         $user = $request->user();
         $invoice = Str::isUuid($invoiceId) ? Invoice::query()->find($invoiceId) : null;
-        abort_unless($user instanceof User && $invoice !== null && Billing::allows($user, Permissions::VIEW, $invoice->dossier_id, withTrashed: true), 404);
+        abort_unless($user instanceof User && $invoice !== null && InvoiceAccess::allows($user, Permissions::VIEW, $invoice, withTrashed: true), 404);
 
         return $invoice;
     }
@@ -461,7 +460,7 @@ class InvoiceController extends Controller
     {
         $user = $request->user();
 
-        return $user instanceof User && Billing::allows($user, Permissions::MANAGE, $invoice->dossier_id);
+        return $user instanceof User && InvoiceAccess::allows($user, Permissions::MANAGE, $invoice);
     }
 
     private function validates(Request $request, Invoice $invoice): bool
@@ -469,6 +468,6 @@ class InvoiceController extends Controller
         $user = $request->user();
 
         return $user instanceof User && $user->can(Permissions::VALIDATE)
-            && Billing::allows($user, Permissions::VALIDATE, $invoice->dossier_id, withTrashed: true);
+            && InvoiceAccess::allows($user, Permissions::VALIDATE, $invoice, withTrashed: true);
     }
 }
