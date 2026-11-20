@@ -108,7 +108,7 @@ Les réponses sont **nominatives en base** (taux de réponse exact, satisfaction
 
 - Routes web hors `auth` : `questionnaire/{token}` (GET formulaire, POST réponses) et
   `questionnaire/s/{token}` (GET liste, POST choix → redirige vers le formulaire signé de
-  l'invitation). `throttle:survey-public` (30/min par IP). Même page 404 pour tout lien invalide
+  l'invitation). `throttle:survey-public` (150/min par IP : une salle entière répond par le QR derrière le même Wi-Fi). Même page 404 pour tout lien invalide
   (jeton inconnu, campagne d'un autre organisme, session supprimée).
 - L'organisme vient de l'hôte de la requête, comme `test-positionnement/{token}` ; le jeton (64
   caractères hexadécimaux) est cherché par son sha256 sous RLS (`findByToken`, `hash_equals`).

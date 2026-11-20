@@ -20,7 +20,7 @@
 - Ne pas toucher `app/Modules/Sessions/Attendance/**` ni `app/Modules/Finance/**`.
 - Tests locaux : ciblés (`--filter`) + `tests/Arch` ; une seule suite Pest à la fois sur la machine.
 - Commits en anglais, conventionnels, trailer `Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>`.
-- Valeurs : lien 30 jours (`LINK_DAYS = 30`), délai à froid défaut 3 mois (0 = aucun, max 24), rattrapage 30 jours, satisfait = score ≥ 400 (moyenne ≥ 4/5), throttle public 30/min.
+- Valeurs : lien 30 jours (`LINK_DAYS = 30`), délai à froid défaut 3 mois (0 = aucun, max 24), rattrapage 30 jours, satisfait = score ≥ 400 (moyenne ≥ 4/5), throttle public 150/min (relevé après revue : une salle derrière une seule adresse).
 
 ## Review Focus
 
