@@ -3,7 +3,9 @@
 use App\Modules\Crm\Public\FicheLinks;
 use App\Modules\Questionnaires\Answering\SurveyAnswers;
 use App\Modules\Questionnaires\Campaigns\SurveyLaunch;
+use App\Modules\Questionnaires\Gdpr\SurveyPersonData;
 use App\Modules\Questionnaires\Surveys\SurveyInvitation;
+use App\Modules\Sessions\Dossiers\Dossier;
 use Illuminate\Support\Facades\Queue;
 
 require_once __DIR__.'/Support/surveys.php';
@@ -43,8 +45,8 @@ it('keeps the fiche of a person invited on an import undo', function () {
     [$session, $people] = svSession();
     app(SurveyLaunch::class)->launch($session->id, 'hot', admin());
 
-    expect(App\Modules\Questionnaires\Gdpr\SurveyPersonData::hasLinked('person', $people['Durand']->id))->toBeTrue()
-        ->and(App\Modules\Questionnaires\Gdpr\SurveyPersonData::hasLinked('organisation', $people['Durand']->id))->toBeFalse();
+    expect(SurveyPersonData::hasLinked('person', $people['Durand']->id))->toBeTrue()
+        ->and(SurveyPersonData::hasLinked('organisation', $people['Durand']->id))->toBeFalse();
 });
 
 it('repoints the invitations on a merge, keeping the answered one when both were invited', function () {
@@ -54,10 +56,10 @@ it('repoints the invitations on a merge, keeping the answered one when both were
     $drop = $people['Petit'];
     svAnswerFull(SurveyInvitation::query()->where('person_id', $drop->id)->sole());
     [$other] = svSession('2026-08-30', ['Roux2' => null]);
-    l2Enrol(App\Modules\Sessions\Dossiers\Dossier::query()->latest('created_at')->firstOrFail(), $other, $drop);
+    l2Enrol(Dossier::query()->latest('created_at')->firstOrFail(), $other, $drop);
     app(SurveyLaunch::class)->launch($other->id, 'hot', admin());
 
-    App\Modules\Questionnaires\Gdpr\SurveyPersonData::merge('person', $keep->id, $drop->id);
+    SurveyPersonData::merge('person', $keep->id, $drop->id);
 
     $invitations = SurveyInvitation::query()->where('person_id', $keep->id)->get();
     expect($invitations)->toHaveCount(2)

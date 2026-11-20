@@ -2,6 +2,7 @@
 
 use App\Modules\Questionnaires\Surveys\SurveyCampaign;
 use App\Modules\Questionnaires\Surveys\SurveyInvitation;
+use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Str;
 
 function surveyCampaignRow(array $overrides = []): SurveyCampaign
@@ -48,5 +49,5 @@ it('keeps one campaign per session, type and public', function () {
     $campaign = surveyCampaignRow();
 
     expect(fn () => surveyCampaignRow(['training_session_id' => $campaign->training_session_id]))
-        ->toThrow(Illuminate\Database\UniqueConstraintViolationException::class);
+        ->toThrow(UniqueConstraintViolationException::class);
 });

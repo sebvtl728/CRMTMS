@@ -9,13 +9,14 @@ import { type BreadcrumbItem } from '@/types';
 import { Head, Link, useForm } from '@inertiajs/react';
 import { FormEventHandler } from 'react';
 
-interface Question {
+// A type (not an interface): useForm needs its index signature.
+type Question = {
     id: string | null;
     type: string;
     label: string;
     required: boolean;
     options?: string[];
-}
+};
 
 interface Template {
     id: string;
@@ -115,7 +116,10 @@ export default function QuestionnaireForm({ template }: { template: Template | n
                                     className={select}
                                     value={q.type}
                                     onChange={(e) =>
-                                        setQuestion(i, { type: e.target.value, options: e.target.value === 'choice' ? (q.options ?? ['Oui', 'Non']) : undefined })
+                                        setQuestion(i, {
+                                            type: e.target.value,
+                                            options: e.target.value === 'choice' ? (q.options ?? ['Oui', 'Non']) : undefined,
+                                        })
                                     }
                                 >
                                     {Object.entries(QUESTION_TYPES).map(([v, l]) => (
@@ -129,7 +133,14 @@ export default function QuestionnaireForm({ template }: { template: Template | n
                                     Obligatoire
                                 </label>
                                 <span className="ml-auto flex gap-1">
-                                    <Button type="button" size="sm" variant="ghost" disabled={i === 0} onClick={() => move(i, -1)} aria-label="Monter">
+                                    <Button
+                                        type="button"
+                                        size="sm"
+                                        variant="ghost"
+                                        disabled={i === 0}
+                                        onClick={() => move(i, -1)}
+                                        aria-label="Monter"
+                                    >
                                         ↑
                                     </Button>
                                     <Button

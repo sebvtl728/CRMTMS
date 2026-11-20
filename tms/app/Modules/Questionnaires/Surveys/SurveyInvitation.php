@@ -67,7 +67,11 @@ class SurveyInvitation extends Model
         return $this->hasOne(SurveyResponse::class, 'invitation_id');
     }
 
-    /** A new personal token: [plain, sha256]. */
+    /**
+     * A new personal token: [plain, sha256].
+     *
+     * @return array{0: string, 1: string}
+     */
     public static function newToken(): array
     {
         $plain = bin2hex(random_bytes(32));

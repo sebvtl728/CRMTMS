@@ -5,6 +5,7 @@ namespace App\Modules\Questionnaires\Surveys;
 use App\Modules\Core\Audit\Auditable;
 use App\Modules\Core\Tenancy\BelongsToTenant;
 use Carbon\CarbonImmutable;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -28,7 +29,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property CarbonImmutable $opened_at
  * @property CarbonImmutable $closes_on
  * @property string|null $launched_by
- * @property-read \Illuminate\Database\Eloquent\Collection<int, SurveyInvitation> $invitations
+ * @property-read Collection<int, SurveyInvitation> $invitations
  */
 class SurveyCampaign extends Model
 {

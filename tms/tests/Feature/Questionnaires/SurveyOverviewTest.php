@@ -1,5 +1,6 @@
 <?php
 
+use App\Modules\Core\Audit\AuditLog;
 use App\Modules\Crm\Public\FicheBlocks;
 use App\Modules\Qualite\Public\Measures;
 use App\Modules\Questionnaires\Answering\SurveyAnswers;
@@ -61,7 +62,7 @@ it('shows the page and exports the CSV with the right only', function () {
     $csv = $this->get('/qualite/questionnaires/export?from=2026-08-01&to=2026-08-31')->assertOk()->streamedContent();
     expect($csv)->toStartWith("\xEF\xBB\xBFSession;Fin;Type;Destinataires;Invités;Réponses;Taux de réponse;Satisfaction moyenne;Satisfaits")
         ->and($csv)->toContain(';67 %;4/5;50 %');
-    expect(App\Modules\Core\Audit\AuditLog::query()->where('event', 'questionnaires.results.exported')->exists())->toBeTrue();
+    expect(AuditLog::query()->where('event', 'questionnaires.results.exported')->exists())->toBeTrue();
 
     $this->actingAs(userWithPermissions(['crm.fiches.view']));
     $this->get('/qualite/questionnaires')->assertForbidden();

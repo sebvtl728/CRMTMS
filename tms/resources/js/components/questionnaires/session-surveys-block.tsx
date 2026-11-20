@@ -43,7 +43,12 @@ interface Props {
     campaigns: Campaign[];
 }
 
-const EMAIL: Record<string, string> = { pending: 'Envoi en cours', sent: 'E-mail envoyé', failed: 'Échec de l’envoi', none: 'Sans adresse (QR code)' };
+const EMAIL: Record<string, string> = {
+    pending: 'Envoi en cours',
+    sent: 'E-mail envoyé',
+    failed: 'Échec de l’envoi',
+    none: 'Sans adresse (QR code)',
+};
 
 const percent = (v: number | null) => (v === null ? '-' : `${v} %`);
 
@@ -53,7 +58,11 @@ export function SessionSurveysBlock({ session_id, can_launch, ended, qr_url, cam
     const hot = campaigns.find((c) => c.kind === 'hot' && c.audience === 'trainee');
     const cold = campaigns.find((c) => c.kind === 'cold' && c.audience === 'trainee');
     const launch = (kind: 'hot' | 'cold') =>
-        router.post(`/sessions/${session_id}/questionnaires/${kind}`, {}, { preserveScroll: true, onStart: () => setBusy(kind), onFinish: () => setBusy(null) });
+        router.post(
+            `/sessions/${session_id}/questionnaires/${kind}`,
+            {},
+            { preserveScroll: true, onStart: () => setBusy(kind), onFinish: () => setBusy(null) },
+        );
 
     return (
         <div className="grid gap-3">

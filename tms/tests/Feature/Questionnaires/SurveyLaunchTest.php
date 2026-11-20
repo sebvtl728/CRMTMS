@@ -9,6 +9,7 @@ use App\Modules\Questionnaires\Surveys\SurveyCampaign;
 use App\Modules\Questionnaires\Surveys\SurveyInvitation;
 use App\Modules\Questionnaires\Surveys\SurveyTemplate;
 use App\Modules\Questionnaires\Templates\DefaultTemplates;
+use App\Modules\Sessions\Dossiers\Dossier;
 use App\Modules\Sessions\Permissions as SessionsPermissions;
 use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\Mail;
@@ -42,7 +43,7 @@ it('invites only the trainees added since, on a second launch', function () {
     [$session] = svSession();
     $launch = app(SurveyLaunch::class);
     $launch->launch($session->id, 'hot', admin());
-    l2Enrol(App\Modules\Sessions\Dossiers\Dossier::query()->firstOrFail(), $session, makePerson('Blanc', ['email' => 'zoe.blanc@example.test']));
+    l2Enrol(Dossier::query()->firstOrFail(), $session, makePerson('Blanc', ['email' => 'zoe.blanc@example.test']));
 
     $campaign = $launch->launch($session->id, 'hot', admin());
 

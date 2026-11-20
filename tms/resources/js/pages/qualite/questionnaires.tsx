@@ -95,7 +95,12 @@ export default function QuestionnairesResults({
                     </div>
                     <div className="grid gap-1">
                         <Label htmlFor="audience">Destinataires</Label>
-                        <select id="audience" className={select} value={form.audience} onChange={(e) => setForm({ ...form, audience: e.target.value })}>
+                        <select
+                            id="audience"
+                            className={select}
+                            value={form.audience}
+                            onChange={(e) => setForm({ ...form, audience: e.target.value })}
+                        >
                             <option value="">Tous</option>
                             <option value="trainee">Stagiaires</option>
                             <option value="client">Entreprises</option>

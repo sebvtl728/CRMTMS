@@ -1,9 +1,12 @@
 <?php
 
+use App\Exceptions\UserFacingHttpException;
+use App\Modules\Questionnaires\Answering\SurveyAnswers;
 use App\Modules\Questionnaires\Campaigns\SurveyLaunch;
-use App\Modules\Questionnaires\Surveys\SurveyCampaign;
 use App\Modules\Questionnaires\Surveys\SurveyInvitation;
 use App\Modules\Questionnaires\Surveys\SurveyResponse;
+use App\Modules\Sessions\Sessions\TrainingSession;
+use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\Queue;
 use Inertia\Testing\AssertableInertia;
@@ -77,8 +80,8 @@ it('gives the same 404 for a malformed, unknown, closed, trashed-session or othe
     $invalid("/questionnaire/{$tokens['Durand']}");
     $this->post("/questionnaire/{$tokens['Durand']}", svAnswers())->assertNotFound();
     $this->travelBack();
-    $this->travelTo(Carbon\CarbonImmutable::parse('2026-09-01 08:00', 'Europe/Paris'));
-    App\Modules\Sessions\Sessions\TrainingSession::query()->findOrFail($campaign->training_session_id)->delete();
+    $this->travelTo(CarbonImmutable::parse('2026-09-01 08:00', 'Europe/Paris'));
+    TrainingSession::query()->findOrFail($campaign->training_session_id)->delete();
     $invalid("/questionnaire/{$tokens['Petit']}");
 });
 
@@ -121,11 +124,11 @@ it('refuses on the QR page an invitation of another campaign, an answered one, a
 it('refuses a second response sent at the same time', function () {
     [, $tokens, $people] = svLaunched();
     $invitation = SurveyInvitation::query()->where('person_id', $people['Durand']->id)->sole();
-    $answers = app(App\Modules\Questionnaires\Answering\SurveyAnswers::class);
+    $answers = app(SurveyAnswers::class);
 
     $answers->submit($invitation, svAnswers()['answers'], 'email');
     // A stale copy loaded before the first answer: the lock re-reads the row.
     expect(fn () => $answers->submit($invitation, svAnswers()['answers'], 'qr'))
-        ->toThrow(App\Exceptions\UserFacingHttpException::class, 'Vous avez déjà répondu à ce questionnaire.');
+        ->toThrow(UserFacingHttpException::class, 'Vous avez déjà répondu à ce questionnaire.');
     expect(SurveyResponse::query()->count())->toBe(1);
 });

@@ -6,6 +6,7 @@ use App\Modules\Questionnaires\Campaigns\SurveyLaunch;
 use App\Modules\Questionnaires\Settings\ColdDelay;
 use App\Modules\Questionnaires\Surveys\SurveyCampaign;
 use App\Modules\Questionnaires\Surveys\SurveyTemplate;
+use App\Modules\Questionnaires\Templates\DefaultTemplates;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\Schedule;
@@ -56,7 +57,7 @@ it('sends no cold questionnaire with a delay of 0, nor without an active cold te
     expect(svRun()['cold'])->toBe(0);
 
     ColdDelay::set(3);
-    App\Modules\Questionnaires\Templates\DefaultTemplates::ensure();
+    DefaultTemplates::ensure();
     SurveyTemplate::query()->where('kind', 'cold')->update(['active' => false]);
     expect(svRun()['cold'])->toBe(0);
 

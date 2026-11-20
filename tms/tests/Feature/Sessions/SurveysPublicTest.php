@@ -7,7 +7,6 @@ use App\Modules\Sessions\Enrolments\EnrolmentStatus;
 use App\Modules\Sessions\Permissions;
 use App\Modules\Sessions\Public\EnrolmentSatisfaction;
 use App\Modules\Sessions\Public\Surveys;
-use App\Modules\Sessions\Sessions\SessionWriter;
 use Carbon\CarbonImmutable;
 
 require_once __DIR__.'/Support/lot2a.php';

@@ -5,6 +5,7 @@ use App\Modules\Questionnaires\Settings\ColdDelay;
 use App\Modules\Questionnaires\Surveys\SurveyTemplate;
 use App\Modules\Questionnaires\Templates\DefaultTemplates;
 use App\Modules\Questionnaires\Templates\SurveyTemplates;
+use Illuminate\Validation\ValidationException;
 
 beforeEach(fn () => inTenant());
 
@@ -55,7 +56,7 @@ it('refuses to make an inactive template the default one', function () {
     $template = app(SurveyTemplates::class)->create(surveyTemplatePayload(['active' => false]), admin());
 
     expect(fn () => app(SurveyTemplates::class)->setDefault($template, admin()))
-        ->toThrow(Illuminate\Validation\ValidationException::class);
+        ->toThrow(ValidationException::class);
 });
 
 it('manages the templates through the administration screen', function () {

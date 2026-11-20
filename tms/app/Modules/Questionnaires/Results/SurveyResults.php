@@ -22,7 +22,11 @@ final class SurveyResults
         return $total === 0 ? null : BigDecimal::of($part * 100)->dividedBy($total, 0, RoundingMode::HALF_UP)->toInt();
     }
 
-    /** The mean of integers, half up; null for none. */
+    /**
+     * The mean of integers, half up; null for none.
+     *
+     * @param  list<int>  $values
+     */
     public static function mean(array $values): ?int
     {
         return $values === [] ? null : BigDecimal::of(array_sum($values))->dividedBy(count($values), 0, RoundingMode::HALF_UP)->toInt();
@@ -45,12 +49,16 @@ final class SurveyResults
             $values = $responses->map(fn (SurveyResponse $r) => $r->answers[$q['id']] ?? null)->filter(fn ($v) => $v !== null && $v !== '')->values();
             $row = ['id' => $q['id'], 'type' => $q['type'], 'label' => $q['label'], 'answers' => $values->count()];
             if ($q['type'] === 'rating') {
-                $marks = $values->filter(fn ($v) => is_int($v))->all();
-                $row['average'] = self::mean(array_map(fn (int $m) => $m * 100, array_values($marks)));
+                $marks = array_values($values->filter(fn ($v) => is_int($v))->all());
+                $row['average'] = self::mean(array_map(fn (int $m) => $m * 100, $marks));
                 $row['average_label'] = SurveyScoring::label($row['average']);
                 $row['distribution'] = array_map(fn (int $m) => count(array_filter($marks, fn ($v) => $v === $m)), [1, 2, 3, 4, 5]);
             } elseif ($q['type'] === 'choice') {
-                $row['counts'] = collect($q['options'] ?? [])->mapWithKeys(fn (string $o) => [$o => $values->filter(fn ($v) => $v === $o)->count()])->all();
+                $counts = [];
+                foreach ((array) ($q['options'] ?? []) as $option) {
+                    $counts[(string) $option] = $values->filter(fn ($v) => $v === $option)->count();
+                }
+                $row['counts'] = $counts;
             } else {
                 $row['texts'] = $values->map(fn ($v) => (string) $v)->all();
             }
