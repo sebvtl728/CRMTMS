@@ -62,8 +62,8 @@ it('treats empty booleans and mode as their defaults', function () {
 
 it('passes every production setting of config/tms.php to the production containers', function () {
     preg_match_all("/'(TMS_[A-Z0-9_]+)'/", (string) file_get_contents(config_path('tms.php')), $m);
-    // Development and end-to-end only: never set on an installation.
-    $settings = array_values(array_diff(array_unique($m[1]), ['TMS_VITE_HOT', 'TMS_E2E_FAKE_AI']));
+    // Development and end-to-end only: never set on an installation (the local sandbox above all).
+    $settings = array_values(array_diff(array_unique($m[1]), ['TMS_VITE_HOT', 'TMS_E2E_FAKE_AI', 'TMS_SANDBOX', 'TMS_SANDBOX_CONNECTION']));
     $compose = (string) file_get_contents(base_path('compose.prod.yaml'));
     $example = (string) file_get_contents(base_path('.env.prod.example'));
 
@@ -76,4 +76,7 @@ it('passes every production setting of config/tms.php to the production containe
         expect($example)->toMatch('/^'.$name.'=$/m');
     }
     expect($compose)->toContain('TMS_ALLOW_LOCAL_AI: ${TMS_ALLOW_LOCAL_AI:-}');
+    // The sandbox reset never reaches a server: neither the production stack nor its example environment carry it.
+    expect($compose)->not->toContain('TMS_SANDBOX')
+        ->and($example)->not->toContain('TMS_SANDBOX');
 });
