@@ -45,6 +45,10 @@ class InvoiceController extends Controller
 {
     public const ARCHIVE_LOST = 'Le PDF archivé de cette pièce est introuvable : contactez l\'administrateur.';
 
+    public const NOTHING_DUE = 'Rien n\'est encore dû sur ce dossier (%s) : ajoutez des lignes libres, ou revenez quand la facturation sera possible et cliquez « Recalculer ».';
+
+    public const NOW_DUE = 'Un montant est maintenant dû sur ce dossier : cliquez « Recalculer » pour l\'ajouter à ce brouillon.';
+
     public function __construct(
         private readonly InvoiceDrafts $drafts,
         private readonly InvoiceRows $rows,
@@ -180,18 +184,33 @@ class InvoiceController extends Controller
 
     /**
      * What a draft should be checked for before its validation (0.9.1): a
-     * particulier whose contract signature is unknown (withdrawal delay).
+     * particulier whose contract signature is unknown (withdrawal delay); an
+     * invoice draft with no computed line, why nothing is due yet (« Formation
+     * non terminée »…) or that something now is (« Recalculer »).
      *
      * @return list<string>
      */
     private function warnings(Invoice $invoice): array
     {
-        if (! $invoice->isDraft() || $invoice->kind !== Invoice::INVOICE || $invoice->funding_id !== null) {
+        if (! $invoice->isDraft() || $invoice->kind !== Invoice::INVOICE) {
             return [];
         }
+        $warnings = [];
         $dossier = Billing::dossier($invoice->dossier_id);
+        if ($invoice->funding_id === null && $dossier !== null && Particulier::is($dossier) && ($dossier['convention_signed_on'] ?? null) === null) {
+            $warnings[] = Particulier::NO_SIGNATURE;
+        }
+        if ($dossier !== null && ! $invoice->lines()->where('kind', InvoiceLine::COMPUTED)->exists()) {
+            $due = app(Due::class)->forDossier($invoice->dossier_id);
+            $row = array_column($due['rows'], null, 'recipient_key')[Ledger::keyOf($invoice)] ?? null;
+            if ($row !== null && $row['kind'] === Invoice::INVOICE) {
+                $warnings[] = self::NOW_DUE;
+            } elseif ($row === null && ($reason = $due['soon'][0]['reason'] ?? null) !== null) {
+                $warnings[] = sprintf(self::NOTHING_DUE, $reason);
+            }
+        }
 
-        return $dossier !== null && Particulier::is($dossier) && ($dossier['convention_signed_on'] ?? null) === null ? [Particulier::NO_SIGNATURE] : [];
+        return $warnings;
     }
 
     /**
