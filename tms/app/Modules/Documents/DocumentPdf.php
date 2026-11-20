@@ -8,6 +8,7 @@ use App\Modules\Core\Companies\CompanyBranding;
 use App\Modules\Core\Companies\LegalMentions;
 use App\Modules\Core\Companies\VatRegime;
 use App\Modules\Core\Documents\PdfRenderer;
+use App\Modules\Core\Documents\PdfSource;
 use App\Modules\Core\Tenancy\TenantStorage;
 use App\Modules\Crm\Public\Fiches;
 use App\Modules\Documents\Texts\DocumentTexts;
@@ -38,12 +39,20 @@ class DocumentPdf
      * @param  array<string, mixed>  $dossier  Paperwork::dossier()
      * @param  array<string, mixed>  $recipient  DocumentRecipient
      */
-    public function render(DocumentType $type, array $dossier, Company $company, string $number, CarbonImmutable $issuedAt, array $recipient): string
+    public function source(DocumentType $type, array $dossier, Company $company, string $number, CarbonImmutable $issuedAt, array $recipient): PdfSource
     {
-        return $this->renderer->fromHtml(
-            $this->html($type, $dossier, $company, $number, $issuedAt, $recipient),
-            view('documents.document-footer', ['label' => $type->label().' '.$number])->render(),
-        );
+        return new PdfSource($this->html($type, $dossier, $company, $number, $issuedAt, $recipient), self::footer($type, $number));
+    }
+
+    /** The PDF of a source (Gotenberg). */
+    public function renderSource(PdfSource $source): string
+    {
+        return $this->renderer->fromHtml($source->html, $source->footer);
+    }
+
+    private static function footer(DocumentType $type, string $number): string
+    {
+        return view('documents.document-footer', ['label' => $type->label().' '.$number])->render();
     }
 
     /**
@@ -96,12 +105,9 @@ class DocumentPdf
      * @param  array<string, mixed>  $dossier  Paperwork::dossier()
      * @param  array<string, mixed>  $recipient
      */
-    public function renderForEnrolment(DocumentType $type, array $enrolment, array $dossier, Company $company, string $number, CarbonImmutable $issuedAt, array $recipient): string
+    public function sourceForEnrolment(DocumentType $type, array $enrolment, array $dossier, Company $company, string $number, CarbonImmutable $issuedAt, array $recipient): PdfSource
     {
-        return $this->renderer->fromHtml(
-            $this->htmlForEnrolment($type, $enrolment, $dossier, $company, $number, $issuedAt, $recipient),
-            view('documents.document-footer', ['label' => $type->label().' '.$number])->render(),
-        );
+        return new PdfSource($this->htmlForEnrolment($type, $enrolment, $dossier, $company, $number, $issuedAt, $recipient), self::footer($type, $number));
     }
 
     /**

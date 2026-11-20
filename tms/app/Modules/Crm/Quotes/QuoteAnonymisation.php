@@ -2,6 +2,7 @@
 
 namespace App\Modules\Crm\Quotes;
 
+use App\Modules\Core\Documents\PdfSource;
 use App\Modules\Core\Signatures\SignatureRequest;
 use Illuminate\Support\Facades\DB;
 
@@ -65,9 +66,9 @@ final class QuoteAnonymisation
         // Their online signatures (« Bon pour accord »): pending ones cancelled, signer data and signed PDFs erased.
         $signed = SignatureRequest::query()->where('subject_type', QuoteSignatures::SUBJECT)
             ->where(fn ($q) => $q->whereIn('subject_id', [...$own->pluck('id')->all(), ...$asContact->pluck('id')->all()])->orWhereIn('signer_person_id', $subjects))->get();
-        $signedFiles = $signed->pluck('signed_pdf_path')->filter()->values()->all();
+        $signedFiles = [...$signed->pluck('signed_pdf_path')->filter()->values()->all(), ...$signed->pluck('drawing_path')->filter()->values()->all()];
         SignatureRequest::query()->whereKey($signed->pluck('id')->all())->update(['signer_name' => null, 'signer_email' => null, 'signer_person_id' => null,
-            'signed_ip' => null, 'signed_user_agent' => null, 'signed_pdf_path' => null, 'status' => DB::raw("case when status = 'pending' then 'cancelled' else status end")]);
+            'signed_ip' => null, 'signed_user_agent' => null, 'signed_pdf_path' => null, 'drawing_path' => null, 'status' => DB::raw("case when status = 'pending' then 'cancelled' else status end")]);
 
         $messaged = self::messagesTo($emails);
 
@@ -75,6 +76,8 @@ final class QuoteAnonymisation
             'quotes' => count(array_unique([...$own->pluck('id')->all(), ...$asContact->pluck('id')->all(), ...$messaged])),
             'files' => array_values(array_filter([
                 ...$own->pluck('pdf_path')->all(), ...$asContact->pluck('pdf_path')->all(),
+                // The frozen HTML of the archived PDF (PdfSource) names her too.
+                ...array_map(fn ($path) => is_string($path) ? PdfSource::pathFor($path) : null, [...$own->pluck('pdf_path')->all(), ...$asContact->pluck('pdf_path')->all()]),
                 ...$own->pluck('signed_path')->all(), ...$asContact->pluck('signed_path')->all(), ...$signedFiles,
             ], 'is_string')),
         ];

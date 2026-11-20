@@ -89,11 +89,17 @@ personnel**, valable **30 jours** :
 2. coche « J'ai lu le document et j'accepte de le signer électroniquement » ;
 3. demande son **code** (6 chiffres, envoyé à son adresse e-mail, valable **10 minutes**, 5 essais ; un nouveau code
    au plus par minute) ;
-4. saisit le code et **signe**.
+4. **dessine sa signature** dans le cadre (doigt, souris ou stylet ; bouton « Effacer ») : obligatoire, « Signer »
+   reste grisé tant que le cadre est vide ;
+5. saisit le code et **signe**.
 
-Le PDF signé = le document émis (jamais modifié) suivi d'une **page de preuve** : signataire, adresse e-mail vérifiée,
-date et heure de Paris, adresse IP, navigateur, empreinte SHA-256 du document, référence de la signature. C'est une
-**signature électronique simple**. Le signataire reçoit une copie du PDF signé ; le document passe à **Signé**, le dossier
+Le PDF signé = le document émis avec la **signature dessinée dans l'encadré** du signataire (« Lu et approuvé » ; sous
+le dessin : « Signé électroniquement le … par … »), suivi d'une **page de preuve** : signataire, adresse e-mail vérifiée,
+date et heure de Paris, adresse IP, navigateur, empreinte SHA-256 du document envoyé, signature dessinée et son
+empreinte, référence de la signature. Le texte est exactement celui du document envoyé : à l'émission, le TMS garde la
+page qui a produit le PDF et la reproduit à la signature avec le dessin, sans relire les données du dossier ; le
+document envoyé reste archivé à l'identique. Un document émis avant la 0.10.1 se signe aussi : le dessin figure alors
+sur la page de preuve seulement. C'est une **signature électronique simple**. Le signataire reçoit une copie du PDF signé ; le document passe à **Signé**, le dossier
 à **Convention signée** (ce qui fait partir le délai de rétractation de 14 jours d'un particulier). Le bloc du dossier
 propose le **PDF signé**.
 

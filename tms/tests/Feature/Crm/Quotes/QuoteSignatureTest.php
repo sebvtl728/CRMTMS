@@ -1,17 +1,23 @@
 <?php
 
 use App\Exceptions\UserFacingHttpException;
+use App\Modules\Core\Documents\PdfSource;
 use App\Modules\Core\References\CapFormationReferenceSeeder;
 use App\Modules\Core\Signatures\SignatureMail;
 use App\Modules\Core\Signatures\SignatureRequest;
 use App\Modules\Core\Signatures\Signatures;
+use App\Modules\Core\Tenancy\TenantStorage;
 use App\Modules\Crm\CrmServiceProvider;
+use App\Modules\Crm\Gdpr\Anonymiser;
+use App\Modules\Crm\People\Person;
 use App\Modules\Crm\Quotes\Quote;
 use App\Modules\Crm\Quotes\QuoteSignatures;
 use App\Modules\Crm\Quotes\QuoteStatus;
 use App\Modules\Crm\Quotes\QuoteTransitions;
 use Carbon\CarbonImmutable;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\Storage;
 use Inertia\Testing\AssertableInertia as Assert;
 
 beforeEach(function () {
@@ -37,7 +43,7 @@ function quoteSign(SignatureRequest $request): void
 {
     app(Signatures::class)->sendCode($request);
     preg_match('/\b(\d{6})\b/', Mail::sent(SignatureMail::class)->last()->text, $m);
-    app(Signatures::class)->sign($request->fresh(), $m[1], '203.0.113.7', 'Firefox');
+    app(Signatures::class)->sign($request->fresh(), $m[1], sigDrawing(), '203.0.113.7', 'Firefox');
 }
 
 it('sends a « Bon pour accord » link; once signed the quote is accepted with its signed copy, no dossier created', function () {
@@ -77,4 +83,42 @@ it('offers the link only on a quote awaiting an answer, to who may update it', f
 
     $draft = sendableQuote('Étude');
     $this->post("/crm/quotes/{$draft->id}/signature", ['email' => 'lea.durand@example.test'])->assertStatus(409);
+});
+
+it('keeps the exact HTML of a sent quote and signs it with the drawing in the « Bon pour accord » box', function () {
+    $quote = signatureQuote();
+    $source = PdfSource::parse((string) Storage::disk(TenantStorage::DISK)->get(PdfSource::pathFor($quote->pdf_path)));
+    expect($source?->hasSlot())->toBeTrue()->and($source->html)->toContain($quote->number, 'Bon pour accord');
+
+    $this->post("/crm/quotes/{$quote->id}/signature", ['email' => 'lea.durand@example.test'])->assertSessionHasNoErrors();
+    quoteSign(SignatureRequest::query()->where('subject_type', 'quote')->sole());
+
+    $pages = [];
+    Http::assertSent(function ($r) use (&$pages) {
+        foreach ($r->data() as $part) {
+            if (($part['filename'] ?? null) === 'index.html') {
+                $pages[] = (string) $part['contents'];
+            }
+        }
+
+        return true;
+    });
+    expect(collect($pages)->first(fn ($p) => str_contains($p, 'Signé électroniquement le 14/11/2026 par Léa Durand')))
+        ->toContain($quote->number, 'Bon pour accord', 'data:image/png;base64,');
+});
+
+it('erases the drawn signature and the frozen HTML of an anonymised customer', function () {
+    $quote = signatureQuote();
+    $this->post("/crm/quotes/{$quote->id}/signature", ['email' => 'lea.durand@example.test'])->assertSessionHasNoErrors();
+    $request = SignatureRequest::query()->where('subject_type', 'quote')->sole();
+    quoteSign($request);
+    $request->refresh();
+    $disk = Storage::disk(TenantStorage::DISK);
+    expect($disk->exists($request->drawing_path))->toBeTrue()->and($disk->exists(PdfSource::pathFor($quote->pdf_path)))->toBeTrue();
+
+    app(Anonymiser::class)->anonymise(Person::query()->where('last_name', 'Durand')->firstOrFail(), 'request');
+
+    expect($disk->exists($request->drawing_path))->toBeFalse()
+        ->and($disk->exists(PdfSource::pathFor($quote->pdf_path)))->toBeFalse()
+        ->and($request->fresh()->drawing_path)->toBeNull();
 });
