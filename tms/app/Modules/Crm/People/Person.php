@@ -105,7 +105,7 @@ class Person extends Model
     protected $fillable = [
         'civility', 'first_name', 'last_name', 'email', 'email_secondary', 'phone', 'mobile',
         'address_line1', 'address_line2', 'postal_code', 'city', 'country', 'birth_date', 'is_individual', 'project',
-        'professional_situation_id', 'education_level_id', 'funding_mode_id', 'origin_id', 'status', 'responsible_user_id',
+        'professional_situation_id', 'education_level_id', 'funding_mode_id', 'origin_id', 'status', 'responsible_user_id', 'future_needs',
         'last_contact_at', 'source_system', 'source_id', 'legal_basis',
     ];
 

@@ -50,7 +50,8 @@ it('adds collaborators to a meeting: only active users who may work on the actio
     $this->get('/crm/activities/options')->assertOk()
         ->assertJsonPath('collaborators', fn (array $options) => collect($options)->pluck('value')->contains($boss->id)
             && collect($options)->pluck('value')->contains($relations->id)
-            && ! collect($options)->pluck('value')->contains($trainer->id)
+            // Lot 1e: a trainer holds crm.activities.view (his follow-up calls), so he may join an action.
+            && collect($options)->pluck('value')->contains($trainer->id)
             && ! collect($options)->pluck('value')->contains($gone->id));
 
     $this->post('/crm/activities', [
@@ -60,7 +61,7 @@ it('adds collaborators to a meeting: only active users who may work on the actio
     $activity = Activity::query()->sole();
     expect($activity->collaborators()->pluck('users.id')->sort()->values()->all())->toBe(collect([$boss->id, $relations->id])->sort()->values()->all());
 
-    foreach ([[$trainer->id], [$gone->id], [$me->id]] as $ids) {
+    foreach ([[$gone->id], [$me->id]] as $ids) {
         $this->put("/crm/activities/{$activity->id}", ['type_id' => colType(), 'subject' => 'RDV', 'collaborator_ids' => $ids])
             ->assertSessionHasErrors(['collaborator_ids' => 'Choisissez des collaborateurs qui ont accès aux actions (pas le responsable).']);
     }
