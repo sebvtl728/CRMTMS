@@ -2,6 +2,7 @@
 
 namespace App\Http\Middleware;
 
+use App\Modules\Admissions\Candidatures\IdentifiedBadge;
 use App\Modules\Connectors\Calendar\CalendarSources;
 use App\Modules\Core\Access\Permissions;
 use App\Modules\Core\Access\Scopes;
@@ -74,6 +75,8 @@ class HandleInertiaRequests extends Middleware
             ],
             // Menu badge of « À faire »: overdue + today, cached 60 s (lazy: skipped by partial reloads).
             'todo_count' => fn () => $user !== null && $user->can(CrmPermissions::ACTIVITIES_VIEW) ? TodoQuery::badge($user) : 0,
+            // Menu counter of « Candidats »: candidatures still « Identifié » in a DAS responsible's DAS (lazy, cached 60 s).
+            'candidates_badge' => fn () => $user !== null ? IdentifiedBadge::count($user) : 0,
             'backups_enabled' => config('tms.mode') !== 'multi',
             // Banner of the dashboard: last backup failed, too old or unknown (administrators, self-hosted only).
             'backup_alert' => fn () => $user !== null && config('tms.mode') !== 'multi' && $user->can(Permissions::SETTINGS_MANAGE) ? BackupStatus::alert() : null,
