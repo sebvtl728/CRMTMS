@@ -4,9 +4,13 @@ namespace App\Modules\Questionnaires;
 
 use App\Modules\Core\Access\Permissions as CorePermissions;
 use App\Modules\Core\Audit\MorphAliases;
+use App\Modules\Core\Users\User;
 use App\Modules\Questionnaires\Campaigns\SurveyMailTemplates;
+use App\Modules\Questionnaires\Results\SessionSurveysBlock;
 use App\Modules\Questionnaires\Surveys\SurveyCampaign;
 use App\Modules\Questionnaires\Surveys\SurveyTemplate;
+use App\Modules\Sessions\Public\SessionBlocks;
+use App\Modules\Sessions\Public\SessionCards;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\RateLimiter;
@@ -35,6 +39,8 @@ class QuestionnairesServiceProvider extends ServiceProvider
     public function boot(): void
     {
         SurveyMailTemplates::register();
+        SessionBlocks::register('questionnaires.session', fn (string $sessionId, User $viewer) => SessionSurveysBlock::for($sessionId, $viewer));
+        SessionCards::register('questionnaires', fn (array $sessionIds, User $viewer) => SessionSurveysBlock::cards($sessionIds, $viewer));
         RateLimiter::for('survey-launch', fn (Request $request) => Limit::perMinute(20)->by('survey-launch:'.($request->user()?->getAuthIdentifier() ?? $request->ip())));
         RateLimiter::for('survey-public', fn (Request $request) => Limit::perMinute(30)->by('survey-public:'.$request->ip()));
         Route::pattern('surveyTemplate', '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}');

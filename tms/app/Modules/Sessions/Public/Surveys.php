@@ -70,6 +70,33 @@ final class Surveys
     }
 
     /**
+     * The number of followed trainees (as trainees()) of these sessions, in
+     * one query; a session without any is left out.
+     *
+     * @param  list<string>  $sessionIds
+     * @return array<string, int>
+     */
+    public static function traineeCounts(array $sessionIds): array
+    {
+        return Enrolment::query()->whereIn('training_session_id', $sessionIds)
+            ->whereIn('status', EnrolmentStatus::values(EnrolmentStatus::HOLDING_A_PLACE))->whereNull('left_on')
+            ->groupBy('training_session_id')->selectRaw('training_session_id, count(*) as n')->toBase()->get()
+            ->mapWithKeys(fn (object $r) => [(string) $r->training_session_id => (int) $r->n])->all();
+    }
+
+    /**
+     * The last day (Y-m-d) of these sessions, in one query (unknown ids left out).
+     *
+     * @param  list<string>  $sessionIds
+     * @return array<string, string>
+     */
+    public static function endDays(array $sessionIds): array
+    {
+        return TrainingSession::query()->whereKey(array_values(array_filter($sessionIds, fn (string $id) => Str::isUuid($id))))
+            ->get(['id', 'ends_on'])->mapWithKeys(fn (TrainingSession $s) => [(string) $s->id => $s->ends_on->toDateString()])->all();
+    }
+
+    /**
      * The sessions (not cancelled, not trashed) whose last day is between
      * $from and $to (Y-m-d, both included).
      *
