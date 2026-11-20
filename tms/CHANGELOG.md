@@ -5,6 +5,8 @@ Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) ; ve
 
 ## [Non publié]
 
+## [0.11.0] - 2026-11-20
+
 ### Ajouté
 
 - Bac à sable local (démonstration) : Administration › Bac à sable pour effacer les données de travail ou repartir de
@@ -745,7 +747,8 @@ Lot 1a : socle de l'application.
   mise à jour avec retour arrière automatique.
 - Publication : image multi-architecture signée (cosign), archive de version, sommes de contrôle.
 
-[Non publié]: https://github.com/sebvtl728/CRMTMS/compare/v0.10.0...HEAD
+[Non publié]: https://github.com/sebvtl728/CRMTMS/compare/v0.11.0...HEAD
+[0.11.0]: https://github.com/sebvtl728/CRMTMS/compare/v0.10.0...v0.11.0
 [0.10.0]: https://github.com/sebvtl728/CRMTMS/compare/v0.9.2...v0.10.0
 [0.9.2]: https://github.com/sebvtl728/CRMTMS/compare/v0.9.1...v0.9.2
 [0.9.1]: https://github.com/sebvtl728/CRMTMS/compare/v0.9.0...v0.9.1
