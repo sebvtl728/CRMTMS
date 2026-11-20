@@ -41,7 +41,7 @@ function dashOwnUser(array $permissions): User
     return $user;
 }
 
-function dashAction(string $type, User $responsible, array $attributes = []): Activity
+function wkAction(string $type, User $responsible, array $attributes = []): Activity
 {
     return Activity::query()->create([
         'type_id' => crmItem(ReferenceList::ActionType, $type)->id, 'subject' => $type,
@@ -55,14 +55,14 @@ it('counts the calls done, the meetings fixed and the response rate of the perio
     $other = commercial();
     $reached = crmItem(ReferenceList::ActionResult, 'Réussi')->id;
     $missed = crmItem(ReferenceList::ActionResult, 'Échec')->id;
-    dashAction('Appel', $me, ['done_at' => '2026-11-17 10:00', 'result_id' => $reached]);
-    dashAction('Appel', $me, ['done_at' => '2026-11-18 09:00', 'result_id' => $missed]);
-    dashAction('Appel', $me, ['done_at' => '2026-11-18 09:30', 'result_id' => $reached]);
-    dashAction('Appel', $me, ['done_at' => '2026-11-10 09:00', 'result_id' => $reached]); // last week
-    dashAction('Appel', $me, ['due_at' => '2026-11-19 09:00']); // not done
-    dashAction('Appel', $other, ['done_at' => '2026-11-17 11:00', 'result_id' => $reached]); // not his
-    dashAction('Rendez-vous physique', $me, ['due_at' => '2026-12-01 10:00']); // fixed this week
-    dashAction('E-mail', $me, ['done_at' => '2026-11-17 12:00']);
+    wkAction('Appel', $me, ['done_at' => '2026-11-17 10:00', 'result_id' => $reached]);
+    wkAction('Appel', $me, ['done_at' => '2026-11-18 09:00', 'result_id' => $missed]);
+    wkAction('Appel', $me, ['done_at' => '2026-11-18 09:30', 'result_id' => $reached]);
+    wkAction('Appel', $me, ['done_at' => '2026-11-10 09:00', 'result_id' => $reached]); // last week
+    wkAction('Appel', $me, ['due_at' => '2026-11-19 09:00']); // not done
+    wkAction('Appel', $other, ['done_at' => '2026-11-17 11:00', 'result_id' => $reached]); // not his
+    wkAction('Rendez-vous physique', $me, ['due_at' => '2026-12-01 10:00']); // fixed this week
+    wkAction('E-mail', $me, ['done_at' => '2026-11-17 12:00']);
 
     expect(dashValue('crm.calls', $me))->toBe(3)
         ->and(dashValue('crm.calls', $me, ['preset' => 'last_week']))->toBe(1)
