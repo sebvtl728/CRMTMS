@@ -10,6 +10,7 @@ use App\Modules\Core\References\ReferenceUsage;
 use App\Modules\Core\Users\User;
 use App\Modules\Crm\Public\FicheLinks;
 use App\Modules\Finance\Invoices\FinanceMailTemplates;
+use App\Modules\Finance\Invoices\FreeInvoices;
 use App\Modules\Finance\Invoices\Invoice;
 use App\Modules\Finance\Invoices\InvoiceAnonymisation;
 use App\Modules\Finance\Invoices\InvoiceLine;
@@ -18,6 +19,7 @@ use App\Modules\Finance\Invoices\InvoiceStatus;
 use App\Modules\Finance\Payments\Payment;
 use App\Modules\Finance\Payments\PaymentAllocation;
 use App\Modules\Finance\Payments\PaymentAnonymisation;
+use App\Modules\Finance\Payouts\CotraitantPayout;
 use App\Modules\Finance\Plans\BillingBlock;
 use App\Modules\Finance\Plans\BillingPlan;
 use App\Modules\Finance\Plans\BillingPlans;
@@ -52,6 +54,7 @@ class FinanceServiceProvider extends ServiceProvider
             InvoiceSending::MORPH_ALIAS => InvoiceSending::class,
             Payment::MORPH_ALIAS => Payment::class,
             PaymentAllocation::MORPH_ALIAS => PaymentAllocation::class,
+            CotraitantPayout::MORPH_ALIAS => CotraitantPayout::class,
             ReminderPause::MORPH_ALIAS => ReminderPause::class,
         ]);
 
@@ -84,6 +87,10 @@ class FinanceServiceProvider extends ServiceProvider
         // Anonymising a person: her drafts go (addressed to her, or naming her as a trainee);
         // validated invoices are accounting records kept 10 years, never changed (spec § 4.7).
         FicheLinks::registerAnonymisation('finance.invoices', fn (array $personIds) => InvoiceAnonymisation::deleteDrafts($personIds));
+        // Free invoices name their client and co-contractors directly (2026-11-20): an import never takes
+        // such a fiche back; a merge repoints the drafts (validated pieces and their payouts stay frozen).
+        FicheLinks::registerLinked('finance.free-invoices', fn (string $type, string $id): bool => FreeInvoices::links($type, $id));
+        FicheLinks::registerMerge('finance.free-invoices', fn (string $type, string $keepId, string $dropId) => FreeInvoices::merge($type, $keepId, $dropId));
         // Her payments are kept too (10 years): their notes and reference are cleared (0.9.1).
         FicheLinks::registerAnonymisation('finance.payments', fn (array $personIds) => PaymentAnonymisation::clear($personIds));
 

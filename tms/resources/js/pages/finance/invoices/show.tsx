@@ -2,6 +2,7 @@ import { InvoiceSendDialog, type InvoiceMessageDefaults } from '@/components/fin
 import { PaymentsPanel, type InvoiceBalance, type InvoicePayment } from '@/components/finance/payments-panel';
 import { RemindersPanel, type InvoiceReminders } from '@/components/finance/reminders-panel';
 import Heading from '@/components/heading';
+import { FichePicker, type PickedFiche } from '@/components/finance/fiche-picker';
 import InputError from '@/components/input-error';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -31,13 +32,17 @@ interface InvoiceLine {
     computed_cents: number | null;
     planned_minutes: number | null;
     realised_minutes: number | null;
+    cotraitant_id: string | null;
+    cotraitant_label: string | null;
 }
 
 interface InvoicePage extends Omit<InvoiceRow, 'recipient'> {
     recipient: { label: string; role: 'contractor' | 'funder'; type: string };
     period: { from: string | null; to: string | null };
     cut_off: string | null;
-    rhythm_label: string;
+    rhythm_label: string | null;
+    buyer_reference: string | null;
+    service_code: string | null;
     total_vat_cents: number;
     vat_mention: string | null;
     notes: string | null;
@@ -85,6 +90,9 @@ type LineForm = {
     unit: string;
     unit_price: string;
     vat_rate: string;
+    /** the co-contractor who delivered the line (free invoice): id and name, '' when none */
+    cotraitant_id: string;
+    cotraitant_label: string;
 };
 
 const COMPONENT_LABELS: Record<string, string> = {
@@ -113,6 +121,9 @@ function LinesTable({ invoice }: { invoice: InvoicePage }) {
                             <td className="px-3 py-2">
                                 {line.label}
                                 {line.description && <span className="text-muted-foreground block text-xs">{line.description}</span>}
+                                {line.cotraitant_label && (
+                                    <span className="text-muted-foreground block text-xs">Réalisé par {line.cotraitant_label} (co-traitant)</span>
+                                )}
                             </td>
                             <td className="px-3 py-2 text-right whitespace-nowrap">
                                 {line.quantity} {line.unit}
@@ -130,8 +141,20 @@ function LinesTable({ invoice }: { invoice: InvoicePage }) {
 
 /** The lines of a draft: computed lines kept (label and amount editable), free lines added and removed. */
 function DraftEditor({ invoice, options }: { invoice: InvoicePage; options: ShowProps['options'] }) {
-    const { data, setData, put, processing, errors, isDirty } = useForm<{ notes: string; lines: LineForm[] }>({
+    const free = invoice.origin === 'free';
+    const { data, setData, put, processing, errors, isDirty, transform } = useForm<{
+        notes: string;
+        buyer_reference: string;
+        service_code: string;
+        period_from: string;
+        period_to: string;
+        lines: LineForm[];
+    }>({
         notes: invoice.notes ?? '',
+        buyer_reference: invoice.buyer_reference ?? '',
+        service_code: invoice.service_code ?? '',
+        period_from: invoice.period.from ?? '',
+        period_to: invoice.period.to ?? '',
         lines: invoice.lines.map((l) => ({
             id: l.id,
             kind: l.kind,
@@ -142,8 +165,16 @@ function DraftEditor({ invoice, options }: { invoice: InvoicePage; options: Show
             unit: l.unit,
             unit_price: l.unit_price,
             vat_rate: l.vat_rate,
+            cotraitant_id: l.cotraitant_id ?? '',
+            cotraitant_label: l.cotraitant_label ?? '',
         })),
     });
+    // The co-contractor travels as its id; the header of a dossier invoice is never sent.
+    transform((d) => ({
+        notes: d.notes,
+        ...(free ? { buyer_reference: d.buyer_reference, service_code: d.service_code, period_from: d.period_from, period_to: d.period_to } : {}),
+        lines: d.lines.map((l) => ({ ...l, cotraitant_label: undefined, cotraitant_id: l.cotraitant_id || null })),
+    }));
     const err = errors as Record<string, string | undefined>;
     const byId = Object.fromEntries(invoice.lines.map((l) => [l.id, l]));
 
@@ -258,6 +289,26 @@ function DraftEditor({ invoice, options }: { invoice: InvoicePage; options: Show
                                     <InputError message={err[`lines.${index}.vat_rate`]} />
                                 </div>
                             </div>
+                            {free && (
+                                <div className="grid gap-1">
+                                    <Label htmlFor={`line-${index}-cotraitant`}>Co-traitant (facultatif : ligne réalisée par un membre du groupement)</Label>
+                                    <FichePicker
+                                        id={`line-${index}-cotraitant`}
+                                        value={line.cotraitant_id ? { type: 'organisation', id: line.cotraitant_id, label: line.cotraitant_label } : null}
+                                        onlyOrganisations
+                                        placeholder="Rechercher une entreprise co-traitante…"
+                                        onChange={(f: PickedFiche | null) =>
+                                            setData(
+                                                'lines',
+                                                data.lines.map((l, i) =>
+                                                    i === index ? { ...l, cotraitant_id: f?.id ?? '', cotraitant_label: f?.label ?? '' } : l,
+                                                ),
+                                            )
+                                        }
+                                    />
+                                    <InputError message={err[`lines.${index}.cotraitant_id`]} />
+                                </div>
+                            )}
                             {stored && (
                                 <p className="text-muted-foreground text-xs">
                                     Total enregistré : {formatCents(stored.total_ht_cents)}
@@ -295,6 +346,8 @@ function DraftEditor({ invoice, options }: { invoice: InvoicePage; options: Show
                                 unit: 'forfait',
                                 unit_price: '',
                                 vat_rate: options.vat_exempt ? '0.00' : '20.00',
+                                cotraitant_id: '',
+                                cotraitant_label: '',
                             },
                         ])
                     }
@@ -303,6 +356,31 @@ function DraftEditor({ invoice, options }: { invoice: InvoicePage; options: Show
                     Ajouter une ligne libre
                 </Button>
             </div>
+
+            {free && (
+                <div className="grid gap-3 rounded-xl border p-3 sm:grid-cols-2">
+                    <div className="grid gap-1">
+                        <Label htmlFor="buyer_reference">N° d'engagement (Chorus Pro)</Label>
+                        <Input id="buyer_reference" value={data.buyer_reference} onChange={(e) => setData('buyer_reference', e.target.value)} />
+                        <InputError message={err.buyer_reference} />
+                    </div>
+                    <div className="grid gap-1">
+                        <Label htmlFor="service_code">Code service</Label>
+                        <Input id="service_code" value={data.service_code} onChange={(e) => setData('service_code', e.target.value)} />
+                        <InputError message={err.service_code} />
+                    </div>
+                    <div className="grid gap-1">
+                        <Label htmlFor="period_from">Période du</Label>
+                        <Input id="period_from" type="date" value={data.period_from} onChange={(e) => setData('period_from', e.target.value)} />
+                        <InputError message={err.period_from} />
+                    </div>
+                    <div className="grid gap-1">
+                        <Label htmlFor="period_to">au</Label>
+                        <Input id="period_to" type="date" value={data.period_to} onChange={(e) => setData('period_to', e.target.value)} />
+                        <InputError message={err.period_to} />
+                    </div>
+                </div>
+            )}
 
             <div className="grid gap-1">
                 <Label htmlFor="notes">Notes internes</Label>
@@ -319,13 +397,15 @@ function DraftEditor({ invoice, options }: { invoice: InvoicePage; options: Show
                 <Button type="submit" disabled={processing || !isDirty}>
                     Enregistrer le brouillon
                 </Button>
-                <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => router.post(route('finance.invoices.recompute', invoice.id), {}, { preserveScroll: true })}
-                >
-                    Recalculer
-                </Button>
+                {!free && (
+                    <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => router.post(route('finance.invoices.recompute', invoice.id), {}, { preserveScroll: true })}
+                    >
+                        Recalculer
+                    </Button>
+                )}
                 <Button
                     type="button"
                     variant="destructive"
@@ -524,19 +604,37 @@ export default function InvoiceShow({ invoice, options, can, email, balance, pay
                     <div>
                         <dt className="text-muted-foreground text-xs">Dossier</dt>
                         <dd>
-                            <Link href={invoice.dossier.url} className="underline">
-                                {invoice.dossier.number}
-                            </Link>
+                            {invoice.dossier ? (
+                                <Link href={invoice.dossier.url} className="underline">
+                                    {invoice.dossier.number}
+                                </Link>
+                            ) : (
+                                'Facture libre'
+                            )}
                         </dd>
                     </div>
+                    {invoice.buyer_reference && (
+                        <div>
+                            <dt className="text-muted-foreground text-xs">N° d'engagement</dt>
+                            <dd>{invoice.buyer_reference}</dd>
+                        </div>
+                    )}
+                    {invoice.service_code && (
+                        <div>
+                            <dt className="text-muted-foreground text-xs">Code service</dt>
+                            <dd>{invoice.service_code}</dd>
+                        </div>
+                    )}
                     <div>
                         <dt className="text-muted-foreground text-xs">Période</dt>
                         <dd>{invoice.period.from ? `du ${formatDay(invoice.period.from)} au ${formatDay(invoice.period.to)}` : '-'}</dd>
                     </div>
-                    <div>
-                        <dt className="text-muted-foreground text-xs">Rythme</dt>
-                        <dd>{invoice.rhythm_label}</dd>
-                    </div>
+                    {invoice.rhythm_label && (
+                        <div>
+                            <dt className="text-muted-foreground text-xs">Rythme</dt>
+                            <dd>{invoice.rhythm_label}</dd>
+                        </div>
+                    )}
                     {invoice.issued_on && (
                         <div>
                             <dt className="text-muted-foreground text-xs">Date d'émission</dt>

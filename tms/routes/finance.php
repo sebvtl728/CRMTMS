@@ -3,6 +3,7 @@
 use App\Modules\Finance\Invoices\InvoiceController;
 use App\Modules\Finance\Invoices\ToInvoiceController;
 use App\Modules\Finance\Payments\PaymentController;
+use App\Modules\Finance\Payouts\PayoutController;
 use App\Modules\Finance\Plans\BillingPlanController;
 use App\Modules\Finance\Reminders\ReminderController;
 use App\Modules\Finance\Settings\FinanceSettingsController;
@@ -21,6 +22,8 @@ Route::middleware(['auth', 'can:finance.invoices.manage'])->prefix('finance')->n
     // A draft made by hand from the dossier (or its draft in progress).
     Route::post('dossiers/{dossierId}/invoices', [InvoiceController::class, 'store'])->name('invoices.store');
     Route::post('to-invoice/prepare', [ToInvoiceController::class, 'prepare'])->name('to-invoice.prepare');
+    Route::post('invoices/free', [InvoiceController::class, 'storeFree'])->name('invoices.store-free');
+    Route::get('clients', [InvoiceController::class, 'clients'])->middleware('throttle:finance-lookup')->name('invoices.clients');
     Route::put('invoices/{invoiceId}', [InvoiceController::class, 'update'])->name('invoices.update');
     Route::post('invoices/{invoiceId}/recompute', [InvoiceController::class, 'recompute'])->name('invoices.recompute');
     Route::delete('invoices/{invoiceId}', [InvoiceController::class, 'destroy'])->name('invoices.destroy');
@@ -70,4 +73,12 @@ Route::middleware(['auth', 'can:finance.invoices.manage'])->prefix('finance')->n
     Route::post('invoices/{invoiceId}/remind', [ReminderController::class, 'remind'])->middleware('throttle:invoice-mail')->name('invoices.remind');
     Route::post('invoices/{invoiceId}/reminders/pause', [ReminderController::class, 'pause'])->name('invoices.reminders.pause');
     Route::delete('invoices/{invoiceId}/reminders/pause', [ReminderController::class, 'resume'])->name('invoices.reminders.resume');
+});
+
+// Finance › À reverser: payouts to the co-contractors of the free invoices (2026-11-20).
+Route::middleware(['auth', 'can:finance.payments.manage'])->prefix('finance')->name('finance.payouts.')->group(function () {
+    Route::get('payouts', [PayoutController::class, 'index'])->name('index');
+    Route::post('payouts', [PayoutController::class, 'store'])->name('store');
+    Route::delete('payouts/{payoutId}', [PayoutController::class, 'destroy'])->name('destroy');
+    Route::get('payouts-export', [PayoutController::class, 'export'])->middleware('throttle:finance-export')->name('export');
 });

@@ -98,6 +98,7 @@ class InvoicePdf
         $exempt = InvoiceTotals::exempt($invoice, $company);
         $credit = $invoice->kind === Invoice::CREDIT_NOTE;
         $corrected = $invoice->corrected_invoice_id === null ? null : Invoice::query()->find($invoice->corrected_invoice_id);
+        $cotraitants = InvoiceRecipient::cotraitants($invoice);
 
         return view('documents.invoice', [
             'watermark' => $invoice->isDraft(),
@@ -131,9 +132,14 @@ class InvoicePdf
                 ],
                 'vat_mention' => $invoice->vat_mention,
                 'exempt' => $exempt,
+                // Free invoices (2026-11-20): the buyer's references (Chorus Pro), the grouping.
+                'buyer_reference' => $invoice->buyer_reference,
+                'service_code' => $invoice->service_code,
+                'grouping' => $lines->contains(fn (InvoiceLine $l) => $l->cotraitant_id !== null),
             ],
             'recipient' => InvoiceRecipient::of($invoice),
             'lines' => $lines->map(fn (InvoiceLine $l) => [
+                'cotraitant' => $l->cotraitant_id === null ? null : ($cotraitants[$l->cotraitant_id] ?? '-'),
                 'label' => $l->label,
                 'description' => $l->description,
                 'quantity' => self::number((string) $l->quantity),

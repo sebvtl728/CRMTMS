@@ -5,6 +5,12 @@ Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) ; ve
 
 ## [Non publié]
 
+### Ajouté
+
+- Facture libre (équivalent des « factures annexes » de Formevol) : facture sans dossier pour un client, N° d'engagement et
+  code service (Chorus Pro), lignes désignant un co-traitant du groupement (mention « mandataire du groupement » sur le
+  PDF) ; écran Finance › À reverser pour suivre les reversements aux co-traitants (dû, reversé, reste, export CSV).
+
 ### Corrigé
 
 - Local : page blanche sur les autres postes du réseau (lien de test de positionnement…). Le serveur Vite de
