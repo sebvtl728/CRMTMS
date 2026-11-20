@@ -153,3 +153,32 @@ Les relances apparaissent dans l'historique d'envoi de la facture ; « Renvoyer 
 - **Délai de rétractation** : quand le dossier porte la **date de signature du contrat** (« Convention signée le »), aucune facture au particulier ne se valide avant **signature + 14 jours** (« Délai de rétractation du particulier : aucune facture avant le … »). Sans date de signature, le brouillon affiche un avertissement mais se valide.
 - **Échéancier** : la **première échéance** d'un particulier ne dépasse pas **30 %** du prix et ne tombe pas pendant le délai de rétractation. Contrôlé à l'enregistrement de l'échéancier (un échéancier déjà verrouillé par une facture n'est pas re-contrôlé).
 - Les factures d'un **financeur** du dossier ne sont pas concernées.
+
+## 16. Facture libre et co-traitance (mandataire d'un groupement)
+
+Pour un **marché public** (ex. un lot de la Région) où l'organisme est **mandataire d'un groupement** : une facture
+globale par mois à l'acheteur, avec les composantes (sessions) de l'organisme et celles des **co-traitants** ; l'acheteur
+paie le mandataire, qui reverse ensuite à chaque co-traitant sa part. C'est l'équivalent des « factures annexes » de
+Formevol.
+
+- **Créer** : Finance › Factures › **Nouvelle facture libre** : client (entreprise ou personne), société émettrice,
+  **N° d'engagement** et **Code service** (références demandées par Chorus Pro), période. Le brouillon n'a pas de
+  dossier : ses lignes se saisissent à la main (libellé, quantité, unité, prix, TVA).
+- **Co-traitant** : chaque ligne peut désigner l'entreprise du groupement qui l'a réalisée. Le PDF porte alors
+  « Facture émise par <société>, mandataire du groupement » et, sous la ligne, « Réalisé par <co-traitant>
+  (co-traitant) ». Le nom du co-traitant est figé à la validation.
+- **Tout le reste est commun** aux autres factures : numérotation, validation (PDF archivé, journal chaîné, contenu
+  figé), envoi, règlements, relances et avoirs. « Recalculer » n'existe pas (rien n'est calculé).
+- **Pas de double facturation** : sur les dossiers des stagiaires du marché, déclarez le financement de l'acheteur avec
+  un type de financement **« facturé hors TMS »** (Administration › Référentiels › Types de financement) : sa part ne
+  sort plus dans « À facturer » et se facture par la facture libre.
+- **À reverser** (menu Finance, droit « Gérer les règlements ») : seules les lignes qui **désignent un co-traitant**
+  y figurent. Par facture et co-traitant : le **dû** (TTC de ses lignes, moins ses lignes reprises par un avoir validé),
+  le **déjà reversé**, le **reste** et l'**état** (À reverser, Reversé en partie, Reversé, Trop reversé) ; toutes les
+  lignes s'affichent par défaut avec l'historique de leurs reversements, le filtre « Reste à reverser seulement » ne
+  garde que celles à solder. La colonne « Client a réglé » indique si l'acheteur a payé la facture. **Marquer reversé** enregistre un virement (montant, date,
+  référence, note), jamais au-delà du reste ; un reversement saisi par erreur se supprime. Export CSV.
+- **Visibilité** : une facture libre n'a pas de dossier ; seuls les utilisateurs dont le périmètre des droits de
+  facturation est **« Tout »** la voient, la créent, la valident ou suivent ses reversements.
+- **Plus tard** : préremplissage des lignes depuis les heures réalisées des sessions d'un marché, dépôt automatique sur
+  Chorus Pro (Factur-X), acomptes propres à chaque financeur.

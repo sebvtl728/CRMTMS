@@ -12,6 +12,8 @@ use App\Modules\Core\Exports\XlsxExporter;
 use App\Modules\Core\References\ReferenceItem;
 use App\Modules\Core\Tenancy\TenantStorage;
 use App\Modules\Core\Users\User;
+use App\Modules\Crm\Public\Fiches;
+use App\Modules\Crm\Public\Trainees;
 use App\Modules\Finance\Billing\Particulier;
 use App\Modules\Finance\Integrity;
 use App\Modules\Finance\Payments\Balances;
@@ -72,6 +74,7 @@ class InvoiceController extends Controller
                 'payment' => [['value' => 'open', 'label' => 'Non soldées'], ['value' => 'overdue', 'label' => 'En retard']],
             ],
             'can' => [
+                'create_free' => $user->can(Permissions::MANAGE) && InvoiceAccess::all($user, Permissions::MANAGE),
                 'export' => $user->can(Permissions::VIEW),
                 'integrity' => $user->can(Permissions::VALIDATE),
             ],
@@ -134,8 +137,7 @@ class InvoiceController extends Controller
      */
     private function listQuery(User $user, array $filters): Builder
     {
-        return Invoice::query()
-            ->whereIn('dossier_id', Billing::dossiersFor($user, ['with_trashed' => true], Permissions::VIEW))
+        return InvoiceAccess::scope(Invoice::query(), $user, Permissions::VIEW, ['with_trashed' => true])
             ->when($filters['status'], fn ($q, string $s) => $q->where('status', $s))
             ->when($filters['kind'], fn ($q, string $k) => $q->where('kind', $k))
             ->when($filters['company'], fn ($q, string $id) => $q->where('company_id', $id))
@@ -192,7 +194,7 @@ class InvoiceController extends Controller
      */
     private function warnings(Invoice $invoice): array
     {
-        if (! $invoice->isDraft() || $invoice->kind !== Invoice::INVOICE) {
+        if (! $invoice->isDraft() || $invoice->kind !== Invoice::INVOICE || $invoice->dossier_id === null) {
             return [];
         }
         $warnings = [];
@@ -323,12 +325,45 @@ class InvoiceController extends Controller
         return redirect('/finance/invoices/'.$invoice->id)->with('status', 'Brouillon prêt.');
     }
 
+    /**
+     * Clients and co-contractors of a free invoice (?q, at least 2
+     * characters; ?only=organisation: entreprises only).
+     */
+    public function clients(Request $request, Fiches $fiches, Trainees $trainees): JsonResponse
+    {
+        // Only who may create a free invoice (scope « Tout »): never a list of fiches out of a narrower scope.
+        $user = $request->user();
+        abort_unless($user instanceof User && InvoiceAccess::all($user, Permissions::MANAGE), 403);
+        $q = $request->query('q');
+        $q = is_string($q) ? mb_substr(trim($q), 0, 100) : '';
+        if (mb_strlen($q) < 2) {
+            return response()->json(['clients' => []])->header('Cache-Control', 'no-store, private');
+        }
+        $organisations = array_map(fn (array $o) => ['type' => 'organisation', 'id' => $o['id'], 'label' => $o['label']], $fiches->searchOrganisations($q, 10));
+        $people = $request->query('only') === 'organisation' ? [] : array_map(
+            fn (array $p) => ['type' => 'person', 'id' => $p['id'], 'label' => trim(($p['first_name'] ?? '').' '.$p['last_name'])],
+            $trainees->search($q, null, 10),
+        );
+
+        return response()->json(['clients' => [...$organisations, ...$people]])->header('Cache-Control', 'no-store, private');
+    }
+
+    /** « Nouvelle facture libre » (2026-11-20): a draft without dossier. */
+    public function storeFree(Request $request, FreeInvoices $free): RedirectResponse
+    {
+        /** @var User $user */
+        $user = $request->user();
+        $invoice = $free->create($user, $request->only(['company_id', 'recipient_type', 'recipient_id', 'buyer_reference', 'service_code', 'period_from', 'period_to']));
+
+        return redirect('/finance/invoices/'.$invoice->id)->with('status', 'Facture libre créée : ajoutez ses lignes.');
+    }
+
     public function update(Request $request, string $invoiceId): RedirectResponse
     {
         $invoice = $this->find($request, $invoiceId);
         abort_unless($this->manages($request, $invoice), 403);
 
-        $this->drafts->update($invoice, $request->only(['notes', 'lines']));
+        $this->drafts->update($invoice, $request->only(['notes', 'lines', 'buyer_reference', 'service_code', 'period_from', 'period_to']));
 
         return back()->with('status', 'Brouillon enregistré.');
     }
@@ -452,7 +487,7 @@ class InvoiceController extends Controller
     {
         $user = $request->user();
         $invoice = Str::isUuid($invoiceId) ? Invoice::query()->find($invoiceId) : null;
-        abort_unless($user instanceof User && $invoice !== null && Billing::allows($user, Permissions::VIEW, $invoice->dossier_id, withTrashed: true), 404);
+        abort_unless($user instanceof User && $invoice !== null && InvoiceAccess::allows($user, Permissions::VIEW, $invoice, withTrashed: true), 404);
 
         return $invoice;
     }
@@ -461,7 +496,7 @@ class InvoiceController extends Controller
     {
         $user = $request->user();
 
-        return $user instanceof User && Billing::allows($user, Permissions::MANAGE, $invoice->dossier_id);
+        return $user instanceof User && InvoiceAccess::allows($user, Permissions::MANAGE, $invoice);
     }
 
     private function validates(Request $request, Invoice $invoice): bool
@@ -469,6 +504,6 @@ class InvoiceController extends Controller
         $user = $request->user();
 
         return $user instanceof User && $user->can(Permissions::VALIDATE)
-            && Billing::allows($user, Permissions::VALIDATE, $invoice->dossier_id, withTrashed: true);
+            && InvoiceAccess::allows($user, Permissions::VALIDATE, $invoice, withTrashed: true);
     }
 }

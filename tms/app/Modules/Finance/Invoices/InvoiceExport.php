@@ -74,7 +74,7 @@ final class InvoiceExport implements ExportResource, PrefetchesRows
         /** @var Collection<int, Invoice> $invoices */
         $invoices = new Collection($models);
         $this->recipients = $this->rows->recipients($invoices);
-        $this->dossiers = Billing::numbers($invoices->pluck('dossier_id')->unique()->values()->all());
+        $this->dossiers = Billing::numbers($invoices->pluck('dossier_id')->filter()->unique()->values()->all());
         $this->balances = Balances::of($invoices->pluck('id')->all());
     }
 
@@ -88,7 +88,7 @@ final class InvoiceExport implements ExportResource, PrefetchesRows
             'issued_on' => ExportCell::date($model->issued_on),
             'due_on' => ExportCell::date($model->due_on),
             'recipient' => $this->recipients[$model->recipient_type.':'.$model->recipient_id] ?? '-',
-            'dossier' => $this->dossiers[$model->dossier_id]['number'] ?? '-',
+            'dossier' => $model->dossier_id === null ? 'Facture libre' : ($this->dossiers[$model->dossier_id]['number'] ?? '-'),
             'total_ht' => self::amount($model->total_ht_cents),
             'total_vat' => self::amount($model->total_vat_cents),
             'total_ttc' => self::amount($model->total_ttc_cents),

@@ -117,7 +117,7 @@ final class Payments
             ->limit(self::MAX_ALLOCATIONS)
             ->get(['id', 'number', 'issued_on', 'due_on', 'total_ttc_cents', 'dossier_id', 'company_id']);
         $balances = Balances::of($invoices->pluck('id')->all());
-        $numbers = Billing::numbers($invoices->pluck('dossier_id')->unique()->values()->all());
+        $numbers = Billing::numbers($invoices->pluck('dossier_id')->filter()->unique()->values()->all());
 
         return $invoices->map(fn (Invoice $i) => [
             'id' => $i->id,
@@ -126,7 +126,7 @@ final class Payments
             'due_on' => $i->due_on?->toDateString(),
             'ttc_cents' => $i->total_ttc_cents,
             'remaining_cents' => $balances[$i->id]['remaining_cents'] ?? 0,
-            'dossier_number' => $numbers[$i->dossier_id]['number'] ?? '-',
+            'dossier_number' => $i->dossier_id === null ? 'Facture libre' : ($numbers[$i->dossier_id]['number'] ?? '-'),
             'company_id' => $i->company_id,
         ])->values()->all();
     }

@@ -112,7 +112,10 @@
     @endif
     @if ($recipient['dossier_number'])<div><strong>Dossier :</strong> {{ $recipient['dossier_number'] }}</div>@endif
     @if ($recipient['agreement_number'])<div><strong>Financement - n° d'accord :</strong> {{ $recipient['agreement_number'] }}</div>@endif
+    @if ($invoice['buyer_reference'])<div><strong>N° d'engagement :</strong> {{ $invoice['buyer_reference'] }}</div>@endif
+    @if ($invoice['service_code'])<div><strong>Code service :</strong> {{ $invoice['service_code'] }}</div>@endif
     @if ($invoice['period'])<div><strong>Période de formation :</strong> {{ $invoice['period'] }}</div>@endif
+    @if ($invoice['grouping'])<div>Facture émise par {{ $company['name'] }}, mandataire du groupement.</div>@endif
 </div>
 
 <table class="lines">
@@ -132,6 +135,7 @@
                 <td>
                     <div>{{ $line['label'] }}</div>
                     @if ($line['description'])<div class="description">{{ $line['description'] }}</div>@endif
+                    @if ($line['cotraitant'])<div class="description">Réalisé par {{ $line['cotraitant'] }} (co-traitant)</div>@endif
                 </td>
                 <td class="num">{{ $line['quantity'] }}</td>
                 <td>{{ $line['unit'] }}</td>
