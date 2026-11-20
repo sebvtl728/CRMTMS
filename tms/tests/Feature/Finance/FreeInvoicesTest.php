@@ -64,3 +64,57 @@ it('shows a free invoice to a scope « Tout » only', function () {
     $this->actingAs($das)->get('/finance/invoices/'.$invoice->id)->assertNotFound();
     $this->actingAs($das)->get('/finance/invoices/'.$invoice->id.'/pdf')->assertNotFound();
 });
+
+it('creates a free draft for a client, refused without the scope « Tout »', function () {
+    $region = frRegion();
+    $company = frCompany();
+    $all = frAccountant();
+
+    $response = $this->actingAs($all)->post('/finance/invoices/free', [
+        'company_id' => $company->id, 'recipient_type' => 'organisation', 'recipient_id' => $region->id, 'buyer_reference' => ' EJ-2026-55 ',
+    ]);
+    $invoice = Invoice::query()->where('origin', 'free')->sole();
+    $response->assertRedirect('/finance/invoices/'.$invoice->id);
+    expect($invoice->recipient_id)->toBe($region->id)->and($invoice->buyer_reference)->toBe('EJ-2026-55')
+        ->and($invoice->dossier_id)->toBeNull()->and($invoice->isDraft())->toBeTrue();
+
+    $this->actingAs($all)->post('/finance/invoices/free', ['company_id' => $company->id, 'recipient_type' => 'organisation', 'recipient_id' => (string) Illuminate\Support\Str::uuid7()])
+        ->assertSessionHasErrors(['recipient_id' => App\Modules\Finance\Invoices\FreeInvoices::NO_RECIPIENT]);
+    $this->actingAs($all)->post('/finance/invoices/free', ['company_id' => (string) Illuminate\Support\Str::uuid7(), 'recipient_type' => 'organisation', 'recipient_id' => $region->id])
+        ->assertSessionHasErrors('company_id');
+    $this->actingAs(frAccountant(App\Modules\Core\Access\AccessScope::Das))
+        ->post('/finance/invoices/free', ['company_id' => $company->id, 'recipient_type' => 'organisation', 'recipient_id' => $region->id])
+        ->assertForbidden();
+});
+
+it('saves the lines of a free draft with their co-contractor', function () {
+    $invoice = frDraft(frRegion(), []);
+    $partner = frCotraitant();
+    $all = frAccountant();
+
+    $this->actingAs($all)->put('/finance/invoices/'.$invoice->id, [
+        'service_code' => 'FORM-44',
+        'lines' => [
+            ['label' => 'Composante S-2026-0001 (CAP)', 'quantity' => '1', 'unit' => 'forfait', 'unit_price' => '1 200,00'],
+            ['label' => 'Composante S-2026-0002', 'quantity' => '1', 'unit' => 'forfait', 'unit_price' => '800,00', 'cotraitant_id' => $partner->id],
+        ],
+    ])->assertSessionHasNoErrors();
+    $invoice->refresh();
+    expect($invoice->total_ht_cents)->toBe(200000)->and($invoice->service_code)->toBe('FORM-44')
+        ->and($invoice->lines()->pluck('cotraitant_id')->all())->toBe([null, $partner->id]);
+
+    $this->actingAs($all)->put('/finance/invoices/'.$invoice->id, ['lines' => [
+        ['label' => 'Composante', 'quantity' => '1', 'unit' => 'forfait', 'unit_price' => '10', 'cotraitant_id' => (string) Illuminate\Support\Str::uuid7()],
+    ]])->assertSessionHasErrors(['lines.0.cotraitant_id' => App\Modules\Finance\Invoices\InvoiceDrafts::NO_COTRAITANT]);
+
+    $this->actingAs($all)->post('/finance/invoices/'.$invoice->id.'/recompute')->assertStatus(409);
+});
+
+it('refuses a co-contractor on a dossier invoice', function () {
+    $x = fiSeed();
+    $draft = fiDrafts()->manual(fiManager(), $x['dossier']->id, Invoice::CONTRACTOR);
+    $lines = $draft->lines()->get()->map(fn ($l) => ['id' => $l->id, 'label' => $l->label, 'quantity' => (string) $l->quantity, 'unit' => $l->unit, 'unit_price' => (string) ($l->unit_price_cents / 100)])->all();
+    $lines[] = ['label' => 'Ligne', 'quantity' => '1', 'unit' => 'forfait', 'unit_price' => '10', 'cotraitant_id' => frCotraitant()->id];
+
+    expect(fn () => fiDrafts()->update($draft, ['lines' => $lines]))->toThrow(Illuminate\Validation\ValidationException::class);
+});

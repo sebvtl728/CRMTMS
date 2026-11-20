@@ -42,7 +42,7 @@ final class InvoiceRecipient
     {
         $identity = app(Fiches::class)->billingIdentity($invoice->recipient_type, $invoice->recipient_id) ?? ['name' => '-'];
         $agreement = null;
-        if ($invoice->funding_id !== null) {
+        if ($invoice->funding_id !== null && $invoice->dossier_id !== null) {
             foreach (Billing::dossier($invoice->dossier_id)['fundings'] ?? [] as $funding) {
                 if ($funding['id'] === $invoice->funding_id) {
                     $agreement = $funding['agreement_number'];
@@ -52,7 +52,7 @@ final class InvoiceRecipient
 
         return [
             ...$identity,
-            'dossier_number' => Billing::numbers([$invoice->dossier_id])[$invoice->dossier_id]['number'] ?? null,
+            'dossier_number' => $invoice->dossier_id === null ? null : (Billing::numbers([$invoice->dossier_id])[$invoice->dossier_id]['number'] ?? null),
             'agreement_number' => $agreement === null || trim((string) $agreement) === '' ? null : trim((string) $agreement),
         ];
     }

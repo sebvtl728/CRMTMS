@@ -322,12 +322,22 @@ class InvoiceController extends Controller
         return redirect('/finance/invoices/'.$invoice->id)->with('status', 'Brouillon prêt.');
     }
 
+    /** « Nouvelle facture libre » (2026-11-20): a draft without dossier. */
+    public function storeFree(Request $request, FreeInvoices $free): RedirectResponse
+    {
+        /** @var User $user */
+        $user = $request->user();
+        $invoice = $free->create($user, $request->only(['company_id', 'recipient_type', 'recipient_id', 'buyer_reference', 'service_code', 'period_from', 'period_to']));
+
+        return redirect('/finance/invoices/'.$invoice->id)->with('status', 'Facture libre créée : ajoutez ses lignes.');
+    }
+
     public function update(Request $request, string $invoiceId): RedirectResponse
     {
         $invoice = $this->find($request, $invoiceId);
         abort_unless($this->manages($request, $invoice), 403);
 
-        $this->drafts->update($invoice, $request->only(['notes', 'lines']));
+        $this->drafts->update($invoice, $request->only(['notes', 'lines', 'buyer_reference', 'service_code', 'period_from', 'period_to']));
 
         return back()->with('status', 'Brouillon enregistré.');
     }
