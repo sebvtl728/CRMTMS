@@ -27,6 +27,7 @@ use App\Modules\Crm\Brochures\BrochureSending;
 use App\Modules\Crm\Brochures\BrochureSendingsProvider;
 use App\Modules\Crm\Dashboard\Indicators;
 use App\Modules\Crm\Dashboard\Indicators\ActivityIndicators;
+use App\Modules\Crm\Dashboard\Indicators\MonthIndicators;
 use App\Modules\Crm\Dashboard\Indicators\PipelineIndicators;
 use App\Modules\Crm\Dashboard\Indicators\QuoteIndicators;
 use App\Modules\Crm\Gdpr\Consent;
@@ -141,7 +142,7 @@ class CrmServiceProvider extends ServiceProvider
     public function boot(): void
     {
         // Lot 1e: the dashboard cards of the CRM.
-        foreach ([...ActivityIndicators::all(), ...PipelineIndicators::all(), ...QuoteIndicators::all()] as $indicator) {
+        foreach ([...ActivityIndicators::all(), ...PipelineIndicators::all(), ...QuoteIndicators::all(), ...MonthIndicators::all()] as $indicator) {
             Indicators::register($indicator);
         }
         self::registerReferenceUsage();

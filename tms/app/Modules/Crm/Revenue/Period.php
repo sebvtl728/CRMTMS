@@ -95,6 +95,15 @@ final readonly class Period
             : self::quarter($after->year, intdiv($after->month - 1, 3) + 1);
     }
 
+    /**
+     * Free dates (lot 1e dashboards: a week, free dates): type « range »,
+     * which never has a revenue target.
+     */
+    public static function range(CarbonImmutable $from, CarbonImmutable $to): self
+    {
+        return new self('range', $from->setTimezone(self::TIMEZONE)->startOfDay(), $to->setTimezone(self::TIMEZONE)->startOfDay());
+    }
+
     private static function month(int $year, int $month): self
     {
         $start = CarbonImmutable::create($year, $month, 1, 0, 0, 0, self::TIMEZONE);

@@ -13,6 +13,8 @@ use App\Modules\Crm\Quotes\Quote;
 use App\Modules\Crm\Quotes\QuoteListQuery;
 use App\Modules\Crm\Visibility\CrmVisibility;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 
 /**
  * The rows behind the dashboard cards (lot 1e), from the queries of the
@@ -75,5 +77,36 @@ final class Sources
         return '/crm/opportunities?'.http_build_query(array_filter([
             'das' => $f->das, 'target' => self::opportunityTarget($f), 'responsible' => $f->responsible, ...$extra,
         ], fn ($v) => $v !== null && $v !== ''));
+    }
+
+    /**
+     * Signed revenue of the period, per opportunity (DasRevenue rule): an
+     * accepted quote counts at accepted_on (its total HT), else a won
+     * opportunity at won_on (its amount) when it has no accepted quote at
+     * all; never twice. Scope and filters of the opportunity list.
+     *
+     * @return Collection<int, \stdClass> opportunity_id, organisation_id, person_id, cents (int)
+     */
+    public static function signed(DashboardFilters $f, User $user): Collection
+    {
+        $from = $f->from->toDateString();
+        $to = $f->to->toDateString();
+        $ids = self::opportunities($f, $user)->select('opportunities.id');
+        $quotes = DB::table('quotes')->join('opportunities', 'opportunities.id', '=', 'quotes.opportunity_id')
+            ->whereIn('quotes.opportunity_id', $ids)->whereNull('quotes.deleted_at')
+            ->where('quotes.status', 'accepted')->whereBetween('quotes.accepted_on', [$from, $to])
+            ->groupBy('opportunities.id', 'opportunities.organisation_id', 'opportunities.person_id')
+            ->selectRaw('opportunities.id as opportunity_id, opportunities.organisation_id, opportunities.person_id, sum(round(quotes.total_ht * 100))::bigint as cents');
+        $won = DB::table('opportunities')->whereIn('opportunities.id', self::opportunities($f, $user)->select('opportunities.id'))
+            ->whereNotNull('opportunities.amount')->whereBetween('opportunities.won_on', [$from, $to])
+            ->whereNotExists(fn ($q) => $q->selectRaw('1')->from('quotes')->whereColumn('quotes.opportunity_id', 'opportunities.id')
+                ->where('quotes.status', 'accepted')->whereNull('quotes.deleted_at'))
+            ->selectRaw('opportunities.id as opportunity_id, opportunities.organisation_id, opportunities.person_id, round(opportunities.amount * 100)::bigint as cents');
+
+        return $quotes->unionAll($won)->get()->map(function (object $r): object {
+            $r->cents = (int) $r->cents;
+
+            return $r;
+        });
     }
 }
