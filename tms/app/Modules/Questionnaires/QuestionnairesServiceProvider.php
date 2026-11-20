@@ -6,6 +6,7 @@ use App\Modules\Core\Access\Permissions as CorePermissions;
 use App\Modules\Core\Audit\MorphAliases;
 use App\Modules\Questionnaires\Surveys\SurveyCampaign;
 use App\Modules\Questionnaires\Surveys\SurveyTemplate;
+use Illuminate\Support\Facades\Route;
 use Illuminate\Support\ServiceProvider;
 
 /**
@@ -27,5 +28,8 @@ class QuestionnairesServiceProvider extends ServiceProvider
         ]);
     }
 
-    public function boot(): void {}
+    public function boot(): void
+    {
+        Route::pattern('surveyTemplate', '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}');
+    }
 }
