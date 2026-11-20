@@ -1,15 +1,21 @@
 <?php
 
 use App\Modules\Core\References\ReferenceList;
+use App\Modules\Core\Users\User;
 use App\Modules\Crm\Activities\Activity;
 use App\Modules\Crm\Gdpr\Anonymiser;
+use App\Modules\Crm\People\Person;
+use App\Modules\Sessions\Enrolments\Enrolment;
 use App\Modules\Sessions\Enrolments\Enrolments;
 use App\Modules\Sessions\FollowUps\FollowUpReminder;
 use App\Modules\Sessions\FollowUps\TrainerFollowUps;
-use App\Modules\Sessions\Sessions\SessionWriter;
+use App\Modules\Sessions\Sessions\TrainingSession;
 use App\Modules\Sessions\Trainers\Trainers;
 use App\Modules\Sessions\Trainers\TrainerStatus;
 use Carbon\CarbonImmutable;
+
+require_once __DIR__.'/Support/lot2a.php';
+require_once __DIR__.'/Support/planning.php';
 
 beforeEach(function () {
     plSetUp();
@@ -20,7 +26,7 @@ beforeEach(function () {
  * A session from 17 to 20/08/2026 with Léa enrolled; $hours: trainer user => number of 3.5 h séances.
  *
  * @param  array<string, int>  $seancesByTrainer  user name => séances
- * @return array{session: \App\Modules\Sessions\Sessions\TrainingSession, lea: \App\Modules\Sessions\Enrolments\Enrolment, users: array<string, \App\Modules\Core\Users\User>}
+ * @return array{session: TrainingSession, lea: Enrolment, users: array<string, User>}
  */
 function tfuSession(array $seancesByTrainer = ['Bernard' => 1, 'Aubert' => 3], ?string $responsibleUserId = null): array
 {
@@ -86,7 +92,7 @@ it('falls back on the session responsible, then the dossier responsible, when no
     // No session responsible: the dossier's.
     Activity::query()->delete();
     FollowUpReminder::query()->delete();
-    app(SessionWriter::class)->update($x['session']->refresh(), ['responsible_user_id' => null]);
+    $x['session']->refresh()->forceFill(['responsible_user_id' => null])->save();
     $dossierResponsible = admin();
     $x['lea']->dossier->forceFill(['responsible_user_id' => $dossierResponsible->id])->save();
     tfuRun('2026-11-20');
@@ -98,7 +104,7 @@ it('skips cancelled sessions, abandoned or cancelled enrolments and anonymised p
     $tom = l2Enrol($x['lea']->dossier, $x['session'], makePerson('Petit', ['first_name' => 'Tom']));
     $ana = l2Enrol($x['lea']->dossier, $x['session'], makePerson('Roux', ['first_name' => 'Ana']));
     app(Enrolments::class)->abandon($tom, CarbonImmutable::parse('2026-08-18'), crmItem(ReferenceList::AbandonReason, 'Maladie')->id);
-    app(Anonymiser::class)->anonymise($ana->person, 'request');
+    app(Anonymiser::class)->anonymise(Person::query()->findOrFail($ana->person_id), 'request');
 
     expect(tfuRun('2026-11-20'))->toBe(1)
         ->and(Activity::query()->sole()->person_id)->toBe($x['lea']->person_id)

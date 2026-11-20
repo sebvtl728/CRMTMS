@@ -27,3 +27,6 @@ Schedule::command('tms:admissions:purge')->dailyAt('03:50')->timezone('Europe/Pa
 
 // Finance (0.9.1): automatic reminders of unpaid invoices, for the organismes that turned them on.
 Schedule::command('tms:finance:remind')->dailyAt('08:30')->timezone('Europe/Paris')->withoutOverlapping()->onOneServer();
+
+// Lot 1e: the trainer's follow-up calls and the reactivation calls due today.
+Schedule::command('tms:sessions:follow-ups')->dailyAt('06:30')->timezone('Europe/Paris')->withoutOverlapping()->onOneServer();
