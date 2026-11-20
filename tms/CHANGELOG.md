@@ -5,14 +5,14 @@ Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) ; ve
 
 ## [Non publié]
 
-## [0.10.0] - 2026-11-20
-
 ### Ajouté
 
 - Signature en ligne : le signataire **dessine sa signature** (obligatoire) ; elle apparaît dans l'encadré signature du
   document (convention, contrat, « Bon pour accord » du devis) et sur la page de preuve, avec son empreinte. Le document
   signé reprend exactement la page du document envoyé (gardée à l'émission) ; un document émis avant cette version porte
   le dessin sur la page de preuve seulement.
+
+## [0.10.0] - 2026-11-20
 
 ### Ajouté
 
