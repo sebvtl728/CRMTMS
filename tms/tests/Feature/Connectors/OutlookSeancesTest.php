@@ -340,20 +340,21 @@ function osConnect(TestCase $test, User $user, array $graph = []): void
         ->assertRedirect('/settings/calendar')->assertSessionHas('status');
 }
 
-it('lets a trainer without CRM connect Outlook; a user without actions nor séances gets 403', function () {
+it('lets a trainer connect Outlook; a user without actions nor séances gets 403', function () {
     m365Config();
     [$user] = osFormateur();
 
     $this->actingAs($user)->get('/settings/calendar')->assertOk()
-        ->assertInertia(fn ($page) => $page->where('crm', false)
+        // Lot 1e: a trainer holds his own actions (follow-up calls), which go to Outlook too.
+        ->assertInertia(fn ($page) => $page->where('crm', true)
             ->where('outlook.available', true)->where('outlook.status', 'none')->where('outlook.sources', true));
     $location = (string) $this->actingAs($user)->post('/settings/calendar/outlook/connect')->assertRedirect()->headers->get('Location');
     expect($location)->toStartWith('https://login.microsoftonline.com/'.M365_TENANT.'/oauth2/v2.0/authorize');
 
-    // An inactive trainer: no Outlook source serves him any more.
+    // An inactive trainer keeps Outlook for his own actions (lot 1e: crm.activities.view on « Ses fiches »).
     $trainer = Trainers::forUser($user);
     Trainers::update($trainer, TrainerStatus::from($trainer->status), false);
-    $this->actingAs($user)->post('/settings/calendar/outlook/connect')->assertForbidden();
+    $this->actingAs($user)->post('/settings/calendar/outlook/connect')->assertRedirect();
 
     $nobody = userWithPermissions([SessionsPermissions::SESSIONS_VIEW]);
     $this->actingAs($nobody)->post('/settings/calendar/outlook/connect')->assertForbidden();
