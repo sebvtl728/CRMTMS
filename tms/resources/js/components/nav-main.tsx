@@ -29,7 +29,12 @@ export function NavMain({ items = [], label }: { items: NavItem[]; label: string
                             </SidebarMenuBadge>
                         )}
                         {item.badge !== undefined && item.badge > 0 && (
-                            <SidebarMenuBadge aria-label={`${item.badge} à faire`}>{item.badge > 99 ? '99+' : item.badge}</SidebarMenuBadge>
+                            <SidebarMenuBadge
+                                aria-label={item.badgeLabel ?? `${item.badge} à faire`}
+                                className={item.badgeAlert ? 'bg-destructive rounded-full px-1.5 text-white' : undefined}
+                            >
+                                {item.badge > 99 ? '99+' : item.badge}
+                            </SidebarMenuBadge>
                         )}
                     </SidebarMenuItem>
                 ))}

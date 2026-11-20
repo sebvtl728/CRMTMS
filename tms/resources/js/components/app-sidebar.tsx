@@ -111,7 +111,7 @@ const adminNavItems: (NavItem & { permission: string })[] = [
 ];
 
 export function AppSidebar() {
-    const { auth, todo_count, backups_enabled, backup_alert } = usePage<SharedData>().props;
+    const { auth, todo_count, candidates_badge, backups_enabled, backup_alert } = usePage<SharedData>().props;
     const crmViewer = ['crm.fiches.view', 'crm.opportunities.view', 'crm.quotes.view', 'crm.activities.view'].some((p) =>
         auth.permissions.includes(p),
     );
@@ -120,7 +120,19 @@ export function AppSidebar() {
         .map((item) => (item.url === '/crm/todo' ? { ...item, badge: todo_count } : item));
     const trainingItems: NavItem[] = [
         ...(auth.my_planning ? [myPlanningItem] : []),
-        ...trainingNavItems.filter((item) => auth.permissions.includes(item.permission)),
+        ...trainingNavItems
+            .filter((item) => auth.permissions.includes(item.permission))
+            // A DAS responsible: the candidatures of his DAS still « Identifié », in red.
+            .map((item) =>
+                item.url === '/admissions/candidatures'
+                    ? {
+                          ...item,
+                          badge: candidates_badge,
+                          badgeAlert: true,
+                          badgeLabel: `${candidates_badge} candidature(s) identifiée(s) dans vos DAS`,
+                      }
+                    : item,
+            ),
     ];
     const financeItems = financeNavItems.filter((item) => auth.permissions.includes(item.permission));
     const qualityItems = qualityNavItems.filter((item) => auth.permissions.includes(item.permission));

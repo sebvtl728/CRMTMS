@@ -18,8 +18,11 @@ Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) ; ve
   automatiques 6 et 12 mois après un dossier, pour le responsable de la fiche ; **suivi formateur** 3 mois après la
   formation de chaque apprenant ; **besoins futurs** sur les fiches ; réglages du CRM (délais, étape des leads, fenêtre
   de rétention) ; résultats d'action « joint ». Le rôle Formateur voit et complète ses propres actions.
+- Admissions : compteur rouge sur « Candidats » pour le responsable de DAS, nombre de candidatures encore « Identifié »
+  dans ses DAS.
 
 ### Modifié
+
 
 - Documents : l'attestation de fin de formation et le certificat de réalisation s'émettent dès le dernier jour de la
   formation (et non plus le lendemain).
