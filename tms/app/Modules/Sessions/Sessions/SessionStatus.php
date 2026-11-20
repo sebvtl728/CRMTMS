@@ -34,9 +34,10 @@ enum SessionStatus: string
 
     /**
      * The state shown on $today (a Paris day): a planned or confirmed session
-     * is running between its dates (both included) and done after its end.
+     * is running between its dates (both included) and done after its end,
+     * or from its last day once its last month is closed ($lastMonthClosed).
      */
-    public function effective(CarbonImmutable $startsOn, CarbonImmutable $endsOn, CarbonImmutable $today): self
+    public function effective(CarbonImmutable $startsOn, CarbonImmutable $endsOn, CarbonImmutable $today, bool $lastMonthClosed = false): self
     {
         if (! in_array($this, self::SETTABLE, true)) {
             return $this;
@@ -44,7 +45,7 @@ enum SessionStatus: string
         $day = $today->toDateString();
 
         return match (true) {
-            $day > $endsOn->toDateString() => self::Done,
+            $day > $endsOn->toDateString(), $lastMonthClosed && $day === $endsOn->toDateString() => self::Done,
             $day >= $startsOn->toDateString() => self::Running,
             default => $this,
         };

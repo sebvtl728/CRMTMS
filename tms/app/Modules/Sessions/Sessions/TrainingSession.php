@@ -2,6 +2,7 @@
 
 namespace App\Modules\Sessions\Sessions;
 
+use App\Modules\Sessions\Attendance\AttendanceClosure;
 use App\Modules\Core\Audit\Auditable;
 use App\Modules\Core\Tenancy\BelongsToTenant;
 use App\Modules\Core\Users\User;
@@ -100,12 +101,25 @@ class TrainingSession extends Model
 
     /**
      * The state on $today (a Paris day): « En cours » / « Terminée » from the
-     * dates while planned or confirmed.
+     * dates while planned or confirmed; « Terminée » on its last day once its
+     * last month is closed (read only on that day).
      */
     public function effectiveStatus(CarbonImmutable $today): SessionStatus
     {
-        return $this->status->effective($this->starts_on, $this->ends_on, $today);
+        $lastDay = $today->toDateString() === $this->ends_on->toDateString() && in_array($this->status, SessionStatus::SETTABLE, true);
+
+        return $this->status->effective($this->starts_on, $this->ends_on, $today, $lastDay && $this->lastMonthClosed());
     }
+
+    /** The Paris month of its last day is closed (Suivi › Clôture des mois). */
+    public function lastMonthClosed(): bool
+    {
+        return AttendanceClosure::query()->where('training_session_id', $this->id)
+            ->where('month', $this->ends_on->startOfMonth()->toDateString())->whereNotNull('closed_at')->exists();
+    }
+
+    /** SQL: the last month of the session row « training_sessions » is closed. */
+    public const LAST_MONTH_CLOSED_SQL = "exists (select 1 from attendance_closures c where c.training_session_id = training_sessions.id and c.month = date_trunc('month', training_sessions.ends_on)::date and c.closed_at is not null)";
 
     public function isCancelled(): bool
     {

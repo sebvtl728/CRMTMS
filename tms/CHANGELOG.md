@@ -7,6 +7,8 @@ Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) ; ve
 
 ### Corrigé
 
+- Sessions : une session passe « Terminée » dès son dernier jour quand son dernier mois est clôturé (Suivi › Clôture
+  des mois), au lieu d'attendre le lendemain.
 - Sessions : la carte « Clôture des mois » de la synthèse compte aussi le dernier mois d'une session à partir de son
   dernier jour, et affiche « Tous les mois sont clôturés » quand un mois a été clôturé avant la fin du mois.
 - Local : page blanche sur les autres postes du réseau (lien de test de positionnement…). Le serveur Vite de
