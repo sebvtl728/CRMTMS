@@ -48,6 +48,9 @@ function backTo042(): Tenant
     $tenant = inTenant();
     // A 0.4.2 organisme: the trainer's own actions (lot 1e) did not exist yet (down() would merge them into crm.view / crm.update).
     RoleModel::query()->where('name', Role::Formateur->value)->sole()->revokePermissionTo(Scopes::TRAINER_OWN_EXTRAS);
+    // Nor the dashboards right (lot 1e).
+    // (The administrator keeps every right whatever its age.)
+    RoleModel::query()->where('name', '!=', Role::AdminOrganisme->value)->get()->each(fn (RoleModel $r) => $r->revokePermissionTo('crm.dashboards.view'));
     splitMigration()->down();
     Scopes::forget();
 
@@ -55,7 +58,8 @@ function backTo042(): Tenant
 }
 
 const MATRIX_042 = [
-    'admin_organisme' => ['catalogue.manage', 'catalogue.view', 'crm.create', 'crm.delete', 'crm.export', 'crm.gdpr', 'crm.import', 'crm.merge', 'crm.update', 'crm.view'],
+    // The administrator holds every right, the dashboards one (lot 1e) included.
+    'admin_organisme' => ['catalogue.manage', 'catalogue.view', 'crm.create', 'crm.dashboards.view', 'crm.delete', 'crm.export', 'crm.gdpr', 'crm.import', 'crm.merge', 'crm.update', 'crm.view'],
     'direction' => ['catalogue.manage', 'catalogue.view', 'crm.export', 'crm.gdpr', 'crm.view'],
     'commercial' => ['catalogue.view', 'crm.create', 'crm.delete', 'crm.export', 'crm.import', 'crm.merge', 'crm.update', 'crm.view'],
     'charge_relations' => ['catalogue.view', 'crm.create', 'crm.delete', 'crm.export', 'crm.import', 'crm.merge', 'crm.update', 'crm.view'],
@@ -77,7 +81,7 @@ it('migration maps every default role', function () {
         // The trainer's own actions (lot 1e) are granted later by tms:permissions:sync, not by this 0.5.0 migration.
         $expected = collect(Permissions::defaultsFor($role))
             ->filter(fn (string $p) => str_starts_with($p, 'crm.') || str_starts_with($p, 'catalogue.'))
-            ->reject(fn (string $p) => $role === Role::Formateur && in_array($p, Scopes::TRAINER_OWN_EXTRAS, true))->sort()->values()->all();
+            ->reject(fn (string $p) => ($role === Role::Formateur && in_array($p, Scopes::TRAINER_OWN_EXTRAS, true)) || ($role !== Role::AdminOrganisme && $p === 'crm.dashboards.view'))->sort()->values()->all();
         expect(crmMatrix()[$role->value], $role->value)->toBe($expected)
             // Like a new organisme: the default scope of each scoped right the role holds.
             ->and(scopesOfRole($role), $role->value)->toEqualCanonicalizing(array_map(fn (AccessScope $s) => $s->value,

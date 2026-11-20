@@ -53,6 +53,9 @@ final class Permissions
     /** Revenue targets. */
     public const REVENUE_MANAGE = 'crm.revenue.manage';
 
+    /** « Tableaux de bord » (lot 1e): the page and its exports; each card follows the right of its domain. */
+    public const DASHBOARDS_VIEW = 'crm.dashboards.view';
+
     public const MERGE = 'crm.merge';
 
     public const IMPORT = 'crm.import';
@@ -78,6 +81,7 @@ final class Permissions
         'Devis' => [self::QUOTES_VIEW, self::QUOTES_UPDATE, self::QUOTES_DELETE],
         'Actions et agenda' => [self::ACTIVITIES_VIEW, self::ACTIVITIES_UPDATE, self::ACTIVITIES_DELETE, self::ACTIVITIES_TEAM],
         "Chiffre d'affaires" => [self::REVENUE_VIEW, self::REVENUE_MANAGE],
+        'Tableaux de bord' => [self::DASHBOARDS_VIEW],
         self::DATA_GROUP => [self::IMPORT, self::EXPORT, self::GDPR],
     ];
 
@@ -103,6 +107,7 @@ final class Permissions
             self::ACTIVITIES_TEAM => ['Voir les actions de l\'équipe', 'Afficher « À faire » et le planning de toute l\'équipe.'],
             self::REVENUE_VIEW => ['Consulter le chiffre d\'affaires', 'Voir le chiffre d\'affaires signé par DAS.'],
             self::REVENUE_MANAGE => ['Gérer les objectifs de chiffre d\'affaires', 'Fixer les objectifs de chiffre d\'affaires de chaque DAS.'],
+            self::DASHBOARDS_VIEW => ['Consulter les tableaux de bord', 'Voir les tableaux de bord commerciaux et les exporter (avec « Exporter vers Excel ») ; chaque indicateur suit le droit de son domaine.'],
             self::IMPORT => ['Importer des fichiers', 'Importer des fichiers CSV ou Excel et annuler un import.'],
             self::EXPORT => ['Exporter vers Excel', 'Télécharger les listes filtrées au format Excel.'],
             self::GDPR => ['Gérer le RGPD', "Exporter les données d'une personne, l'anonymiser, gérer les durées de conservation."],
@@ -177,11 +182,11 @@ final class Permissions
 
         return match ($role) {
             Role::AdminOrganisme => self::all(),
-            Role::Direction => [...$views, self::ACTIVITIES_TEAM, self::REVENUE_VIEW, self::REVENUE_MANAGE, self::EXPORT, self::GDPR],
-            Role::Commercial, Role::ChargeRelations => [...self::domains(), self::MERGE, self::REVENUE_VIEW, self::IMPORT, self::EXPORT],
+            Role::Direction => [...$views, self::ACTIVITIES_TEAM, self::REVENUE_VIEW, self::REVENUE_MANAGE, self::EXPORT, self::GDPR, self::DASHBOARDS_VIEW],
+            Role::Commercial, Role::ChargeRelations => [...self::domains(), self::MERGE, self::REVENUE_VIEW, self::IMPORT, self::EXPORT, self::DASHBOARDS_VIEW],
             // Removing an action was part of « Modifier » before 0.5.0.
-            Role::Assistant => [...$views, ...$updates, self::ACTIVITIES_DELETE],
-            Role::ResponsableDas => [...$views, self::REVENUE_VIEW, self::EXPORT],
+            Role::Assistant => [...$views, ...$updates, self::ACTIVITIES_DELETE, self::DASHBOARDS_VIEW],
+            Role::ResponsableDas => [...$views, self::REVENUE_VIEW, self::EXPORT, self::DASHBOARDS_VIEW],
             // A trainer reaches his séances, and his own actions (the follow-up calls, lot 1e): never the fiches.
             Role::Formateur => [self::ACTIVITIES_VIEW, self::ACTIVITIES_UPDATE],
         };

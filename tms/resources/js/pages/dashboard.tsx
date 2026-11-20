@@ -208,7 +208,7 @@ export default function Dashboard({ recent_views, counters, commercial, sessions
                                 </Button>
                             </>
                         )}
-                        {commercial !== null && (
+                        {can('crm.dashboards.view') && (
                             <Button asChild variant="outline">
                                 <Link href="/crm/dashboards">
                                     <Gauge /> Tableaux de bord

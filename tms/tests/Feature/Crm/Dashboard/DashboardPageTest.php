@@ -1,5 +1,6 @@
 <?php
 
+use App\Modules\Core\Access\Role;
 use App\Modules\Core\References\CapFormationReferenceSeeder;
 use App\Modules\Core\Users\User;
 use App\Modules\Crm\CrmServiceProvider;
@@ -7,6 +8,7 @@ use App\Modules\Crm\Dashboard\DashboardFilters;
 use App\Modules\Crm\Dashboard\Indicator;
 use App\Modules\Crm\Dashboard\Indicators;
 use App\Modules\Crm\Dashboard\IndicatorValue;
+use App\Modules\Crm\Permissions;
 use App\Modules\Crm\Public\DashboardIndicators;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\Cache;
@@ -105,7 +107,15 @@ it('caches each card 60 s under the tenant, per user and filters', function () {
         ->and(Cache::has('tenant:'.tenant()->id.':dashboard:'.$user->id.':'.DashboardFilters::from([], CarbonImmutable::now(), 'week')->key().':test.cached'))->toBeTrue();
 });
 
-it('is reached with any CRM view right, never without', function () {
-    $this->actingAs(userWithPermissions(['crm.activities.view']))->get('/crm/dashboards')->assertOk();
-    $this->actingAs(userWithPermissions(['sessions.sessions.view']))->get('/crm/dashboards')->assertForbidden();
+it('is reached with the « Consulter les tableaux de bord » right only, set in the roles', function () {
+    $this->actingAs(userWithPermissions(['crm.dashboards.view']))->get('/crm/dashboards')->assertOk();
+    $this->actingAs(userWithPermissions(['crm.opportunities.view', 'crm.activities.view']))->get('/crm/dashboards')->assertForbidden();
+    $this->actingAs(userWithPermissions(['crm.opportunities.view', 'crm.export']))->get('/crm/dashboards/export.csv')->assertForbidden();
+
+    // Granted by default to the roles that see the CRM, never to the trainer.
+    expect(commercial()->can('crm.dashboards.view'))->toBeTrue()
+        ->and(direction()->can('crm.dashboards.view'))->toBeTrue()
+        ->and(userWithRole(Role::ResponsableDas)->can('crm.dashboards.view'))->toBeTrue()
+        ->and(userWithRole(Role::Formateur)->can('crm.dashboards.view'))->toBeFalse()
+        ->and(Permissions::labels()['crm.dashboards.view'][0])->toBe('Consulter les tableaux de bord');
 });

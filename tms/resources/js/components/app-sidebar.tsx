@@ -55,8 +55,7 @@ const commercialNavItems: (NavItem & { permission: string })[] = [
     { title: 'Devis', url: '/crm/quotes', icon: FileText, permission: 'crm.quotes.view' },
     { title: "Chiffre d'affaires", url: '/crm/revenue', icon: Euro, permission: 'crm.revenue.view' },
     { title: 'À faire', url: '/crm/todo', icon: CalendarCheck, permission: 'crm.activities.view' },
-    // Any CRM « Consulter » right (each card follows its own right).
-    { title: 'Tableaux de bord', url: '/crm/dashboards', icon: Gauge, permission: 'crm.any-view' },
+    { title: 'Tableaux de bord', url: '/crm/dashboards', icon: Gauge, permission: 'crm.dashboards.view' },
     { title: 'Planning', url: '/crm/planning', icon: CalendarRange, permission: 'crm.activities.view' },
     { title: 'Compte rendu de RDV', url: '/crm/report', icon: ClipboardPen, permission: 'crm.activities.update' },
     { title: 'Catalogue', url: '/catalogue', icon: BookOpen, permission: 'catalogue.view' },
@@ -112,11 +111,8 @@ const adminNavItems: (NavItem & { permission: string })[] = [
 
 export function AppSidebar() {
     const { auth, todo_count, candidates_badge, backups_enabled, backup_alert } = usePage<SharedData>().props;
-    const crmViewer = ['crm.fiches.view', 'crm.opportunities.view', 'crm.quotes.view', 'crm.activities.view'].some((p) =>
-        auth.permissions.includes(p),
-    );
     const commercialItems = commercialNavItems
-        .filter((item) => (item.permission === 'crm.any-view' ? crmViewer : auth.permissions.includes(item.permission)))
+        .filter((item) => auth.permissions.includes(item.permission))
         .map((item) => (item.url === '/crm/todo' ? { ...item, badge: todo_count } : item));
     const trainingItems: NavItem[] = [
         ...(auth.my_planning ? [myPlanningItem] : []),
