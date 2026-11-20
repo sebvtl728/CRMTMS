@@ -74,8 +74,12 @@ services:
     <<: *app
     command: php artisan schedule:work
 
+  # Hot-reload dev server, started only on demand (`docker compose --profile dev up -d vite`):
+  # while it runs, pages load their JavaScript from localhost:5173, blank from any other machine.
+  # `docker compose run --rm vite …` (build, lint) still works without the profile.
   vite:
     image: node:22
+    profiles: ["dev"]
     working_dir: /var/www/html
     command: sh -c "npm ci && npm run dev -- --host 0.0.0.0"
     ports:

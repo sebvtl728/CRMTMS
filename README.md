@@ -202,6 +202,21 @@ et ne part jamais sur le serveur de production.
    - sur le Mac : <http://localhost:8080>
    - depuis un autre poste du réseau local : <http://MacBook-Pro-de-Sebvtl.local:8080>
 
+Les écrans viennent des fichiers construits (`npm run build`, voir plus bas). Le serveur de développement Vite
+(rechargement à chaud) ne démarre pas avec la pile : tant qu'il tourne, les pages chargent leur JavaScript depuis
+`localhost:5173` et restent **blanches sur tout autre poste** (liens de test de positionnement, signature…). Pour
+développer seulement, sur le Mac :
+
+```bash
+cd ~/Desktop/CRM/tms && docker compose --profile dev up -d vite
+```
+
+Puis l'arrêter (et revenir aux fichiers construits) :
+
+```bash
+cd ~/Desktop/CRM/tms && docker compose stop vite && rm -f public/hot
+```
+
 ### Redémarrer
 
 ```bash
