@@ -118,3 +118,45 @@ it('refuses a co-contractor on a dossier invoice', function () {
 
     expect(fn () => fiDrafts()->update($draft, ['lines' => $lines]))->toThrow(Illuminate\Validation\ValidationException::class);
 });
+
+it('validates a free invoice: number, chained journal, PDF with the buyer references and the co-contractor', function () {
+    $partner = frCotraitant('Formation Atlantique');
+    $draft = frDraft(frRegion(), [['Composante S-2026-0001', 120000, null], ['Composante S-2026-0002', 80000, $partner->id]], ['buyer_reference' => 'EJ-123', 'service_code' => 'SERV-9']);
+    $user = frAccountant();
+
+    $invoice = app(App\Modules\Finance\Invoices\InvoiceValidator::class)->validate($draft, $user);
+
+    expect($invoice->number)->toEndWith('-2026-00001')
+        ->and($invoice->status)->toBe(InvoiceStatus::Validated)->and($invoice->hash)->not->toBeNull()
+        ->and($invoice->recipient_snapshot['cotraitants'] ?? null)->toBe([$partner->id => 'Formation Atlantique']);
+    $text = frSentText();
+    expect($text)->toContain("N° d'engagement : EJ-123")->toContain('Code service : SERV-9')
+        ->toContain('mandataire du groupement')->toContain('Réalisé par Formation Atlantique (co-traitant)');
+    expect(Integrity::verify())->toBe(['count' => 1, 'broken' => null]);
+});
+
+it('refuses to validate an empty free invoice', function () {
+    $draft = frDraft(frRegion(), []);
+
+    expect(fn () => app(App\Modules\Finance\Invoices\InvoiceValidator::class)->validate($draft, frAccountant()))
+        ->toThrow(App\Exceptions\UserFacingHttpException::class);
+});
+
+it('credits a free invoice, the co-contractor lines given back, never beyond the invoice', function () {
+    $partner = frCotraitant();
+    $user = frAccountant();
+    $validator = app(App\Modules\Finance\Invoices\InvoiceValidator::class);
+    $invoice = $validator->validate(frDraft(frRegion(), [['CAP', 100000, null], ['Co-traitant', 50000, $partner->id]], ['buyer_reference' => 'EJ-1']), $user);
+
+    $coLine = $invoice->lines()->where('cotraitant_id', $partner->id)->value('id');
+    $credit = app(App\Modules\Finance\Invoices\CreditNotes::class)->create($user, $invoice, [$coLine]);
+    expect($credit->isFree())->toBeTrue()->and($credit->dossier_id)->toBeNull()->and($credit->buyer_reference)->toBe('EJ-1')
+        ->and($credit->lines()->sole()->cotraitant_id)->toBe($partner->id)->and($credit->total_ht_cents)->toBe(-50000);
+    expect(fn () => app(App\Modules\Finance\Invoices\CreditNotes::class)->create($user, $invoice, [$coLine]))
+        ->toThrow(App\Exceptions\UserFacingHttpException::class);
+    $validator->validate($credit, $user);
+
+    // Another credit note of the whole invoice would exceed what is left (1 500 − 500).
+    $again = app(App\Modules\Finance\Invoices\CreditNotes::class)->create($user, $invoice);
+    expect(fn () => $validator->validate($again, $user))->toThrow(App\Exceptions\UserFacingHttpException::class);
+});

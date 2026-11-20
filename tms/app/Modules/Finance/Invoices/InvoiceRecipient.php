@@ -50,10 +50,39 @@ final class InvoiceRecipient
             }
         }
 
+        // A free invoice names the co-contractors of its lines (frozen with the recipient).
+        $cotraitants = self::liveCotraitants($invoice);
+
         return [
             ...$identity,
+            ...($cotraitants === [] ? [] : ['cotraitants' => $cotraitants]),
             'dossier_number' => $invoice->dossier_id === null ? null : (Billing::numbers([$invoice->dossier_id])[$invoice->dossier_id]['number'] ?? null),
             'agreement_number' => $agreement === null || trim((string) $agreement) === '' ? null : trim((string) $agreement),
         ];
+    }
+
+    /**
+     * Names of the co-contractors of the lines, keyed by id: frozen at
+     * validation, as the fiches name them today on a draft.
+     *
+     * @return array<string, string>
+     */
+    public static function cotraitants(Invoice $invoice): array
+    {
+        if (is_array($invoice->recipient_snapshot)) {
+            $frozen = $invoice->recipient_snapshot['cotraitants'] ?? [];
+
+            return is_array($frozen) ? array_map('strval', $frozen) : [];
+        }
+
+        return self::liveCotraitants($invoice);
+    }
+
+    /** @return array<string, string> */
+    private static function liveCotraitants(Invoice $invoice): array
+    {
+        $ids = InvoiceLine::query()->where('invoice_id', $invoice->id)->whereNotNull('cotraitant_id')->distinct()->pluck('cotraitant_id')->all();
+
+        return array_map(fn (array $o) => $o['label'], app(Fiches::class)->organisationLabels($ids));
     }
 }
