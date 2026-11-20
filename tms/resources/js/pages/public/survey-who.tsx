@@ -12,7 +12,7 @@ interface Props {
  * The page of the session QR code: the trainee picks his name among those
  * who have not answered yet, then reaches his own questionnaire.
  */
-export default function SurveyWho({ organisme, title, session, people }: Props) {
+export default function SurveyWho({ organisme, title, session, trainees }: Props) {
     return (
         <AuthLayout title={title} description={`Session ${session}${organisme ? ` - ${organisme}` : ''}. Qui êtes-vous ?`}>
             <Head title="Questionnaire" />
