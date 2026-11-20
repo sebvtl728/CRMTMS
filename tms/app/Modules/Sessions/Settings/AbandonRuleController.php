@@ -25,6 +25,7 @@ class AbandonRuleController extends Controller
     {
         return Inertia::render('admin/abandon-rule', [
             'rule' => AbandonRule::forTenant($this->tenants->current()),
+            'trainer_follow_up_months' => TrainerFollowUp::months($this->tenants->current()),
             'status' => $request->session()->get('status'),
         ]);
     }
@@ -66,5 +67,28 @@ class AbandonRuleController extends Controller
         });
 
         return to_route('admin.abandon-rule.edit')->with('status', 'Règle d\'abandon enregistrée.');
+    }
+
+    /** « Suivi des apprenants »: the trainer's follow-up call delay (lot 1e). */
+    public function updateTrainerFollowUp(Request $request): RedirectResponse
+    {
+        $months = (int) $request->validate(
+            ['months' => ['required', 'integer', 'between:0,'.TrainerFollowUp::MAX]],
+            ['months.*' => 'Le délai du suivi formateur est un nombre de mois de 0 à 36.'],
+        )['months'];
+
+        DB::transaction(function () use ($months): void {
+            $tenant = Tenant::query()->lockForUpdate()->findOrFail($this->tenants->id());
+            $old = TrainerFollowUp::months($tenant);
+            if ($old === $months) {
+                return;
+            }
+            $settings = $tenant->settings ?? [];
+            $settings['sessions']['trainer_follow_up_months'] = $months;
+            $tenant->forceFill(['settings' => $settings])->save();
+            $this->audit->record('settings.trainer_follow_up_changed', $tenant, ['months' => $old], ['months' => $months]);
+        });
+
+        return to_route('admin.abandon-rule.edit')->with('status', 'Délai du suivi formateur enregistré.');
     }
 }

@@ -33,6 +33,7 @@ class ReferenceController extends Controller
                 'has_planning' => $list->hasPlanning(),
                 'has_quote_stage' => $list->hasQuoteStage(),
                 'has_force_majeure' => $list->hasForceMajeure(),
+                'has_reached' => $list->hasReached(),
                 'has_default_for' => $list->hasDefaultFor(),
                 'has_external_billing' => $list->hasExternalBilling(),
                 'items' => ($items[$list->value] ?? collect())->map(fn (ReferenceItem $i) => [
@@ -162,6 +163,7 @@ class ReferenceController extends Controller
             'meta.planning' => ['nullable', Rule::in(array_keys(ReferenceItem::PLANNING_KINDS))],
             'meta.quote_stage' => ['nullable', 'boolean'],
             'meta.force_majeure' => ['nullable', 'boolean'],
+            'meta.reached' => ['nullable', 'boolean'],
             'meta.default_for' => ['nullable', Rule::in(array_keys(ReferenceItem::DEFAULT_FOR))],
             'meta.external_billing' => ['nullable', 'boolean'],
         ], [
@@ -213,6 +215,14 @@ class ReferenceController extends Controller
                 $meta['quote_stage'] = true;
             } else {
                 unset($meta['quote_stage']);
+            }
+        }
+        // « Joint » flag of an action result: kept unless the form sends it.
+        if ($list->hasReached() && array_key_exists('reached', $input)) {
+            if ((bool) $input['reached']) {
+                $meta['reached'] = true;
+            } else {
+                unset($meta['reached']);
             }
         }
         // Force majeure flag of an abandon reason: kept unless the form sends it.

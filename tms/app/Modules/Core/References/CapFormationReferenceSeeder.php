@@ -30,6 +30,9 @@ final class CapFormationReferenceSeeder
         'Perdu' => [0, 'lost'],
     ];
 
+    /** The action result that counts a call as answered (meta.reached, lot 1e), by code. */
+    public const REACHED = 'reussi';
+
     /** Abandon reasons that are a force majeure (never a dédit), by code. */
     private const FORCE_MAJEURE = ['maladie', 'accident'];
 
@@ -81,6 +84,9 @@ final class CapFormationReferenceSeeder
                     $code = Str::slug($label);
                     $planning = $list === ReferenceList::ActionType->value ? (self::PLANNING[$code] ?? null) : null;
                     $meta = $planning === null ? null : ['planning' => $planning];
+                    if ($list === ReferenceList::ActionResult->value && $code === self::REACHED) {
+                        $meta = ['reached' => true];
+                    }
                     if ($list === ReferenceList::AbandonReason->value && in_array($code, self::FORCE_MAJEURE, true)) {
                         $meta = ['force_majeure' => true];
                     }

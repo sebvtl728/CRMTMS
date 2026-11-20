@@ -19,6 +19,7 @@ type ReferenceMeta = {
     planning?: 'meeting' | 'call' | null;
     quote_stage?: boolean;
     force_majeure?: boolean;
+    reached?: boolean;
     default_for?: 'organisation' | 'person' | null;
     external_billing?: boolean;
 };
@@ -47,6 +48,7 @@ interface ReferenceListData {
     has_planning: boolean;
     has_quote_stage: boolean;
     has_force_majeure: boolean;
+    has_reached: boolean;
     has_default_for: boolean;
     has_external_billing: boolean;
     items: ReferenceItem[];
@@ -65,6 +67,7 @@ interface EditorState {
     planning: string; // '' = not in the planning
     quoteStage: boolean;
     forceMajeure: boolean;
+    reached: boolean;
     defaultFor: string; // '' = none
     externalBilling: boolean;
 }
@@ -106,6 +109,7 @@ export default function ReferencesIndex({ lists, status }: ReferencesIndexProps)
             planning: item?.meta.planning ?? '',
             quoteStage: item?.meta.quote_stage === true,
             forceMajeure: item?.meta.force_majeure === true,
+            reached: item?.meta.reached === true,
             defaultFor: item?.meta.default_for ?? '',
             externalBilling: item?.meta.external_billing === true,
         });
@@ -121,6 +125,7 @@ export default function ReferencesIndex({ lists, status }: ReferencesIndexProps)
         if (list.has_planning) meta.planning = editor.planning === '' ? null : (editor.planning as 'meeting' | 'call');
         if (list.has_quote_stage && !closing) meta.quote_stage = editor.quoteStage;
         if (list.has_force_majeure) meta.force_majeure = editor.forceMajeure;
+        if (list.has_reached) meta.reached = editor.reached;
         if (list.has_default_for) meta.default_for = editor.defaultFor === '' ? null : (editor.defaultFor as 'organisation' | 'person');
         if (list.has_external_billing) meta.external_billing = editor.externalBilling;
         const payload = { label: editor.label, meta };
@@ -236,6 +241,7 @@ export default function ReferencesIndex({ lists, status }: ReferencesIndexProps)
                                     <Badge variant="outline">Planning : {PLANNING_KINDS[item.meta.planning]}</Badge>
                                 )}
                                 {list.has_force_majeure && item.meta.force_majeure && <Badge variant="outline">Force majeure</Badge>}
+                                {list.has_reached && item.meta.reached && <Badge variant="outline">Joint</Badge>}
                                 {list.has_default_for && item.meta.default_for && (
                                     <Badge variant="outline">Par défaut : {DEFAULT_FOR[item.meta.default_for]}</Badge>
                                 )}
@@ -375,6 +381,23 @@ export default function ReferencesIndex({ lists, status }: ReferencesIndexProps)
                                     retire des autres.
                                 </p>
                                 <InputError message={errors['meta.quote_stage']} />
+                            </div>
+                        )}
+
+                        {list.has_reached && (
+                            <div className="grid gap-1">
+                                <label className="flex items-center gap-2 text-sm">
+                                    <input
+                                        type="checkbox"
+                                        checked={editor?.reached ?? false}
+                                        onChange={(e) => setEditor((s) => s && { ...s, reached: e.target.checked })}
+                                    />
+                                    Compte comme joint
+                                </label>
+                                <p className="text-muted-foreground text-xs">
+                                    Un appel fait avec ce résultat compte dans le taux de réponse des tableaux de bord.
+                                </p>
+                                <InputError message={errors['meta.reached']} />
                             </div>
                         )}
 

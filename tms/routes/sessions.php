@@ -22,6 +22,7 @@ use Illuminate\Support\Facades\Route;
 Route::middleware(['auth', 'can:settings.manage'])->prefix('admin/abandon-rule')->name('admin.abandon-rule.')->group(function () {
     Route::get('/', [AbandonRuleController::class, 'edit'])->name('edit');
     Route::put('/', [AbandonRuleController::class, 'update'])->name('update');
+    Route::put('trainer-follow-up', [AbandonRuleController::class, 'updateTrainerFollowUp'])->name('trainer-follow-up');
 });
 
 // Identity searches (people with their birth date, entreprises): the named

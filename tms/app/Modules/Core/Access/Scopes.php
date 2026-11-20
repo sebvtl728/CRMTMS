@@ -53,8 +53,15 @@ final class Scopes
     }
 
     /**
+     * Rights a trainer holds on his own records besides « Ses séances »
+     * (lot 1e: his follow-up calls in « À faire »); they keep him a trainer.
+     */
+    public const TRAINER_OWN_EXTRAS = ['crm.activities.view', 'crm.activities.update'];
+
+    /**
      * The user holds rights, all of them on « Ses séances » only (a trainer
-     * and nothing else): the menu shows « Mon planning » alone.
+     * and nothing else; his own actions besides): the menu shows « Mon
+     * planning » and « À faire ».
      */
     public static function trainerOnly(User $user): bool
     {
@@ -63,7 +70,11 @@ final class Scopes
             if (! $user->can($permission)) {
                 continue;
             }
-            if (self::of($user, $permission) !== AccessScope::Trainer) {
+            $scope = self::of($user, $permission);
+            if ($scope === AccessScope::Own && in_array($permission, self::TRAINER_OWN_EXTRAS, true)) {
+                continue;
+            }
+            if ($scope !== AccessScope::Trainer) {
                 return false;
             }
             $held++;

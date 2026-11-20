@@ -100,7 +100,8 @@ const adminNavItems: (NavItem & { permission: string })[] = [
     { title: 'Sécurité', url: '/admin/security', icon: ShieldCheck, permission: 'settings.manage' },
     { title: 'Champs personnalisés', url: '/admin/custom-fields', icon: SlidersHorizontal, permission: 'settings.manage' },
     { title: 'Sauvegardes', url: '/admin/backups', icon: DatabaseBackup, permission: 'settings.manage' },
-    { title: "Règle d'abandon", url: '/admin/abandon-rule', icon: UserMinus, permission: 'settings.manage' },
+    { title: "Règle d'abandon et suivi", url: '/admin/abandon-rule', icon: UserMinus, permission: 'settings.manage' },
+    { title: 'Réglages du CRM', url: '/admin/crm-settings', icon: Settings2, permission: 'settings.manage' },
     { title: 'Salles et fermetures', url: '/admin/sessions-settings', icon: DoorOpen, permission: 'sessions.rooms.manage' },
     { title: "Modèles d'e-mails", url: '/admin/mail-templates', icon: Mail, permission: 'settings.manage' },
     { title: 'Modèles de documents', url: '/admin/document-texts', icon: FileSignature, permission: 'settings.manage' },
@@ -138,8 +139,8 @@ export function AppSidebar() {
 
             <SidebarContent>
                 {auth.trainer_only ? (
-                    // A trainer and nothing else: his planning only.
-                    <NavMain items={[myPlanningItem]} label="Navigation" />
+                    // A trainer and nothing else: his planning, and his follow-up calls when he holds them.
+                    <NavMain items={[myPlanningItem, ...commercialItems.filter((item) => item.url === '/crm/todo')]} label="Navigation" />
                 ) : (
                     <>
                         <NavMain items={homeNavItems} label="Navigation" />

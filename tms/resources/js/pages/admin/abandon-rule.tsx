@@ -10,16 +10,23 @@ import { FormEventHandler } from 'react';
 
 interface AbandonRuleProps {
     rule: { mode: 'prorata' | 'prorata_dedit'; dedit_percent: number | null };
+    trainer_follow_up_months: number;
     status?: string;
 }
 
 const breadcrumbs: BreadcrumbItem[] = [{ title: "Règle d'abandon", href: '/admin/abandon-rule' }];
 
-export default function AbandonRule({ rule, status }: AbandonRuleProps) {
+export default function AbandonRule({ rule, trainer_follow_up_months, status }: AbandonRuleProps) {
     const { data, setData, put, processing, errors } = useForm({
         mode: rule.mode,
         dedit_percent: rule.dedit_percent === null ? '' : String(rule.dedit_percent),
     });
+
+    const followUp = useForm({ months: String(trainer_follow_up_months) });
+    const submitFollowUp: FormEventHandler = (e) => {
+        e.preventDefault();
+        followUp.put(route('admin.abandon-rule.trainer-follow-up'), { preserveScroll: true });
+    };
 
     const submit: FormEventHandler = (e) => {
         e.preventDefault();
@@ -93,6 +100,32 @@ export default function AbandonRule({ rule, status }: AbandonRuleProps) {
                     <div>
                         <Button type="submit" disabled={processing}>
                             Enregistrer
+                        </Button>
+                    </div>
+                </form>
+
+                <Heading
+                    title="Suivi des apprenants"
+                    description="Le formateur rappelle chaque apprenant après la fin de sa formation : une action « Appel » lui est créée automatiquement."
+                />
+                <form onSubmit={submitFollowUp} className="flex max-w-xl flex-col gap-3">
+                    <div className="grid gap-2">
+                        <Label htmlFor="follow_up_months">Délai du suivi formateur (mois après la fin, 0 = aucun suivi)</Label>
+                        <Input
+                            id="follow_up_months"
+                            type="number"
+                            min={0}
+                            max={36}
+                            step={1}
+                            className="w-40"
+                            value={followUp.data.months}
+                            onChange={(e) => followUp.setData('months', e.target.value)}
+                        />
+                        <InputError message={followUp.errors.months} />
+                    </div>
+                    <div>
+                        <Button type="submit" disabled={followUp.processing}>
+                            Enregistrer le délai
                         </Button>
                     </div>
                 </form>
