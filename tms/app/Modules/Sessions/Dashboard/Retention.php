@@ -50,7 +50,7 @@ final class Retention
             ->when(($filters['target'] ?? null) === 'person', fn ($q) => $q->whereNull('dossiers.account_organisation_id'))
             ->where('s.started_on', '<=', $to)
             ->orderBy('s.started_on')
-            ->get(['dossiers.account_organisation_id', 'dossiers.account_person_id', 's.started_on']);
+            ->toBase()->get(['dossiers.account_organisation_id', 'dossiers.account_person_id', 's.started_on']);
 
         $byClient = [];
         foreach ($dossiers as $d) {
