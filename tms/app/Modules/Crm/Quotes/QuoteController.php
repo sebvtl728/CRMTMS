@@ -112,6 +112,7 @@ class QuoteController extends Controller
                     'at' => $quote->signed_at?->toIso8601String(),
                     'url' => route('crm.quotes.signed.show', $quote),
                 ],
+                'signature' => QuoteSignatures::state($quote),
                 'replaced_by' => $replacedBy === null ? null : ['id' => $replacedBy->id, 'number' => $replacedBy->number],
                 'email' => $quote->email_status === null ? null : [
                     'status' => $quote->email_status,
@@ -155,6 +156,8 @@ class QuoteController extends Controller
                 'resend' => $quote->email_status === 'failed' && $pdfAvailable && $canUpdate,
                 'answer' => $quote->isAwaitingAnswer() && $canUpdate,
                 'attachSigned' => $quote->status === QuoteStatus::Accepted && $canUpdate,
+                // « Bon pour accord » online: a sent quote with its archive.
+                'sign' => $quote->isAwaitingAnswer() && $pdfAvailable && $canUpdate,
             ],
             // A sent quote without its archive: no PDF link, no reminder.
             'pdf_available' => $pdfAvailable,

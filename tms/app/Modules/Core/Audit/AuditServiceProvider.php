@@ -7,6 +7,7 @@ use App\Modules\Core\Access\RoleModel;
 use App\Modules\Core\Companies\Company;
 use App\Modules\Core\Mail\MailTemplate;
 use App\Modules\Core\References\ReferenceItem;
+use App\Modules\Core\Signatures\SignatureRequest;
 use App\Modules\Core\Tenancy\Tenant;
 use App\Modules\Core\Users\Invitation;
 use App\Modules\Core\Users\User;
@@ -21,6 +22,7 @@ class AuditServiceProvider extends ServiceProvider
             'tenant' => Tenant::class,
             'user' => User::class,
             'invitation' => Invitation::class,
+            SignatureRequest::MORPH_ALIAS => SignatureRequest::class,
             'company' => Company::class,
             'reference_item' => ReferenceItem::class,
             'role' => RoleModel::class,

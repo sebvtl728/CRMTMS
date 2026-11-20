@@ -54,6 +54,9 @@ final class DossierDocumentsBlock
                         ? DocumentSending::query()->where('document_id', $d->id)->where('status', 'failed')->latest('created_at')->value('error') : null,
                     'cancel_reason' => $d->cancel_reason,
                     'defaults' => $canManage && ! $d->isCancelled() ? DocumentMail::defaults($d) : null,
+                    'signature' => DocumentSignatures::state($d),
+                    'can_sign' => $canManage && in_array($d->type, [DocumentType::Convention->value, DocumentType::Contract->value], true)
+                        && ! $d->isCancelled() && $d->status !== DocumentStatus::Signed,
                 ])->values()->all(),
             ],
         ];

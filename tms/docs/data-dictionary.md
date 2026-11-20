@@ -744,6 +744,9 @@ Clé (`tenant_id`, `year`) : `last_number` (année de Paris, incrémenté dans l
 
 `companies.signature_path` : image de signature et cachet (disque privé).
 
+### `signature_requests` — signatures en ligne (socle)
+`subject_type` (alias : `document`, `quote`) · `subject_id` · `title` · `pdf_path`, `pdf_sha256` (le PDF à signer, jamais modifié) · `signer_name`, `signer_email`, `signer_person_id` (personnels, effacés par l'anonymisation) · `token_hash` (sha256 du lien, unique) · `expires_at` (30 jours, fin de journée de Paris) · `status` (`pending`, `signed`, `cancelled`) · `code_hash` (HMAC du code), `code_expires_at`, `code_attempts`, `code_sent_at` · `signed_at`, `signed_ip`, `signed_user_agent` · `signed_pdf_path`, `signed_pdf_sha256` (original + page de preuve) · `created_by`.
+
 Permissions : `documents.view`, `documents.manage` (à périmètre, celui du dossier).
 
 ## Module Qualité

@@ -2,8 +2,8 @@
 
 Depuis la 0.10, le TMS produit les documents d'un dossier avec ses données : **convention de formation** (contractant
 entreprise) et **contrat de formation** (particulier) pour le dossier ; **convocation**, **attestation de fin de
-formation** et **certificat de réalisation** pour chaque stagiaire (§ 6). La signature en ligne arrive avec la
-livraison suivante de la 0.10.
+formation** et **certificat de réalisation** pour chaque stagiaire (§ 6). La convention et le contrat se signent en
+ligne (§ 7).
 
 ## 1. Droits
 
@@ -80,8 +80,30 @@ sortis) avec, pour chacun, sa convocation, son attestation et son certificat.
 - La synthèse de la session porte deux cartes : **Convocations** (envoyées / stagiaires) et **Attestations** (émises /
   stagiaires, à faire après la fin de la formation).
 
+## 7. Signature en ligne
+
+**Demander la signature** (convention ou contrat émis, droit « Émettre les documents ») envoie au signataire un **lien
+personnel**, valable **30 jours** :
+
+1. il ouvre le lien (sans compte), lit le document ;
+2. coche « J'ai lu le document et j'accepte de le signer électroniquement » ;
+3. demande son **code** (6 chiffres, envoyé à son adresse e-mail, valable **10 minutes**, 5 essais ; un nouveau code
+   au plus par minute) ;
+4. saisit le code et **signe**.
+
+Le PDF signé = le document émis (jamais modifié) suivi d'une **page de preuve** : signataire, adresse e-mail vérifiée,
+date et heure de Paris, adresse IP, navigateur, empreinte SHA-256 du document, référence de la signature. C'est une
+**signature électronique simple**. Le signataire reçoit une copie du PDF signé ; le document passe à **Signé**, le dossier
+à **Convention signée** (ce qui fait partir le délai de rétractation de 14 jours d'un particulier). Le bloc du dossier
+propose le **PDF signé**.
+
+Un nouvel envoi remplace le lien précédent ; annuler le document rend le lien invalide. Les e-mails (« Demande de
+signature en ligne », « Code de signature », « Confirmation de signature ») se modifient dans Administration ›
+Modèles d'e-mails ; la demande doit garder `{lien}`, le code `{code}`.
+
 ## 5. Données personnelles
 
 Le document émis est conservé (preuve de la formation). L'anonymisation d'une personne efface le destinataire figé
 (particulier : nom et adresse ; convention : contact et e-mail) et l'adresse, l'objet et le message des e-mails ; le PDF
-archivé est gardé. L'export des données d'une personne liste les documents qui la nomment.
+archivé est gardé ; ses signatures en ligne perdent nom, adresse e-mail, adresse IP et navigateur. L'export des données
+d'une personne liste les documents qui la nomment.

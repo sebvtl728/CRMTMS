@@ -172,8 +172,9 @@ services:
     networks:
       - tms
 
-  # HTML -> PDF (quotes). Internal only: no published port. Chromium without
-  # JavaScript nor outbound access (documents are self-contained); unused routes off.
+  # HTML -> PDF (quotes, invoices, documents) and PDF merge (signature proof).
+  # Internal only: no published port. Chromium without JavaScript nor outbound
+  # access (documents are self-contained); LibreOffice routes off.
   gotenberg:
     image: gotenberg/gotenberg:8.40
     restart: unless-stopped
@@ -183,8 +184,8 @@ services:
       "--chromium-deny-private-ips=true",
       "--api-disable-download-from=true",
       "--webhook-disable=true",
-      "--libreoffice-disable-routes=true",
-      "--pdfengines-disable-routes=true"]
+      "--libreoffice-disable-routes=true"]
+    # PDF engines routes stay on: the online signature merges a document and its proof page (0.10).
     healthcheck:
       test: ["CMD", "curl", "-fsS", "-o", "/dev/null", "http://127.0.0.1:3000/health"]
       interval: 15s

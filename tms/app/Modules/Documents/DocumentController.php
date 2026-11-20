@@ -3,6 +3,7 @@
 namespace App\Modules\Documents;
 
 use App\Http\Controllers\Controller;
+use App\Modules\Core\Signatures\Signatures;
 use App\Modules\Core\Users\User;
 use App\Modules\Documents\Texts\DocumentType;
 use App\Modules\Sessions\Public\Paperwork;
@@ -88,6 +89,29 @@ class DocumentController extends Controller
         $sender->send($user, $document, $request->only(['to', 'subject', 'body']));
 
         return back()->with('status', 'Envoi de '.$document->number.' en cours.');
+    }
+
+    /** « Demander la signature »: the signer's link by e-mail. */
+    public function requestSignature(Request $request, Document $document, DocumentSignatures $signatures): RedirectResponse
+    {
+        $user = self::manager($request, $document);
+        $signatures->request($user, $document, (string) $request->input('email', ''));
+
+        return back()->with('status', 'Lien de signature envoyé pour '.$document->number.'.');
+    }
+
+    /** The signed PDF (with its proof page). */
+    public function signed(Document $document): Response
+    {
+        $signature = Signatures::latestFor(DocumentSignatures::SUBJECT, $document->id);
+        abort_if($signature === null || $signature->status !== 'signed', 404);
+
+        return response(Signatures::signedPdf($signature), 200, [
+            'Content-Type' => 'application/pdf',
+            'Content-Disposition' => 'inline; filename="'.$document->number.'-signe.pdf"',
+            'Cache-Control' => 'private, no-store',
+            'X-Content-Type-Options' => 'nosniff',
+        ]);
     }
 
     public function cancel(Request $request, Document $document, DocumentIssuer $issuer): RedirectResponse

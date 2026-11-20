@@ -155,6 +155,22 @@ final class QuoteSignedCopy
     }
 
     /**
+     * The PDF signed online (Core\Signatures) stored as the signed copy of an
+     * accepted quote, in the caller's transaction.
+     */
+    public function storePdf(Quote $quote, string $content): void
+    {
+        $path = TenantStorage::path('quotes', $quote->id).'/signe-en-ligne.pdf';
+        Storage::disk(TenantStorage::DISK)->put($path, $content);
+        $previous = $quote->signed_path;
+        $quote->forceFill(['signed_path' => $path, 'signed_name' => $quote->number.'-signe.pdf', 'signed_at' => now()])->save();
+        $this->audit->record('quote.signed_added', $quote, [], ['type' => 'pdf', 'size' => strlen($content), 'sha256' => hash('sha256', $content), 'online' => true]);
+        if ($previous !== null && $previous !== $path && self::isOwnPath($quote, $previous)) {
+            DB::afterCommit(fn () => Storage::disk(TenantStorage::DISK)->delete($previous));
+        }
+    }
+
+    /**
      * The stored copy (path and MIME type), null without one or when the file
      * is missing.
      *

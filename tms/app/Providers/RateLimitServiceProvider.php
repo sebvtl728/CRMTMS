@@ -36,6 +36,8 @@ class RateLimitServiceProvider extends ServiceProvider
         // Online test page: answers saved as typed (debounced) and traces.
         'positioning-test' => 240,
         'positioning-send' => 20,
+        // Online signature page (signer, no account: per address).
+        'signature-public' => 30,
     ];
 
     /**

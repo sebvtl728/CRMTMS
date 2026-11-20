@@ -13,6 +13,8 @@ use App\Modules\Core\Access\Scopes;
 use App\Modules\Core\Audit\MorphAliases;
 use App\Modules\Core\References\ReferenceList;
 use App\Modules\Core\References\ReferenceUsage;
+use App\Modules\Core\Signatures\Events\SignatureCompleted;
+use App\Modules\Core\Signatures\Signatures;
 use App\Modules\Core\Users\User;
 use App\Modules\Crm\Activities\ActivitiesProvider;
 use App\Modules\Crm\Activities\Activity;
@@ -44,7 +46,10 @@ use App\Modules\Crm\Quotes\Quote;
 use App\Modules\Crm\Quotes\QuoteBrochure;
 use App\Modules\Crm\Quotes\QuoteLine;
 use App\Modules\Crm\Quotes\QuotePolicy;
+use App\Modules\Crm\Quotes\QuoteSignatures;
+use App\Modules\Crm\Quotes\QuoteSignedCopy;
 use App\Modules\Crm\Quotes\QuotesProvider;
+use App\Modules\Crm\Quotes\QuoteTransitions;
 use App\Modules\Crm\Revenue\RevenueTarget;
 use App\Modules\Crm\Search\SavedFilter;
 use App\Modules\Crm\Support\CrmMailTemplates;
@@ -137,6 +142,9 @@ class CrmServiceProvider extends ServiceProvider
         self::registerContactSources();
         FollowedDas::registerOnUsersPage();
         Event::listen(PrimaryRoleChanged::class, FollowedDas::onRoleChanged(...));
+        // « Bon pour accord » signed online: the quote is accepted (Core\Signatures).
+        Event::listen(SignatureCompleted::class, fn (SignatureCompleted $e) => QuoteSignatures::completed($e, app(QuoteTransitions::class), app(QuoteSignedCopy::class)));
+        Signatures::registerGuard(QuoteSignatures::SUBJECT, fn (string $quoteId): ?string => QuoteSignatures::refusal($quoteId));
         Event::listen(RoleScopesChanged::class, FollowedDas::onRoleScopesChanged(...));
         // « Confier à… »: the new responsible is told by e-mail (queued, after commit).
         Event::listen(ActivityAssigned::class, fn (ActivityAssigned $e) => SendActivityAssigned::dispatch($e->activityId, $e->byUserId, $e->message));
