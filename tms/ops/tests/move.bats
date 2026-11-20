@@ -157,7 +157,8 @@ good_export() { tail -n 1 "$BATS_FILE_TMPDIR/export.out"; }
     # Only that file in the output directory (no temporary file left).
     [ "$(ls -A "$BATS_FILE_TMPDIR/export" | wc -l | tr -d ' ')" -eq 1 ]
     # One restic repository inside, nothing readable: no secret, no personal data, no APP_KEY.
-    tar -tf "$file" | grep -qx 'repo/config'
+    # grep reads the whole list (-q would stop early, tar then fails on a write error).
+    tar -tf "$file" | grep -x 'repo/config' >/dev/null
     refute grep -qaF "$CONNECTOR_SECRET" "$file"
     refute grep -qaF "admin@a.test" "$file"
     refute grep -qaF "$(cat "$BATS_FILE_TMPDIR/a-app-key")" "$file"
