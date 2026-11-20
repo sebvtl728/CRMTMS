@@ -5,6 +5,15 @@ Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) ; ve
 
 ## [Non publié]
 
+### Ajouté
+
+- **Questionnaires de satisfaction** (Qualiopi, indicateurs 30 et 2) : questionnaire **à chaud** en fin de session
+  (e-mail avec lien personnel et **QR code** à afficher en salle, où le stagiaire choisit son nom) et **à froid** envoyé
+  automatiquement N mois après (3 par défaut), questionnaire entreprise facultatif ; réponses sans compte, une seule par
+  personne. Modèles paramétrables (notes de 1 à 5, choix, texte libre). Résultats sur la session, carte
+  « Satisfaction », satisfaction sur la fiche de l'apprenant, page Qualité › Questionnaires avec export CSV, mesures
+  Qualiopi automatiques. Droits « Consulter les résultats des questionnaires » et « Paramétrer les questionnaires ».
+
 ## [0.11.0] - 2026-11-20
 
 ### Ajouté

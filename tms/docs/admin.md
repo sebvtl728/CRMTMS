@@ -411,3 +411,14 @@ Guide utilisateur : `admissions.md`.
 - **Référentiels › Résultats d'action** : case « Compte comme joint » (taux de réponse des tableaux de bord).
 - La commande `tms:sessions:follow-ups` (6 h 30, heure de Paris) crée les actions de suivi et de réactivation dues.
 
+## 22. Questionnaires de satisfaction (0.11)
+
+- **Administration › Questionnaires** (droit « Paramétrer les questionnaires », par défaut administrateur et
+  direction) : modèles (types, destinataires, actif, par défaut, questions) et délai du questionnaire à froid (3 mois par
+  défaut, de 0 à 24 ; 0 = jamais). Le changement de délai est journalisé. Guide : `questionnaires.md`.
+- Droit « Consulter les résultats des questionnaires » : par défaut administrateur, direction, responsable de DAS,
+  assistant. Il est aussi exigé (sur tout l'organisme) pour télécharger l'export RGPD d'une personne.
+- **Modèles d'e-mails** : « Questionnaire de satisfaction à chaud », « à froid », « entreprise » (`{lien}` obligatoire).
+- La commande `tms:questionnaires:daily` (7 h, heure de Paris) lance les questionnaires à chaud non lancés (lendemain du
+  dernier jour) et les questionnaires à froid dus, organisme par organisme.
+
