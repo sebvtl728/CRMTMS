@@ -27,4 +27,10 @@ Route::middleware(['auth', 'throttle:survey-launch'])->group(function () {
 // the same 404.
 Route::middleware('throttle:survey-public')->prefix('questionnaire')->name('survey.')->group(function () {
     Route::get('{token}', [SurveyAnswerController::class, 'show'])->where('token', '[0-9a-f]{64}')->name('show');
+    Route::post('{token}', [SurveyAnswerController::class, 'submit'])->where('token', '[0-9a-f]{64}')->name('submit');
+    // The session QR code: « Qui êtes-vous ? », then a short signed link to the trainee's questionnaire.
+    Route::get('s/{token}', [SurveyAnswerController::class, 'who'])->where('token', '[0-9a-f]{64}')->name('qr');
+    Route::post('s/{token}', [SurveyAnswerController::class, 'choose'])->where('token', '[0-9a-f]{64}')->name('qr.choose');
+    Route::get('q/{invitation}', [SurveyAnswerController::class, 'signedShow'])->whereUuid('invitation')->middleware('signed')->name('signed.show');
+    Route::post('q/{invitation}', [SurveyAnswerController::class, 'signedSubmit'])->whereUuid('invitation')->middleware('signed')->name('signed.submit');
 });
