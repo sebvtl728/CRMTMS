@@ -37,7 +37,7 @@ it('anonymises a person: no address, no free text, marks kept, links closed', fu
         ->and($lea->response->answers)->not->toHaveKey('commentaires')
         ->and($lea->response->answers['global'])->toBe(4)
         ->and($lea->response->score)->toBe(400)
-        ->and($tom->fresh()->email)->toBeNull();
+        ->and($tom->fresh())->toBeNull();
     $this->get("/questionnaire/{$plain}")->assertNotFound();
 });
 
@@ -76,4 +76,14 @@ it('exports the questionnaires of a person', function () {
 
     expect($export['questionnaires'][0])->toMatchArray(['questionnaire' => 'Questionnaire de satisfaction de fin de formation', 'repondu_le' => '2026-09-01'])
         ->and($export['questionnaires'][0]['reponses']['Vos commentaires et suggestions'])->toBe('Bien');
+});
+
+it('drops the unanswered invitations of an anonymised person (out of the QR list and the rates)', function () {
+    [$session, $people] = svSession();
+    $campaign = app(SurveyLaunch::class)->launch($session->id, 'hot', admin());
+
+    FicheLinks::anonymise([$people['Roux']->id]);
+
+    expect($campaign->invitations()->count())->toBe(2)
+        ->and(collect(SurveyAnswers::waiting($campaign))->pluck('name')->all())->not->toContain('Alex R.');
 });

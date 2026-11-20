@@ -68,13 +68,13 @@ export function SessionSurveysBlock({ session_id, can_launch, ended, qr_url, cam
         <div className="grid gap-3">
             {(can_launch || qr_url) && (
                 <div className="flex flex-wrap gap-2">
-                    {can_launch && (
+                    {can_launch && (!hot || hot.open) && (
                         <Button size="sm" variant={hot ? 'outline' : 'default'} disabled={busy !== null} onClick={() => launch('hot')}>
                             {busy === 'hot' ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
                             {hot ? 'Inviter les nouveaux stagiaires (à chaud)' : 'Lancer le questionnaire à chaud'}
                         </Button>
                     )}
-                    {can_launch && ended && (
+                    {can_launch && ended && (!cold || cold.open) && (
                         <Button size="sm" variant="outline" disabled={busy !== null} onClick={() => launch('cold')}>
                             {busy === 'cold' ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
                             {cold ? 'Inviter les nouveaux stagiaires (à froid)' : 'Envoyer le questionnaire à froid maintenant'}

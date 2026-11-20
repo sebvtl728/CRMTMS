@@ -61,10 +61,13 @@ final class SurveyLaunch
                 return $by === null ? null : throw new UserFacingHttpException(409,
                     'Aucun modèle de questionnaire '.($kind === SurveyCampaign::HOT ? 'à chaud' : 'à froid').' actif par défaut : choisissez-en un dans Administration › Questionnaires.');
             }
+            if (! $campaign->isOpen()) {
+                return $by === null ? null : throw new UserFacingHttpException(409, 'Ce questionnaire est clos : il n\'accepte plus de réponse.');
+            }
             $this->inviteMissing($campaign);
             if ($kind === SurveyCampaign::HOT) {
                 $client = $this->open($sessionId, $kind, SurveyCampaign::CLIENT, $by);
-                if ($client !== null) {
+                if ($client !== null && $client->isOpen()) {
                     $this->inviteMissing($client);
                 }
             }
@@ -82,7 +85,8 @@ final class SurveyLaunch
         $recipients = $campaign->audience === SurveyCampaign::TRAINEE
             ? array_map(fn (array $t) => ['person_id' => $t['person_id'], 'enrolment_id' => $t['enrolment_id']], Surveys::trainees($campaign->training_session_id))
             : array_map(fn (string $id) => ['person_id' => $id, 'enrolment_id' => null], Surveys::clientContacts($campaign->training_session_id));
-        $known = $campaign->invitations()->pluck('person_id')->all();
+        // Never an anonymised person (nobody to ask; she would lower the response rate).
+        $known = [...$campaign->invitations()->pluck('person_id')->all(), ...$this->fiches->anonymisedIds(array_column($recipients, 'person_id'))];
         $recipients = array_values(array_filter($recipients, fn (array $r) => ! in_array($r['person_id'], $known, true)));
         $emails = $this->fiches->personEmails(array_column($recipients, 'person_id'));
         $created = 0;

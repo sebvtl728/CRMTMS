@@ -132,3 +132,12 @@ it('refuses a second response sent at the same time', function () {
         ->toThrow(UserFacingHttpException::class, 'Vous avez déjà répondu à ce questionnaire.');
     expect(SurveyResponse::query()->count())->toBe(1);
 });
+
+it('lets a room of trainees behind one address use the QR code (no 429)', function () {
+    [$campaign] = svLaunched();
+    $qr = Crypt::decryptString($campaign->qr_token_encrypted);
+
+    foreach (range(1, 60) as $i) {
+        $this->get("/questionnaire/s/{$qr}")->assertOk();
+    }
+});

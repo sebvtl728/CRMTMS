@@ -11,7 +11,8 @@ use Illuminate\Support\Facades\DB;
  * What the questionnaires keep on a person, for the CRM (FicheLinks):
  * linked data (an invitation keeps the fiche on an import undo), merge
  * (repoint; one invitation per campaign, the answered one wins), anonymisation
- * (address and free texts cleared, marks and choices kept, links closed) and
+ * (unanswered invitations dropped; address and free texts cleared, marks and
+ * choices kept, links closed) and
  * the RGPD export.
  */
 final class SurveyPersonData
@@ -54,6 +55,12 @@ final class SurveyPersonData
         $questions = SurveyCampaign::query()->whereKey($invitations->pluck('campaign_id')->unique()->values())->get(['id', 'questions'])->keyBy('id');
         DB::transaction(function () use ($invitations, $questions): void {
             foreach ($invitations as $invitation) {
+                // Not answered: nobody to ask any more (out of the QR list and the rates).
+                if ($invitation->answered_at === null) {
+                    $invitation->delete();
+
+                    continue;
+                }
                 $texts = collect($questions[$invitation->campaign_id]->questions ?? [])->where('type', 'text')->pluck('id')->all();
                 $response = SurveyResponse::query()->where('invitation_id', $invitation->id)->first();
                 if ($response !== null && $texts !== []) {

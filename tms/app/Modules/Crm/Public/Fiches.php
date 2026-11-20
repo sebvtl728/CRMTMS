@@ -144,6 +144,23 @@ final class Fiches
     }
 
     /**
+     * The ids among these that belong to anonymised people (trashed ones
+     * included).
+     *
+     * @param  list<string>  $ids
+     * @return list<string>
+     */
+    public function anonymisedIds(array $ids): array
+    {
+        $ids = array_values(array_unique(array_filter($ids, fn (string $id) => Str::isUuid($id))));
+        if ($ids === []) {
+            return [];
+        }
+
+        return Person::withTrashed()->whereKey($ids)->whereNotNull('anonymised_at')->pluck('id')->map(fn ($id) => (string) $id)->all();
+    }
+
+    /**
      * Ids of the people of the organisme (out of the trash, not anonymised)
      * whose primary e-mail is $email, case-insensitive.
      *

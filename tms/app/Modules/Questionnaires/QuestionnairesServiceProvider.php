@@ -31,6 +31,12 @@ use Illuminate\Support\ServiceProvider;
  */
 class QuestionnairesServiceProvider extends ServiceProvider
 {
+    /**
+     * Public pages per minute and address: a whole room answering through
+     * the QR code shares the Wi-Fi of the venue (about 5 requests each).
+     */
+    public const PUBLIC_PER_MINUTE = 150;
+
     public function register(): void
     {
         CorePermissions::registerModule('questionnaires', Permissions::all(), Permissions::defaultsFor(...), Permissions::labels(), Permissions::GROUP);
@@ -53,7 +59,7 @@ class QuestionnairesServiceProvider extends ServiceProvider
         FicheLinks::registerExport('questionnaires', fn (string $personId): array => SurveyPersonData::export($personId), [Permissions::VIEW]);
         SessionCards::register('questionnaires', fn (array $sessionIds, User $viewer) => SessionSurveysBlock::cards($sessionIds, $viewer));
         RateLimiter::for('survey-launch', fn (Request $request) => Limit::perMinute(20)->by('survey-launch:'.($request->user()?->getAuthIdentifier() ?? $request->ip())));
-        RateLimiter::for('survey-public', fn (Request $request) => Limit::perMinute(30)->by('survey-public:'.$request->ip()));
+        RateLimiter::for('survey-public', fn (Request $request) => Limit::perMinute(self::PUBLIC_PER_MINUTE)->by('survey-public:'.$request->ip()));
         Route::pattern('surveyTemplate', '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}');
     }
 }

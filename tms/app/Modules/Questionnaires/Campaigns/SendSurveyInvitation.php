@@ -29,8 +29,8 @@ use Throwable;
 /**
  * Sends one questionnaire invitation: its e-mail template filled in, {lien}
  * the personal link (the plain token travels in the encrypted payload only,
- * never in the database). Reads the current row: a replay after success, an
- * answered or anonymised invitation does nothing. Three tries, then
+ * never in the database). Reads the current row: a replay after success or
+ * an invitation answered meanwhile does nothing; an anonymised one fails. Three tries, then
  * « failed » with a fixed French reason, never the server's text.
  */
 class SendSurveyInvitation implements ShouldBeEncrypted, ShouldQueue
@@ -56,7 +56,11 @@ class SendSurveyInvitation implements ShouldBeEncrypted, ShouldQueue
         if ($invitation === null || $invitation->email_status !== SurveyInvitation::PENDING) {
             return;
         }
-        if ($invitation->email === null || $invitation->answered_at !== null) {
+        // Answered meanwhile (the QR code in the room): nothing to send, nothing failed.
+        if ($invitation->answered_at !== null) {
+            return;
+        }
+        if ($invitation->email === null) {
             $this->failed(new SurveyMailFailed('Plus aucune adresse : l\'e-mail n\'est pas parti.'));
 
             return;

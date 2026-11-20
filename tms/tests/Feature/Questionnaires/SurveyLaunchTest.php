@@ -2,6 +2,7 @@
 
 use App\Exceptions\UserFacingHttpException;
 use App\Modules\Core\References\ReferenceList;
+use App\Modules\Crm\Public\FicheLinks;
 use App\Modules\Questionnaires\Campaigns\SendSurveyInvitation;
 use App\Modules\Questionnaires\Campaigns\SurveyLaunch;
 use App\Modules\Questionnaires\Campaigns\SurveyMail;
@@ -125,4 +126,41 @@ it('records a failure without the server text', function () {
     $invitation = SurveyInvitation::query()->sole();
     expect($invitation->email_status)->toBe('failed')
         ->and($invitation->email_error)->toBe("Le serveur d'envoi a refusé le message (code 550).");
+});
+
+it('refuses to invite again once the campaign is closed, and skips it when automatic', function () {
+    Queue::fake();
+    [$session] = svSession();
+    app(SurveyLaunch::class)->launch($session->id, 'hot', admin());
+    $this->travel(31)->days();
+    l2Enrol(Dossier::query()->firstOrFail(), $session, makePerson('Blanc', ['email' => 'zoe.blanc@example.test']));
+
+    expect(fn () => app(SurveyLaunch::class)->launch($session->id, 'hot', admin()))
+        ->toThrow(UserFacingHttpException::class, 'Ce questionnaire est clos : il n\'accepte plus de réponse.')
+        ->and(app(SurveyLaunch::class)->launch($session->id, 'hot', null))->toBeNull()
+        ->and(SurveyInvitation::query()->count())->toBe(3);
+});
+
+it('never invites an anonymised trainee', function () {
+    Queue::fake();
+    [$session, $people] = svSession();
+    FicheLinks::anonymise([$people['Roux']->id]);
+    $people['Roux']->forceFill(['anonymised_at' => now()])->save();
+
+    $campaign = app(SurveyLaunch::class)->launch($session->id, 'hot', admin());
+
+    expect($campaign->invitations()->pluck('person_id')->all())->not->toContain($people['Roux']->id)
+        ->and($campaign->invitations()->count())->toBe(2);
+});
+
+it('leaves an invitation answered before its e-mail left untouched, never failed', function () {
+    Queue::fake();
+    [$session, $people] = svSession('2026-08-31', ['Durand' => 'lea.durand@example.test']);
+    app(SurveyLaunch::class)->launch($session->id, 'hot', admin());
+    $invitation = SurveyInvitation::query()->sole();
+    $invitation->forceFill(['answered_at' => now(), 'answered_via' => 'qr'])->save();
+
+    (new SendSurveyInvitation($invitation->id, str_repeat('a', 64)))->handle();
+
+    expect($invitation->fresh()->email_status)->toBe('pending')->and($invitation->fresh()->email_error)->toBeNull();
 });
