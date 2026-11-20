@@ -7,6 +7,8 @@ Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) ; ve
 
 ### Corrigé
 
+- Sessions : la carte « Clôture des mois » de la synthèse compte aussi le dernier mois d'une session à partir de son
+  dernier jour, et affiche « Tous les mois sont clôturés » quand un mois a été clôturé avant la fin du mois.
 - Local : page blanche sur les autres postes du réseau (lien de test de positionnement…). Le serveur Vite de
   développement ne démarre plus avec `docker compose up -d` (profil `dev`) ; les pages utilisent les fichiers construits.
 

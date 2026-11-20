@@ -163,6 +163,9 @@ it('counts past séances without attendance and elapsed months not closed', func
     plSeance($module, '2026-11-20');
     app(Attendances::class)->record($recorded, $lea->id, 'present', null, null);
 
+    // Before the end of the first month: nothing to close yet.
+    expect(scCards($session, today: '2026-09-15')['closures']->toArray())->toMatchArray(['state' => 'na']);
+
     $cards = scCards($session, today: '2026-11-17');
     expect($cards['attendance']->toArray())->toMatchArray(['value' => '1', 'state' => 'todo', 'step' => 'suivi'])
         ->and($cards['closures']->toArray())->toMatchArray(['value' => '2', 'state' => 'todo', 'step' => 'suivi']);
@@ -171,9 +174,23 @@ it('counts past séances without attendance and elapsed months not closed', func
     expect(scCards($session, today: '2026-11-17')['closures']->toArray())->toMatchArray(['value' => '1', 'state' => 'todo']);
     app(Closures::class)->close($session, '2026-10');
     expect(scCards($session, today: '2026-11-17')['closures']->toArray())->toMatchArray(['state' => 'done']);
+});
 
-    // Before the end of the first month: nothing to close yet.
-    expect(scCards($session, today: '2026-09-15')['closures']->toArray())->toMatchArray(['state' => 'na']);
+it('counts the last month of a session ending today, and a month closed early', function () {
+    $session = plSession('2026-11-02', '2026-11-20');
+    $module = plModule($session);
+    $lea = atEnrol($session);
+    app(Attendances::class)->record(plSeance($module, '2026-11-19'), $lea->id, 'present', null, null);
+
+    // Under way, its month not closed: nothing to close yet.
+    expect(scCards($session, today: '2026-11-10')['closures']->toArray())->toMatchArray(['state' => 'na']);
+    // Its last day: its month is to close.
+    expect(scCards($session, today: '2026-11-20')['closures']->toArray())->toMatchArray(['value' => '1', 'state' => 'todo', 'text' => '1 mois à clôturer.']);
+
+    app(Closures::class)->close($session, '2026-11');
+    expect(scCards($session, today: '2026-11-20')['closures']->toArray())->toMatchArray(['value' => '0', 'state' => 'done', 'text' => 'Tous les mois sont clôturés.']);
+    // Closed before its end: shown as closed, not « nothing to close ».
+    expect(scCards($session, today: '2026-11-10')['closures']->toArray())->toMatchArray(['state' => 'done']);
 });
 
 it('returns no card for a cancelled session', function () {
