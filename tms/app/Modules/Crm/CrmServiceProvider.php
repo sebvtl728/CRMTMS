@@ -25,6 +25,10 @@ use App\Modules\Crm\Activities\SendActivityAssigned;
 use App\Modules\Crm\Affiliations\Affiliation;
 use App\Modules\Crm\Brochures\BrochureSending;
 use App\Modules\Crm\Brochures\BrochureSendingsProvider;
+use App\Modules\Crm\Dashboard\Indicators;
+use App\Modules\Crm\Dashboard\Indicators\ActivityIndicators;
+use App\Modules\Crm\Dashboard\Indicators\PipelineIndicators;
+use App\Modules\Crm\Dashboard\Indicators\QuoteIndicators;
 use App\Modules\Crm\Gdpr\Consent;
 use App\Modules\Crm\Import\HeaderChoice;
 use App\Modules\Crm\Import\ImportBatch;
@@ -136,6 +140,10 @@ class CrmServiceProvider extends ServiceProvider
 
     public function boot(): void
     {
+        // Lot 1e: the dashboard cards of the CRM.
+        foreach ([...ActivityIndicators::all(), ...PipelineIndicators::all(), ...QuoteIndicators::all()] as $indicator) {
+            Indicators::register($indicator);
+        }
         self::registerReferenceUsage();
         self::registerLinkedData();
         self::registerTrainingUsage();
