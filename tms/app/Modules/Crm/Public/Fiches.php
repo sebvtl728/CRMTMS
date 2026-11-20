@@ -282,4 +282,23 @@ final class Fiches
         return Opportunity::query()->where($type === 'organisation' ? 'organisation_id' : 'person_id', $id)
             ->whereNull('won_on')->whereNull('lost_on')->exists();
     }
+
+    /**
+     * Responsible user of each fiche (trashed ones included), keyed by id;
+     * unknown ids are left out (lot 1e: the dashboards' commercial filter).
+     *
+     * @param  'organisation'|'person'  $type
+     * @param  list<string>  $ids
+     * @return array<string, string|null>
+     */
+    public function responsibleUsers(string $type, array $ids): array
+    {
+        $ids = array_values(array_unique(array_filter($ids, fn (string $id) => Str::isUuid($id))));
+        if ($ids === []) {
+            return [];
+        }
+        $query = $type === 'organisation' ? Organisation::withTrashed() : Person::withTrashed();
+
+        return $query->whereKey($ids)->pluck('responsible_user_id', 'id')->all();
+    }
 }
