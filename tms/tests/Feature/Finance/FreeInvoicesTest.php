@@ -1,11 +1,20 @@
 <?php
 
+use App\Exceptions\UserFacingHttpException;
+use App\Modules\Core\Access\AccessScope;
 use App\Modules\Finance\Integrity;
+use App\Modules\Finance\Invoices\CreditNotes;
+use App\Modules\Finance\Invoices\FreeInvoices;
 use App\Modules\Finance\Invoices\Invoice;
+use App\Modules\Finance\Invoices\InvoiceDrafts;
 use App\Modules\Finance\Invoices\InvoiceStatus;
+use App\Modules\Finance\Invoices\InvoiceValidator;
+use App\Modules\Finance\Permissions;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
 
 require_once __DIR__.'/Support/free.php';
 require_once __DIR__.'/Support/invoices.php';
@@ -52,7 +61,7 @@ it('freezes the references of a validated free invoice', function () {
 it('shows a free invoice to a scope « Tout » only', function () {
     $invoice = frDraft(frRegion(), [['Composante', 120000, null]]);
     $all = frAccountant();
-    $das = frAccountant(App\Modules\Core\Access\AccessScope::Das);
+    $das = frAccountant(AccessScope::Das);
 
     $this->actingAs($all)->get('/finance/invoices')->assertOk()
         ->assertInertia(fn ($page) => $page->where('invoices.data.0.id', $invoice->id)->where('invoices.data.0.origin', 'free')->where('invoices.data.0.dossier', null));
@@ -78,11 +87,11 @@ it('creates a free draft for a client, refused without the scope « Tout »', fu
     expect($invoice->recipient_id)->toBe($region->id)->and($invoice->buyer_reference)->toBe('EJ-2026-55')
         ->and($invoice->dossier_id)->toBeNull()->and($invoice->isDraft())->toBeTrue();
 
-    $this->actingAs($all)->post('/finance/invoices/free', ['company_id' => $company->id, 'recipient_type' => 'organisation', 'recipient_id' => (string) Illuminate\Support\Str::uuid7()])
-        ->assertSessionHasErrors(['recipient_id' => App\Modules\Finance\Invoices\FreeInvoices::NO_RECIPIENT]);
-    $this->actingAs($all)->post('/finance/invoices/free', ['company_id' => (string) Illuminate\Support\Str::uuid7(), 'recipient_type' => 'organisation', 'recipient_id' => $region->id])
+    $this->actingAs($all)->post('/finance/invoices/free', ['company_id' => $company->id, 'recipient_type' => 'organisation', 'recipient_id' => (string) Str::uuid7()])
+        ->assertSessionHasErrors(['recipient_id' => FreeInvoices::NO_RECIPIENT]);
+    $this->actingAs($all)->post('/finance/invoices/free', ['company_id' => (string) Str::uuid7(), 'recipient_type' => 'organisation', 'recipient_id' => $region->id])
         ->assertSessionHasErrors('company_id');
-    $this->actingAs(frAccountant(App\Modules\Core\Access\AccessScope::Das))
+    $this->actingAs(frAccountant(AccessScope::Das))
         ->post('/finance/invoices/free', ['company_id' => $company->id, 'recipient_type' => 'organisation', 'recipient_id' => $region->id])
         ->assertForbidden();
 });
@@ -104,8 +113,8 @@ it('saves the lines of a free draft with their co-contractor', function () {
         ->and($invoice->lines()->pluck('cotraitant_id')->all())->toBe([null, $partner->id]);
 
     $this->actingAs($all)->put('/finance/invoices/'.$invoice->id, ['lines' => [
-        ['label' => 'Composante', 'quantity' => '1', 'unit' => 'forfait', 'unit_price' => '10', 'cotraitant_id' => (string) Illuminate\Support\Str::uuid7()],
-    ]])->assertSessionHasErrors(['lines.0.cotraitant_id' => App\Modules\Finance\Invoices\InvoiceDrafts::NO_COTRAITANT]);
+        ['label' => 'Composante', 'quantity' => '1', 'unit' => 'forfait', 'unit_price' => '10', 'cotraitant_id' => (string) Str::uuid7()],
+    ]])->assertSessionHasErrors(['lines.0.cotraitant_id' => InvoiceDrafts::NO_COTRAITANT]);
 
     $this->actingAs($all)->post('/finance/invoices/'.$invoice->id.'/recompute')->assertStatus(409);
 });
@@ -116,7 +125,7 @@ it('refuses a co-contractor on a dossier invoice', function () {
     $lines = $draft->lines()->get()->map(fn ($l) => ['id' => $l->id, 'label' => $l->label, 'quantity' => (string) $l->quantity, 'unit' => $l->unit, 'unit_price' => (string) ($l->unit_price_cents / 100)])->all();
     $lines[] = ['label' => 'Ligne', 'quantity' => '1', 'unit' => 'forfait', 'unit_price' => '10', 'cotraitant_id' => frCotraitant()->id];
 
-    expect(fn () => fiDrafts()->update($draft, ['lines' => $lines]))->toThrow(Illuminate\Validation\ValidationException::class);
+    expect(fn () => fiDrafts()->update($draft, ['lines' => $lines]))->toThrow(ValidationException::class);
 });
 
 it('validates a free invoice: number, chained journal, PDF with the buyer references and the co-contractor', function () {
@@ -124,7 +133,7 @@ it('validates a free invoice: number, chained journal, PDF with the buyer refere
     $draft = frDraft(frRegion(), [['Composante S-2026-0001', 120000, null], ['Composante S-2026-0002', 80000, $partner->id]], ['buyer_reference' => 'EJ-123', 'service_code' => 'SERV-9']);
     $user = frAccountant();
 
-    $invoice = app(App\Modules\Finance\Invoices\InvoiceValidator::class)->validate($draft, $user);
+    $invoice = app(InvoiceValidator::class)->validate($draft, $user);
 
     expect($invoice->number)->toEndWith('-2026-00001')
         ->and($invoice->status)->toBe(InvoiceStatus::Validated)->and($invoice->hash)->not->toBeNull()
@@ -138,25 +147,51 @@ it('validates a free invoice: number, chained journal, PDF with the buyer refere
 it('refuses to validate an empty free invoice', function () {
     $draft = frDraft(frRegion(), []);
 
-    expect(fn () => app(App\Modules\Finance\Invoices\InvoiceValidator::class)->validate($draft, frAccountant()))
-        ->toThrow(App\Exceptions\UserFacingHttpException::class);
+    expect(fn () => app(InvoiceValidator::class)->validate($draft, frAccountant()))
+        ->toThrow(UserFacingHttpException::class);
 });
 
 it('credits a free invoice, the co-contractor lines given back, never beyond the invoice', function () {
     $partner = frCotraitant();
     $user = frAccountant();
-    $validator = app(App\Modules\Finance\Invoices\InvoiceValidator::class);
+    $validator = app(InvoiceValidator::class);
     $invoice = $validator->validate(frDraft(frRegion(), [['CAP', 100000, null], ['Co-traitant', 50000, $partner->id]], ['buyer_reference' => 'EJ-1']), $user);
 
     $coLine = $invoice->lines()->where('cotraitant_id', $partner->id)->value('id');
-    $credit = app(App\Modules\Finance\Invoices\CreditNotes::class)->create($user, $invoice, [$coLine]);
+    $credit = app(CreditNotes::class)->create($user, $invoice, [$coLine]);
     expect($credit->isFree())->toBeTrue()->and($credit->dossier_id)->toBeNull()->and($credit->buyer_reference)->toBe('EJ-1')
         ->and($credit->lines()->sole()->cotraitant_id)->toBe($partner->id)->and($credit->total_ht_cents)->toBe(-50000);
-    expect(fn () => app(App\Modules\Finance\Invoices\CreditNotes::class)->create($user, $invoice, [$coLine]))
-        ->toThrow(App\Exceptions\UserFacingHttpException::class);
+    expect(fn () => app(CreditNotes::class)->create($user, $invoice, [$coLine]))
+        ->toThrow(UserFacingHttpException::class);
     $validator->validate($credit, $user);
 
     // Another credit note of the whole invoice would exceed what is left (1 500 − 500).
-    $again = app(App\Modules\Finance\Invoices\CreditNotes::class)->create($user, $invoice);
-    expect(fn () => $validator->validate($again, $user))->toThrow(App\Exceptions\UserFacingHttpException::class);
+    $again = app(CreditNotes::class)->create($user, $invoice);
+    expect(fn () => $validator->validate($again, $user))->toThrow(UserFacingHttpException::class);
+});
+
+it('lists the clients and co-contractors of a free invoice, and offers the creation on « Tout »', function () {
+    frRegion();
+    $person = makePerson('Régnier', ['first_name' => 'Anne']);
+    $all = frAccountant();
+
+    $this->actingAs($all)->getJson('/finance/clients?q=Rég')->assertOk()
+        ->assertJsonFragment(['type' => 'organisation', 'label' => 'Région Pays de la Loire']);
+    $only = $this->actingAs($all)->getJson('/finance/clients?q=Rég&only=organisation')->json('clients');
+    expect(collect($only)->pluck('type')->unique()->all())->toBe(['organisation']);
+    $this->actingAs($all)->getJson('/finance/clients?q=R')->assertOk()->assertExactJson(['clients' => []]);
+    $this->actingAs(userWithPermissions([Permissions::VIEW]))->getJson('/finance/clients?q=Rég')->assertForbidden();
+
+    $this->actingAs($all)->get('/finance/invoices')->assertInertia(fn ($page) => $page->where('can.create_free', true));
+    $this->actingAs(frAccountant(AccessScope::Das))->get('/finance/invoices')
+        ->assertInertia(fn ($page) => $page->where('can.create_free', false));
+});
+
+it('shows the co-contractor of a line on the page of a free invoice', function () {
+    $partner = frCotraitant('Formation Atlantique');
+    $invoice = frDraft(frRegion(), [['Composante', 1000, $partner->id]], ['buyer_reference' => 'EJ-7']);
+
+    $this->actingAs(frAccountant())->get('/finance/invoices/'.$invoice->id)->assertOk()
+        ->assertInertia(fn ($page) => $page->where('invoice.buyer_reference', 'EJ-7')->where('invoice.rhythm_label', null)
+            ->where('invoice.lines.0.cotraitant_id', $partner->id)->where('invoice.lines.0.cotraitant_label', 'Formation Atlantique'));
 });

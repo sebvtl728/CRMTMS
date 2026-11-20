@@ -1,11 +1,14 @@
 <?php
 
 use App\Exceptions\UserFacingHttpException;
+use App\Modules\Core\Access\AccessScope;
 use App\Modules\Finance\Invoices\CreditNotes;
 use App\Modules\Finance\Invoices\InvoiceValidator;
 use App\Modules\Finance\Payouts\CotraitantPayout;
 use App\Modules\Finance\Payouts\CotraitantPayouts;
+use App\Modules\Finance\Permissions;
 use Carbon\CarbonImmutable;
+use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 
 require_once __DIR__.'/Support/free.php';
@@ -53,7 +56,7 @@ it('follows the buyer payment and refuses a payout where nothing is owed', funct
     payRecord($this->user, $this->invoice, 250000);
     expect(poRow()['buyer_paid'])->toBeTrue();
 
-    expect(fn () => app(CotraitantPayouts::class)->record($this->user, $this->invoice->id, (string) Illuminate\Support\Str::uuid7(), ['amount' => '10', 'paid_on' => '2026-11-20']))
+    expect(fn () => app(CotraitantPayouts::class)->record($this->user, $this->invoice->id, (string) Str::uuid7(), ['amount' => '10', 'paid_on' => '2026-11-20']))
         ->toThrow(UserFacingHttpException::class);
 });
 
@@ -71,6 +74,6 @@ it('serves the page and the CSV to who manages payments on « Tout » only', fun
     $csv = str_replace(["\u{202F}", "\u{00A0}"], ' ', (string) $csv);
     expect($csv)->toContain('Facture;"Émise le";Client;Co-traitant')->toContain('"Formation Atlantique";1 000,00;1 000,00;0,00;Non');
 
-    $this->actingAs(frAccountant(App\Modules\Core\Access\AccessScope::Das))->get('/finance/payouts')->assertForbidden();
-    $this->actingAs(userWithPermissions([App\Modules\Finance\Permissions::VIEW]))->get('/finance/payouts')->assertForbidden();
+    $this->actingAs(frAccountant(AccessScope::Das))->get('/finance/payouts')->assertForbidden();
+    $this->actingAs(userWithPermissions([Permissions::VIEW]))->get('/finance/payouts')->assertForbidden();
 });

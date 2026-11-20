@@ -4,10 +4,10 @@ namespace App\Modules\Finance\Invoices;
 
 use App\Exceptions\UserFacingHttpException;
 use App\Modules\Core\Companies\Company;
-use App\Modules\Crm\Public\Fiches;
 use App\Modules\Core\Documents\PdfRenderingFailed;
 use App\Modules\Core\Tenancy\TenantContext;
 use App\Modules\Core\Users\User;
+use App\Modules\Crm\Public\Fiches;
 use App\Modules\Finance\Billing\Particulier;
 use App\Modules\Finance\Integrity;
 use App\Modules\Finance\Plans\BillingPlans;

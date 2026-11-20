@@ -82,6 +82,7 @@ final class InvoiceRows
     {
         $row = $this->rows(new Collection([$invoice]))[0];
         $corrected = $invoice->corrected_invoice_id === null ? null : Invoice::query()->find($invoice->corrected_invoice_id);
+        $cotraitants = InvoiceRecipient::cotraitants($invoice);
 
         return [
             ...$row,
@@ -115,6 +116,7 @@ final class InvoiceRows
                 'planned_minutes' => $l->planned_minutes,
                 'realised_minutes' => $l->realised_minutes,
                 'cotraitant_id' => $l->cotraitant_id,
+                'cotraitant_label' => $l->cotraitant_id === null ? null : ($cotraitants[$l->cotraitant_id] ?? '-'),
             ])->values()->all(),
         ];
     }

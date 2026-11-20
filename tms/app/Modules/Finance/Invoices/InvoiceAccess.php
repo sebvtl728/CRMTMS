@@ -43,7 +43,7 @@ final class InvoiceAccess
         $free = self::all($user, $permission);
 
         return $query->where(fn (Builder $q) => $q
-            ->whereIn('dossier_id', Billing::dossiersFor($user, ['with_trashed' => $options['with_trashed'] ?? false], $permission)->select('dossiers.id'))
+            ->whereIn('dossier_id', Billing::dossiersFor($user, ['with_trashed' => $options['with_trashed'] ?? false], $permission))
             ->when($free, fn (Builder $q) => $q->orWhere('origin', Invoice::ORIGIN_FREE)));
     }
 }

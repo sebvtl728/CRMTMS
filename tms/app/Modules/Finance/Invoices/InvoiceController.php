@@ -12,6 +12,8 @@ use App\Modules\Core\Exports\XlsxExporter;
 use App\Modules\Core\References\ReferenceItem;
 use App\Modules\Core\Tenancy\TenantStorage;
 use App\Modules\Core\Users\User;
+use App\Modules\Crm\Public\Fiches;
+use App\Modules\Crm\Public\Trainees;
 use App\Modules\Finance\Billing\Particulier;
 use App\Modules\Finance\Integrity;
 use App\Modules\Finance\Payments\Balances;
@@ -72,6 +74,7 @@ class InvoiceController extends Controller
                 'payment' => [['value' => 'open', 'label' => 'Non soldées'], ['value' => 'overdue', 'label' => 'En retard']],
             ],
             'can' => [
+                'create_free' => $user->can(Permissions::MANAGE) && InvoiceAccess::all($user, Permissions::MANAGE),
                 'export' => $user->can(Permissions::VIEW),
                 'integrity' => $user->can(Permissions::VALIDATE),
             ],
@@ -320,6 +323,26 @@ class InvoiceController extends Controller
         $invoice = $this->drafts->manual($user, $dossierId, (string) $request->input('recipient', ''));
 
         return redirect('/finance/invoices/'.$invoice->id)->with('status', 'Brouillon prêt.');
+    }
+
+    /**
+     * Clients and co-contractors of a free invoice (?q, at least 2
+     * characters; ?only=organisation: entreprises only).
+     */
+    public function clients(Request $request, Fiches $fiches, Trainees $trainees): JsonResponse
+    {
+        $q = $request->query('q');
+        $q = is_string($q) ? mb_substr(trim($q), 0, 100) : '';
+        if (mb_strlen($q) < 2) {
+            return response()->json(['clients' => []])->header('Cache-Control', 'no-store, private');
+        }
+        $organisations = array_map(fn (array $o) => ['type' => 'organisation', 'id' => $o['id'], 'label' => $o['label']], $fiches->searchOrganisations($q, 10));
+        $people = $request->query('only') === 'organisation' ? [] : array_map(
+            fn (array $p) => ['type' => 'person', 'id' => $p['id'], 'label' => trim(($p['first_name'] ?? '').' '.$p['last_name'])],
+            $trainees->search($q, null, 10),
+        );
+
+        return response()->json(['clients' => [...$organisations, ...$people]])->header('Cache-Control', 'no-store, private');
     }
 
     /** « Nouvelle facture libre » (2026-11-20): a draft without dossier. */

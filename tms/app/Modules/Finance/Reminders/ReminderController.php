@@ -13,7 +13,6 @@ use App\Modules\Finance\Invoices\InvoiceSending;
 use App\Modules\Finance\Invoices\Money;
 use App\Modules\Finance\Payments\Balances;
 use App\Modules\Finance\Permissions;
-use App\Modules\Sessions\Public\Billing;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;

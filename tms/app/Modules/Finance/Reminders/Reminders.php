@@ -12,7 +12,6 @@ use App\Modules\Finance\Invoices\InvoiceStatus;
 use App\Modules\Finance\Payments\Balances;
 use App\Modules\Finance\Permissions;
 use App\Modules\Finance\Settings\FinanceSettings;
-use App\Modules\Sessions\Public\Billing;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;

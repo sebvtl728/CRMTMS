@@ -34,9 +34,10 @@ final class InvoiceRecipient
     }
 
     /**
-     * The recipient as the fiches and the dossier describe it today.
+     * The recipient as the fiches and the dossier describe it today (and,
+     * on a free invoice, the names of its co-contractors keyed by id).
      *
-     * @return array<string, string|null>
+     * @return array<string, string|array<string, string>|null>
      */
     public static function current(Invoice $invoice): array
     {

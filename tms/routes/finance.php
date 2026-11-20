@@ -23,6 +23,7 @@ Route::middleware(['auth', 'can:finance.invoices.manage'])->prefix('finance')->n
     Route::post('dossiers/{dossierId}/invoices', [InvoiceController::class, 'store'])->name('invoices.store');
     Route::post('to-invoice/prepare', [ToInvoiceController::class, 'prepare'])->name('to-invoice.prepare');
     Route::post('invoices/free', [InvoiceController::class, 'storeFree'])->name('invoices.store-free');
+    Route::get('clients', [InvoiceController::class, 'clients'])->middleware('throttle:finance-lookup')->name('invoices.clients');
     Route::put('invoices/{invoiceId}', [InvoiceController::class, 'update'])->name('invoices.update');
     Route::post('invoices/{invoiceId}/recompute', [InvoiceController::class, 'recompute'])->name('invoices.recompute');
     Route::delete('invoices/{invoiceId}', [InvoiceController::class, 'destroy'])->name('invoices.destroy');
