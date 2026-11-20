@@ -6,7 +6,7 @@
 <html lang="fr">
 <head>
     <meta charset="utf-8">
-    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src data:; style-src 'unsafe-inline'">
     <title>Preuve de signature</title>
     <style>
         @page { size: A4; margin: 20mm 18mm; }

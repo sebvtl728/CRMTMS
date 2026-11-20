@@ -172,7 +172,7 @@ it('signs the frozen source with the drawing in the signature box, keeps the dra
     [$document, $proof] = sigSentHtml();
     expect($document)->toContain('<p>Texte figé</p>', 'data:image/png;base64,', 'Signé électroniquement le 19/11/2026 par Claire Martin')
         ->not->toContain(PdfSource::SLOT)
-        ->and($proof)->toContain('data:image/png;base64,', hash('sha256', SIG_PDF), hash('sha256', $png), 'reprend le texte du document envoyé')
+        ->and($proof)->toContain('data:image/png;base64,', hash('sha256', SIG_PDF), hash('sha256', $png), 'reprend le texte du document envoyé', "img-src data:")
         ->and(Storage::disk(TenantStorage::DISK)->get($signed->drawing_path))->toBe($png)
         ->and($signed->drawing_sha256)->toBe(hash('sha256', $png))
         ->and(Storage::disk(TenantStorage::DISK)->get($this->path))->toBe(SIG_PDF);
