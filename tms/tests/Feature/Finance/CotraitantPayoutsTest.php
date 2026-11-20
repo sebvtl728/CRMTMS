@@ -32,7 +32,7 @@ function poRow(): array
 }
 
 it('owes the co-contractor its lines, less credit notes and payouts', function () {
-    expect(poRow())->toMatchArray(['owed_cents' => 100000, 'left_cents' => 100000, 'cotraitant' => 'Formation Atlantique', 'buyer_paid' => false]);
+    expect(poRow())->toMatchArray(['owed_cents' => 100000, 'left_cents' => 100000, 'cotraitant' => 'Formation Atlantique', 'buyer_paid' => false, 'state' => 'todo', 'state_label' => 'À reverser']);
 
     $line = $this->invoice->lines()->where('cotraitant_id', $this->partner->id)->value('id');
     $credit = app(CreditNotes::class)->create($this->user, $this->invoice, [$line]);
@@ -43,7 +43,7 @@ it('owes the co-contractor its lines, less credit notes and payouts', function (
 
     $payouts = app(CotraitantPayouts::class);
     $first = $payouts->record($this->user, $this->invoice->id, $this->partner->id, ['amount' => '500,00', 'paid_on' => '2026-11-20', 'reference' => 'VIR-1']);
-    expect(poRow())->toMatchArray(['paid_out_cents' => 50000, 'left_cents' => 30000]);
+    expect(poRow())->toMatchArray(['paid_out_cents' => 50000, 'left_cents' => 30000, 'state' => 'partial', 'state_label' => 'Reversé en partie']);
 
     expect(fn () => $payouts->record($this->user, $this->invoice->id, $this->partner->id, ['amount' => '400,00', 'paid_on' => '2026-11-20']))
         ->toThrow(ValidationException::class, 'Ce reversement dépasse le reste à reverser (300,00');
@@ -67,13 +67,16 @@ it('serves the page and the CSV to who manages payments on « Tout » only', fun
     ])->assertSessionHasNoErrors();
     expect((int) CotraitantPayout::query()->sum('amount_cents'))->toBe(100000);
 
-    $this->actingAs($this->user)->get('/finance/payouts?state=all')->assertOk()
-        ->assertInertia(fn ($page) => $page->component('finance/payouts')->where('rows.0.left_cents', 0)->where('rows.0.payouts.0.amount_cents', 100000));
-    $this->actingAs($this->user)->get('/finance/payouts')->assertOk()->assertInertia(fn ($page) => $page->where('rows', []));
+    // Every co-contractor line by default, with its state; « Reste à reverser » only on demand.
+    $this->actingAs($this->user)->get('/finance/payouts')->assertOk()
+        ->assertInertia(fn ($page) => $page->component('finance/payouts')->where('filters.state', 'all')
+            ->where('rows.0.left_cents', 0)->where('rows.0.state', 'done')->where('rows.0.state_label', 'Reversé')
+            ->where('rows.0.payouts.0.amount_cents', 100000));
+    $this->actingAs($this->user)->get('/finance/payouts?state=open')->assertOk()->assertInertia(fn ($page) => $page->where('rows', []));
 
     $csv = $this->actingAs($this->user)->get('/finance/payouts-export?state=all')->assertOk()->streamedContent();
     $csv = str_replace(["\u{202F}", "\u{00A0}"], ' ', (string) $csv);
-    expect($csv)->toContain('Facture;"Émise le";Client;Co-traitant')->toContain('"Formation Atlantique";1 000,00;1 000,00;0,00;Non');
+    expect($csv)->toContain('Facture;"Émise le";Client;Co-traitant')->toContain('"Formation Atlantique";1 000,00;1 000,00;0,00;Reversé;Non');
 
     $this->actingAs(frAccountant(AccessScope::Das))->get('/finance/payouts')->assertForbidden();
     $this->actingAs(userWithPermissions([Permissions::VIEW]))->get('/finance/payouts')->assertForbidden();

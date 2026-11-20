@@ -27,7 +27,7 @@ final class PayoutController extends Controller
         $user = self::user($request);
         $filters = self::filters($request);
         $rows = $this->payouts->owed($user, $filters);
-        $all = $filters['cotraitant'] === null ? $rows : $this->payouts->owed($user, ['state' => 'all']);
+        $all = $filters['cotraitant'] === null && $filters['state'] === 'all' ? $rows : $this->payouts->owed($user, ['state' => 'all']);
         $recorded = CotraitantPayout::query()->whereIn('invoice_id', array_column($rows, 'invoice_id'))
             ->orderByDesc('paid_on')->orderByDesc('created_at')->get()
             ->groupBy(fn (CotraitantPayout $p) => $p->invoice_id.'|'.$p->cotraitant_id);
@@ -36,7 +36,7 @@ final class PayoutController extends Controller
             'rows' => array_map(fn (array $r) => [...$r, 'payouts' => ($recorded[$r['invoice_id'].'|'.$r['cotraitant_id']] ?? collect())
                 ->map(fn (CotraitantPayout $p) => ['id' => $p->id, 'amount_cents' => $p->amount_cents, 'paid_on' => $p->paid_on->toDateString(), 'reference' => $p->reference])
                 ->values()->all()], $rows),
-            'totals' => ['left_cents' => array_sum(array_column($rows, 'left_cents'))],
+            'totals' => ['left_cents' => array_sum(array_map(fn (array $r) => max(0, $r['left_cents']), $rows))],
             'filters' => $filters,
             'cotraitants' => collect($all)->unique('cotraitant_id')->sortBy('cotraitant')
                 ->map(fn (array $r) => ['value' => $r['cotraitant_id'], 'label' => $r['cotraitant']])->values()->all(),
@@ -79,11 +79,11 @@ final class PayoutController extends Controller
             fwrite($out, "\xEF\xBB\xBF");
             // Every cell neutralised (a fiche named « =… » never runs as a formula), as Core\Exports\CsvExporter.
             $write = fn (array $cells) => fputcsv($out, array_map(fn (string $c) => XlsxExporter::neutralise($c) ?? '', $cells), ';', '"', '', "\r\n");
-            $write(['Facture', 'Émise le', 'Client', 'Co-traitant', 'Dû au co-traitant', 'Déjà reversé', 'Reste à reverser', 'Facture réglée par le client']);
+            $write(['Facture', 'Émise le', 'Client', 'Co-traitant', 'Dû au co-traitant', 'Déjà reversé', 'Reste à reverser', 'État', 'Facture réglée par le client']);
             foreach ($rows as $r) {
                 $write([
                     $r['number'], $r['issued_on'] === null ? '' : date('d/m/Y', (int) strtotime($r['issued_on'])), $r['recipient'], $r['cotraitant'],
-                    Money::input($r['owed_cents'], true), Money::input($r['paid_out_cents'], true), Money::input($r['left_cents'], true), $r['buyer_paid'] ? 'Oui' : 'Non',
+                    Money::input($r['owed_cents'], true), Money::input($r['paid_out_cents'], true), Money::input($r['left_cents'], true), $r['state_label'], $r['buyer_paid'] ? 'Oui' : 'Non',
                 ]);
             }
             fclose($out);
@@ -96,7 +96,7 @@ final class PayoutController extends Controller
         $cotraitant = $request->query('cotraitant');
 
         return [
-            'state' => $request->query('state') === 'all' ? 'all' : 'open',
+            'state' => $request->query('state') === 'open' ? 'open' : 'all',
             'cotraitant' => is_string($cotraitant) && Str::isUuid($cotraitant) ? $cotraitant : null,
         ];
     }

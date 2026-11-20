@@ -34,13 +34,16 @@ final class CotraitantPayouts
 
     public const NOTHING_OWED = 'Rien n\'est dû à ce co-traitant sur cette facture.';
 
+    /** State of a line: label shown. */
+    public const STATES = ['todo' => 'À reverser', 'partial' => 'Reversé en partie', 'done' => 'Reversé', 'over' => 'Trop reversé'];
+
     public const NOT_ALL = 'Le suivi des reversements exige de voir toutes les factures (périmètre « Tout »).';
 
     public function __construct(private readonly Fiches $fiches) {}
 
     /**
-     * @param  array{state?: string|null, cotraitant?: string|null}  $filters  state: open (default) | all
-     * @return list<array{invoice_id: string, number: string, issued_on: ?string, url: string, recipient: string, cotraitant_id: string, cotraitant: string, owed_cents: int, paid_out_cents: int, left_cents: int, buyer_paid: bool, buyer_left_cents: int}>
+     * @param  array{state?: string|null, cotraitant?: string|null}  $filters  state: all (default) | open (something left)
+     * @return list<array{invoice_id: string, number: string, issued_on: ?string, url: string, recipient: string, cotraitant_id: string, cotraitant: string, owed_cents: int, paid_out_cents: int, left_cents: int, state: string, state_label: string, buyer_paid: bool, buyer_left_cents: int}>
      */
     public function owed(User $user, array $filters = []): array
     {
@@ -77,13 +80,15 @@ final class CotraitantPayouts
                     'owed_cents' => $cents,
                     'paid_out_cents' => $out,
                     'left_cents' => $cents - $out,
+                    'state' => $state = $cents - $out < 0 ? 'over' : ($cents - $out === 0 ? 'done' : ($out > 0 ? 'partial' : 'todo')),
+                    'state_label' => self::STATES[$state],
                     'buyer_paid' => ($balances[$invoice->id]['remaining_cents'] ?? 1) <= 0,
                     'buyer_left_cents' => (int) ($balances[$invoice->id]['remaining_cents'] ?? 0),
                 ];
                 if (($filters['cotraitant'] ?? null) !== null && $filters['cotraitant'] !== $cotraitant) {
                     continue;
                 }
-                if (($filters['state'] ?? 'open') !== 'all' && $row['left_cents'] <= 0) {
+                if (($filters['state'] ?? 'all') === 'open' && $row['left_cents'] <= 0) {
                     continue;
                 }
                 $rows[] = $row;

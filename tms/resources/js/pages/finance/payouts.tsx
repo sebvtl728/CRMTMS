@@ -8,6 +8,7 @@ import AppLayout from '@/layouts/app-layout';
 import { formatDay } from '@/lib/crm';
 import { formatCents } from '@/lib/revenue';
 import { type BreadcrumbItem } from '@/types';
+import { Badge } from '@/components/ui/badge';
 import { Head, Link, router, useForm } from '@inertiajs/react';
 import { Download, HandCoins, Trash2 } from 'lucide-react';
 import { useState } from 'react';
@@ -23,6 +24,8 @@ interface PayoutRow {
     owed_cents: number;
     paid_out_cents: number;
     left_cents: number;
+    state: 'todo' | 'partial' | 'done' | 'over';
+    state_label: string;
     buyer_paid: boolean;
     buyer_left_cents: number;
     payouts: { id: string; amount_cents: number; paid_on: string; reference: string | null }[];
@@ -31,11 +34,18 @@ interface PayoutRow {
 interface Props {
     rows: PayoutRow[];
     totals: { left_cents: number };
-    filters: { state: 'open' | 'all'; cotraitant: string | null };
+    filters: { state: 'all' | 'open'; cotraitant: string | null };
     cotraitants: { value: string; label: string }[];
     today: string;
     status?: string;
 }
+
+const STATE_VARIANT: Record<PayoutRow['state'], 'default' | 'secondary' | 'outline' | 'destructive'> = {
+    todo: 'default',
+    partial: 'secondary',
+    done: 'outline',
+    over: 'destructive',
+};
 
 const breadcrumbs: BreadcrumbItem[] = [{ title: 'À reverser', href: '/finance/payouts' }];
 
@@ -73,6 +83,13 @@ export default function PayoutsIndex({ rows, totals, filters, cotraitants, today
                     </Button>
                 </div>
 
+                <p className="bg-muted/40 rounded-xl border p-3 text-sm">
+                    Seules les lignes de facture qui <strong>désignent un co-traitant</strong> apparaissent ici (champ « Co-traitant » d'une
+                    ligne de facture libre, avant validation). Pour chacune : le dû (TTC de la ligne, moins un avoir), ce qui est déjà
+                    reversé, le reste et son état. « Marquer reversé » enregistre un virement ; un reversement saisi par erreur se supprime
+                    avec la corbeille à côté de son montant.
+                </p>
+
                 {status && <div className="text-sm font-medium text-green-600">{status}</div>}
 
                 <div className="flex flex-wrap items-end gap-3">
@@ -82,10 +99,10 @@ export default function PayoutsIndex({ rows, totals, filters, cotraitants, today
                             id="state"
                             className="border-input h-9 rounded-md border bg-transparent px-2 text-sm"
                             value={filters.state}
-                            onChange={(e) => filter({ state: e.target.value as 'open' | 'all' })}
+                            onChange={(e) => filter({ state: e.target.value as 'all' | 'open' })}
                         >
-                            <option value="open">Reste à reverser</option>
-                            <option value="all">Tout</option>
+                            <option value="all">Toutes les lignes co-traitées</option>
+                            <option value="open">Reste à reverser seulement</option>
                         </select>
                     </div>
                     <div className="grid gap-1">
@@ -110,7 +127,11 @@ export default function PayoutsIndex({ rows, totals, filters, cotraitants, today
                 </div>
 
                 {rows.length === 0 ? (
-                    <div className="text-muted-foreground rounded-xl border p-8 text-center text-sm">Rien à reverser.</div>
+                    <div className="text-muted-foreground rounded-xl border p-8 text-center text-sm">
+                        {filters.state === 'open'
+                            ? 'Tout est reversé.'
+                            : 'Aucune ligne de facture validée ne désigne de co-traitant pour le moment.'}
+                    </div>
                 ) : (
                     <div className="overflow-x-auto rounded-xl border">
                         <table className="w-full text-sm">
@@ -122,6 +143,7 @@ export default function PayoutsIndex({ rows, totals, filters, cotraitants, today
                                     <th className="px-3 py-2 text-right font-medium">Dû</th>
                                     <th className="px-3 py-2 text-right font-medium">Reversé</th>
                                     <th className="px-3 py-2 text-right font-medium">Reste</th>
+                                    <th className="px-3 py-2 font-medium">État</th>
                                     <th className="px-3 py-2 font-medium">Client a réglé</th>
                                     <th className="px-3 py-2">
                                         <span className="sr-only">Actions</span>
@@ -162,6 +184,9 @@ export default function PayoutsIndex({ rows, totals, filters, cotraitants, today
                                         <td className="px-3 py-2 text-right whitespace-nowrap tabular-nums">{formatCents(r.owed_cents)}</td>
                                         <td className="px-3 py-2 text-right whitespace-nowrap tabular-nums">{formatCents(r.paid_out_cents)}</td>
                                         <td className="px-3 py-2 text-right font-medium whitespace-nowrap tabular-nums">{formatCents(r.left_cents)}</td>
+                                        <td className="px-3 py-2 whitespace-nowrap">
+                                            <Badge variant={STATE_VARIANT[r.state]}>{r.state_label}</Badge>
+                                        </td>
                                         <td className="px-3 py-2 whitespace-nowrap">
                                             {r.buyer_paid ? 'Oui' : `Non (reste ${formatCents(r.buyer_left_cents)})`}
                                         </td>

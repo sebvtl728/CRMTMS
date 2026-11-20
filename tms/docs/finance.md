@@ -172,9 +172,11 @@ Formevol.
 - **Pas de double facturation** : sur les dossiers des stagiaires du marché, déclarez le financement de l'acheteur avec
   un type de financement **« facturé hors TMS »** (Administration › Référentiels › Types de financement) : sa part ne
   sort plus dans « À facturer » et se facture par la facture libre.
-- **À reverser** (menu Finance, droit « Gérer les règlements ») : par facture et co-traitant, le **dû** (TTC de ses
-  lignes, moins ses lignes reprises par un avoir validé), le **déjà reversé** et le **reste** ; la colonne « Client a
-  réglé » indique si l'acheteur a payé la facture. **Marquer reversé** enregistre un virement (montant, date,
+- **À reverser** (menu Finance, droit « Gérer les règlements ») : seules les lignes qui **désignent un co-traitant**
+  y figurent. Par facture et co-traitant : le **dû** (TTC de ses lignes, moins ses lignes reprises par un avoir validé),
+  le **déjà reversé**, le **reste** et l'**état** (À reverser, Reversé en partie, Reversé, Trop reversé) ; toutes les
+  lignes s'affichent par défaut avec l'historique de leurs reversements, le filtre « Reste à reverser seulement » ne
+  garde que celles à solder. La colonne « Client a réglé » indique si l'acheteur a payé la facture. **Marquer reversé** enregistre un virement (montant, date,
   référence, note), jamais au-delà du reste ; un reversement saisi par erreur se supprime. Export CSV.
 - **Visibilité** : une facture libre n'a pas de dossier ; seuls les utilisateurs dont le périmètre des droits de
   facturation est **« Tout »** la voient, la créent, la valident ou suivent ses reversements.
