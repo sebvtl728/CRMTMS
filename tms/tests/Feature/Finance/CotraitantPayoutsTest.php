@@ -2,6 +2,7 @@
 
 use App\Exceptions\UserFacingHttpException;
 use App\Modules\Core\Access\AccessScope;
+use App\Modules\Crm\Organisations\Organisation;
 use App\Modules\Finance\Invoices\CreditNotes;
 use App\Modules\Finance\Invoices\InvoiceValidator;
 use App\Modules\Finance\Payouts\CotraitantPayout;
@@ -76,4 +77,16 @@ it('serves the page and the CSV to who manages payments on « Tout » only', fun
 
     $this->actingAs(frAccountant(AccessScope::Das))->get('/finance/payouts')->assertForbidden();
     $this->actingAs(userWithPermissions([Permissions::VIEW]))->get('/finance/payouts')->assertForbidden();
+});
+
+it('neutralises formulas in the CSV and names a person client', function () {
+    $evil = frCotraitant('=HYPERLINK("http://x")');
+    $person = makePerson('Durand', ['first_name' => 'Léa']);
+    $draft = frDraft(Organisation::query()->where('name', 'Région Pays de la Loire')->sole(), [['Composante', 1000, $evil->id]]);
+    $draft->forceFill(['recipient_type' => 'person', 'recipient_id' => $person->id])->save();
+    app(InvoiceValidator::class)->validate($draft, $this->user);
+
+    $csv = (string) $this->actingAs($this->user)->get('/finance/payouts-export?state=all')->streamedContent();
+    expect($csv)->toContain("'=HYPERLINK")->not->toContain(';"=HYPERLINK');
+    expect(collect(app(CotraitantPayouts::class)->owed($this->user, ['state' => 'all']))->firstWhere('cotraitant_id', $evil->id)['recipient'])->toBe('Léa Durand');
 });

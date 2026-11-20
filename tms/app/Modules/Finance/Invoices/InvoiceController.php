@@ -331,6 +331,9 @@ class InvoiceController extends Controller
      */
     public function clients(Request $request, Fiches $fiches, Trainees $trainees): JsonResponse
     {
+        // Only who may create a free invoice (scope « Tout »): never a list of fiches out of a narrower scope.
+        $user = $request->user();
+        abort_unless($user instanceof User && InvoiceAccess::all($user, Permissions::MANAGE), 403);
         $q = $request->query('q');
         $q = is_string($q) ? mb_substr(trim($q), 0, 100) : '';
         if (mb_strlen($q) < 2) {

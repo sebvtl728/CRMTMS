@@ -172,7 +172,8 @@ final class InvoiceDrafts
                         ? (string) $line->vat_rate
                         : InvoiceTotals::rateFor($exempt, $line->component, $input['vat_rate']),
                     'total_ht_cents' => InvoiceTotals::line($quantity, $price),
-                    'cotraitant_id' => $input['cotraitant_id'] ?? null,
+                    // A credit-note line gives back the co-contractor of the corrected line, never another one.
+                    'cotraitant_id' => $invoice->kind === Invoice::CREDIT_NOTE && $line->exists ? $line->cotraitant_id : ($input['cotraitant_id'] ?? null),
                 ]);
                 $line->save();
                 $kept[] = $line->id;
@@ -453,7 +454,11 @@ final class InvoiceDrafts
                 }
                 // A line of a free invoice may name the co-contractor who delivered it (2026-11-20).
                 $cotraitant = $line['cotraitant_id'] ?? null;
-                if ($cotraitant !== null && $cotraitant !== '') {
+                $id = $line['id'] ?? null;
+                $kept = is_string($id) && $current->has($id) ? $current[$id] : null;
+                // A line keeps its co-contractor (a fiche in the trash since stays); a credit note never changes it (update()).
+                $unchanged = $kept !== null && ($kept->cotraitant_id === $cotraitant || $invoice->kind === Invoice::CREDIT_NOTE);
+                if ($cotraitant !== null && $cotraitant !== '' && ! $unchanged) {
                     if (! $invoice->isFree()) {
                         $v->errors()->add("lines.{$i}.cotraitant_id", self::COTRAITANT_FREE_ONLY);
                     } elseif (! is_string($cotraitant) || app(Fiches::class)->organisation($cotraitant) === null) {

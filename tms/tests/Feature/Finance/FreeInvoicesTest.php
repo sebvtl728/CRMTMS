@@ -2,6 +2,9 @@
 
 use App\Exceptions\UserFacingHttpException;
 use App\Modules\Core\Access\AccessScope;
+use App\Modules\Core\Companies\Company;
+use App\Modules\Crm\Duplicates\Merger;
+use App\Modules\Crm\Support\LinkedData;
 use App\Modules\Finance\Integrity;
 use App\Modules\Finance\Invoices\CreditNotes;
 use App\Modules\Finance\Invoices\FreeInvoices;
@@ -194,4 +197,50 @@ it('shows the co-contractor of a line on the page of a free invoice', function (
     $this->actingAs(frAccountant())->get('/finance/invoices/'.$invoice->id)->assertOk()
         ->assertInertia(fn ($page) => $page->where('invoice.buyer_reference', 'EJ-7')->where('invoice.rhythm_label', null)
             ->where('invoice.lines.0.cotraitant_id', $partner->id)->where('invoice.lines.0.cotraitant_label', 'Formation Atlantique'));
+});
+
+it('refuses the client search to a scope narrower than « Tout »', function () {
+    frRegion();
+    $this->actingAs(frAccountant(AccessScope::Das))->getJson('/finance/clients?q=Rég')->assertForbidden();
+});
+
+it('keeps the co-contractor of a credit-note line even once its fiche is in the trash', function () {
+    $partner = frCotraitant();
+    $user = frAccountant();
+    $invoice = app(InvoiceValidator::class)->validate(frDraft(frRegion(), [['Co-traitant', 50000, $partner->id]]), $user);
+    $partner->delete();
+    $credit = app(CreditNotes::class)->create($user, $invoice);
+    $line = $credit->lines()->sole();
+
+    // Saved with its co-contractor as it was, then with another one: the credit note keeps the corrected line's.
+    $other = frCotraitant('Autre');
+    fiDrafts()->update($credit, ['notes' => 'Erreur de prix', 'lines' => [[
+        'id' => $line->id, 'label' => $line->label, 'quantity' => '1', 'unit' => 'forfait', 'unit_price' => '-500,00', 'cotraitant_id' => $other->id,
+    ]]]);
+    expect($credit->refresh()->notes)->toBe('Erreur de prix')->and($line->refresh()->cotraitant_id)->toBe($partner->id);
+});
+
+it('links the client and the co-contractors of free invoices to their fiches (import undo, merge)', function () {
+    $region = frRegion();
+    $partner = frCotraitant();
+    $dropped = frCotraitant('Formation Atlantique (doublon)');
+    $draft = frDraft($region, [['Co-traitant', 1000, $dropped->id]]);
+
+    expect(LinkedData::any($region, []))->toBeTrue()
+        ->and(LinkedData::any($dropped, []))->toBeTrue()
+        ->and(LinkedData::any(frCotraitant('Sans lien'), []))->toBeFalse();
+
+    app(Merger::class)->organisations($partner, $dropped, []);
+    expect($draft->lines()->sole()->cotraitant_id)->toBe($partner->id);
+});
+
+it('names a person client in the payouts and refuses a company in the trash at validation', function () {
+    $person = makePerson('Durand', ['first_name' => 'Léa']);
+    $user = frAccountant();
+    $draft = frDraft(frRegion(), [['Composante', 1000, null]]);
+    $draft->forceFill(['recipient_type' => 'person', 'recipient_id' => $person->id])->save();
+    Company::query()->whereKey($draft->company_id)->first()->delete();
+
+    expect(fn () => app(InvoiceValidator::class)->validate($draft, $user))
+        ->toThrow(UserFacingHttpException::class, InvoiceValidator::COMPANY_GONE);
 });

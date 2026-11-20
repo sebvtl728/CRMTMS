@@ -74,6 +74,8 @@ final class InvoiceValidator
 
     public const NO_CORRECTED = 'Un avoir corrige une facture validée du même destinataire : celle-ci est introuvable.';
 
+    public const COMPANY_GONE = 'La société qui émet cette facture est à la corbeille : restaurez-la ou recréez la facture.';
+
     public const COMPANY_CHANGED = 'La société du dossier a changé : recalculez le brouillon avant de le valider.';
 
     public const OTHER_PARTIES = 'Un avoir doit être émis par la même société et au même destinataire que la facture corrigée.';
@@ -208,6 +210,9 @@ final class InvoiceValidator
             throw new UserFacingHttpException(409, self::NOT_POSITIVE);
         }
         if ($invoice->dossier_id === null) {
+            if (! Company::query()->whereKey($invoice->company_id)->exists()) {
+                throw new UserFacingHttpException(409, self::COMPANY_GONE);
+            }
             // A free invoice: its client still exists (a fiche anonymised or deleted is never invoiced anew).
             $client = $invoice->recipient_type === 'organisation'
                 ? app(Fiches::class)->organisation($invoice->recipient_id)

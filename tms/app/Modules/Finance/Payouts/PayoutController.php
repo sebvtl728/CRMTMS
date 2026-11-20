@@ -4,6 +4,7 @@ namespace App\Modules\Finance\Payouts;
 
 use App\Http\Controllers\Controller;
 use App\Modules\Core\Audit\AuditRecorder;
+use App\Modules\Core\Exports\XlsxExporter;
 use App\Modules\Core\Users\User;
 use App\Modules\Finance\Invoices\Money;
 use Illuminate\Http\RedirectResponse;
@@ -76,15 +77,17 @@ final class PayoutController extends Controller
                 return;
             }
             fwrite($out, "\xEF\xBB\xBF");
-            fputcsv($out, ['Facture', 'Émise le', 'Client', 'Co-traitant', 'Dû au co-traitant', 'Déjà reversé', 'Reste à reverser', 'Facture réglée par le client'], ';');
+            // Every cell neutralised (a fiche named « =… » never runs as a formula), as Core\Exports\CsvExporter.
+            $write = fn (array $cells) => fputcsv($out, array_map(fn (string $c) => XlsxExporter::neutralise($c) ?? '', $cells), ';', '"', '', "\r\n");
+            $write(['Facture', 'Émise le', 'Client', 'Co-traitant', 'Dû au co-traitant', 'Déjà reversé', 'Reste à reverser', 'Facture réglée par le client']);
             foreach ($rows as $r) {
-                fputcsv($out, [
+                $write([
                     $r['number'], $r['issued_on'] === null ? '' : date('d/m/Y', (int) strtotime($r['issued_on'])), $r['recipient'], $r['cotraitant'],
                     Money::input($r['owed_cents'], true), Money::input($r['paid_out_cents'], true), Money::input($r['left_cents'], true), $r['buyer_paid'] ? 'Oui' : 'Non',
-                ], ';');
+                ]);
             }
             fclose($out);
-        }, 'reversements-cotraitants-'.now()->format('Ymd-Hi').'.csv', ['Content-Type' => 'text/csv; charset=UTF-8']);
+        }, 'reversements-cotraitants-'.now()->format('Ymd-Hi').'.csv', ['Content-Type' => 'text/csv; charset=UTF-8', 'Cache-Control' => 'no-store, private']);
     }
 
     /** @return array{state: string, cotraitant: ?string} */

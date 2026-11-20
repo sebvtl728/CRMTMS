@@ -54,7 +54,13 @@ final class CotraitantPayouts
         $paid = $this->paidOut($invoices->pluck('id')->all());
         $balances = Balances::of($invoices->pluck('id')->all());
         $names = $this->fiches->organisationLabels(collect($owed)->flatMap(fn (array $byCotraitant) => array_keys($byCotraitant))->unique()->values()->all());
-        $clients = $this->fiches->organisationLabels($invoices->where('recipient_type', 'organisation')->pluck('recipient_id')->all());
+        $clients = [];
+        foreach ($this->fiches->organisationLabels($invoices->where('recipient_type', 'organisation')->pluck('recipient_id')->all()) as $id => $o) {
+            $clients['organisation:'.$id] = $o['label'];
+        }
+        foreach ($this->fiches->personLabels($invoices->where('recipient_type', 'person')->pluck('recipient_id')->all()) as $id => $p) {
+            $clients['person:'.$id] = $p['label'];
+        }
 
         $rows = [];
         foreach ($invoices as $invoice) {
@@ -65,7 +71,7 @@ final class CotraitantPayouts
                     'number' => (string) $invoice->number,
                     'issued_on' => $invoice->issued_on?->toDateString(),
                     'url' => '/finance/invoices/'.$invoice->id,
-                    'recipient' => $clients[$invoice->recipient_id]['label'] ?? '-',
+                    'recipient' => $clients[$invoice->recipient_type.':'.$invoice->recipient_id] ?? '-',
                     'cotraitant_id' => $cotraitant,
                     'cotraitant' => $names[$cotraitant]['label'] ?? '-',
                     'owed_cents' => $cents,

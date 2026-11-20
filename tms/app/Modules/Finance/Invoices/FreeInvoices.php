@@ -72,6 +72,28 @@ final class FreeInvoices
         });
     }
 
+    /** A free invoice is addressed to the fiche, or one of its lines names it as co-contractor. */
+    public static function links(string $type, string $id): bool
+    {
+        $client = Invoice::query()->where('origin', Invoice::ORIGIN_FREE)->where('recipient_type', $type)->where('recipient_id', $id)->exists();
+
+        return $client || ($type === 'organisation' && InvoiceLine::query()->where('cotraitant_id', $id)->exists());
+    }
+
+    /**
+     * Merge of two fiches (called by the CRM's Merger in its transaction):
+     * the free drafts and their lines follow the fiche kept; a validated
+     * piece is frozen, it and its payouts keep the fiche merged.
+     */
+    public static function merge(string $type, string $keepId, string $dropId): void
+    {
+        $drafts = Invoice::query()->where('origin', Invoice::ORIGIN_FREE)->where('status', InvoiceStatus::Draft);
+        (clone $drafts)->where('recipient_type', $type)->where('recipient_id', $dropId)->update(['recipient_id' => $keepId]);
+        if ($type === 'organisation') {
+            InvoiceLine::query()->where('cotraitant_id', $dropId)->whereIn('invoice_id', (clone $drafts)->select('id'))->update(['cotraitant_id' => $keepId]);
+        }
+    }
+
     /**
      * The header a free invoice may change: the buyer's references (Chorus
      * Pro) and the period invoiced; only the keys present ($all: every key).
