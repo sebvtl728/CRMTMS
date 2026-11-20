@@ -74,7 +74,12 @@ final class Integrity
                 'dossier_line_id' => $l->dossier_line_id,
                 'enrolment_id' => $l->enrolment_id,
                 'funding_id' => $l->funding_id,
+                // Free invoices (2026-11-20): only when set, so that the hash of the earlier pieces never changes.
+                ...($l->cotraitant_id !== null ? ['cotraitant_id' => $l->cotraitant_id] : []),
             ])->values()->all(),
+            ...($invoice->origin === Invoice::ORIGIN_FREE ? ['origin' => Invoice::ORIGIN_FREE] : []),
+            ...($invoice->buyer_reference !== null ? ['buyer_reference' => $invoice->buyer_reference] : []),
+            ...($invoice->service_code !== null ? ['service_code' => $invoice->service_code] : []),
             'totals' => [
                 'ht' => $invoice->total_ht_cents,
                 'vat' => $invoice->total_vat_cents,

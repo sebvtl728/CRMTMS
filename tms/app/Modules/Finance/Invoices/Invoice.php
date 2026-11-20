@@ -23,7 +23,10 @@ use Illuminate\Support\Carbon;
  * @property string $kind invoice|credit_note
  * @property string|null $number set at validation
  * @property InvoiceStatus $status
- * @property string $dossier_id
+ * @property string|null $dossier_id null for a free invoice
+ * @property string $origin dossier|free
+ * @property string|null $buyer_reference the buyer's engagement / order number (free invoice)
+ * @property string|null $service_code the buyer's service code (free invoice)
  * @property string $recipient_type organisation|person
  * @property string $recipient_id
  * @property string|null $funding_id the funder's funding; null: the contractor
@@ -65,6 +68,12 @@ class Invoice extends Model
 
     public const CREDIT_NOTE = 'credit_note';
 
+    /** An invoice of a dossier (computed from what is due). */
+    public const ORIGIN_DOSSIER = 'dossier';
+
+    /** An invoice created by hand, without dossier (free lines only). */
+    public const ORIGIN_FREE = 'free';
+
     /** recipient_key of the contractor of the dossier. */
     public const CONTRACTOR = 'contractor';
 
@@ -83,11 +92,13 @@ class Invoice extends Model
         'company_id', 'kind', 'dossier_id', 'recipient_type', 'recipient_id', 'funding_id',
         'period_from', 'period_to', 'cut_off', 'rhythm', 'basis', 'vat_mention', 'corrected_invoice_id', 'notes',
         'total_ht_cents', 'total_vat_cents', 'total_ttc_cents', 'created_by', 'updated_by',
+        'origin', 'buyer_reference', 'service_code',
     ];
 
     /** @var array<string, mixed> */
     protected $attributes = [
         'status' => 'draft',
+        'origin' => 'dossier',
         'total_ht_cents' => 0,
         'total_vat_cents' => 0,
         'total_ttc_cents' => 0,
@@ -108,6 +119,11 @@ class Invoice extends Model
             'sent_at' => 'datetime',
             'validated_at' => 'datetime',
         ];
+    }
+
+    public function isFree(): bool
+    {
+        return $this->origin === self::ORIGIN_FREE;
     }
 
     public function isDraft(): bool
