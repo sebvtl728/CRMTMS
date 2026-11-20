@@ -11,6 +11,8 @@ Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) ; ve
   document (convention, contrat, « Bon pour accord » du devis) et sur la page de preuve, avec son empreinte. Le document
   signé reprend exactement la page du document envoyé (gardée à l'émission) ; un document émis avant cette version porte
   le dessin sur la page de preuve seulement.
+- Factures : un brouillon de facture sans ligne calculée explique pourquoi rien n'est encore dû (« Formation non
+  terminée »…), ou invite à cliquer « Recalculer » quand un montant est devenu dû.
 
 ## [0.10.0] - 2026-11-20
 
