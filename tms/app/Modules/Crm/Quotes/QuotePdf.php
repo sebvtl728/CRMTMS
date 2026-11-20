@@ -6,6 +6,7 @@ use App\Modules\Core\Companies\CompanyBranding;
 use App\Modules\Core\Companies\LegalMentions;
 use App\Modules\Core\Documents\PdfRenderer;
 use App\Modules\Core\Documents\PdfRenderingFailed;
+use App\Modules\Core\Documents\PdfSource;
 use App\Modules\Core\Tenancy\TenantStorage;
 use Illuminate\Support\Facades\Storage;
 use RuntimeException;
@@ -44,12 +45,16 @@ class QuotePdf
      */
     public function archive(Quote $quote): string
     {
-        $bytes = $this->render($quote, false);
+        $html = $this->html($quote, false);
+        $footer = $this->footerHtml($quote);
+        $bytes = $this->renderer->fromHtml($html, $footer);
         $path = self::archivePath($quote);
 
         if (! Storage::disk(TenantStorage::DISK)->put($path, $bytes)) {
             throw new RuntimeException('The quote PDF could not be written to the private disk.');
         }
+        // Its exact HTML: a « Bon pour accord » signed online renders it again with the drawing in the box.
+        PdfSource::store($path, $html, $footer);
 
         return $path;
     }

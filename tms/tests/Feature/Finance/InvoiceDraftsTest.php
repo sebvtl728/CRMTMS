@@ -547,3 +547,23 @@ it('keeps invoices inside their organisme', function () {
             ->and(app(Due::class)->forDossier($x['dossier']->id))->toBe(['rows' => [], 'soon' => []]);
     });
 });
+
+it('says on an empty draft why nothing is due, then that a recalculation fills it', function () {
+    $x = fiSeed(opco: false);
+    $manager = fiManager();
+    $this->travelTo(CarbonImmutable::parse('2026-09-30 10:00', 'Europe/Paris'));
+    $draft = fiDrafts()->manual($manager, $x['dossier']->id, 'contractor');
+    expect($draft->lines()->count())->toBe(0);
+
+    $this->actingAs($manager)->get('/finance/invoices/'.$draft->id)->assertInertia(fn (Assert $p) => $p
+        ->where('warnings', ['Rien n\'est encore dû sur ce dossier (Formation non terminée) : ajoutez des lignes libres, ou revenez quand la facturation sera possible et cliquez « Recalculer ».']));
+
+    $this->travelTo(CarbonImmutable::parse('2026-10-01 09:00', 'Europe/Paris'));
+    // A day later: a new session (the idle one has expired).
+    $this->flushSession();
+    $this->actingAs($manager)->get('/finance/invoices/'.$draft->id)->assertInertia(fn (Assert $p) => $p
+        ->where('warnings', ['Un montant est maintenant dû sur ce dossier : cliquez « Recalculer » pour l\'ajouter à ce brouillon.']));
+
+    fiDrafts()->recompute($draft);
+    $this->actingAs($manager)->get('/finance/invoices/'.$draft->id)->assertInertia(fn (Assert $p) => $p->where('warnings', []));
+});

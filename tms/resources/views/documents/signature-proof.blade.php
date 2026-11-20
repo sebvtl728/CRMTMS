@@ -6,7 +6,7 @@
 <html lang="fr">
 <head>
     <meta charset="utf-8">
-    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src data:; style-src 'unsafe-inline'">
     <title>Preuve de signature</title>
     <style>
         @page { size: A4; margin: 20mm 18mm; }
@@ -27,12 +27,20 @@
         <tr><th>Signé le (heure de Paris)</th><td>{{ $signed_at }}</td></tr>
         <tr><th>Adresse IP</th><td>{{ $ip }}</td></tr>
         <tr><th>Navigateur</th><td>{{ $agent }}</td></tr>
-        <tr><th>Empreinte SHA-256 du document signé</th><td>{{ $sha256 }}</td></tr>
+        <tr><th>Empreinte SHA-256 du document envoyé</th><td>{{ $sha256 }}</td></tr>
+        <tr><th>Signature dessinée</th><td><img src="{{ $drawing }}" alt="Signature dessinée" style="max-height: 60pt; max-width: 220pt;"></td></tr>
+        <tr><th>Empreinte SHA-256 de la signature dessinée</th><td>{{ $drawing_sha256 }}</td></tr>
         <tr><th>Référence de la signature</th><td>{{ $request }}</td></tr>
         <tr><th>Organisme</th><td>{{ $organisme }}</td></tr>
     </table>
     <p class="note">Signature électronique simple : le signataire a ouvert son lien personnel, lu le document, accepté de le
-        signer et saisi le code à usage unique reçu à l'adresse e-mail ci-dessus. L'empreinte permet de vérifier que le
-        document précédant cette page n'a pas été modifié.</p>
+        signer, dessiné sa signature et saisi le code à usage unique reçu à l'adresse e-mail ci-dessus.
+        @if ($rerendered)
+            Le document signé reprend le texte du document envoyé, la signature dessinée insérée dans l'encadré ; le
+            document envoyé est conservé à l'identique par l'organisme (empreinte ci-dessus).
+        @else
+            L'empreinte permet de vérifier que le document précédant cette page n'a pas été modifié.
+        @endif
+    </p>
 </body>
 </html>
