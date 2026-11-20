@@ -17,6 +17,7 @@ use App\Modules\Finance\Invoices\InvoiceSending;
 use App\Modules\Finance\Invoices\InvoiceStatus;
 use App\Modules\Finance\Payments\Payment;
 use App\Modules\Finance\Payments\PaymentAllocation;
+use App\Modules\Finance\Payouts\CotraitantPayout;
 use App\Modules\Finance\Payments\PaymentAnonymisation;
 use App\Modules\Finance\Plans\BillingBlock;
 use App\Modules\Finance\Plans\BillingPlan;
@@ -52,6 +53,7 @@ class FinanceServiceProvider extends ServiceProvider
             InvoiceSending::MORPH_ALIAS => InvoiceSending::class,
             Payment::MORPH_ALIAS => Payment::class,
             PaymentAllocation::MORPH_ALIAS => PaymentAllocation::class,
+            CotraitantPayout::MORPH_ALIAS => CotraitantPayout::class,
             ReminderPause::MORPH_ALIAS => ReminderPause::class,
         ]);
 
