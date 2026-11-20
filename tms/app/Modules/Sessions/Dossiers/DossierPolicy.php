@@ -4,6 +4,7 @@ namespace App\Modules\Sessions\Dossiers;
 
 use App\Modules\Core\Users\User;
 use App\Modules\Sessions\Permissions;
+use App\Modules\Sessions\Public\BillingGuards;
 use App\Modules\Sessions\SessionsVisibility;
 
 /**
@@ -36,7 +37,9 @@ class DossierPolicy
 
     public function delete(User $user, Dossier $dossier): bool
     {
-        return ! $dossier->trashed() && SessionsVisibility::allows($user, Permissions::DOSSIERS_DELETE, $dossier);
+        // An invoiced dossier never goes to the trash (BillingGuards): no « Mettre à la corbeille » either.
+        return ! $dossier->trashed() && SessionsVisibility::allows($user, Permissions::DOSSIERS_DELETE, $dossier)
+            && BillingGuards::dossierTrashable($dossier->id) === null;
     }
 
     public function restore(User $user, Dossier $dossier): bool
