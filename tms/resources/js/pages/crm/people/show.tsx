@@ -1,6 +1,7 @@
 import { BrochureSendButton, type BrochureSendProps } from '@/components/crm/brochure-send';
 import { SimilarFiches, type DuplicateCandidate } from '@/components/crm/duplicate-warning';
 import { FicheBlockPanel, type FicheBlock } from '@/components/crm/fiche-blocks';
+import { FutureNeeds, type FutureNeedsData } from '@/components/crm/future-needs';
 import { InterestTrainings, type InterestTraining, type InterestTrainingOption } from '@/components/crm/interest-trainings';
 import { FicheOpportunities, type OpportunityRow } from '@/components/crm/opportunity-list';
 import { PersonGdpr, type GdprData } from '@/components/crm/person-gdpr';
@@ -36,6 +37,7 @@ interface AffiliationRow {
 }
 
 interface PersonData {
+    future_needs: FutureNeedsData;
     id: string;
     civility: string | null;
     first_name: string | null;
@@ -310,6 +312,7 @@ export default function PersonShow({
                         updateUrl={route('crm.people.trainings.update', p.id)}
                         canUpdate={can.update}
                     />
+                    <FutureNeeds needs={p.future_needs} updateUrl={route('crm.people.future-needs', p.id)} canUpdate={can.update} />
 
                     <PersonGdpr
                         personId={p.id}

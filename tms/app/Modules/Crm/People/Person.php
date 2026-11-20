@@ -11,6 +11,7 @@ use App\Modules\Crm\Affiliations\Affiliation;
 use App\Modules\Crm\Gdpr\LegalBasis;
 use App\Modules\Crm\Interests\FicheTraining;
 use App\Modules\Crm\Organisations\OrganisationStatus;
+use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Model;
@@ -47,6 +48,9 @@ use Illuminate\Support\Facades\DB;
  * @property string|null $education_level_id
  * @property string|null $funding_mode_id
  * @property string|null $origin_id
+ * @property string|null $future_needs
+ * @property CarbonImmutable|null $future_needs_updated_at
+ * @property string|null $future_needs_updated_by
  * @property OrganisationStatus $status
  * @property string|null $responsible_user_id
  * @property Carbon|null $last_contact_at
@@ -76,7 +80,7 @@ class Person extends Model
      */
     public const PERSONAL_FIELDS = [
         'first_name', 'last_name', 'email', 'email_secondary', 'phone', 'mobile',
-        'address_line1', 'address_line2', 'postal_code', 'city', 'birth_date', 'project',
+        'address_line1', 'address_line2', 'postal_code', 'city', 'birth_date', 'project', 'future_needs',
     ];
 
     /** @var list<string> */
@@ -153,6 +157,7 @@ class Person extends Model
     protected function casts(): array
     {
         return [
+            'future_needs_updated_at' => 'immutable_datetime',
             'status' => OrganisationStatus::class,
             'birth_date' => 'date',
             'is_individual' => 'boolean',
@@ -281,5 +286,15 @@ class Person extends Model
         }
 
         return $query;
+    }
+
+    /**
+     * Author of the last change of « Besoins futurs » (lot 1e).
+     *
+     * @return BelongsTo<User, $this>
+     */
+    public function futureNeedsAuthor(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'future_needs_updated_by');
     }
 }

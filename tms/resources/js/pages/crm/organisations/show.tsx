@@ -1,6 +1,7 @@
 import { BrochureSendButton, type BrochureSendProps } from '@/components/crm/brochure-send';
 import { SimilarFiches, type DuplicateCandidate } from '@/components/crm/duplicate-warning';
 import { FicheBlockPanel, type FicheBlock } from '@/components/crm/fiche-blocks';
+import { FutureNeeds, type FutureNeedsData } from '@/components/crm/future-needs';
 import { InterestTrainings, type InterestTraining, type InterestTrainingOption } from '@/components/crm/interest-trainings';
 import { FicheOpportunities, type OpportunityRow } from '@/components/crm/opportunity-list';
 import { OrganisationContacts, type AffiliationRow } from '@/components/crm/organisation-contacts';
@@ -23,6 +24,7 @@ interface Ref {
 }
 
 interface OrganisationData {
+    future_needs: FutureNeedsData;
     id: string;
     name: string;
     siret: string | null;
@@ -253,6 +255,7 @@ export default function OrganisationShow({
                             updateUrl={route('crm.organisations.trainings.update', o.id)}
                             canUpdate={can.update}
                         />
+                        <FutureNeeds needs={o.future_needs} updateUrl={route('crm.organisations.future-needs', o.id)} canUpdate={can.update} />
                         <section className="rounded-xl border p-4 lg:col-span-2">
                             <h2 className="mb-3 text-sm font-semibold">Suivi</h2>
                             <dl className="grid gap-3 sm:grid-cols-3">

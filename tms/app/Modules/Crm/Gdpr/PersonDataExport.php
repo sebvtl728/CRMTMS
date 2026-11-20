@@ -101,6 +101,7 @@ final class PersonDataExport
                 'date_de_naissance' => $person->birth_date?->toDateString(),
                 'particulier' => $person->is_individual,
                 'projet' => $person->project,
+                'besoins_futurs' => $person->future_needs,
                 'statut' => $person->status->label(),
                 'situation_professionnelle' => $label($person->professionalSituation),
                 'mode_de_financement' => $label($person->fundingMode),

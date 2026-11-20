@@ -11,6 +11,7 @@ use App\Modules\Core\Users\User;
 use App\Modules\Crm\Affiliations\Affiliation;
 use App\Modules\Crm\Brochures\BrochureSendProps;
 use App\Modules\Crm\Duplicates\DuplicateGuard;
+use App\Modules\Crm\FutureNeeds\FutureNeedsController;
 use App\Modules\Crm\Interests\FicheTrainings;
 use App\Modules\Crm\Opportunities\OpportunityRows;
 use App\Modules\Crm\Opportunities\OpportunityTrainings;
@@ -150,6 +151,7 @@ class OrganisationController extends Controller
         return Inertia::render('crm/organisations/show', [
             'organisation' => [
                 ...$this->fields($organisation),
+                'future_needs' => FutureNeedsController::present($organisation),
                 'status' => ['value' => $organisation->status->value, 'label' => $organisation->status->label()],
                 'legal_form' => $label($organisation->legalForm),
                 'sector' => $label($organisation->sector),
