@@ -17,6 +17,12 @@ docker compose run --rm vite sh -c "npm ci && npm run build"
 docker compose exec app php artisan migrate --database=pgsql_owner
 ```
 
+Le serveur Vite de développement (rechargement à chaud) est dans le profil `dev` : il ne démarre pas avec
+`docker compose up -d`. Le lancer avec `docker compose --profile dev up -d vite` ; tant qu'il tourne (fichier
+`public/hot`), les pages chargent leur JavaScript depuis `localhost:5173` et restent blanches depuis un autre poste.
+L'arrêter : `docker compose stop vite && rm -f public/hot`. `docker compose run --rm vite …` (build, lint) marche
+sans le profil.
+
 Organisme par défaut (mode `TMS_MODE=single`, slug `TMS_DEFAULT_TENANT`) : `docker compose exec app php artisan db:seed`.
 En mode `multi`, l'organisme est trouvé par le nom d'hôte (table `tenant_domains`).
 
