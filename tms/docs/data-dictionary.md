@@ -766,3 +766,14 @@ CRM : `crm.fiches.view|update|delete`, `crm.opportunities.view|update|delete`, `
 Finance (0.9) : `finance.invoices.view`, `finance.invoices.manage`, `finance.invoices.validate` (tous à périmètre, celui du dossier ; défauts dans `admin.md` § 10).
 
 Admissions : `admissions.candidatures.view|update|delete` (à périmètre), `admissions.sensitive.view` (défauts dans `admin.md` § 19).
+
+### `follow_up_reminders` — suivis traités (lot 1e)
+
+`kind` (`trainer` : suivi formateur d'une inscription ; `reactivation` : réactivation d'un dossier) · `subject_id`
+(inscription ou dossier) · `months` · `activity_id` (action créée) · `outcome` (`created`, `skipped`) · `reason`
+(`rachat_en_cours`, `aucun_destinataire`, `fiche_indisponible`) · `processed_at`. Unique (`kind`, `subject_id`, `months`) :
+une échéance n'est traitée qu'une fois. Aucune donnée personnelle.
+
+Colonnes ajoutées (lot 1e) : `organisations` et `people` : `future_needs` (texte, personnel pour une personne),
+`future_needs_updated_at`, `future_needs_updated_by` ; `reference_items.meta.reached` (résultats d'action « joint »).
+

@@ -265,3 +265,16 @@ Chaque séance : « <session> — <module> », de l'heure de début à l'heure d
 Quand le connecteur Microsoft 365 « agenda » est actif (`connectors.md`) et que le formateur a **connecté son Outlook** dans « Mon agenda », ses séances **planifiées** y sont créées, déplacées et retirées automatiquement. Seul le **formateur de la séance** les reçoit, et seulement s'il a un compte lié à sa fiche formateur et actif. Chaque évènement s'intitule « <session> — <module> », avec les heures de Paris, le lieu (salle et adresse, sinon lieu libre, sinon adresse de la session) et un lien vers **Mon planning** ; il ne contient **jamais** de stagiaire, de note interne ni de prix.
 
 La copie suit la séance : création, changement d'horaire, de salle, de formateur (retirée chez l'ancien, créée chez le nouveau), annulation de la séance ou de la session, suppression, mise à la corbeille de la session, et renommage de la session, du module ou de la salle. Délier ou désactiver un formateur retire ses séances à venir de son agenda ; le relier ou le réactiver les y remet. Un formateur sans accès au CRM voit lui aussi « Connecter Outlook » dans « Mon agenda » ; à la connexion, ses séances des 180 prochains jours y sont envoyées, et une déconnexion suivie d'une reconnexion les y remet. C'est un envoi à sens unique : une modification faite dans Outlook n'est pas relue.
+
+## 11. Suivi des apprenants par le formateur (lot 1e)
+
+Chaque matin, **3 mois** (réglable, Administration › Règle d'abandon et suivi ; 0 = aucun suivi) après la fin de la
+formation d'un apprenant (sa sortie, sinon la fin de la session), une action « Appel » est créée sur sa fiche :
+« Suivi à 3 mois : Léa Durand, HACCP (S-2026-0005) ». Elle va au **formateur de la session ayant un compte** qui a assuré
+le plus d'heures de séances (égalité : ordre alphabétique) ; sans formateur avec compte, au **responsable de la session**,
+sinon à celui du dossier. Seules les inscriptions suivies (inscrites ou confirmées) d'une session non annulée comptent ;
+un apprenant anonymisé n'en reçoit pas. Une échéance manquée de quelques jours est rattrapée ; jamais une échéance de
+plus de 30 jours (aucune rafale à la mise en service). Le formateur voit ses actions dans « À faire » (droits « Consulter »
+et « Modifier » les actions sur ses fiches, accordés par défaut au rôle Formateur) et y saisit son compte rendu. Sur la
+fiche de l'apprenant, « Formations suivies » indique la date de fin et la satisfaction (« - » jusqu'aux questionnaires).
+

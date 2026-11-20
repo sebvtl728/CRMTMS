@@ -401,3 +401,13 @@ Guide utilisateur : `admissions.md`.
   « Confirmation de signature »).
 - **Signature en ligne** : lien personnel de 30 jours, code e-mail de 10 minutes (5 essais), page de preuve ajoutée au
   PDF (signature électronique simple) ; aucun prestataire externe.
+
+## 21. Réglages du CRM et suivis (lot 1e)
+
+- **Administration › Réglages du CRM** (droit « Paramètres ») : délais des rappels de réactivation en mois après la fin
+  d'un dossier (« 6, 12 » par défaut ; vide = aucun rappel ; de 1 à 36), étape à partir de laquelle une fiche devient un
+  lead (« Contacté » par défaut) et fenêtre du taux de rétention (24 mois par défaut). Modifications journalisées.
+- **Administration › Règle d'abandon et suivi** : délai du suivi formateur (3 mois par défaut, 0 = aucun).
+- **Référentiels › Résultats d'action** : case « Compte comme joint » (taux de réponse des tableaux de bord).
+- La commande `tms:sessions:follow-ups` (6 h 30, heure de Paris) crée les actions de suivi et de réactivation dues.
+

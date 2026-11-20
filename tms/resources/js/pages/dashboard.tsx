@@ -9,7 +9,7 @@ import { canViewCrm } from '@/lib/permissions';
 import { formatCentsWhole, formatRate } from '@/lib/revenue';
 import { type BreadcrumbItem, type SharedData } from '@/types';
 import { Head, Link, usePage } from '@inertiajs/react';
-import { CalendarClock, Contact, Factory, GraduationCap, Search, UserPlus } from 'lucide-react';
+import { CalendarClock, Contact, Factory, Gauge, GraduationCap, Search, UserPlus } from 'lucide-react';
 
 const breadcrumbs: BreadcrumbItem[] = [{ title: 'Accueil', href: '/dashboard' }];
 
@@ -207,6 +207,13 @@ export default function Dashboard({ recent_views, counters, commercial, sessions
                                     </Link>
                                 </Button>
                             </>
+                        )}
+                        {commercial !== null && (
+                            <Button asChild variant="outline">
+                                <Link href="/crm/dashboards">
+                                    <Gauge /> Tableaux de bord
+                                </Link>
+                            </Button>
                         )}
                         <Button variant="outline" onClick={() => window.dispatchEvent(new Event(OPEN_EVENT))}>
                             <Search /> Rechercher{' '}

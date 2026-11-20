@@ -1,5 +1,6 @@
 <?php
 
+use App\Modules\Crm\Dashboard\DashboardExportController;
 use App\Modules\Crm\Dashboard\DashboardsController;
 use App\Modules\Crm\Settings\CrmSettingsController;
 use Illuminate\Support\Facades\Route;
@@ -12,3 +13,7 @@ Route::middleware(['auth', 'can:settings.manage'])->prefix('admin/crm-settings')
 
 // « Tableaux de bord » (lot 1e): any CRM view right; each card follows its own right.
 Route::middleware(['auth', 'can:crm.any-view'])->get('crm/dashboards', [DashboardsController::class, 'index'])->name('crm.dashboards');
+Route::middleware(['auth', 'can:crm.export', 'throttle:crm-export'])->prefix('crm/dashboards')->name('crm.dashboards.')->group(function () {
+    Route::get('export.csv', [DashboardExportController::class, 'csv'])->name('csv');
+    Route::get('export.pdf', [DashboardExportController::class, 'pdf'])->name('pdf');
+});
