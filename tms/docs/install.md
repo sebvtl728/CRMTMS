@@ -107,6 +107,23 @@ applique les migrations et exécute `tms:install` ; le lien d'activation obtenu 
 d'échec, la trace est dans `test-results/` (`npx playwright show-trace <trace.zip>`). Ces tests ne sont pas
 encore exécutés par la CI GitHub (ils demandent la pile Docker complète) : suite à prévoir.
 
+## Bac à sable local (démonstration)
+
+Le TMS lancé sur un poste de développement peut servir de **bac à sable** et de démonstration pour d'autres organismes.
+
+- **Activer** : dans le `.env` local, `APP_ENV=local` et `TMS_SANDBOX=true`, puis `docker compose exec app php artisan optimize:clear`.
+  Les deux sont requis : un serveur tourne en `APP_ENV=production`, et l'installateur comme `update.sh` n'écrivent jamais
+  `TMS_SANDBOX`. Hors bac à sable, la page répond 404 et la commande refuse : rien ne peut être effacé sur un serveur.
+- **Réinitialiser** : Administration › Bac à sable (droit « Paramètres »), confirmation en tapant `RÉINITIALISER` ; ou
+  `docker compose exec app php artisan tms:sandbox:reset --mode=work|all [--admin=e-mail]`.
+  - « Effacer les données de travail » : fiches, opportunités, devis, catalogue, sessions, dossiers, factures, documents,
+    candidatures, actions et fichiers ; comptes, rôles, référentiels, modèles, connecteurs et réglages gardés.
+  - « Repartir de zéro » : organisme neuf (réglages par défaut) ; seul l'administrateur qui réinitialise est gardé.
+  - Dans les deux cas, l'organisme devient « Organisme de démonstration » et sa société une entreprise fictive.
+- **Réseau local** : le port 8080 écoute sur toutes les interfaces. Avec `APP_URL=http://<nom-du-mac>.local:8080`
+  (nom : `scutil --get LocalHostName`), les autres postes du réseau ouvrent `http://<nom-du-mac>.local:8080` et les liens
+  envoyés par e-mail (signature, tests de positionnement) fonctionnent depuis ces postes.
+
 ## Production : installation en une ligne
 
 Deux scripts publiés avec chaque version : `proxmox.sh` (crée un conteneur LXC sur un nœud Proxmox VE et

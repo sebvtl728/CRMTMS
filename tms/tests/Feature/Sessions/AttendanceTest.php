@@ -2,6 +2,7 @@
 
 use App\Modules\Core\Access\AccessScope;
 use App\Modules\Core\Access\Role;
+use App\Modules\Core\Access\Scopes;
 use App\Modules\Core\References\ReferenceList;
 use App\Modules\Crm\Gdpr\Anonymiser;
 use App\Modules\Crm\People\Person;
@@ -249,6 +250,33 @@ it('lets the trainer of the séance enter its attendance, never another trainer 
     $this->actingAs($other)->getJson("/seances/{$seance->id}/attendance")->assertNotFound();
     $this->actingAs($other)->postJson("/seances/{$seance->id}/attendance", ['enrolment_id' => $lea->id, 'status' => 'absent'])->assertNotFound();
     expect(Attendance::query()->sole()->status)->toBe('present');
+});
+
+it('opens to a trainer, from the « Suivi » of the session, the attendance of his own séances only', function () {
+    $formateur = userWithRole(Role::Formateur);
+    $mine = Trainers::forUser($formateur) ?? Trainers::ensureForUser($formateur);
+    assert($mine !== null);
+    // His role also opens the sessions he is responsible for (as set by an administrator).
+    $role = $formateur->roles()->firstOrFail();
+    $role->givePermissionTo(Permissions::SESSIONS_VIEW);
+    DB::table(Scopes::TABLE)->insert(['tenant_id' => tenant()->id, 'role_id' => $role->id, 'permission' => Permissions::SESSIONS_VIEW, 'scope' => 'own']);
+    Scopes::forget();
+    $colleague = plTrainer('Bernard');
+    $session = plSession('2026-09-01', '2026-09-30', ['responsible_user_id' => $formateur->id]);
+    $module = plModule($session);
+    $his = plSeance($module, '2026-09-02', '09:00', '12:00', ['trainer_id' => $mine->id]);
+    $theirs = plSeance($module, '2026-09-03', '09:00', '12:00', ['trainer_id' => $colleague->id]);
+    atEnrol($session);
+
+    $rows = collect($this->actingAs($formateur)->getJson("/sessions/{$session->id}/attendance?month=2026-09")->assertOk()
+        ->assertJsonPath('can.manage', false)->json('seances'))->keyBy('id');
+    expect($rows[$his->id]['can_record'])->toBeTrue()
+        ->and($rows[$theirs->id]['can_record'])->toBeFalse();
+
+    // A manager may open every séance.
+    $manager = l2User([Permissions::SESSIONS_VIEW => null, Permissions::SEANCES_VIEW => null, Permissions::ATTENDANCE_MANAGE => null]);
+    $all = collect($this->actingAs($manager)->getJson("/sessions/{$session->id}/attendance?month=2026-09")->json('seances'));
+    expect($all->pluck('can_record')->unique()->all())->toBe([true]);
 });
 
 it('lets a manager enter the attendance of the sessions of his scope only', function () {

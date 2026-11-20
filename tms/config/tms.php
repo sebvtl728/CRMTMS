@@ -21,6 +21,13 @@ return [
     */
     'mode' => $mode,
 
+    // Local sandbox / demo (never on a server): TMS_SANDBOX=true AND APP_ENV=local unlock the « Bac à sable »
+    // reset (Core\Platform\Sandbox). The installer and update.sh never write it; production runs APP_ENV=production.
+    'sandbox' => $bool('TMS_SANDBOX', false),
+
+    // Connection of the reset (TRUNCATE needs the owner); the tests use their own transactional connection.
+    'sandbox_connection' => env('TMS_SANDBOX_CONNECTION') ?: 'pgsql_owner',
+
     // Slug of the tenant used in "single" mode (created by the installer / seeder).
     'default_tenant' => env('TMS_DEFAULT_TENANT') ?: 'default',
 

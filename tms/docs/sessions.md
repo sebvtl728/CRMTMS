@@ -278,3 +278,7 @@ plus de 30 jours (aucune rafale à la mise en service). Le formateur voit ses ac
 et « Modifier » les actions sur ses fiches, accordés par défaut au rôle Formateur) et y saisit son compte rendu. Sur la
 fiche de l'apprenant, « Formations suivies » indique la date de fin et la satisfaction (« - » jusqu'aux questionnaires).
 
+**Émarger depuis le « Suivi »** : un formateur qui ouvre le « Suivi » d'une session (s'il voit la session) peut y saisir les
+présences de **ses propres séances** (bouton « Présences »). Les autres séances, les heures mensuelles et la clôture du
+mois restent réservées aux gestionnaires.
+

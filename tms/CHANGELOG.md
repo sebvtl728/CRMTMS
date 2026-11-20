@@ -7,6 +7,8 @@ Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) ; ve
 
 ### Ajouté
 
+- Bac à sable local (démonstration) : Administration › Bac à sable pour effacer les données de travail ou repartir de
+  zéro, organisme et société fictifs ; uniquement avec `TMS_SANDBOX=true` et `APP_ENV=local`, jamais sur un serveur.
 - Signature en ligne : le signataire **dessine sa signature** (obligatoire) ; elle apparaît dans l'encadré signature du
   document (convention, contrat, « Bon pour accord » du devis) et sur la page de preuve, avec son empreinte. Le document
   signé reprend exactement la page du document envoyé (gardée à l'émission) ; un document émis avant cette version porte
@@ -23,6 +25,7 @@ Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) ; ve
 
 ### Modifié
 
+- Sessions : un formateur peut saisir les présences de ses propres séances depuis le « Suivi » de la session.
 
 - Documents : l'attestation de fin de formation et le certificat de réalisation s'émettent dès le dernier jour de la
   formation (et non plus le lendemain).

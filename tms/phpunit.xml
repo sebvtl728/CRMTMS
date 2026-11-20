@@ -43,5 +43,8 @@
         <env name="SESSION_DRIVER" value="array"/>
         <env name="TELESCOPE_ENABLED" value="false"/>
         <env name="TRUSTED_PROXIES" value="172.29.250.10"/>
+        <env name="TMS_SANDBOX_CONNECTION" value="pgsql"/>
+        <!-- Never read the local .env sandbox flag: each test turns the sandbox on itself. -->
+        <env name="TMS_SANDBOX" value="false" force="true"/>
     </php>
 </phpunit>

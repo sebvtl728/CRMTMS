@@ -8,6 +8,7 @@ use App\Modules\Core\Access\Permissions;
 use App\Modules\Core\Access\Scopes;
 use App\Modules\Core\Backups\BackupStatus;
 use App\Modules\Core\Companies\Brand;
+use App\Modules\Core\Platform\Sandbox;
 use App\Modules\Core\Users\User;
 use App\Modules\Crm\Activities\TodoQuery;
 use App\Modules\Crm\Permissions as CrmPermissions;
@@ -78,6 +79,8 @@ class HandleInertiaRequests extends Middleware
             // Menu counter of « Candidats »: candidatures still « Identifié » in a DAS responsible's DAS (lazy, cached 60 s).
             'candidates_badge' => fn () => $user !== null ? IdentifiedBadge::count($user) : 0,
             'backups_enabled' => config('tms.mode') !== 'multi',
+            // « Bac à sable » in the menu: a local sandbox only (never a server).
+            'sandbox' => Sandbox::enabled(),
             // Banner of the dashboard: last backup failed, too old or unknown (administrators, self-hosted only).
             'backup_alert' => fn () => $user !== null && config('tms.mode') !== 'multi' && $user->can(Permissions::SETTINGS_MANAGE) ? BackupStatus::alert() : null,
         ]);
