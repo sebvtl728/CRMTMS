@@ -73,12 +73,12 @@ sortis) avec, pour chacun, sa convocation, son attestation et son certificat.
 - **Attestation de fin de formation** : stagiaire, entreprise, formation, période (de son entrée à sa sortie), heures
   réalisées (présences et heures saisies) sur les heures prévues ; textes modifiables.
 - **Certificat de réalisation** : modèle du ministère du Travail, texte non modifiable, durée = heures réalisées.
-- L'attestation et le certificat s'émettent **à la fin de la formation**, ou plus tôt pour un stagiaire **sorti**
+- L'attestation et le certificat s'émettent **dès le dernier jour de la formation**, ou plus tôt pour un stagiaire **sorti**
   (abandon). Rien n'est émis pour une inscription annulée ou en liste d'attente, ni pour une session annulée.
 - Quand chaque stagiaire encore attendu d'un dossier a reçu sa convocation, le dossier passe de **Convention signée** à
   **Convocations envoyées**.
 - La synthèse de la session porte deux cartes : **Convocations** (envoyées / stagiaires) et **Attestations** (émises /
-  stagiaires, à faire après la fin de la formation).
+  stagiaires, à faire dès le dernier jour de la formation).
 
 ## 7. Signature en ligne
 

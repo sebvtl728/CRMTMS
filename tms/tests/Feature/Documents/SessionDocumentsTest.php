@@ -56,3 +56,12 @@ it('refuses the session actions without the right to manage documents', function
     $this->actingAs($reader)->post("/enrolments/{$x['lea']->id}/documents", ['type' => 'convocation'])->assertForbidden();
     expect(Document::query()->count())->toBe(0);
 });
+
+it('asks for the attestations on the last day of the training', function () {
+    $dossier = l2Dossier();
+    $session = l2Session(null, ['starts_on' => '2026-11-16', 'ends_on' => '2026-11-19', 'planned_hours' => '28']);
+    l2Enrol($dossier, $session, makePerson('Durand', ['first_name' => 'Léa']));
+
+    $this->actingAs(admin(twoFactor: true))->get("/sessions/{$session->id}")->assertInertia(fn (Assert $p) => $p
+        ->where('checklist', fn ($cards) => collect($cards)->firstWhere('key', 'documents.attestations')['state'] === 'todo'));
+});

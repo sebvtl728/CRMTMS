@@ -130,7 +130,7 @@ class DocumentIssuer
         if (! in_array($enrolment['status'], ['enrolled', 'confirmed', 'abandoned'], true)) {
             throw new UserFacingHttpException(409, 'Ce stagiaire n\'est pas inscrit : aucun document ne peut être émis.');
         }
-        $ended = $enrolment['session']['ends_on'] < CarbonImmutable::now('Europe/Paris')->toDateString();
+        $ended = $enrolment['session']['ends_on'] <= CarbonImmutable::now('Europe/Paris')->toDateString();
         if ($type !== DocumentType::Convocation && ! $ended && $enrolment['left_on'] === null) {
             throw new UserFacingHttpException(409, 'L\'attestation et le certificat s\'émettent à la fin de la formation ou à la sortie du stagiaire.');
         }
