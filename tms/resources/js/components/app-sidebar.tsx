@@ -89,6 +89,7 @@ const financeNavItems: (NavItem & { permission: string })[] = [
 // « Qualité »: the Qualiopi file.
 const qualityNavItems: (NavItem & { permission: string })[] = [
     { title: 'Qualiopi', url: '/qualite/qualiopi', icon: BadgeCheck, permission: 'qualite.view' },
+    { title: 'Questionnaires', url: '/qualite/questionnaires', icon: Smile, permission: 'questionnaires.view' },
 ];
 
 const myPlanningItem: NavItem = { title: 'Mon planning', url: '/mon-planning', icon: CalendarClock };

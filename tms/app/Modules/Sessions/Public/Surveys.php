@@ -41,6 +41,27 @@ final class Surveys
     }
 
     /**
+     * session() for several sessions, in grouped queries (unknown or trashed
+     * ones left out).
+     *
+     * @param  list<string>  $sessionIds
+     * @return array<string, array{id: string, label: string, training_id: string, ends_on: string, cancelled: bool}>
+     */
+    public static function describe(array $sessionIds): array
+    {
+        $sessions = TrainingSession::query()->whereKey(array_values(array_filter($sessionIds, fn (string $id) => Str::isUuid($id))))->get();
+        $titles = app(Trainings::class)->findMany($sessions->pluck('training_id')->unique()->values()->all());
+
+        return $sessions->mapWithKeys(fn (TrainingSession $s) => [(string) $s->id => [
+            'id' => (string) $s->id,
+            'label' => $s->label($titles[$s->training_id]->title ?? null),
+            'training_id' => (string) $s->training_id,
+            'ends_on' => $s->ends_on->toDateString(),
+            'cancelled' => $s->isCancelled(),
+        ]])->all();
+    }
+
+    /**
      * @return list<array{enrolment_id: string, person_id: string, dossier_id: string}>
      */
     public static function trainees(string $sessionId): array

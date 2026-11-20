@@ -3,6 +3,7 @@
 use App\Modules\Questionnaires\Answering\SurveyAnswerController;
 use App\Modules\Questionnaires\Campaigns\SurveyCampaignController;
 use App\Modules\Questionnaires\Results\QrCodeController;
+use App\Modules\Questionnaires\Results\SurveyOverviewController;
 use App\Modules\Questionnaires\Templates\SurveyTemplateController;
 use Illuminate\Support\Facades\Route;
 
@@ -37,4 +38,10 @@ Route::middleware('throttle:survey-public')->prefix('questionnaire')->name('surv
     Route::post('s/{token}', [SurveyAnswerController::class, 'choose'])->where('token', '[0-9a-f]{64}')->name('qr.choose');
     Route::get('q/{invitation}', [SurveyAnswerController::class, 'signedShow'])->whereUuid('invitation')->middleware('signed')->name('signed.show');
     Route::post('q/{invitation}', [SurveyAnswerController::class, 'signedSubmit'])->whereUuid('invitation')->middleware('signed')->name('signed.submit');
+});
+
+// Qualité › Questionnaires: the results of every session and their export.
+Route::middleware(['auth', 'can:questionnaires.view'])->prefix('qualite/questionnaires')->name('qualite.questionnaires.')->group(function () {
+    Route::get('/', [SurveyOverviewController::class, 'index'])->name('index');
+    Route::get('export', [SurveyOverviewController::class, 'export'])->name('export');
 });
