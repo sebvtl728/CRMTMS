@@ -11,8 +11,8 @@ use InvalidArgumentException;
 /**
  * What a dossier owes up to a cut-off, cumulated, per recipient (spec 0.9
  * § 4.3 and § 4 bis): a pure computation (no database, no clock) on the
- * arrays of Sessions\Public\Billing::dossier() and ::hours() — hours read up
- * to the cut-off month for « monthly » — and the plan of BillingPlans::for().
+ * arrays of Sessions\Public\Billing::dossier() and ::hours() - hours read up
+ * to the cut-off month for « monthly » - and the plan of BillingPlans::for().
  * Integer cents only (brick/math, half up), never a float.
  *
  * Billable B(D), the training part:

@@ -1,5 +1,6 @@
 import Heading from '@/components/heading';
 import InputError from '@/components/input-error';
+import { SessionBlocks, type SessionBlock } from '@/components/session-blocks';
 import { EnrolDialog, type EnrolDossierOption } from '@/components/sessions/enrolment-dialog';
 import { EnrolmentList, type EnrolmentReferences, type EnrolmentRow } from '@/components/sessions/enrolment-list';
 import { SessionAttendance } from '@/components/sessions/session-attendance';
@@ -44,6 +45,8 @@ interface ShowProps {
     attendance_tab: boolean;
     /** Steps shown to the user (synthese, configuration, planning, stagiaires[, suivi]). */
     steps: string[];
+    /** Blocks of other modules (documents…), on the « Stagiaires » step. */
+    blocks: SessionBlock[];
     /** Cards of the « Synthèse » (none once cancelled). */
     checklist: CardRow[];
     /** Tasks and notes of the « Synthèse » (spec § 4.5). */
@@ -117,6 +120,7 @@ export default function SessionShow({
     planning,
     attendance_tab,
     steps,
+    blocks,
     checklist,
     notes_panel,
     status,
@@ -198,7 +202,7 @@ export default function SessionShow({
 
                 {session.status === 'cancelled' && step !== 'synthese' && (
                     <div className="border-destructive/40 bg-destructive/5 rounded-xl border p-3 text-sm">
-                        Annulée le {formatDay(session.cancelled_on)} · Motif : {session.cancel_reason ?? '—'}
+                        Annulée le {formatDay(session.cancelled_on)} · Motif : {session.cancel_reason ?? '-'}
                     </div>
                 )}
 
@@ -233,14 +237,14 @@ export default function SessionShow({
                                             {session.training.code && <span className="text-muted-foreground"> ({session.training.code})</span>}
                                         </>
                                     ) : (
-                                        '—'
+                                        '-'
                                     ),
                                 )}
-                                {field('DAS', session.das ?? '—')}
+                                {field('DAS', session.das ?? '-')}
                                 {field('Dates', sessionDates(session))}
-                                {field('Heures prévues', session.planned_hours ? `${session.planned_hours} h` : '—')}
+                                {field('Heures prévues', session.planned_hours ? `${session.planned_hours} h` : '-')}
                                 {field('Lieu', sessionLocation(session))}
-                                {field('Modalité', session.modality ?? '—')}
+                                {field('Modalité', session.modality ?? '-')}
                                 {session.kind !== 'inter'
                                     ? field(
                                           'Entreprise',
@@ -254,11 +258,11 @@ export default function SessionShow({
                                                   `${session.organisation.label}${session.organisation.trashed ? ' (supprimée)' : ''}`
                                               )
                                           ) : (
-                                              '—'
+                                              '-'
                                           ),
                                       )
-                                    : field('Places', session.capacity ?? '—')}
-                                {field('Responsable', session.responsible ?? '—')}
+                                    : field('Places', session.capacity ?? '-')}
+                                {field('Responsable', session.responsible ?? '-')}
                                 {field('Créée', `${formatDateTime(session.created_at)}${session.created_by ? ` par ${session.created_by}` : ''}`)}
                             </dl>
                             {session.notes && (
@@ -301,6 +305,8 @@ export default function SessionShow({
                                 <EnrolmentList rows={waiting} context="session" references={enrolment_references} />
                             </section>
                         )}
+
+                        <SessionBlocks blocks={blocks} />
                     </div>
                 )}
             </div>

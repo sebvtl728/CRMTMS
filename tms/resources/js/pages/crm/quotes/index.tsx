@@ -114,7 +114,7 @@ function SuccessRateBanner({ rate, onPeriod }: { rate: SuccessRate; onPeriod: (p
             <div className="flex flex-wrap items-baseline gap-x-6 gap-y-1">
                 <div>
                     <span className="text-muted-foreground text-sm">Taux de réussite · {rate.label}</span>{' '}
-                    <span className="text-2xl font-semibold tabular-nums">{rate.rate === null ? '—' : `${percent.format(rate.rate)} %`}</span>
+                    <span className="text-2xl font-semibold tabular-nums">{rate.rate === null ? '-' : `${percent.format(rate.rate)} %`}</span>
                 </div>
                 <span className="text-sm">
                     {count.format(rate.sent)} envoyé{rate.sent > 1 ? 's' : ''}, {count.format(rate.accepted)} accepté{rate.accepted > 1 ? 's' : ''}
@@ -231,7 +231,14 @@ export default function QuotesIndex({ quotes, filters, options, success_rate, ca
                     </div>
                     <div className="flex items-end">
                         {filtered && (
-                            <Button type="button" variant="ghost" size="sm" onClick={() => router.get(route('crm.quotes.index'), success_rate.period === 'month' ? {} : { period: success_rate.period })}>
+                            <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                onClick={() =>
+                                    router.get(route('crm.quotes.index'), success_rate.period === 'month' ? {} : { period: success_rate.period })
+                                }
+                            >
                                 Réinitialiser
                             </Button>
                         )}
@@ -270,8 +277,8 @@ export default function QuotesIndex({ quotes, filters, options, success_rate, ca
                                                 </Link>
                                             </td>
                                             <td className="px-3 py-2 whitespace-nowrap">{formatDay(q.issued_on)}</td>
-                                            <td className="px-3 py-2">{q.account.name ?? '—'}</td>
-                                            <td className="px-3 py-2">{q.opportunity.title ?? '—'}</td>
+                                            <td className="px-3 py-2">{q.account.name ?? '-'}</td>
+                                            <td className="px-3 py-2">{q.opportunity.title ?? '-'}</td>
                                             <td className="px-3 py-2">
                                                 <QuoteStatusBadge status={q.status} />
                                             </td>

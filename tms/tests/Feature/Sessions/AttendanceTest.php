@@ -321,8 +321,8 @@ it('shows the attendance in the history of the dossier', function () {
     app(Attendances::class)->record($seance, $lea->id, 'partial', 90, 'Retard');
 
     $titles = collect(SessionsHistory::dossierPage($lea->dossier()->firstOrFail()))->pluck('title')->all();
-    expect($titles)->toContain('Léa Durand — Présence du 02/09/2026 : présent (3 h)')
-        ->toContain('Léa Durand — Présence du 02/09/2026 modifiée : partiel (1 h 30)')
+    expect($titles)->toContain('Léa Durand - Présence du 02/09/2026 : présent (3 h)')
+        ->toContain('Léa Durand - Présence du 02/09/2026 modifiée : partiel (1 h 30)')
         ->and(implode(' ', $titles))->not->toContain('Retard');
 });
 

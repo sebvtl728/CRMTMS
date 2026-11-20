@@ -13,8 +13,8 @@ use Brick\Math\RoundingMode;
  * The amounts of an invoice in integer cents (brick/math, half up, never a
  * float): a line = round(quantity × unit price); HT = Σ lines; VAT per
  * rate on the sum of its lines (as the quotes); TTC = HT + VAT. The VAT
- * mention follows the company — or, for a credit note, the invoice it
- * corrects — and the lines (spec 0.9 § 4.2, § 4 bis 1).
+ * mention follows the company - or, for a credit note, the invoice it
+ * corrects - and the lines (spec 0.9 § 4.2, § 4 bis 1).
  */
 final class InvoiceTotals
 {

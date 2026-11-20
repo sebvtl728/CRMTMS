@@ -5,7 +5,7 @@ const percent = new Intl.NumberFormat('fr-FR', { maximumFractionDigits: 1 });
 
 /** Cents as « 12 345 € » (the table: no useless decimals, but a rounded figure is never shown for amounts with cents). */
 export function formatCentsWhole(cents: number | null | undefined): string {
-    if (cents === null || cents === undefined) return '—';
+    if (cents === null || cents === undefined) return '-';
 
     return cents % 100 === 0 ? eurosWhole.format(cents / 100) : eurosCents.format(cents / 100);
 }

@@ -17,7 +17,7 @@ use LogicException;
  * The mechanics of QuoteNumbering: an atomic upsert on invoice_sequences,
  * run in the validation transaction; the row lock it takes makes a
  * concurrent validation of the same company and kind wait until this one
- * commits or rolls back — no duplicate, and a rolled back validation gives
+ * commits or rolls back - no duplicate, and a rolled back validation gives
  * its number back (no gap).
  */
 class InvoiceNumbering

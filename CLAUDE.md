@@ -188,6 +188,7 @@ Code dans `tms/app/Modules/Documents/` (`Texts`, `Gdpr`). Guide : `tms/docs/docu
 - **Envoi** : `DocumentSender` (verrou, 409 annulé / envoi en cours) → `SendDocument` (`TenantAwareJob`, après commit, `TenantMailer`, motif sans texte du serveur) ; modèles d'e-mails `document_<type>` ; succès = document « Envoyé » et dossier « Convention envoyée » (jamais en arrière).
 - **RGPD** : `Gdpr\DocumentAnonymisation` via `FicheLinks` (destinataire figé et e-mails effacés, PDF gardé ; `recipient_snapshot.person_id` désigne la personne) ; export « documents ».
 - **Signature et cachet** : `CompanyBranding::storeSignature|signatureDataUri` (`companies.signature_path`).
+- **Documents des stagiaires** (livraison 2) : `DocumentType::perEnrolment()` (convocation, attestation, certificat du ministère non modifiable) ; `DocumentIssuer::issueForEnrolment` (`Paperwork::enrolment` : séances en clé `schedule`, heures réalisées) ; `DocumentBatch` (émission tout ou rien, envoi aux stagiaires ayant un e-mail, limité aux dossiers que l'utilisateur gère) ; page session par les registres `Sessions\Public\SessionBlocks` / `SessionCards` (`resources/js/components/session-blocks.tsx`) ; dossier « Convocations envoyées » quand tous les stagiaires attendus ont reçu la leur.
 
 ## Conventions
 

@@ -24,7 +24,7 @@ use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
  * their amounts and labels editable; free lines added and removed) and
  * deleted. One open draft per recipient of a dossier and kind (an invoice
  * draft and a credit-note draft may live together): preparing again (a
- * double click, another user) skips it — under the row lock of the
+ * double click, another user) skips it - under the row lock of the
  * dossier (Billing::lockDossier), the check is made again inside the
  * transaction.
  */

@@ -92,7 +92,7 @@ it('sends a quote: frozen, archived, mailed with its pdf, in the timeline and as
     // The window is prefilled from the recipient, the number, the company and the validity.
     $this->get("/crm/quotes/{$quote->id}")->assertInertia(fn (Assert $page) => $page
         ->where('send.to', 'lea.durand@example.test')
-        ->where('send.subject', 'Devis CF-2026-0001 — CAP FORMATION')
+        ->where('send.subject', 'Devis CF-2026-0001 - CAP FORMATION')
         ->where('send.body', fn (string $body) => str_contains($body, 'CF-2026-0001') && str_contains($body, '14/12/2026') && str_contains($body, 'CAP FORMATION'))
         ->where('can.send', true)
         ->where('can.remind', false));

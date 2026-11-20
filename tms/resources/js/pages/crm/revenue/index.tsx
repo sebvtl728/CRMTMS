@@ -51,7 +51,7 @@ const TYPES: { value: RevenuePeriod['type']; label: string }[] = [
 
 /** Bar and percentage of a target reached (the bar stops at 100 %). */
 function Progress({ rate, label }: { rate: number | null; label: string }) {
-    if (rate === null) return <span className="text-muted-foreground">—</span>;
+    if (rate === null) return <span className="text-muted-foreground">-</span>;
 
     return (
         <div className="flex min-w-32 items-center gap-2">
@@ -247,8 +247,8 @@ export default function RevenueIndex({ period, rows, totals, own, can, status }:
                 </div>
                 {!own && partialTarget && (
                     <p className="text-muted-foreground text-sm">
-                        « Atteint » du total : calculé sur les seuls DAS ayant un objectif ({formatCentsWhole(totals.targeted_total_cents)} signés
-                        sur {formatCentsWhole(totals.total_cents)}).
+                        « Atteint » du total : calculé sur les seuls DAS ayant un objectif ({formatCentsWhole(totals.targeted_total_cents)} signés sur{' '}
+                        {formatCentsWhole(totals.total_cents)}).
                     </p>
                 )}
             </div>

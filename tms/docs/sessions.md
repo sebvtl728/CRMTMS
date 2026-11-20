@@ -119,6 +119,8 @@ Chaque dossier reçoit un numéro `D-2026-0001`.
 
 ### Bloc Documents (0.10)
 
+Sur la page de la **session** (étape Stagiaires), un bloc **Documents** émet et envoie convocations, attestations et certificats de réalisation, un par un ou pour tous ; la synthèse porte les cartes **Convocations** et **Attestations**. Les modules ajoutent leurs blocs et cartes par `Sessions\Public\SessionBlocks` et `SessionCards`.
+
 La page du dossier porte un bloc **Documents** (droit « Consulter les documents ») : convention (contractant entreprise) ou contrat (particulier), émis, archivés, envoyés et annulés depuis le dossier. Voir `documents.md`.
 
 ### Bloc Facturation (0.9)

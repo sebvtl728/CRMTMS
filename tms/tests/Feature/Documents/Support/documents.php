@@ -3,6 +3,8 @@
 use App\Modules\Connectors\Core\ConnectorConfig;
 use App\Modules\Connectors\Smtp\SmtpTransportFactory;
 use App\Modules\Sessions\Dossiers\Dossier;
+use App\Modules\Sessions\Enrolments\Enrolment;
+use App\Modules\Sessions\Sessions\TrainingSession;
 use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\Http;
 use Symfony\Component\Mailer\Envelope;
@@ -100,4 +102,23 @@ function docSmtp(Closure $send): ConnectorConfig
         'settings' => ['host' => 'smtp.example.test', 'port' => 587, 'encryption' => 'tls', 'from_address' => 'documents@cap.test', 'from_name' => 'CAP'],
         'secrets' => ['username' => 'cap-user', 'password' => 's3cret'],
     ]);
+}
+
+/**
+ * A finished session (2–4 November 2026, two séances of 3 h 30) of the
+ * « Hôtel du Parc » dossier with Léa (who has an e-mail) and Tom.
+ *
+ * @return array{dossier: Dossier, session: TrainingSession, lea: Enrolment, tom: Enrolment}
+ */
+function docFinishedSession(): array
+{
+    $dossier = l2Dossier();
+    $session = l2Session(null, ['starts_on' => '2026-11-02', 'ends_on' => '2026-11-04', 'planned_hours' => '7', 'location_kind' => 'address', 'location_text' => 'Salle B, Nantes']);
+    $module = plModule($session);
+    plSeance($module, '2026-11-02', '09:00', '12:30');
+    plSeance($module, '2026-11-03', '13:30', '17:00');
+    $lea = l2Enrol($dossier, $session, makePerson('Durand', ['first_name' => 'Léa', 'email' => 'lea.durand@example.test']));
+    $tom = l2Enrol($dossier, $session, makePerson('Petit', ['first_name' => 'Tom']));
+
+    return ['dossier' => $dossier->fresh(), 'session' => $session, 'lea' => $lea, 'tom' => $tom];
 }

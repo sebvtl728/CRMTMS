@@ -81,7 +81,7 @@ function Field({
 
 /** Contact links of an affiliation line. */
 function ContactLinks({ email, phone, mobile }: { email: string | null; phone: string | null; mobile: string | null }) {
-    if (!email && !phone && !mobile) return <span className="text-muted-foreground">—</span>;
+    if (!email && !phone && !mobile) return <span className="text-muted-foreground">-</span>;
 
     return (
         <div className="flex flex-col gap-0.5 break-all">
@@ -319,7 +319,7 @@ function AffiliationDialog({
                                                     >
                                                         <span className="font-medium">{h.name}</span>
                                                         <span className="text-muted-foreground block text-xs">
-                                                            {[h.email, h.organisations.join(', ')].filter(Boolean).join(' · ') || '—'}
+                                                            {[h.email, h.organisations.join(', ')].filter(Boolean).join(' · ') || '-'}
                                                         </span>
                                                     </button>
                                                 </li>
@@ -526,8 +526,8 @@ export function OrganisationContacts({ organisationId, affiliations, former, dec
                                         <td className="px-4 py-2">
                                             {personLink(a)} {a.is_referent && <Badge className="ml-1">Référent</Badge>}
                                         </td>
-                                        <td className="px-4 py-2">{a.job_title ?? '—'}</td>
-                                        <td className="px-4 py-2">{a.decision_role?.label ?? '—'}</td>
+                                        <td className="px-4 py-2">{a.job_title ?? '-'}</td>
+                                        <td className="px-4 py-2">{a.decision_role?.label ?? '-'}</td>
                                         <td className="px-4 py-2">
                                             <ContactLinks email={a.work_email} phone={a.work_phone} mobile={a.mobile} />
                                         </td>

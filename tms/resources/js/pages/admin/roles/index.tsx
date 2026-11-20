@@ -337,7 +337,7 @@ export default function Roles({ roles, groups, scopeOptions, status }: RolesProp
                                                                 type="button"
                                                                 role="switch"
                                                                 aria-checked
-                                                                aria-label={`Double authentification obligatoire — ${role.label}`}
+                                                                aria-label={`Double authentification obligatoire - ${role.label}`}
                                                                 aria-disabled
                                                                 className="bg-primary relative inline-flex h-5 w-9 shrink-0 cursor-not-allowed items-center rounded-full opacity-60"
                                                             >
@@ -353,7 +353,7 @@ export default function Roles({ roles, groups, scopeOptions, status }: RolesProp
                                                         type="button"
                                                         role="switch"
                                                         aria-checked={role.requires_2fa}
-                                                        aria-label={`Double authentification obligatoire — ${role.label}`}
+                                                        aria-label={`Double authentification obligatoire - ${role.label}`}
                                                         disabled={saving === `${role.id}:2fa`}
                                                         onClick={() => set2fa(role, !role.requires_2fa)}
                                                         className={`relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors ${role.requires_2fa ? 'bg-primary' : 'bg-input'}`}
@@ -419,7 +419,7 @@ export default function Roles({ roles, groups, scopeOptions, status }: RolesProp
                                                                 <Checkbox
                                                                     checked={granted}
                                                                     disabled={fixed || saving === key}
-                                                                    aria-label={`${p.label} — ${role.label}`}
+                                                                    aria-label={`${p.label} - ${role.label}`}
                                                                     onCheckedChange={(c) => toggle(role, p.name, c === true)}
                                                                 />
                                                                 {fixed && <Lock className="text-muted-foreground h-3 w-3" aria-hidden />}
@@ -432,16 +432,18 @@ export default function Roles({ roles, groups, scopeOptions, status }: RolesProp
                                                                 >
                                                                     <SelectTrigger
                                                                         className="h-7 w-full text-xs"
-                                                                        aria-label={`Périmètre de ${p.label} — ${role.label}`}
+                                                                        aria-label={`Périmètre de ${p.label} - ${role.label}`}
                                                                     >
                                                                         <SelectValue />
                                                                     </SelectTrigger>
                                                                     <SelectContent>
-                                                                        {scopeOptions.filter((o) => p.scope_options.includes(o.value)).map((o) => (
-                                                                            <SelectItem key={o.value} value={o.value}>
-                                                                                {o.label}
-                                                                            </SelectItem>
-                                                                        ))}
+                                                                        {scopeOptions
+                                                                            .filter((o) => p.scope_options.includes(o.value))
+                                                                            .map((o) => (
+                                                                                <SelectItem key={o.value} value={o.value}>
+                                                                                    {o.label}
+                                                                                </SelectItem>
+                                                                            ))}
                                                                     </SelectContent>
                                                                 </Select>
                                                             )}

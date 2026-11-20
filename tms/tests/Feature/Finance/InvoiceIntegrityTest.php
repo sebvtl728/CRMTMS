@@ -85,7 +85,7 @@ it('detects a journal row forged by the application role', function () {
  * own connection in a transaction rolled back afterwards: the whole
  * scenario lives there. The per-test transaction of the application role
  * is rolled back first (what it wrote would be invisible to the owner, and
- * its uncommitted global rows — permissions — would block the owner's),
+ * its uncommitted global rows - permissions - would block the owner's),
  * then opened again for the end of the test.
  */
 function fgAsOwner(Closure $fn): void

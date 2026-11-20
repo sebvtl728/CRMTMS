@@ -117,7 +117,7 @@ export default function OnlineTestsIndex({ tests, status }: { tests: Row[]; stat
                                                     ? 'Brouillon'
                                                     : `Version ${t.published_version}`}
                                         </td>
-                                        <td className="px-3 py-2">{t.total_points ?? '—'}</td>
+                                        <td className="px-3 py-2">{t.total_points ?? '-'}</td>
                                         <td className="px-3 py-2">{t.time_limit_minutes ? `${t.time_limit_minutes} min` : 'Libre'}</td>
                                         <td className="px-3 py-2">{formatDate(t.updated_at)}</td>
                                     </tr>

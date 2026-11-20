@@ -125,7 +125,7 @@ test('dossier from an accepted quote: summary, new intra session, trainees found
     // Its history: creation, the two enrolments, the initial funding.
     const history = page.getByRole('region', { name: 'Historique' });
     await expect(history.getByText('Dossier créé')).toBeVisible();
-    await expect(history.getByText(new RegExp(`^${EMPLOYEE.first_name} ${EMPLOYEE.last_name} — Inscription à la session S-`))).toBeVisible();
+    await expect(history.getByText(new RegExp(`^${EMPLOYEE.first_name} ${EMPLOYEE.last_name} - Inscription à la session S-`))).toBeVisible();
     await expect(history.getByText(new RegExp(`^Financement ajouté : ${CLIENT} \\(Entreprise\\)`))).toBeVisible();
     const dossierUrl = page.url();
 

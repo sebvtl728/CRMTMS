@@ -100,7 +100,7 @@ it('shows the rate above the list, by month, quarter or year (Paris)', function 
     $this->get('/crm/quotes?status=accepted')->assertInertia(fn (Assert $page) => $page->where('success_rate.sent', 4));
 });
 
-it('none sent gives no rate (« — »), on the list and on the dashboard', function () {
+it('none sent gives no rate (« - »), on the list and on the dashboard', function () {
     $this->travelTo(CarbonImmutable::parse('2026-12-10 10:00', 'Europe/Paris'));
     srNovember();
     $this->actingAs(commercial());

@@ -83,7 +83,7 @@ final class PlanningRows
                     'cancelled' => $session?->isCancelled() ?? false,
                     'href' => isset($openable[$s->training_session_id]) ? route('sessions.show', $s->training_session_id, false) : null,
                 ],
-                'module' => $modules[$s->session_module_id] ?? '—',
+                'module' => $modules[$s->session_module_id] ?? '-',
                 'trainer' => $s->trainer_id === null ? null : ['id' => $s->trainer_id, 'label' => $trainers[$s->trainer_id] ?? 'Formateur introuvable'],
                 'room' => $room === null ? null : ['id' => $room->id, 'name' => $room->name, 'address' => $room->address],
                 'place_text' => $s->place_text,

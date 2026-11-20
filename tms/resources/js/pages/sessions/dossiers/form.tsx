@@ -1,6 +1,6 @@
 import Heading from '@/components/heading';
-import { FichePicker, type Picked } from '@/components/sessions/fiche-picker';
 import InputError from '@/components/input-error';
+import { FichePicker, type Picked } from '@/components/sessions/fiche-picker';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -156,7 +156,12 @@ export default function DossierFormPage({ dossier, defaults, options }: FormProp
             const price = accountType === 'person' ? training?.price_individual : training?.price_company;
             const lines = d.lines.map((l, i) =>
                 i === index
-                    ? { ...l, training_id: id, label: l.label === '' || l.label === titleOf(line.training_id) ? (training?.title ?? '') : l.label, unit_price: l.unit_price || (price ?? '') }
+                    ? {
+                          ...l,
+                          training_id: id,
+                          label: l.label === '' || l.label === titleOf(line.training_id) ? (training?.title ?? '') : l.label,
+                          unit_price: l.unit_price || (price ?? ''),
+                      }
                     : l,
             );
             // The DAS of the dossier is proposed from the training of its first line.
@@ -206,11 +211,21 @@ export default function DossierFormPage({ dossier, defaults, options }: FormProp
                             <legend className="mb-1 text-sm font-medium">Type *</legend>
                             <div className="flex flex-wrap gap-6">
                                 <label className="flex items-center gap-2 text-sm">
-                                    <input type="radio" name="account_type" checked={accountType === 'organisation'} onChange={() => pickAccount('organisation', null)} />
+                                    <input
+                                        type="radio"
+                                        name="account_type"
+                                        checked={accountType === 'organisation'}
+                                        onChange={() => pickAccount('organisation', null)}
+                                    />
                                     Entreprise
                                 </label>
                                 <label className="flex items-center gap-2 text-sm">
-                                    <input type="radio" name="account_type" checked={accountType === 'person'} onChange={() => pickAccount('person', null)} />
+                                    <input
+                                        type="radio"
+                                        name="account_type"
+                                        checked={accountType === 'person'}
+                                        onChange={() => pickAccount('person', null)}
+                                    />
                                     Particulier
                                 </label>
                             </div>
@@ -223,7 +238,9 @@ export default function DossierFormPage({ dossier, defaults, options }: FormProp
                                 kind={accountType}
                                 value={account}
                                 onPick={(p) => pickAccount(accountType, p)}
-                                placeholder={accountType === 'organisation' ? 'Nom, ville ou SIRET (2 lettres au moins)' : 'Nom ou e-mail (2 lettres au moins)'}
+                                placeholder={
+                                    accountType === 'organisation' ? 'Nom, ville ou SIRET (2 lettres au moins)' : 'Nom ou e-mail (2 lettres au moins)'
+                                }
                             />
                             <InputError message={fieldErrors.account ?? errors.account_organisation_id ?? errors.account_person_id} />
                         </div>
@@ -282,14 +299,24 @@ export default function DossierFormPage({ dossier, defaults, options }: FormProp
                                     <Label htmlFor={`lines.${i}.label`} className="text-xs">
                                         Libellé *
                                     </Label>
-                                    <Input id={`lines.${i}.label`} value={line.label} maxLength={255} onChange={(e) => setLine(i, { label: e.target.value })} />
+                                    <Input
+                                        id={`lines.${i}.label`}
+                                        value={line.label}
+                                        maxLength={255}
+                                        onChange={(e) => setLine(i, { label: e.target.value })}
+                                    />
                                     <InputError message={fieldErrors[`lines.${i}.label`]} />
                                 </div>
                                 <div className="grid gap-1">
                                     <Label htmlFor={`lines.${i}.quantity`} className="text-xs">
                                         Quantité *
                                     </Label>
-                                    <Input id={`lines.${i}.quantity`} inputMode="decimal" value={line.quantity} onChange={(e) => setLine(i, { quantity: e.target.value })} />
+                                    <Input
+                                        id={`lines.${i}.quantity`}
+                                        inputMode="decimal"
+                                        value={line.quantity}
+                                        onChange={(e) => setLine(i, { quantity: e.target.value })}
+                                    />
                                     <InputError message={fieldErrors[`lines.${i}.quantity`]} />
                                 </div>
                                 <div className="grid gap-1">
@@ -299,7 +326,12 @@ export default function DossierFormPage({ dossier, defaults, options }: FormProp
                                     <Select
                                         value={line.unit}
                                         onValueChange={(v) =>
-                                            setLine(i, line.kind === 'training' ? { unit: v, pricing_mode: v === 'stagiaire' ? 'per_trainee' : 'group' } : { unit: v })
+                                            setLine(
+                                                i,
+                                                line.kind === 'training'
+                                                    ? { unit: v, pricing_mode: v === 'stagiaire' ? 'per_trainee' : 'group' }
+                                                    : { unit: v },
+                                            )
                                         }
                                     >
                                         <SelectTrigger id={`lines.${i}.unit`}>
@@ -366,23 +398,33 @@ export default function DossierFormPage({ dossier, defaults, options }: FormProp
                                     {(() => {
                                         const cents = lineTotalCents(line.quantity, line.unit_price, line.discount_percent);
 
-                                        return cents === null ? '—' : displayCents(cents);
+                                        return cents === null ? '-' : displayCents(cents);
                                     })()}
                                 </div>
                             </div>
                         ))}
                         <div className="flex flex-wrap items-center justify-between gap-2">
                             <div className="flex flex-wrap gap-2">
-                                <Button type="button" variant="outline" size="sm" onClick={() => setData((d) => ({ ...d, lines: [...d.lines, emptyLine('training')] }))}>
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => setData((d) => ({ ...d, lines: [...d.lines, emptyLine('training')] }))}
+                                >
                                     <Plus className="h-4 w-4" />
                                     Ligne de formation
                                 </Button>
-                                <Button type="button" variant="outline" size="sm" onClick={() => setData((d) => ({ ...d, lines: [...d.lines, emptyLine('fee')] }))}>
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => setData((d) => ({ ...d, lines: [...d.lines, emptyLine('fee')] }))}
+                                >
                                     <Plus className="h-4 w-4" />
                                     Frais (déplacement, repas…)
                                 </Button>
                             </div>
-                            <div className="text-sm font-semibold">Prix du dossier HT : {total === null ? '—' : displayCents(total)}</div>
+                            <div className="text-sm font-semibold">Prix du dossier HT : {total === null ? '-' : displayCents(total)}</div>
                         </div>
                     </fieldset>
 
@@ -395,7 +437,13 @@ export default function DossierFormPage({ dossier, defaults, options }: FormProp
                             <Label htmlFor="abandon_mode">Règle en cas d'abandon</Label>
                             <Select
                                 value={data.abandon_mode || ORGANISME}
-                                onValueChange={(v) => setData((d) => ({ ...d, abandon_mode: v === ORGANISME ? '' : v, abandon_dedit_percent: v === 'prorata_dedit' ? d.abandon_dedit_percent : '' }))}
+                                onValueChange={(v) =>
+                                    setData((d) => ({
+                                        ...d,
+                                        abandon_mode: v === ORGANISME ? '' : v,
+                                        abandon_dedit_percent: v === 'prorata_dedit' ? d.abandon_dedit_percent : '',
+                                    }))
+                                }
                             >
                                 <SelectTrigger id="abandon_mode">
                                     <SelectValue />
@@ -424,7 +472,13 @@ export default function DossierFormPage({ dossier, defaults, options }: FormProp
                         )}
                         <div className="grid gap-2 md:col-span-2">
                             <Label htmlFor="notes">Notes</Label>
-                            <textarea id="notes" rows={3} value={data.notes} onChange={(e) => setData('notes', e.target.value)} className={textareaClass} />
+                            <textarea
+                                id="notes"
+                                rows={3}
+                                value={data.notes}
+                                onChange={(e) => setData('notes', e.target.value)}
+                                className={textareaClass}
+                            />
                             <InputError message={errors.notes} />
                         </div>
                     </fieldset>

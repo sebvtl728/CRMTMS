@@ -51,7 +51,7 @@ const breadcrumbs: BreadcrumbItem[] = [{ title: 'Utilisateurs', href: '/admin/us
 const dateTime = new Intl.DateTimeFormat('fr-FR', { dateStyle: 'short', timeStyle: 'short', timeZone: 'Europe/Paris' });
 
 function formatDate(value: string | null): string {
-    return value ? dateTime.format(new Date(value)) : '—';
+    return value ? dateTime.format(new Date(value)) : '-';
 }
 
 function UserStatus({ user }: { user: UserRow }) {
@@ -232,7 +232,7 @@ export default function UsersIndex({ users, dasOptions, roleOptions, invitations
                                             value={user.role ?? ''}
                                             onChange={(e) => changeRole(user, e.target.value)}
                                         >
-                                            {user.role === null && <option value="">—</option>}
+                                            {user.role === null && <option value="">-</option>}
                                             {roleOptions.map((o) => (
                                                 <option key={o.value} value={o.value}>
                                                     {o.label}
@@ -243,7 +243,7 @@ export default function UsersIndex({ users, dasOptions, roleOptions, invitations
                                     <td className="px-4 py-2">
                                         <UserStatus user={user} />
                                     </td>
-                                    <td className="px-4 py-2">{user.two_factor ? 'Activée' : '—'}</td>
+                                    <td className="px-4 py-2">{user.two_factor ? 'Activée' : '-'}</td>
                                     <td className="px-4 py-2">{formatDate(user.last_login_at)}</td>
                                     {dasOptions && (
                                         <td className="px-4 py-2">
@@ -257,7 +257,7 @@ export default function UsersIndex({ users, dasOptions, roleOptions, invitations
                                                               .join(', ')}
                                                 </Button>
                                             ) : (
-                                                '—'
+                                                '-'
                                             )}
                                         </td>
                                     )}

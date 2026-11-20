@@ -112,7 +112,7 @@ export function previewTotals(lines: QuoteLineInput[], vatExempt: boolean): Tota
 
 /** Cents as « 12 500,00 € ». */
 export function formatCentsBig(cents: bigint | null): string {
-    if (cents === null) return '—';
+    if (cents === null) return '-';
     const euros = (cents / 100n).toString().replace(/\B(?=(\d{3})+(?!\d))/g, '\u00A0');
 
     return `${euros},${(cents % 100n).toString().padStart(2, '0')} €`;

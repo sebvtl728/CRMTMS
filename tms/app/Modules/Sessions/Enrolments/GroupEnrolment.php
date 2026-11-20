@@ -17,7 +17,7 @@ use Illuminate\Validation\ValidationException;
  * Enrolment of a group of trainees on a session for one line of a dossier
  * (a group journey, and the later waves of it): one transaction for the
  * batch, each trainee through Enrolments::enrolInBatch() (places of an inter
- * session — the extras on the waiting list, in order —, intra entreprise,
+ * session - the extras on the waiting list, in order -, intra entreprise,
  * duplicates, hours). A trainee is a person of the CRM ({person_id}) or one
  * created on the spot ({new_person: {…, employee, confirm_duplicate, ref}},
  * the same ref being one person, as in the dossier assistant); the shares

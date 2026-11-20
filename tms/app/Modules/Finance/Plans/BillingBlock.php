@@ -45,7 +45,7 @@ final class BillingBlock
         $parties = [$dossier['contractor'], ...array_map(fn (array $f) => $f['funder'], $direct)];
         $ids = fn (string $type) => array_values(array_unique(array_map(fn (array $p) => $p['id'], array_filter($parties, fn (array $p) => $p['type'] === $type))));
         $labels = app(Fiches::class)->organisationLabels($ids('organisation')) + app(Fiches::class)->personLabels($ids('person'));
-        $label = fn (array $party) => $labels[$party['id']]['label'] ?? '—';
+        $label = fn (array $party) => $labels[$party['id']]['label'] ?? '-';
         $funder = fn (array $f) => $label($f['funder']);
         $balances = Balances::of($invoices->pluck('id')->all());
         $left = fn (string $id): string => ! isset($balances[$id]) ? '' : ($balances[$id]['remaining_cents'] <= 0

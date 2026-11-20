@@ -152,12 +152,23 @@ export function QuoteSendDialog({
 
                     <div className="grid gap-2">
                         <Label htmlFor="quote-to">Destinataire *</Label>
-                        <Input id="quote-to" type="email" value={data.to} onChange={(e) => setData('to', e.target.value)} aria-invalid={Boolean(errs.to)} />
+                        <Input
+                            id="quote-to"
+                            type="email"
+                            value={data.to}
+                            onChange={(e) => setData('to', e.target.value)}
+                            aria-invalid={Boolean(errs.to)}
+                        />
                         <InputError message={errs.to} />
                     </div>
                     <div className="grid gap-2">
                         <Label htmlFor="quote-cc">Copie (5 adresses au plus)</Label>
-                        <Input id="quote-cc" value={data.cc} onChange={(e) => setData('cc', e.target.value)} placeholder="adresse@exemple.fr, autre@exemple.fr" />
+                        <Input
+                            id="quote-cc"
+                            value={data.cc}
+                            onChange={(e) => setData('cc', e.target.value)}
+                            placeholder="adresse@exemple.fr, autre@exemple.fr"
+                        />
                         <InputError message={errs.cc ?? itemError(errs, 'cc')} />
                     </div>
                     <div className="grid gap-2">
@@ -186,7 +197,9 @@ export function QuoteSendDialog({
                             </div>
                             {join && (
                                 <>
-                                    {list.length === 0 && <p className="text-muted-foreground text-sm">Aucune plaquette rattachée aux formations du devis.</p>}
+                                    {list.length === 0 && (
+                                        <p className="text-muted-foreground text-sm">Aucune plaquette rattachée aux formations du devis.</p>
+                                    )}
                                     <ul className="grid gap-1">
                                         {list.map((c) => (
                                             <li key={c.version_id} className="flex items-center gap-2 text-sm">
@@ -214,7 +227,11 @@ export function QuoteSendDialog({
                                         <ul className="grid gap-1 rounded-md border p-1">
                                             {hits.map((h) => (
                                                 <li key={h.version_id}>
-                                                    <button type="button" className="hover:bg-muted w-full rounded px-2 py-1 text-left text-sm" onClick={() => addHit(h)}>
+                                                    <button
+                                                        type="button"
+                                                        className="hover:bg-muted w-full rounded px-2 py-1 text-left text-sm"
+                                                        onClick={() => addHit(h)}
+                                                    >
                                                         {h.title}
                                                     </button>
                                                 </li>

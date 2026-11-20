@@ -35,9 +35,9 @@ final class InvoiceRows
             'status_label' => $i->status->label(),
             'issued_on' => $i->issued_on?->toDateString(),
             'created_on' => $i->created_at?->toDateString(),
-            'recipient' => $labels[$i->recipient_type.':'.$i->recipient_id] ?? '—',
+            'recipient' => $labels[$i->recipient_type.':'.$i->recipient_id] ?? '-',
             'recipient_role' => $i->funding_id === null ? 'contractor' : 'funder',
-            'dossier' => ['id' => $i->dossier_id, 'number' => $numbers[$i->dossier_id]['number'] ?? '—', 'url' => '/dossiers/'.$i->dossier_id],
+            'dossier' => ['id' => $i->dossier_id, 'number' => $numbers[$i->dossier_id]['number'] ?? '-', 'url' => '/dossiers/'.$i->dossier_id],
             'total_ht_cents' => $i->total_ht_cents,
             'total_ttc_cents' => $i->total_ttc_cents,
             // Issued invoices only (never a draft nor a credit note): what is paid and left (0.9.1).

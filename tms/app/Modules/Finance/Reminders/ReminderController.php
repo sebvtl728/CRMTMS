@@ -43,7 +43,7 @@ class ReminderController extends Controller
                 'id' => $d['invoice']->id,
                 'title' => $d['invoice']->title(),
                 'url' => '/finance/invoices/'.$d['invoice']->id,
-                'recipient' => $rows[$d['invoice']->id]['recipient'] ?? '—',
+                'recipient' => $rows[$d['invoice']->id]['recipient'] ?? '-',
                 'dossier' => $rows[$d['invoice']->id]['dossier'] ?? null,
                 'due_on' => $d['invoice']->due_on?->toDateString(),
                 'days_late' => $d['days_late'],

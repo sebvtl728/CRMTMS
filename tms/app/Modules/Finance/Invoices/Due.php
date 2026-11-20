@@ -25,7 +25,7 @@ use Carbon\CarbonImmutable;
  * <financeur> » on the contractor's.
  *
  * Cut-offs, oldest first (each recipient gets the first one where
- * something is due, from its latest invoiced cut-off on — a late change of
+ * something is due, from its latest invoiced cut-off on - a late change of
  * an invoiced period gives a complement or a credit note):
  *  - « end »: today (Paris), ready once the training is over and closed;
  *  - « monthly »: each month of the sessions up to the current one, ready
@@ -40,9 +40,9 @@ use Carbon\CarbonImmutable;
  */
 final class Due
 {
-    public const DEDIT_LABEL = 'Dédit — non imputable sur les fonds de la formation professionnelle';
+    public const DEDIT_LABEL = 'Dédit - non imputable sur les fonds de la formation professionnelle';
 
-    public const ABSENCES_LABEL = 'Absences non justifiées — non imputables sur les fonds de la formation professionnelle';
+    public const ABSENCES_LABEL = 'Absences non justifiées - non imputables sur les fonds de la formation professionnelle';
 
     public const NOTHING_TO_CORRECT = 'À régulariser : aucune facture à corriger';
 
@@ -165,7 +165,7 @@ final class Due
             'id' => $dossier['id'],
             'number' => $dossier['number'],
             'url' => '/dossiers/'.$dossier['id'],
-            'contractor' => $labels[$dossier['contractor']['type'].':'.$dossier['contractor']['id']] ?? '—',
+            'contractor' => $labels[$dossier['contractor']['type'].':'.$dossier['contractor']['id']] ?? '-',
         ];
         $rows = [];
         foreach ($found as $key => [$recipient, $cut, $shares, $components]) {
@@ -231,7 +231,7 @@ final class Due
         if ($key === Invoice::CONTRACTOR) {
             foreach ($shares->byRecipient as $share) {
                 if ($share['external'] && $share['training_cents'] > 0) {
-                    $funder = $labels[$share['recipient']['fiche_type'].':'.$share['recipient']['id']] ?? '—';
+                    $funder = $labels[$share['recipient']['fiche_type'].':'.$share['recipient']['id']] ?? '-';
                     $lines[] = [...self::line(InvoiceLine::MENTION, 'Part réglée par '.$funder, 0), 'funding_id' => $share['recipient']['funding_id'] ?? null];
                 }
             }
@@ -259,7 +259,7 @@ final class Due
             'key' => $dossier['id'].'|'.$key,
             'dossier' => $head,
             'recipient_key' => $key,
-            'recipient' => [...$recipient, 'label' => $labels[$recipient['type'].':'.$recipient['id']] ?? '—'],
+            'recipient' => [...$recipient, 'label' => $labels[$recipient['type'].':'.$recipient['id']] ?? '-'],
             'rhythm' => $plan['rhythm'],
             'rhythm_label' => self::RHYTHMS[$plan['rhythm']],
             'basis' => $plan['basis'],
@@ -271,14 +271,14 @@ final class Due
             'components' => $components,
             'lines' => $lines,
             'split' => array_values(array_map(fn (array $s) => [
-                'label' => $labels[$s['recipient']['fiche_type'].':'.$s['recipient']['id']] ?? '—',
+                'label' => $labels[$s['recipient']['fiche_type'].':'.$s['recipient']['id']] ?? '-',
                 'role' => $s['recipient']['type'],
                 'training_cents' => $s['training_cents'],
                 'external' => $s['external'],
             ], $shares->byRecipient)),
             'detail' => array_map(fn (array $d) => [
                 ...$d,
-                'line_label' => $linesById[$d['line_id']]['label'] ?? '—',
+                'line_label' => $linesById[$d['line_id']]['label'] ?? '-',
                 'trainee' => $d['enrolment_id'] === null ? null : ($labels['trainee:'.$d['enrolment_id']] ?? null),
             ], $shares->detail),
             'modified_cents' => $ledger->modified[$key] ?? 0,
@@ -371,9 +371,9 @@ final class Due
             $realised = array_filter(array_column($details, 'realised'), fn ($v) => $v !== null);
             $hours = $planned === [] ? null : [array_sum($realised), array_sum($planned)];
 
-            $label = $line['label'].' — '.$cut['label'];
+            $label = $line['label'].' - '.$cut['label'];
             if ($hours !== null) {
-                $label .= ' — '.self::hours($hours[0]).' réalisées / '.self::hours($hours[1]).' prévues';
+                $label .= ' - '.self::hours($hours[0]).' réalisées / '.self::hours($hours[1]).' prévues';
             }
             $trainees = $key === Invoice::CONTRACTOR ? [] : array_values(array_filter(array_map(
                 fn (array $d) => $d['enrolment_id'] === null ? null : ($labels['trainee:'.$d['enrolment_id']] ?? null), $details)));

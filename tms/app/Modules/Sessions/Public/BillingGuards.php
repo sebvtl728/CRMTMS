@@ -17,7 +17,7 @@ use InvalidArgumentException;
  *  - PARTIES_LOCKED: changing the issuing company or the contractor of the
  *    dossier (DossierWriter, under the lock of the dossier);
  *  - FUNDER_LOCKED: changing the funder of a funding (FundingWriter, under
- *    the lock of the dossier) — the closure receives the funding's id.
+ *    the lock of the dossier) - the closure receives the funding's id.
  *
  * The first refusal wins. The registry lives in the application container:
  * a fresh application (each test) starts with what the providers register.

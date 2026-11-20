@@ -18,7 +18,7 @@ use RuntimeException;
  *
  * A draft is previewed on the fly with a « BROUILLON » watermark; a
  * validated one is rendered once, inside its validation, and archived
- * under tenants/<tenant_id>/invoices/<invoice_id>/<number>.pdf — that file
+ * under tenants/<tenant_id>/invoices/<invoice_id>/<number>.pdf - that file
  * is the invoice, served and sent ever after.
  */
 class InvoicePdf
@@ -120,13 +120,13 @@ class InvoicePdf
                 'footer' => $company->invoice_footer,
             ],
             'invoice' => [
-                'number' => $invoice->number ?? '—',
-                'issued_on' => $invoice->issued_on?->format('d/m/Y') ?? '—',
+                'number' => $invoice->number ?? '-',
+                'issued_on' => $invoice->issued_on?->format('d/m/Y') ?? '-',
                 'due_on' => $invoice->due_on?->format('d/m/Y'),
                 'period' => $invoice->period_from !== null && $invoice->period_to !== null
                     ? 'du '.$invoice->period_from->format('d/m/Y').' au '.$invoice->period_to->format('d/m/Y') : null,
                 'corrected' => $corrected === null ? null : [
-                    'number' => $corrected->number ?? '—',
+                    'number' => $corrected->number ?? '-',
                     'issued_on' => $corrected->issued_on?->format('d/m/Y'),
                 ],
                 'vat_mention' => $invoice->vat_mention,

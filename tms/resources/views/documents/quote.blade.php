@@ -174,7 +174,7 @@
 @endif
 
 <div class="agreement">
-    <div class="small">Bon pour accord — date, nom, signature et cachet :</div>
+    <div class="small">Bon pour accord - date, nom, signature et cachet :</div>
 </div>
 
 <footer class="legal small muted">

@@ -212,11 +212,11 @@ export default function CandidatureShow({ candidature: c, custom_fields, history
                     <Card title="Identité">
                         <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-sm">
                             <dt className="text-muted-foreground">Naissance</dt>
-                            <dd>{formatDate(c.person.birth_date) || '—'}</dd>
+                            <dd>{formatDate(c.person.birth_date) || '-'}</dd>
                             <dt className="text-muted-foreground">E-mail</dt>
-                            <dd>{c.person.email ?? '—'}</dd>
+                            <dd>{c.person.email ?? '-'}</dd>
                             <dt className="text-muted-foreground">Téléphone</dt>
-                            <dd>{formatPhone(c.person.mobile ?? c.person.phone) || '—'}</dd>
+                            <dd>{formatPhone(c.person.mobile ?? c.person.phone) || '-'}</dd>
                         </dl>
                         {c.is_minor && (
                             <p role="alert" className="flex items-center gap-2 text-sm text-amber-700 dark:text-amber-400">

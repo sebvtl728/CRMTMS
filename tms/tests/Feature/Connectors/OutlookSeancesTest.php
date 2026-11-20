@@ -85,7 +85,7 @@ it('copies a séance into the calendar of its trainer, without trainee nor note'
     $body = $post->data();
     expect($post->method())->toBe('POST')
         ->and($post->header('Authorization')[0])->toBe('Bearer '.$link->access_token)
-        ->and($body['subject'])->toBe('Commis de cuisine ('.$session->number.') — '.$module->title)
+        ->and($body['subject'])->toBe('Commis de cuisine ('.$session->number.') - '.$module->title)
         ->and($body['start'])->toBe(['dateTime' => '2026-09-02T09:00:00', 'timeZone' => 'Europe/Paris'])
         ->and($body['end'])->toBe(['dateTime' => '2026-09-02T12:30:00', 'timeZone' => 'Europe/Paris'])
         ->and($body['location'])->toBe(['displayName' => 'Salle A, 12 rue des Lilas, Annecy'])
@@ -301,7 +301,7 @@ it('updates the copies when the session, its module or the room is renamed', fun
         ...$session->only(['training_id', 'kind', 'organisation_id', 'modality_id', 'location_kind', 'location_text', 'capacity', 'responsible_user_id', 'notes']),
         'starts_on' => '2026-09-01', 'ends_on' => '2026-09-30', 'status' => $session->status->value, 'title' => 'Cuisinier confirmé',
     ]);
-    expect($patched())->toBe(['PATCH Cuisinier confirmé ('.$session->number.') — '.$module->title.' @ Salle A']);
+    expect($patched())->toBe(['PATCH Cuisinier confirmé ('.$session->number.') - '.$module->title.' @ Salle A']);
 
     // A change that does not show (capacity): nothing sent.
     m365Http();
@@ -314,12 +314,12 @@ it('updates the copies when the session, its module or the room is renamed', fun
     // The module renamed.
     m365Http([GRAPH_EVENTS.'/AAMk1' => Http::response(['id' => 'AAMk1'])]);
     app(SessionModules::class)->save($session->refresh(), ['title' => 'Cuisine chaude', 'planned_hours' => '21', 'modality_id' => '', 'dating_mode' => 'seances', 'starts_on' => '', 'ends_on' => ''], $module);
-    expect($patched())->toBe(['PATCH Cuisinier confirmé ('.$session->number.') — Cuisine chaude @ Salle A']);
+    expect($patched())->toBe(['PATCH Cuisinier confirmé ('.$session->number.') - Cuisine chaude @ Salle A']);
 
     // The room renamed and given an address.
     m365Http([GRAPH_EVENTS.'/AAMk1' => Http::response(['id' => 'AAMk1'])]);
     Rooms::save($room, ['name' => 'Salle Mont-Blanc', 'capacity' => null, 'address' => '12 rue des Lilas, Annecy', 'active' => true]);
-    expect($patched())->toBe(['PATCH Cuisinier confirmé ('.$session->number.') — Cuisine chaude @ Salle Mont-Blanc, 12 rue des Lilas, Annecy']);
+    expect($patched())->toBe(['PATCH Cuisinier confirmé ('.$session->number.') - Cuisine chaude @ Salle Mont-Blanc, 12 rue des Lilas, Annecy']);
 });
 
 it('keeps the name of the CRM actions to the CRM', function () {

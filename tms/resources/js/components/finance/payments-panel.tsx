@@ -88,7 +88,7 @@ export function PaymentsPanel({
                     {payments.map((p) => (
                         <li key={p.id} className="flex flex-wrap items-center justify-between gap-2 rounded-md border px-2 py-1">
                             <span>
-                                {formatDay(p.received_on)} — {p.method}
+                                {formatDay(p.received_on)} - {p.method}
                                 {p.reference ? ` (${p.reference})` : ''}
                             </span>
                             <span className="tabular-nums">

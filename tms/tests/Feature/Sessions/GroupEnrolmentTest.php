@@ -333,7 +333,7 @@ it('changes the planned hours of a trainee within the hours of the session, jour
 
     $this->get("/sessions/{$session->id}")->assertInertia(fn (Assert $page) => $page->where('enrolments.0.planned_hours', '28,00')->where('session.planned_hours', '35,00'));
     $this->get("/dossiers/{$dossier->id}")->assertInertia(fn (Assert $page) => $page
-        ->where('history.0.title', "Durand — Heures prévues modifiées — session {$session->number} (Commis de cuisine)")
+        ->where('history.0.title', "Durand - Heures prévues modifiées - session {$session->number} (Commis de cuisine)")
         ->where('history.0.body', '35,00 h → 28,00 h'));
 });
 

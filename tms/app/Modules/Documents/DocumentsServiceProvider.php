@@ -10,6 +10,8 @@ use App\Modules\Documents\Gdpr\DocumentAnonymisation;
 use App\Modules\Documents\Texts\DocumentText;
 use App\Modules\Sessions\Public\DossierBlocks;
 use App\Modules\Sessions\Public\Paperwork;
+use App\Modules\Sessions\Public\SessionBlocks;
+use App\Modules\Sessions\Public\SessionCards;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\RateLimiter;
@@ -38,6 +40,8 @@ class DocumentsServiceProvider extends ServiceProvider
         RateLimiter::for('document-mail', fn (Request $request) => Limit::perMinute(20)->by('document-mail:'.($request->user()?->getAuthIdentifier() ?? $request->ip())));
         FicheLinks::registerAnonymisation('documents', fn (array $personIds) => DocumentAnonymisation::clear($personIds));
         FicheLinks::registerExport('documents', fn (string $personId): array => DocumentAnonymisation::export($personId), [Permissions::VIEW]);
+        SessionBlocks::register('documents.session', fn (string $sessionId, User $viewer) => SessionDocumentsBlock::for($sessionId, $viewer));
+        SessionCards::register('documents', fn (array $sessionIds, User $viewer) => SessionDocumentsBlock::cards($sessionIds, $viewer));
         DossierBlocks::register('documents.dossier', fn (string $dossierId, User $viewer) => DossierDocumentsBlock::for($dossierId, $viewer));
 
         // A document out of the viewer's documents.view scope (read on its dossier) is a 404.

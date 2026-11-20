@@ -1,9 +1,9 @@
+import { BrochureSendButton, type BrochureSendProps } from '@/components/crm/brochure-send';
 import { SimilarFiches, type DuplicateCandidate } from '@/components/crm/duplicate-warning';
 import { FicheBlockPanel, type FicheBlock } from '@/components/crm/fiche-blocks';
 import { InterestTrainings, type InterestTraining, type InterestTrainingOption } from '@/components/crm/interest-trainings';
 import { FicheOpportunities, type OpportunityRow } from '@/components/crm/opportunity-list';
 import { OrganisationContacts, type AffiliationRow } from '@/components/crm/organisation-contacts';
-import { BrochureSendButton, type BrochureSendProps } from '@/components/crm/brochure-send';
 import { QuickActionFicheButton } from '@/components/crm/quick-action';
 import { FicheQuotes, type QuoteRow } from '@/components/crm/quote-list';
 import { Timeline } from '@/components/crm/timeline';
@@ -82,7 +82,7 @@ function Item({ label, children }: { label: string; children: React.ReactNode })
     return (
         <div>
             <dt className="text-muted-foreground text-xs">{label}</dt>
-            <dd className="text-sm break-words">{children || '—'}</dd>
+            <dd className="text-sm break-words">{children || '-'}</dd>
         </div>
     );
 }

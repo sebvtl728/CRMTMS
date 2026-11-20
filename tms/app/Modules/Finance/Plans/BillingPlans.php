@@ -26,7 +26,7 @@ use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
  *  - basis: « realised » (default) or « planned » (a flat price; never
  *    with « monthly », billed at the realised hours only);
  *  - unjustified_absences: « not_billed », « bill_contractor », or null for
- *    the organisme's default (FinanceSettings) — for a dossier not yet
+ *    the organisme's default (FinanceSettings) - for a dossier not yet
  *    invoiced only: the lock stores the rule then applied, so a later change
  *    of the organisme's default never changes what an invoiced dossier owes;
  *  - locked once the first invoice of the dossier is validated (lock(),

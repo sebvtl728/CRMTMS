@@ -179,7 +179,10 @@ export default function SessionsSettings({ rooms, closures, status }: Props) {
             <Head title="Salles et fermetures" />
 
             <div className="flex flex-col gap-8 p-4">
-                <Heading title="Salles et fermetures" description="Les salles de formation et les périodes de fermeture de l'organisme, utilisées par le planning des séances." />
+                <Heading
+                    title="Salles et fermetures"
+                    description="Les salles de formation et les périodes de fermeture de l'organisme, utilisées par le planning des séances."
+                />
 
                 {status && <div className="text-sm font-medium text-green-600">{status}</div>}
 
@@ -210,9 +213,11 @@ export default function SessionsSettings({ rooms, closures, status }: Props) {
                                     {rooms.map((r) => (
                                         <tr key={r.id} className="border-t">
                                             <td className="px-3 py-2 font-medium">{r.name}</td>
-                                            <td className="px-3 py-2">{r.capacity === null ? '—' : `${r.capacity} places`}</td>
-                                            <td className="px-3 py-2">{r.address ?? '—'}</td>
-                                            <td className="px-3 py-2">{r.active ? <Badge variant="secondary">Active</Badge> : <Badge variant="outline">Inactive</Badge>}</td>
+                                            <td className="px-3 py-2">{r.capacity === null ? '-' : `${r.capacity} places`}</td>
+                                            <td className="px-3 py-2">{r.address ?? '-'}</td>
+                                            <td className="px-3 py-2">
+                                                {r.active ? <Badge variant="secondary">Active</Badge> : <Badge variant="outline">Inactive</Badge>}
+                                            </td>
                                             <td className="px-3 py-2 text-right whitespace-nowrap">
                                                 <Button variant="ghost" size="icon" aria-label={`Modifier ${r.name}`} onClick={() => setRoom(r)}>
                                                     <Pencil className="h-4 w-4" />
@@ -262,7 +267,12 @@ export default function SessionsSettings({ rooms, closures, status }: Props) {
                                                 <Button variant="ghost" size="icon" aria-label={`Modifier ${c.label}`} onClick={() => setClosure(c)}>
                                                     <Pencil className="h-4 w-4" />
                                                 </Button>
-                                                <Button variant="ghost" size="icon" aria-label={`Supprimer ${c.label}`} onClick={() => removeClosure(c)}>
+                                                <Button
+                                                    variant="ghost"
+                                                    size="icon"
+                                                    aria-label={`Supprimer ${c.label}`}
+                                                    onClick={() => removeClosure(c)}
+                                                >
                                                     <Trash2 className="h-4 w-4" />
                                                 </Button>
                                             </td>

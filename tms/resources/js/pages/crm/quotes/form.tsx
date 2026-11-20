@@ -141,7 +141,7 @@ export default function QuoteFormPage({
             <Head title={title} />
 
             <div className="flex max-w-5xl flex-col gap-6 p-4">
-                <Heading title={title} description={`Opportunité « ${opportunity.title} » · ${opportunity.account.name ?? '—'}`} />
+                <Heading title={title} description={`Opportunité « ${opportunity.title} » · ${opportunity.account.name ?? '-'}`} />
 
                 {regimeChanged && (
                     <div
@@ -168,7 +168,7 @@ export default function QuoteFormPage({
                         {editing ? (
                             <div className="grid gap-2">
                                 <span className="text-sm font-medium">Société émettrice</span>
-                                <p className="text-sm">{company?.label ?? '—'} (fixée à la création : elle donne le numéro)</p>
+                                <p className="text-sm">{company?.label ?? '-'} (fixée à la création : elle donne le numéro)</p>
                             </div>
                         ) : (
                             <div className="grid gap-2">

@@ -39,7 +39,7 @@ final class CrmMailTemplates
             key: self::QUOTE_SEND,
             label: "Envoi d'un devis",
             description: "Proposé dans la fenêtre « Envoyer le devis », toujours modifiable avant l'envoi. Le PDF est joint automatiquement.",
-            subject: 'Devis {numero_devis} — {societe}',
+            subject: 'Devis {numero_devis} - {societe}',
             body: "Bonjour,\n\nVeuillez trouver ci-joint notre devis {numero_devis}, valable jusqu'au {date_validite}.\n\nNous restons à votre disposition pour toute question.\n\nCordialement,\n{societe}",
             variables: $quote,
         ));
@@ -47,7 +47,7 @@ final class CrmMailTemplates
             key: self::QUOTE_REMIND,
             label: "Relance d'un devis",
             description: 'Proposé dans la fenêtre « Relancer », toujours modifiable avant l\'envoi. Le PDF archivé est joint de nouveau.',
-            subject: 'Relance : devis {numero_devis} — {societe}',
+            subject: 'Relance : devis {numero_devis} - {societe}',
             body: "Bonjour,\n\nNous revenons vers vous au sujet de notre devis {numero_devis}, valable jusqu'au {date_validite}, que vous trouverez de nouveau ci-joint.\n\nN'hésitez pas à nous contacter pour toute question.\n\nCordialement,\n{societe}",
             variables: $quote,
         ));
@@ -55,7 +55,7 @@ final class CrmMailTemplates
             key: self::BROCHURE,
             label: "Envoi d'une plaquette",
             description: 'Proposé dans la fenêtre « Envoyer une plaquette » (fiche ou opportunité), toujours modifiable avant l\'envoi. Les plaquettes choisies sont jointes automatiquement.',
-            subject: 'Nos formations — {organisme}',
+            subject: 'Nos formations - {organisme}',
             body: "Bonjour {destinataire},\n\nVeuillez trouver ci-joint la documentation sur nos formations.\n\nNous restons à votre disposition pour toute question.\n\nCordialement,\n{commercial}\n{organisme}",
             variables: [
                 'destinataire' => ['prénom et nom du destinataire', 'Léa Durand'],
@@ -89,7 +89,7 @@ final class CrmMailTemplates
                 'type' => ["type de l'action", 'Appel'],
                 'objet' => ["objet de l'action", 'Appel – Hôtel du Lac'],
                 'echeance' => ['échéance (« 20/11/2026 à 09:00 »)', '20/11/2026 à 09:00'],
-                'motif' => ["motif de l'action (« — » s'il est vide)", 'Présenter la formation HACCP'],
+                'motif' => ["motif de l'action (« - » s'il est vide)", 'Présenter la formation HACCP'],
                 'message' => ['message facultatif de la personne qui confie (vide sinon)', 'Peux-tu le rappeler cette semaine ?'],
                 'lien' => ["lien vers l'action dans « À faire »", 'https://tms.example.fr/crm/todo'],
             ],

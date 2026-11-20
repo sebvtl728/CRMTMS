@@ -92,7 +92,7 @@ function sessionsQuery(filters: Filters, view: View = 'liste', withCancelled = f
 function places(row: SessionRow): string {
     if (row.kind === 'individual') return '1 stagiaire';
 
-    return row.kind === 'inter' && row.capacity !== null ? `${row.capacity} place${row.capacity > 1 ? 's' : ''}` : '—';
+    return row.kind === 'inter' && row.capacity !== null ? `${row.capacity} place${row.capacity > 1 ? 's' : ''}` : '-';
 }
 
 export default function SessionsIndex({ view, sessions, board, with_cancelled, filters, options, can, status }: IndexProps) {
@@ -305,18 +305,18 @@ export default function SessionsIndex({ view, sessions, board, with_cancelled, f
                                             </td>
                                             <td className="px-3 py-2">
                                                 {s.title && <div className="font-medium">{s.title}</div>}
-                                                {s.training?.title ?? '—'}
+                                                {s.training?.title ?? '-'}
                                                 {s.das && <div className="text-muted-foreground text-xs">{s.das}</div>}
                                             </td>
                                             <td className="px-3 py-2">
                                                 {s.kind_label}
                                                 {s.organisation && <div className="text-muted-foreground text-xs">{s.organisation.label}</div>}
                                             </td>
-                                            <td className="px-3 py-2">{s.modality ?? '—'}</td>
+                                            <td className="px-3 py-2">{s.modality ?? '-'}</td>
                                             <td className="px-3 py-2 whitespace-nowrap">{sessionDates(s)}</td>
                                             <td className="px-3 py-2">{sessionLocation(s)}</td>
                                             <td className="px-3 py-2 whitespace-nowrap">{places(s)}</td>
-                                            <td className="px-3 py-2">{s.responsible ?? '—'}</td>
+                                            <td className="px-3 py-2">{s.responsible ?? '-'}</td>
                                             <td className="px-3 py-2">{statusBadge(s)}</td>
                                         </tr>
                                     ))}
@@ -334,7 +334,7 @@ export default function SessionsIndex({ view, sessions, board, with_cancelled, f
                                         {statusBadge(s)}
                                     </div>
                                     {s.title && <div className="font-medium">{s.title}</div>}
-                                    <div>{s.training?.title ?? '—'}</div>
+                                    <div>{s.training?.title ?? '-'}</div>
                                     <div className="text-muted-foreground text-xs">
                                         {[s.kind_label, s.modality, s.organisation?.label, sessionDates(s), places(s)].filter(Boolean).join(' · ')}
                                     </div>

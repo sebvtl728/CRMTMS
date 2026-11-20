@@ -716,7 +716,7 @@ function GeneratorDialog({ session, planning, onClose }: { session: SessionDates
                                     ) : preview ? (
                                         <span className="text-muted-foreground">Les heures prévues sont déjà planifiées.</span>
                                     ) : (
-                                        <span className="text-muted-foreground">—</span>
+                                        <span className="text-muted-foreground">-</span>
                                     )}
                                 </p>
                                 <InputError message={errors.to} />
@@ -925,8 +925,8 @@ function SeanceList({
                                     )}
                                 </td>
                                 <td className="px-3 py-2 whitespace-nowrap">{s.duration}</td>
-                                <td className="px-3 py-2">{s.trainer?.label ?? '—'}</td>
-                                <td className="px-3 py-2">{s.room?.name ?? s.place_text ?? '—'}</td>
+                                <td className="px-3 py-2">{s.trainer?.label ?? '-'}</td>
+                                <td className="px-3 py-2">{s.room?.name ?? s.place_text ?? '-'}</td>
                                 {planning.can_seances && (
                                     <td className="px-3 py-2">
                                         {s.status === 'planned' && (

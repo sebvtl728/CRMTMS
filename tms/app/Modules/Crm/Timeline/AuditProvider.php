@@ -84,6 +84,6 @@ final class AuditProvider implements TimelineProvider
 
     private function status(mixed $value): string
     {
-        return is_string($value) ? (OrganisationStatus::tryFrom($value)?->label() ?? $value) : '—';
+        return is_string($value) ? (OrganisationStatus::tryFrom($value)?->label() ?? $value) : '-';
     }
 }

@@ -531,7 +531,7 @@ export default function InvoiceShow({ invoice, options, can, email, balance, pay
                     </div>
                     <div>
                         <dt className="text-muted-foreground text-xs">Période</dt>
-                        <dd>{invoice.period.from ? `du ${formatDay(invoice.period.from)} au ${formatDay(invoice.period.to)}` : '—'}</dd>
+                        <dd>{invoice.period.from ? `du ${formatDay(invoice.period.from)} au ${formatDay(invoice.period.to)}` : '-'}</dd>
                     </div>
                     <div>
                         <dt className="text-muted-foreground text-xs">Rythme</dt>

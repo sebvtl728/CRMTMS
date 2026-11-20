@@ -31,7 +31,7 @@ Route::middleware(['auth', 'can:crm.activities.view'])->get('crm/todo', TodoCont
 // « Planning »: meetings and planned calls of a week (a colleague's with crm.activities.team).
 Route::middleware(['auth', 'can:crm.activities.view'])->get('crm/planning', PlanningController::class)->name('crm.planning');
 
-// « Compte rendu de RDV »: one form (phone first) — done action, stage, next follow-up.
+// « Compte rendu de RDV »: one form (phone first) - done action, stage, next follow-up.
 Route::middleware(['auth', 'can:crm.activities.update'])->prefix('crm/report')->name('crm.report')->group(function () {
     Route::get('/', [QuickReportController::class, 'create']);
     Route::post('/', [QuickReportController::class, 'store'])->name('.store');

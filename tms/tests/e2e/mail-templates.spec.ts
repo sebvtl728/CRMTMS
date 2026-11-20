@@ -15,7 +15,7 @@ test('mail templates: insert a variable, preview, save, then back to the default
     await page.getByRole('link', { name: "Envoi d'un devis" }).click();
 
     const subject = page.getByLabel('Objet');
-    await expect(subject).toHaveValue('Devis {numero_devis} — {societe}');
+    await expect(subject).toHaveValue('Devis {numero_devis} - {societe}');
     await subject.fill('Votre proposition ');
     await page.getByRole('button', { name: /\{numero_devis\}/ }).click();
     await expect(subject).toHaveValue('Votre proposition {numero_devis}');
@@ -35,7 +35,7 @@ test('mail templates: insert a variable, preview, save, then back to the default
     page.once('dialog', (dialog) => dialog.accept());
     await page.getByRole('button', { name: 'Rétablir le modèle par défaut' }).click();
     await expect(page.getByText('Modèle par défaut rétabli.')).toBeVisible();
-    await expect(subject).toHaveValue('Devis {numero_devis} — {societe}');
+    await expect(subject).toHaveValue('Devis {numero_devis} - {societe}');
 
     await context.close();
 });

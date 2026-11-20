@@ -5,8 +5,8 @@ namespace App\Modules\Finance\Invoices;
 /**
  * What was already invoiced on a dossier, per recipient (« contractor »,
  * « funding:<id> »; spec 0.9 § 4.3 step 4 and § 4 bis 3): the computed
- * lines of its validated (or sent) invoices and credit notes — the latter
- * negative, so a plain sum — at the amount really invoiced; free lines and
+ * lines of its validated (or sent) invoices and credit notes - the latter
+ * negative, so a plain sum - at the amount really invoiced; free lines and
  * informative mentions never count. Open drafts are « in preparation »: not
  * invoiced, but one per recipient and kind (Préparer skips it).
  */

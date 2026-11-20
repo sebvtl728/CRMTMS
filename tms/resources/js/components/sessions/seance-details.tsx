@@ -35,7 +35,7 @@ export function SeanceDetails({
                             <dt className="text-muted-foreground">Formateur</dt>
                             <dd>{seance.trainer?.label ?? 'À définir'}</dd>
                             <dt className="text-muted-foreground">Lieu</dt>
-                            <dd>{seancePlace(seance) ?? '—'}</dd>
+                            <dd>{seancePlace(seance) ?? '-'}</dd>
                             {cancelled && (
                                 <>
                                     <dt className="text-muted-foreground">Statut</dt>

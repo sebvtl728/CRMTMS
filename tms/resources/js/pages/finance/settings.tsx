@@ -21,7 +21,7 @@ const CHOICES: { value: Absences; label: string; help: string }[] = [
     {
         value: 'bill_contractor',
         label: 'Facturées au contractant',
-        help: 'Ligne distincte « Absences non justifiées — non imputables sur les fonds de la formation professionnelle », au tarif horaire de la ligne ; jamais aux financeurs.',
+        help: 'Ligne distincte « Absences non justifiées - non imputables sur les fonds de la formation professionnelle », au tarif horaire de la ligne ; jamais aux financeurs.',
     },
 ];
 

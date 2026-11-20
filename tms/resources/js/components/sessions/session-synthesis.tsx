@@ -71,7 +71,7 @@ export function SessionSynthesis({
             <section aria-label="Avancement" className="grid content-start gap-3">
                 {cancelled ? (
                     <div className="border-destructive/40 bg-destructive/5 rounded-xl border p-3 text-sm">
-                        Session annulée : {cancelled.reason ?? '—'}
+                        Session annulée : {cancelled.reason ?? '-'}
                     </div>
                 ) : (
                     <ul className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">

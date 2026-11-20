@@ -21,7 +21,7 @@ export interface OpportunityRow {
 export function StageBadge({ stage }: { stage: OpportunityRow['stage'] }) {
     const variant = stage.outcome === 'won' ? 'default' : stage.outcome === 'lost' ? 'destructive' : 'secondary';
 
-    return <Badge variant={variant}>{stage.label ?? '—'}</Badge>;
+    return <Badge variant={variant}>{stage.label ?? '-'}</Badge>;
 }
 
 /** Cards of opportunities (« Opportunités » tab of a fiche, small screens). */
@@ -37,7 +37,7 @@ export function OpportunityCards({ rows, showAccount = true }: { rows: Opportuni
                         </div>
                         {showAccount && (
                             <p className="text-muted-foreground mt-1 text-sm">
-                                {o.account.name ?? '—'} · {o.target === 'individual' ? 'Particulier' : 'Entreprise'}
+                                {o.account.name ?? '-'} · {o.target === 'individual' ? 'Particulier' : 'Entreprise'}
                             </p>
                         )}
                         <p className="mt-1 text-sm">

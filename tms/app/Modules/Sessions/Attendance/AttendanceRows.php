@@ -21,7 +21,7 @@ use Illuminate\Support\Collection;
 
 /**
  * What the attendance screens read:
- *  - grid(): the trainees of a séance and their attendance — names only,
+ *  - grid(): the trainees of a séance and their attendance - names only,
  *    never adaptation needs, notes, fundings nor prices (a trainer reads it);
  *  - session(): the « Présences » tab of a session for a Paris month: its
  *    months and closures, its séances with their counts, the monthly grid
@@ -66,7 +66,7 @@ final class AttendanceRows
                 'end' => $seance->end(),
                 'duration_minutes' => $seance->duration_minutes,
                 'duration' => SessionModules::label($seance->duration_minutes),
-                'module' => $module === null ? '—' : $module->title,
+                'module' => $module === null ? '-' : $module->title,
                 'cancelled' => $seance->isCancelled(),
                 'closed' => $closed,
             ],
@@ -156,7 +156,7 @@ final class AttendanceRows
                 'start' => $s->start(),
                 'end' => $s->end(),
                 'duration' => SessionModules::label($s->duration_minutes),
-                'module' => $titles[$s->session_module_id] ?? '—',
+                'module' => $titles[$s->session_module_id] ?? '-',
                 'trainer' => $s->trainer_id === null ? null : ($trainers[$s->trainer_id] ?? null),
                 'cancelled' => $s->isCancelled(),
                 'recorded' => (int) ($counts[$s->id]->recorded ?? 0),

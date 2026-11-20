@@ -19,7 +19,7 @@ use Illuminate\Validation\ValidationException;
 
 /**
  * Attendance of the séances (spec § 4.7): one row per séance and trainee,
- * in whole minutes — present = the séance's duration, partial 0 < m <
+ * in whole minutes - present = the séance's duration, partial 0 < m <
  * duration (typed), absent / excused 0. « Tous présents » marks present the
  * expected trainees not entered yet. Each write locks the séance (as
  * Seances does) and holds the session row shared (Closures locks it to

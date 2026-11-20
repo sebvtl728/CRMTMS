@@ -52,8 +52,7 @@ export default function TrainerShow({ trainer, unavailabilities, statusOptions, 
         e.preventDefault();
         das.put(route('trainers.das', trainer.id), { preserveScroll: true });
     };
-    const toggleDas = (id: string, on: boolean) =>
-        das.setData('das_ids', on ? [...das.data.das_ids, id] : das.data.das_ids.filter((d) => d !== id));
+    const toggleDas = (id: string, on: boolean) => das.setData('das_ids', on ? [...das.data.das_ids, id] : das.data.das_ids.filter((d) => d !== id));
     const saveAccount: FormEventHandler = (e) => {
         e.preventDefault();
         account.put(route('trainers.user', trainer.id), { preserveScroll: true });
@@ -70,7 +69,10 @@ export default function TrainerShow({ trainer, unavailabilities, statusOptions, 
 
             <div className="flex flex-col gap-8 p-4">
                 <div className="flex flex-wrap items-start justify-between gap-2">
-                    <Heading title={trainer.label} description={`Formateur ${trainer.status_label.toLowerCase()}${trainer.email ? ` · ${trainer.email}` : ''}`} />
+                    <Heading
+                        title={trainer.label}
+                        description={`Formateur ${trainer.status_label.toLowerCase()}${trainer.email ? ` · ${trainer.email}` : ''}`}
+                    />
                     <div className="flex items-center gap-2">
                         {!trainer.active && <Badge variant="outline">Inactif</Badge>}
                         {trainer.fiche_url && (
@@ -131,7 +133,8 @@ export default function TrainerShow({ trainer, unavailabilities, statusOptions, 
                                     <Checkbox
                                         checked={das.data.das_ids.includes(o.value)}
                                         disabled={dasEditable !== null && !dasEditable.includes(o.value)}
-                                        onCheckedChange={(c) => toggleDas(o.value, c === true)} />
+                                        onCheckedChange={(c) => toggleDas(o.value, c === true)}
+                                    />
                                     {o.label}
                                 </label>
                             ))}
@@ -180,8 +183,8 @@ export default function TrainerShow({ trainer, unavailabilities, statusOptions, 
                                 <Link href={invite_url}>Inviter à se connecter</Link>
                             </Button>
                             <p className="text-muted-foreground mt-1 text-sm">
-                                L'invitation propose le rôle « Formateur » ; à l'activation, le compte est lié à ce formateur s'il est le seul à avoir cet
-                                e-mail.
+                                L'invitation propose le rôle « Formateur » ; à l'activation, le compte est lié à ce formateur s'il est le seul à avoir
+                                cet e-mail.
                             </p>
                         </div>
                     )}

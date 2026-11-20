@@ -20,7 +20,7 @@ use Illuminate\Support\Facades\DB;
  * find() is the copy a séance should have now: a planned séance (not in
  * the trash) of a module and a session out of the trash, the session not
  * cancelled, whose trainer is active and linked to an account. « <session>
- * — <module> », Paris times, the place of the iCal feed (SeanceCalendar),
+ * - <module> », Paris times, the place of the iCal feed (SeanceCalendar),
  * a link to « Mon planning »; never a trainee, a note nor a price.
  *
  * The writers call touch*() on every change: the push is queued once the
@@ -74,7 +74,7 @@ final class SeanceOutlook
 
         return new OutlookItem(
             userId: $trainer->user_id,
-            subject: $label.' — '.$module->title,
+            subject: $label.' - '.$module->title,
             start: $seance->startsAtInstant(),
             end: $seance->endsAtInstant(),
             location: SeanceCalendar::location($room, $seance, $session),

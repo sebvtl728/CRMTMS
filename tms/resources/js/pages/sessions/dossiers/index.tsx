@@ -222,14 +222,14 @@ export default function DossiersIndex({ dossiers, filters, options, can, status 
                                                     {d.das && ` · ${d.das}`}
                                                 </div>
                                             </td>
-                                            <td className="px-3 py-2">{d.training_titles.length > 0 ? d.training_titles.join(', ') : '—'}</td>
+                                            <td className="px-3 py-2">{d.training_titles.length > 0 ? d.training_titles.join(', ') : '-'}</td>
                                             <td className="px-3 py-2 text-right whitespace-nowrap">{d.price}</td>
                                             <td
                                                 className={`px-3 py-2 text-right ${d.remaining_cents < 0 ? 'text-destructive' : d.remaining_cents > 0 ? 'text-amber-700 dark:text-amber-400' : 'text-muted-foreground'}`}
                                             >
                                                 {d.remaining}
                                             </td>
-                                            <td className="px-3 py-2">{d.responsible ?? '—'}</td>
+                                            <td className="px-3 py-2">{d.responsible ?? '-'}</td>
                                             <td className="px-3 py-2">{statusBadge(d)}</td>
                                         </tr>
                                     ))}
@@ -248,7 +248,11 @@ export default function DossiersIndex({ dossiers, filters, options, can, status 
                                     </div>
                                     <div>{d.account.label}</div>
                                     <div className="text-muted-foreground text-xs">
-                                        {[d.training_titles.join(', '), d.price, d.remaining_cents > 0 ? `Reste à financer : ${d.remaining}` : d.remaining_cents < 0 ? d.remaining : null]
+                                        {[
+                                            d.training_titles.join(', '),
+                                            d.price,
+                                            d.remaining_cents > 0 ? `Reste à financer : ${d.remaining}` : d.remaining_cents < 0 ? d.remaining : null,
+                                        ]
                                             .filter(Boolean)
                                             .join(' · ')}
                                     </div>

@@ -126,7 +126,7 @@ final class Payments
             'due_on' => $i->due_on?->toDateString(),
             'ttc_cents' => $i->total_ttc_cents,
             'remaining_cents' => $balances[$i->id]['remaining_cents'] ?? 0,
-            'dossier_number' => $numbers[$i->dossier_id]['number'] ?? '—',
+            'dossier_number' => $numbers[$i->dossier_id]['number'] ?? '-',
             'company_id' => $i->company_id,
         ])->values()->all();
     }

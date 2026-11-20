@@ -23,7 +23,7 @@ use Illuminate\Database\Eloquent\Builder;
  * sessions.seances.view; sessions and séances in the trash left out, cancelled
  * ones published as cancelled (so subscribed calendars drop them).
  *
- * An event: « <session> — <module> », the room (and its address), else
+ * An event: « <session> - <module> », the room (and its address), else
  * the free place, else the address of the session (not of an individual
  * session: maybe the trainee's home); never a trainee, a
  * note nor a cancellation reason. Paris wall-clock times (Seance::instant);
@@ -93,7 +93,7 @@ final class SeanceCalendar
             $mine = $trainer !== null && $seance->trainer_id === $trainer->id;
             $events[] = new CalendarEvent(
                 uid: 'seance-'.$seance->id,
-                title: ($labels[$seance->training_session_id] ?? 'Session').' — '.($modules[$seance->session_module_id] ?? 'Séance'),
+                title: ($labels[$seance->training_session_id] ?? 'Session').' - '.($modules[$seance->session_module_id] ?? 'Séance'),
                 start: $start,
                 minutes: (int) $start->diffInMinutes($seance->endsAtInstant()),
                 location: self::location($room, $seance, $session),

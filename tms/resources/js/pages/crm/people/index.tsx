@@ -257,7 +257,7 @@ export default function PeopleIndex({ people, filters, options, can, savedFilter
                                         </div>
                                         {orgLine(p) && <p className="text-muted-foreground mt-1 text-sm">{orgLine(p)}</p>}
                                         <p className="text-muted-foreground mt-1 text-sm break-all">
-                                            {[p.email, p.phone ? formatPhone(p.phone) : null].filter(Boolean).join(' · ') || '—'}
+                                            {[p.email, p.phone ? formatPhone(p.phone) : null].filter(Boolean).join(' · ') || '-'}
                                         </p>
                                         <p className="text-muted-foreground mt-1 text-xs">
                                             {p.responsible ?? 'Sans responsable'} · Dernier contact : {formatDate(p.last_contact_at)}

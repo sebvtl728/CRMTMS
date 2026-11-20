@@ -230,7 +230,7 @@ function AssigneesField({
     error?: string;
 }) {
     const all = [...options, ...responsibles.filter((r) => value.includes(r.value) && !options.some((o) => o.value === r.value))];
-    const name = (v: string) => all.find((o) => o.value === v)?.label ?? '—';
+    const name = (v: string) => all.find((o) => o.value === v)?.label ?? '-';
     const toggle = (v: string, checked: boolean) => {
         if (checked) onChange([...value, v]);
         else if (value.length > 1) onChange(value.filter((x) => x !== v));
@@ -249,7 +249,7 @@ function AssigneesField({
                     >
                         <span>
                             {value.length === 0
-                                ? '—'
+                                ? '-'
                                 : value.map((v, i) => (i === 0 && value.length > 1 ? `${name(v)} (responsable)` : name(v))).join(', ')}
                         </span>
                         <ChevronDown className="h-4 w-4 shrink-0 opacity-50" />
@@ -468,7 +468,7 @@ function CreateForm({ context, onDone }: { context: QuickActionContext; onDone: 
                             <Label htmlFor="qa-result">Résultat</Label>
                             <Select value={data.result_id} onValueChange={(v) => setData('result_id', v)}>
                                 <SelectTrigger id="qa-result">
-                                    <SelectValue placeholder="—" />
+                                    <SelectValue placeholder="-" />
                                 </SelectTrigger>
                                 <SelectContent>
                                     {choices.results.map((r) => (
@@ -643,7 +643,7 @@ function CompleteForm({ activityId, onDone }: { activityId: string; onDone: () =
                     <Label htmlFor="qa-result">Résultat</Label>
                     <Select value={data.result_id} onValueChange={(v) => setData('result_id', v)}>
                         <SelectTrigger id="qa-result">
-                            <SelectValue placeholder="—" />
+                            <SelectValue placeholder="-" />
                         </SelectTrigger>
                         <SelectContent>
                             {loaded.results.map((r) => (
@@ -916,7 +916,7 @@ function EditForm({ activityId, onDone }: { activityId: string; onDone: () => vo
                         <Label htmlFor="qa-result">Résultat</Label>
                         <Select value={data.result_id} onValueChange={(v) => setData('result_id', v)}>
                             <SelectTrigger id="qa-result">
-                                <SelectValue placeholder="—" />
+                                <SelectValue placeholder="-" />
                             </SelectTrigger>
                             <SelectContent>
                                 {loaded.results.map((r) => (

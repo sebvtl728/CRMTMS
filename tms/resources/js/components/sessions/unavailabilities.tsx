@@ -65,7 +65,12 @@ export function Unavailabilities({
             <form onSubmit={submit} className="grid gap-3 sm:grid-cols-[auto_auto_1fr_auto] sm:items-end">
                 <div className="grid gap-2">
                     <Label htmlFor="unavailability_starts">Du *</Label>
-                    <Input id="unavailability_starts" type="datetime-local" value={data.starts_at} onChange={(e) => setData('starts_at', e.target.value)} />
+                    <Input
+                        id="unavailability_starts"
+                        type="datetime-local"
+                        value={data.starts_at}
+                        onChange={(e) => setData('starts_at', e.target.value)}
+                    />
                     <InputError message={errors.starts_at} />
                 </div>
                 <div className="grid gap-2">

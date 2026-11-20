@@ -44,7 +44,7 @@ it('reminds a sent quote with the same pdf, as a contact', function () {
 
     $this->get("/crm/quotes/{$quote->id}")->assertInertia(fn (Assert $page) => $page
         ->where('can.remind', true)->where('can.send', false)
-        ->where('remind.subject', 'Relance : devis CF-2026-0001 — CAP FORMATION'));
+        ->where('remind.subject', 'Relance : devis CF-2026-0001 - CAP FORMATION'));
 
     $this->post("/crm/quotes/{$quote->id}/remind", quoteMessage(['subject' => 'Relance devis']))
         ->assertSessionHasNoErrors()->assertSessionHas('status', 'Relance du devis CF-2026-0001 envoyée.');

@@ -180,14 +180,21 @@ function BrochureSendDialog({
         setData((d) => ({
             ...d,
             recipient_person_id: id,
-            subject: d.subject === fillTemplate(send.template.subject, previous?.name ?? '') ? fillTemplate(send.template.subject, next?.name ?? '') : d.subject,
-            message: d.message === fillTemplate(send.template.body, previous?.name ?? '') ? fillTemplate(send.template.body, next?.name ?? '') : d.message,
+            subject:
+                d.subject === fillTemplate(send.template.subject, previous?.name ?? '')
+                    ? fillTemplate(send.template.subject, next?.name ?? '')
+                    : d.subject,
+            message:
+                d.message === fillTemplate(send.template.body, previous?.name ?? '') ? fillTemplate(send.template.body, next?.name ?? '') : d.message,
         }));
     };
     const toggle = (c: Choice, on: boolean) => {
         const next = on ? [...picked, c] : picked.filter((p) => p.version_id !== c.version_id);
         setPicked(next);
-        setData('versions', next.map((p) => p.version_id));
+        setData(
+            'versions',
+            next.map((p) => p.version_id),
+        );
     };
 
     const submit: FormEventHandler = (e) => {
@@ -224,7 +231,7 @@ function BrochureSendDialog({
                         >
                             {send.recipients.map((r) => (
                                 <option key={r.id} value={r.id} disabled={r.email === null}>
-                                    {r.name} {r.email ? `(${r.email})` : '(pas d\'adresse e-mail)'}
+                                    {r.name} {r.email ? `(${r.email})` : "(pas d'adresse e-mail)"}
                                 </option>
                             ))}
                         </select>
@@ -233,7 +240,12 @@ function BrochureSendDialog({
 
                     <div className="grid gap-2">
                         <Label>Plaquettes *</Label>
-                        <Input aria-label="Rechercher une plaquette" placeholder="Rechercher une plaquette (titre)" value={search} onChange={(e) => setSearch(e.target.value)} />
+                        <Input
+                            aria-label="Rechercher une plaquette"
+                            placeholder="Rechercher une plaquette (titre)"
+                            value={search}
+                            onChange={(e) => setSearch(e.target.value)}
+                        />
                         <ul className="grid max-h-40 gap-1 overflow-y-auto rounded-md border p-2">
                             {shown.length === 0 && <li className="text-muted-foreground text-sm">Aucune plaquette trouvée.</li>}
                             {shown.map((c) => (

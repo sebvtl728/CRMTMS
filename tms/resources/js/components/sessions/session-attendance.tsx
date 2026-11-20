@@ -238,7 +238,7 @@ export function AttendanceDialog({ seanceId, open, onClose }: { seanceId: string
                     <DialogTitle>Présences</DialogTitle>
                     <DialogDescription>
                         {grid
-                            ? `${grid.seance.module} — ${formatDay(grid.seance.date)}, ${grid.seance.start}–${grid.seance.end} (${grid.seance.duration})`
+                            ? `${grid.seance.module} - ${formatDay(grid.seance.date)}, ${grid.seance.start}–${grid.seance.end} (${grid.seance.duration})`
                             : 'Chargement…'}
                     </DialogDescription>
                 </DialogHeader>
@@ -530,7 +530,7 @@ function MonthlyCell({
 }
 
 /**
- * « Présences » tab of a session: a Paris month at a time — its séances
+ * « Présences » tab of a session: a Paris month at a time - its séances
  * and their attendance, the hours of its interval modules, the realised
  * hours, and its closure (closing locks attendance, hours and séances of
  * the month; reopening needs a reason).
@@ -646,7 +646,7 @@ export function SessionAttendance({ sessionId }: { sessionId: string }) {
                         <p className="text-muted-foreground mt-1">
                             Dernière réouverture le {formatDateTime(data.closure.reopened_at)}
                             {data.closure.reopened_by ? ` par ${data.closure.reopened_by}` : ''}
-                            {data.closure.reopen_reason ? ` — motif : ${data.closure.reopen_reason}` : ''}
+                            {data.closure.reopen_reason ? ` - motif : ${data.closure.reopen_reason}` : ''}
                         </p>
                     )}
                 </div>
@@ -691,7 +691,7 @@ export function SessionAttendance({ sessionId }: { sessionId: string }) {
                                             {s.start}–{s.end} ({s.duration})
                                         </td>
                                         <td className="py-2 pr-3">{s.module}</td>
-                                        <td className="py-2 pr-3">{s.trainer ?? '—'}</td>
+                                        <td className="py-2 pr-3">{s.trainer ?? '-'}</td>
                                         <td className="py-2 pr-3">
                                             {s.recorded} / {s.expected}
                                             {s.needs_review > 0 && (
@@ -745,7 +745,7 @@ export function SessionAttendance({ sessionId }: { sessionId: string }) {
                                                 <td key={m.id} className="py-2 pr-3">
                                                     <MonthlyCell
                                                         value={r.minutes[m.id]}
-                                                        label={`Heures de ${r.name} — ${m.title}`}
+                                                        label={`Heures de ${r.name} - ${m.title}`}
                                                         disabled={!data.can.manage || closed || !r.allowed}
                                                         onSave={(minutes) => saveHours(r.enrolment_id, m.id, minutes)}
                                                     />

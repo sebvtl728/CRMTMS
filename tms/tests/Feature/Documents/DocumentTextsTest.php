@@ -68,3 +68,17 @@ it('lets only settings.manage see and edit the texts', function () {
     $this->put('/admin/document-texts/contract/nope', ['company_id' => null, 'body' => 'x'])->assertNotFound();
     $this->delete('/admin/document-texts/contract/abandon', ['company_id' => $this->company->id])->assertSessionHasNoErrors();
 });
+
+it('declares the blocks of the per-trainee documents, the ministry certificate without any editable text', function () {
+    expect(array_keys(DocumentTexts::blocks(DocumentType::Convocation)))->toBe(['message', 'pratique'])
+        ->and(array_keys(DocumentTexts::blocks(DocumentType::CompletionCertificate)))->toBe(['attestation', 'assiduite'])
+        ->and(DocumentTexts::blocks(DocumentType::RealisationCertificate))->toBe([])
+        ->and(DocumentType::RealisationCertificate->editable())->toBeFalse()
+        ->and(DocumentType::Convocation->perEnrolment())->toBeTrue()
+        ->and(DocumentType::Convention->perEnrolment())->toBeFalse()
+        ->and(DocumentTexts::FIELDS)->toContain('{heures_realisees}', '{date_entree}', '{date_sortie}');
+
+    $this->actingAs(admin(twoFactor: true))->get('/admin/document-texts')
+        ->assertInertia(fn (Assert $p) => $p->where('types', fn ($types) => ! collect($types)->contains('value', 'realisation_certificate')
+            && collect($types)->contains('value', 'convocation')));
+});

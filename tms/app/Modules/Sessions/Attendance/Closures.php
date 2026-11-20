@@ -14,7 +14,7 @@ use Illuminate\Validation\ValidationException;
  * Closure of the attendance of a session for a Paris month (spec § 4 bis 5):
  * once closed, its attendance, its monthly hours and the creation, deletion,
  * cancellation or change of hours of its séances are refused (409, French)
- * until it is reopened — sessions.attendance.close and a mandatory reason,
+ * until it is reopened - sessions.attendance.close and a mandatory reason,
  * journaled (the reason kept on the row, never in clear in the journal).
  * Invoices (0.9) rely on closed hours.
  *

@@ -111,7 +111,7 @@ export default function OpportunitiesIndex({ opportunities, totals, filters, opt
                                                 {o.priority && <div className="text-muted-foreground text-xs">{o.priority}</div>}
                                             </td>
                                             <td className="px-3 py-2">
-                                                {o.account.name ?? '—'}
+                                                {o.account.name ?? '-'}
                                                 <div className="text-muted-foreground text-xs">
                                                     {o.target === 'individual' ? 'Particulier' : 'Entreprise'}
                                                 </div>
@@ -120,11 +120,11 @@ export default function OpportunitiesIndex({ opportunities, totals, filters, opt
                                                 <StageBadge stage={o.stage} />{' '}
                                                 <span className="text-muted-foreground text-xs">{o.probability} %</span>
                                             </td>
-                                            <td className="px-3 py-2">{o.das ?? '—'}</td>
+                                            <td className="px-3 py-2">{o.das ?? '-'}</td>
                                             <td className="px-3 py-2 text-right whitespace-nowrap">{formatAmount(o.amount)}</td>
                                             <td className="px-3 py-2 text-right whitespace-nowrap">{formatAmount(o.weighted_amount)}</td>
                                             <td className="px-3 py-2 whitespace-nowrap">{formatDay(o.expected_close_on)}</td>
-                                            <td className="px-3 py-2">{o.responsible ?? '—'}</td>
+                                            <td className="px-3 py-2">{o.responsible ?? '-'}</td>
                                             <td className="px-3 py-2 whitespace-nowrap">{formatDate(o.created_at)}</td>
                                         </tr>
                                     ))}

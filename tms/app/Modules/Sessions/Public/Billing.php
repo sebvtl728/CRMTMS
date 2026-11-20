@@ -302,7 +302,7 @@ final class Billing
      * Billing::dossiersFor(...))). Filters: company_id, das_id,
      * responsible_user_id; started_by (a Paris day): only the dossiers
      * neither cancelled nor settled with a trainee sharing the price in a
-     * session (not in the trash) started on or before that day — those
+     * session (not in the trash) started on or before that day - those
      * that may have something to invoice; with_trashed: dossiers in the
      * trash too (their validated invoices stay listed).
      *

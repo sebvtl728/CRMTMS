@@ -18,7 +18,7 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
  */
 final class ImportTemplate
 {
-    public const EXAMPLE_MARKER = 'Exemple — à supprimer';
+    public const EXAMPLE_MARKER = 'Exemple - à supprimer';
 
     public const EXAMPLE_SKIPPED = "Ligne d'exemple du modèle ignorée.";
 

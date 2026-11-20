@@ -17,7 +17,7 @@ use Illuminate\Support\Facades\Storage;
  * the organisme (spec 0.9 § 4.4, NF203-compatible):
  *
  *  - canonical(): the frozen content of an invoice as JSON, keys sorted at
- *    every level, no whitespace — number, kind, company, dossier,
+ *    every level, no whitespace - number, kind, company, dossier,
  *    recipient (type, id, funding, snapshot), dates, period, corrected
  *    invoice, VAT mention, fingerprint of the archived PDF, lines (in
  *    order) and totals;
@@ -26,8 +26,8 @@ use Illuminate\Support\Facades\Storage;
  *  - verify(): walks the journal in order and recomputes every link; the
  *    first number whose content, totals, link, journal row or archived PDF
  *    (its SHA-256) does not match, an issued invoice missing from the
- *    journal, or a number given (invoice_sequences) missing from it — a
- *    deleted tail, a hole — breaks it.
+ *    journal, or a number given (invoice_sequences) missing from it - a
+ *    deleted tail, a hole - breaks it.
  */
 final class Integrity
 {

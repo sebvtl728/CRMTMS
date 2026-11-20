@@ -52,7 +52,7 @@ export function sessionDates(row: Pick<SessionRow, 'starts_on' | 'ends_on'>): st
 
 /** « Adresse : 12 rue… », « Chez le client », « Distanciel : lien ». */
 export function sessionLocation(row: Pick<SessionRow, 'location_kind' | 'location_label' | 'location_text'>): string {
-    if (row.location_kind === 'address') return row.location_text ?? '—';
+    if (row.location_kind === 'address') return row.location_text ?? '-';
 
     return row.location_text ? `${row.location_label} : ${row.location_text}` : row.location_label;
 }

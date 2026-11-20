@@ -216,7 +216,7 @@ export default function CandidaturesIndex({ rows, filters, counts, options, can,
                                                 )}
                                             </td>
                                             <td className="px-3 py-2">
-                                                {r.training ?? '—'}
+                                                {r.training ?? '-'}
                                                 {r.rncp_code && <div className="text-muted-foreground text-xs">{r.rncp_code}</div>}
                                             </td>
                                             <td className="px-3 py-2">
@@ -230,10 +230,10 @@ export default function CandidaturesIndex({ rows, filters, counts, options, can,
                                                         </div>
                                                     </>
                                                 ) : (
-                                                    (r.pathway_label ?? '—')
+                                                    (r.pathway_label ?? '-')
                                                 )}
                                             </td>
-                                            <td className="px-3 py-2">{r.responsible ?? '—'}</td>
+                                            <td className="px-3 py-2">{r.responsible ?? '-'}</td>
                                             <td className="px-3 py-2">
                                                 <Badge variant={stageVariant(r.status)}>{r.status_label}</Badge>
                                             </td>

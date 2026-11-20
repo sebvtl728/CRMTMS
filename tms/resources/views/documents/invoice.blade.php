@@ -111,7 +111,7 @@
         <div><strong>Avoir sur la facture</strong> {{ $invoice['corrected']['number'] }}@if ($invoice['corrected']['issued_on']) du {{ $invoice['corrected']['issued_on'] }}@endif</div>
     @endif
     @if ($recipient['dossier_number'])<div><strong>Dossier :</strong> {{ $recipient['dossier_number'] }}</div>@endif
-    @if ($recipient['agreement_number'])<div><strong>Financement — n° d'accord :</strong> {{ $recipient['agreement_number'] }}</div>@endif
+    @if ($recipient['agreement_number'])<div><strong>Financement - n° d'accord :</strong> {{ $recipient['agreement_number'] }}</div>@endif
     @if ($invoice['period'])<div><strong>Période de formation :</strong> {{ $invoice['period'] }}</div>@endif
 </div>
 

@@ -74,12 +74,12 @@ final class CandidatureHistory
         $numbers = Candidature::withTrashed()->whereKey($logs->pluck('auditable_id')->unique()->values()->all())->pluck('number', 'id');
 
         return $logs->map(function (AuditLog $log) use ($numbers): array {
-            $number = $numbers[$log->auditable_id] ?? '—';
+            $number = $numbers[$log->auditable_id] ?? '-';
             $status = is_array($log->new_values) ? CandidatureStatus::tryFrom((string) ($log->new_values['status'] ?? '')) : null;
 
             return [
                 'at' => CarbonImmutable::instance($log->created_at),
-                'title' => $log->event === 'created' ? "Candidature {$number} ouverte" : "Candidature {$number} : ".($status?->label() ?? '—'),
+                'title' => $log->event === 'created' ? "Candidature {$number} ouverte" : "Candidature {$number} : ".($status?->label() ?? '-'),
                 'body' => null,
                 'author' => $log->user?->name,
                 'meta' => ['id' => $log->id, 'candidature_id' => $log->auditable_id, 'href' => "/admissions/candidatures/{$log->auditable_id}"],

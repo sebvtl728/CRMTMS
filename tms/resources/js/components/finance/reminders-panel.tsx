@@ -99,7 +99,7 @@ export function RemindersPanel({
                             </span>
                             <span className="text-muted-foreground">
                                 {h.status_label}
-                                {h.at ? ` — ${formatDateTime(h.at)}` : ''}
+                                {h.at ? ` - ${formatDateTime(h.at)}` : ''}
                             </span>
                         </li>
                     ))}
