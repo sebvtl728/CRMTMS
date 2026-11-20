@@ -16,6 +16,7 @@ use App\Modules\Sessions\Planning\SeanceRows;
 use App\Modules\Sessions\Public\RealisedHours;
 use App\Modules\Sessions\Sessions\TrainingSession;
 use App\Modules\Sessions\SessionsVisibility;
+use App\Modules\Sessions\Trainers\Trainers;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Collection;
 
@@ -96,6 +97,9 @@ final class AttendanceRows
         $userNames = User::query()->whereKey(array_filter([$closure?->closed_by, $closure?->reopened_by]))->pluck('name', 'id');
         $manage = Scopes::of($user, Permissions::ATTENDANCE_MANAGE) !== AccessScope::Trainer
             && SessionsVisibility::allows($user, Permissions::ATTENDANCE_MANAGE, $session);
+        // A trainer opens, from the « Suivi », the attendance of his own séances (the séance endpoints check it too).
+        $ownTrainerId = ! $manage && Scopes::of($user, Permissions::ATTENDANCE_MANAGE) === AccessScope::Trainer
+            ? Trainers::forUser($user)?->id : null;
 
         // Trainees: every enrolment of the session that attends or has hours, loaded once.
         $enrolments = Enrolment::query()->where('training_session_id', $session->id)->get();
@@ -159,6 +163,7 @@ final class AttendanceRows
                 'module' => $titles[$s->session_module_id] ?? '-',
                 'trainer' => $s->trainer_id === null ? null : ($trainers[$s->trainer_id] ?? null),
                 'cancelled' => $s->isCancelled(),
+                'can_record' => $manage || ($ownTrainerId !== null && $s->trainer_id === $ownTrainerId),
                 'recorded' => (int) ($counts[$s->id]->recorded ?? 0),
                 'needs_review' => (int) ($counts[$s->id]->review ?? 0),
                 'expected' => $enrolments->filter(fn (Enrolment $e) => self::attendsDay($e, $s->date))->count(),

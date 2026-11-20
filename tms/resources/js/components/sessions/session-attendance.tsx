@@ -77,6 +77,8 @@ interface SessionAttendance {
         module: string;
         trainer: string | null;
         cancelled: boolean;
+        /** The user may open its attendance (a manager, or its trainer). */
+        can_record: boolean;
         recorded: number;
         needs_review: number;
         expected: number;
@@ -701,7 +703,7 @@ export function SessionAttendance({ sessionId }: { sessionId: string }) {
                                             )}
                                         </td>
                                         <td className="py-2 text-right">
-                                            {data.can.manage && (
+                                            {s.can_record && (
                                                 <Button type="button" size="sm" variant="outline" onClick={() => setSeanceId(s.id)}>
                                                     <ClipboardCheck className="h-4 w-4" />
                                                     Présences

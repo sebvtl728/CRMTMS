@@ -25,6 +25,7 @@ Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) ; ve
 
 ### Modifié
 
+- Sessions : un formateur peut saisir les présences de ses propres séances depuis le « Suivi » de la session.
 
 - Documents : l'attestation de fin de formation et le certificat de réalisation s'émettent dès le dernier jour de la
   formation (et non plus le lendemain).
