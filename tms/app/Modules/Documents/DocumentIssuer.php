@@ -4,6 +4,7 @@ namespace App\Modules\Documents;
 
 use App\Exceptions\UserFacingHttpException;
 use App\Modules\Core\Companies\Company;
+use App\Modules\Core\Documents\PdfSource;
 use App\Modules\Core\Signatures\Signatures;
 use App\Modules\Core\Tenancy\TenantStorage;
 use App\Modules\Core\Users\User;
@@ -53,9 +54,9 @@ class DocumentIssuer
             $recipient = $this->recipient($type, $dossier);
             $issuedAt = CarbonImmutable::now();
             $number = $this->numbering->next($issuedAt);
-            $content = $this->pdf->render($type, $dossier, $company, $number, $issuedAt, $recipient);
+            $source = $this->pdf->source($type, $dossier, $company, $number, $issuedAt, $recipient);
 
-            return $this->store($by, $type, $dossierId, null, $company, $number, $issuedAt, $recipient, $content);
+            return $this->store($by, $type, $dossierId, null, $company, $number, $issuedAt, $recipient, $source);
         });
     }
 
@@ -80,21 +81,27 @@ class DocumentIssuer
             $recipient = $this->traineeRecipient($enrolment['person_id']);
             $issuedAt = CarbonImmutable::now();
             $number = $this->numbering->next($issuedAt);
-            $content = $this->pdf->renderForEnrolment($type, $enrolment, $dossier, $company, $number, $issuedAt, $recipient);
+            $source = $this->pdf->sourceForEnrolment($type, $enrolment, $dossier, $company, $number, $issuedAt, $recipient);
 
-            return $this->store($by, $type, $dossier['id'], $enrolmentId, $company, $number, $issuedAt, $recipient, $content);
+            return $this->store($by, $type, $dossier['id'], $enrolmentId, $company, $number, $issuedAt, $recipient, $source);
         });
     }
 
     /**
      * @param  array<string, mixed>  $recipient
      */
-    private function store(User $by, DocumentType $type, string $dossierId, ?string $enrolmentId, Company $company, string $number, CarbonImmutable $issuedAt, array $recipient, string $content): Document
+    private function store(User $by, DocumentType $type, string $dossierId, ?string $enrolmentId, Company $company, string $number, CarbonImmutable $issuedAt, array $recipient, PdfSource $source): Document
     {
+        $content = $this->pdf->renderSource($source);
         $path = TenantStorage::path('documents', $issuedAt->setTimezone('Europe/Paris')->format('Y').'/'.Str::uuid7().'.pdf');
         $disk = Storage::disk(TenantStorage::DISK);
         $disk->put($path, $content);
         try {
+            // Signable documents keep their exact HTML: an online signature renders it again with the drawing in its box.
+            if ($type->signable()) {
+                PdfSource::store($path, $source->html, $source->footer);
+            }
+
             return Document::query()->create([
                 'type' => $type->value,
                 'dossier_id' => $dossierId,
@@ -110,6 +117,7 @@ class DocumentIssuer
             ]);
         } catch (Throwable $e) {
             $disk->delete($path);
+            $disk->delete(PdfSource::pathFor($path));
 
             throw $e;
         }

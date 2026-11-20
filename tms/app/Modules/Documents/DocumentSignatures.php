@@ -29,7 +29,7 @@ final class DocumentSignatures
         Validator::make(['email' => $email], ['email' => ['required', 'email:rfc', 'max:254']],
             ['email.required' => 'Indiquez l\'adresse du signataire.', 'email.email' => 'Adresse e-mail invalide.'])->validate();
         $type = DocumentType::from($document->type);
-        if (! in_array($type, [DocumentType::Convention, DocumentType::Contract], true)) {
+        if (! $type->signable()) {
             throw new UserFacingHttpException(409, 'Seuls la convention et le contrat se signent en ligne.');
         }
         if ($document->isCancelled() || $document->status === DocumentStatus::Signed) {

@@ -32,6 +32,10 @@ use Illuminate\Database\Eloquent\Model;
  * @property string|null $signed_user_agent
  * @property string|null $signed_pdf_path
  * @property string|null $signed_pdf_sha256
+ * @property string|null $source_path frozen source of the PDF (PdfSource), re-rendered with the drawing
+ * @property string|null $source_sha256
+ * @property string|null $drawing_path the drawn signature (PNG)
+ * @property string|null $drawing_sha256
  * @property string|null $created_by
  */
 class SignatureRequest extends Model
@@ -47,7 +51,7 @@ class SignatureRequest extends Model
     protected array $auditIgnore = ['token_hash', 'code_hash', 'code_expires_at', 'code_attempts', 'code_sent_at', 'updated_at'];
 
     /** @var list<string> */
-    protected $fillable = ['subject_type', 'subject_id', 'title', 'pdf_path', 'pdf_sha256', 'signer_name', 'signer_email', 'signer_person_id', 'token_hash', 'expires_at', 'status', 'created_by'];
+    protected $fillable = ['subject_type', 'subject_id', 'title', 'pdf_path', 'pdf_sha256', 'signer_name', 'signer_email', 'signer_person_id', 'token_hash', 'expires_at', 'status', 'created_by', 'source_path', 'source_sha256'];
 
     protected function casts(): array
     {

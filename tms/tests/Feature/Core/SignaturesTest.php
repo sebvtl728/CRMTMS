@@ -1,6 +1,7 @@
 <?php
 
 use App\Exceptions\UserFacingHttpException;
+use App\Modules\Core\Documents\PdfSource;
 use App\Modules\Core\Signatures\Events\SignatureCompleted;
 use App\Modules\Core\Signatures\SignatureMail;
 use App\Modules\Core\Signatures\SignatureRequest;
@@ -64,19 +65,19 @@ it('sends a 6-digit code at most once a minute, and refuses a wrong, expired or 
     Mail::assertSent(SignatureMail::class, fn ($m) => $m->hasTo('claire.martin@hotel-parc.test'));
     expect(fn () => $signatures->sendCode($request->fresh()))->toThrow(UserFacingHttpException::class, 'Patientez une minute avant de demander un nouveau code.');
 
-    expect(fn () => $signatures->sign($request->fresh(), '000000', '203.0.113.7', 'Firefox'))->toThrow(ValidationException::class, 'Code incorrect.');
+    expect(fn () => $signatures->sign($request->fresh(), '000000', sigDrawing(), '203.0.113.7', 'Firefox'))->toThrow(ValidationException::class, 'Code incorrect.');
     foreach (range(2, 5) as $_) {
         try {
-            $signatures->sign($request->fresh(), '000000', '203.0.113.7', 'Firefox');
+            $signatures->sign($request->fresh(), '000000', sigDrawing(), '203.0.113.7', 'Firefox');
         } catch (ValidationException) {
         }
     }
-    expect(fn () => $signatures->sign($request->fresh(), sigCode(), '203.0.113.7', 'Firefox'))->toThrow(ValidationException::class, 'Trop d\'essais : demandez un nouveau code.');
+    expect(fn () => $signatures->sign($request->fresh(), sigCode(), sigDrawing(), '203.0.113.7', 'Firefox'))->toThrow(ValidationException::class, 'Trop d\'essais : demandez un nouveau code.');
 
     $this->travel(2)->minutes();
     $signatures->sendCode($request->fresh());
     $this->travel(11)->minutes();
-    expect(fn () => $signatures->sign($request->fresh(), sigCode(), '203.0.113.7', 'Firefox'))->toThrow(ValidationException::class, 'Ce code a expiré : demandez-en un nouveau.');
+    expect(fn () => $signatures->sign($request->fresh(), sigCode(), sigDrawing(), '203.0.113.7', 'Firefox'))->toThrow(ValidationException::class, 'Ce code a expiré : demandez-en un nouveau.');
 });
 
 it('signs: the original PDF plus a proof page, an event after commit, a confirmation with the signed PDF', function () {
@@ -85,7 +86,7 @@ it('signs: the original PDF plus a proof page, an event after commit, a confirma
     $signatures = app(Signatures::class);
     $signatures->sendCode($request);
 
-    $signed = $signatures->sign($request->fresh(), sigCode(), '203.0.113.7', 'Firefox 140');
+    $signed = $signatures->sign($request->fresh(), sigCode(), sigDrawing(), '203.0.113.7', 'Firefox 140');
 
     expect($signed->status)->toBe('signed')
         ->and($signed->signed_ip)->toBe('203.0.113.7')
@@ -109,7 +110,7 @@ it('signs: the original PDF plus a proof page, an event after commit, a confirma
     });
     expect($proof)->toContain('Claire Martin', 'claire.martin@hotel-parc.test', '19/11/2026', '203.0.113.7', hash('sha256', SIG_PDF));
     expect(Signatures::find('anything'))->toBeNull()
-        ->and(fn () => $signatures->sign($signed, '123456', '1.1.1.1', 'x'))->toThrow(UserFacingHttpException::class);
+        ->and(fn () => $signatures->sign($signed, '123456', sigDrawing(), '1.1.1.1', 'x'))->toThrow(UserFacingHttpException::class);
 });
 
 it('refuses to sign when the original was altered', function () {
@@ -118,7 +119,87 @@ it('refuses to sign when the original was altered', function () {
     $signatures->sendCode($request);
     Storage::disk(TenantStorage::DISK)->put($this->path, '%PDF-1.7 autre');
 
-    expect(fn () => $signatures->sign($request->fresh(), sigCode(), '203.0.113.7', 'Firefox'))
+    expect(fn () => $signatures->sign($request->fresh(), sigCode(), sigDrawing(), '203.0.113.7', 'Firefox'))
+        ->toThrow(fn (UserFacingHttpException $e) => expect($e->getStatusCode())->toBe(410));
+    expect(SignatureRequest::query()->sole()->status)->toBe('pending');
+});
+
+/** The HTML parts sent to Gotenberg, in order. */
+function sigSentHtml(): array
+{
+    $html = [];
+    Http::assertSent(function ($r) use (&$html) {
+        foreach ($r->data() as $part) {
+            if (($part['filename'] ?? null) === 'index.html') {
+                $html[] = (string) $part['contents'];
+            }
+        }
+
+        return true;
+    });
+
+    return $html;
+}
+
+it('requires a drawn signature: a real, non-blank, small PNG; a refused drawing costs no try', function (string $drawing) {
+    ['request' => $request] = sigRequest($this);
+    $signatures = app(Signatures::class);
+    $signatures->sendCode($request);
+
+    expect(fn () => $signatures->sign($request->fresh(), sigCode(), $drawing, '203.0.113.7', 'Firefox'))
+        ->toThrow(ValidationException::class, 'Dessinez votre signature dans le cadre.');
+    expect($request->fresh()->code_attempts)->toBe(0)->and($request->fresh()->status)->toBe('pending');
+})->with([
+    'empty' => '',
+    'blank canvas' => fn () => sigDrawing(blank: true),
+    'not a PNG' => 'data:image/png;base64,'.base64_encode('<svg onload="x"></svg>'),
+    'another type' => 'data:image/svg+xml;base64,'.base64_encode('<svg/>'),
+    'too large' => fn () => sigDrawing(width: 2400, height: 400),
+]);
+
+it('signs the frozen source with the drawing in the signature box, keeps the drawing and records both fingerprints', function () {
+    PdfSource::store($this->path, '<html><body><p>Texte figé</p><div class="box">'.PdfSource::SLOT.'</div></body></html>', '<html><body>pied</body></html>');
+    ['request' => $request] = sigRequest($this);
+    $sourceSha = hash('sha256', (string) Storage::disk(TenantStorage::DISK)->get(PdfSource::pathFor($this->path)));
+    expect($request->source_path)->toBe(PdfSource::pathFor($this->path))->and($request->source_sha256)->toBe($sourceSha);
+    $signatures = app(Signatures::class);
+    $signatures->sendCode($request);
+
+    $drawing = sigDrawing();
+    $signed = $signatures->sign($request->fresh(), sigCode(), $drawing, '203.0.113.7', 'Firefox 140');
+
+    $png = base64_decode(substr($drawing, strlen('data:image/png;base64,')));
+    [$document, $proof] = sigSentHtml();
+    expect($document)->toContain('<p>Texte figé</p>', 'data:image/png;base64,', 'Signé électroniquement le 19/11/2026 par Claire Martin')
+        ->not->toContain(PdfSource::SLOT)
+        ->and($proof)->toContain('data:image/png;base64,', hash('sha256', SIG_PDF), hash('sha256', $png), 'reprend le texte du document envoyé', 'img-src data:')
+        ->and(Storage::disk(TenantStorage::DISK)->get($signed->drawing_path))->toBe($png)
+        ->and($signed->drawing_sha256)->toBe(hash('sha256', $png))
+        ->and(Storage::disk(TenantStorage::DISK)->get($this->path))->toBe(SIG_PDF);
+});
+
+it('without a frozen source, signs the original and shows the drawing on the proof page only', function () {
+    ['request' => $request] = sigRequest($this);
+    expect($request->source_path)->toBeNull();
+    $signatures = app(Signatures::class);
+    $signatures->sendCode($request);
+
+    $signed = $signatures->sign($request->fresh(), sigCode(), sigDrawing(), '203.0.113.7', 'Firefox');
+
+    $html = sigSentHtml();
+    expect($html)->toHaveCount(1)
+        ->and($html[0])->toContain('Preuve de signature', 'data:image/png;base64,')->not->toContain('reprend le texte du document envoyé')
+        ->and($signed->drawing_path)->not->toBeNull();
+});
+
+it('refuses to sign when the frozen source was altered', function () {
+    PdfSource::store($this->path, '<p>'.PdfSource::SLOT.'</p>', null);
+    ['request' => $request] = sigRequest($this);
+    $signatures = app(Signatures::class);
+    $signatures->sendCode($request);
+    Storage::disk(TenantStorage::DISK)->put(PdfSource::pathFor($this->path), '{"html":"<p>autre</p>","footer":null}');
+
+    expect(fn () => $signatures->sign($request->fresh(), sigCode(), sigDrawing(), '203.0.113.7', 'Firefox'))
         ->toThrow(fn (UserFacingHttpException $e) => expect($e->getStatusCode())->toBe(410));
     expect(SignatureRequest::query()->sole()->status)->toBe('pending');
 });

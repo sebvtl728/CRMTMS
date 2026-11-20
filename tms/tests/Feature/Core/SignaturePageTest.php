@@ -32,8 +32,9 @@ it('lets the signer read, receive a code and sign without an account', function 
     preg_match('/\b(\d{6})\b/', Mail::sent(SignatureMail::class)->last()->text, $m);
 
     $this->post("/signature/{$this->token}/sign", ['code' => $m[1]])->assertSessionHasErrors('accept');
-    $this->post("/signature/{$this->token}/sign", ['code' => '000000', 'accept' => '1'])->assertSessionHasErrors(['code' => 'Code incorrect.']);
-    $this->post("/signature/{$this->token}/sign", ['code' => $m[1], 'accept' => '1'], ['User-Agent' => 'Firefox 140'])
+    $this->post("/signature/{$this->token}/sign", ['code' => $m[1], 'accept' => '1'])->assertSessionHasErrors(['drawing' => 'Dessinez votre signature dans le cadre.']);
+    $this->post("/signature/{$this->token}/sign", ['code' => '000000', 'accept' => '1', 'drawing' => sigDrawing()])->assertSessionHasErrors(['code' => 'Code incorrect.']);
+    $this->post("/signature/{$this->token}/sign", ['code' => $m[1], 'accept' => '1', 'drawing' => sigDrawing()], ['User-Agent' => 'Firefox 140'])
         ->assertRedirect("/signature/{$this->token}")->assertSessionHasNoErrors();
 
     $this->get("/signature/{$this->token}")->assertInertia(fn (Assert $p) => $p->where('state', 'signed')->where('signed_at', fn ($v) => str_starts_with($v, '19/11/2026')));
