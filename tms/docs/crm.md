@@ -458,7 +458,8 @@ Avec le périmètre « Ses fiches », le tableau ne compte que vos devis et vos 
 
 ## 13 ter. Tableaux de bord, rappels et besoins futurs (lot 1e)
 
-**Tableaux de bord** (menu Commercial › Tableaux de bord, avec n'importe quel droit « Consulter » du CRM ; lien aussi sur
+**Tableaux de bord** (menu Commercial › Tableaux de bord, droit « **Consulter les tableaux de bord** », réglable dans
+Administration › Rôles et droits ; accordé par défaut aux rôles qui voient le CRM, jamais au formateur ; lien aussi sur
 l'accueil). Deux vues, mêmes filtres (période : cette semaine, semaine dernière, ce mois, mois dernier, ce trimestre,
 cette année ou dates libres ; DAS ; cible entreprises / particuliers ; commercial) :
 
@@ -474,7 +475,7 @@ qui la compose. Chaque carte suit le périmètre de son droit : un commercial su
 fois). Le taux de réponse compte les appels dont le résultat est marqué « Compte comme joint » (Administration ›
 Référentiels › Résultats d'action ; « Réussi » par défaut). Un lead est une fiche dont une opportunité atteint pour la
 première fois l'étape choisie dans les réglages du CRM (« Contacté » par défaut). Exports : **Excel (CSV)** et **PDF**
-(droit « Exporter », journalisés). Le filtre DAS ne s'applique pas aux cartes d'actions (une action n'a pas de DAS).
+(droits « Consulter les tableaux de bord » et « Exporter vers Excel », journalisés). Le filtre DAS ne s'applique pas aux cartes d'actions (une action n'a pas de DAS).
 
 **Rappels de réactivation** : chaque matin, une action « Appel » est créée **6 et 12 mois** (réglables, Administration ›
 Réglages du CRM) après la fin d'un dossier, sur la fiche du client (l'entreprise, ou le particulier), pour le **responsable

@@ -71,3 +71,11 @@ Onglets **Candidats** (sans dossier en cours ; non retenus et désistés seuleme
 - L'**export RGPD** d'une personne contient ses candidatures (données sensibles et champs personnalisés compris) : il est réservé à qui voit tout l'organisme, candidatures et données sensibles comprises.
 - L'**anonymisation** d'une personne efface aussi les données personnelles, sensibles, personnalisées et les fichiers de ses candidatures (numéro, étape, formation et dates restent).
 - **Conservation** : une candidature **non retenue** ou **désistée** est anonymisée automatiquement **2 ans** après sa dernière modification (commande `tms:admissions:purge`, chaque nuit à 3 h 50). La fiche du CRM suit sa propre règle.
+
+## Pastille « Candidats » du responsable de DAS
+
+Un utilisateur dont le droit « Candidats » est sur **Ses DAS** (le responsable de DAS) voit dans le menu, à côté de
+« Candidats », un **compteur rouge** : le nombre de candidatures encore à l'étape **Identifié** dans ses DAS. Une
+candidature sort du compteur dès qu'elle quitte cette étape (test envoyé, entretien, non retenu…). Le compteur se met à
+jour en une minute au plus ; les utilisateurs qui voient toutes les candidatures (ou seulement les leurs) n'en ont pas.
+
