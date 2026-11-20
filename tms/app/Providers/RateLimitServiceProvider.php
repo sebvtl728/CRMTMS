@@ -38,6 +38,8 @@ class RateLimitServiceProvider extends ServiceProvider
         'positioning-send' => 20,
         // Online signature page (signer, no account: per address).
         'signature-public' => 30,
+        // Local sandbox reset (Administration › Bac à sable).
+        'sandbox-reset' => 6,
     ];
 
     /**

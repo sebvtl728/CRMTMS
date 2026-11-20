@@ -40,6 +40,7 @@ export interface SharedData {
     auth: Auth;
     /** Menu badge of « À faire »: overdue + today. */
     todo_count: number;
+    sandbox: boolean;
     /** The « Sauvegardes » page exists (self-hosted install). */
     backups_enabled: boolean;
     /** French banner text about the backups (settings.manage, single mode), null when all is well. */

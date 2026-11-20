@@ -111,7 +111,7 @@ const adminNavItems: (NavItem & { permission: string })[] = [
 ];
 
 export function AppSidebar() {
-    const { auth, todo_count, backups_enabled, backup_alert } = usePage<SharedData>().props;
+    const { auth, todo_count, backups_enabled, backup_alert, sandbox } = usePage<SharedData>().props;
     const crmViewer = ['crm.fiches.view', 'crm.opportunities.view', 'crm.quotes.view', 'crm.activities.view'].some((p) =>
         auth.permissions.includes(p),
     );
@@ -125,7 +125,12 @@ export function AppSidebar() {
     const financeItems = financeNavItems.filter((item) => auth.permissions.includes(item.permission));
     const qualityItems = qualityNavItems.filter((item) => auth.permissions.includes(item.permission));
     const adminItems = adminNavItems
-        .filter((item) => auth.permissions.includes(item.permission) && (item.url !== '/admin/backups' || backups_enabled))
+        .filter(
+            (item) =>
+                auth.permissions.includes(item.permission) &&
+                (item.url !== '/admin/backups' || backups_enabled) &&
+                (item.url !== '/admin/sandbox' || sandbox),
+        )
         // Backup in trouble: a red dot on « Sauvegardes » for the administrator (never on the home page).
         .map((item) => (item.url === '/admin/backups' ? { ...item, alert: backup_alert } : item));
 
