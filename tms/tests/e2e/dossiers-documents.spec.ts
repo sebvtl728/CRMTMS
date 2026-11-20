@@ -9,10 +9,14 @@ const CLIENT = 'E2E Imprimerie des Alpes';
 
 /** The last match of $pattern in the e-mails of the e2e stack (MAIL_MAILER=log; quoted-printable soft breaks removed). */
 function lastInMails(pattern: RegExp): string {
-    const log = execFileSync('docker', ['compose', '-f', 'compose.yaml', '-f', 'compose.e2e.yaml', 'exec', '-T', 'app-e2e', 'cat', 'storage/logs/laravel.log'], {
-        encoding: 'utf8',
-        maxBuffer: 64 * 1024 * 1024,
-    }).replace(/=\r?\n/g, '');
+    const log = execFileSync(
+        'docker',
+        ['compose', '-f', 'compose.yaml', '-f', 'compose.e2e.yaml', 'exec', '-T', 'app-e2e', 'cat', 'storage/logs/laravel.log'],
+        {
+            encoding: 'utf8',
+            maxBuffer: 64 * 1024 * 1024,
+        },
+    ).replace(/=\r?\n/g, '');
     const all = [...log.matchAll(new RegExp(pattern.source, 'g'))];
     expect(all.length, `nothing like ${pattern} in the e-mails`).toBeGreaterThan(0);
 
@@ -21,7 +25,12 @@ function lastInMails(pattern: RegExp): string {
 
 test('convention: issued from the dossier, previewed, sent, then cancelled with a reason', async ({ browser }) => {
     expect(existsSync(ADMIN_STATE), 'run admin.spec.ts first (it signs the administrator in)').toBe(true);
-    const context = await browser.newContext({ storageState: ADMIN_STATE, locale: 'fr-FR', timezoneId: 'Europe/Paris', viewport: { width: 1400, height: 1000 } });
+    const context = await browser.newContext({
+        storageState: ADMIN_STATE,
+        locale: 'fr-FR',
+        timezoneId: 'Europe/Paris',
+        viewport: { width: 1400, height: 1000 },
+    });
     const page = await context.newPage();
 
     // The organisme's own text of an article.
@@ -34,7 +43,10 @@ test('convention: issued from the dossier, previewed, sent, then cancelled with 
 
     // The dossier of the client.
     await page.goto('/dossiers');
-    await page.getByRole('row', { name: new RegExp(CLIENT) }).getByRole('link', { name: /^D-\d{4}-\d{4}$/ }).click();
+    await page
+        .getByRole('row', { name: new RegExp(CLIENT) })
+        .getByRole('link', { name: /^D-\d{4}-\d{4}$/ })
+        .click();
     await expect(page.getByRole('heading', { name: /^Dossier / })).toBeVisible();
 
     await page.getByRole('button', { name: 'Émettre : convention de formation' }).click();
@@ -70,6 +82,15 @@ test('convention: issued from the dossier, previewed, sent, then cancelled with 
     const signerPage = await signer.newPage();
     await signerPage.goto(`/signature/${token}`);
     await signerPage.getByLabel("J'ai lu le document et j'accepte de le signer électroniquement.").check();
+    // The drawn signature (mandatory): a stroke across the box.
+    const pad = await signerPage.getByLabel('Cadre de signature : dessinez votre signature').boundingBox();
+    if (!pad) throw new Error('signature box not found');
+    await signerPage.mouse.move(pad.x + 20, pad.y + pad.height * 0.7);
+    await signerPage.mouse.down();
+    for (let i = 1; i <= 30; i++) {
+        await signerPage.mouse.move(pad.x + 20 + i * ((pad.width - 40) / 30), pad.y + pad.height * (0.7 - 0.4 * Math.sin((i / 30) * Math.PI)));
+    }
+    await signerPage.mouse.up();
     await signerPage.getByRole('button', { name: 'Recevoir mon code par e-mail' }).click();
     await expect(signerPage.getByText(/Code envoyé à/)).toBeVisible();
     await signerPage.getByLabel('Code à 6 chiffres').fill(lastInMails(/code de signature[^0-9]*(\d{6})/i));

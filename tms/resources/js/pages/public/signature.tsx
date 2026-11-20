@@ -1,4 +1,5 @@
 import InputError from '@/components/input-error';
+import SignaturePad from '@/components/signature-pad';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -24,7 +25,11 @@ export default function Signature({ state, organisme, title, signer, email, dead
     const token = window.location.pathname.split('/').filter(Boolean).pop() ?? '';
     const [sending, setSending] = useState(false);
     const errs = usePage().props.errors as Record<string, string | undefined>;
-    const { data, setData, post, processing, errors } = useForm<{ accept: boolean; code: string }>({ accept: false, code: '' });
+    const { data, setData, post, processing, errors } = useForm<{ accept: boolean; drawing: string; code: string }>({
+        accept: false,
+        drawing: '',
+        code: '',
+    });
 
     if (state === 'invalid') {
         return (
@@ -38,7 +43,11 @@ export default function Signature({ state, organisme, title, signer, email, dead
     }
 
     const askCode = () =>
-        router.post(`/signature/${token}/code`, {}, { preserveScroll: true, onStart: () => setSending(true), onFinish: () => setSending(false) });
+        router.post(
+            `/signature/${token}/code`,
+            {},
+            { preserveScroll: true, preserveState: true, onStart: () => setSending(true), onFinish: () => setSending(false) },
+        );
     const submit: FormEventHandler = (e) => {
         e.preventDefault();
         post(`/signature/${token}/sign`, { preserveScroll: true });
@@ -63,13 +72,20 @@ export default function Signature({ state, organisme, title, signer, email, dead
                 ) : (
                     <form onSubmit={submit} className="grid gap-4" noValidate>
                         <p className="text-muted-foreground text-sm">
-                            {signer}, lisez le document puis signez-le avec le code envoyé à {email}. Ce lien est valable jusqu'au {deadline}.
+                            {signer}, lisez le document, signez dans le cadre puis validez avec le code envoyé à {email}. Ce lien est valable jusqu'au{' '}
+                            {deadline}.
                         </p>
                         <Label className="flex items-start gap-2 font-normal">
                             <input type="checkbox" className="mt-1" checked={data.accept} onChange={(e) => setData('accept', e.target.checked)} />
                             J'ai lu le document et j'accepte de le signer électroniquement.
                         </Label>
                         <InputError message={errors.accept} />
+                        <div className="grid gap-1">
+                            <Label htmlFor="drawing">Votre signature</Label>
+                            <p className="text-muted-foreground text-xs">Signez dans le cadre avec le doigt, la souris ou un stylet.</p>
+                            <SignaturePad id="drawing" onChange={(uri) => setData('drawing', uri)} invalid={!!errors.drawing} />
+                            <InputError message={errors.drawing} />
+                        </div>
                         <div className="grid gap-2">
                             <Button type="button" variant="outline" onClick={askCode} disabled={sending}>
                                 {sending ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <Mail className="h-4 w-4" />}
@@ -89,7 +105,7 @@ export default function Signature({ state, organisme, title, signer, email, dead
                             />
                             <InputError message={errors.code} />
                         </div>
-                        <Button type="submit" disabled={processing || data.code.length !== 6}>
+                        <Button type="submit" disabled={processing || data.code.length !== 6 || data.drawing === ''}>
                             {processing ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <PenLine className="h-4 w-4" />}
                             Signer
                         </Button>

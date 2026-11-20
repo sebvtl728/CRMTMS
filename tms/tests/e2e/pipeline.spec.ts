@@ -195,8 +195,13 @@ test('phone: meeting report on a fiche without a planned meeting, 375 px wide', 
 
     // Let the visit settle (the menu link is prefetched, then visited): text typed earlier was sometimes lost.
     await page.waitForLoadState('networkidle');
-    await page.getByRole('searchbox', { name: 'Rechercher une entreprise ou une personne' }).fill('Traiteur des Alpes');
-    await page.getByRole('button', { name: new RegExp(`^${ENTREPRISE}`) }).click({ timeout: 15_000 });
+    // Typed again until a result shows: the prefetched page may still replace the field once.
+    const result = page.getByRole('button', { name: new RegExp(`^${ENTREPRISE}`) });
+    await expect(async () => {
+        await page.getByRole('searchbox', { name: 'Rechercher une entreprise ou une personne' }).fill('Traiteur des Alpes');
+        await expect(result).toBeVisible({ timeout: 4_000 });
+    }).toPass({ timeout: 20_000 });
+    await result.click();
     await page.getByRole('button', { name: 'Réussi', exact: true }).click();
     await page.getByLabel('Compte rendu', { exact: true }).fill('Rencontre sur place : le chef veut une session en mars.');
     await page.getByRole('button', { name: 'Enregistrer le compte rendu' }).click();

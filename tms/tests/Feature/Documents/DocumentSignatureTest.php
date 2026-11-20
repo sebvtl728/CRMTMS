@@ -1,9 +1,11 @@
 <?php
 
 use App\Exceptions\UserFacingHttpException;
+use App\Modules\Core\Documents\PdfSource;
 use App\Modules\Core\Signatures\SignatureMail;
 use App\Modules\Core\Signatures\SignatureRequest;
 use App\Modules\Core\Signatures\Signatures;
+use App\Modules\Core\Tenancy\TenantStorage;
 use App\Modules\Crm\Gdpr\Anonymiser;
 use App\Modules\Crm\People\Person;
 use App\Modules\Documents\DocumentIssuer;
@@ -13,7 +15,9 @@ use App\Modules\Documents\Permissions;
 use App\Modules\Documents\Texts\DocumentType;
 use App\Modules\Sessions\Dossiers\DossierStatus;
 use Carbon\CarbonImmutable;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\Storage;
 use Inertia\Testing\AssertableInertia as Assert;
 
 require_once __DIR__.'/Support/documents.php';
@@ -32,7 +36,7 @@ function docSign(SignatureRequest $request): SignatureRequest
     app(Signatures::class)->sendCode($request);
     preg_match('/\b(\d{6})\b/', Mail::sent(SignatureMail::class)->last()->text, $m);
 
-    return app(Signatures::class)->sign($request->fresh(), $m[1], '203.0.113.7', 'Firefox');
+    return app(Signatures::class)->sign($request->fresh(), $m[1], sigDrawing(), '203.0.113.7', 'Firefox');
 }
 
 it('asks the contact to sign the convention; once signed the document and the dossier say so', function () {
@@ -92,5 +96,39 @@ it('erases the signer of an anonymised person', function () {
 
     expect($request->fresh()->only(['signer_name', 'signer_email', 'signed_ip', 'signed_user_agent']))
         ->toBe(['signer_name' => null, 'signer_email' => null, 'signed_ip' => null, 'signed_user_agent' => null])
-        ->and($request->fresh()->status)->toBe('signed');
+        ->and($request->fresh()->status)->toBe('signed')
+        ->and($request->fresh()->drawing_path)->toBeNull()
+        ->and(Storage::disk(TenantStorage::DISK)->exists($request->drawing_path))->toBeFalse();
+});
+
+it('keeps the exact HTML of a convention or a contract, and signs it with the drawing in the contractor box', function () {
+    $doc = app(DocumentIssuer::class)->issue(admin(), DocumentType::Convention, docCompanyDossier()->id);
+    $disk = Storage::disk(TenantStorage::DISK);
+    $source = PdfSource::parse((string) $disk->get(PdfSource::pathFor($doc->pdf_path)));
+    expect($source?->hasSlot())->toBeTrue()->and($source->html)->toContain($doc->number, 'Lu et approuvé')
+        ->and($source->footer)->toContain($doc->number);
+
+    $request = app(DocumentSignatures::class)->request(admin(), $doc, 'claire.martin@hotel-parc.test');
+    $signed = docSign($request);
+
+    expect($signed->source_sha256)->not->toBeNull()
+        ->and(docSentHtml())->toContain('Preuve de signature');
+    $pages = [];
+    Http::assertSent(function ($r) use (&$pages) {
+        foreach ($r->data() as $part) {
+            if (($part['filename'] ?? null) === 'index.html') {
+                $pages[] = (string) $part['contents'];
+            }
+        }
+
+        return true;
+    });
+    expect(collect($pages)->first(fn ($p) => str_contains($p, 'Signé électroniquement le 19/11/2026 par Claire Martin')))
+        ->toContain($doc->number, 'data:image/png;base64,');
+});
+
+it('keeps no source for a document that is not signed (a convocation)', function () {
+    $doc = app(DocumentIssuer::class)->issueForEnrolment(admin(), DocumentType::Convocation, docFinishedSession()['lea']->id);
+
+    expect(Storage::disk(TenantStorage::DISK)->exists(PdfSource::pathFor($doc->pdf_path)))->toBeFalse();
 });
