@@ -88,7 +88,7 @@ it('lets a trainee pick his name on the session QR page, then answer through a s
     $this->post("/questionnaire/{$tokens['Petit']}", svAnswers());
 
     $this->get("/questionnaire/s/{$qr}")->assertOk()->assertInertia(fn (AssertableInertia $page) => $page
-        ->component('public/survey-who')->where('people', fn ($people) => collect($people)->pluck('name')->all() === ['Alex R.', 'Léa D.']));
+        ->component('public/survey-who')->where('trainees', fn ($list) => collect($list)->pluck('name')->all() === ['Alex R.', 'Léa D.']));
 
     $lea = SurveyInvitation::query()->where('person_id', $people['Durand']->id)->sole();
     $response = $this->post("/questionnaire/s/{$qr}", ['invitation_id' => $lea->id]);

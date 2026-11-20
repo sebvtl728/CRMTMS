@@ -5,7 +5,7 @@ interface Props {
     organisme: string;
     title: string;
     session: string;
-    people: { id: string; name: string }[];
+    trainees: { id: string; name: string }[];
 }
 
 /**
@@ -16,11 +16,11 @@ export default function SurveyWho({ organisme, title, session, people }: Props) 
     return (
         <AuthLayout title={title} description={`Session ${session}${organisme ? ` - ${organisme}` : ''}. Qui êtes-vous ?`}>
             <Head title="Questionnaire" />
-            {people.length === 0 ? (
+            {trainees.length === 0 ? (
                 <p className="text-sm">Tous les stagiaires ont répondu. Merci !</p>
             ) : (
                 <ul className="grid gap-2">
-                    {people.map((p) => (
+                    {trainees.map((p) => (
                         <li key={p.id}>
                             <button
                                 type="button"

@@ -52,7 +52,7 @@ class SurveyAnswerController extends Controller
             'organisme' => $this->organisme(),
             'title' => $campaign->title,
             'session' => (string) (Surveys::session($campaign->training_session_id)['label'] ?? ''),
-            'people' => SurveyAnswers::waiting($campaign),
+            'trainees' => SurveyAnswers::waiting($campaign),
         ])->toResponse($request);
     }
 
