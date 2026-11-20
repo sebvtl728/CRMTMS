@@ -146,17 +146,22 @@ final class EnrolmentRows
         // His planning: next séances and placements of each enrolment.
         $planning = TraineePlanning::details($enrolments, TrainingSession::today());
 
+        $today = TrainingSession::today()->toDateString();
+
         return [
             'title' => 'Formations suivies',
             'empty' => 'Aucune inscription à une session.',
-            'rows' => $enrolments->map(function (Enrolment $e) use ($trainings, $planning): array {
+            'rows' => $enrolments->map(function (Enrolment $e) use ($trainings, $planning, $today): array {
                 $s = $e->session;
+                // Lot 1e: the end of a training over, and its satisfaction (questionnaires: 0.11).
+                $over = $s !== null && $e->left_on === null && ! $s->isCancelled() && $s->ends_on->toDateString() < $today
+                    ? "Terminée le {$s->ends_on->format('d/m/Y')} · Satisfaction : -" : null;
 
                 return [
                     'id' => $e->id,
                     'title' => $s === null ? 'Session introuvable' : ($s->title ?? $trainings[$s->training_id]->title ?? 'Formation introuvable'),
                     'subtitle' => $s === null ? null : "Session {$s->number} · du {$s->starts_on->format('d/m/Y')} au {$s->ends_on->format('d/m/Y')}",
-                    'meta' => $e->left_on === null ? null : "Sortie le {$e->left_on->format('d/m/Y')}",
+                    'meta' => $e->left_on === null ? $over : "Sortie le {$e->left_on->format('d/m/Y')}",
                     'badge' => $s?->isCancelled() ? 'Session annulée' : $e->status->label(),
                     'href' => $s === null ? null : route('sessions.show', $s->id, false),
                     'details' => $planning[$e->id] ?? [],

@@ -33,7 +33,7 @@ it('masks every personal field on creation and deletion but keeps business field
     $person = makePerson('Durand', [
         'first_name' => 'Paul', 'email' => 'paul@example.org', 'email_secondary' => 'p2@example.org', 'phone' => '0612345678', 'mobile' => '0712345678',
         'address_line1' => '3 rue Secrète', 'address_line2' => 'Bât B', 'postal_code' => '69001', 'city' => 'Lyon',
-        'birth_date' => '1980-02-03', 'project' => 'Devenir sommelier', 'status' => 'client', 'is_individual' => true,
+        'birth_date' => '1980-02-03', 'project' => 'Devenir sommelier', 'future_needs' => 'Un BTS en 2027', 'status' => 'client', 'is_individual' => true,
     ]);
     $person->delete();
 

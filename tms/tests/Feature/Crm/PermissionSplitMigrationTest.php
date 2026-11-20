@@ -46,6 +46,8 @@ function scopesOfRole(Role $role): array
 function backTo042(): Tenant
 {
     $tenant = inTenant();
+    // A 0.4.2 organisme: the trainer's own actions (lot 1e) did not exist yet (down() would merge them into crm.view / crm.update).
+    RoleModel::query()->where('name', Role::Formateur->value)->sole()->revokePermissionTo(Scopes::TRAINER_OWN_EXTRAS);
     splitMigration()->down();
     Scopes::forget();
 
@@ -72,8 +74,10 @@ it('migration maps every default role', function () {
     Scopes::forget();
 
     foreach (Role::cases() as $role) {
+        // The trainer's own actions (lot 1e) are granted later by tms:permissions:sync, not by this 0.5.0 migration.
         $expected = collect(Permissions::defaultsFor($role))
-            ->filter(fn (string $p) => str_starts_with($p, 'crm.') || str_starts_with($p, 'catalogue.'))->sort()->values()->all();
+            ->filter(fn (string $p) => str_starts_with($p, 'crm.') || str_starts_with($p, 'catalogue.'))
+            ->reject(fn (string $p) => $role === Role::Formateur && in_array($p, Scopes::TRAINER_OWN_EXTRAS, true))->sort()->values()->all();
         expect(crmMatrix()[$role->value], $role->value)->toBe($expected)
             // Like a new organisme: the default scope of each scoped right the role holds.
             ->and(scopesOfRole($role), $role->value)->toEqualCanonicalizing(array_map(fn (AccessScope $s) => $s->value,

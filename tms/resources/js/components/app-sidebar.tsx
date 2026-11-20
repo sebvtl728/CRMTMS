@@ -25,6 +25,7 @@ import {
     Factory,
     FileSignature,
     FileText,
+    Gauge,
     GraduationCap,
     Handshake,
     History,
@@ -54,6 +55,8 @@ const commercialNavItems: (NavItem & { permission: string })[] = [
     { title: 'Devis', url: '/crm/quotes', icon: FileText, permission: 'crm.quotes.view' },
     { title: "Chiffre d'affaires", url: '/crm/revenue', icon: Euro, permission: 'crm.revenue.view' },
     { title: 'À faire', url: '/crm/todo', icon: CalendarCheck, permission: 'crm.activities.view' },
+    // Any CRM « Consulter » right (each card follows its own right).
+    { title: 'Tableaux de bord', url: '/crm/dashboards', icon: Gauge, permission: 'crm.any-view' },
     { title: 'Planning', url: '/crm/planning', icon: CalendarRange, permission: 'crm.activities.view' },
     { title: 'Compte rendu de RDV', url: '/crm/report', icon: ClipboardPen, permission: 'crm.activities.update' },
     { title: 'Catalogue', url: '/catalogue', icon: BookOpen, permission: 'catalogue.view' },
@@ -100,7 +103,8 @@ const adminNavItems: (NavItem & { permission: string })[] = [
     { title: 'Sécurité', url: '/admin/security', icon: ShieldCheck, permission: 'settings.manage' },
     { title: 'Champs personnalisés', url: '/admin/custom-fields', icon: SlidersHorizontal, permission: 'settings.manage' },
     { title: 'Sauvegardes', url: '/admin/backups', icon: DatabaseBackup, permission: 'settings.manage' },
-    { title: "Règle d'abandon", url: '/admin/abandon-rule', icon: UserMinus, permission: 'settings.manage' },
+    { title: "Règle d'abandon et suivi", url: '/admin/abandon-rule', icon: UserMinus, permission: 'settings.manage' },
+    { title: 'Réglages du CRM', url: '/admin/crm-settings', icon: Settings2, permission: 'settings.manage' },
     { title: 'Salles et fermetures', url: '/admin/sessions-settings', icon: DoorOpen, permission: 'sessions.rooms.manage' },
     { title: "Modèles d'e-mails", url: '/admin/mail-templates', icon: Mail, permission: 'settings.manage' },
     { title: 'Modèles de documents', url: '/admin/document-texts', icon: FileSignature, permission: 'settings.manage' },
@@ -108,8 +112,11 @@ const adminNavItems: (NavItem & { permission: string })[] = [
 
 export function AppSidebar() {
     const { auth, todo_count, backups_enabled, backup_alert } = usePage<SharedData>().props;
+    const crmViewer = ['crm.fiches.view', 'crm.opportunities.view', 'crm.quotes.view', 'crm.activities.view'].some((p) =>
+        auth.permissions.includes(p),
+    );
     const commercialItems = commercialNavItems
-        .filter((item) => auth.permissions.includes(item.permission))
+        .filter((item) => (item.permission === 'crm.any-view' ? crmViewer : auth.permissions.includes(item.permission)))
         .map((item) => (item.url === '/crm/todo' ? { ...item, badge: todo_count } : item));
     const trainingItems: NavItem[] = [
         ...(auth.my_planning ? [myPlanningItem] : []),
@@ -138,8 +145,8 @@ export function AppSidebar() {
 
             <SidebarContent>
                 {auth.trainer_only ? (
-                    // A trainer and nothing else: his planning only.
-                    <NavMain items={[myPlanningItem]} label="Navigation" />
+                    // A trainer and nothing else: his planning, and his follow-up calls when he holds them.
+                    <NavMain items={[myPlanningItem, ...commercialItems.filter((item) => item.url === '/crm/todo')]} label="Navigation" />
                 ) : (
                     <>
                         <NavMain items={homeNavItems} label="Navigation" />

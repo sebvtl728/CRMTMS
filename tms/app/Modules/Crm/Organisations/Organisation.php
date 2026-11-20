@@ -9,6 +9,7 @@ use App\Modules\Core\Users\User;
 use App\Modules\Crm\Activities\CalendarAnnouncements;
 use App\Modules\Crm\Affiliations\Affiliation;
 use App\Modules\Crm\Interests\FicheTraining;
+use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Model;
@@ -32,6 +33,9 @@ use Illuminate\Support\Facades\Auth;
  * @property string|null $establishment_type_id
  * @property string|null $company_size_id
  * @property string|null $origin_id
+ * @property string|null $future_needs
+ * @property CarbonImmutable|null $future_needs_updated_at
+ * @property string|null $future_needs_updated_by
  * @property OrganisationStatus $status
  * @property string|null $responsible_user_id
  * @property string|null $email
@@ -114,6 +118,7 @@ class Organisation extends Model
     protected function casts(): array
     {
         return [
+            'future_needs_updated_at' => 'immutable_datetime',
             'status' => OrganisationStatus::class,
             'last_contact_at' => 'datetime',
             'merged_sources' => 'array',
@@ -209,5 +214,15 @@ class Organisation extends Model
         }
 
         return $query;
+    }
+
+    /**
+     * Author of the last change of « Besoins futurs » (lot 1e).
+     *
+     * @return BelongsTo<User, $this>
+     */
+    public function futureNeedsAuthor(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'future_needs_updated_by');
     }
 }

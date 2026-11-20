@@ -69,12 +69,13 @@ it('gives the Formateur his séances and their attendance only, on « Ses séanc
     $formateur = userWithRole(Role::Formateur);
     $granted = RoleModel::forSystem(Role::Formateur)->permissions()->pluck('name')->sort()->values()->all();
 
-    expect($granted)->toBe(['sessions.attendance.manage', 'sessions.seances.view'])
+    // Lot 1e: his own actions too (the follow-up calls), on « Ses fiches ».
+    expect($granted)->toBe(['crm.activities.update', 'crm.activities.view', 'sessions.attendance.manage', 'sessions.seances.view'])
         ->and(Scopes::of($formateur, Permissions::SEANCES_VIEW))->toBe(AccessScope::Trainer)
         ->and(Scopes::of($formateur, Permissions::ATTENDANCE_MANAGE))->toBe(AccessScope::Trainer);
 
     foreach (CorePermissions::all() as $permission) {
-        if (str_starts_with($permission, 'crm.') || str_starts_with($permission, 'catalogue.') || $permission === CorePermissions::EXPORTS_RUN
+        if ((str_starts_with($permission, 'crm.') && ! in_array($permission, Scopes::TRAINER_OWN_EXTRAS, true)) || str_starts_with($permission, 'catalogue.') || $permission === CorePermissions::EXPORTS_RUN
             || str_starts_with($permission, 'sessions.dossiers.') || str_starts_with($permission, 'sessions.sessions.')) {
             expect($formateur->can($permission), $permission)->toBeFalse();
         }
@@ -172,7 +173,7 @@ it('reduces the navigation of a trainer-only user to « Mon planning »', functi
     $this->actingAs($formateur)->get('/dashboard')->assertRedirect('/mon-planning');
     $this->actingAs($formateur)->get('/mon-planning')->assertInertia(fn (Assert $page) => $page
         ->where('auth.trainer_only', true)
-        ->where('auth.permissions', [Permissions::SEANCES_VIEW, Permissions::ATTENDANCE_MANAGE]));
+        ->where('auth.permissions', fn ($held) => collect($held)->sort()->values()->all() === ['crm.activities.update', 'crm.activities.view', Permissions::ATTENDANCE_MANAGE, Permissions::SEANCES_VIEW]));
 
     $this->actingAs(commercial())->get('/dashboard')->assertOk()->assertInertia(fn (Assert $page) => $page->where('auth.trainer_only', false));
 });
@@ -215,7 +216,7 @@ it('creates the Formateur role and offers the planning rights to an existing org
     expect(planningMatrix($tenant))->toBe($fresh)
         ->and($fresh['formateur'])->toBe(['sessions.attendance.manage', 'sessions.seances.view'])
         ->and(app(TenantContext::class)->run($tenant, fn () => DB::table(Scopes::TABLE)->where('role_id', RoleModel::forSystem(Role::Formateur)->id)->pluck('scope', 'permission')->sortKeys()->all()))
-        ->toBe(['sessions.attendance.manage' => 'trainer', 'sessions.seances.view' => 'trainer']);
+        ->toBe(['crm.activities.update' => 'own', 'crm.activities.view' => 'own', 'sessions.attendance.manage' => 'trainer', 'sessions.seances.view' => 'trainer']);
 
     // A right an administrator revoked stays revoked on the next sync.
     app(TenantContext::class)->run($tenant, fn () => RoleModel::forSystem(Role::Commercial)->revokePermissionTo(Permissions::ROOMS_MANAGE));

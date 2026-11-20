@@ -3,6 +3,7 @@
 use App\Modules\Crm\Affiliations\AffiliationController;
 use App\Modules\Crm\Duplicates\MergeController;
 use App\Modules\Crm\Export\ExportController;
+use App\Modules\Crm\FutureNeeds\FutureNeedsController;
 use App\Modules\Crm\Gdpr\GdprController;
 use App\Modules\Crm\Gdpr\PersonGdprController;
 use App\Modules\Crm\Interests\FicheTrainingController;
@@ -38,6 +39,8 @@ Route::middleware(['auth'])->group(function () {
     // « Formations d'intérêt » of a fiche (same right as editing it).
     Route::put('crm/organisations/{organisation}/trainings', [FicheTrainingController::class, 'organisation'])->middleware('can:crm.fiches.update')->name('crm.organisations.trainings.update');
     Route::put('crm/people/{person}/trainings', [FicheTrainingController::class, 'person'])->middleware('can:crm.fiches.update')->name('crm.people.trainings.update');
+    Route::put('crm/organisations/{organisation}/future-needs', [FutureNeedsController::class, 'organisation'])->middleware('can:crm.fiches.update')->name('crm.organisations.future-needs');
+    Route::put('crm/people/{person}/future-needs', [FutureNeedsController::class, 'person'])->middleware('can:crm.fiches.update')->name('crm.people.future-needs');
 
     // Historique: feed, notes and attachments of a fiche.
     Route::get('crm/organisations/{organisation}/timeline', [TimelineController::class, 'organisation'])->middleware('can:crm.fiches.view')->name('crm.organisations.timeline');

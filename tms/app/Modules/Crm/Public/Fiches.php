@@ -3,6 +3,7 @@
 namespace App\Modules\Crm\Public;
 
 use App\Modules\Core\Users\User;
+use App\Modules\Crm\Opportunities\Opportunity;
 use App\Modules\Crm\Organisations\Organisation;
 use App\Modules\Crm\Organisations\OrganisationStatus;
 use App\Modules\Crm\People\Person;
@@ -254,5 +255,50 @@ final class Fiches
             ->get(['id', 'name', 'siret'])
             ->map(fn (Organisation $o): array => ['id' => $o->id, 'label' => $o->name, 'siret' => $o->siret])
             ->values()->all();
+    }
+
+    /**
+     * The responsible user of a live fiche (not trashed, not anonymised),
+     * active; null otherwise (lot 1e: who receives its reactivation call).
+     *
+     * @param  'organisation'|'person'  $type
+     */
+    public function responsibleUser(string $type, string $id): ?string
+    {
+        $fiche = $type === 'organisation' ? Organisation::query()->find($id) : Person::query()->whereNull('anonymised_at')->find($id);
+        $userId = $fiche?->responsible_user_id;
+
+        return $userId !== null && User::query()->whereKey($userId)->whereNull('deactivated_at')->exists() ? $userId : null;
+    }
+
+    /**
+     * The fiche is the account of an open opportunity (neither won nor lost,
+     * not in the trash): a client already buying again (lot 1e).
+     *
+     * @param  'organisation'|'person'  $type
+     */
+    public function hasOpenOpportunity(string $type, string $id): bool
+    {
+        return Opportunity::query()->where($type === 'organisation' ? 'organisation_id' : 'person_id', $id)
+            ->whereNull('won_on')->whereNull('lost_on')->exists();
+    }
+
+    /**
+     * Responsible user of each fiche (trashed ones included), keyed by id;
+     * unknown ids are left out (lot 1e: the dashboards' commercial filter).
+     *
+     * @param  'organisation'|'person'  $type
+     * @param  list<string>  $ids
+     * @return array<string, string|null>
+     */
+    public function responsibleUsers(string $type, array $ids): array
+    {
+        $ids = array_values(array_unique(array_filter($ids, fn (string $id) => Str::isUuid($id))));
+        if ($ids === []) {
+            return [];
+        }
+        $query = $type === 'organisation' ? Organisation::withTrashed() : Person::withTrashed();
+
+        return $query->whereKey($ids)->pluck('responsible_user_id', 'id')->all();
     }
 }

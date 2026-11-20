@@ -456,6 +456,35 @@ Cliquez sur un DAS pour ouvrir le détail (devis et opportunités, au centime, a
 
 Avec le périmètre « Ses fiches », le tableau ne compte que vos devis et vos opportunités, sans objectif. L'accueil affiche la carte « CA signé » du mois dans votre périmètre.
 
+## 13 ter. Tableaux de bord, rappels et besoins futurs (lot 1e)
+
+**Tableaux de bord** (menu Commercial › Tableaux de bord, avec n'importe quel droit « Consulter » du CRM ; lien aussi sur
+l'accueil). Deux vues, mêmes filtres (période : cette semaine, semaine dernière, ce mois, mois dernier, ce trimestre,
+cette année ou dates libres ; DAS ; cible entreprises / particuliers ; commercial) :
+
+- **Semaine** (réunion commerciale) : appels faits, rendez-vous fixés, taux de réponse, nouveaux leads, pipeline pondéré,
+  opportunités à clôturer, devis envoyés et acceptés ;
+- **Mois / direction** : CA signé par DAS et objectifs, taux de conversion, CA prévisionnel, durée du cycle de vente
+  (moyenne et médiane), formations vendues, entreprises / particuliers, origine des leads, motifs de perte, taux de
+  rétention (clients ayant au moins deux dossiers sur la fenêtre glissante) et réachats.
+
+Chaque carte montre sa **formule**, la valeur de la **période précédente** et l'écart, et « Voir le détail » ouvre la liste
+qui la compose. Chaque carte suit le périmètre de son droit : un commercial sur « ses fiches » ne compte que les siennes.
+« CA signé » suit la règle de l'écran Chiffre d'affaires (devis accepté, sinon opportunité gagnée sans devis, jamais deux
+fois). Le taux de réponse compte les appels dont le résultat est marqué « Compte comme joint » (Administration ›
+Référentiels › Résultats d'action ; « Réussi » par défaut). Un lead est une fiche dont une opportunité atteint pour la
+première fois l'étape choisie dans les réglages du CRM (« Contacté » par défaut). Exports : **Excel (CSV)** et **PDF**
+(droit « Exporter », journalisés). Le filtre DAS ne s'applique pas aux cartes d'actions (une action n'a pas de DAS).
+
+**Rappels de réactivation** : chaque matin, une action « Appel » est créée **6 et 12 mois** (réglables, Administration ›
+Réglages du CRM) après la fin d'un dossier, sur la fiche du client (l'entreprise, ou le particulier), pour le **responsable
+de la fiche** (à défaut, celui du dossier). Aucun rappel si le client a déjà une opportunité ouverte ou un dossier plus
+récent ; jamais deux fois le même rappel. Le **suivi formateur** à 3 mois est décrit dans `sessions.md` § 11.
+
+**Besoins futurs** : carte de la fiche entreprise ou personne, texte libre (2000 caractères) avec la date et l'auteur de
+la dernière mise à jour ; modifiable avec le droit de modifier la fiche ; effacé par l'anonymisation d'une personne et
+présent dans son export RGPD.
+
 ## 14. Utilisateurs et droits (administrateur)
 
 Le menu **Administration › Utilisateurs** permet à l'administrateur de l'organisme d'**inviter** des collègues, de **changer leur rôle**, de **désactiver** / **réactiver** un compte, de **renvoyer** ou **révoquer** une invitation et d'attribuer les **DAS suivis** à un Responsable de DAS. Un organisme garde toujours au moins un administrateur actif. L'administrateur règle aussi les **droits par domaine et leur périmètre** (« Ses fiches », « Ses DAS », « Tout l'organisme ») et crée des **rôles personnalisés** dans **Administration › Rôles et droits** ; tout est détaillé dans `admin.md` (§ 10). Avec « Ses fiches », vous ne voyez et ne modifiez que les fiches, opportunités et actions dont vous êtes le responsable ou le créateur.

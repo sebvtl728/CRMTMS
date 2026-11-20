@@ -25,6 +25,7 @@ use App\Modules\Sessions\Attendance\Attendances;
 use App\Modules\Sessions\Attendance\AttendanceSheetScan;
 use App\Modules\Sessions\Attendance\Closures;
 use App\Modules\Sessions\Attendance\MonthlyHour;
+use App\Modules\Sessions\Dashboard\Retention;
 use App\Modules\Sessions\Dossiers\Dossier;
 use App\Modules\Sessions\Dossiers\DossierFromQuote;
 use App\Modules\Sessions\Dossiers\DossierLine;
@@ -120,6 +121,8 @@ class SessionsServiceProvider extends ServiceProvider
 
     public function boot(): void
     {
+        // Lot 1e: the retention card of the CRM dashboards.
+        Retention::register();
         self::registerReferenceUsage();
         self::registerTrainingUsage();
         self::registerFicheBlocks();

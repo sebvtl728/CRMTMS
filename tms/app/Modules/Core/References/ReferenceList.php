@@ -86,6 +86,15 @@ enum ReferenceList: string
     }
 
     /**
+     * Action results carry a « joint » flag (meta.reached, lot 1e): a call
+     * done with such a result counts as answered in the dashboards.
+     */
+    public function hasReached(): bool
+    {
+        return $this === self::ActionResult;
+    }
+
+    /**
      * Abandon reasons carry a « force majeure » flag (meta.force_majeure):
      * a force majeure abandon never costs a dédit (spec lot 2a § 5.6).
      */

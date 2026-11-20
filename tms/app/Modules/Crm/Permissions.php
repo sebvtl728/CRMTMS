@@ -182,8 +182,8 @@ final class Permissions
             // Removing an action was part of « Modifier » before 0.5.0.
             Role::Assistant => [...$views, ...$updates, self::ACTIVITIES_DELETE],
             Role::ResponsableDas => [...$views, self::REVENUE_VIEW, self::EXPORT],
-            // A trainer reaches his séances only, never the CRM.
-            Role::Formateur => [],
+            // A trainer reaches his séances, and his own actions (the follow-up calls, lot 1e): never the fiches.
+            Role::Formateur => [self::ACTIVITIES_VIEW, self::ACTIVITIES_UPDATE],
         };
     }
 
@@ -198,6 +198,7 @@ final class Permissions
         return match ($role) {
             Role::Commercial, Role::ChargeRelations => [self::REVENUE_VIEW => AccessScope::Own],
             Role::ResponsableDas => array_fill_keys(self::scoped(), AccessScope::Das),
+            Role::Formateur => [self::ACTIVITIES_VIEW => AccessScope::Own, self::ACTIVITIES_UPDATE => AccessScope::Own],
             default => [],
         };
     }
