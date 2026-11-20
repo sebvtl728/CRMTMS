@@ -31,6 +31,12 @@ enum DocumentType: string
         return in_array($this, [self::Convocation, self::CompletionCertificate, self::RealisationCertificate], true);
     }
 
+    /** Signed by its recipient, online too (convention, contract). */
+    public function signable(): bool
+    {
+        return in_array($this, [self::Convention, self::Contract], true);
+    }
+
     /** The organisme may adapt its texts (never the ministry's certificate). */
     public function editable(): bool
     {

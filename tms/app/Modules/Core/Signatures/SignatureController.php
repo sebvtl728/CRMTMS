@@ -67,10 +67,10 @@ class SignatureController extends Controller
     {
         $signature = Signatures::find($token) ?? abort(404);
         $request->validate(
-            ['accept' => ['accepted'], 'code' => ['required', 'string', 'max:12']],
-            ['accept.accepted' => 'Cochez la case pour confirmer que vous avez lu et acceptez le document.', 'code.required' => 'Saisissez le code reçu par e-mail.'],
+            ['accept' => ['accepted'], 'drawing' => ['required', 'string'], 'code' => ['required', 'string', 'max:12']],
+            ['accept.accepted' => 'Cochez la case pour confirmer que vous avez lu et acceptez le document.', 'drawing.required' => SignatureDrawing::MESSAGE, 'code.required' => 'Saisissez le code reçu par e-mail.'],
         );
-        $signatures->sign($signature, (string) $request->input('code'), (string) $request->ip(), (string) $request->userAgent());
+        $signatures->sign($signature, (string) $request->input('code'), (string) $request->input('drawing'), (string) $request->ip(), (string) $request->userAgent());
 
         return redirect('/signature/'.$token)->with('status', 'Merci, votre signature est enregistrée. Une copie du document signé vous a été envoyée.');
     }

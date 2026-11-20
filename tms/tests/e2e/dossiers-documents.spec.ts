@@ -70,6 +70,15 @@ test('convention: issued from the dossier, previewed, sent, then cancelled with 
     const signerPage = await signer.newPage();
     await signerPage.goto(`/signature/${token}`);
     await signerPage.getByLabel("J'ai lu le document et j'accepte de le signer électroniquement.").check();
+    // The drawn signature (mandatory): a stroke across the box.
+    const pad = await signerPage.getByLabel('Cadre de signature : dessinez votre signature').boundingBox();
+    if (!pad) throw new Error('signature box not found');
+    await signerPage.mouse.move(pad.x + 20, pad.y + pad.height * 0.7);
+    await signerPage.mouse.down();
+    for (let i = 1; i <= 30; i++) {
+        await signerPage.mouse.move(pad.x + 20 + i * ((pad.width - 40) / 30), pad.y + pad.height * (0.7 - 0.4 * Math.sin((i / 30) * Math.PI)));
+    }
+    await signerPage.mouse.up();
     await signerPage.getByRole('button', { name: 'Recevoir mon code par e-mail' }).click();
     await expect(signerPage.getByText(/Code envoyé à/)).toBeVisible();
     await signerPage.getByLabel('Code à 6 chiffres').fill(lastInMails(/code de signature[^0-9]*(\d{6})/i));

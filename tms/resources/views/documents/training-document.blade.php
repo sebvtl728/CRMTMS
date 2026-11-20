@@ -130,6 +130,7 @@
     <div>
         <div><strong>{{ $partyLabel }}</strong></div>
         <div class="muted small">Date, signature, précédées de la mention « Lu et approuvé »</div>
+        <div class="signature-slot"></div>
     </div>
 </div>
 

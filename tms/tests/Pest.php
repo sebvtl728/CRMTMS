@@ -446,3 +446,26 @@ function quoteMessage(array $overrides = []): array
         ...$overrides,
     ];
 }
+
+/*
+|--------------------------------------------------------------------------
+| Online signature helpers
+|--------------------------------------------------------------------------
+*/
+
+/** A drawn signature as the signature page sends it: a PNG data URI (a line on a transparent canvas, or blank). */
+function sigDrawing(bool $blank = false, int $width = 600, int $height = 200): string
+{
+    $image = imagecreatetruecolor($width, $height);
+    imagesavealpha($image, true);
+    imagefill($image, 0, 0, imagecolorallocatealpha($image, 0, 0, 0, 127));
+    if (! $blank) {
+        imagesetthickness($image, 3);
+        imageline($image, 20, 150, 280, 40, imagecolorallocate($image, 20, 30, 60));
+        imageline($image, 280, 40, 560, 160, imagecolorallocate($image, 20, 30, 60));
+    }
+    ob_start();
+    imagepng($image);
+
+    return 'data:image/png;base64,'.base64_encode((string) ob_get_clean());
+}
