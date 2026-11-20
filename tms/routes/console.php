@@ -30,3 +30,6 @@ Schedule::command('tms:finance:remind')->dailyAt('08:30')->timezone('Europe/Pari
 
 // Lot 1e: the trainer's follow-up calls and the reactivation calls due today.
 Schedule::command('tms:sessions:follow-ups')->dailyAt('06:30')->timezone('Europe/Paris')->withoutOverlapping()->onOneServer();
+
+// 0.11: the hot questionnaires nobody launched and the cold ones due today.
+Schedule::command('tms:questionnaires:daily')->dailyAt('07:00')->timezone('Europe/Paris')->withoutOverlapping()->onOneServer();
