@@ -3,6 +3,7 @@
 use App\Modules\Core\Access\AccessScope;
 use App\Modules\Core\References\ReferenceList;
 use App\Modules\Core\Users\User;
+use App\Modules\Sessions\Attendance\Closures;
 use App\Modules\Sessions\Permissions;
 use App\Modules\Sessions\Sessions\SessionBoard;
 use App\Modules\Sessions\Sessions\SessionListQuery;
@@ -198,7 +199,7 @@ it('shows a session done on its last day once its last month is closed', functio
     expect($session->refresh()->effectiveStatus($today))->toBe(SessionStatus::Running)
         ->and($ids('running'))->toContain($session->id)->and($ids('done'))->not->toContain($session->id);
 
-    app(App\Modules\Sessions\Attendance\Closures::class)->close($session, '2026-11');
+    app(Closures::class)->close($session, '2026-11');
 
     expect($session->refresh()->effectiveStatus($today))->toBe(SessionStatus::Done)
         ->and($ids('done'))->toContain($session->id)->and($ids('running'))->not->toContain($session->id);

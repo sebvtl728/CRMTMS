@@ -2,10 +2,10 @@
 
 namespace App\Modules\Sessions\Sessions;
 
-use App\Modules\Sessions\Attendance\AttendanceClosure;
 use App\Modules\Core\Audit\Auditable;
 use App\Modules\Core\Tenancy\BelongsToTenant;
 use App\Modules\Core\Users\User;
+use App\Modules\Sessions\Attendance\AttendanceClosure;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Model;
