@@ -66,3 +66,13 @@ it('never issues for a cancelled enrolment, a cancelled session, or a per-dossie
         ->toThrow(UserFacingHttpException::class, 'Ce stagiaire n\'est pas inscrit : aucun document ne peut être émis.');
     expect(fn () => $issuer->issueForEnrolment(admin(), DocumentType::Convention, $x['lea']->id))->toThrow(InvalidArgumentException::class);
 });
+
+it('issues the attestation and the certificate on the last day of the training', function () {
+    $dossier = l2Dossier();
+    $session = l2Session(null, ['starts_on' => '2026-11-16', 'ends_on' => '2026-11-19', 'planned_hours' => '28']);
+    $lea = l2Enrol($dossier, $session, makePerson('Durand', ['first_name' => 'Léa']));
+    $issuer = app(DocumentIssuer::class);
+
+    expect($issuer->issueForEnrolment(admin(), DocumentType::CompletionCertificate, $lea->id)->type)->toBe('completion_certificate')
+        ->and($issuer->issueForEnrolment(admin(), DocumentType::RealisationCertificate, $lea->id)->type)->toBe('realisation_certificate');
+});

@@ -223,6 +223,8 @@ it('refuses to change who pays directly, or to trash the dossier, once a plan is
 
     expect(fn () => app(DossierWriter::class)->trash($dossier))->toThrow(UserFacingHttpException::class, BillingPlans::HAS_INVOICES)
         ->and($dossier->fresh()->trashed())->toBeFalse();
+    // The page offers no « Mettre à la corbeille » for it.
+    $this->actingAs(admin(twoFactor: true))->get("/dossiers/{$dossier->id}")->assertInertia(fn (Assert $p) => $p->where('can.delete', false));
 
     $free = l2Dossier();
     app(DossierWriter::class)->trash($free);
