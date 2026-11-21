@@ -764,6 +764,22 @@ Permissions : `documents.view`, `documents.manage` (à périmètre, celui du dos
 
 Permissions : `qualite.view`, `qualite.manage` (sans périmètre ; défauts : administrateur et direction).
 
+## Module Questionnaires (0.11)
+
+### `survey_templates` — modèles de questionnaires
+`name` · `kind` (`hot`, `cold`, CHECK) · `audience` (`trainee`, `client`, CHECK) · `questions` (jsonb : `id`, `type` `rating|choice|text`, `label`, `required`, `options`) · `active` · `is_default` (un seul par organisme, type et destinataires : index unique partiel hors corbeille) · `created_by`, `updated_by` · suppression logique. Créés au premier usage (`DefaultTemplates`).
+
+### `survey_campaigns` — questionnaire d'une session
+`training_session_id` · `template_id` (null si modèle supprimé) · `kind`, `audience` · unique (`tenant_id`, `training_session_id`, `kind`, `audience`) · `title` · `questions` (copie figée) · `qr_token_hash` (sha256 du lien QR, à chaud stagiaires seulement), `qr_token_encrypted` (jeton chiffré, pour réafficher le QR) · `opened_at` · `closes_on` (lancement + 30 jours, Paris) · `launched_by` (null = automatique).
+
+### `survey_invitations` — destinataires
+`campaign_id` · `enrolment_id` (stagiaire ; null pour un contact entreprise) · `person_id` · unique (`campaign_id`, `person_id`) · `email` (effacé par l'anonymisation) · `token_hash` (sha256 du lien personnel, unique ; le jeton en clair ne vit que dans la charge chiffrée du job) · `email_status` (`pending`, `sent`, `failed`, `none` = sans adresse) · `email_error` (motif fixe) · `sent_at` · `answered_at`, `answered_via` (`email`, `qr`). Non journalisée.
+
+### `survey_responses` — réponses
+`invitation_id` (unique) · `answers` (jsonb : id de question → note, choix ou texte ; textes effacés par l'anonymisation) · `score` (moyenne des notes × 100, 100–500, null sans note) · `submitted_at`. Non journalisée.
+
+Permissions : `questionnaires.view`, `questionnaires.manage` (sans périmètre). Lancer et lire le bloc d'une session suivent les droits de la session.
+
 ## Permissions CRM (catalogue global `permissions`)
 
 CRM : `crm.fiches.view|update|delete`, `crm.opportunities.view|update|delete`, `crm.quotes.view|update|delete`, `crm.activities.view|update|delete`, `crm.activities.team`, `crm.revenue.view`, `crm.revenue.manage`, `crm.merge`, `crm.import`, `crm.export`, `crm.gdpr` ; catalogue : `catalogue.view`, `catalogue.manage`, `catalogue.delete`. Les anciens `crm.view|create|update|delete` sont supprimés par la migration 0.5.0 (convertis organisme par organisme). La matrice par rôle est dans `admin.md`. `role_permission_defaults_applied` (`tenant_id`, `role`, `permission`) mémorise les droits par défaut déjà accordés à chaque organisme, pour qu'une mise à jour n'ajoute que les nouveaux droits sans rétablir ceux qu'un administrateur a retirés. `role_permission_scopes` (`tenant_id`, `role_id`, `permission`, `scope` = `own`/`das`/`all`/`trainer`) : périmètre d'un rôle pour un droit à périmètre ; sans ligne, le périmètre vaut `all` ; `trainer` (« Ses séances », 0.8.0) n'est accepté que pour `sessions.seances.view` et `sessions.attendance.manage`.

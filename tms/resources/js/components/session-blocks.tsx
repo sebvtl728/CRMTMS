@@ -1,4 +1,5 @@
 import { SessionDocumentsBlock } from '@/components/documents/session-documents-block';
+import { SessionSurveysBlock } from '@/components/questionnaires/session-surveys-block';
 import { type ComponentType } from 'react';
 
 /** A block another module adds to a session page (Sessions\Public\SessionBlocks). */
@@ -13,6 +14,7 @@ export interface SessionBlock {
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const COMPONENTS: Record<string, ComponentType<any>> = {
     'documents.session': SessionDocumentsBlock,
+    'questionnaires.session': SessionSurveysBlock,
 };
 
 /** The blocks of the session page, each under its title (anchor = last part of its key: #documents). */

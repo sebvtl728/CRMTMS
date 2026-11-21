@@ -38,4 +38,5 @@ require __DIR__.'/finance.php';
 require __DIR__.'/admissions.php';
 require __DIR__.'/qualite.php';
 require __DIR__.'/documents.php';
+require __DIR__.'/questionnaires.php';
 require __DIR__.'/signatures.php';

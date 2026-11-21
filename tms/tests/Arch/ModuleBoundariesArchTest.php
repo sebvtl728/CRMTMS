@@ -458,3 +458,62 @@ it('detects every way Documents could reach another module beyond its public ser
         expect(preg_match(DOCUMENTS_FOREIGN_REFERENCE, $code), $code)->toBe(0);
     }
 });
+
+// ---------------------------------------------------------------- Questionnaires (0.11)
+
+const QUESTIONNAIRES_TABLES = '/[\'"`](?:public\.)?(?:survey_templates|survey_campaigns|survey_invitations|survey_responses)(?:[\'"`.]|\s+as\b)'
+    .'|\b(?:exists|unique):(?:public\.)?(?:survey_templates|survey_campaigns|survey_invitations|survey_responses)\b'
+    .'|\b(?:from|join|into|update)\s+(?:public\.)?["`]?(?:survey_templates|survey_campaigns|survey_invitations|survey_responses)\b/i';
+
+it('keeps every other module free of any reference to the Questionnaires module and its tables', function () {
+    foreach (['Sessions', 'Crm', 'Catalogue', 'Core', 'Connectors', 'Finance', 'Admissions', 'Qualite', 'Documents'] as $module) {
+        expect(moduleFilesMatching($module, '/App\\\\Modules\\\\Questionnaires\\\\|App\\\\Modules\\\\\{[^}]*\bQuestionnaires\\\\/'), $module)->toBe([])
+            ->and(moduleFilesMatching($module, QUESTIONNAIRES_TABLES), $module)->toBe([]);
+    }
+});
+
+/**
+ * A reference to another module than Questionnaires and Core beyond their
+ * public services: Sessions\Public, Crm\Public, Qualite\Public, the
+ * catalogue's Trainings and the four connector classes an e-mail needs.
+ */
+const QUESTIONNAIRES_FOREIGN_REFERENCE = '/App\\\\Modules\\\\(?!(?:Questionnaires|Core)\b|Sessions\\\\Public\b|Crm\\\\Public\b|Qualite\\\\Public\b|Catalogue\\\\Trainings\b|Connectors\\\\(?:Smtp\\\\(?:TenantMailer|SmtpHostRefused)|Core\\\\(?:ConnectorRun|PermanentDeliveryFailure))\b)\w+'
+    .'|App\\\\Modules\\\\\{[^}]*\b(?!(?:Questionnaires|Core)\\\\|Sessions\\\\Public\b|Crm\\\\Public\b|Qualite\\\\Public\b|Catalogue\\\\Trainings\b|Connectors\\\\(?:Smtp\\\\(?:TenantMailer|SmtpHostRefused)|Core\\\\(?:ConnectorRun|PermanentDeliveryFailure))\b)(?:Sessions|Crm|Catalogue|Connectors|Finance|Admissions|Qualite|Documents)\\\\/';
+
+it('lets Questionnaires reach the other modules through their public services only, never their tables', function () {
+    expect(moduleFilesMatching('Questionnaires', QUESTIONNAIRES_FOREIGN_REFERENCE))->toBe([]);
+
+    $offenders = [];
+    foreach (new RecursiveIteratorIterator(new RecursiveDirectoryIterator(app_path('Modules/Questionnaires'))) as $file) {
+        if ($file->getExtension() !== 'php') {
+            continue;
+        }
+        $code = (string) file_get_contents($file->getPathname());
+        if (namesCrmTables($code) || namesCatalogueTables($code) || namesSessionsTables($code)) {
+            $offenders[] = $file->getPathname();
+        }
+    }
+    expect($offenders)->toBe([]);
+});
+
+it('detects every way Questionnaires could reach another module beyond its public services', function () {
+    foreach ([
+        'use App\Modules\Sessions\Enrolments\Enrolment;',
+        'use App\Modules\Crm\People\Person;',
+        'use App\Modules\Qualite\Qualiopi\QualityProof;',
+        'use App\Modules\Documents\Document;',
+        'use App\Modules\{Sessions\Dossiers\Dossier, Core\Access\Role};',
+    ] as $code) {
+        expect(preg_match(QUESTIONNAIRES_FOREIGN_REFERENCE, $code), $code)->toBe(1);
+    }
+    foreach ([
+        'use App\Modules\Sessions\Public\Surveys;',
+        'use App\Modules\Crm\Public\Fiches;',
+        'use App\Modules\Qualite\Public\Measures;',
+        'use App\Modules\Catalogue\Trainings;',
+        'use App\Modules\Connectors\Smtp\TenantMailer;',
+    ] as $code) {
+        expect(preg_match(QUESTIONNAIRES_FOREIGN_REFERENCE, $code), $code)->toBe(0);
+    }
+    expect(preg_match(QUESTIONNAIRES_TABLES, "DB::table('survey_invitations')"))->toBe(1);
+});

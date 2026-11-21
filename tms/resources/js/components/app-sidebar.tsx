@@ -41,6 +41,7 @@ import {
     ShieldAlert,
     ShieldCheck,
     SlidersHorizontal,
+    Smile,
     Upload,
     UserMinus,
     UserRoundCheck,
@@ -90,6 +91,7 @@ const financeNavItems: (NavItem & { permission: string })[] = [
 // « Qualité »: the Qualiopi file.
 const qualityNavItems: (NavItem & { permission: string })[] = [
     { title: 'Qualiopi', url: '/qualite/qualiopi', icon: BadgeCheck, permission: 'qualite.view' },
+    { title: 'Questionnaires', url: '/qualite/questionnaires', icon: Smile, permission: 'questionnaires.view' },
 ];
 
 const myPlanningItem: NavItem = { title: 'Mon planning', url: '/mon-planning', icon: CalendarClock };
@@ -110,6 +112,7 @@ const adminNavItems: (NavItem & { permission: string })[] = [
     { title: 'Salles et fermetures', url: '/admin/sessions-settings', icon: DoorOpen, permission: 'sessions.rooms.manage' },
     { title: "Modèles d'e-mails", url: '/admin/mail-templates', icon: Mail, permission: 'settings.manage' },
     { title: 'Modèles de documents', url: '/admin/document-texts', icon: FileSignature, permission: 'settings.manage' },
+    { title: 'Questionnaires', url: '/admin/questionnaires', icon: Smile, permission: 'questionnaires.manage' },
     // Local sandbox only (shown when the shared prop « sandbox » is true; never on a server).
     { title: 'Bac à sable', url: '/admin/sandbox', icon: RotateCcw, permission: 'settings.manage' },
 ];

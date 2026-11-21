@@ -29,7 +29,10 @@ alternance, sous-traitance…). Les boutons filtrent par statut ou n'affichent q
   - 1 et 5 : fiches formation actives complètes (objectifs, public, prérequis, méthodes, évaluation, accessibilité) ;
   - 8 : candidatures des 12 derniers mois avec test de positionnement reçu (désistements exclus) ;
   - 12 : taux d'abandon des inscriptions des sessions commencées depuis 12 mois (liste d'attente et annulations exclues) ;
-  - 13 : contrats d'alternance avec tuteur désigné.
+  - 13 : contrats d'alternance avec tuteur désigné ;
+  - 30 et 2 : taux de réponse et de satisfaction des questionnaires à chaud et à froid des stagiaires (sessions
+    terminées depuis 12 mois ; satisfait = moyenne d'au moins 4/5), et satisfaction des entreprises si le questionnaire
+    entreprise est utilisé (`questionnaires.md`).
 - **Suivi** : non applicable (justification obligatoire, présentée à l'auditeur), statut (À faire, En cours, Prêt,
   À revoir), responsable, date de revue, notes internes.
 - **Preuves** : fichier (PDF, images, documents bureautiques, 20 Mo au plus, type vérifié par le contenu), lien

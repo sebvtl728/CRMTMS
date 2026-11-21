@@ -276,7 +276,8 @@ sinon à celui du dossier. Seules les inscriptions suivies (inscrites ou confirm
 un apprenant anonymisé n'en reçoit pas. Une échéance manquée de quelques jours est rattrapée ; jamais une échéance de
 plus de 30 jours (aucune rafale à la mise en service). Le formateur voit ses actions dans « À faire » (droits « Consulter »
 et « Modifier » les actions sur ses fiches, accordés par défaut au rôle Formateur) et y saisit son compte rendu. Sur la
-fiche de l'apprenant, « Formations suivies » indique la date de fin et la satisfaction (« - » jusqu'aux questionnaires).
+fiche de l'apprenant, « Formations suivies » indique la date de fin et la satisfaction de sa réponse au questionnaire à chaud (« - » sans réponse ;
+voir `questionnaires.md`).
 
 **Émarger depuis le « Suivi »** : un formateur qui ouvre le « Suivi » d'une session (s'il voit la session) peut y saisir les
 présences de **ses propres séances** (bouton « Présences »). Les autres séances, les heures mensuelles et la clôture du

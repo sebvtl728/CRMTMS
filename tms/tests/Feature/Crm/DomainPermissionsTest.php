@@ -37,7 +37,7 @@ it('declares the rights per domain with their scope', function () {
     // Themes of the « Rôles et droits » screen, in the order of the plan.
     $this->actingAs(admin(twoFactor: true))->get('/admin/roles')->assertInertia(fn (Assert $page) => $page
         ->where('groups', fn ($groups) => collect($groups)->pluck('label')->all() === [
-            'Entreprises et personnes', 'Opportunités', 'Devis', 'Actions et agenda', "Chiffre d'affaires", 'Tableaux de bord', 'Catalogue', 'Dossiers', 'Sessions et inscriptions', 'Planning et présences', 'Formateurs et salles', 'Factures', 'Candidatures', 'Données sensibles des candidats', 'Qualité', 'Documents', 'Imports, exports et RGPD', 'Administration',
+            'Entreprises et personnes', 'Opportunités', 'Devis', 'Actions et agenda', "Chiffre d'affaires", 'Tableaux de bord', 'Catalogue', 'Dossiers', 'Sessions et inscriptions', 'Planning et présences', 'Formateurs et salles', 'Factures', 'Candidatures', 'Données sensibles des candidats', 'Qualité', 'Documents', 'Questionnaires', 'Imports, exports et RGPD', 'Administration',
         ]));
 });
 

@@ -11,6 +11,7 @@ use App\Modules\Sessions\Dossiers\Dossier;
 use App\Modules\Sessions\Dossiers\DossierLine;
 use App\Modules\Sessions\Permissions;
 use App\Modules\Sessions\Planning\TraineePlanning;
+use App\Modules\Sessions\Public\EnrolmentSatisfaction;
 use App\Modules\Sessions\Sessions\SessionRows;
 use App\Modules\Sessions\Sessions\TrainingSession;
 use App\Modules\Sessions\SessionsVisibility;
@@ -147,15 +148,17 @@ final class EnrolmentRows
         $planning = TraineePlanning::details($enrolments, TrainingSession::today());
 
         $today = TrainingSession::today()->toDateString();
+        // The satisfaction of each enrolment, given by the questionnaires (EnrolmentSatisfaction).
+        $satisfaction = EnrolmentSatisfaction::for($enrolments->pluck('id')->map(fn ($id) => (string) $id)->values()->all());
 
         return [
             'title' => 'Formations suivies',
             'empty' => 'Aucune inscription à une session.',
-            'rows' => $enrolments->map(function (Enrolment $e) use ($trainings, $planning, $today): array {
+            'rows' => $enrolments->map(function (Enrolment $e) use ($trainings, $planning, $today, $satisfaction): array {
                 $s = $e->session;
-                // Lot 1e: the end of a training over, and its satisfaction (questionnaires: 0.11).
+                // Lot 1e: the end of a training over, and its satisfaction (questionnaires).
                 $over = $s !== null && $e->left_on === null && ! $s->isCancelled() && $s->ends_on->toDateString() < $today
-                    ? "Terminée le {$s->ends_on->format('d/m/Y')} · Satisfaction : -" : null;
+                    ? "Terminée le {$s->ends_on->format('d/m/Y')} · Satisfaction : ".($satisfaction[$e->id] ?? '-') : null;
 
                 return [
                     'id' => $e->id,

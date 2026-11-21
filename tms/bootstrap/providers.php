@@ -12,6 +12,7 @@ use App\Modules\Crm\CrmServiceProvider;
 use App\Modules\Documents\DocumentsServiceProvider;
 use App\Modules\Finance\FinanceServiceProvider;
 use App\Modules\Qualite\QualiteServiceProvider;
+use App\Modules\Questionnaires\QuestionnairesServiceProvider;
 use App\Modules\Sessions\SessionsServiceProvider;
 use App\Providers\AppServiceProvider;
 use App\Providers\HorizonServiceProvider;
@@ -34,4 +35,5 @@ return [
     AdmissionsServiceProvider::class,
     QualiteServiceProvider::class,
     DocumentsServiceProvider::class,
+    QuestionnairesServiceProvider::class,
 ];
