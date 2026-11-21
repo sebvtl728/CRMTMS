@@ -43,6 +43,13 @@ final class SlotRows
             'is_today' => $slot->date->toDateString() === TrainingSession::today()->toDateString(),
             'validated_at' => $slot->validated_at?->toIso8601String(),
             'validated_by' => $slot->trainer_name,
+            // On-site catch-up of a past half-day (the link is shown once, when opened).
+            'can_catch_up' => $slot->date->toDateString() < TrainingSession::today()->toDateString(),
+            'catch_up' => [
+                'open' => $slot->catch_up_token_hash !== null && $slot->catch_up_expires_at?->isFuture() === true,
+                'public_url' => null,
+                'expires_at' => $slot->catch_up_expires_at?->toIso8601String(),
+            ],
             'rows' => $expected->map(fn ($e) => [
                 'enrolment_id' => $e->id,
                 'name' => $labels[$e->person_id]['label'] ?? 'Stagiaire',
