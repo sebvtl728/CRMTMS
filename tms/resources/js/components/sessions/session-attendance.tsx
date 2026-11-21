@@ -176,6 +176,22 @@ interface SessionAttendance {
     }[];
     /** Archived signed sheets of the session, the latest first. */
     signed_sheets: { id: string; month: string; month_label: string; generated_at: string | null; sha256: string; url: string }[];
+    /** Catch-ups of the month waiting for a confirmation (attendance managers only). */
+    catch_ups: CatchUp[];
+}
+
+interface CatchUp {
+    signature_id: string;
+    enrolment_id: string;
+    name: string;
+    date: string;
+    half: string;
+    half_label: string;
+    kind: string;
+    kind_label: string;
+    signed_at: string;
+    drawing_url: string | null;
+    manual_attendance: boolean;
 }
 
 /** 750 → « 12:30 ». */
@@ -441,10 +457,14 @@ export function AttendanceDialog({ seanceId, open, onClose }: { seanceId: string
                             })}
                         </ul>
                         <OnlineSigning seanceId={grid.seance.id} slots={grid.slots ?? []} />
-                        <section aria-labelledby="sheet-title" className="grid gap-3 rounded-md border p-3">
-                            <h3 id="sheet-title" className="font-medium">
-                                Feuille d'émargement
-                            </h3>
+                        <details className="group grid gap-3 rounded-md border p-3">
+                            <summary id="sheet-title" className="cursor-pointer font-medium">
+                                Émargement papier (secours)
+                            </summary>
+                            <p className="text-muted-foreground mt-2 text-sm">
+                                Sans réseau, sans téléphone ou à la demande d'un financeur : imprimez la feuille, faites-la signer, puis déposez le
+                                scan.
+                            </p>
                             <div className="flex flex-wrap gap-2">
                                 <Button asChild variant="outline" size="sm" disabled={grid.seance.cancelled}>
                                     <a href={route('seances.sheet', { seance: grid.seance.id })} target="_blank" rel="noreferrer">
@@ -503,7 +523,7 @@ export function AttendanceDialog({ seanceId, open, onClose }: { seanceId: string
                                 </label>
                                 <InputError message={scanError ?? undefined} />
                             </div>
-                        </section>
+                        </details>
                     </div>
                 )}
                 <DialogFooter>
@@ -876,6 +896,7 @@ export function SessionAttendance({ sessionId }: { sessionId: string }) {
                         ))}
                     </ul>
                 )}
+                {data.catch_ups.length > 0 && <CatchUps catchUps={data.catch_ups} onChange={() => load(data.month)} />}
                 <SignedSheets
                     sessionId={sessionId}
                     month={data.month}
@@ -995,6 +1016,103 @@ function SignedSheets({
                 </ul>
             )}
             <InputError message={error ?? undefined} />
+        </div>
+    );
+}
+
+/** « Rattrapages à confirmer »: a catch-up counts as attendance once confirmed; refused, it stays as a trace. */
+function CatchUps({ catchUps, onChange }: { catchUps: CatchUp[]; onChange: () => void }) {
+    const [busy, setBusy] = useState<string | null>(null);
+    const [error, setError] = useState<string | null>(null);
+    const [refusing, setRefusing] = useState<CatchUp | null>(null);
+    const [reason, setReason] = useState('');
+    const [reasonError, setReasonError] = useState<string | undefined>();
+
+    const confirm = async (c: CatchUp) => {
+        setBusy(c.signature_id);
+        const answer = await sendJson('POST', route('sessions.catch-ups.confirm', c.signature_id));
+        setBusy(null);
+        if (answer.ok) {
+            setError(null);
+            onChange();
+        } else setError(answer.message);
+    };
+    const refuse = async () => {
+        if (!refusing) return;
+        setBusy(refusing.signature_id);
+        const answer = await sendJson('POST', route('sessions.catch-ups.refuse', refusing.signature_id), { reason });
+        setBusy(null);
+        if (answer.ok) {
+            setRefusing(null);
+            onChange();
+        } else setReasonError(answer.errors.reason ?? answer.message);
+    };
+
+    return (
+        <div className="grid gap-2 rounded-md border border-amber-300 p-3">
+            <span className="flex items-center gap-2 text-sm font-medium">
+                Rattrapages à confirmer <Badge variant="destructive">{catchUps.length}</Badge>
+            </span>
+            <p className="text-muted-foreground text-xs">
+                Signatures faites après coup (sur place ou à distance). Confirmer écrit la présence ; refuser garde la signature sans présence.
+            </p>
+            <ul className="divide-y rounded-md border text-sm">
+                {catchUps.map((c) => (
+                    <li key={c.signature_id} className="flex flex-wrap items-center justify-between gap-2 p-2">
+                        <span className="flex items-center gap-2">
+                            {c.drawing_url && (
+                                <img src={c.drawing_url} alt={`Signature de ${c.name}`} className="h-8 w-16 rounded border bg-white object-contain" />
+                            )}
+                            <span>
+                                {c.name} · {formatDay(c.date)} {c.half_label.toLowerCase()}
+                                <span className="text-muted-foreground block text-xs">
+                                    {c.kind_label}, signé le {formatDateTime(c.signed_at)}
+                                    {c.manual_attendance && ' · Présence saisie à la main : non modifiée'}
+                                </span>
+                            </span>
+                        </span>
+                        <span className="flex gap-2">
+                            <Button size="sm" disabled={busy !== null} onClick={() => confirm(c)}>
+                                Confirmer
+                            </Button>
+                            <Button
+                                size="sm"
+                                variant="outline"
+                                disabled={busy !== null}
+                                onClick={() => {
+                                    setRefusing(c);
+                                    setReason('');
+                                    setReasonError(undefined);
+                                }}
+                            >
+                                Refuser
+                            </Button>
+                        </span>
+                    </li>
+                ))}
+            </ul>
+            <InputError message={error ?? undefined} />
+            <Dialog open={refusing !== null} onOpenChange={(o) => !o && setRefusing(null)}>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>Refuser le rattrapage – {refusing?.name}</DialogTitle>
+                        <DialogDescription>La signature est gardée comme trace, sans présence. Indiquez pourquoi.</DialogDescription>
+                    </DialogHeader>
+                    <div className="grid gap-1">
+                        <Label htmlFor="refusal-reason">Motif</Label>
+                        <Input id="refusal-reason" maxLength={300} value={reason} onChange={(e) => setReason(e.target.value)} />
+                        <InputError message={reasonError} />
+                    </div>
+                    <DialogFooter>
+                        <Button variant="outline" onClick={() => setRefusing(null)}>
+                            Annuler
+                        </Button>
+                        <Button disabled={busy !== null || reason.trim() === ''} onClick={refuse}>
+                            Refuser
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
         </div>
     );
 }

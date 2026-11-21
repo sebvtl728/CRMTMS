@@ -1,6 +1,9 @@
 import InputError from '@/components/input-error';
 import SignaturePad from '@/components/signature-pad';
 import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import AuthLayout from '@/layouts/auth-layout';
 import { sendJson } from '@/lib/sessions';
 import { Head, router } from '@inertiajs/react';
@@ -17,6 +20,11 @@ interface Props {
     /** Trainees expected on this half-day, signed or not. */
     expected?: number;
     post_url?: string;
+    /** on_time, or a catch-up of a past half-day (on site: the same list; remote: one trainee, a code by e-mail). */
+    mode?: 'on_time' | 'catch_up_onsite' | 'catch_up_remote';
+    banner?: string | null;
+    trainee_first_name?: string;
+    code_url?: string;
 }
 
 /**
@@ -24,7 +32,14 @@ interface Props {
  * « Je signe ma présence ». The same device may be passed round: after the
  * thank-you, the list comes back without the names already signed.
  */
-export default function AttendanceSigning({ state, organisme, session, date, half_label, trainees = [], expected = 0, post_url }: Props) {
+export default function AttendanceSigning(props: Props) {
+    if (props.state === 'open' && props.mode === 'catch_up_remote') return <RemoteCatchUp {...props} />;
+
+    return <ClassSigning {...props} />;
+}
+
+/** The list of the half-day (on time, or the on-site catch-up of a past half-day). */
+function ClassSigning({ state, organisme, session, date, half_label, trainees = [], expected = 0, post_url, banner }: Props) {
     const [chosen, setChosen] = useState<{ id: string; label: string } | null>(null);
     const [drawing, setDrawing] = useState('');
     const [busy, setBusy] = useState(false);
@@ -62,6 +77,7 @@ export default function AttendanceSigning({ state, organisme, session, date, hal
     return (
         <AuthLayout title={`Émargement – ${half_label ?? ''}`} description={`${organisme ?? ''} · ${session ?? ''} · ${date ?? ''}`}>
             <Head title="Émargement" />
+            {banner && <p className="rounded-md border border-amber-300 bg-amber-50 p-2 text-sm text-amber-900">{banner}</p>}
             {done ? (
                 <p className="flex items-center gap-2 rounded-md border p-4 text-sm" role="status">
                     <CheckCircle2 className="h-5 w-5 text-green-600" />
@@ -100,6 +116,96 @@ export default function AttendanceSigning({ state, organisme, session, date, hal
                             </li>
                         ))}
                     </ul>
+                </div>
+            )}
+        </AuthLayout>
+    );
+}
+
+/** The remote catch-up of one trainee: consent, a code by e-mail, the drawing. */
+function RemoteCatchUp({ organisme, session, date, half_label, trainee_first_name, banner, code_url, post_url }: Props) {
+    const [consent, setConsent] = useState(false);
+    const [codeSent, setCodeSent] = useState(false);
+    const [code, setCode] = useState('');
+    const [drawing, setDrawing] = useState('');
+    const [busy, setBusy] = useState(false);
+    const [errors, setErrors] = useState<{ code?: string; drawing?: string; general?: string }>({});
+    const [done, setDone] = useState(false);
+
+    const askCode = async () => {
+        if (!code_url) return;
+        setBusy(true);
+        const answer = await sendJson('POST', code_url);
+        setBusy(false);
+        if (answer.ok) {
+            setCodeSent(true);
+            setErrors({});
+        } else {
+            setErrors({ general: answer.message ?? undefined });
+        }
+    };
+    const sign = async () => {
+        if (!post_url) return;
+        setBusy(true);
+        const answer = await sendJson('POST', post_url, { code, drawing });
+        setBusy(false);
+        if (answer.ok) setDone(true);
+        else if (answer.status === 404) router.reload();
+        else
+            setErrors({
+                code: answer.errors.code,
+                drawing: answer.errors.drawing,
+                general: answer.errors.code || answer.errors.drawing ? undefined : (answer.message ?? undefined),
+            });
+    };
+
+    return (
+        <AuthLayout title={`Émargement – ${half_label ?? ''}`} description={`${organisme ?? ''} · ${session ?? ''} · ${date ?? ''}`}>
+            <Head title="Émargement" />
+            {done ? (
+                <p className="flex items-center gap-2 rounded-md border p-4 text-sm" role="status">
+                    <CheckCircle2 className="h-5 w-5 text-green-600" />
+                    Merci {trainee_first_name}, votre signature est enregistrée. Elle sera confirmée par l'organisme.
+                </p>
+            ) : (
+                <div className="grid gap-4">
+                    {banner && <p className="rounded-md border border-amber-300 bg-amber-50 p-2 text-sm text-amber-900">{banner}</p>}
+                    <p className="text-sm">
+                        Bonjour {trainee_first_name}, signez votre présence du {date}, {half_label?.toLowerCase()}.
+                    </p>
+                    <div className="flex items-start gap-2">
+                        <Checkbox id="consent" checked={consent} onCheckedChange={(v) => setConsent(v === true)} />
+                        <Label htmlFor="consent" className="text-sm leading-snug font-normal">
+                            Je confirme avoir été présent(e) à cette demi-journée.
+                        </Label>
+                    </div>
+                    <SignaturePad id="drawing" onChange={setDrawing} invalid={!!errors.drawing} />
+                    <InputError message={errors.drawing} />
+                    <div className="grid gap-1">
+                        <Button variant="outline" className="justify-self-start" disabled={busy || !consent} onClick={askCode}>
+                            {codeSent ? 'Recevoir un nouveau code' : 'Recevoir mon code'}
+                        </Button>
+                        {codeSent && (
+                            <p className="text-muted-foreground text-xs">Un code à 6 chiffres vous a été envoyé par e-mail (valable 10 minutes).</p>
+                        )}
+                    </div>
+                    <div className="grid gap-1">
+                        <Label htmlFor="code">Code reçu par e-mail</Label>
+                        <Input
+                            id="code"
+                            inputMode="numeric"
+                            autoComplete="one-time-code"
+                            maxLength={6}
+                            value={code}
+                            onChange={(e) => setCode(e.target.value)}
+                        />
+                        <InputError message={errors.code} />
+                    </div>
+                    <InputError message={errors.general} />
+                    <Button disabled={busy || !consent || drawing === '' || code.trim().length !== 6} onClick={sign}>
+                        {busy ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <PenLine className="h-4 w-4" />}
+                        Signer
+                    </Button>
                 </div>
             )}
         </AuthLayout>
