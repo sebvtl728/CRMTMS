@@ -2,6 +2,7 @@
 
 use App\Modules\Sessions\Attendance\AttendanceController;
 use App\Modules\Sessions\Attendance\AttendanceSheetController;
+use App\Modules\Sessions\Attendance\Signing\CatchUpController;
 use App\Modules\Sessions\Attendance\Signing\PublicSigningController;
 use App\Modules\Sessions\Attendance\Signing\SignedSheetController;
 use App\Modules\Sessions\Attendance\Signing\SigningController;
@@ -103,6 +104,13 @@ Route::middleware(['auth', 'can:sessions.attendance.manage'])->prefix('sessions/
     Route::post('close', [SigningController::class, 'close'])->name('close');
     Route::post('validate', [SigningController::class, 'validate'])->name('validate');
     Route::delete('signatures/{signature}', [SigningController::class, 'erase'])->name('erase');
+});
+
+// Catch-ups of the online signing (2026-11-21): an attendance manager confirms or refuses them.
+Route::middleware(['auth', 'can:sessions.attendance.manage'])->prefix('sessions/rattrapages/{signature}')->name('sessions.catch-ups.')->group(function () {
+    Route::post('confirm', [CatchUpController::class, 'confirm'])->name('confirm');
+    Route::post('refuse', [CatchUpController::class, 'refuse'])->name('refuse');
+    Route::get('dessin', [CatchUpController::class, 'drawing'])->name('drawing');
 });
 
 // The trainees' page of a half-day (no account; the host gives the organisme): per link and address.

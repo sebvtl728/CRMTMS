@@ -183,6 +183,8 @@ final class AttendanceRows
             'realised' => $realised,
             'slots' => Signing\SlotRows::forMonth($session->id, $first),
             'signed_sheets' => Signing\SignedSheetController::list($session->id),
+            // Catch-ups to confirm: attendance managers only (never « Ses séances »).
+            'catch_ups' => $manage ? Signing\SlotRows::pendingCatchUps($session->id, $first) : [],
         ];
     }
 

@@ -3,7 +3,9 @@
 namespace App\Modules\Sessions\Attendance\Signing;
 
 use App\Modules\Crm\Public\Fiches;
+use App\Modules\Sessions\Attendance\Attendance;
 use App\Modules\Sessions\Attendance\Attendances;
+use App\Modules\Sessions\Enrolments\Enrolment;
 use App\Modules\Sessions\Planning\Seance;
 use App\Modules\Sessions\Sessions\TrainingSession;
 use Carbon\CarbonImmutable;
@@ -108,12 +110,55 @@ final class SlotRows
     }
 
     /**
+     * The catch-ups of a Paris month of the session neither confirmed nor
+     * refused (« Rattrapages à confirmer »), the oldest half-day first.
+     *
+     * @return list<array<string, mixed>>
+     */
+    public static function pendingCatchUps(string $sessionId, CarbonImmutable $first): array
+    {
+        $slots = SignSlot::query()->where('training_session_id', $sessionId)
+            ->whereBetween('date', [$first->toDateString(), $first->endOfMonth()->toDateString()])->get()->keyBy('id');
+        $pending = AttendanceSignature::query()->whereIn('slot_id', $slots->keys()->all())
+            ->where('kind', '<>', AttendanceSignature::KIND_ON_TIME)->whereNull('confirmed_at')->whereNull('refused_at')
+            ->orderBy('signed_at')->get();
+        if ($pending->isEmpty()) {
+            return [];
+        }
+        $enrolments = Enrolment::query()->whereKey($pending->pluck('enrolment_id')->all())->get()->keyBy('id');
+        $labels = app(Fiches::class)->personLabels($enrolments->pluck('person_id')->map(fn ($id) => (string) $id)->unique()->values()->all());
+        $manual = Attendance::query()->whereIn('enrolment_id', $enrolments->keys()->all())->whereNull('source')
+            ->join('seances', 'seances.id', '=', 'attendances.seance_id')
+            ->toBase()->get(['attendances.enrolment_id', 'seances.date'])
+            ->map(fn ($r) => $r->enrolment_id.'|'.CarbonImmutable::parse($r->date)->toDateString())->all();
+
+        return $pending->map(function (AttendanceSignature $s) use ($slots, $enrolments, $labels, $manual): array {
+            $slot = $slots[$s->slot_id];
+            $enrolment = $enrolments[$s->enrolment_id] ?? null;
+
+            return [
+                'signature_id' => $s->id,
+                'enrolment_id' => $s->enrolment_id,
+                'name' => $enrolment === null ? 'Stagiaire' : ($labels[$enrolment->person_id]['label'] ?? 'Stagiaire'),
+                'date' => $slot->date->toDateString(),
+                'half' => $slot->half,
+                'half_label' => SignSlot::label($slot->half),
+                'kind' => $s->kind,
+                'kind_label' => $s->kind === AttendanceSignature::KIND_ONSITE ? 'Sur place' : 'À distance',
+                'signed_at' => $s->signed_at->toIso8601String(),
+                'drawing_url' => $s->drawing_path === null ? null : route('sessions.catch-ups.drawing', $s->id),
+                'manual_attendance' => in_array($s->enrolment_id.'|'.$slot->date->toDateString(), $manual, true),
+            ];
+        })->sortBy(fn (array $r) => $r['date'].($r['half'] === SignSlot::AFTERNOON ? '1' : '0').$r['signed_at'])->values()->all();
+    }
+
+    /**
      * @param  list<string>  $slotIds
      * @return array<string, int>
      */
     private static function counts(array $slotIds): array
     {
-        return AttendanceSignature::query()->whereIn('slot_id', $slotIds)->selectRaw('slot_id, count(*) as n')->groupBy('slot_id')
+        return AttendanceSignature::query()->counted()->whereIn('slot_id', $slotIds)->selectRaw('slot_id, count(*) as n')->groupBy('slot_id')
             ->toBase()->pluck('n', 'slot_id')->map(fn ($n) => (int) $n)->all();
     }
 }
