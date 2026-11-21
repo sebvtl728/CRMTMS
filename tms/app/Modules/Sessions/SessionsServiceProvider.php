@@ -23,6 +23,9 @@ use App\Modules\Sessions\Attendance\Attendance;
 use App\Modules\Sessions\Attendance\AttendanceClosure;
 use App\Modules\Sessions\Attendance\Attendances;
 use App\Modules\Sessions\Attendance\AttendanceSheetScan;
+use App\Modules\Sessions\Attendance\Signing\AttendanceSignature;
+use App\Modules\Sessions\Attendance\Signing\SignedSheet;
+use App\Modules\Sessions\Attendance\Signing\SignSlot;
 use App\Modules\Sessions\Attendance\Closures;
 use App\Modules\Sessions\Attendance\MonthlyHour;
 use App\Modules\Sessions\Dashboard\Retention;
@@ -114,6 +117,9 @@ class SessionsServiceProvider extends ServiceProvider
             MonthlyHour::MORPH_ALIAS => MonthlyHour::class,
             AttendanceClosure::MORPH_ALIAS => AttendanceClosure::class,
             AttendanceSheetScan::MORPH_ALIAS => AttendanceSheetScan::class,
+            SignSlot::MORPH_ALIAS => SignSlot::class,
+            AttendanceSignature::MORPH_ALIAS => AttendanceSignature::class,
+            SignedSheet::MORPH_ALIAS => SignedSheet::class,
             SessionTask::MORPH_ALIAS => SessionTask::class,
             SessionNote::MORPH_ALIAS => SessionNote::class,
         ]);
