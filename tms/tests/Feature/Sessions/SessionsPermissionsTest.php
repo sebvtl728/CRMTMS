@@ -17,7 +17,7 @@ it('declares the rights of the Sessions module, scoped but for trainers and room
     expect(Permissions::all())->toBe([
         'sessions.dossiers.view', 'sessions.dossiers.update', 'sessions.dossiers.delete',
         'sessions.sessions.view', 'sessions.sessions.update', 'sessions.sessions.delete',
-        'sessions.seances.view', 'sessions.seances.manage', 'sessions.attendance.manage', 'sessions.attendance.close',
+        'sessions.seances.view', 'sessions.seances.manage', 'sessions.attendance.manage', 'sessions.attendance.close', 'sessions.attendance.advance_entry',
         'sessions.trainers.manage', 'sessions.rooms.manage',
     ])
         ->and(Permissions::DOSSIERS_VIEW)->toBe('sessions.dossiers.view')
@@ -108,8 +108,8 @@ it('offers the Sessions rights and their scopes to the roles of an existing orga
 
     $synced = sessionsMatrix($tenant);
     expect($synced)->toBe($fresh)
-        ->and($synced['rights']['responsable_das'])->toBe(['sessions.dossiers.view', 'sessions.seances.view', 'sessions.sessions.view', 'sessions.trainers.manage'])
-        ->and($synced['scopes'])->toContain('responsable_das sessions.dossiers.view das', 'responsable_das sessions.sessions.view das', 'responsable_das sessions.trainers.manage das');
+        ->and($synced['rights']['responsable_das'])->toBe(['sessions.attendance.advance_entry', 'sessions.dossiers.view', 'sessions.seances.view', 'sessions.sessions.view', 'sessions.trainers.manage'])
+        ->and($synced['scopes'])->toContain('responsable_das sessions.attendance.advance_entry das', 'responsable_das sessions.dossiers.view das', 'responsable_das sessions.sessions.view das', 'responsable_das sessions.trainers.manage das');
 
     // Twice: nothing changes.
     $applied = app(TenantContext::class)->run($tenant, fn () => DB::table(PermissionSync::TABLE)->count());

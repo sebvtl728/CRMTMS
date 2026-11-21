@@ -41,6 +41,9 @@ final class Permissions
 
     public const ATTENDANCE_CLOSE = 'sessions.attendance.close';
 
+    /** From the online signing, bring forward the entry day of a trainee expected later (2026-11-21). */
+    public const ATTENDANCE_ADVANCE_ENTRY = 'sessions.attendance.advance_entry';
+
     /** Trainers (CRM people declared trainers) and their unavailabilities. */
     public const TRAINERS_MANAGE = 'sessions.trainers.manage';
 
@@ -55,7 +58,7 @@ final class Permissions
     public const GROUPS = [
         'Dossiers' => [self::DOSSIERS_VIEW, self::DOSSIERS_UPDATE, self::DOSSIERS_DELETE],
         'Sessions et inscriptions' => [self::SESSIONS_VIEW, self::SESSIONS_UPDATE, self::SESSIONS_DELETE],
-        'Planning et présences' => [self::SEANCES_VIEW, self::SEANCES_MANAGE, self::ATTENDANCE_MANAGE, self::ATTENDANCE_CLOSE],
+        'Planning et présences' => [self::SEANCES_VIEW, self::SEANCES_MANAGE, self::ATTENDANCE_MANAGE, self::ATTENDANCE_CLOSE, self::ATTENDANCE_ADVANCE_ENTRY],
         'Formateurs et salles' => [self::TRAINERS_MANAGE, self::ROOMS_MANAGE],
     ];
 
@@ -78,6 +81,7 @@ final class Permissions
             self::SEANCES_MANAGE => ['Planifier les séances', 'Créer, déplacer, annuler et supprimer des séances, générer les séances d\'un module.'],
             self::ATTENDANCE_MANAGE => ['Saisir les présences', 'Noter les présences des séances et les heures réalisées par mois. « Ses séances » : celles dont il est le formateur.'],
             self::ATTENDANCE_CLOSE => ['Clôturer les présences', 'Clôturer un mois de présences d\'une session et le rouvrir (avec un motif).'],
+            self::ATTENDANCE_ADVANCE_ENTRY => ['Faire entrer un stagiaire en formation', 'Depuis l\'émargement en ligne, avancer la date d\'entrée d\'un stagiaire inscrit au jour de la demi-journée, pour qu\'il puisse signer.'],
             self::TRAINERS_MANAGE => ['Gérer les formateurs', 'Déclarer des formateurs, leur statut, leurs DAS, leurs indisponibilités et leur compte. Un formateur sans DAS reste visible de tous.'],
             self::ROOMS_MANAGE => ['Gérer les salles et fermetures', 'Paramétrer les salles de formation et les périodes de fermeture de l\'organisme.'],
         ];
@@ -121,9 +125,9 @@ final class Permissions
 
         return match ($role) {
             Role::AdminOrganisme => self::all(),
-            Role::Direction => [...$views, ...$planning],
+            Role::Direction => [...$views, ...$planning, self::ATTENDANCE_ADVANCE_ENTRY],
             // He sees the sessions of his DAS: their séances too, and manages the trainers of his DAS.
-            Role::ResponsableDas => [...$views, self::SEANCES_VIEW, self::TRAINERS_MANAGE],
+            Role::ResponsableDas => [...$views, self::SEANCES_VIEW, self::TRAINERS_MANAGE, self::ATTENDANCE_ADVANCE_ENTRY],
             // Who manages the sessions plans them (closing a month: direction and administrator).
             Role::Commercial, Role::ChargeRelations, Role::Assistant => [...$views, self::DOSSIERS_UPDATE, self::SESSIONS_UPDATE, ...array_values(array_diff($planning, [self::ATTENDANCE_CLOSE]))],
             Role::Formateur => self::TRAINER_SCOPED,

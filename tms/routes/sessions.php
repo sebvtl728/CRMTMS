@@ -103,6 +103,7 @@ Route::middleware(['auth', 'can:sessions.attendance.manage'])->prefix('sessions/
     Route::post('close', [SigningController::class, 'close'])->name('close');
     Route::post('validate', [SigningController::class, 'validate'])->name('validate');
     Route::delete('signatures/{signature}', [SigningController::class, 'erase'])->name('erase');
+    Route::post('advance-entry', [SigningController::class, 'advanceEntry'])->name('advance-entry');
 });
 
 // The trainees' page of a half-day (no account; the host gives the organisme): per link and address.
