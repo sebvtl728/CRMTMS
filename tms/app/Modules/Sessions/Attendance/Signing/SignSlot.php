@@ -32,6 +32,10 @@ use Illuminate\Support\Carbon;
  * @property string|null $validator_role trainer|manager
  * @property string|null $trainer_signature_path
  * @property string|null $trainer_signature_sha256
+ * @property string|null $catch_up_token_hash the on-site catch-up link (SHA-256)
+ * @property Carbon|null $catch_up_opened_at
+ * @property string|null $catch_up_opened_by
+ * @property Carbon|null $catch_up_expires_at end of the day the on-site catch-up was opened (Paris)
  */
 class SignSlot extends Model
 {
@@ -58,7 +62,7 @@ class SignSlot extends Model
     protected $table = 'attendance_sign_slots';
 
     /** @var list<string> */
-    protected array $auditIgnore = ['token_hash', 'token_encrypted', 'trainer_signature_sha256'];
+    protected array $auditIgnore = ['token_hash', 'token_encrypted', 'trainer_signature_sha256', 'catch_up_token_hash'];
 
     /** @var list<string> */
     protected array $auditPersonal = ['trainer_signature_path', 'trainer_name'];
@@ -67,6 +71,7 @@ class SignSlot extends Model
     protected $fillable = [
         'training_session_id', 'date', 'half', 'status', 'token_hash', 'token_encrypted', 'opened_at', 'opened_by',
         'validated_at', 'validated_by', 'trainer_name', 'validator_role', 'trainer_signature_path', 'trainer_signature_sha256',
+        'catch_up_token_hash', 'catch_up_opened_at', 'catch_up_opened_by', 'catch_up_expires_at',
     ];
 
     protected function casts(): array
@@ -76,6 +81,8 @@ class SignSlot extends Model
             'opened_at' => 'datetime',
             'validated_at' => 'datetime',
             'token_encrypted' => 'encrypted',
+            'catch_up_opened_at' => 'datetime',
+            'catch_up_expires_at' => 'datetime',
         ];
     }
 

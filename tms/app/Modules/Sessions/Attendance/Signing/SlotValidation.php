@@ -95,12 +95,23 @@ final class SlotValidation
         }
     }
 
+    /**
+     * Writes the attendance of a validated half-day again (a catch-up was
+     * confirmed): inside the caller's transaction, slot and session locked.
+     */
+    public function recompute(SignSlot $slot): void
+    {
+        if ($slot->isValidated()) {
+            $this->writeAttendance($slot);
+        }
+    }
+
     private function writeAttendance(SignSlot $slot): void
     {
         $date = $slot->date->toDateString();
         $validated = SignSlot::query()->where('training_session_id', $slot->training_session_id)->where('date', $date)
             ->where('status', SignSlot::VALIDATED)->get()->keyBy('half');
-        $signed = AttendanceSignature::query()->whereIn('slot_id', $validated->pluck('id')->all())->get(['slot_id', 'enrolment_id'])
+        $signed = AttendanceSignature::query()->counted()->whereIn('slot_id', $validated->pluck('id')->all())->get(['slot_id', 'enrolment_id'])
             ->groupBy('enrolment_id')->map(fn ($rows) => $rows->map(fn (AttendanceSignature $r) => $validated->firstWhere('id', $r->slot_id)?->half)->filter()->values()->all());
         $expected = SlotSeances::expected($slot);
         foreach (SlotSeances::ofSlot($slot) as $seance) {
