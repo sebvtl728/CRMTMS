@@ -27,6 +27,7 @@ use App\Modules\Sessions\Attendance\Closures;
 use App\Modules\Sessions\Attendance\MonthlyHour;
 use App\Modules\Sessions\Attendance\Signing\AttendanceSignature;
 use App\Modules\Sessions\Attendance\Signing\CatchUpLink;
+use App\Modules\Sessions\Attendance\Signing\CatchUpMailTemplates;
 use App\Modules\Sessions\Attendance\Signing\SignedSheet;
 use App\Modules\Sessions\Attendance\Signing\SignSlot;
 use App\Modules\Sessions\Dashboard\Retention;
@@ -131,6 +132,8 @@ class SessionsServiceProvider extends ServiceProvider
     {
         // Lot 1e: the retention card of the CRM dashboards.
         Retention::register();
+        // E-mails of the remote signing catch-up (2026-11-21).
+        CatchUpMailTemplates::register();
         self::registerReferenceUsage();
         self::registerTrainingUsage();
         self::registerFicheBlocks();

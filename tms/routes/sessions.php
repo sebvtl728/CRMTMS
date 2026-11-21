@@ -106,6 +106,7 @@ Route::middleware(['auth', 'can:sessions.attendance.manage'])->prefix('sessions/
     Route::delete('signatures/{signature}', [SigningController::class, 'erase'])->name('erase');
     Route::post('catch-up', [SigningController::class, 'openCatchUp'])->name('catch-up');
     Route::post('catch-up/close', [SigningController::class, 'closeCatchUp'])->name('catch-up.close');
+    Route::post('catch-up-links', [SigningController::class, 'sendCatchUpLink'])->middleware('throttle:attendance-signing-open')->name('catch-up-links');
 });
 
 // Catch-ups of the online signing (2026-11-21): an attendance manager confirms or refuses them.
@@ -117,6 +118,9 @@ Route::middleware(['auth', 'can:sessions.attendance.manage'])->prefix('sessions/
 
 // The trainees' page of a half-day (no account; the host gives the organisme): per link and address.
 Route::prefix('emargement')->name('signing.public.')->group(function () {
+    Route::get('l/{token}', [PublicSigningController::class, 'showRemote'])->middleware('throttle:attendance-signing')->where('token', '[A-Za-z0-9]{40}')->name('remote.show');
+    Route::post('l/{token}/code', [PublicSigningController::class, 'codeRemote'])->middleware('throttle:attendance-signing-post')->where('token', '[A-Za-z0-9]{40}')->name('remote.code');
+    Route::post('l/{token}', [PublicSigningController::class, 'storeRemote'])->middleware('throttle:attendance-signing-post')->where('token', '[A-Za-z0-9]{40}')->name('remote.store');
     Route::get('r/{token}', [PublicSigningController::class, 'showCatchUp'])->middleware('throttle:attendance-signing')->where('token', '[A-Za-z0-9]{40}')->name('catch-up.show');
     Route::post('r/{token}', [PublicSigningController::class, 'storeCatchUp'])->middleware('throttle:attendance-signing-post')->where('token', '[A-Za-z0-9]{40}')->name('catch-up.store');
     Route::get('{token}', [PublicSigningController::class, 'show'])->middleware('throttle:attendance-signing')->where('token', '[A-Za-z0-9]{40}')->name('show');

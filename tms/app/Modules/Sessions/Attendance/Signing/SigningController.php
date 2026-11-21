@@ -22,7 +22,7 @@ use Inertia\Response;
  */
 class SigningController extends Controller
 {
-    public function __construct(private readonly AttendanceSigning $signing, private readonly SlotValidation $validation, private readonly OnsiteCatchUp $onsite) {}
+    public function __construct(private readonly AttendanceSigning $signing, private readonly SlotValidation $validation, private readonly OnsiteCatchUp $onsite, private readonly RemoteCatchUp $remote) {}
 
     /** Opens (or renews) a half-day of the séance's day; the séance reached, else 404. */
     public function open(Request $request, Seance $seance): JsonResponse
@@ -84,6 +84,15 @@ class SigningController extends Controller
         $state = SlotRows::state($found->fresh() ?? $found);
 
         return self::json([...$state, 'catch_up' => [...$state['catch_up'], 'public_url' => url('/emargement/r/'.$token)]]);
+    }
+
+    /** Sends one trainee the personal link of a remote catch-up. */
+    public function sendCatchUpLink(Request $request, string $slot): JsonResponse
+    {
+        $found = self::slot($request, $slot);
+        $this->remote->send($found, (string) $request->input('enrolment_id', ''), (string) $request->input('email', ''), self::user($request));
+
+        return self::json(SlotRows::state($found->fresh() ?? $found));
     }
 
     public function closeCatchUp(Request $request, string $slot): JsonResponse

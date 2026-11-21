@@ -25,6 +25,8 @@ final class SlotRows
         $expected = SlotSeances::expected($slot);
         $signatures = AttendanceSignature::query()->where('slot_id', $slot->id)->get()->keyBy('enrolment_id');
         $labels = app(Fiches::class)->personLabels($expected->pluck('person_id')->map(fn ($id) => (string) $id)->unique()->values()->all());
+        $emails = app(Fiches::class)->personEmails($expected->pluck('person_id')->map(fn ($id) => (string) $id)->unique()->values()->all());
+        $links = CatchUpLink::query()->where('slot_id', $slot->id)->whereNull('revoked_at')->orderBy('created_at')->get()->keyBy('enrolment_id');
         $session = TrainingSession::withTrashed()->find($slot->training_session_id);
         $token = $slot->token();
         $url = $token === null ? null : SlotQr::publicUrl($token);
@@ -55,6 +57,14 @@ final class SlotRows
                 'name' => $labels[$e->person_id]['label'] ?? 'Stagiaire',
                 'signed_at' => $signatures->get($e->id)?->signed_at?->toIso8601String(),
                 'signature_id' => $signatures->get($e->id)?->id,
+                // A catch-up waiting for its confirmation, and the remote link last sent.
+                'catch_up_kind' => $signatures->get($e->id)?->kind === AttendanceSignature::KIND_ON_TIME ? null : $signatures->get($e->id)?->kind,
+                'email' => $emails[$e->person_id] ?? null,
+                'catch_up_link' => ($l = $links->get($e->id)) === null ? null : [
+                    'sent_at' => $l->created_at?->toIso8601String(),
+                    'email_status' => $l->email_status,
+                    'expires_at' => $l->expires_at->toIso8601String(),
+                ],
             ])->sortBy(fn (array $r) => mb_strtolower($r['name']).$r['enrolment_id'])->values()->all(),
         ];
     }
