@@ -656,7 +656,9 @@ Une ligne par organisme (`tenant_id` unique), créée au premier changement : `u
 | `kind` | string(12) | `invoice` / `credit_note` (CHECK) |
 | `number` | string(30), null | `<préfixe>-<AAAA>-<NNNNN>` ; nul **exactement** tant que `status = draft` (CHECK) ; unique (`company_id`, `number`) |
 | `status` | string(10) | `draft`, `validated`, `sent` (CHECK) |
-| `dossier_id` | uuid (FK `dossiers`) | Dossier |
+| `origin` | string(10) | `dossier` (calculée depuis un dossier) / `free` (facture libre) ; CHECK `invoices_origin_check` |
+| `dossier_id` | uuid, null (FK `dossiers`) | Dossier ; nul **exactement** pour une facture libre (CHECK `invoices_origin_dossier_check`) |
+| `buyer_reference`, `service_code` | string(60), null | Facture libre : n° d'engagement et code service de l'acheteur (Chorus Pro), dans le contenu haché quand renseignés |
 | `recipient_type`, `recipient_id` | string(12), uuid | `organisation` / `person` et fiche du destinataire |
 | `funding_id` | uuid, null, **sans FK** | Financement d'un financeur payant directement ; nul = le contractant |
 | `recipient_key` | string(40), colonne générée stockée | `coalesce(funding_id::text, 'contractor')` : « déjà facturé » par destinataire et un seul brouillon ouvert (index unique partiel `invoices_one_open_draft` sur `dossier_id`, `recipient_key`, `kind` où `status = 'draft'`) |
@@ -674,7 +676,10 @@ Une ligne par organisme (`tenant_id` unique), créée au premier changement : `u
 | `created_by`, `updated_by`, `validated_by`, `validated_at` | | |
 
 ### `invoice_lines` — lignes
-`invoice_id` (FK, cascade, index) · `position` · `kind` (`computed` / `free`, CHECK) · `component` (`training`, `dedit`, `absences`, `mention`; **nul exactement pour une ligne libre**, CHECK) · `label`, `description` (`$auditPersonal`) · `quantity` numeric(10,2) · `unit` · `unit_price_cents` · `vat_rate` numeric(4,2) · `total_ht_cents` · `computed_cents` (montant proposé par le calcul : l'écart avec le total montre une modification à la main) · `planned_minutes`, `realised_minutes` · `dossier_line_id`, `enrolment_id`, `funding_id` (uuid sans FK). Les lignes libres et les mentions ne comptent jamais dans le « déjà facturé » (`Ledger`).
+`invoice_id` (FK, cascade, index) · `position` · `kind` (`computed` / `free`, CHECK) · `component` (`training`, `dedit`, `absences`, `mention`; **nul exactement pour une ligne libre**, CHECK) · `label`, `description` (`$auditPersonal`) · `quantity` numeric(10,2) · `unit` · `unit_price_cents` · `vat_rate` numeric(4,2) · `total_ht_cents` · `computed_cents` (montant proposé par le calcul : l'écart avec le total montre une modification à la main) · `planned_minutes`, `realised_minutes` · `dossier_line_id`, `enrolment_id`, `funding_id` (uuid sans FK). Les lignes libres et les mentions ne comptent jamais dans le « déjà facturé » (`Ledger`). · `cotraitant_id` (uuid, null, **sans FK** : fiche entreprise du co-traitant qui a réalisé la ligne d'une facture libre ; dans le contenu haché quand renseigné)
+
+### `cotraitant_payouts` — reversements aux co-traitants
+Un virement du mandataire à un co-traitant pour ses lignes d'une facture : `invoice_id` (FK `invoices`), `cotraitant_id` (uuid, **sans FK**, fiche entreprise), `amount_cents` (> 0, CHECK), `paid_on`, `reference` (string(100), null), `notes` (text, null, `$auditPersonal`), `created_by`. Jamais écrit sur la facture figée ; le reste à reverser est calculé par `Finance\Payouts\CotraitantPayouts` (TTC des lignes co-traitées de la facture et de ses avoirs validés, moins les reversements), sous verrou de la facture.
 
 ### `invoice_sequences` — compteurs de numérotation
 Unique (`tenant_id`, `company_id`, `kind`, `year`) : `last_number`. Année de Paris ; incrémenté sous verrou, dans la transaction de validation (un échec rend le numéro : ni trou ni doublon). Le compteur appartient à la société et au type, pas au préfixe.

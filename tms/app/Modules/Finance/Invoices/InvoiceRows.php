@@ -22,7 +22,7 @@ final class InvoiceRows
     public function rows(Collection $invoices): array
     {
         $labels = $this->recipients($invoices);
-        $numbers = Billing::numbers($invoices->pluck('dossier_id')->unique()->values()->all());
+        $numbers = Billing::numbers($invoices->pluck('dossier_id')->filter()->unique()->values()->all());
         $balances = Balances::of($invoices->pluck('id')->all());
 
         return $invoices->map(fn (Invoice $i) => [
@@ -37,7 +37,9 @@ final class InvoiceRows
             'created_on' => $i->created_at?->toDateString(),
             'recipient' => $labels[$i->recipient_type.':'.$i->recipient_id] ?? '-',
             'recipient_role' => $i->funding_id === null ? 'contractor' : 'funder',
-            'dossier' => ['id' => $i->dossier_id, 'number' => $numbers[$i->dossier_id]['number'] ?? '-', 'url' => '/dossiers/'.$i->dossier_id],
+            'origin' => $i->origin,
+            // A free invoice has no dossier (2026-11-20).
+            'dossier' => $i->dossier_id === null ? null : ['id' => $i->dossier_id, 'number' => $numbers[$i->dossier_id]['number'] ?? '-', 'url' => '/dossiers/'.$i->dossier_id],
             'total_ht_cents' => $i->total_ht_cents,
             'total_ttc_cents' => $i->total_ttc_cents,
             // Issued invoices only (never a draft nor a credit note): what is paid and left (0.9.1).
@@ -80,6 +82,7 @@ final class InvoiceRows
     {
         $row = $this->rows(new Collection([$invoice]))[0];
         $corrected = $invoice->corrected_invoice_id === null ? null : Invoice::query()->find($invoice->corrected_invoice_id);
+        $cotraitants = InvoiceRecipient::cotraitants($invoice);
 
         return [
             ...$row,
@@ -89,7 +92,9 @@ final class InvoiceRows
                 'to' => $invoice->period_to?->toDateString(),
             ],
             'cut_off' => $invoice->cut_off,
-            'rhythm_label' => Due::RHYTHMS[$invoice->rhythm] ?? $invoice->rhythm,
+            'buyer_reference' => $invoice->buyer_reference,
+            'service_code' => $invoice->service_code,
+            'rhythm_label' => $invoice->isFree() ? null : (Due::RHYTHMS[$invoice->rhythm] ?? $invoice->rhythm),
             'total_vat_cents' => $invoice->total_vat_cents,
             'vat_mention' => $invoice->vat_mention,
             'notes' => $invoice->notes,
@@ -110,6 +115,8 @@ final class InvoiceRows
                 'computed_cents' => $l->computed_cents,
                 'planned_minutes' => $l->planned_minutes,
                 'realised_minutes' => $l->realised_minutes,
+                'cotraitant_id' => $l->cotraitant_id,
+                'cotraitant_label' => $l->cotraitant_id === null ? null : ($cotraitants[$l->cotraitant_id] ?? '-'),
             ])->values()->all(),
         ];
     }

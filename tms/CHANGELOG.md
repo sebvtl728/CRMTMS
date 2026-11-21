@@ -13,6 +13,18 @@ Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) ; ve
   prorata, absent), sans jamais écraser une saisie manuelle. **Feuille d'émargement signée** par session et par mois :
   PDF archivé avec les dessins, le valideur et les empreintes SHA-256. Service public prêt pour un futur connecteur
   (SoWeSign). Dessins effacés par l'anonymisation.
+- Facture libre (équivalent des « factures annexes » de Formevol) : facture sans dossier pour un client, N° d'engagement et
+  code service (Chorus Pro), lignes désignant un co-traitant du groupement (mention « mandataire du groupement » sur le
+  PDF) ; écran Finance › À reverser pour suivre les reversements aux co-traitants (dû, reversé, reste, export CSV).
+
+### Corrigé
+
+- Sessions : une session passe « Terminée » dès son dernier jour quand son dernier mois est clôturé (Suivi › Clôture
+  des mois), au lieu d'attendre le lendemain.
+- Sessions : la carte « Clôture des mois » de la synthèse compte aussi le dernier mois d'une session à partir de son
+  dernier jour, et affiche « Tous les mois sont clôturés » quand un mois a été clôturé avant la fin du mois.
+- Local : page blanche sur les autres postes du réseau (lien de test de positionnement…). Le serveur Vite de
+  développement ne démarre plus avec `docker compose up -d` (profil `dev`) ; les pages utilisent les fichiers construits.
 
 ## [0.11.0] - 2026-11-20
 

@@ -276,22 +276,26 @@ final class SessionChecklist
     }
 
     /**
-     * The months of the session before the current Paris month are closed;
-     * none elapsed yet: sans objet.
+     * The months of the session to close: those before the current Paris
+     * month, the current one too from the session's last day, and any month
+     * already closed (closed early: shown done, never « nothing to close »);
+     * none of them yet: sans objet.
      *
      * @param  array<string, true>  $closed  « 2026-09 » => true
      */
     private static function closures(TrainingSession $session, array $closed, CarbonImmutable $today): Card
     {
         $current = Months::key($today);
-        $elapsed = array_values(array_filter(Months::ofSession($session), fn (string $m) => $m < $current));
-        if ($elapsed === []) {
+        $ended = $session->ends_on->toDateString() <= $today->toDateString();
+        $due = array_values(array_filter(Months::ofSession($session),
+            fn (string $m) => $m < $current || ($ended && $m === $current) || isset($closed[$m])));
+        if ($due === []) {
             return new Card('closures', 'Clôture des mois', '0', Card::NA, 'Aucun mois écoulé à clôturer.', 'suivi', 'closures');
         }
 
         return self::count('closures', 'Clôture des mois', 'suivi', 'closures',
-            count(array_filter($elapsed, fn (string $m) => ! isset($closed[$m]))),
-            'Tous les mois écoulés sont clôturés.',
+            count(array_filter($due, fn (string $m) => ! isset($closed[$m]))),
+            'Tous les mois sont clôturés.',
             fn (int $n) => "{$n} mois à clôturer.");
     }
 

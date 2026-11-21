@@ -16,7 +16,9 @@ export interface InvoiceRow {
     created_on: string | null;
     recipient: string;
     recipient_role: 'contractor' | 'funder';
-    dossier: { id: string; number: string; url: string };
+    /** dossier | free (a free invoice has no dossier) */
+    origin: 'dossier' | 'free';
+    dossier: { id: string; number: string; url: string } | null;
     total_ht_cents: number;
     total_ttc_cents: number;
     /** Issued invoices only (0.9.1); null for a draft or a credit note. */
