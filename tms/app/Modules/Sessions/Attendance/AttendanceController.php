@@ -38,7 +38,7 @@ class AttendanceController extends Controller
     {
         self::authorizeSeance($request, $seance);
 
-        return self::json([...AttendanceRows::grid($seance), ...AttendanceSheetController::list($seance, self::user($request))]);
+        return self::json([...AttendanceRows::grid($seance), ...AttendanceSheetController::list($seance, self::user($request)), 'slots' => \App\Modules\Sessions\Attendance\Signing\SlotRows::forSeance($seance)]);
     }
 
     public function record(Request $request, Seance $seance): JsonResponse

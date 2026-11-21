@@ -26,6 +26,8 @@ return new class extends Migration
             $table->string('half', 10);
             $table->string('status', 10);
             $table->char('token_hash', 64)->nullable()->unique();
+            // The shared token, encrypted (APP_KEY): shown again to the trainer only (QR code); lookups use token_hash.
+            $table->text('token_encrypted')->nullable();
             $table->timestampTz('opened_at');
             $table->foreignUuid('opened_by')->nullable()->constrained('users')->nullOnDelete();
             $table->timestampTz('validated_at')->nullable();

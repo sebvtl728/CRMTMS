@@ -23,6 +23,7 @@ use Illuminate\Support\Carbon;
  * @property string $half morning|afternoon
  * @property string $status open|closed|validated
  * @property string|null $token_hash
+ * @property string|null $token_encrypted the token, encrypted, for the trainer's screen
  * @property Carbon $opened_at
  * @property string|null $opened_by
  * @property Carbon|null $validated_at
@@ -57,14 +58,14 @@ class SignSlot extends Model
     protected $table = 'attendance_sign_slots';
 
     /** @var list<string> */
-    protected array $auditIgnore = ['token_hash', 'trainer_signature_sha256'];
+    protected array $auditIgnore = ['token_hash', 'token_encrypted', 'trainer_signature_sha256'];
 
     /** @var list<string> */
     protected array $auditPersonal = ['trainer_signature_path', 'trainer_name'];
 
     /** @var list<string> */
     protected $fillable = [
-        'training_session_id', 'date', 'half', 'status', 'token_hash', 'opened_at', 'opened_by',
+        'training_session_id', 'date', 'half', 'status', 'token_hash', 'token_encrypted', 'opened_at', 'opened_by',
         'validated_at', 'validated_by', 'trainer_name', 'validator_role', 'trainer_signature_path', 'trainer_signature_sha256',
     ];
 
@@ -74,7 +75,14 @@ class SignSlot extends Model
             'date' => 'immutable_date',
             'opened_at' => 'datetime',
             'validated_at' => 'datetime',
+            'token_encrypted' => 'encrypted',
         ];
+    }
+
+    /** The shared token while the slot is open, else null. */
+    public function token(): ?string
+    {
+        return $this->status === self::OPEN ? $this->token_encrypted : null;
     }
 
     public function isValidated(): bool

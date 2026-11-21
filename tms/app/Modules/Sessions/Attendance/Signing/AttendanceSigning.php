@@ -73,6 +73,7 @@ final class AttendanceSigning
             $slot->fill([
                 'status' => SignSlot::OPEN,
                 'token_hash' => hash('sha256', $token),
+                'token_encrypted' => $token,
                 'opened_at' => CarbonImmutable::now(),
                 'opened_by' => $by->id,
             ])->save();
@@ -90,7 +91,7 @@ final class AttendanceSigning
             if ($locked->isValidated()) {
                 throw new UserFacingHttpException(409, self::ALREADY_VALIDATED);
             }
-            $locked->fill(['status' => SignSlot::CLOSED, 'token_hash' => null])->save();
+            $locked->fill(['status' => SignSlot::CLOSED, 'token_hash' => null, 'token_encrypted' => null])->save();
         });
     }
 

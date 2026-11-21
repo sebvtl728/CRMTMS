@@ -2,6 +2,8 @@
 
 use App\Modules\Sessions\Attendance\AttendanceController;
 use App\Modules\Sessions\Attendance\AttendanceSheetController;
+use App\Modules\Sessions\Attendance\Signing\PublicSigningController;
+use App\Modules\Sessions\Attendance\Signing\SigningController;
 use App\Modules\Sessions\Dossiers\DossierController;
 use App\Modules\Sessions\Dossiers\DossierFromQuoteController;
 use App\Modules\Sessions\Enrolments\EnrolmentController;
@@ -90,6 +92,20 @@ Route::middleware(['auth'])->prefix('sessions')->name('sessions.')->group(functi
     Route::post('{trainingSession}/closures/reopen', [AttendanceController::class, 'reopen'])->middleware('can:sessions.attendance.close')->name('closures.reopen');
 });
 
+Route::middleware(['auth', 'can:sessions.attendance.manage'])->prefix('sessions/emargement/{slot}')->name('sessions.signing.')->group(function () {
+    Route::get('/', [SigningController::class, 'show'])->name('show');
+    Route::get('state', [SigningController::class, 'state'])->name('state');
+    Route::post('close', [SigningController::class, 'close'])->name('close');
+    Route::post('validate', [SigningController::class, 'validate'])->name('validate');
+    Route::delete('signatures/{signature}', [SigningController::class, 'erase'])->name('erase');
+});
+
+// The trainees' page of a half-day (no account; the host gives the organisme): per link and address.
+Route::prefix('emargement')->name('signing.public.')->group(function () {
+    Route::get('{token}', [PublicSigningController::class, 'show'])->middleware('throttle:attendance-signing')->where('token', '[A-Za-z0-9]{40}')->name('show');
+    Route::post('{token}', [PublicSigningController::class, 'store'])->middleware('throttle:attendance-signing-post')->where('token', '[A-Za-z0-9]{40}')->name('store');
+});
+
 // Attendance of a séance (JSON): sessions.attendance.manage within its scope
 // on the séance (« Ses séances » for a trainer), else 404.
 Route::middleware(['auth', 'can:sessions.attendance.manage'])->prefix('seances/{seance}/attendance')->name('seances.attendance.')->group(function () {
@@ -98,6 +114,11 @@ Route::middleware(['auth', 'can:sessions.attendance.manage'])->prefix('seances/{
     Route::post('all-present', [AttendanceController::class, 'allPresent'])->name('all-present');
     Route::delete('{enrolmentId}', [AttendanceController::class, 'clear'])->name('destroy');
 });
+
+// Online signing (émargement en ligne): a half-day of the séance's day, opened from the séance
+// (sessions.attendance.manage within its scope on one séance of the half-day, else 404).
+Route::post('seances/{seance}/signing-slots', [SigningController::class, 'open'])
+    ->middleware(['auth', 'can:sessions.attendance.manage', 'throttle:attendance-signing-open'])->name('seances.signing-slots');
 
 // Printable attendance sheet (?day=1: the whole day of the session) and signed scans of a séance.
 Route::middleware(['auth', 'can:sessions.attendance.manage'])->prefix('seances/{seance}')->name('seances.')->group(function () {

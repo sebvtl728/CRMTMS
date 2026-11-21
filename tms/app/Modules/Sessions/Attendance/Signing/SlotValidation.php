@@ -70,6 +70,7 @@ final class SlotValidation
                 $locked->fill([
                     'status' => SignSlot::VALIDATED,
                     'token_hash' => null,
+                    'token_encrypted' => null,
                     'validated_at' => CarbonImmutable::now(),
                     'validated_by' => $userId,
                     'trainer_name' => mb_substr($name, 0, 200),

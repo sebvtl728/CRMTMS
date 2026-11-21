@@ -181,6 +181,7 @@ final class AttendanceRows
                 ),
             ],
             'realised' => $realised,
+            'slots' => Signing\SlotRows::forMonth($session->id, $first),
         ];
     }
 
