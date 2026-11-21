@@ -34,15 +34,16 @@ final class InvoiceRecipient
     }
 
     /**
-     * The recipient as the fiches and the dossier describe it today.
+     * The recipient as the fiches and the dossier describe it today (and,
+     * on a free invoice, the names of its co-contractors keyed by id).
      *
-     * @return array<string, string|null>
+     * @return array<string, string|array<string, string>|null>
      */
     public static function current(Invoice $invoice): array
     {
         $identity = app(Fiches::class)->billingIdentity($invoice->recipient_type, $invoice->recipient_id) ?? ['name' => '-'];
         $agreement = null;
-        if ($invoice->funding_id !== null) {
+        if ($invoice->funding_id !== null && $invoice->dossier_id !== null) {
             foreach (Billing::dossier($invoice->dossier_id)['fundings'] ?? [] as $funding) {
                 if ($funding['id'] === $invoice->funding_id) {
                     $agreement = $funding['agreement_number'];
@@ -50,10 +51,39 @@ final class InvoiceRecipient
             }
         }
 
+        // A free invoice names the co-contractors of its lines (frozen with the recipient).
+        $cotraitants = self::liveCotraitants($invoice);
+
         return [
             ...$identity,
-            'dossier_number' => Billing::numbers([$invoice->dossier_id])[$invoice->dossier_id]['number'] ?? null,
+            ...($cotraitants === [] ? [] : ['cotraitants' => $cotraitants]),
+            'dossier_number' => $invoice->dossier_id === null ? null : (Billing::numbers([$invoice->dossier_id])[$invoice->dossier_id]['number'] ?? null),
             'agreement_number' => $agreement === null || trim((string) $agreement) === '' ? null : trim((string) $agreement),
         ];
+    }
+
+    /**
+     * Names of the co-contractors of the lines, keyed by id: frozen at
+     * validation, as the fiches name them today on a draft.
+     *
+     * @return array<string, string>
+     */
+    public static function cotraitants(Invoice $invoice): array
+    {
+        if (is_array($invoice->recipient_snapshot)) {
+            $frozen = $invoice->recipient_snapshot['cotraitants'] ?? [];
+
+            return is_array($frozen) ? array_map('strval', $frozen) : [];
+        }
+
+        return self::liveCotraitants($invoice);
+    }
+
+    /** @return array<string, string> */
+    private static function liveCotraitants(Invoice $invoice): array
+    {
+        $ids = InvoiceLine::query()->where('invoice_id', $invoice->id)->whereNotNull('cotraitant_id')->distinct()->pluck('cotraitant_id')->all();
+
+        return array_map(fn (array $o) => $o['label'], app(Fiches::class)->organisationLabels($ids));
     }
 }

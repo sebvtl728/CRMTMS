@@ -3,6 +3,7 @@
 use App\Modules\Core\Access\AccessScope;
 use App\Modules\Core\References\ReferenceList;
 use App\Modules\Core\Users\User;
+use App\Modules\Sessions\Attendance\Closures;
 use App\Modules\Sessions\Permissions;
 use App\Modules\Sessions\Sessions\SessionBoard;
 use App\Modules\Sessions\Sessions\SessionListQuery;
@@ -187,4 +188,21 @@ it('builds the board in a fixed number of queries', function () {
     };
 
     expect($count(10))->toBe($count(30));
+});
+
+it('shows a session done on its last day once its last month is closed', function () {
+    $session = plSession('2026-11-02', '2026-11-20');
+    $today = CarbonImmutable::parse('2026-11-20', 'Europe/Paris');
+    $user = l2User([Permissions::SESSIONS_VIEW => null]);
+    $ids = fn (string $status) => SessionListQuery::build(SessionListQuery::filters(['status' => $status]), $user, $today)->pluck('training_sessions.id')->all();
+
+    expect($session->refresh()->effectiveStatus($today))->toBe(SessionStatus::Running)
+        ->and($ids('running'))->toContain($session->id)->and($ids('done'))->not->toContain($session->id);
+
+    app(Closures::class)->close($session, '2026-11');
+
+    expect($session->refresh()->effectiveStatus($today))->toBe(SessionStatus::Done)
+        ->and($ids('done'))->toContain($session->id)->and($ids('running'))->not->toContain($session->id);
+    // Before its last day a closed month changes nothing.
+    expect($session->effectiveStatus(CarbonImmutable::parse('2026-11-19', 'Europe/Paris')))->toBe(SessionStatus::Running);
 });

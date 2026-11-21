@@ -33,6 +33,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property string|null $dossier_line_id
  * @property string|null $enrolment_id
  * @property string|null $funding_id
+ * @property string|null $cotraitant_id the co-contractor (organisation fiche) who delivered the line
  */
 class InvoiceLine extends Model
 {
@@ -66,6 +67,7 @@ class InvoiceLine extends Model
     protected $fillable = [
         'invoice_id', 'position', 'kind', 'component', 'label', 'description', 'quantity', 'unit', 'unit_price_cents',
         'vat_rate', 'total_ht_cents', 'computed_cents', 'planned_minutes', 'realised_minutes', 'dossier_line_id', 'enrolment_id', 'funding_id',
+        'cotraitant_id',
     ];
 
     protected function casts(): array

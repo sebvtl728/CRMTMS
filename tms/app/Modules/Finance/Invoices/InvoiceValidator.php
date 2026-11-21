@@ -7,6 +7,7 @@ use App\Modules\Core\Companies\Company;
 use App\Modules\Core\Documents\PdfRenderingFailed;
 use App\Modules\Core\Tenancy\TenantContext;
 use App\Modules\Core\Users\User;
+use App\Modules\Crm\Public\Fiches;
 use App\Modules\Finance\Billing\Particulier;
 use App\Modules\Finance\Integrity;
 use App\Modules\Finance\Plans\BillingPlans;
@@ -73,6 +74,8 @@ final class InvoiceValidator
 
     public const NO_CORRECTED = 'Un avoir corrige une facture validée du même destinataire : celle-ci est introuvable.';
 
+    public const COMPANY_GONE = 'La société qui émet cette facture est à la corbeille : restaurez-la ou recréez la facture.';
+
     public const COMPANY_CHANGED = 'La société du dossier a changé : recalculez le brouillon avant de le valider.';
 
     public const OTHER_PARTIES = 'Un avoir doit être émis par la même société et au même destinataire que la facture corrigée.';
@@ -99,12 +102,17 @@ final class InvoiceValidator
     public function validate(Invoice $draft, User $user): Invoice
     {
         return DB::transaction(function () use ($draft, $user): Invoice {
-            Billing::lockDossier($draft->dossier_id);
+            // A free invoice has no dossier (2026-11-20): neither its lock nor its billing plan.
+            if ($draft->dossier_id !== null) {
+                Billing::lockDossier($draft->dossier_id);
+            }
             $invoice = Invoice::query()->lockForUpdate()->findOrFail($draft->id);
             if (! $invoice->isDraft()) {
                 throw new UserFacingHttpException(409, self::NOT_DRAFT);
             }
-            $this->plans->lock($invoice->dossier_id);
+            if ($invoice->dossier_id !== null) {
+                $this->plans->lock($invoice->dossier_id);
+            }
 
             $company = Company::withTrashed()->findOrFail($invoice->company_id);
             $lines = $invoice->lines()->get();
@@ -146,7 +154,9 @@ final class InvoiceValidator
                 'pdf_sha256' => $invoice->pdf_sha256,
             ]);
 
-            $this->followDossier($invoice->dossier_id);
+            if ($invoice->dossier_id !== null) {
+                $this->followDossier($invoice->dossier_id);
+            }
 
             return $invoice;
         });
@@ -182,6 +192,9 @@ final class InvoiceValidator
             if (-$invoice->total_ht_cents > $corrected->total_ht_cents + $credited) {
                 throw new UserFacingHttpException(409, sprintf(self::OVER_CORRECTED, $corrected->number));
             }
+            if ($invoice->dossier_id === null) {
+                return;
+            }
             // Net of the recipient on the dossier: its invoices minus its credit notes (all lines; computed lines alone).
             $issued = (int) Invoice::query()->where('dossier_id', $invoice->dossier_id)->where('recipient_key', $invoice->recipient_key)
                 ->whereIn('status', InvoiceStatus::values(InvoiceStatus::ISSUED))->sum('total_ht_cents');
@@ -195,6 +208,20 @@ final class InvoiceValidator
 
         if ($invoice->total_ht_cents <= 0) {
             throw new UserFacingHttpException(409, self::NOT_POSITIVE);
+        }
+        if ($invoice->dossier_id === null) {
+            if (! Company::query()->whereKey($invoice->company_id)->exists()) {
+                throw new UserFacingHttpException(409, self::COMPANY_GONE);
+            }
+            // A free invoice: its client still exists (a fiche anonymised or deleted is never invoiced anew).
+            $client = $invoice->recipient_type === 'organisation'
+                ? app(Fiches::class)->organisation($invoice->recipient_id)
+                : app(Fiches::class)->person($invoice->recipient_id);
+            if ($client === null) {
+                throw new UserFacingHttpException(409, self::NOT_INVOICEABLE);
+            }
+
+            return;
         }
         $dossier = Billing::dossier($invoice->dossier_id);
         if ($dossier === null || $dossier['trashed']) {

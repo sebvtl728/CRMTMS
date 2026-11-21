@@ -25,6 +25,7 @@ import {
     Factory,
     FileSignature,
     FileText,
+    HandCoins,
     Gauge,
     GraduationCap,
     Handshake,
@@ -83,6 +84,7 @@ const financeNavItems: (NavItem & { permission: string })[] = [
     { title: 'Factures', url: '/finance/invoices', icon: ReceiptEuro, permission: 'finance.invoices.view' },
     { title: 'À relancer', url: '/finance/reminders', icon: BellRing, permission: 'finance.invoices.manage' },
     { title: 'Règlements', url: '/finance/payments', icon: Banknote, permission: 'finance.payments.manage' },
+    { title: 'À reverser', url: '/finance/payouts', icon: HandCoins, permission: 'finance.payments.manage' },
     { title: 'Réglages de facturation', url: '/finance/settings', icon: Settings2, permission: 'settings.manage' },
 ];
 

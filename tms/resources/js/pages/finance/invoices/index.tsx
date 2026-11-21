@@ -9,6 +9,7 @@ import { invoiceStatusVariant, type InvoiceRow } from '@/lib/finance';
 import { formatCents } from '@/lib/revenue';
 import { type BreadcrumbItem } from '@/types';
 import { Head, Link, router, usePage } from '@inertiajs/react';
+import { FreeInvoiceDialog } from '@/components/finance/free-invoice-dialog';
 import { ChevronLeft, ChevronRight, Download, ShieldCheck } from 'lucide-react';
 import { useState } from 'react';
 
@@ -23,7 +24,7 @@ interface InvoicesIndexProps {
     invoices: Paginated<InvoiceRow>;
     filters: Filters;
     options: { status: Option[]; kind: Option[]; company: Option[]; payment: Option[] };
-    can: { export: boolean; integrity: boolean };
+    can: { create_free: boolean; export: boolean; integrity: boolean };
     status?: string;
 }
 
@@ -49,7 +50,10 @@ export default function InvoicesIndex({ invoices, filters, options, can, status 
 
             <div className="flex flex-col gap-4 p-4">
                 <div className="flex flex-wrap items-start justify-between gap-2">
-                    <Heading title="Factures" description="Factures et avoirs des dossiers ; les brouillons se préparent depuis « À facturer »." />
+                    <Heading
+                        title="Factures"
+                        description="Factures et avoirs des dossiers (brouillons préparés depuis « À facturer ») et factures libres (marchés, co-traitance)."
+                    />
                     <div className="flex flex-wrap gap-2">
                         {can.integrity && (
                             <Button
@@ -79,6 +83,7 @@ export default function InvoicesIndex({ invoices, filters, options, can, status 
                         <Button variant="outline" asChild>
                             <Link href={route('finance.to-invoice.index')}>À facturer</Link>
                         </Button>
+                        {can.create_free && <FreeInvoiceDialog companies={options.company} />}
                     </div>
                 </div>
 
@@ -138,9 +143,13 @@ export default function InvoicesIndex({ invoices, filters, options, can, status 
                                             <td className="px-3 py-2 whitespace-nowrap">{formatDay(invoice.issued_on ?? invoice.created_on)}</td>
                                             <td className="px-3 py-2">{invoice.recipient}</td>
                                             <td className="px-3 py-2 whitespace-nowrap">
-                                                <Link href={invoice.dossier.url} className="underline">
-                                                    {invoice.dossier.number}
-                                                </Link>
+                                                {invoice.dossier ? (
+                                                    <Link href={invoice.dossier.url} className="underline">
+                                                        {invoice.dossier.number}
+                                                    </Link>
+                                                ) : (
+                                                    <span className="text-muted-foreground">Facture libre</span>
+                                                )}
                                             </td>
                                             <td className="px-3 py-2 text-right whitespace-nowrap tabular-nums">
                                                 {formatCents(invoice.total_ht_cents)}

@@ -167,10 +167,14 @@ final class SessionListQuery
             SessionStatus::Running => $query->where(fn (Builder $q) => $q
                 ->where('training_sessions.status', SessionStatus::Running->value)
                 ->orWhere(fn (Builder $o) => $o->whereIn('training_sessions.status', $open)
-                    ->where('training_sessions.starts_on', '<=', $day)->where('training_sessions.ends_on', '>=', $day))),
+                    ->where('training_sessions.starts_on', '<=', $day)->where('training_sessions.ends_on', '>=', $day)
+                    // Its last day with its last month closed: already done.
+                    ->whereNot(fn (Builder $last) => $last->where('training_sessions.ends_on', $day)->whereRaw(TrainingSession::LAST_MONTH_CLOSED_SQL)))),
             SessionStatus::Done => $query->where(fn (Builder $q) => $q
                 ->where('training_sessions.status', SessionStatus::Done->value)
-                ->orWhere(fn (Builder $o) => $o->whereIn('training_sessions.status', $open)->where('training_sessions.ends_on', '<', $day))),
+                ->orWhere(fn (Builder $o) => $o->whereIn('training_sessions.status', $open)->where(fn (Builder $end) => $end
+                    ->where('training_sessions.ends_on', '<', $day)
+                    ->orWhere(fn (Builder $last) => $last->where('training_sessions.ends_on', $day)->whereRaw(TrainingSession::LAST_MONTH_CLOSED_SQL))))),
             SessionStatus::Cancelled => $query->where('training_sessions.status', SessionStatus::Cancelled->value),
         };
     }

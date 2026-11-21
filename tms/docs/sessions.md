@@ -23,7 +23,7 @@ Une **session** est une formation du catalogue donnée à des dates précises. �
 
 Chaque session reçoit un numéro `S-2026-0001` (séquence par organisme et par année de Paris).
 
-**États** : *Planifiée*, *Confirmée*, *En cours*, *Terminée*, *Annulée*. « En cours » et « Terminée » se calculent d'après les dates (du premier au dernier jour inclus) ; ils ne se posent pas à la main. **Annuler la session** demande un **motif** (liste *Motifs d'annulation*) et annule ses inscriptions encore actives (places libérées, parts de prix recalculées) ; une session annulée ne se rouvre pas : créez-en une nouvelle.
+**États** : *Planifiée*, *Confirmée*, *En cours*, *Terminée*, *Annulée*. « En cours » et « Terminée » se calculent d'après les dates (du premier au dernier jour inclus ; « Terminée » dès le dernier jour quand son dernier mois est clôturé dans *Suivi › Clôture des mois*) ; ils ne se posent pas à la main. **Annuler la session** demande un **motif** (liste *Motifs d'annulation*) et annule ses inscriptions encore actives (places libérées, parts de prix recalculées) ; une session annulée ne se rouvre pas : créez-en une nouvelle.
 
 Dès qu'une session a des inscriptions, sa formation, son type et son entreprise ne changent plus, et elle ne va pas à la corbeille.
 
