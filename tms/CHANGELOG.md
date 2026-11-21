@@ -5,6 +5,12 @@ Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) ; ve
 
 ## [Non publié]
 
+### Ajouté
+
+- Émargement en ligne : **Faire entrer ce jour-là** avance la date d'entrée d'un inscrit qui entre en formation plus
+  tard, pour qu'il signe la demi-journée (nouveau droit « Faire entrer un stagiaire en formation » : administrateur,
+  direction et Responsable de DAS par défaut ; mois clôturé refusé ; noté dans l'historique du dossier).
+
 ## [0.12.0] - 2026-11-21
 
 ### Ajouté
