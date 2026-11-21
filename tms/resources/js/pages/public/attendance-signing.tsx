@@ -14,6 +14,8 @@ interface Props {
     date?: string;
     half_label?: string;
     trainees?: { id: string; label: string }[];
+    /** Trainees expected on this half-day, signed or not. */
+    expected?: number;
     post_url?: string;
 }
 
@@ -22,7 +24,7 @@ interface Props {
  * « Je signe ma présence ». The same device may be passed round: after the
  * thank-you, the list comes back without the names already signed.
  */
-export default function AttendanceSigning({ state, organisme, session, date, half_label, trainees = [], post_url }: Props) {
+export default function AttendanceSigning({ state, organisme, session, date, half_label, trainees = [], expected = 0, post_url }: Props) {
     const [chosen, setChosen] = useState<{ id: string; label: string } | null>(null);
     const [drawing, setDrawing] = useState('');
     const [busy, setBusy] = useState(false);
@@ -49,11 +51,11 @@ export default function AttendanceSigning({ state, organisme, session, date, hal
             setError(null);
             window.setTimeout(() => {
                 setDone(null);
-                router.reload({ only: ['trainees'] });
+                router.reload({ only: ['trainees', 'expected'] });
             }, 3000);
         } else {
             setError(answer.errors.drawing ?? answer.errors.enrolment_id ?? answer.message);
-            if (answer.status === 409 || answer.status === 404) router.reload({ only: ['trainees', 'state'] });
+            if (answer.status === 409 || answer.status === 404) router.reload({ only: ['trainees', 'expected', 'state'] });
         }
     };
 
@@ -81,6 +83,8 @@ export default function AttendanceSigning({ state, organisme, session, date, hal
                         Je signe ma présence
                     </Button>
                 </div>
+            ) : trainees.length === 0 && expected === 0 ? (
+                <p className="text-sm">Aucun stagiaire n'est attendu à cette demi-journée. Prévenez le formateur.</p>
             ) : trainees.length === 0 ? (
                 <p className="text-sm">Tout le monde a signé. Merci !</p>
             ) : (

@@ -53,7 +53,7 @@ final class SlotRows
     /**
      * The half-days of the séance's day for its session.
      *
-     * @return list<array{half: string, label: string, status: string|null, slot_id: string|null, signed: int, expected: int, is_today: bool}>
+     * @return list<array{half: string, label: string, status: string|null, slot_id: string|null, signed: int, expected: int, is_today: bool, is_future: bool}>
      */
     public static function forSeance(Seance $seance): array
     {
@@ -74,6 +74,7 @@ final class SlotRows
                 'signed' => $slot === null ? 0 : ($counts[$slot->id] ?? 0),
                 'expected' => Attendances::expected($seance)->count(),
                 'is_today' => $date === TrainingSession::today()->toDateString(),
+                'is_future' => $date > TrainingSession::today()->toDateString(),
             ];
         }
 

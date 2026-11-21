@@ -5,6 +5,8 @@ Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) ; ve
 
 ## [Non publié]
 
+## [0.12.0] - 2026-11-21
+
 ### Ajouté
 
 - **Émargement en ligne** : par demi-journée (matin / après-midi, coupure à 13 h), le formateur affiche un **QR code** ;
@@ -25,6 +27,10 @@ Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) ; ve
 
 ### Corrigé
 
+- Émargement en ligne : une séance qui n'a pas lieu aujourd'hui indique pourquoi le bouton « Ouvrir l'émargement »
+  manque (« S'ouvre le jour de la séance » ou « Pas d'émargement en ligne ce jour-là »).
+- Émargement en ligne : quand aucun stagiaire n'est attendu à la demi-journée (date d'entrée en formation plus tardive,
+  pas d'inscription), la page du stagiaire ne dit plus « Tout le monde a signé » et l'écran du formateur le signale.
 - Sessions : une session passe « Terminée » dès son dernier jour quand son dernier mois est clôturé (Suivi › Clôture
   des mois), au lieu d'attendre le lendemain.
 - Sessions : la carte « Clôture des mois » de la synthèse compte aussi le dernier mois d'une session à partir de son
@@ -774,7 +780,8 @@ Lot 1a : socle de l'application.
   mise à jour avec retour arrière automatique.
 - Publication : image multi-architecture signée (cosign), archive de version, sommes de contrôle.
 
-[Non publié]: https://github.com/sebvtl728/CRMTMS/compare/v0.11.0...HEAD
+[Non publié]: https://github.com/sebvtl728/CRMTMS/compare/v0.12.0...HEAD
+[0.12.0]: https://github.com/sebvtl728/CRMTMS/compare/v0.11.0...v0.12.0
 [0.11.0]: https://github.com/sebvtl728/CRMTMS/compare/v0.10.0...v0.11.0
 [0.10.0]: https://github.com/sebvtl728/CRMTMS/compare/v0.9.2...v0.10.0
 [0.9.2]: https://github.com/sebvtl728/CRMTMS/compare/v0.9.1...v0.9.2

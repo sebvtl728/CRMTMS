@@ -46,6 +46,8 @@ class PublicSigningController extends Controller
             'date' => $slot->date->locale('fr')->isoFormat('dddd D MMMM YYYY'),
             'half_label' => SignSlot::label($slot->half),
             'trainees' => $trainees,
+            // Nobody expected (entry date later, no enrolment): not « everyone has signed ».
+            'expected' => count($names),
             'post_url' => url('/emargement/'.$token),
         ])->toResponse($request);
         $response->headers->add(['Cache-Control' => 'no-store, private', 'X-Robots-Tag' => 'noindex, nofollow']);

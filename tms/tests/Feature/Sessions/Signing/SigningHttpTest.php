@@ -67,7 +67,7 @@ it('lets a trainee sign on the public page, which shows the first name and initi
 
     $this->postJson("/emargement/{$token}", ['enrolment_id' => $lea->id, 'drawing' => sigDrawing()])->assertCreated();
     $this->postJson("/emargement/{$token}", ['enrolment_id' => $lea->id, 'drawing' => sigDrawing()])->assertStatus(409)->assertJsonPath('message', 'Ce nom a déjà signé.');
-    $this->get("/emargement/{$token}")->assertInertia(fn (AssertableInertia $p) => $p->where('trainees', []));
+    $this->get("/emargement/{$token}")->assertInertia(fn (AssertableInertia $p) => $p->where('trainees', [])->where('expected', 1));
 
     $this->actingAs(atManager())->getJson("/sessions/emargement/{$slotId}/state")->assertJsonPath('rows.0.signed_at', fn ($v) => $v !== null);
 });
@@ -146,4 +146,31 @@ it('lists the half-days of the month on the « Présences » tab, the past open 
     $this->actingAs(atManager())->getJson("/sessions/{$session->id}/attendance?month=2026-09")->assertOk()
         ->assertJsonPath('slots.0.date', '2026-09-10')->assertJsonPath('slots.0.half', 'morning')
         ->assertJsonPath('slots.0.to_validate', true)->assertJsonPath('slots.0.expected', 1);
+});
+
+it('tells the « Présences » tab whether a séance\'s day is to come, so the screen explains the missing button', function () {
+    $session = plSession();
+    $past = plSeance(plModule($session), '2026-09-09');
+    $today = plSeance(plModule($session), '2026-09-10');
+    $later = plSeance(plModule($session), '2026-09-14');
+    atEnrol($session, 'Durand');
+    $this->actingAs(atManager());
+
+    $this->getJson("/seances/{$later->id}/attendance")->assertOk()
+        ->assertJsonPath('slots.0.is_today', false)->assertJsonPath('slots.0.is_future', true);
+    $this->getJson("/seances/{$today->id}/attendance")->assertOk()
+        ->assertJsonPath('slots.0.is_today', true)->assertJsonPath('slots.0.is_future', false);
+    $this->getJson("/seances/{$past->id}/attendance")->assertOk()
+        ->assertJsonPath('slots.0.is_today', false)->assertJsonPath('slots.0.is_future', false);
+});
+
+it('tells the public page that nobody is expected, rather than that everyone has signed', function () {
+    $session = plSession();
+    $seance = plSeance(plModule($session), '2026-09-10');
+    atEnrol($session, 'Durand', ['entered_on' => '2026-09-14']);
+    [, $url] = hOpen($seance->id);
+    auth()->logout();
+
+    $this->get('/emargement/'.hToken($url))->assertOk()
+        ->assertInertia(fn (AssertableInertia $p) => $p->where('trainees', [])->where('expected', 0));
 });
