@@ -73,6 +73,7 @@ final class Attendances
                 'reason' => $reason,
                 'needs_review' => false,
                 'recorded_by' => self::userId(),
+                'source' => null,
             ])->save();
 
             return $attendance;
@@ -102,6 +103,37 @@ final class Attendances
             }
 
             return $count;
+        });
+    }
+
+    /**
+     * The attendance computed from the online signatures (SlotValidation),
+     * under the same lock and rules as record(): written only when the row
+     * is missing or was itself written from the signatures (source =
+     * signing) - an attendance entered by hand is never overwritten.
+     * Returns whether a row was written.
+     */
+    public function fromSigning(Seance $seance, string $enrolmentId, string $status, int $minutes): bool
+    {
+        return DB::transaction(function () use ($seance, $enrolmentId, $status, $minutes): bool {
+            $locked = self::lock($seance);
+            $enrolment = self::enrolmentOf($locked, $enrolmentId);
+            self::assertExpected($enrolment, $locked->date);
+            $attendance = Attendance::query()->where('seance_id', $locked->id)->where('enrolment_id', $enrolment->id)->lockForUpdate()->first();
+            if ($attendance !== null && $attendance->source !== Attendance::SOURCE_SIGNING) {
+                return false;
+            }
+            $attendance ??= new Attendance(['seance_id' => $locked->id, 'enrolment_id' => $enrolment->id]);
+            $attendance->fill([
+                'status' => $status,
+                'minutes' => $status === Attendance::PRESENT ? $locked->duration_minutes : $minutes,
+                'reason' => null,
+                'needs_review' => false,
+                'recorded_by' => self::userId(),
+                'source' => Attendance::SOURCE_SIGNING,
+            ])->save();
+
+            return true;
         });
     }
 
