@@ -12,6 +12,9 @@ Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) ; ve
   et code à 6 chiffres par e-mail). Chaque rattrapage est **confirmé ou refusé** par un gestionnaire des présences
   (onglet Présences) avant de compter ; la feuille signée l'indique. Deux nouveaux modèles d'e-mails.
 - Émargement papier replié sous « Émargement papier (secours) » dans la feuille de présences d'une séance.
+- Émargement en ligne : **Faire entrer ce jour-là** avance la date d'entrée d'un inscrit qui entre en formation plus
+  tard, pour qu'il signe la demi-journée (nouveau droit « Faire entrer un stagiaire en formation » : administrateur,
+  direction et Responsable de DAS par défaut ; mois clôturé refusé ; noté dans l'historique du dossier).
 - Feuille d'émargement signée : bouton **Aperçu** (ouvre le PDF archivé dans un nouvel onglet) à côté de
   **Télécharger**.
 

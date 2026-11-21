@@ -4,6 +4,7 @@ use App\Modules\Core\Access\Role;
 use App\Modules\Core\Tenancy\TenantStorage;
 use App\Modules\Sessions\Attendance\Signing\AttendanceSignature;
 use App\Modules\Sessions\Attendance\Signing\SignSlot;
+use App\Modules\Sessions\Permissions;
 use App\Modules\Sessions\Trainers\Trainers;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\Storage;
@@ -173,4 +174,42 @@ it('tells the public page that nobody is expected, rather than that everyone has
 
     $this->get('/emargement/'.hToken($url))->assertOk()
         ->assertInertia(fn (AssertableInertia $p) => $p->where('trainees', [])->where('expected', 0));
+});
+
+it('lets who holds « Faire entrer un stagiaire » bring a trainee in on the half-day, who can then sign', function () {
+    $session = plSession();
+    $seance = plSeance(plModule($session), '2026-09-10');
+    $lea = atEnrol($session, 'Durand', ['entered_on' => '2026-09-14']);
+    $manager = userWithPermissions([
+        Permissions::SESSIONS_VIEW, Permissions::SEANCES_VIEW, Permissions::ATTENDANCE_MANAGE, Permissions::ATTENDANCE_ADVANCE_ENTRY,
+    ]);
+    [$slotId, $url] = hOpen($seance->id, $manager);
+
+    $this->actingAs($manager)->getJson("/sessions/emargement/{$slotId}/state")->assertOk()
+        ->assertJsonPath('rows', [])->assertJsonPath('can_advance_entry', true)
+        ->assertJsonPath('late_entrants.0.enrolment_id', $lea->id)->assertJsonPath('late_entrants.0.entered_on', '2026-09-14');
+
+    // Without the right: listed, not allowed.
+    $this->actingAs(atManager())->getJson("/sessions/emargement/{$slotId}/state")->assertJsonPath('can_advance_entry', false);
+    $this->actingAs(atManager())->postJson("/sessions/emargement/{$slotId}/advance-entry", ['enrolment_id' => $lea->id])->assertForbidden();
+
+    $this->actingAs($manager)->postJson("/sessions/emargement/{$slotId}/advance-entry", ['enrolment_id' => $lea->id])->assertOk()
+        ->assertJsonPath('rows.0.enrolment_id', $lea->id)->assertJsonPath('late_entrants', []);
+    expect($lea->refresh()->entered_on->toDateString())->toBe('2026-09-10');
+
+    auth()->logout();
+    $this->get('/emargement/'.hToken($url))->assertInertia(fn (AssertableInertia $p) => $p->where('trainees.0.id', $lea->id));
+});
+
+it('refuses to bring in a trainee of another session', function () {
+    $session = plSession();
+    $seance = plSeance(plModule($session), '2026-09-10');
+    $other = atEnrol(plSession(), 'Martin', ['entered_on' => '2026-09-14']);
+    $manager = userWithPermissions([
+        Permissions::SESSIONS_VIEW, Permissions::SEANCES_VIEW, Permissions::ATTENDANCE_MANAGE, Permissions::ATTENDANCE_ADVANCE_ENTRY,
+    ]);
+    [$slotId] = hOpen($seance->id, $manager);
+
+    $this->actingAs($manager)->postJson("/sessions/emargement/{$slotId}/advance-entry", ['enrolment_id' => $other->id])->assertNotFound();
+    expect($other->refresh()->entered_on->toDateString())->toBe('2026-09-14');
 });

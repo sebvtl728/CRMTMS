@@ -107,6 +107,7 @@ Route::middleware(['auth', 'can:sessions.attendance.manage'])->prefix('sessions/
     Route::post('catch-up', [SigningController::class, 'openCatchUp'])->name('catch-up');
     Route::post('catch-up/close', [SigningController::class, 'closeCatchUp'])->name('catch-up.close');
     Route::post('catch-up-links', [SigningController::class, 'sendCatchUpLink'])->middleware('throttle:attendance-signing-open')->name('catch-up-links');
+    Route::post('advance-entry', [SigningController::class, 'advanceEntry'])->name('advance-entry');
 });
 
 // Catch-ups of the online signing (2026-11-21): an attendance manager confirms or refuses them.
