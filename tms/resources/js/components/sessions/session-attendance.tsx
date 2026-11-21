@@ -67,6 +67,8 @@ interface DaySlot {
     signed: number;
     expected: number;
     is_today: boolean;
+    /** The séance's day is still to come: signing opens that day. */
+    is_future: boolean;
 }
 
 const SLOT_STATUS: Record<string, string> = { open: 'Ouvert', closed: 'Lien fermé', validated: 'Validé' };
@@ -112,9 +114,13 @@ function OnlineSigning({ seanceId, slots }: { seanceId: string; slots: DaySlot[]
                         ) : s.is_today ? (
                             <Button size="sm" disabled={busy !== null} onClick={() => open(s.half)}>
                                 {busy === s.half ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <QrCode className="h-4 w-4" />}
-                                {s.status === 'open' ? 'Afficher le QR code' : s.status === 'closed' ? 'Rouvrir' : 'Ouvrir l\'émargement'}
+                                {s.status === 'open' ? 'Afficher le QR code' : s.status === 'closed' ? 'Rouvrir' : "Ouvrir l'émargement"}
                             </Button>
-                        ) : null}
+                        ) : (
+                            <span className="text-muted-foreground text-xs">
+                                {s.is_future ? "S'ouvre le jour de la séance" : "Pas d'émargement en ligne ce jour-là"}
+                            </span>
+                        )}
                     </li>
                 ))}
             </ul>
@@ -157,7 +163,17 @@ interface SessionAttendance {
     };
     realised: { enrolment_id: string; name: string; planned: string; realised: string }[];
     /** Half-days signed online this month (SlotRows::forMonth). */
-    slots: { id: string; date: string; half: string; label: string; status: 'open' | 'closed' | 'validated'; signed: number; expected: number; validated_by: string | null; to_validate: boolean }[];
+    slots: {
+        id: string;
+        date: string;
+        half: string;
+        label: string;
+        status: 'open' | 'closed' | 'validated';
+        signed: number;
+        expected: number;
+        validated_by: string | null;
+        to_validate: boolean;
+    }[];
     /** Archived signed sheets of the session, the latest first. */
     signed_sheets: { id: string; month: string; month_label: string; generated_at: string | null; sha256: string; url: string }[];
 }
@@ -860,7 +876,14 @@ export function SessionAttendance({ sessionId }: { sessionId: string }) {
                         ))}
                     </ul>
                 )}
-                <SignedSheets sessionId={sessionId} month={data.month} label={label} canGenerate={data.can.manage} sheets={data.signed_sheets} onChange={(sheets) => setData({ ...data, signed_sheets: sheets })} />
+                <SignedSheets
+                    sessionId={sessionId}
+                    month={data.month}
+                    label={label}
+                    canGenerate={data.can.manage}
+                    sheets={data.signed_sheets}
+                    onChange={(sheets) => setData({ ...data, signed_sheets: sheets })}
+                />
             </section>
 
             <section className="grid gap-2">
@@ -924,7 +947,9 @@ function SignedSheets({
 
     const generate = async () => {
         setBusy(true);
-        const answer = await sendJson<{ sheets: SessionAttendance['signed_sheets'] }>('POST', route('sessions.signed-sheets.store', sessionId), { month });
+        const answer = await sendJson<{ sheets: SessionAttendance['signed_sheets'] }>('POST', route('sessions.signed-sheets.store', sessionId), {
+            month,
+        });
         setBusy(false);
         if (answer.ok && answer.data) {
             onChange(answer.data.sheets);

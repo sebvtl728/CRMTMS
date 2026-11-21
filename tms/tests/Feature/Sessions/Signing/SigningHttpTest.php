@@ -147,3 +147,19 @@ it('lists the half-days of the month on the « Présences » tab, the past open 
         ->assertJsonPath('slots.0.date', '2026-09-10')->assertJsonPath('slots.0.half', 'morning')
         ->assertJsonPath('slots.0.to_validate', true)->assertJsonPath('slots.0.expected', 1);
 });
+
+it('tells the « Présences » tab whether a séance\'s day is to come, so the screen explains the missing button', function () {
+    $session = plSession();
+    $past = plSeance(plModule($session), '2026-09-09');
+    $today = plSeance(plModule($session), '2026-09-10');
+    $later = plSeance(plModule($session), '2026-09-14');
+    atEnrol($session, 'Durand');
+    $this->actingAs(atManager());
+
+    $this->getJson("/seances/{$later->id}/attendance")->assertOk()
+        ->assertJsonPath('slots.0.is_today', false)->assertJsonPath('slots.0.is_future', true);
+    $this->getJson("/seances/{$today->id}/attendance")->assertOk()
+        ->assertJsonPath('slots.0.is_today', true)->assertJsonPath('slots.0.is_future', false);
+    $this->getJson("/seances/{$past->id}/attendance")->assertOk()
+        ->assertJsonPath('slots.0.is_today', false)->assertJsonPath('slots.0.is_future', false);
+});
