@@ -99,6 +99,8 @@ it('anonymisation scrubs action reports', function () {
 });
 
 it('lists the actions of a person in her data export', function () {
+    // Fixed clock: the reminder due on 20/11 must stay « À faire », not « En retard ».
+    $this->travelTo(CarbonImmutable::parse('2026-11-15 10:00', 'Europe/Paris'));
     $this->actingAs(commercial());
     $person = makePerson('Durand', ['first_name' => 'Claire']);
     gdprActivity(['person_id' => $person->id, 'subject' => 'Appel – Claire Durand', 'report' => 'Rappeler lundi',
