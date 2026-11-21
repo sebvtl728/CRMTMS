@@ -38,6 +38,10 @@ class RateLimitServiceProvider extends ServiceProvider
         'positioning-send' => 20,
         // Online signature page (signer, no account: per address).
         'signature-public' => 30,
+        // Online attendance signing (émargement): a class shares one address, so per link and address.
+        'attendance-signing' => 240,
+        'attendance-signing-post' => 60,
+        'attendance-signing-open' => 30,
         // Local sandbox reset (Administration › Bac à sable).
         'sandbox-reset' => 6,
     ];
@@ -85,6 +89,14 @@ class RateLimitServiceProvider extends ServiceProvider
     {
         $token = $request->route('token');
 
-        return $name === 'calendar-feed' && is_string($token) ? 'feed:'.hash('sha256', $token) : null;
+        if (! is_string($token)) {
+            return null;
+        }
+
+        return match ($name) {
+            'calendar-feed' => 'feed:'.hash('sha256', $token),
+            'attendance-signing', 'attendance-signing-post' => 'sign:'.hash('sha256', $token).'|'.$request->ip(),
+            default => null,
+        };
     }
 }

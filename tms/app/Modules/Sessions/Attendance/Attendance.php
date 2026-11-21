@@ -24,6 +24,7 @@ use Illuminate\Support\Carbon;
  * @property string|null $reason ≤ 300, personal
  * @property bool $needs_review the séance changed its hours since
  * @property string|null $recorded_by
+ * @property string|null $source null = by hand, signing = from the online signatures
  * @property Carbon|null $created_at
  * @property Carbon|null $updated_at
  */
@@ -41,13 +42,16 @@ class Attendance extends Model
 
     public const EXCUSED = 'excused';
 
+    /** attendances.source of a row written from the online signatures (null = entered by hand). */
+    public const SOURCE_SIGNING = 'signing';
+
     public const STATUSES = [self::PRESENT, self::PARTIAL, self::ABSENT, self::EXCUSED];
 
     /** @var list<string> */
     protected array $auditPersonal = ['reason'];
 
     /** @var list<string> */
-    protected $fillable = ['seance_id', 'enrolment_id', 'status', 'minutes', 'reason', 'needs_review', 'recorded_by'];
+    protected $fillable = ['seance_id', 'enrolment_id', 'status', 'minutes', 'reason', 'needs_review', 'recorded_by', 'source'];
 
     /** @var array<string, mixed> */
     protected $attributes = ['needs_review' => false];
