@@ -29,6 +29,8 @@ Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) ; ve
 
 - Émargement en ligne : une séance qui n'a pas lieu aujourd'hui indique pourquoi le bouton « Ouvrir l'émargement »
   manque (« S'ouvre le jour de la séance » ou « Pas d'émargement en ligne ce jour-là »).
+- Émargement en ligne : quand aucun stagiaire n'est attendu à la demi-journée (date d'entrée en formation plus tardive,
+  pas d'inscription), la page du stagiaire ne dit plus « Tout le monde a signé » et l'écran du formateur le signale.
 - Sessions : une session passe « Terminée » dès son dernier jour quand son dernier mois est clôturé (Suivi › Clôture
   des mois), au lieu d'attendre le lendemain.
 - Sessions : la carte « Clôture des mois » de la synthèse compte aussi le dernier mois d'une session à partir de son

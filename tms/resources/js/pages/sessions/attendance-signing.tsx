@@ -9,7 +9,7 @@ import { formatDateTime } from '@/lib/crm';
 import { sendJson } from '@/lib/sessions';
 import { type BreadcrumbItem } from '@/types';
 import { Head } from '@inertiajs/react';
-import { CheckCircle2, Clock, ExternalLink, Lock, LoaderCircle, PenLine, Trash2 } from 'lucide-react';
+import { CheckCircle2, Clock, ExternalLink, LoaderCircle, Lock, PenLine, Trash2 } from 'lucide-react';
 import { useEffect, useState } from 'react';
 
 /** The live state of a half-day (SlotRows::state): full names, the trainer is authenticated. */
@@ -75,10 +75,7 @@ export default function AttendanceSigning({ state: initial }: { state: SlotState
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Émargement en ligne" />
             <div className="grid gap-6 p-4">
-                <Heading
-                    title={`Émargement – ${state.half_label}`}
-                    description={`${state.session ?? ''} · ${state.date_label}`}
-                />
+                <Heading title={`Émargement – ${state.half_label}`} description={`${state.session ?? ''} · ${state.date_label}`} />
                 {error && <p className="text-destructive text-sm">{error}</p>}
 
                 <div className="grid gap-6 lg:grid-cols-2">
@@ -100,7 +97,12 @@ export default function AttendanceSigning({ state: initial }: { state: SlotState
                                             Ouvrir la page de signature ici
                                         </a>
                                     </Button>
-                                    <Button variant="outline" size="sm" disabled={busy} onClick={() => act('POST', route('sessions.signing.close', state.id))}>
+                                    <Button
+                                        variant="outline"
+                                        size="sm"
+                                        disabled={busy}
+                                        onClick={() => act('POST', route('sessions.signing.close', state.id))}
+                                    >
                                         <Lock className="h-4 w-4" />
                                         Fermer le lien
                                     </Button>
@@ -129,6 +131,11 @@ export default function AttendanceSigning({ state: initial }: { state: SlotState
                         <h3 className="font-medium">
                             Signatures : {signed} / {state.rows.length}
                         </h3>
+                        {state.rows.length === 0 && (
+                            <p className="text-muted-foreground rounded-md border p-3 text-sm">
+                                Aucun stagiaire n'est attendu ce jour-là : vérifiez les inscriptions et leur date d'entrée en formation.
+                            </p>
+                        )}
                         <ul className="divide-y rounded-md border">
                             {state.rows.map((r) => (
                                 <li key={r.enrolment_id} className="flex items-center justify-between gap-2 p-2 text-sm">

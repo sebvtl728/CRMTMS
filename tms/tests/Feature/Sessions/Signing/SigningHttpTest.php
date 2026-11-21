@@ -67,7 +67,7 @@ it('lets a trainee sign on the public page, which shows the first name and initi
 
     $this->postJson("/emargement/{$token}", ['enrolment_id' => $lea->id, 'drawing' => sigDrawing()])->assertCreated();
     $this->postJson("/emargement/{$token}", ['enrolment_id' => $lea->id, 'drawing' => sigDrawing()])->assertStatus(409)->assertJsonPath('message', 'Ce nom a déjà signé.');
-    $this->get("/emargement/{$token}")->assertInertia(fn (AssertableInertia $p) => $p->where('trainees', []));
+    $this->get("/emargement/{$token}")->assertInertia(fn (AssertableInertia $p) => $p->where('trainees', [])->where('expected', 1));
 
     $this->actingAs(atManager())->getJson("/sessions/emargement/{$slotId}/state")->assertJsonPath('rows.0.signed_at', fn ($v) => $v !== null);
 });
@@ -162,4 +162,15 @@ it('tells the « Présences » tab whether a séance\'s day is to come, so the s
         ->assertJsonPath('slots.0.is_today', true)->assertJsonPath('slots.0.is_future', false);
     $this->getJson("/seances/{$past->id}/attendance")->assertOk()
         ->assertJsonPath('slots.0.is_today', false)->assertJsonPath('slots.0.is_future', false);
+});
+
+it('tells the public page that nobody is expected, rather than that everyone has signed', function () {
+    $session = plSession();
+    $seance = plSeance(plModule($session), '2026-09-10');
+    atEnrol($session, 'Durand', ['entered_on' => '2026-09-14']);
+    [, $url] = hOpen($seance->id);
+    auth()->logout();
+
+    $this->get('/emargement/'.hToken($url))->assertOk()
+        ->assertInertia(fn (AssertableInertia $p) => $p->where('trainees', [])->where('expected', 0));
 });
