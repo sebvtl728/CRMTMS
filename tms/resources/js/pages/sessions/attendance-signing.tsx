@@ -5,11 +5,11 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import AppLayout from '@/layouts/app-layout';
-import { formatDateTime } from '@/lib/crm';
+import { formatDateTime, formatDay } from '@/lib/crm';
 import { sendJson } from '@/lib/sessions';
 import { type BreadcrumbItem } from '@/types';
 import { Head } from '@inertiajs/react';
-import { CheckCircle2, Clock, ExternalLink, LoaderCircle, Lock, PenLine, Trash2 } from 'lucide-react';
+import { CheckCircle2, Clock, ExternalLink, LoaderCircle, Lock, LogIn, PenLine, Trash2 } from 'lucide-react';
 import { useEffect, useState } from 'react';
 
 /** The live state of a half-day (SlotRows::state): full names, the trainer is authenticated. */
@@ -25,6 +25,10 @@ interface SlotState {
     validated_at: string | null;
     validated_by: string | null;
     rows: { enrolment_id: string; name: string; signed_at: string | null; signature_id: string | null }[];
+    /** Enrolled, but entering the training after this day: not expected yet. */
+    late_entrants: { enrolment_id: string; name: string; entered_on: string | null }[];
+    /** « Faire entrer un stagiaire en formation » on this session. */
+    can_advance_entry: boolean;
 }
 
 const breadcrumbs: BreadcrumbItem[] = [{ title: 'Mon planning', href: '/mon-planning' }];
@@ -135,6 +139,41 @@ export default function AttendanceSigning({ state: initial }: { state: SlotState
                             <p className="text-muted-foreground rounded-md border p-3 text-sm">
                                 Aucun stagiaire n'est attendu ce jour-là : vérifiez les inscriptions et leur date d'entrée en formation.
                             </p>
+                        )}
+                        {(state.late_entrants ?? []).length > 0 && (
+                            <div className="grid gap-2 rounded-md border p-3 text-sm">
+                                <p className="font-medium">Inscrits qui entrent en formation plus tard</p>
+                                <p className="text-muted-foreground">
+                                    {state.can_advance_entry
+                                        ? "« Faire entrer ce jour-là » avance sa date d'entrée au jour de cette demi-journée (noté dans l'historique du dossier) : il peut alors signer."
+                                        : "Pour qu'ils signent, une personne ayant le droit « Faire entrer un stagiaire en formation » doit avancer leur date d'entrée."}
+                                </p>
+                                <ul className="divide-y rounded-md border">
+                                    {state.late_entrants.map((r) => (
+                                        <li key={r.enrolment_id} className="flex flex-wrap items-center justify-between gap-2 p-2">
+                                            <span>
+                                                {r.name}
+                                                <span className="text-muted-foreground"> · entrée le {formatDay(r.entered_on)}</span>
+                                            </span>
+                                            {state.can_advance_entry && (
+                                                <Button
+                                                    size="sm"
+                                                    variant="outline"
+                                                    disabled={busy}
+                                                    onClick={() =>
+                                                        act('POST', route('sessions.signing.advance-entry', state.id), {
+                                                            enrolment_id: r.enrolment_id,
+                                                        })
+                                                    }
+                                                >
+                                                    <LogIn className="h-4 w-4" />
+                                                    Faire entrer ce jour-là
+                                                </Button>
+                                            )}
+                                        </li>
+                                    ))}
+                                </ul>
+                            </div>
                         )}
                         <ul className="divide-y rounded-md border">
                             {state.rows.map((r) => (

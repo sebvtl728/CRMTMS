@@ -208,6 +208,7 @@ Le planning (0.8.0) ajoute les thèmes *Planning et présences* (droits à péri
 | `sessions.seances.view` / `.manage` | Voir le planning des séances, leurs formateurs et leurs salles ; créer, déplacer, annuler, supprimer des séances, générer les séances d'un module |
 | `sessions.attendance.manage` | Saisir les présences des séances et les heures réalisées par mois |
 | `sessions.attendance.close` | Clôturer un mois de présences d'une session et le rouvrir (motif obligatoire) |
+| `sessions.attendance.advance_entry` | **Faire entrer un stagiaire en formation** : depuis l'écran d'émargement en ligne, avancer la date d'entrée d'un inscrit au jour de la demi-journée pour qu'il puisse signer (droit à périmètre ; par défaut administrateur, direction et Responsable de DAS sur « Ses DAS »). L'écran d'émargement exige aussi « Saisir les présences » |
 | `sessions.trainers.manage` | Menu **Formateurs** (droit à périmètre : « Ses fiches » = formateurs créés par l'utilisateur ou liés à son compte ; « Ses DAS » = formateurs d'un DAS suivi **ou sans DAS** ; tout l'organisme ; Responsable de DAS : Ses DAS par défaut) : déclarer des formateurs, leur statut, leurs DAS, leurs indisponibilités, leur compte ; bloc « Formateur » des fiches Personne |
 | `sessions.rooms.manage` | Administration › **Salles et fermetures** |
 

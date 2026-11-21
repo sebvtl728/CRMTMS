@@ -2,8 +2,10 @@
 
 namespace App\Modules\Sessions\Attendance\Signing;
 
+use App\Exceptions\UserFacingHttpException;
 use App\Http\Controllers\Controller;
 use App\Modules\Core\Users\User;
+use App\Modules\Sessions\Enrolments\Enrolments;
 use App\Modules\Sessions\Permissions;
 use App\Modules\Sessions\Planning\Seance;
 use App\Modules\Sessions\Sessions\TrainingSession;
@@ -43,12 +45,12 @@ class SigningController extends Controller
     {
         $found = self::slot($request, $slot);
 
-        return Inertia::render('sessions/attendance-signing', ['state' => SlotRows::state($found)]);
+        return Inertia::render('sessions/attendance-signing', ['state' => SlotRows::state($found, self::user($request))]);
     }
 
     public function state(Request $request, string $slot): JsonResponse
     {
-        return self::json(SlotRows::state(self::slot($request, $slot)));
+        return self::json(SlotRows::state(self::slot($request, $slot), self::user($request)));
     }
 
     public function close(Request $request, string $slot): JsonResponse
@@ -56,7 +58,7 @@ class SigningController extends Controller
         $found = self::slot($request, $slot);
         $this->signing->close($found);
 
-        return self::json(SlotRows::state($found->fresh() ?? $found));
+        return self::json(SlotRows::state($found->fresh() ?? $found, self::user($request)));
     }
 
     public function erase(Request $request, string $slot, string $signature): JsonResponse
@@ -65,7 +67,7 @@ class SigningController extends Controller
         abort_unless(Str::isUuid($signature), 404);
         $this->signing->erase(AttendanceSignature::query()->where('slot_id', $found->id)->findOrFail($signature));
 
-        return self::json(SlotRows::state($found));
+        return self::json(SlotRows::state($found, self::user($request)));
     }
 
     public function validate(Request $request, string $slot): JsonResponse
@@ -73,7 +75,28 @@ class SigningController extends Controller
         $found = self::slot($request, $slot);
         $done = $this->validation->validate($found, (string) $request->input('drawing', ''), self::user($request));
 
-        return self::json(SlotRows::state($done));
+        return self::json(SlotRows::state($done, self::user($request)));
+    }
+
+    /**
+     * Brings a trainee entering later in on the slot's day (« Faire entrer un
+     * stagiaire en formation » on the session, else 403): his entry date
+     * becomes that day through Enrolments::update (closed months refused,
+     * journaled), so he is expected and can sign.
+     */
+    public function advanceEntry(Request $request, string $slot, Enrolments $enrolments): JsonResponse
+    {
+        $found = self::slot($request, $slot);
+        $user = self::user($request);
+        abort_unless(SlotRows::mayAdvanceEntry($found, $user), 403);
+        if ($found->status === SignSlot::VALIDATED) {
+            throw new UserFacingHttpException(409, 'Cette demi-journée est validée : corrigez la date d\'entrée depuis l\'inscription.');
+        }
+        $id = (string) $request->input('enrolment_id', '');
+        $enrolment = SlotRows::lateEntrants($found)->firstWhere('id', $id) ?? abort(404);
+        $enrolments->update($enrolment, ['entered_on' => $found->date->toDateString()]);
+
+        return self::json(SlotRows::state($found, $user));
     }
 
     /** The slot reached by the user (one of its séances within the scope of sessions.attendance.manage), else 404. */

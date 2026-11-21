@@ -2,11 +2,16 @@
 
 namespace App\Modules\Sessions\Attendance\Signing;
 
+use App\Modules\Core\Users\User;
 use App\Modules\Crm\Public\Fiches;
 use App\Modules\Sessions\Attendance\Attendances;
+use App\Modules\Sessions\Enrolments\Enrolment;
+use App\Modules\Sessions\Permissions;
 use App\Modules\Sessions\Planning\Seance;
 use App\Modules\Sessions\Sessions\TrainingSession;
+use App\Modules\Sessions\SessionsVisibility;
 use Carbon\CarbonImmutable;
+use Illuminate\Support\Collection;
 
 /**
  * What the screens read about the half-days: the trainer's live state of a
@@ -18,11 +23,12 @@ final class SlotRows
     /**
      * @return array<string, mixed>
      */
-    public static function state(SignSlot $slot): array
+    public static function state(SignSlot $slot, ?User $user = null): array
     {
         $expected = SlotSeances::expected($slot);
+        $late = self::lateEntrants($slot);
         $signatures = AttendanceSignature::query()->where('slot_id', $slot->id)->get()->keyBy('enrolment_id');
-        $labels = app(Fiches::class)->personLabels($expected->pluck('person_id')->map(fn ($id) => (string) $id)->unique()->values()->all());
+        $labels = app(Fiches::class)->personLabels($expected->concat($late)->pluck('person_id')->map(fn ($id) => (string) $id)->unique()->values()->all());
         $session = TrainingSession::withTrashed()->find($slot->training_session_id);
         $token = $slot->token();
         $url = $token === null ? null : SlotQr::publicUrl($token);
@@ -47,7 +53,37 @@ final class SlotRows
                 'signed_at' => $signatures->get($e->id)?->signed_at?->toIso8601String(),
                 'signature_id' => $signatures->get($e->id)?->id,
             ])->sortBy(fn (array $r) => mb_strtolower($r['name']).$r['enrolment_id'])->values()->all(),
+            // Enrolled but entering the training after this day: not expected, may be brought in.
+            'late_entrants' => $slot->status === SignSlot::VALIDATED ? [] : $late->map(fn (Enrolment $e) => [
+                'enrolment_id' => $e->id,
+                'name' => $labels[$e->person_id]['label'] ?? 'Stagiaire',
+                'entered_on' => $e->entered_on?->toDateString(),
+            ])->sortBy(fn (array $r) => mb_strtolower($r['name']).$r['enrolment_id'])->values()->all(),
+            'can_advance_entry' => $user !== null && self::mayAdvanceEntry($slot, $user),
         ];
+    }
+
+    /**
+     * Enrolments of the session that attend the training but enter it after
+     * the slot's day (and have not left before it).
+     *
+     * @return Collection<int, Enrolment>
+     */
+    public static function lateEntrants(SignSlot $slot): Collection
+    {
+        $date = $slot->date->toDateString();
+
+        return Enrolment::query()->where('training_session_id', $slot->training_session_id)
+            ->whereIn('status', Attendances::ATTENDING)
+            ->where('entered_on', '>', $date)
+            ->where(fn ($q) => $q->whereNull('left_on')->orWhere('left_on', '>=', $date))
+            ->orderBy('id')->get()->values();
+    }
+
+    /** The user holds « Faire entrer un stagiaire en formation » on the slot's session. */
+    public static function mayAdvanceEntry(SignSlot $slot, User $user): bool
+    {
+        return SessionsVisibility::sessions(TrainingSession::query()->whereKey($slot->training_session_id), $user, Permissions::ATTENDANCE_ADVANCE_ENTRY)->exists();
     }
 
     /**
