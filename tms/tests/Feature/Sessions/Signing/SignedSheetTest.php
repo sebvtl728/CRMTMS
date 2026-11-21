@@ -73,6 +73,11 @@ it('archives each generation with its SHA-256 and serves the archive, 410 when a
     expect($sheet->pdf_sha256)->toBe(hash('sha256', (string) $disk->get($sheet->path)));
     $response = $this->actingAs($manager)->get("/signed-sheets/{$sheet->id}")->assertOk();
     expect($response->streamedContent())->toStartWith('%PDF-');
+    expect($response->headers->get('Content-Disposition'))->toStartWith('attachment;');
+    // « Aperçu »: the same archived file, shown in the browser.
+    $preview = $this->actingAs($manager)->get("/signed-sheets/{$sheet->id}?apercu=1")->assertOk();
+    expect($preview->headers->get('Content-Disposition'))->toStartWith('inline;')
+        ->and($preview->streamedContent())->toStartWith('%PDF-');
 
     $disk->put($sheet->path, 'altered');
     $this->actingAs($manager)->get("/signed-sheets/{$sheet->id}")->assertStatus(410);
