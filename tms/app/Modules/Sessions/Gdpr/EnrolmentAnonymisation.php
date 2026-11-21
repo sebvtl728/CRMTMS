@@ -3,6 +3,7 @@
 namespace App\Modules\Sessions\Gdpr;
 
 use App\Modules\Sessions\Attendance\AttendanceScans;
+use App\Modules\Sessions\Attendance\Signing\SigningAnonymisation;
 use App\Modules\Sessions\Sessions\SessionKind;
 use Illuminate\Support\Facades\DB;
 
@@ -19,7 +20,9 @@ use Illuminate\Support\Facades\DB;
  *  - her attendance (0.8.0): the reasons of an absence or a partial
  *    attendance (status and minutes stay: realised hours, invoicing); the
  *    monthly hours stay; the signed scans of the sessions stay (collective
- *    proof) except on an individual session (one trainee), where they go.
+ *    proof) except on an individual session (one trainee), where they go;
+ *  - her online signatures: drawings, address and browser erased (the hour
+ *    stays); the signed sheets go with the scans on an individual session.
  * Dossiers of an entreprise she is the contact of keep their notes (they
  * are the entreprise's). Written in SQL: the journal never held the values.
  */
@@ -45,8 +48,10 @@ final class EnrolmentAnonymisation
         // The signed sheets are a proof shared by the whole session: kept, except
         // on an individual session, where the only trainee they concern is her.
         AttendanceScans::neutraliseNames($enrolments->clone()->distinct()->pluck('training_session_id')->all());
-        AttendanceScans::purgeOfSessions(DB::table('training_sessions')->where('kind', SessionKind::Individual->value)
-            ->whereIn('id', $enrolments->clone()->select('training_session_id'))->pluck('id')->all());
+        $individual = DB::table('training_sessions')->where('kind', SessionKind::Individual->value)
+            ->whereIn('id', $enrolments->clone()->select('training_session_id'))->pluck('id')->all();
+        AttendanceScans::purgeOfSessions($individual);
+        SigningAnonymisation::scrub($enrolments->clone()->pluck('id')->all(), $individual);
 
         $ownDossiers = DB::table('dossiers')->whereIn('account_person_id', $personIds);
         DB::table('fundings')->whereNotNull('notes')
