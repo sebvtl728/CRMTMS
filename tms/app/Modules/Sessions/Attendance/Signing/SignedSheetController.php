@@ -62,7 +62,8 @@ class SignedSheetController extends Controller
             echo $bytes;
         }, 200, [
             'Content-Type' => 'application/pdf',
-            'Content-Disposition' => 'attachment; filename="emargement-signe-'.$row->month->format('Y-m').'.pdf"',
+            // ?apercu=1: shown in the browser (« Aperçu »), else downloaded.
+            'Content-Disposition' => ($request->boolean('apercu') ? 'inline' : 'attachment').'; filename="emargement-signe-'.$row->month->format('Y-m').'.pdf"',
             'Content-Length' => (string) strlen($bytes),
             'Cache-Control' => 'private, no-store',
             'X-Content-Type-Options' => 'nosniff',
