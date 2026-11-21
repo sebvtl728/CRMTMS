@@ -2,8 +2,8 @@
 
 namespace App\Modules\Sessions\Attendance\Signing;
 
-use App\Http\Controllers\Controller;
 use App\Exceptions\UserFacingHttpException;
+use App\Http\Controllers\Controller;
 use App\Modules\Core\Users\User;
 use App\Modules\Sessions\Enrolments\Enrolments;
 use App\Modules\Sessions\Permissions;
