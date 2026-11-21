@@ -3,6 +3,7 @@
 namespace App\Modules\Sessions\Attendance\Signing;
 
 use App\Modules\Crm\Public\Fiches;
+use App\Modules\Sessions\Attendance\Attendances;
 use App\Modules\Sessions\Planning\Seance;
 use App\Modules\Sessions\Sessions\TrainingSession;
 use Carbon\CarbonImmutable;
@@ -71,7 +72,7 @@ final class SlotRows
                 'status' => $slot?->status,
                 'slot_id' => $slot?->id,
                 'signed' => $slot === null ? 0 : ($counts[$slot->id] ?? 0),
-                'expected' => \App\Modules\Sessions\Attendance\Attendances::expected($seance)->count(),
+                'expected' => Attendances::expected($seance)->count(),
                 'is_today' => $date === TrainingSession::today()->toDateString(),
             ];
         }

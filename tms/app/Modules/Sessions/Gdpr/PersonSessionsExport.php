@@ -7,6 +7,8 @@ use App\Modules\Core\References\ReferenceItem;
 use App\Modules\Sessions\Amounts;
 use App\Modules\Sessions\Attendance\Attendance;
 use App\Modules\Sessions\Attendance\MonthlyHour;
+use App\Modules\Sessions\Attendance\Signing\AttendanceSignature;
+use App\Modules\Sessions\Attendance\Signing\SignSlot;
 use App\Modules\Sessions\Dossiers\Dossier;
 use App\Modules\Sessions\Dossiers\DossierLine;
 use App\Modules\Sessions\Enrolments\Enrolment;
@@ -53,15 +55,15 @@ final class PersonSessionsExport
         $modules = SessionModule::withTrashed()->whereKey($seances->pluck('session_module_id')->merge($hours->pluck('session_module_id'))->unique()->values()->all())->pluck('title', 'id');
         $sessionOf = $enrolments->pluck('session', 'id');
 
-        $signatures = \App\Modules\Sessions\Attendance\Signing\AttendanceSignature::query()->whereIn('enrolment_id', $enrolmentIds)->orderBy('signed_at')->get();
-        $slots = \App\Modules\Sessions\Attendance\Signing\SignSlot::query()->whereKey($signatures->pluck('slot_id')->unique()->values()->all())->get()->keyBy('id');
+        $signatures = AttendanceSignature::query()->whereIn('enrolment_id', $enrolmentIds)->orderBy('signed_at')->get();
+        $slots = SignSlot::query()->whereKey($signatures->pluck('slot_id')->unique()->values()->all())->get()->keyBy('id');
 
         return [
             'emargements' => $signatures->map(fn ($sig): array => [
                 'session' => $sessionOf[$sig->enrolment_id]?->number,
                 'date' => $slots[$sig->slot_id]?->date->toDateString(),
-                'demi_journee' => \App\Modules\Sessions\Attendance\Signing\SignSlot::label((string) $slots[$sig->slot_id]?->half),
-                'signe_le' => $sig->signed_at?->toIso8601String(),
+                'demi_journee' => SignSlot::label((string) $slots[$sig->slot_id]?->half),
+                'signe_le' => $sig->signed_at->toIso8601String(),
                 'source' => $sig->source,
             ])->values()->all(),
             'presences' => $attendances->sortBy(fn (Attendance $a) => $seances[$a->seance_id]->date->toDateString().$seances[$a->seance_id]->starts_at.$a->id)

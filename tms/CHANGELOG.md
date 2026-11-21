@@ -5,6 +5,15 @@ Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) ; ve
 
 ## [Non publié]
 
+### Ajouté
+
+- **Émargement en ligne** : par demi-journée (matin / après-midi, coupure à 13 h), le formateur affiche un **QR code** ;
+  les stagiaires signent au doigt sur leur téléphone, sans compte (prénom et initiale seulement sur la page publique) ;
+  le formateur (ou un gestionnaire des présences) signe et **valide** : les présences se remplissent (présent, partiel au
+  prorata, absent), sans jamais écraser une saisie manuelle. **Feuille d'émargement signée** par session et par mois :
+  PDF archivé avec les dessins, le valideur et les empreintes SHA-256. Service public prêt pour un futur connecteur
+  (SoWeSign). Dessins effacés par l'anonymisation.
+
 ## [0.11.0] - 2026-11-20
 
 ### Ajouté

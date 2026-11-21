@@ -4,6 +4,7 @@ use App\Exceptions\UserFacingHttpException;
 use App\Modules\Core\Tenancy\TenantStorage;
 use App\Modules\Sessions\Attendance\Attendance;
 use App\Modules\Sessions\Attendance\Signing\AttendanceSignature;
+use App\Modules\Sessions\Attendance\Signing\SignSlot;
 use App\Modules\Sessions\Public\AttendanceSigning;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\Storage;
@@ -73,6 +74,6 @@ it('creates the half-day of a past day for a connector importing afterwards, wit
     $port->recordExternal($slotId, $lea->id, CarbonImmutable::parse('2026-09-08 09:05', 'Europe/Paris'), sigDrawing(), 'fake');
     $port->validateExternal($slotId, 'fake', null, 'Marie Martin');
 
-    expect(\App\Modules\Sessions\Attendance\Signing\SignSlot::query()->sole())->token_hash->toBeNull()->status->toBe('validated');
+    expect(SignSlot::query()->sole())->token_hash->toBeNull()->status->toBe('validated');
     expect(Attendance::query()->sole()->status)->toBe('present');
 });

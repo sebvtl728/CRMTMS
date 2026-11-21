@@ -39,7 +39,7 @@ class PublicSigningController extends Controller
         }
         usort($trainees, fn (array $a, array $b) => strcmp(mb_strtolower($a['label']), mb_strtolower($b['label'])));
 
-        return Inertia::render('public/attendance-signing', [
+        $response = Inertia::render('public/attendance-signing', [
             'state' => 'open',
             'organisme' => (string) (app(TenantContext::class)->current()->name ?? ''),
             'session' => PlanningRows::sessionLabels([$session])[$session->id] ?? $session->number,
@@ -47,7 +47,10 @@ class PublicSigningController extends Controller
             'half_label' => SignSlot::label($slot->half),
             'trainees' => $trainees,
             'post_url' => url('/emargement/'.$token),
-        ])->toResponse($request)->withHeaders(['Cache-Control' => 'no-store, private', 'X-Robots-Tag' => 'noindex, nofollow']);
+        ])->toResponse($request);
+        $response->headers->add(['Cache-Control' => 'no-store, private', 'X-Robots-Tag' => 'noindex, nofollow']);
+
+        return $response;
     }
 
     public function store(Request $request, string $token): JsonResponse

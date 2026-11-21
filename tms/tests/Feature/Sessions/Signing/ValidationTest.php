@@ -3,6 +3,7 @@
 use App\Exceptions\UserFacingHttpException;
 use App\Modules\Core\Access\Role;
 use App\Modules\Core\Tenancy\TenantStorage;
+use App\Modules\Core\Users\User;
 use App\Modules\Sessions\Attendance\Attendance;
 use App\Modules\Sessions\Attendance\Attendances;
 use App\Modules\Sessions\Attendance\Closures;
@@ -32,7 +33,7 @@ function vSign(SignSlot $slot, string $enrolmentId): void
     app(AttendanceSigning::class)->sign($slot, $enrolmentId, sigDrawing(), '', '');
 }
 
-function vValidate(SignSlot $slot, ?\App\Modules\Core\Users\User $by = null): SignSlot
+function vValidate(SignSlot $slot, ?User $by = null): SignSlot
 {
     $by ??= atManager();
     test()->actingAs($by);

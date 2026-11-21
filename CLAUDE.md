@@ -200,6 +200,18 @@ Guide : `tms/docs/crm.md` (§ 13 ter), `tms/docs/sessions.md` (§ 11), `tms/docs
 - **Formateur** : droits `crm.activities.view|update` sur « Ses fiches » par défaut ; `Scopes::trainerOnly` les ignore (`TRAINER_OWN_EXTRAS`) : menu « Mon planning » + « À faire ».
 - **Besoins futurs** : `future_needs` (+ date, auteur) sur `organisations` et `people` (dans `Person::PERSONAL_FIELDS`), `FutureNeedsController`.
 
+## Émargement en ligne : points d'architecture à connaître
+
+Code dans `tms/app/Modules/Sessions/Attendance/Signing/`. Guide : `tms/docs/sessions.md` (§ 10 « Émargement en ligne ») ; tables : `tms/docs/data-dictionary.md`. Spec : `docs/superpowers/specs/2026-11-20-emargement-design.md`.
+
+- **Demi-journée** (`SignSlot`, table `attendance_sign_slots`) = session × jour de Paris × `morning|afternoon`, coupure `Halves::CUT` (13 h) ; elle couvre les séances non annulées qui la touchent (`SlotSeances::of`), attendus = `Attendances::expected`. Ouverture **le jour même** (`AttendanceSigning::open`, nouveau jeton à chaque ouverture) ; jeton de 40 caractères, `token_hash` sha256 pour la recherche, `token_encrypted` (cast `encrypted`) seulement pour réafficher le QR (`SlotQr`, SVG bacon, aucun service externe).
+- **Page publique** `emargement/{token}` (`PublicSigningController`, hors `auth`, throttles `attendance-signing*` **par jeton + adresse** : une classe partage une IP) : `findByToken` renvoie null pour tout cas invalide → même page 404 ; noms `publicNames` (« Léa D. »), jamais plus. Signature : `SignatureDrawing`, zone `TenantStorage` `attendance_signatures`, unique (créneau, inscription).
+- **Validation** (`SlotValidation`, une transaction) : le valideur doit atteindre **toutes** les séances du créneau (`sessions.attendance.manage`, sinon 403 français) ; `validator_role` `trainer|manager`. Présences calculées sur les demi-journées **validées** de chaque séance (présent / partiel `Halves::minutes` / absent) et écrites par `Attendances::fromSigning`, qui ne touche que les lignes absentes ou `attendances.source = 'signing'` ; `Attendances::record` remet `source` à null (saisie à la main jamais écrasée). Mois clôturé = 409, rien n'est validé.
+- **Ouverture par la séance** : `POST /seances/{seance}/signing-slots` (un formateur pur ne lie pas `{trainingSession}`) ; page formateur `sessions/emargement/{slot}` (404 hors périmètre d'une séance du créneau).
+- **Feuille signée** (`SignedSheetPdf`, `SignedSheet`, gabarit `documents/attendance-signed-sheet`) : par session et mois, générée par un gestionnaire (périmètre ≠ « Ses séances »), chaque génération archivée (`attendance_sheets`) avec `pdf_sha256`, servie depuis l'archive vérifiée (410).
+- **Connecteur futur** : `Sessions\Public\AttendanceSigning` (`slots`, `ensureSlot`, `recordExternal`, `validateExternal`, `source` ≠ `online`) ; rien dans Sessions ne nomme SoWeSign.
+- **RGPD** : `SigningAnonymisation` (appelée par `EnrolmentAnonymisation`) efface dessins, IP, navigateur (heure gardée) et les feuilles d'une session individuelle ; export `emargements` dans `PersonSessionsExport`.
+
 ## Conventions
 
 - Identifiants UUID v7 ; suppression logique sur les fiches métier.

@@ -1,12 +1,16 @@
 <?php
 
 use App\Exceptions\UserFacingHttpException;
+use App\Modules\Core\References\ReferenceList;
 use App\Modules\Core\Tenancy\TenantStorage;
 use App\Modules\Sessions\Attendance\Closures;
 use App\Modules\Sessions\Attendance\Signing\AttendanceSignature;
 use App\Modules\Sessions\Attendance\Signing\AttendanceSigning;
 use App\Modules\Sessions\Attendance\Signing\SignSlot;
+use App\Modules\Sessions\Attendance\Signing\SlotSeances;
 use App\Modules\Sessions\Planning\Seances;
+use App\Modules\Sessions\Sessions\SessionWriter;
+use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\ValidationException;
@@ -22,7 +26,7 @@ beforeEach(function () {
     sgNow();
 });
 
-afterEach(fn () => \Carbon\CarbonImmutable::setTestNow());
+afterEach(fn () => CarbonImmutable::setTestNow());
 
 function sgSign(SignSlot $slot, string $enrolmentId): AttendanceSignature
 {
@@ -76,7 +80,7 @@ it('refuses to open a closed month or a cancelled session', function () {
 
     $other = plSession();
     plSeance(plModule($other), '2026-09-10');
-    app(\App\Modules\Sessions\Sessions\SessionWriter::class)->cancel($other, crmItem(\App\Modules\Core\References\ReferenceList::CancelReason, 'Effectif insuffisant')->id);
+    app(SessionWriter::class)->cancel($other, crmItem(ReferenceList::CancelReason, 'Effectif insuffisant')->id);
     expect(fn () => sgOpen($other->fresh()))->toThrow(UserFacingHttpException::class, 'Cette session est annulée.');
 });
 
@@ -148,7 +152,7 @@ it('shows the first name and initial only, homonyms numbered', function () {
     $c = atEnrol($session, 'Martin');
     $slot = sgOpen($session)['slot'];
 
-    $names = AttendanceSigning::publicNames(\App\Modules\Sessions\Attendance\Signing\SlotSeances::expected($slot));
+    $names = AttendanceSigning::publicNames(SlotSeances::expected($slot));
 
     $first = strcmp($a->id, $b->id) < 0 ? $a : $b;
     $second = $first->is($a) ? $b : $a;

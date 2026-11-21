@@ -64,8 +64,8 @@ final class SlotValidation
                 if ($locked->isValidated()) {
                     throw new UserFacingHttpException(409, AttendanceSigning::ALREADY_VALIDATED);
                 }
-                if ($path !== null && $png !== null) {
-                    Storage::disk(TenantStorage::DISK)->put($path, $png);
+                if ($png !== null) {
+                    Storage::disk(TenantStorage::DISK)->put((string) $path, $png);
                 }
                 $locked->fill([
                     'status' => SignSlot::VALIDATED,

@@ -8,6 +8,7 @@ use App\Modules\Sessions\Attendance\Signing\AttendanceSignature;
 use App\Modules\Sessions\Attendance\Signing\AttendanceSigning;
 use App\Modules\Sessions\Attendance\Signing\SignedSheet;
 use App\Modules\Sessions\Attendance\Signing\SignedSheetPdf;
+use App\Modules\Sessions\Attendance\Signing\SignSlot;
 use App\Modules\Sessions\Gdpr\PersonSessionsExport;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\Storage;
@@ -29,7 +30,7 @@ afterEach(fn () => CarbonImmutable::setTestNow());
 
 function gsSign(string $slotId, string $enrolmentId): AttendanceSignature
 {
-    return app(AttendanceSigning::class)->sign(\App\Modules\Sessions\Attendance\Signing\SignSlot::query()->findOrFail($slotId), $enrolmentId, sigDrawing(), '10.0.0.1', 'Firefox');
+    return app(AttendanceSigning::class)->sign(SignSlot::query()->findOrFail($slotId), $enrolmentId, sigDrawing(), '10.0.0.1', 'Firefox');
 }
 
 it('erases her drawings, address and browser when a trainee is anonymised, the hour kept', function () {

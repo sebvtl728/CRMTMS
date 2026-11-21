@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Modules\Core\Access\AccessScope;
 use App\Modules\Core\Access\Scopes;
 use App\Modules\Core\Users\User;
+use App\Modules\Sessions\Attendance\Signing\SlotRows;
 use App\Modules\Sessions\Modules\SessionModule;
 use App\Modules\Sessions\Permissions;
 use App\Modules\Sessions\Planning\Seance;
@@ -38,7 +39,7 @@ class AttendanceController extends Controller
     {
         self::authorizeSeance($request, $seance);
 
-        return self::json([...AttendanceRows::grid($seance), ...AttendanceSheetController::list($seance, self::user($request)), 'slots' => \App\Modules\Sessions\Attendance\Signing\SlotRows::forSeance($seance)]);
+        return self::json([...AttendanceRows::grid($seance), ...AttendanceSheetController::list($seance, self::user($request)), 'slots' => SlotRows::forSeance($seance)]);
     }
 
     public function record(Request $request, Seance $seance): JsonResponse

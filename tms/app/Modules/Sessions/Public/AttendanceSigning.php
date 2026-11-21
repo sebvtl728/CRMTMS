@@ -2,6 +2,7 @@
 
 namespace App\Modules\Sessions\Public;
 
+use App\Modules\Core\Signatures\SignatureDrawing;
 use App\Modules\Sessions\Attendance\Closures;
 use App\Modules\Sessions\Attendance\Signing\AttendanceSigning as Signing;
 use App\Modules\Sessions\Attendance\Signing\SignSlot;
@@ -81,7 +82,7 @@ final class AttendanceSigning
     public function validateExternal(string $slotId, string $source, ?string $trainerPngDataUri, string $trainerName): void
     {
         self::assertSource($source);
-        $png = $trainerPngDataUri === null ? null : \App\Modules\Core\Signatures\SignatureDrawing::decode($trainerPngDataUri);
+        $png = $trainerPngDataUri === null ? null : SignatureDrawing::decode($trainerPngDataUri);
         $this->validation->complete(SignSlot::query()->findOrFail($slotId), $png, $trainerName, SignSlot::ROLE_TRAINER, null);
     }
 
