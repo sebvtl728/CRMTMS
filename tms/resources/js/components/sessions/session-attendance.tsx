@@ -980,9 +980,16 @@ function SignedSheets({
                                     SHA-256 {s.sha256.slice(0, 12)}…
                                 </span>
                             </span>
-                            <Button asChild variant="ghost" size="sm">
-                                <a href={s.url}>Télécharger</a>
-                            </Button>
+                            <span className="flex gap-1">
+                                <Button asChild variant="ghost" size="sm">
+                                    <a href={`${s.url}?apercu=1`} target="_blank" rel="noopener noreferrer">
+                                        Aperçu
+                                    </a>
+                                </Button>
+                                <Button asChild variant="ghost" size="sm">
+                                    <a href={s.url}>Télécharger</a>
+                                </Button>
+                            </span>
                         </li>
                     ))}
                 </ul>

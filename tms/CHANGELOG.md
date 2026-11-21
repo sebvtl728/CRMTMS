@@ -5,6 +5,11 @@ Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) ; ve
 
 ## [Non publié]
 
+### Ajouté
+
+- Feuille d'émargement signée : bouton **Aperçu** (ouvre le PDF archivé dans un nouvel onglet) à côté de
+  **Télécharger**.
+
 ## [0.12.0] - 2026-11-21
 
 ### Ajouté
