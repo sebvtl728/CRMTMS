@@ -13,6 +13,7 @@ use App\Modules\Sessions\Attendance\Signing\SlotValidation;
 use App\Modules\Sessions\Planning\Seances;
 use App\Modules\Sessions\Trainers\Trainers;
 use Carbon\CarbonImmutable;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 
 require_once __DIR__.'/../Support/lot2a.php';
@@ -167,4 +168,22 @@ it('keeps the signing rows under review when the séance moves', function () {
     app(Seances::class)->reschedule($seance->refresh(), ['ends_at' => '11:00', 'break_minutes' => 0]);
 
     expect(vAttendance($seance->id, $lea->id))->source->toBe('signing')->needs_review->toBeTrue()->minutes->toBe(120);
+});
+
+it('locks the session before the slot when validating, as when opening (no lost update, no deadlock)', function () {
+    $session = plSession();
+    plSeance(plModule($session), '2026-09-10', '09:00', '17:00', ['break_minutes' => 60]);
+    atEnrol($session, 'Durand');
+    $slot = sgOpen($session)['slot'];
+    $by = atManager();
+    test()->actingAs($by);
+    DB::enableQueryLog();
+    app(SlotValidation::class)->validate($slot->fresh(), sigDrawing(), $by);
+    $log = collect(DB::getQueryLog())->pluck('query');
+    DB::disableQueryLog();
+
+    $locks = $log->filter(fn (string $q) => str_contains($q, ' for update') || str_contains($q, ' for share'))
+        ->map(fn (string $q) => str_contains($q, '"training_sessions"') ? 'session' : (str_contains($q, '"attendance_sign_slots"') ? 'slot' : 'other'))
+        ->values()->all();
+    expect($locks[0])->toBe('session')->and(array_search('slot', $locks, true))->toBeGreaterThan(0);
 });

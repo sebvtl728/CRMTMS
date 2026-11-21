@@ -10,6 +10,7 @@ use App\Modules\Sessions\Attendance\Attendance;
 use App\Modules\Sessions\Attendance\Attendances;
 use App\Modules\Sessions\Permissions;
 use App\Modules\Sessions\Planning\Seance;
+use App\Modules\Sessions\Sessions\TrainingSession;
 use App\Modules\Sessions\SessionsVisibility;
 use App\Modules\Sessions\Trainers\Trainers;
 use Carbon\CarbonImmutable;
@@ -60,6 +61,9 @@ final class SlotValidation
         $path = $png === null ? null : AttendanceSigning::drawingPath($slot, 'validation-'.CarbonImmutable::now()->format('YmdHisu'));
         try {
             return DB::transaction(function () use ($slot, $png, $name, $role, $userId, $path): SignSlot {
+                // Session first, as open() does: every validation of the session's day is serialised
+                // (morning and afternoon at once never lose each other's signatures) and never deadlocks.
+                TrainingSession::withTrashed()->lockForUpdate()->findOrFail($slot->training_session_id);
                 $locked = SignSlot::query()->lockForUpdate()->findOrFail($slot->id);
                 if ($locked->isValidated()) {
                     throw new UserFacingHttpException(409, AttendanceSigning::ALREADY_VALIDATED);
