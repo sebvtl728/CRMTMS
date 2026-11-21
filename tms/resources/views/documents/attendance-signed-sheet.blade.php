@@ -23,7 +23,7 @@
         header img { max-height: 46pt; max-width: 160pt; display: block; margin-bottom: 4pt; }
         .issuer { font-size: 12pt; font-weight: 700; }
         h1 { margin: 0; font-size: 16pt; text-align: right; }
-        h2 { font-size: 11pt; margin: 16pt 0 4pt; text-transform: capitalize; page-break-after: avoid; }
+        h2 { font-size: 11pt; margin: 16pt 0 4pt; page-break-after: avoid; }
         .muted { color: #52606d; }
         table.info { border-collapse: collapse; margin: 12pt 0 4pt; }
         table.info th { text-align: left; font-weight: 700; padding: 1pt 10pt 1pt 0; }

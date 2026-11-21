@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { formatDateTime, formatDay, type Option } from '@/lib/crm';
 import { sendJson } from '@/lib/sessions';
-import { CheckCheck, ClipboardCheck, FileText, LoaderCircle, Lock, LockOpen, Trash2 } from 'lucide-react';
+import { CheckCheck, ClipboardCheck, FileText, LoaderCircle, Lock, LockOpen, QrCode, Trash2 } from 'lucide-react';
 import { FormEventHandler, useCallback, useEffect, useState } from 'react';
 
 /** Attendance of a trainee at a séance (AttendanceRows::grid): names only, never needs, notes nor prices. */
@@ -54,6 +54,73 @@ interface Grid {
     statuses: Option[];
     can_edit: boolean;
     count?: number;
+    /** The half-days of the séance's day (SlotRows::forSeance): online signing. */
+    slots?: DaySlot[];
+}
+
+/** A half-day of the séance's day and its online signing, if opened. */
+interface DaySlot {
+    half: 'morning' | 'afternoon';
+    label: string;
+    status: 'open' | 'closed' | 'validated' | null;
+    slot_id: string | null;
+    signed: number;
+    expected: number;
+    is_today: boolean;
+}
+
+const SLOT_STATUS: Record<string, string> = { open: 'Ouvert', closed: 'Lien fermé', validated: 'Validé' };
+
+/** « Émargement en ligne » of a séance: open the half-day of today (QR code), or follow it. */
+function OnlineSigning({ seanceId, slots }: { seanceId: string; slots: DaySlot[] }) {
+    const [error, setError] = useState<string | null>(null);
+    const [busy, setBusy] = useState<string | null>(null);
+    if (slots.length === 0) return null;
+
+    const open = async (half: string) => {
+        setBusy(half);
+        const answer = await sendJson<{ url: string }>('POST', route('seances.signing-slots', seanceId), { half });
+        setBusy(null);
+        if (answer.ok && answer.data) window.location.assign(answer.data.url);
+        else setError(answer.errors.half ?? answer.message);
+    };
+
+    return (
+        <section aria-labelledby="online-signing-title" className="grid gap-3 rounded-md border p-3">
+            <h3 id="online-signing-title" className="font-medium">
+                Émargement en ligne
+            </h3>
+            <p className="text-muted-foreground text-xs">
+                Les stagiaires signent depuis leur téléphone en scannant un QR code, le jour même ; vous validez ensuite chaque demi-journée.
+            </p>
+            <ul className="grid gap-2">
+                {slots.map((s) => (
+                    <li key={s.half} className="flex flex-wrap items-center justify-between gap-2 text-sm">
+                        <span className="flex items-center gap-2">
+                            {s.label}
+                            {s.status && <Badge variant={s.status === 'validated' ? 'secondary' : 'outline'}>{SLOT_STATUS[s.status]}</Badge>}
+                            {s.status && (
+                                <span className="text-muted-foreground text-xs">
+                                    {s.signed} / {s.expected} signé{s.signed > 1 ? 's' : ''}
+                                </span>
+                            )}
+                        </span>
+                        {s.slot_id && (s.status === 'validated' || !s.is_today) ? (
+                            <Button asChild variant="outline" size="sm">
+                                <a href={route('sessions.signing.show', s.slot_id)}>{s.status === 'validated' ? 'Voir' : 'Valider'}</a>
+                            </Button>
+                        ) : s.is_today ? (
+                            <Button size="sm" disabled={busy !== null} onClick={() => open(s.half)}>
+                                {busy === s.half ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <QrCode className="h-4 w-4" />}
+                                {s.status === 'open' ? 'Afficher le QR code' : s.status === 'closed' ? 'Rouvrir' : 'Ouvrir l\'émargement'}
+                            </Button>
+                        ) : null}
+                    </li>
+                ))}
+            </ul>
+            <InputError message={error ?? undefined} />
+        </section>
+    );
 }
 
 interface SessionAttendance {
@@ -89,6 +156,10 @@ interface SessionAttendance {
         trainers: Option[];
     };
     realised: { enrolment_id: string; name: string; planned: string; realised: string }[];
+    /** Half-days signed online this month (SlotRows::forMonth). */
+    slots: { id: string; date: string; half: string; label: string; status: 'open' | 'closed' | 'validated'; signed: number; expected: number; validated_by: string | null; to_validate: boolean }[];
+    /** Archived signed sheets of the session, the latest first. */
+    signed_sheets: { id: string; month: string; month_label: string; generated_at: string | null; sha256: string; url: string }[];
 }
 
 /** 750 → « 12:30 ». */
@@ -353,6 +424,7 @@ export function AttendanceDialog({ seanceId, open, onClose }: { seanceId: string
                                 );
                             })}
                         </ul>
+                        <OnlineSigning seanceId={grid.seance.id} slots={grid.slots ?? []} />
                         <section aria-labelledby="sheet-title" className="grid gap-3 rounded-md border p-3">
                             <h3 id="sheet-title" className="font-medium">
                                 Feuille d'émargement
@@ -763,6 +835,35 @@ export function SessionAttendance({ sessionId }: { sessionId: string }) {
             )}
 
             <section className="grid gap-2">
+                <h3 className="font-medium">Émargement en ligne</h3>
+                {data.slots.length === 0 ? (
+                    <p className="text-muted-foreground text-sm">Aucune demi-journée émargée en ligne ce mois-ci.</p>
+                ) : (
+                    <ul className="divide-y rounded-md border text-sm">
+                        {data.slots.map((s) => (
+                            <li key={s.id} className="flex flex-wrap items-center justify-between gap-2 p-2">
+                                <span>
+                                    {formatDay(s.date)} – {s.label} · {s.signed} / {s.expected} signé{s.signed > 1 ? 's' : ''}
+                                    {s.validated_by && <span className="text-muted-foreground"> · validé par {s.validated_by}</span>}
+                                </span>
+                                <span className="flex items-center gap-2">
+                                    {s.to_validate ? (
+                                        <Badge variant="destructive">À valider</Badge>
+                                    ) : (
+                                        <Badge variant={s.status === 'validated' ? 'secondary' : 'outline'}>{SLOT_STATUS[s.status]}</Badge>
+                                    )}
+                                    <Button asChild variant="outline" size="sm">
+                                        <a href={route('sessions.signing.show', s.id)}>Ouvrir</a>
+                                    </Button>
+                                </span>
+                            </li>
+                        ))}
+                    </ul>
+                )}
+                <SignedSheets sessionId={sessionId} month={data.month} label={label} canGenerate={data.can.manage} sheets={data.signed_sheets} onChange={(sheets) => setData({ ...data, signed_sheets: sheets })} />
+            </section>
+
+            <section className="grid gap-2">
                 <h3 className="font-medium">Heures réalisées</h3>
                 {data.realised.length === 0 ? (
                     <p className="text-muted-foreground text-sm">Aucun stagiaire.</p>
@@ -797,6 +898,71 @@ export function SessionAttendance({ sessionId }: { sessionId: string }) {
                 }}
             />
             <ReopenDialog open={reopen} month={label} onClose={() => setReopen(false)} onSubmit={reopenMonth} />
+        </div>
+    );
+}
+
+/** The signed sheet of the month: generated by a manager, archived versions with their SHA-256. */
+function SignedSheets({
+    sessionId,
+    month,
+    label,
+    canGenerate,
+    sheets,
+    onChange,
+}: {
+    sessionId: string;
+    month: string;
+    label: string;
+    canGenerate: boolean;
+    sheets: SessionAttendance['signed_sheets'];
+    onChange: (sheets: SessionAttendance['signed_sheets']) => void;
+}) {
+    const [busy, setBusy] = useState(false);
+    const [error, setError] = useState<string | null>(null);
+    const ofMonth = sheets.filter((s) => s.month === month);
+
+    const generate = async () => {
+        setBusy(true);
+        const answer = await sendJson<{ sheets: SessionAttendance['signed_sheets'] }>('POST', route('sessions.signed-sheets.store', sessionId), { month });
+        setBusy(false);
+        if (answer.ok && answer.data) {
+            onChange(answer.data.sheets);
+            setError(null);
+        } else setError(answer.errors.month ?? answer.message);
+    };
+
+    return (
+        <div className="grid gap-2 rounded-md border p-3">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+                <span className="text-sm font-medium">Feuille d'émargement signée – {label}</span>
+                {canGenerate && (
+                    <Button size="sm" variant="outline" disabled={busy} onClick={generate}>
+                        {busy ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <FileText className="h-4 w-4" />}
+                        Générer la feuille signée
+                    </Button>
+                )}
+            </div>
+            {ofMonth.length === 0 ? (
+                <p className="text-muted-foreground text-xs">Aucune feuille générée pour ce mois.</p>
+            ) : (
+                <ul className="grid gap-1 text-sm">
+                    {ofMonth.map((s) => (
+                        <li key={s.id} className="flex flex-wrap items-center justify-between gap-2">
+                            <span>
+                                {s.generated_at ? formatDateTime(s.generated_at) : ''}{' '}
+                                <span className="text-muted-foreground font-mono text-xs" title={s.sha256}>
+                                    SHA-256 {s.sha256.slice(0, 12)}…
+                                </span>
+                            </span>
+                            <Button asChild variant="ghost" size="sm">
+                                <a href={s.url}>Télécharger</a>
+                            </Button>
+                        </li>
+                    ))}
+                </ul>
+            )}
+            <InputError message={error ?? undefined} />
         </div>
     );
 }

@@ -57,7 +57,7 @@ it('renders the month with the drawings, the validation and the unvalidated half
     expect($html)->toContain('CAP FORMATION')->toContain('Léa Durand')->toContain('Léa Petit')
         ->toContain('data:image/png;base64,')->toContain('Validé par')->toContain('gestionnaire des présences')
         ->toContain('Non validé')->toContain('Mois non clôturé')->toContain('Absent')
-        ->toContain('jeudi 10 septembre 2026')
+        ->toContain('Jeudi 10 septembre 2026')
         ->not->toContain('<script>alert')->toContain('&lt;script&gt;');
 });
 

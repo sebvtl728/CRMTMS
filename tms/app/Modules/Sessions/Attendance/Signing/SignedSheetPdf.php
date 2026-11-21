@@ -129,7 +129,7 @@ final class SignedSheetPdf
             }
             usort($rows, fn (array $a, array $b) => strcmp(mb_strtolower($a['name']), mb_strtolower($b['name'])));
             $days[] = [
-                'label' => CarbonImmutable::parse($date)->locale('fr')->isoFormat('dddd D MMMM YYYY'),
+                'label' => ucfirst(CarbonImmutable::parse($date)->locale('fr')->isoFormat('dddd D MMMM YYYY')),
                 'halves' => $halves,
                 'rows' => $rows,
             ];
