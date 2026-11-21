@@ -7,6 +7,11 @@ Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) ; ve
 
 ### Ajouté
 
+- **Rattrapage d'émargement** : un stagiaire présent qui n'a pas signé rattrape sa signature après coup, **sur place**
+  (lien de rattrapage d'une demi-journée passée, jusqu'à minuit) ou **à distance** (lien personnel par e-mail de 7 jours
+  et code à 6 chiffres par e-mail). Chaque rattrapage est **confirmé ou refusé** par un gestionnaire des présences
+  (onglet Présences) avant de compter ; la feuille signée l'indique. Deux nouveaux modèles d'e-mails.
+- Émargement papier replié sous « Émargement papier (secours) » dans la feuille de présences d'une séance.
 - Feuille d'émargement signée : bouton **Aperçu** (ouvre le PDF archivé dans un nouvel onglet) à côté de
   **Télécharger**.
 

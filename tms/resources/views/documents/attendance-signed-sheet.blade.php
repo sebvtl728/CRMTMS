@@ -81,7 +81,13 @@
                             @if ($cell['image'])
                                 <img src="{{ $cell['image'] }}" alt="">
                             @endif
-                            <span class="muted">Signé à {{ $cell['hour'] }}@if ($cell['source'] !== 'online') ({{ $cell['source'] }})@endif</span>
+                            @if ($cell['mention'] ?? null)
+                                <span class="muted">{{ $cell['mention'] }}</span>
+                            @else
+                                <span class="muted">Signé à {{ $cell['hour'] }}@if ($cell['source'] !== 'online') ({{ $cell['source'] }})@endif</span>
+                            @endif
+                        @elseif ($cell['state'] === 'catch_up_refused')
+                            <span class="muted">{{ $cell['mention'] }}</span>
                         @elseif ($cell['state'] === 'absent')
                             Absent
                         @elseif ($cell['state'] === 'pending')
@@ -121,6 +127,12 @@
     Signature électronique simple : chaque stagiaire a signé depuis le lien d'émargement de la demi-journée, ouvert par le formateur le jour même ;
     l'heure de signature est celle du serveur (heure de Paris). Document généré le {{ $generated }}.
 </p>
+@if ($catch_ups ?? false)
+    <p class="note muted">
+        Rattrapage : une signature faite après la demi-journée (sur place, appareil de l'organisme ; ou à distance, lien personnel et code e-mail à usage unique)
+        ne compte comme présence qu'après confirmation par un gestionnaire des présences, nommé dans la cellule.
+    </p>
+@endif
 
 @if (count($annex) > 0)
     <div class="annex">
