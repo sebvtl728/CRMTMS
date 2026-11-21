@@ -404,6 +404,8 @@ it('enforces at least one fiche and a date in the database', function () {
 });
 
 it('lists the actions of an opportunity on its page', function () {
+    // Fixed clock: the follow-up is due on 20/11 and must stay « à faire », not « en retard ».
+    $this->travelTo(parisTime('2026-11-15 10:00'));
     $this->actingAs(commercial());
     $org = Organisation::query()->create(['name' => 'Le Bistrot']);
     $opportunity = makeOpportunity($org, ['title' => 'HACCP']);
