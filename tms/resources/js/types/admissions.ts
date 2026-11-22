@@ -12,7 +12,7 @@ export interface AdmissionOptions {
     situations: Option[];
     funding_types: Option[];
     users: Option[];
-    training_options: (Option & { rncp_code: string | null })[];
+    training_options: (Option & { rncp_code: string | null; das_id: string | null })[];
     sessions: { id: string; label: string; starts_on: string }[];
 }
 

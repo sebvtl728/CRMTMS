@@ -31,7 +31,7 @@ final class Admission
      *
      * @return list<array{id: string, label: string, starts_on: string}>
      */
-    public static function sessionOptions(string $trainingId): array
+    public static function sessionOptions(string $trainingId, ?string $dasId = null): array
     {
         if (! Str::isUuid($trainingId)) {
             return [];
@@ -39,6 +39,7 @@ final class Admission
         $title = app(Trainings::class)->find($trainingId)?->title;
 
         return TrainingSession::query()->where('training_id', $trainingId)
+            ->when($dasId !== null, fn ($q) => $q->where('das_id', $dasId))
             ->whereIn('status', [SessionStatus::Planned->value, SessionStatus::Confirmed->value])
             ->whereDate('ends_on', '>=', TrainingSession::today()->toDateString())
             ->orderBy('starts_on')->orderBy('number')->get()
@@ -49,7 +50,7 @@ final class Admission
     /**
      * A session (trashed included) as a candidature shows it; null when unknown.
      *
-     * @return array{id: string, label: string, training_id: string, starts_on: string, ends_on: string, trashed: bool}|null
+     * @return array{id: string, label: string, training_id: string, das_id: string, starts_on: string, ends_on: string, trashed: bool}|null
      */
     public static function session(string $sessionId): ?array
     {
@@ -62,6 +63,7 @@ final class Admission
             'id' => $session->id,
             'label' => $session->label(app(Trainings::class)->find($session->training_id)?->title),
             'training_id' => $session->training_id,
+            'das_id' => $session->das_id,
             'starts_on' => $session->starts_on->toDateString(),
             'ends_on' => $session->ends_on->toDateString(),
             'trashed' => $session->trashed(),

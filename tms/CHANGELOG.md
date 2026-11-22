@@ -5,6 +5,11 @@ Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) ; ve
 
 ## [Non publié]
 
+### Modifié
+
+- **Fiche candidat** : le DAS vient avant la formation visée, qui ne propose que les formations de ce DAS ; la session
+  visée doit appartenir au DAS de la candidature.
+
 ## [0.14.4] - 2026-11-22
 
 ### Ajouté
