@@ -7,6 +7,8 @@ Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) ; ve
 
 ### Modifié
 
+- **Créer le dossier de formation** : le contractant se choisit (une entreprise ou le candidat comme particulier, au
+  prix correspondant) ; pour une session intra visée, son entreprise est proposée d'office.
 - **Créer le dossier de formation** (candidature admise) : un refus de l'inscription (session intra d'une autre
   entreprise, session complète…) s'affiche sous « Session » ; toute autre erreur s'affiche dans la fenêtre, plus de clic
   sans effet.

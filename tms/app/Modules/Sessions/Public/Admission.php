@@ -50,7 +50,7 @@ final class Admission
     /**
      * A session (trashed included) as a candidature shows it; null when unknown.
      *
-     * @return array{id: string, label: string, training_id: string, das_id: string, starts_on: string, ends_on: string, trashed: bool}|null
+     * @return array{id: string, label: string, training_id: string, das_id: string, kind: string, organisation_id: string|null, starts_on: string, ends_on: string, trashed: bool}|null
      */
     public static function session(string $sessionId): ?array
     {
@@ -64,6 +64,8 @@ final class Admission
             'label' => $session->label(app(Trainings::class)->find($session->training_id)?->title),
             'training_id' => $session->training_id,
             'das_id' => $session->das_id,
+            'kind' => $session->kind,
+            'organisation_id' => $session->organisation_id,
             'starts_on' => $session->starts_on->toDateString(),
             'ends_on' => $session->ends_on->toDateString(),
             'trashed' => $session->trashed(),

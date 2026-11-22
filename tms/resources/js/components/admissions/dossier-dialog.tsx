@@ -10,6 +10,11 @@ import { useEffect, useState } from 'react';
 
 interface Defaults {
     account: { type: 'organisation' | 'person'; id: string } | null;
+    /** Name of the proposed entreprise (contract employer or intra session's entreprise). */
+    account_label: string | null;
+    /** The candidate as particulier, null when she is not one. */
+    person_account: { type: 'person'; id: string } | null;
+    prices: { organisation: string; person: string };
     label: string;
     quantity: string;
     unit: string;
@@ -53,7 +58,9 @@ export function DossierDialog({
             .then((json: Defaults | null) => {
                 setData(json);
                 setOrganisation(
-                    json?.account?.type === 'organisation' ? { id: json.account.id, label: employerLabel ?? 'Employeur du contrat' } : null,
+                    json?.account?.type === 'organisation'
+                        ? { id: json.account.id, label: json.account_label ?? employerLabel ?? 'Employeur du contrat' }
+                        : null,
                 );
                 setWithFunding(json?.funding !== null && json?.funding !== undefined);
             })
@@ -74,6 +81,16 @@ export function DossierDialog({
     }
 
     const isPerson = data.account?.type === 'person';
+    /** Switches the contractant: the candidate as particulier or an entreprise, with the matching price. */
+    const choose = (type: 'organisation' | 'person') => {
+        if (type === 'person' && data.person_account) setData({ ...data, account: data.person_account, unit_price: data.prices.person });
+        if (type === 'organisation')
+            setData({
+                ...data,
+                account: organisation ? { type: 'organisation', id: organisation.id } : null,
+                unit_price: data.prices.organisation,
+            });
+    };
     /** Errors shown next to a field; any other one is listed above the buttons, so a click never looks ignored. */
     const SHOWN = [
         'account',
@@ -133,6 +150,18 @@ export function DossierDialog({
                 <div className="grid gap-3">
                     <div className="grid gap-1">
                         <Label>Contractant</Label>
+                        <div role="radiogroup" aria-label="Contractant" className="flex flex-wrap gap-4 text-sm">
+                            <Label className="flex items-center gap-2 font-normal">
+                                <input type="radio" name="dossier-account-type" checked={!isPerson} onChange={() => choose('organisation')} />
+                                Une entreprise
+                            </Label>
+                            {data.person_account && (
+                                <Label className="flex items-center gap-2 font-normal">
+                                    <input type="radio" name="dossier-account-type" checked={isPerson} onChange={() => choose('person')} />
+                                    Le candidat (particulier)
+                                </Label>
+                            )}
+                        </div>
                         {isPerson ? (
                             <p className="rounded-md border px-3 py-2 text-sm">{personLabel} (particulier)</p>
                         ) : (

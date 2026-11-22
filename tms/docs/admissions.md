@@ -54,7 +54,8 @@ Sur la candidature, la carte « Test de positionnement » propose les tests en l
 
 Sur une candidature **admise**, **Créer le dossier** (droits : modifier la candidature **et** créer des dossiers dans son DAS) propose :
 
-- le **contractant** : l'entreprise d'accueil du contrat, sinon la personne si c'est un particulier, sinon une entreprise à choisir ;
+- le **contractant** : l'entreprise d'accueil du contrat, sinon l'entreprise de la session visée si elle est **intra** (seuls ses stagiaires y entrent), sinon la personne si c'est un particulier, sinon une entreprise à choisir. Vous pouvez toujours basculer entre **Une entreprise** et **Le candidat (particulier)** : le prix suit (tarif entreprise ou particulier) ;
+- un refus de l'inscription (session intra d'une autre entreprise, session complète…) s'affiche sous **Session** ; toute autre erreur s'affiche dans la fenêtre ;
 - une ligne de formation au **tarif** du catalogue (entreprise ou particulier), modifiable ;
 - l'**inscription** à la session visée (facultative : sans session, le dossier est créé sans inscription) ;
 - avec un OPCO renseigné, un **financement** par l'OPCO (type et montant à indiquer), payé directement à l'organisme.

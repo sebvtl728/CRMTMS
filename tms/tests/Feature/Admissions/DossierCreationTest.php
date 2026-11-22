@@ -171,11 +171,33 @@ it('answers on the session field when the enrolment is refused (intra session of
     $c = adAdmitted(['target_session_id' => $intra->id]);
 
     try {
-        app(DossierCreation::class)->create($c, adDossierData($c), admin());
+        // The user switched the contractant to the candidate as particulier.
+        app(DossierCreation::class)->create($c, adDossierData($c, ['account' => ['type' => 'person', 'id' => $c->person_id]]), admin());
         test()->fail('expected a validation error');
     } catch (ValidationException $e) {
         expect(array_keys($e->errors()))->toBe(['session_id'])
             ->and($e->errors()['session_id'][0])->toBe('Cette session intra est réservée à son entreprise : le contractant de ce dossier est différent.');
     }
     expect(Dossier::query()->count())->toBe(0);
+});
+
+it('proposes the entreprise of an intra targeted session as contractant, and lets the user choose either', function () {
+    $entreprise = Organisation::query()->create(['name' => 'Brasserie du Port']);
+    $intra = app(SessionWriter::class)->create([
+        'training_id' => adTraining()->id, 'kind' => 'intra', 'organisation_id' => $entreprise->id,
+        'starts_on' => '2027-01-04', 'ends_on' => '2027-06-30', 'planned_hours' => '', 'location_kind' => 'remote',
+        'location_text' => null, 'capacity' => null, 'responsible_user_id' => null, 'status' => 'planned', 'notes' => null,
+    ]);
+    $c = adAdmitted(['target_session_id' => $intra->id]);
+
+    $defaults = app(DossierCreation::class)->defaults($c);
+    expect($defaults['account'])->toBe(['type' => 'organisation', 'id' => $entreprise->id])
+        ->and($defaults['account_label'])->toBe('Brasserie du Port')
+        ->and($defaults['unit_price'])->toBe('6000.00')
+        ->and($defaults['person_account'])->toBe(['type' => 'person', 'id' => $c->person_id])
+        ->and($defaults['prices'])->toBe(['organisation' => '6000.00', 'person' => '4500.00']);
+
+    $dossierId = app(DossierCreation::class)->create($c, adDossierData($c), admin());
+    expect(Dossier::query()->findOrFail($dossierId)->account_organisation_id)->toBe($entreprise->id)
+        ->and(Enrolment::query()->where('person_id', $c->person_id)->where('training_session_id', $intra->id)->exists())->toBeTrue();
 });
