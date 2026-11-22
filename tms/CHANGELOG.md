@@ -5,6 +5,12 @@ Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) ; ve
 
 ## [Non publié]
 
+### Ajouté
+
+- **Planning des séances aux couleurs des sessions** : chaque session reçoit une couleur à son enregistrement (12
+  couleurs à tour de rôle, les sessions existantes colorées par ordre de création) ; ses séances la portent dans le
+  planning et « Mon planning ».
+
 ## [0.14.0] - 2026-11-22
 
 ### Ajouté

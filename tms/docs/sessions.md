@@ -232,7 +232,7 @@ Administration › **Salles et fermetures** (droit « Gérer les salles et ferme
 
 ### Planning des séances
 
-Menu **Formation › Planning des séances** (`/sessions/planning`, droit « Consulter les séances ») : toutes les séances de votre périmètre (« Ses fiches », « Ses DAS », « Tout l'organisme » ; « Ses séances » : les vôtres) des sessions qui ne sont pas à la corbeille, en vue **Mois** ou **Semaine** (lundi à dimanche). Les week-ends, jours fériés et fermetures sont grisés et nommés ; une séance annulée est barrée.
+Menu **Formation › Planning des séances** (`/sessions/planning`, droit « Consulter les séances ») : toutes les séances de votre périmètre (« Ses fiches », « Ses DAS », « Tout l'organisme » ; « Ses séances » : les vôtres) des sessions qui ne sont pas à la corbeille, en vue **Mois** ou **Semaine** (lundi à dimanche). Les week-ends, jours fériés et fermetures sont grisés et nommés ; une séance annulée est barrée. Chaque séance prend la **couleur de sa session**, donnée automatiquement à l'enregistrement de la session (12 couleurs à tour de rôle : deux sessions créées l'une après l'autre n'ont jamais la même).
 
 - **Filtres** : **DAS** (de la session ; la liste des formateurs se limite alors aux formateurs de ce DAS), **Formateur**, **Salle**, **Session** (celles qui ont une séance sur la période).
 - **Une séance** s'ouvre : module, formateur, lieu, alertes (formateur ou salle déjà pris, indisponibilité, férié, fermeture, stage, capacité…), note interne ; **Ouvrir la session** (si vous pouvez la consulter) et **Saisir les présences** (droit « Saisir les présences » sur cette séance).

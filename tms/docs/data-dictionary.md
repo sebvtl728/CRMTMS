@@ -466,6 +466,7 @@ Nommée ainsi pour ne pas se confondre avec la table `sessions` (sessions web). 
 | `planned_hours` | numeric(6,2), null | Heures prévues = somme des `session_modules.planned_minutes` (0.8.0), recalculée sous verrou de la session à chaque écriture d'un module ; la saisie ne sert qu'au module unique d'une formation sans module |
 | `location_kind` | string(10) | `address` (adresse obligatoire), `client` (chez le client), `remote` (distanciel) |
 | `location_text` | string(500), null | Adresse, précision ou lien |
+| `color` | varchar(7) nul | Couleur du planning (`SessionColors`), donnée à tour de rôle dans une palette de 12 à la création. |
 | `capacity` | int, null | Places d'une session inter (≥ 1, vide en intra et en individuel : CHECK). Une session individuelle n'accueille qu'un stagiaire (inscription non annulée), sans liste d'attente |
 | `responsible_user_id` | uuid, null (FK `users`) | Responsable (créateur par défaut) |
 | `status` | string(20) | `planned`, `confirmed`, `running`, `done`, `cancelled` (CHECK). « En cours » et « Terminée » se calculent à la lecture d'après les dates tant que l'état posé est `planned` ou `confirmed` |

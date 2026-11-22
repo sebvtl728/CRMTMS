@@ -76,6 +76,7 @@ final class SessionWriter
         return DB::transaction(function () use ($values): TrainingSession {
             $session = new TrainingSession($values);
             $session->number = $this->numbering->next(CarbonImmutable::now());
+            $session->color = SessionColors::next();
             $session->save();
             $this->modules->copyFromTraining($session);
 

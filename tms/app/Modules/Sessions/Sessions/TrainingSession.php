@@ -34,6 +34,7 @@ use Illuminate\Support\Facades\Auth;
  * @property string|null $planned_hours numeric(6,2) as a string
  * @property string $location_kind address|client|remote (SessionLocation)
  * @property string|null $location_text
+ * @property string|null $color the planning colour (SessionColors)
  * @property int|null $capacity places of an inter session
  * @property string|null $responsible_user_id
  * @property SessionStatus $status stored state (see effectiveStatus())
