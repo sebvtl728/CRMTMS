@@ -53,7 +53,10 @@ final class CustomFieldValues
                 case CustomFieldType::Number:
                     $number = is_string($value) || is_int($value) || is_float($value) ? str_replace([' ', ','], ['', '.'], (string) $value) : '';
                     if (preg_match('/^-?\d{1,12}(\.\d{1,4})?$/', $number) !== 1) {
-                        $errors[$key] = ["Le champ « {$label} » attend un nombre."];
+                        // A long run of digits is an identifier (social security, phone), not a quantity.
+                        $errors[$key] = [preg_match('/^\d{13,}$/', preg_replace('/[\s.]/', '', $number) ?? '') === 1
+                            ? "Le champ « {$label} » attend un nombre de 12 chiffres au plus. Pour un numéro (sécurité sociale, téléphone…), donnez-lui le type Texte dans Administration › Champs personnalisés."
+                            : "Le champ « {$label} » attend un nombre."];
                     } else {
                         $clean[$field->id] = $number;
                     }

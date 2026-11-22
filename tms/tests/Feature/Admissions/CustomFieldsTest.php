@@ -161,3 +161,13 @@ it('shows the active fields with their value on the candidature page', function 
         ->where('custom_fields.0.value', 'B')
         ->where('custom_fields.0.options', ['B']));
 });
+
+it('explains that a long identifier (social security number) belongs in a text field', function () {
+    $number = adField(['label' => 'Numéro de sécurité sociale', 'type' => 'number']);
+    $c = adCandidature();
+
+    $errors = adErrors(fn () => app(CandidatureWriter::class)->update($c, ['custom_values' => [$number->id => '1 85 05 78 006 084 36']], admin()));
+    expect($errors["custom_values.{$number->id}"][0])->toBe(
+        'Le champ « Numéro de sécurité sociale » attend un nombre de 12 chiffres au plus. Pour un numéro (sécurité sociale, téléphone…), donnez-lui le type Texte dans Administration › Champs personnalisés.'
+    );
+});
