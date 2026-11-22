@@ -23,7 +23,6 @@ use App\Modules\Sessions\Public\DossierBlocks;
 use App\Modules\Sessions\Public\DossierStates;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Validation\ValidationException;
 use Inertia\Testing\AssertableInertia as Assert;
 
 require_once __DIR__.'/Support/lot2a.php';
@@ -278,12 +277,10 @@ it('records whether a funder pays the organisme directly, never the contractor i
     $writer->update($x['opco'], ['pays_directly' => false]);
     expect($x['opco']->fresh()->pays_directly)->toBeFalse();
 
-    try {
-        l2Funding($x['dossier'], ['funder_organisation_id' => $x['hotel']->id, 'funding_type_id' => crmItem(ReferenceList::FundingType, 'Entreprise')->id, 'pays_directly' => true]);
-        $this->fail('The contractor paying directly must be refused.');
-    } catch (ValidationException $e) {
-        expect($e->errors())->toBe(['pays_directly' => ['Le contractant ne peut pas être un financeur payant directement.']]);
-    }
+    // The contractor ticked « paie directement »: accepted, the box ignored (he is invoiced the rest anyway).
+    $own = l2Funding($x['dossier'], ['funder_organisation_id' => $x['hotel']->id, 'funding_type_id' => crmItem(ReferenceList::FundingType, 'Entreprise')->id, 'pays_directly' => true]);
+    expect($own->pays_directly)->toBeFalse();
+    $own->delete();
     // The contractor as a funder not paying directly stays possible.
     expect(l2Funding($x['dossier'], ['funder_organisation_id' => $x['hotel']->id, 'pays_directly' => false])->pays_directly)->toBeFalse();
 
@@ -293,7 +290,7 @@ it('records whether a funder pays the organisme directly, never the contractor i
     $this->actingAs($manager)->post("/dossiers/{$x['dossier']->id}/fundings", [
         'funder_organisation_id' => $x['hotel']->id, 'funding_type_id' => crmItem(ReferenceList::FundingType, 'Entreprise')->id,
         'target' => 'dossier', 'amount' => '100', 'status' => 'agreed', 'pays_directly' => true,
-    ])->assertSessionHasErrors(['pays_directly' => 'Le contractant ne peut pas être un financeur payant directement.']);
+    ])->assertSessionHasNoErrors();
     $this->get("/dossiers/{$x['dossier']->id}")->assertInertia(fn (Assert $page) => $page
         ->where('fundings.0.pays_directly', true)->where('fundings.1.pays_directly', false));
 });

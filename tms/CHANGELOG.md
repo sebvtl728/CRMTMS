@@ -5,6 +5,11 @@ Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) ; ve
 
 ## [Non publié]
 
+### Modifié
+
+- **Financement par le contractant** : cocher « Paie directement l'organisme » n'est plus refusé ; la case est sans
+  effet pour lui (il reçoit déjà la facture du reste à charge).
+
 ### Ajouté
 
 - **Coordonnées bancaires** de la société (Administration › Sociétés) : banque, IBAN (clé vérifiée) et BIC, imprimés
