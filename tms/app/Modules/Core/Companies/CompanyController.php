@@ -4,6 +4,7 @@ namespace App\Modules\Core\Companies;
 
 use App\Http\Controllers\Controller;
 use App\Modules\Core\Tenancy\TenantContext;
+use App\Rules\Iban;
 use App\Rules\Siret;
 use Closure;
 use Illuminate\Http\JsonResponse;
@@ -189,6 +190,9 @@ class CompanyController extends Controller
                 'credit_note_prefix' => $company->credit_note_prefix,
                 'payment_terms_days' => $company->payment_terms_days,
                 'invoice_footer' => $company->invoice_footer,
+                'bank_name' => $company->bank_name,
+                'iban' => $company->iban,
+                'bic' => $company->bic,
                 'logo' => $this->branding->logoDataUri($company),
                 'signature' => $this->branding->signatureDataUri($company),
             ],
@@ -233,9 +237,14 @@ class CompanyController extends Controller
     {
         $input = $request->all();
 
-        foreach (['siret', 'vat_number'] as $key) {
+        foreach (['siret', 'vat_number', 'iban', 'bic'] as $key) {
             if (is_string($input[$key] ?? null)) {
                 $input[$key] = preg_replace('/\s+/', '', $input[$key]);
+            }
+        }
+        foreach (['iban', 'bic'] as $key) {
+            if (is_string($input[$key] ?? null)) {
+                $input[$key] = $input[$key] === '' ? null : mb_strtoupper($input[$key]);
             }
         }
         if (is_string($input['vat_number'] ?? null)) {
@@ -309,6 +318,9 @@ class CompanyController extends Controller
                 $request->route('company') instanceof Company ? $request->route('company')->invoice_prefix : 'F')]), $this->unusedPrefix($request, PrefixUsage::CREDIT_NOTE)],
             'payment_terms_days' => ['sometimes', 'required', 'integer', 'between:0,60'],
             'invoice_footer' => ['nullable', 'string', 'max:2000'],
+            'bank_name' => ['nullable', 'string', 'max:100'],
+            'iban' => ['nullable', 'string', new Iban, 'required_with:bic'],
+            'bic' => ['nullable', 'string', 'regex:/^[A-Z]{4}[A-Z]{2}[A-Z0-9]{2}([A-Z0-9]{3})?$/'],
         ], [
             'capital_amount.required' => 'Le capital social est obligatoire pour cette forme juridique (sauf capital variable).',
             'capital_amount.gt' => 'Le capital doit être strictement supérieur à 0.',
@@ -338,6 +350,9 @@ class CompanyController extends Controller
             'payment_terms_days.between' => 'Le délai de paiement doit être compris entre 0 et 60 jours.',
             'invoice_footer.string' => 'Les mentions de pied de facture doivent être un texte.',
             'invoice_footer.max' => 'Les mentions de pied de facture ne peuvent pas dépasser 2 000 caractères.',
+            'iban.required_with' => 'Indiquez l\'IBAN avec le BIC.',
+            'bic.regex' => 'Le BIC doit compter 8 ou 11 caractères (ex. BNPAFRPP).',
+            'bank_name.max' => 'Le nom de la banque ne peut pas dépasser 100 caractères.',
         ]);
 
         if (! (LegalForm::from($data['legal_form'])->isCooperative())) {

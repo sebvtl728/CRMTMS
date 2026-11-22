@@ -665,7 +665,7 @@ Une ligne par dossier (`dossier_id` unique, FK `dossiers`), créée au premier r
 Une ligne par organisme (`tenant_id` unique), créée au premier changement : `unjustified_absences` (`not_billed` par défaut, `bill_contractor`; CHECK).
 
 ### `companies` — colonnes ajoutées (0.9)
-`invoice_prefix` (string(10), défaut `F`), `credit_note_prefix` (défaut `AV`) : CHECK `^[A-Z0-9]{1,10}$` pour les deux et **différents** ; `payment_terms_days` (smallint, défaut 30, CHECK 0 à 60) ; `invoice_footer` (text, null).
+`invoice_prefix` (string(10), défaut `F`), `credit_note_prefix` (défaut `AV`) : CHECK `^[A-Z0-9]{1,10}$` pour les deux et **différents** ; `payment_terms_days` (smallint, défaut 30, CHECK 0 à 60) ; `invoice_footer` (text, null) ; `bank_name` (string(100), null), `iban` (string(34), null, sans espaces, clé vérifiée par `App\Rules\Iban`), `bic` (string(11), null, 8 ou 11 caractères, exige l'IBAN) : imprimés sur les factures (« Règlement par virement »), jamais sur un avoir.
 
 ### `invoices` — factures et avoirs
 | Colonne | Type | Rôle |

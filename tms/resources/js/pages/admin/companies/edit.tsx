@@ -43,12 +43,24 @@ type CompanyForm = {
     credit_note_prefix: string;
     payment_terms_days: string;
     invoice_footer: string;
+    bank_name: string;
+    iban: string;
+    bic: string;
 };
 
 interface CompanyData
     extends Omit<
         CompanyForm,
-        'scop_underlying_form' | 'capital_amount' | 'quote_validity_days' | 'quote_terms' | 'quote_footer' | 'payment_terms_days' | 'invoice_footer'
+        | 'scop_underlying_form'
+        | 'capital_amount'
+        | 'quote_validity_days'
+        | 'quote_terms'
+        | 'quote_footer'
+        | 'payment_terms_days'
+        | 'invoice_footer'
+        | 'bank_name'
+        | 'iban'
+        | 'bic'
     > {
     id: string;
     scop_underlying_form: string | null;
@@ -58,6 +70,9 @@ interface CompanyData
     quote_footer: string | null;
     payment_terms_days: number;
     invoice_footer: string | null;
+    bank_name: string | null;
+    iban: string | null;
+    bic: string | null;
     /** data URI of the current logo, null without one */
     logo: string | null;
     /** data URI of the signature and stamp printed on the training documents, null without one */
@@ -125,6 +140,9 @@ export default function EditCompany({ company, mentions, legalForms, underlyingF
         credit_note_prefix: company?.credit_note_prefix ?? 'AV',
         payment_terms_days: String(company?.payment_terms_days ?? 30),
         invoice_footer: company?.invoice_footer ?? '',
+        bank_name: company?.bank_name ?? '',
+        iban: company?.iban ? company.iban.replace(/(.{4})/g, '$1 ').trim() : '',
+        bic: company?.bic ?? '',
     });
 
     const [logoError, setLogoError] = useState<string | undefined>();
@@ -515,6 +533,27 @@ export default function EditCompany({ company, mentions, legalForms, underlyingF
                             </Field>
                         </div>
 
+                        <div className="grid gap-4 sm:grid-cols-3">
+                            <Field id="bank_name" label="Banque" error={errors.bank_name}>
+                                <Input {...text('bank_name')} maxLength={100} placeholder="Crédit Coopératif" />
+                            </Field>
+                            <Field id="iban" label="IBAN" error={errors.iban}>
+                                <Input {...text('iban')} maxLength={42} placeholder="FR76 3000 6000 0112 3456 7890 189" autoComplete="off" />
+                            </Field>
+                            <Field id="bic" label="BIC" error={errors.bic}>
+                                <Input
+                                    {...text('bic')}
+                                    onChange={(e) => setData('bic', e.target.value.toUpperCase())}
+                                    maxLength={11}
+                                    placeholder="BNPAFRPP"
+                                    autoComplete="off"
+                                />
+                            </Field>
+                        </div>
+                        <p className="text-muted-foreground -mt-2 text-xs">
+                            Imprimés sur chaque facture (« Règlement par virement »), jamais sur un avoir.
+                        </p>
+
                         <Field id="invoice_footer" label="Mentions de pied de facture" error={errors.invoice_footer}>
                             <textarea
                                 id="invoice_footer"
@@ -526,7 +565,8 @@ export default function EditCompany({ company, mentions, legalForms, underlyingF
                                 aria-describedby="invoice_footer-help"
                             />
                             <p id="invoice_footer-help" className="text-muted-foreground text-xs">
-                                Pénalités de retard, indemnité forfaitaire de 40 € pour frais de recouvrement, coordonnées bancaires…
+                                Mentions libres en plus (les pénalités, l'indemnité de 40 € et les coordonnées bancaires ci-dessus sont déjà
+                                imprimées).
                             </p>
                         </Field>
                     </fieldset>

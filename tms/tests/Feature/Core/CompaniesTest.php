@@ -241,3 +241,23 @@ it('rolls the default company back with a failed install', function () {
 
     expect(DB::table('companies')->count())->toBe(0);
 });
+
+it('stores the bank details of a company: IBAN checked by its key, BIC by its format', function () {
+    $this->actingAs(admin(twoFactor: true))
+        ->post('/admin/companies', companyPayload(['bank_name' => 'Crédit Coopératif', 'iban' => 'fr76 3000 6000 0112 3456 7890 189', 'bic' => 'bnpafrppxxx']))
+        ->assertSessionHasNoErrors();
+
+    $company = Company::query()->sole();
+    expect($company->iban)->toBe('FR7630006000011234567890189')
+        ->and($company->bic)->toBe('BNPAFRPPXXX')
+        ->and($company->bank_name)->toBe('Crédit Coopératif');
+});
+
+it('refuses an IBAN with a wrong key, a BIC of the wrong shape, and a BIC without IBAN', function () {
+    $this->actingAs(admin(twoFactor: true));
+
+    $this->post('/admin/companies', companyPayload(['iban' => 'FR7630006000011234567890188']))->assertSessionHasErrors(['iban' => 'L\'IBAN est invalide : vérifiez sa clé et sa longueur.']);
+    $this->post('/admin/companies', companyPayload(['iban' => 'FR7630006000011234567890189', 'bic' => 'BNP']))->assertSessionHasErrors(['bic' => 'Le BIC doit compter 8 ou 11 caractères (ex. BNPAFRPP).']);
+    $this->post('/admin/companies', companyPayload(['bic' => 'BNPAFRPP']))->assertSessionHasErrors(['iban' => 'Indiquez l\'IBAN avec le BIC.']);
+    expect(Company::count())->toBe(0);
+});

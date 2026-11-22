@@ -429,3 +429,11 @@ function funKeepLines(Dossier $dossier, array $keep): array
         ])->values()->all(),
     ];
 }
+
+it('takes the contractant as funder even when « paie directement » is ticked: he already gets the invoice of the rest', function () {
+    $dossier = l2Dossier();
+    $funding = l2Funding($dossier, ['funder_organisation_id' => $dossier->account_organisation_id, 'pays_directly' => true]);
+
+    expect($funding->funder_organisation_id)->toBe($dossier->account_organisation_id)
+        ->and($funding->pays_directly)->toBeFalse();
+});

@@ -289,7 +289,7 @@ function FundingDialog({
                             Paie directement l'organisme
                         </label>
                         <p className="text-muted-foreground text-xs">
-                            Le financeur règle l'organisme et reçoit sa propre facture pour sa part. Jamais le contractant lui-même.
+                            Le financeur règle l'organisme et reçoit sa propre facture pour sa part. Pour le contractant, la case est sans effet : il reçoit déjà la facture du reste à charge.
                         </p>
                         <InputError message={fieldErrors.pays_directly} />
                     </div>

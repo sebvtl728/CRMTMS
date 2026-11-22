@@ -8,6 +8,7 @@ use App\Modules\Core\Companies\LegalMentions;
 use App\Modules\Core\Documents\PdfRenderer;
 use App\Modules\Core\Documents\PdfRenderingFailed;
 use App\Modules\Core\Tenancy\TenantStorage;
+use App\Rules\Iban;
 use Illuminate\Support\Facades\Storage;
 use RuntimeException;
 
@@ -165,6 +166,11 @@ class InvoicePdf
                 'no_discount' => self::NO_DISCOUNT,
                 // Late penalties and the 40 € indemnity concern professionals only (Code de commerce).
                 'penalties' => $invoice->recipient_type === 'organisation' ? self::PENALTIES : null,
+                'bank' => $company->iban === null ? null : [
+                    'name' => $company->bank_name,
+                    'iban' => Iban::format($company->iban),
+                    'bic' => $company->bic,
+                ],
             ],
         ])->render();
     }
