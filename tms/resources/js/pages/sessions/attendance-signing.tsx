@@ -157,8 +157,8 @@ export default function AttendanceSigning({ state: initial }: { state: SlotState
                                 <p className="font-medium">Rattrapage</p>
                                 <p className="text-muted-foreground text-sm">
                                     Un stagiaire présent n'a pas signé ? Faites-le signer sur cet appareil (rattrapage sur place, jusqu'à ce soir
-                                    minuit) ou envoyez-lui un lien par e-mail. Chaque rattrapage est à confirmer dans l'onglet « Présences » de la
-                                    session.
+                                    minuit) ou envoyez-lui un lien par e-mail (bouton « Envoyer un lien » sur sa ligne, dans la liste ci-dessous).
+                                    Chaque rattrapage est à confirmer dans l'onglet « Présences » de la session.
                                 </p>
                                 {state.catch_up.open && state.catch_up.public_url ? (
                                     <div className="flex flex-wrap gap-2">
@@ -264,7 +264,7 @@ export default function AttendanceSigning({ state: initial }: { state: SlotState
                                         {r.catch_up_kind && <Badge variant="outline">Rattrapage à confirmer</Badge>}
                                         {!r.signed_at && state.can_catch_up && (
                                             <Button
-                                                variant="ghost"
+                                                variant="outline"
                                                 size="sm"
                                                 disabled={busy}
                                                 onClick={() => {
