@@ -57,6 +57,8 @@ class SireneLookupController extends Controller
             'name' => $r->name,
             'siret' => $r->siret,
             'naf_code' => $r->nafCode,
+            'idcc' => $r->idccCodes[0] ?? null,
+            'other_idcc' => array_slice($r->idccCodes, 1),
             'address_line1' => $r->addressLine1,
             'postal_code' => $r->postalCode,
             'city' => $r->city,

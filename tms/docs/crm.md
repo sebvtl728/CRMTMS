@@ -25,7 +25,7 @@ Tous ces chiffres respectent votre périmètre : un Responsable de DAS n'y compt
 
 ### Entreprises
 
-Écran **Entreprises**. Une fiche entreprise porte : raison sociale, SIRET, code NAF, **IDCC** (convention collective, 4 chiffres : « 843 » devient « 0843 » ; exporté et importable, colonne « IDCC » ou « convention collective »), forme juridique, secteur, type d'établissement, taille, origine, statut (**Prospect**, **Client** ou **Inactif**), responsable, coordonnées, DAS concernés et un résumé libre.
+Écran **Entreprises**. Une fiche entreprise porte : raison sociale, SIRET, code NAF, **IDCC** (convention collective, 4 chiffres : « 843 » devient « 0843 » ; exporté et importable, colonne « IDCC » ou « convention collective » ; rempli par **Compléter depuis le SIRET** quand l'annuaire officiel le connaît, les autres conventions de l'établissement signalées), forme juridique, secteur, type d'établissement, taille, origine, statut (**Prospect**, **Client** ou **Inactif**), responsable, coordonnées, DAS concernés et un résumé libre.
 
 - **Saisie rapide** : seule la **raison sociale** est obligatoire. Complétez le reste quand vous l'avez.
 - **Compléter depuis le SIRET** : saisissez les 14 chiffres, puis ce bouton va chercher l'annuaire officiel des entreprises et remplit **uniquement les champs encore vides**. Rien n'est enregistré tant que vous n'avez pas cliqué sur **Enregistrer**. Si l'annuaire ne répond pas, saisissez les informations à la main.

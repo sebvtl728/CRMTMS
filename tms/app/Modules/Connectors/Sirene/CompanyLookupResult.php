@@ -9,6 +9,9 @@ namespace App\Modules\Connectors\Sirene;
  */
 final readonly class CompanyLookupResult
 {
+    /**
+     * @param  list<string>  $idccCodes
+     */
     public function __construct(
         public string $name,
         public string $siret,
@@ -23,6 +26,8 @@ final readonly class CompanyLookupResult
         public ?int $employeeMax = null,
         /** The directory's legal-form code (kept so a sole trader is not cached). */
         public ?string $legalFormCode = null,
+        /** IDCC of the establishment (collective agreements, 4 digits), DSN placeholders removed. */
+        public array $idccCodes = [],
     ) {}
 
     /**
@@ -50,6 +55,7 @@ final readonly class CompanyLookupResult
             employeeMin: $a['employeeMin'] ?? null,
             employeeMax: $a['employeeMax'] ?? null,
             legalFormCode: $a['legalFormCode'] ?? null,
+            idccCodes: array_values(array_filter((array) ($a['idccCodes'] ?? []), 'is_string')),
         );
     }
 }

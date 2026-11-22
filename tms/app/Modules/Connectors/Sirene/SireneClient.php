@@ -233,7 +233,29 @@ class SireneClient
             employeeMin: $range['min'] ?? null,
             employeeMax: $range['max'] ?? null,
             legalFormCode: $legalCode,
+            idccCodes: $this->idcc($establishment['liste_idcc'] ?? $company['complements']['liste_idcc'] ?? null),
         );
+    }
+
+    /**
+     * The 4-digit IDCC of a list, in order, without duplicates nor the DSN
+     * placeholders 9998 (not yet covered) and 9999 (no agreement).
+     *
+     * @return list<string>
+     */
+    private function idcc(mixed $list): array
+    {
+        if (! is_array($list)) {
+            return [];
+        }
+        $codes = [];
+        foreach ($list as $code) {
+            if (is_string($code) && preg_match('/^\d{4}$/', $code) === 1 && ! in_array($code, ['9998', '9999', ...$codes], true)) {
+                $codes[] = $code;
+            }
+        }
+
+        return $codes;
     }
 
     /** The directory's one-line address minus its trailing "<postal code> <city>". */

@@ -56,6 +56,8 @@ it('prefills an entreprise from a known siret', function () {
         ->assertJsonPath('data.name', 'DASSAULT SYSTEMES')
         ->assertJsonPath('data.siret', SIEGE_SIRET)
         ->assertJsonPath('data.naf_code', '5829C')
+        ->assertJsonPath('data.idcc', '3248')
+        ->assertJsonPath('data.other_idcc', [])
         ->assertJsonPath('data.address_line1', '10 RUE MARCEL DASSAULT')
         ->assertJsonPath('data.postal_code', '78140')
         ->assertJsonPath('data.city', 'VELIZY-VILLACOUBLAY')
@@ -390,3 +392,22 @@ it('treats a non-diffusible entreprise as not found and never prefills its place
         $c['nom_complet'] = '[NON-DIFFUSIBLE]';
     }],
 ]);
+
+it('gives the IDCC of the establishment, the others apart, and never the DSN placeholders 9998 / 9999', function () {
+    $fixture = sireneFixture('dassault-systemes');
+    $fixture['results'][0]['siege']['liste_idcc'] = ['9999', '1486', '3248'];
+    freshHttp();
+    Http::fake(['recherche-entreprises.api.gouv.fr/*' => Http::response($fixture)]);
+
+    $this->actingAs(commercial())->getJson('/crm/sirene/'.SIEGE_SIRET)
+        ->assertOk()->assertJsonPath('data.idcc', '1486')->assertJsonPath('data.other_idcc', ['3248']);
+
+    $fixture['results'][0]['siege']['liste_idcc'] = ['9998'];
+    $fixture['results'][0]['complements']['liste_idcc'] = null;
+    freshHttp();
+    Http::fake(['recherche-entreprises.api.gouv.fr/*' => Http::response($fixture)]);
+    Cache::flush();
+
+    $this->actingAs(commercial())->getJson('/crm/sirene/'.SIEGE_SIRET)
+        ->assertOk()->assertJsonPath('data.idcc', null)->assertJsonPath('data.other_idcc', []);
+});

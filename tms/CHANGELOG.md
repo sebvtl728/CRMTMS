@@ -5,11 +5,14 @@ Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) ; ve
 
 ## [Non publié]
 
+## [0.14.4] - 2026-11-22
+
 ### Ajouté
 
 - **Justificatifs d'absence** : dans la saisie des présences, sous un stagiaire absent, partiel ou excusé, dépôt d'un PDF
   ou d'une image (10 Mo au plus) ; réservés aux gestionnaires (jamais au formateur), supprimés à l'anonymisation.
-- **IDCC** (convention collective) sur la fiche entreprise : saisie à 4 chiffres, affichage, export et import.
+- **IDCC** (convention collective) sur la fiche entreprise : saisie à 4 chiffres, affichage, export et import ;
+  **Compléter depuis le SIRET** le remplit depuis l'annuaire officiel (Recherche d'entreprises).
 
 ### Modifié
 

@@ -63,6 +63,9 @@ const NONE = 'none';
 interface SireneData {
     name: string;
     naf_code: string | null;
+    idcc: string | null;
+    /** Other agreements of the establishment (rare): shown, not filled. */
+    other_idcc: string[];
     address_line1: string | null;
     postal_code: string | null;
     city: string | null;
@@ -74,6 +77,7 @@ interface SireneData {
 const SIRENE_FIELDS: Array<[keyof SireneData & keyof OrganisationForm, string]> = [
     ['name', 'raison sociale'],
     ['naf_code', 'code NAF'],
+    ['idcc', 'IDCC'],
     ['legal_form_id', 'forme juridique'],
     ['company_size_id', 'taille'],
     ['address_line1', 'adresse'],
@@ -174,6 +178,9 @@ export default function OrganisationFormPage({ organisation, options, duplicates
                     filled.push(label);
                 }
             });
+            if (found.other_idcc.length > 0) {
+                filled.push(`autres conventions de l'établissement : ${found.other_idcc.join(', ')}`);
+            }
             setSirene({ loading: false, error: null, filled });
         } catch {
             setSirene({
