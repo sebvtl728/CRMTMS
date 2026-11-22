@@ -5,6 +5,8 @@ Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) ; ve
 
 ## [Non publié]
 
+## [0.14.0] - 2026-11-22
+
 ### Ajouté
 
 - **Automatismes** (Administration › Automatismes) : chaque matin, **convocations** des sessions confirmées à J-7
