@@ -5,8 +5,6 @@ Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) ; ve
 
 ## [Non publié]
 
-## [0.13.0] - 2026-11-22
-
 ### Ajouté
 
 - **Automatismes** (Administration › Automatismes) : chaque matin, **convocations** des sessions confirmées à J-7
@@ -16,6 +14,10 @@ Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) ; ve
 - **À traiter** (menu, avec compteur) : ce qui attend chacun selon ses droits — sessions à préparer, rattrapages à
   confirmer, demi-journées non validées, devis sans réponse, actions à faire, candidatures, montants à facturer,
   factures à relancer.
+
+## [0.13.0] - 2026-11-22
+
+### Ajouté
 
 - **Rattrapage d'émargement** : un stagiaire présent qui n'a pas signé rattrape sa signature après coup, **sur place**
   (lien de rattrapage d'une demi-journée passée, jusqu'à minuit) ou **à distance** (lien personnel par e-mail de 7 jours
