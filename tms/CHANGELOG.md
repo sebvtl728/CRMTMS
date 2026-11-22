@@ -9,7 +9,8 @@ Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) ; ve
 
 - **Planning des séances aux couleurs des sessions** : chaque session reçoit une couleur à son enregistrement (12
   couleurs à tour de rôle, les sessions existantes colorées par ordre de création) ; ses séances la portent dans le
-  planning et « Mon planning ».
+  planning et « Mon planning », et la session l'affiche aussi (pastille dans la liste, bord de sa carte dans les
+  colonnes, en tête de sa page).
 
 ## [0.14.0] - 2026-11-22
 

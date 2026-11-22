@@ -127,6 +127,8 @@ final class SessionRows
         return [
             'id' => $s->id,
             'number' => $s->number,
+            'color' => $s->color,
+            'color' => $s->color,
             'title' => $s->title,
             'label' => $s->label($training?->title),
             'training' => $training === null ? null : ['id' => $training->id, 'code' => $training->code, 'title' => $training->title, 'is_active' => $training->is_active],

@@ -2,6 +2,8 @@
 export interface SessionRow {
     id: string;
     number: string;
+    /** The planning colour of the session (« #2563eb »). */
+    color: string | null;
     /** « Commis de cuisine – entrée du 30 novembre 2026 » (optional). */
     title: string | null;
     /** « <intitulé> (S-…) », or « <formation> (S-…) » without a title. */
