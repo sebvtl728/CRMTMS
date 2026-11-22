@@ -7,7 +7,7 @@ import { Label } from '@/components/ui/label';
 import { formatDateTime, formatDay, type Option } from '@/lib/crm';
 import { sendJson } from '@/lib/sessions';
 import { CheckCheck, ClipboardCheck, FileText, LoaderCircle, Lock, LockOpen, QrCode, Trash2 } from 'lucide-react';
-import { FormEventHandler, useCallback, useEffect, useState } from 'react';
+import { FormEventHandler, useCallback, useEffect, useRef, useState } from 'react';
 
 /** Attendance of a trainee at a séance (AttendanceRows::grid): names only, never needs, notes nor prices. */
 interface GridRow {
@@ -664,6 +664,16 @@ function MonthlyCell({
  * hours, and its closure (closing locks attendance, hours and séances of
  * the month; reopening needs a reason).
  */
+/** Monday to Sunday of the current week, Paris days (YYYY-MM-DD). */
+function currentWeek(): { from: string; to: string } {
+    const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Paris' }).format(new Date());
+    const day = new Date(`${today}T12:00:00Z`);
+    const monday = new Date(day.getTime() - ((day.getUTCDay() + 6) % 7) * 86400000);
+    const sunday = new Date(monday.getTime() + 6 * 86400000);
+
+    return { from: monday.toISOString().slice(0, 10), to: sunday.toISOString().slice(0, 10) };
+}
+
 export function SessionAttendance({ sessionId }: { sessionId: string }) {
     const [data, setData] = useState<SessionAttendance | null>(null);
     const [month, setMonth] = useState<string | null>(null);
@@ -671,7 +681,7 @@ export function SessionAttendance({ sessionId }: { sessionId: string }) {
     const [seanceId, setSeanceId] = useState<string | null>(null);
     const [reopen, setReopen] = useState(false);
     const [busy, setBusy] = useState(false);
-    const [allSeances, setAllSeances] = useState(false);
+    const seancesBox = useRef<HTMLDivElement>(null);
 
     const load = useCallback(
         (m: string | null) => {
@@ -690,6 +700,15 @@ export function SessionAttendance({ sessionId }: { sessionId: string }) {
 
     useEffect(() => load(null), [load]);
 
+    // The scroll area opens on the current week (the month's start otherwise), without moving the page.
+    useEffect(() => {
+        const box = seancesBox.current;
+        if (!box) return;
+        const row = box.querySelector<HTMLElement>('[data-this-week]');
+        const head = box.querySelector('thead')?.getBoundingClientRect().height ?? 0;
+        box.scrollTop = row ? row.offsetTop - head : 0;
+    }, [data?.month]);
+
     if (!data) {
         return error ? (
             <p className="text-destructive text-sm">{error}</p>
@@ -698,11 +717,7 @@ export function SessionAttendance({ sessionId }: { sessionId: string }) {
         );
     }
 
-    // Folded by default: the past séances whose attendance is still to complete (or to review).
-    const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Paris' }).format(new Date());
-    const shownSeances = allSeances
-        ? data.seances
-        : data.seances.filter((s) => !s.cancelled && s.date <= today && (s.recorded < s.expected || s.needs_review > 0));
+    const week = currentWeek();
 
     const current = data.months.find((m) => m.value === data.month);
     const label = current ? monthLabel(current.label) : data.month;
@@ -801,24 +816,15 @@ export function SessionAttendance({ sessionId }: { sessionId: string }) {
             </section>
 
             <section className="grid gap-2">
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                    <h3 className="font-medium">Séances du mois</h3>
-                    {data.seances.length > 0 && (
-                        <Button type="button" variant="ghost" size="sm" onClick={() => setAllSeances(!allSeances)}>
-                            {allSeances ? 'Seulement les séances à compléter' : `Afficher les ${data.seances.length} séances`}
-                        </Button>
-                    )}
-                </div>
+                <h3 className="font-medium">Séances du mois</h3>
                 {data.seances.length === 0 ? (
                     <p className="text-muted-foreground text-sm">Aucune séance ce mois-ci.</p>
-                ) : shownSeances.length === 0 ? (
-                    <p className="text-muted-foreground text-sm">Aucune séance passée à compléter : les présences sont saisies.</p>
                 ) : (
-                    <div className="overflow-x-auto">
+                    <div ref={seancesBox} className="max-h-80 overflow-auto rounded-md border">
                         <table className="w-full text-sm">
-                            <thead className="text-muted-foreground text-left">
+                            <thead className="text-muted-foreground bg-background sticky top-0 z-10 text-left">
                                 <tr>
-                                    <th className="py-2 pr-3 font-normal">Date</th>
+                                    <th className="py-2 pr-3 pl-2 font-normal">Date</th>
                                     <th className="py-2 pr-3 font-normal">Horaires</th>
                                     <th className="py-2 pr-3 font-normal">Module</th>
                                     <th className="py-2 pr-3 font-normal">Formateur</th>
@@ -829,9 +835,13 @@ export function SessionAttendance({ sessionId }: { sessionId: string }) {
                                 </tr>
                             </thead>
                             <tbody>
-                                {shownSeances.map((s) => (
-                                    <tr key={s.id} className={`border-t ${s.cancelled ? 'text-muted-foreground line-through' : ''}`}>
-                                        <td className="py-2 pr-3">{formatDay(s.date)}</td>
+                                {data.seances.map((s) => (
+                                    <tr
+                                        key={s.id}
+                                        data-this-week={s.date >= week.from && s.date <= week.to ? '' : undefined}
+                                        className={`border-t ${s.date >= week.from && s.date <= week.to ? 'bg-muted/50' : ''} ${s.cancelled ? 'text-muted-foreground line-through' : ''}`}
+                                    >
+                                        <td className="py-2 pr-3 pl-2">{formatDay(s.date)}</td>
                                         <td className="py-2 pr-3">
                                             {s.start}–{s.end} ({s.duration})
                                         </td>
