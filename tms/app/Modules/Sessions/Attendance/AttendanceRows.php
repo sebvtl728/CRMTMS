@@ -138,7 +138,7 @@ final class AttendanceRows
             'realised' => SessionModules::label($r['realised_minutes']),
         ], RealisedHours::forSession($session->id, $month));
         usort($realised, fn (array $a, array $b) => strcmp(mb_strtolower($a['name']).$a['enrolment_id'], mb_strtolower($b['name']).$b['enrolment_id']));
-        // The validated half-days of the month: a séance is « validated » when every half it touches is, « partial » when some are.
+        // The validated half-days of the month: a day is « validated » when every half its séances touch is, « partial » when some are.
         $validated = Signing\SignSlot::query()->where('training_session_id', $session->id)
             ->whereBetween('date', [$first->toDateString(), $first->endOfMonth()->toDateString()])
             ->where('status', Signing\SignSlot::VALIDATED)->get(['date', 'half'])
@@ -172,7 +172,7 @@ final class AttendanceRows
                 'recorded' => (int) ($counts[$s->id]->recorded ?? 0),
                 'needs_review' => (int) ($counts[$s->id]->review ?? 0),
                 'expected' => $enrolments->filter(fn (Enrolment $e) => self::attendsDay($e, $s->date))->count(),
-                'signing' => self::signing($s, $validated),
+                'signing' => self::signing($s, $seances, $validated),
             ])->values()->all(),
             'monthly' => [
                 'modules' => $interval->map(fn (SessionModule $m) => [
@@ -228,15 +228,19 @@ final class AttendanceRows
     }
 
     /**
-     * « validated » when every half-day the séance touches is validated,
-     * « partial » when some are, null otherwise.
+     * The day of the séance: « validated » when every half-day touched by its
+     * live séances that day is validated, « partial » when some are, null
+     * otherwise (a morning séance and an afternoon séance share their day).
      *
+     * @param  Collection<int, Seance>  $seances  the month's séances
      * @param  Collection<string, bool>  $validated  keys « date|half »
      */
-    private static function signing(Seance $seance, Collection $validated): ?string
+    private static function signing(Seance $seance, Collection $seances, Collection $validated): ?string
     {
-        $halves = Signing\Halves::of($seance->start(), $seance->end());
-        $done = count(array_filter($halves, fn (string $half) => $validated->has($seance->date->toDateString().'|'.$half)));
+        $date = $seance->date->toDateString();
+        $halves = $seances->filter(fn (Seance $s) => $s->date->toDateString() === $date && ! $s->isCancelled())
+            ->flatMap(fn (Seance $s) => Signing\Halves::of($s->start(), $s->end()))->unique()->values()->all();
+        $done = count(array_filter($halves, fn (string $half) => $validated->has($date.'|'.$half)));
 
         return match (true) {
             $done === 0 => null,

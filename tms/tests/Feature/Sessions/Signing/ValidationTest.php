@@ -188,7 +188,7 @@ it('locks the session before the slot when validating, as when opening (no lost 
     expect($locks[0])->toBe('session')->and(array_search('slot', $locks, true))->toBeGreaterThan(0);
 });
 
-it('flags in the month list the séances whose half-days are validated, all or some', function () {
+it('flags in the month list the days whose half-days are validated, all or some', function () {
     $session = plSession();
     plSeance(plModule($session), '2026-09-10', '09:00', '12:00');
     plSeance(plModule($session), '2026-09-10', '14:00', '17:00');
@@ -202,7 +202,7 @@ it('flags in the month list the séances whose half-days are validated, all or s
 
     expect($flags())->toBe([null, null, null]);
     app(App\Modules\Sessions\Public\AttendanceSigning::class)->validateExternal($morning->id, 'fake', null, 'Marie Martin');
-    expect($flags())->toBe(['validated', null, null]);
+    expect($flags())->toBe(['partial', 'partial', null]);
     app(App\Modules\Sessions\Public\AttendanceSigning::class)->validateExternal($afternoon->id, 'fake', null, 'Marie Martin');
     expect($flags())->toBe(['validated', 'validated', null]);
     sgNow('2026-09-11 09:30');
