@@ -25,7 +25,7 @@ it('lists the editable templates and the system ones, read only', function () {
 
     $this->get('/admin/mail-templates')->assertOk()->assertInertia(fn (Assert $page) => $page
         ->component('admin/mail-templates/index')
-        ->where('templates', fn ($t) => collect($t)->where('editable', true)->pluck('key')->sort()->values()->all() === ['activity_assigned', 'attendance_catch_up', 'attendance_catch_up_code', 'brochure', 'crm.daily_digest', 'document_completion_certificate', 'document_contract', 'document_convention', 'document_convocation', 'document_realisation_certificate', 'invoice', 'invoice_reminder_1', 'invoice_reminder_2', 'invoice_reminder_3', 'positioning_test', 'quote.remind', 'quote.send', 'signature_code', 'signature_done', 'signature_request', 'survey_client', 'survey_cold', 'survey_hot', 'users.invitation'])
+        ->where('templates', fn ($t) => collect($t)->where('editable', true)->pluck('key')->sort()->values()->all() === ['activity_assigned', 'attendance_catch_up', 'attendance_catch_up_code', 'brochure', 'crm.daily_digest', 'document_completion_certificate', 'document_contract', 'document_convention', 'document_convocation', 'document_realisation_certificate', 'invoice', 'invoice_reminder_1', 'invoice_reminder_2', 'invoice_reminder_3', 'positioning_test', 'quote.remind', 'quote.send', 'session_day_before_trainee', 'session_day_before_trainer', 'signature_code', 'signature_done', 'signature_request', 'survey_client', 'survey_cold', 'survey_hot', 'users.invitation'])
         ->where('templates', fn ($t) => collect($t)->where('editable', false)->pluck('key')->contains('auth.password_reset')));
 
     $this->get('/admin/mail-templates/quote.send')->assertOk()->assertInertia(fn (Assert $page) => $page

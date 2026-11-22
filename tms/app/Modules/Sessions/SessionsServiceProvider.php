@@ -12,6 +12,7 @@ use App\Modules\Core\Access\Role;
 use App\Modules\Core\Access\RoleScopesChanged;
 use App\Modules\Core\Access\Scopes;
 use App\Modules\Core\Audit\MorphAliases;
+use App\Modules\Core\Automation\DailyAutomations;
 use App\Modules\Core\References\ReferenceList;
 use App\Modules\Core\References\ReferenceUsage;
 use App\Modules\Core\Users\InvitationAccepted;
@@ -30,6 +31,8 @@ use App\Modules\Sessions\Attendance\Signing\CatchUpLink;
 use App\Modules\Sessions\Attendance\Signing\CatchUpMailTemplates;
 use App\Modules\Sessions\Attendance\Signing\SignedSheet;
 use App\Modules\Sessions\Attendance\Signing\SignSlot;
+use App\Modules\Sessions\Automation\DayBeforeMailTemplates;
+use App\Modules\Sessions\Automation\DayBeforeReminders;
 use App\Modules\Sessions\Dashboard\Retention;
 use App\Modules\Sessions\Dossiers\Dossier;
 use App\Modules\Sessions\Dossiers\DossierFromQuote;
@@ -134,6 +137,8 @@ class SessionsServiceProvider extends ServiceProvider
         Retention::register();
         // E-mails of the remote signing catch-up (2026-11-21).
         CatchUpMailTemplates::register();
+        DayBeforeMailTemplates::register();
+        DailyAutomations::register('day_before', fn (CarbonImmutable $today): int => app(DayBeforeReminders::class)->run($today));
         self::registerReferenceUsage();
         self::registerTrainingUsage();
         self::registerFicheBlocks();
