@@ -29,6 +29,7 @@ interface OrganisationData {
     name: string;
     siret: string | null;
     naf_code: string | null;
+    idcc: string | null;
     status: StatusValue;
     legal_form: Ref | null;
     sector: Ref | null;
@@ -225,6 +226,7 @@ export default function OrganisationShow({
                             <dl className="grid gap-3 sm:grid-cols-2">
                                 <Item label="SIRET">{o.siret ? formatSiret(o.siret) : null}</Item>
                                 <Item label="Code NAF">{o.naf_code}</Item>
+                                <Item label="IDCC">{o.idcc}</Item>
                                 <Item label="Forme juridique">{o.legal_form?.label}</Item>
                                 <Item label="Secteur d'activité">{o.sector?.label}</Item>
                                 <Item label="Type d'établissement">{o.establishment_type?.label}</Item>

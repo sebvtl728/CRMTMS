@@ -12,6 +12,8 @@ enum CustomFieldType: string
     case Boolean = 'boolean';
     case Choice = 'choice';
     case File = 'file';
+    /** Social security number (NIR): checked, sensitive (admissions.sensitive.view). */
+    case Nir = 'nir';
 
     public function label(): string
     {
@@ -23,7 +25,14 @@ enum CustomFieldType: string
             self::Boolean => 'Oui / non',
             self::Choice => 'Liste de choix',
             self::File => 'Fichier joint',
+            self::Nir => 'N° de sécurité sociale',
         };
+    }
+
+    /** Shown and written only with admissions.sensitive.view. */
+    public function sensitive(): bool
+    {
+        return $this === self::Nir;
     }
 
     /**

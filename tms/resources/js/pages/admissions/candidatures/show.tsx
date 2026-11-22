@@ -81,6 +81,14 @@ function Suggest({ c, to, label, canUpdate }: { c: Candidature; to: string; labe
     );
 }
 
+/** « 1 85 05 78 006 084 91 »: the groups of a social security number, as typed. */
+function formatNir(value: string): string {
+    const raw = value.replace(/\s/g, '');
+    return [raw.slice(0, 1), raw.slice(1, 3), raw.slice(3, 5), raw.slice(5, 7), raw.slice(7, 10), raw.slice(10, 13), raw.slice(13, 15)]
+        .filter((g) => g !== '')
+        .join(' ');
+}
+
 export default function CandidatureShow({ candidature: c, custom_fields, history, options, can, positioning: positioningTests, status }: ShowProps) {
     const errors = usePage().props.errors as Record<string, string | undefined>;
     const [stage, setStage] = useState<string | null>(null);
@@ -124,7 +132,7 @@ export default function CandidatureShow({ candidature: c, custom_fields, history
         ...(can.sensitive ? { interview_report: c.interview_report ?? '', rqth: c.rqth ?? false, adaptation_needs: c.adaptation_needs ?? '' } : {}),
     });
     const custom = useCard(c.id, {
-        custom_values: Object.fromEntries(custom_fields.filter((f) => f.type !== 'file').map((f) => [f.id, f.value ?? ''])),
+        custom_values: Object.fromEntries(custom_fields.filter((f) => f.type !== 'file' && !f.hidden).map((f) => [f.id, f.value ?? ''])),
     });
 
     const [contract, setContract] = useState({
@@ -654,6 +662,27 @@ export default function CandidatureShow({ candidature: c, custom_fields, history
                                     const label = `${f.label}${f.required_for_admission ? " (requis pour l'admission)" : ''}`;
                                     const value = (customValues[f.id] as string | boolean | null | undefined) ?? '';
                                     const error = errors[`custom_values.${f.id}`];
+                                    if (f.hidden) {
+                                        return (
+                                            <div key={f.id} className="grid gap-1">
+                                                <Label>{label}</Label>
+                                                <p className="text-muted-foreground text-sm">Donnée sensible, réservée aux personnes autorisées.</p>
+                                            </div>
+                                        );
+                                    }
+                                    if (f.type === 'nir') {
+                                        return (
+                                            <TextField
+                                                key={f.id}
+                                                id={`cf-${f.id}`}
+                                                label={label}
+                                                value={formatNir(String(value))}
+                                                onChange={(v) => setCustom(f.id, v.replace(/\s/g, '').toUpperCase())}
+                                                error={error}
+                                                disabled={disabled}
+                                            />
+                                        );
+                                    }
                                     if (f.type === 'file') {
                                         return (
                                             <div key={f.id} className="grid gap-1 sm:col-span-2">

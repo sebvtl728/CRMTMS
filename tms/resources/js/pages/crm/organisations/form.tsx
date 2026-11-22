@@ -17,6 +17,7 @@ type OrganisationForm = {
     name: string;
     siret: string;
     naf_code: string;
+    idcc: string;
     status: string;
     legal_form_id: string;
     sector_id: string;
@@ -62,6 +63,9 @@ const NONE = 'none';
 interface SireneData {
     name: string;
     naf_code: string | null;
+    idcc: string | null;
+    /** Other agreements of the establishment (rare): shown, not filled. */
+    other_idcc: string[];
     address_line1: string | null;
     postal_code: string | null;
     city: string | null;
@@ -73,6 +77,7 @@ interface SireneData {
 const SIRENE_FIELDS: Array<[keyof SireneData & keyof OrganisationForm, string]> = [
     ['name', 'raison sociale'],
     ['naf_code', 'code NAF'],
+    ['idcc', 'IDCC'],
     ['legal_form_id', 'forme juridique'],
     ['company_size_id', 'taille'],
     ['address_line1', 'adresse'],
@@ -119,6 +124,7 @@ export default function OrganisationFormPage({ organisation, options, duplicates
         name: str('name'),
         siret: str('siret'),
         naf_code: str('naf_code'),
+        idcc: str('idcc'),
         status: str('status', 'prospect'),
         legal_form_id: str('legal_form_id'),
         sector_id: str('sector_id'),
@@ -172,6 +178,9 @@ export default function OrganisationFormPage({ organisation, options, duplicates
                     filled.push(label);
                 }
             });
+            if (found.other_idcc.length > 0) {
+                filled.push(`autres conventions de l'établissement : ${found.other_idcc.join(', ')}`);
+            }
             setSirene({ loading: false, error: null, filled });
         } catch {
             setSirene({
@@ -282,6 +291,7 @@ export default function OrganisationFormPage({ organisation, options, duplicates
                         </div>
                     </Field>
                     {text('naf_code', 'Code NAF', { placeholder: '5610A', maxLength: 6 })}
+                    {text('idcc', 'IDCC (convention collective)', { placeholder: '1979', maxLength: 4 })}
                     {pick('status', 'Statut', options.status, 'Prospect')}
                     {pick('responsible_user_id', 'Responsable', options.responsible, 'Sans responsable')}
                 </Section>

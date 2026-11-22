@@ -161,6 +161,7 @@ Conventions communes : UUID v7, `tenant_id`, suppression logique (`deleted_at`) 
 | `name` | string | Raison sociale (seul champ obligatoire) |
 | `siret` | char(14), null | 14 chiffres (CHECK) ; **unique par organisme** parmi les fiches non supprimées (`organisations_siret_unique`) |
 | `naf_code` | string(6), null | Code NAF |
+| `idcc` | string(4), null | IDCC (convention collective), 4 chiffres |
 | `legal_form_id`, `sector_id`, `establishment_type_id`, `company_size_id`, `origin_id` | uuid, null | FK `reference_items` (listes `legal_form_org`, `sector`, `establishment_type`, `company_size`, `contact_origin`) |
 | `status` | string | `prospect` (défaut), `client`, `inactif` (CHECK) |
 | `responsible_user_id` | uuid, null | FK `users` (`SET NULL`) |
@@ -524,6 +525,19 @@ Module `Sessions` (`Attendance\Attendance`, écrite par `Attendance\Attendances`
 ### `attendance_closures` — mois clôturés d'une session (0.8.0)
 `Attendance\AttendanceClosure`, écrite par `Attendance\Closures`. `id`, `tenant_id` · `training_session_id` (FK `training_sessions`) · `month` date (1er du mois de Paris, CHECK), unique avec la session · `closed_at` timestamptz, null (non nul = clôturé) · `closed_by` (FK `users`, null) · `reopened_at` timestamptz, null · `reopened_by` (FK `users`, null) · `reopen_reason` string(300), null (motif de la dernière réouverture, donnée personnelle) · horodatages. Journalisée (`attendance_closure`) sans le motif en clair. Un mois clôturé refuse (409) présences, heures du mois et création, suppression, annulation ou changement d'horaires de ses séances. Service public `Sessions\Public\RealisedHours` (`forEnrolment`, `forSession`) : minutes réalisées (dans les dates d'entrée et de sortie du stagiaire) et prévues (somme des modules, null = 0), mois clôturés.
 
+### `attendance_proofs` — justificatifs d'absence (0.14.4)
+
+| Colonne | Type | Rôle |
+|---|---|---|
+| `seance_id` | uuid → `seances` | Séance concernée |
+| `enrolment_id` | uuid → `enrolments` | Stagiaire concerné |
+| `path` | string(500) | Fichier, zone privée `attendance_proofs` |
+| `original_name` | string(255) | Nom neutre `justificatif-<date>.<ext>` |
+| `mime`, `size_bytes` | string, entier | Type vérifié sur le contenu (PDF, PNG, JPEG), 10 Mo au plus |
+| `uploaded_by` | uuid → `users`, null | Qui l'a déposé |
+
+Lu et écrit par les gestionnaires de présences seulement (périmètre ≠ « Ses séances ») ; non journalisé ; supprimé par l'anonymisation du stagiaire.
+
 ### `attendance_sheet_scans` — feuilles d'émargement signées, scannées (0.8.0)
 `Attendance\AttendanceSheetScan`, écrite par `Attendance\AttendanceScans`. `id`, `tenant_id` · `training_session_id` (FK `training_sessions`) · `seance_id` (FK `seances`, sans cascade, null = scan de toute la journée de la session) · `date` date (jour de Paris) · `path` string(300) (fichier privé `tenants/<tenant_id>/attendance_sheets/<session>/<date>/<uuid>.<pdf|png|jpg>`) · `original_name` string(200) (nom envoyé, jamais journalisé) · `mime` string(100) · `size_bytes` int (≤ 10 Mo) · `uploaded_by` (FK `users`, null) · horodatages. Journalisée (`attendance_sheet_scan`) sans le chemin ni le nom du fichier. Supprimée par un gestionnaire, ou par l'anonymisation du stagiaire d'une session individuelle (fichier compris) ; gardée sinon.
 
@@ -624,7 +638,7 @@ Le module ne lit aucune table du CRM ; il se déclare par `Crm\Public\FicheLinks
 | Données liées (annulation d'un import) | `training_sessions.organisation_id`, `dossiers.account_organisation_id` / `account_person_id` / `contact_person_id`, `enrolments.person_id`, `fundings.funder_organisation_id` / `funder_person_id` (corbeille comprise) | La fiche nommée est conservée (« Liée à des données ajoutées depuis l'import, conservée. ») |
 | Fusion de deux fiches | mêmes colonnes | Repointées vers la fiche conservée, dans la transaction de la fusion ; fusion refusée (rien n'est écrit) si les deux personnes ont chacune une inscription non annulée sur la même session |
 | Corbeille d'une personne | `enrolments.person_id` | Autorisée : les inscriptions restent (badge « Fiche à la corbeille »), restauration possible ; une personne à la corbeille ne peut pas être inscrite |
-| Anonymisation (`Sessions\Gdpr\EnrolmentAnonymisation`) | `enrolments.adaptation_needs`, `enrolments.notes` ; `attendances.reason` (présences et heures du mois gardées) ; scans `attendance_sheet_scans` et feuilles signées `attendance_signed_sheets` d'une session individuelle supprimés (gardés sur une session collective) ; `attendance_signatures.drawing_path`, `ip`, `user_agent` (dessins effacés, heure gardée) ; `fundings.notes` (financements qu'elle paie, qui visent ses inscriptions ou ses dossiers de particulier) ; `dossiers.notes` (ses dossiers de particulier) | Valeurs effacées ; inscriptions, dossiers, financements, présences et heures gardés (statistiques, BPF, facturation) |
+| Anonymisation (`Sessions\Gdpr\EnrolmentAnonymisation`) | `enrolments.adaptation_needs`, `enrolments.notes` ; `attendances.reason` (présences et heures du mois gardées) ; justificatifs `attendance_proofs` supprimés ; scans `attendance_sheet_scans` et feuilles signées `attendance_signed_sheets` d'une session individuelle supprimés (gardés sur une session collective) ; `attendance_signatures.drawing_path`, `ip`, `user_agent` (dessins effacés, heure gardée) ; `fundings.notes` (financements qu'elle paie, qui visent ses inscriptions ou ses dossiers de particulier) ; `dossiers.notes` (ses dossiers de particulier) | Valeurs effacées ; inscriptions, dossiers, financements, présences et heures gardés (statistiques, BPF, facturation) |
 | Export RGPD (`Sessions\Gdpr\PersonSessionsExport`) | inscriptions, dossiers dont elle est contractante ou contact, financements, présences, heures du mois | Sections `inscriptions`, `dossiers`, `financements`, `presences` et `heures_mensuelles` ; l'export exige aussi `sessions.dossiers.view` et `sessions.sessions.view` sur « Tout l'organisme » |
 
 **Historique** : aucune table propre ; lu dans `audit_logs` (créations et changements d'état des `dossier`, `enrolment`, `funding`). Fiche d'une entreprise ou d'une personne : ses dossiers (contractant ; contact pour une personne), selon le périmètre de `sessions.dossiers.view` ; inscriptions d'une personne, selon `sessions.sessions.view`. Page d'un dossier : création et états, inscriptions (stagiaire nommé), financements ajoutés, modifiés, supprimés (200 derniers évènements).
@@ -741,7 +755,7 @@ Clé (`tenant_id`, `year`) : `last_number` (année de Paris, incrémenté dans l
 `positioning_sendings` : `candidature_id` (FK cascade) · `email`, `subject`, `message` (`$auditPersonal`, effacés par l'anonymisation ; le message garde `{lien}`) · `token_hash` (sha256 du lien, unique, sert à la recherche) · `token_encrypted` (le jeton chiffré par la clé de l'application : le lien affiché sur la candidature à qui peut la modifier ; effacé par l'anonymisation) · `expires_at` (envoi + 14 jours, fin de journée de Paris) · `revoked_at` (envoi plus récent, anonymisation) · `submitted_at` (copie déposée, une seule fois) · `email_status` (`pending`, `sent`, `failed`, `none` = lien généré sans e-mail, CHECK), `email_error` (motif fixe) · `sent_at` · `created_by`. `positioning_sending_versions` : (`positioning_sending_id` cascade, `brochure_version_id` restrict) + `position`. Les copies déposées sont des `candidature_files` de type `positioning` (`uploaded_by` null).
 
 ### `custom_field_definitions` — champs personnalisés
-`entity` (`candidature` seulement aujourd'hui) · `label` · `type` (`text`, `textarea`, `number`, `date`, `boolean`, `choice`, `file`, CHECK) · `options` (jsonb, choix) · `required_for_admission` · `position` · `hidden_at` (un champ utilisé se masque, ne se supprime pas).
+`entity` (`candidature` seulement aujourd'hui) · `label` · `type` (`text`, `textarea`, `number`, `date`, `boolean`, `choice`, `file`, `nir` (N° de sécurité sociale, vérifié, sensible), CHECK) · `options` (jsonb, choix) · `required_for_admission` · `position` · `hidden_at` (un champ utilisé se masque, ne se supprime pas).
 
 ### Catalogue
 `trainings.rncp_code` (string(20), null) : code RNCP de la certification (`RNCP` + chiffres).

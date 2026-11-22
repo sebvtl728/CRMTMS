@@ -28,6 +28,7 @@ use Illuminate\Support\Facades\Auth;
  * @property string $name
  * @property string|null $siret 14 digits
  * @property string|null $naf_code
+ * @property string|null $idcc
  * @property string|null $legal_form_id
  * @property string|null $sector_id
  * @property string|null $establishment_type_id
@@ -77,7 +78,7 @@ class Organisation extends Model
 
     /** @var list<string> */
     protected $fillable = [
-        'name', 'siret', 'naf_code', 'legal_form_id', 'sector_id', 'establishment_type_id', 'company_size_id', 'origin_id',
+        'name', 'siret', 'naf_code', 'idcc', 'legal_form_id', 'sector_id', 'establishment_type_id', 'company_size_id', 'origin_id',
         'status', 'responsible_user_id', 'email', 'phone', 'website',
         'address_line1', 'address_line2', 'postal_code', 'city', 'country', 'notes_summary',
         'last_contact_at', 'source_system', 'source_id',

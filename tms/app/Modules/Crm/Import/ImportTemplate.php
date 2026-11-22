@@ -24,7 +24,7 @@ final class ImportTemplate
 
     /** Made-up example values (no real data), by field code. */
     private const EXAMPLES = [
-        'siret' => '12345678900011', 'naf_code' => '8559A', 'email' => 'contact@exemple.test', 'email_secondary' => 'autre@exemple.test',
+        'siret' => '12345678900011', 'naf_code' => '8559A', 'idcc' => '1516', 'email' => 'contact@exemple.test', 'email_secondary' => 'autre@exemple.test',
         'phone' => '01 23 45 67 89', 'mobile' => '06 12 34 56 78', 'website' => 'https://www.exemple.test', 'address_line1' => '1 rue de l\'Exemple',
         'postal_code' => '75001', 'city' => 'Paris', 'country' => 'France', 'birth_date' => '01/01/1990', 'first_name' => 'Prénom',
         'last_name' => 'Nom', 'is_individual' => 'Non', 'is_referent' => 'Oui', 'started_on' => '01/01/2026', 'date' => '01/01/2026',

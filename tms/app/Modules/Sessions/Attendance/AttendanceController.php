@@ -39,7 +39,7 @@ class AttendanceController extends Controller
     {
         self::authorizeSeance($request, $seance);
 
-        return self::json([...AttendanceRows::grid($seance), ...AttendanceSheetController::list($seance, self::user($request)), 'slots' => SlotRows::forSeance($seance, self::user($request))]);
+        return self::json([...AttendanceRows::grid($seance), ...AttendanceSheetController::list($seance, self::user($request)), ...self::proofs($seance, self::user($request)), 'slots' => SlotRows::forSeance($seance, self::user($request))]);
     }
 
     public function record(Request $request, Seance $seance): JsonResponse
@@ -137,6 +137,18 @@ class AttendanceController extends Controller
     /**
      * sessions.attendance.manage (route) within its scope on the séance: 404 otherwise.
      */
+    /**
+     * The proofs of absence of the séance, for managers only.
+     *
+     * @return array{proofs: array<string, list<array<string, mixed>>>, can_manage_proofs: bool}
+     */
+    private static function proofs(Seance $seance, User $user): array
+    {
+        $can = AttendanceProofController::canManage($user);
+
+        return ['proofs' => $can ? AttendanceProofs::forSeance($seance) : [], 'can_manage_proofs' => $can];
+    }
+
     private static function authorizeSeance(Request $request, Seance $seance): void
     {
         $reached = SessionsVisibility::seances(Seance::query()->whereKey($seance->id), self::user($request), Permissions::ATTENDANCE_MANAGE)->exists();

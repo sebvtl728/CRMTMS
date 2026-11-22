@@ -56,7 +56,7 @@ final class RowImporter
     ];
 
     private const ORGANISATION_FIELDS = [
-        'name', 'siret', 'naf_code', 'legal_form_id', 'sector_id', 'establishment_type_id', 'company_size_id', 'origin_id', 'status',
+        'name', 'siret', 'naf_code', 'idcc', 'legal_form_id', 'sector_id', 'establishment_type_id', 'company_size_id', 'origin_id', 'status',
         'responsible_user_id', 'email', 'phone', 'website', 'address_line1', 'address_line2', 'postal_code', 'city', 'country', 'notes_summary',
     ];
 

@@ -41,7 +41,7 @@ class OrganisationRequest extends FormRequest
     {
         $clean = [];
 
-        foreach (['name', 'siret', 'naf_code', 'email', 'phone', 'website', 'address_line1', 'address_line2', 'postal_code', 'city', 'country', 'notes_summary'] as $key) {
+        foreach (['name', 'siret', 'naf_code', 'idcc', 'email', 'phone', 'website', 'address_line1', 'address_line2', 'postal_code', 'city', 'country', 'notes_summary'] as $key) {
             if (array_key_exists($key, $input)) {
                 $value = is_string($input[$key]) ? trim($input[$key]) : $input[$key];
                 $clean[$key] = $value === '' ? null : $value;
@@ -53,6 +53,9 @@ class OrganisationRequest extends FormRequest
         }
         if (is_string($clean['naf_code'] ?? null)) {
             $clean['naf_code'] = mb_strtoupper($clean['naf_code']);
+        }
+        if (is_string($clean['idcc'] ?? null) && preg_match('/^\d{1,4}$/', $clean['idcc'])) {
+            $clean['idcc'] = str_pad($clean['idcc'], 4, '0', STR_PAD_LEFT);
         }
         if (is_string($clean['country'] ?? null)) {
             $clean['country'] = mb_strtoupper($clean['country']);
@@ -76,6 +79,7 @@ class OrganisationRequest extends FormRequest
             'name' => ['required', 'string', 'max:255'],
             'siret' => ['nullable', 'string', new Siret],
             'naf_code' => ['nullable', 'string', 'regex:/^\d{2}\.?\d{2}[A-Z]$/'],
+            'idcc' => ['nullable', 'string', 'regex:/^\d{4}$/'],
             'status' => ['sometimes', Rule::enum(OrganisationStatus::class)],
             'email' => ['nullable', 'string', 'email', 'max:255'],
             'phone' => ['nullable', 'string', 'max:30'],
@@ -130,6 +134,7 @@ class OrganisationRequest extends FormRequest
             'url' => 'L\'adresse du site n\'est pas valide.',
             'exists' => 'Cette valeur n\'existe pas ou n\'est plus disponible.',
             'naf_code.regex' => 'Le code NAF doit être de la forme 5610A.',
+            'idcc.regex' => 'L\'IDCC est un numéro de 4 chiffres (ex. 1979).',
             'country.size' => 'Indiquez le code pays sur 2 lettres (FR).',
             'country.alpha' => 'Indiquez le code pays sur 2 lettres (FR).',
             'enum' => 'Cette valeur n\'est pas valide.',

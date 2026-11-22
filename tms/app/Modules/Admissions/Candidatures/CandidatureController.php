@@ -86,7 +86,7 @@ class CandidatureController extends Controller
         $person = $personId !== '' ? app(Fiches::class)->person($personId) : null;
 
         return Inertia::render('admissions/candidatures/create', [
-            'custom_fields' => CustomFieldValues::forPage(new Candidature),
+            'custom_fields' => CustomFieldValues::forPage(new Candidature, AdmissionsVisibility::sensitive(self::user($request))),
             'person' => $person === null ? null : ['id' => $person['id'], 'label' => $person['label']],
             'options' => self::options(null),
         ]);
@@ -112,7 +112,7 @@ class CandidatureController extends Controller
         return Inertia::render('admissions/candidatures/show', [
             'status' => $request->session()->get('status'),
             'candidature' => CandidaturePresenter::show($candidature, $user),
-            'custom_fields' => CustomFieldValues::forPage($candidature),
+            'custom_fields' => CustomFieldValues::forPage($candidature, AdmissionsVisibility::sensitive($user)),
             'history' => CandidatureHistory::forCandidature($candidature),
             'can' => [
                 'update' => AdmissionsVisibility::allows($user, Permissions::CANDIDATURES_UPDATE, $candidature) && ! $candidature->trashed(),

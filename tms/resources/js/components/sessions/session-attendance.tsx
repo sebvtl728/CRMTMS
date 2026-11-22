@@ -38,6 +38,20 @@ interface ScanList {
     can_delete: boolean;
 }
 
+/** Proof of an absence (AttendanceProofs::forSeance), by enrolment: managers only. */
+interface Proof {
+    id: string;
+    name: string;
+    size_bytes: number;
+    created_at: string | null;
+    url: string;
+}
+
+interface ProofList {
+    proofs: Record<string, Proof[]>;
+    can_manage_proofs?: boolean;
+}
+
 interface Grid {
     seance: {
         id: string;
@@ -250,6 +264,9 @@ export function AttendanceDialog({ seanceId, open, onClose }: { seanceId: string
     const [scans, setScans] = useState<ScanList>({ scans: [], can_delete: false });
     const [scanDay, setScanDay] = useState(false);
     const [scanError, setScanError] = useState<string | null>(null);
+    const [proofs, setProofs] = useState<Record<string, Proof[]>>({});
+    const [canProofs, setCanProofs] = useState(false);
+    const [proofErrors, setProofErrors] = useState<Record<string, string>>({});
 
     const take = (answer: Grid) => {
         setGrid(answer);
@@ -272,10 +289,15 @@ export function AttendanceDialog({ seanceId, open, onClose }: { seanceId: string
         setNotice(null);
         setScans({ scans: [], can_delete: false });
         setScanError(null);
-        sendJson<Grid & ScanList>('GET', route('seances.attendance.show', seanceId)).then((answer) => {
+        setProofs({});
+        setCanProofs(false);
+        setProofErrors({});
+        sendJson<Grid & ScanList & ProofList>('GET', route('seances.attendance.show', seanceId)).then((answer) => {
             if (answer.ok && answer.data) {
                 take(answer.data);
                 setScans({ scans: answer.data.scans, can_delete: answer.data.can_delete });
+                setProofs(Array.isArray(answer.data.proofs) ? {} : answer.data.proofs);
+                setCanProofs(answer.data.can_manage_proofs === true);
             } else setError(answer.message);
         });
     }, [open, seanceId]);
@@ -353,6 +375,27 @@ export function AttendanceDialog({ seanceId, open, onClose }: { seanceId: string
         setBusy(null);
         if (answer.ok && answer.data) setScans(answer.data);
         else setScanError(answer.message);
+    };
+
+    const uploadProof = async (row: GridRow, file: File | undefined) => {
+        if (!grid || !file) return;
+        const body = new FormData();
+        body.append('file', file);
+        setBusy(`proof-${row.enrolment_id}`);
+        setProofErrors((e) => ({ ...e, [row.enrolment_id]: '' }));
+        const answer = await sendJson<ProofList>('POST', route('seances.proofs.store', [grid.seance.id, row.enrolment_id]), body);
+        setBusy(null);
+        if (answer.ok && answer.data) setProofs(Array.isArray(answer.data.proofs) ? {} : answer.data.proofs);
+        else setProofErrors((e) => ({ ...e, [row.enrolment_id]: answer.errors.file ?? answer.message ?? 'Une erreur est survenue.' }));
+    };
+
+    const deleteProof = async (row: GridRow, proof: Proof) => {
+        if (!grid || !window.confirm('Supprimer ce justificatif ? Cette action est définitive.')) return;
+        setBusy(`proof-${row.enrolment_id}`);
+        const answer = await sendJson<ProofList>('DELETE', route('seances.proofs.destroy', [grid.seance.id, proof.id]));
+        setBusy(null);
+        if (answer.ok && answer.data) setProofs(Array.isArray(answer.data.proofs) ? {} : answer.data.proofs);
+        else setProofErrors((e) => ({ ...e, [row.enrolment_id]: answer.message ?? 'Une erreur est survenue.' }));
     };
 
     const missing = grid ? grid.rows.filter((r) => r.eligible && r.status === null).length : 0;
@@ -473,6 +516,46 @@ export function AttendanceDialog({ seanceId, open, onClose }: { seanceId: string
                                             </div>
                                         )}
                                         <InputError message={rowErrors.minutes ?? rowErrors.status ?? rowErrors.reason ?? rowErrors.enrolment_id} />
+                                        {canProofs &&
+                                            (row.status === 'absent' ||
+                                                row.status === 'excused' ||
+                                                row.status === 'partial' ||
+                                                (proofs[row.enrolment_id] ?? []).length > 0) && (
+                                                <div className="mt-2 grid gap-1 text-sm">
+                                                    {(proofs[row.enrolment_id] ?? []).map((proof) => (
+                                                        <div key={proof.id} className="flex flex-wrap items-center justify-between gap-2">
+                                                            <a href={proof.url} className="inline-flex items-center gap-1 underline">
+                                                                <FileText className="h-4 w-4" />
+                                                                {proof.name}
+                                                            </a>
+                                                            <Button
+                                                                type="button"
+                                                                size="sm"
+                                                                variant="ghost"
+                                                                disabled={busy !== null}
+                                                                onClick={() => deleteProof(row, proof)}
+                                                                aria-label={`Supprimer le justificatif ${proof.name}`}
+                                                            >
+                                                                <Trash2 className="h-4 w-4" />
+                                                            </Button>
+                                                        </div>
+                                                    ))}
+                                                    <Label htmlFor={`proof-${row.enrolment_id}`} className="text-muted-foreground font-normal">
+                                                        Justificatif d'absence (PDF, PNG ou JPEG, 10 Mo au plus)
+                                                    </Label>
+                                                    <Input
+                                                        id={`proof-${row.enrolment_id}`}
+                                                        type="file"
+                                                        accept="application/pdf,image/png,image/jpeg"
+                                                        disabled={busy !== null}
+                                                        onChange={(e) => {
+                                                            void uploadProof(row, e.target.files?.[0]);
+                                                            e.target.value = '';
+                                                        }}
+                                                    />
+                                                    <InputError message={proofErrors[row.enrolment_id] || undefined} />
+                                                </div>
+                                            )}
                                     </li>
                                 );
                             })}

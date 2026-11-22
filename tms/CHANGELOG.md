@@ -5,6 +5,22 @@ Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) ; ve
 
 ## [Non publié]
 
+## [0.14.4] - 2026-11-22
+
+### Ajouté
+
+- **Justificatifs d'absence** : dans la saisie des présences, sous un stagiaire absent, partiel ou excusé, dépôt d'un PDF
+  ou d'une image (10 Mo au plus) ; réservés aux gestionnaires (jamais au formateur), supprimés à l'anonymisation.
+- Type de champ personnalisé **N° de sécurité sociale** (fiche candidat) : 15 caractères et clé vérifiés (Corse comprise),
+  affichage par groupes, réservé aux personnes ayant le droit de voir les données sensibles.
+- **IDCC** (convention collective) sur la fiche entreprise : saisie à 4 chiffres, affichage, export et import ;
+  **Compléter depuis le SIRET** le remplit depuis l'annuaire officiel (Recherche d'entreprises).
+
+### Modifié
+
+- Un long numéro tapé dans un champ **Nombre** explique qu'il faut le type Texte (ou N° de sécurité sociale).
+- **Test de positionnement** : la page utilise la largeur de l'écran au lieu d'une colonne étroite au centre.
+
 ## [0.14.3] - 2026-11-22
 
 ### Ajouté
