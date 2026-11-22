@@ -5,6 +5,8 @@ Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) ; ve
 
 ## [Non publié]
 
+## [0.14.5] - 2026-11-22
+
 ### Modifié
 
 - **Créer le dossier de formation** : le contractant se choisit (une entreprise ou le candidat comme particulier, au
