@@ -23,7 +23,7 @@ final class CrmTodo
                 ->where('quotes.sent_at', '<=', CarbonImmutable::now()->subDays(self::QUOTE_SILENCE_DAYS))->count(),
             fn (User $u): string => '/crm/quotes?status='.QuoteStatus::Sent->value);
 
-        TodoSources::register('crm.activities', 'Commercial', 'Actions commerciales à faire', Permissions::ACTIVITIES_VIEW,
+        TodoSources::register('crm.activities', 'Commercial', 'Mes actions commerciales à faire', Permissions::ACTIVITIES_VIEW,
             fn (User $u): int => TodoQuery::badge($u),
             fn (User $u): string => '/crm/todo');
     }

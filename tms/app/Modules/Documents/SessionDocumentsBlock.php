@@ -4,6 +4,7 @@ namespace App\Modules\Documents;
 
 use App\Modules\Core\Users\User;
 use App\Modules\Crm\Public\Fiches;
+use App\Modules\Documents\Automation\ConvocationAutomation;
 use App\Modules\Documents\Texts\DocumentType;
 use App\Modules\Sessions\Public\Paperwork;
 use Carbon\CarbonImmutable;
@@ -46,6 +47,8 @@ final class SessionDocumentsBlock
                 'session_id' => $sessionId,
                 'can_manage' => $manage,
                 'types' => DocumentType::options(self::TYPES),
+                // When the convocations leave by themselves (Administration › Automatismes), else null.
+                'auto_convocation' => ConvocationAutomation::notice($sessionId),
                 'trainees' => array_map(fn (array $e) => [
                     'enrolment_id' => $e['id'],
                     'name' => $names[$e['person_id']]['label'] ?? 'Stagiaire',

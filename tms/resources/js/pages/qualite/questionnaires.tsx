@@ -39,7 +39,7 @@ interface Totals {
     satisfaction_rate: number | null;
 }
 
-const breadcrumbs: BreadcrumbItem[] = [{ title: 'Questionnaires', href: '/qualite/questionnaires' }];
+const breadcrumbs: BreadcrumbItem[] = [{ title: 'Résultats des questionnaires', href: '/qualite/questionnaires' }];
 const select = 'border-input bg-background h-9 rounded-md border px-3 text-sm';
 const percent = (v: number | null) => (v === null ? '-' : `${v} %`);
 
@@ -70,7 +70,7 @@ export default function QuestionnairesResults({
 
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
-            <Head title="Questionnaires" />
+            <Head title="Résultats des questionnaires" />
             <div className="flex flex-col gap-4 p-4">
                 <Heading
                     title="Résultats des questionnaires"

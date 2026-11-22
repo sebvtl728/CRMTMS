@@ -11,6 +11,7 @@ use App\Modules\Crm\CrmServiceProvider;
 use App\Modules\Crm\Gdpr\Anonymiser;
 use App\Modules\Crm\People\Person;
 use App\Modules\Crm\Quotes\Quote;
+use App\Modules\Crm\Quotes\QuoteMail;
 use App\Modules\Crm\Quotes\QuoteSignatures;
 use App\Modules\Crm\Quotes\QuoteStatus;
 use App\Modules\Crm\Quotes\QuoteTransitions;
@@ -121,4 +122,28 @@ it('erases the drawn signature and the frozen HTML of an anonymised customer', f
     expect($disk->exists($request->drawing_path))->toBeFalse()
         ->and($disk->exists(PdfSource::pathFor($quote->pdf_path)))->toBeFalse()
         ->and($request->fresh()->drawing_path)->toBeNull();
+});
+
+it('sends the quote and its signature link in one e-mail when asked', function () {
+    $this->actingAs(commercial());
+    $quote = sendableQuote('Étude');
+
+    $this->post("/crm/quotes/{$quote->id}/send", quoteMessage(['sign_online' => true]))->assertSessionHasNoErrors();
+
+    $request = SignatureRequest::query()->where('subject_type', 'quote')->where('subject_id', $quote->id)->sole();
+    expect($request->signer_email)->toBe('lea.durand@example.test');
+    Mail::assertNotSent(SignatureMail::class);
+    $mail = Mail::sent(QuoteMail::class)->sole();
+    expect(preg_match('#/signature/([A-Za-z0-9]{40})#', $mail->text, $m))->toBe(1)
+        ->and(Signatures::find($m[1])?->id)->toBe($request->id)
+        ->and($quote->fresh()->email_message)->not->toHaveKey('sign_token');
+});
+
+it('keeps the two separate steps when the box is unticked', function () {
+    $this->actingAs(commercial());
+    $quote = sendableQuote('Étude');
+
+    $this->post("/crm/quotes/{$quote->id}/send", quoteMessage())->assertSessionHasNoErrors();
+
+    expect(SignatureRequest::query()->where('subject_type', 'quote')->count())->toBe(0);
 });

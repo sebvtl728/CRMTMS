@@ -74,7 +74,7 @@ final class Signatures
      *
      * @return array{request: SignatureRequest, token: string}
      */
-    public function request(string $subjectType, string $subjectId, string $pdfPath, string $pdfSha256, string $signerName, string $signerEmail, ?string $signerPersonId, string $title, User $by): array
+    public function request(string $subjectType, string $subjectId, string $pdfPath, string $pdfSha256, string $signerName, string $signerEmail, ?string $signerPersonId, string $title, User $by, bool $mail = true): array
     {
         $token = Str::random(40);
         $disk = Storage::disk(TenantStorage::DISK);
@@ -93,6 +93,10 @@ final class Signatures
                 'source_path' => $source === null ? null : $sourcePath, 'source_sha256' => $source === null ? null : hash('sha256', $source),
             ]);
         });
+        if (! $mail) {
+            // The caller sends the link in its own e-mail (a quote and its « Bon pour accord » together).
+            return ['request' => $request, 'token' => $token];
+        }
         $text = $this->templates->render(SignatureMailTemplates::REQUEST, [
             'document' => $request->title, 'destinataire' => $signerName, 'lien' => url('/signature/'.$token),
             'echeance' => $request->expires_at->setTimezone('Europe/Paris')->format('d/m/Y'), 'organisme' => self::organisme(),

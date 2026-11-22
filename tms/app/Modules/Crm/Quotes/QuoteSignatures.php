@@ -30,6 +30,21 @@ final class QuoteSignatures
 
     public function request(User $by, Quote $quote, string $email): SignatureRequest
     {
+        return $this->create($by, $quote, $email, true)['request'];
+    }
+
+    /**
+     * The request of a quote being sent, without its own e-mail: the plain
+     * token, for the link joined to the quote's e-mail.
+     */
+    public function prepare(User $by, Quote $quote, string $email): string
+    {
+        return $this->create($by, $quote, $email, false)['token'];
+    }
+
+    /** @return array{request: SignatureRequest, token: string} */
+    private function create(User $by, Quote $quote, string $email, bool $mail): array
+    {
         Validator::make(['email' => $email], ['email' => ['required', 'email:rfc', 'max:254']],
             ['email.required' => 'Indiquez l\'adresse du signataire.', 'email.email' => 'Adresse e-mail invalide.'])->validate();
         if (! $quote->isAwaitingAnswer()) {
@@ -43,7 +58,7 @@ final class QuoteSignatures
 
         return $this->signatures->request(self::SUBJECT, $quote->id, $quote->pdf_path, hash('sha256', (string) $disk->get($quote->pdf_path)),
             (string) ($recipient['attention'] ?? $recipient['name']), $email, $quote->contact_person_id ?? $quote->person_id,
-            'Devis '.$quote->number, $by)['request'];
+            'Devis '.$quote->number, $by, $mail);
     }
 
     /** Refusal of the signature service: only a quote awaiting an answer is signed. */

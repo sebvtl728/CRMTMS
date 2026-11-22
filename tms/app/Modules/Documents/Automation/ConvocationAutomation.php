@@ -82,4 +82,33 @@ final class ConvocationAutomation
             return 0;
         }
     }
+
+    /**
+     * What the documents block tells about the automatic convocations of a
+     * session: the morning they leave, « too late », or « once confirmed »;
+     * null when the automation is off or the session has no séance.
+     */
+    public static function notice(string $sessionId): ?string
+    {
+        $days = AutomationSettings::convocationDays();
+        $start = Paperwork::sessionStart($sessionId);
+        if ($days < 2 || $start === null || $start['status'] === 'cancelled') {
+            return null;
+        }
+        if ($start['status'] !== 'confirmed') {
+            return "Les convocations partiront automatiquement {$days} jours avant le début, une fois la session confirmée.";
+        }
+        $now = CarbonImmutable::now('Europe/Paris');
+        // The next morning run: today until 7:15, tomorrow after.
+        $next = $now->format('H:i') < '07:15' ? $now->startOfDay() : $now->startOfDay()->addDay();
+        $first = CarbonImmutable::parse($start['first_day'], 'Europe/Paris');
+        $due = $first->subDays($days);
+        $on = $due->greaterThan($next) ? $due : $next;
+        if ($on->greaterThan($first->subDays(2))) {
+            return 'Trop tard pour l\'envoi automatique des convocations : envoyez-les vous-même.';
+        }
+
+        return 'Envoi automatique des convocations prévu le '.$on->locale('fr')->isoFormat('dddd D MMMM YYYY').' à 7 h 15'
+            .($on->equalTo($due) ? " ({$days} jours avant le début)." : '.');
+    }
 }

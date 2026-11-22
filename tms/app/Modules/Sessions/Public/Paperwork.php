@@ -133,6 +133,20 @@ final class Paperwork
     }
 
     /**
+     * The stored state and first live séance of a session (the automatic
+     * convocations' notice), null when unknown or without séance.
+     *
+     * @return array{status: string, first_day: string}|null
+     */
+    public static function sessionStart(string $sessionId): ?array
+    {
+        $session = TrainingSession::query()->find($sessionId);
+        $first = $session === null ? null : Seance::query()->where('training_session_id', $sessionId)->where('status', '!=', Seance::CANCELLED)->min('date');
+
+        return $first === null ? null : ['status' => $session->status->value, 'first_day' => CarbonImmutable::parse($first)->toDateString()];
+    }
+
+    /**
      * The trainees to convene automatically (2026-11-22): enrolled or
      * confirmed (never waitlisted, abandoned nor cancelled), not left before
      * the first day $startsOn, in order of entry.

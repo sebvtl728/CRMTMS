@@ -48,6 +48,7 @@ class QuoteMessageRequest extends FormRequest
             'body' => ['required', 'string', 'max:10000'],
             // Brochure versions joined (sending only: a reminder re-joins the recorded ones).
             'brochure_version_ids' => ['nullable', 'array', 'max:'.self::MAX_BROCHURES],
+            'sign_online' => ['sometimes', 'boolean'],
             'brochure_version_ids.*' => ['string', 'uuid'],
         ];
     }
@@ -128,5 +129,11 @@ class QuoteMessageRequest extends FormRequest
         $v = $this->validated();
 
         return array_values(array_unique($v['brochure_version_ids'] ?? []));
+    }
+
+    /** « Joindre un lien de signature en ligne »: the quote and its « Bon pour accord » in one e-mail. */
+    public function signOnline(): bool
+    {
+        return $this->boolean('sign_online');
     }
 }

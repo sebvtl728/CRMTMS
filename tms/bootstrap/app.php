@@ -62,5 +62,14 @@ return Application::configure(basePath: dirname(__DIR__))
 
             return response()->json(['message' => 'Trop de requêtes, réessayez dans quelques instants.'], 429, $e->getHeaders());
         });
+        // A business refusal (409, 410, 503…) of an Inertia action (a button, a form): a message on the
+        // page it came from, never an error page in a modal. Plain visits and fetch() keep theirs.
+        $exceptions->render(function (\App\Exceptions\UserFacingHttpException $e, Request $request) {
+            if (! $request->header('X-Inertia') || $request->isMethod('GET') || in_array($e->getStatusCode(), [401, 403, 404], true)) {
+                return null;
+            }
+
+            return back()->with('error', $e->getMessage());
+        });
         $exceptions->report(fn (Throwable $e) => DatabaseErrorLog::report($e));
     })->create();

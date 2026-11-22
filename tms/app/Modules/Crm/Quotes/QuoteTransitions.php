@@ -6,6 +6,7 @@ use App\Exceptions\UserFacingHttpException;
 use App\Modules\Catalogue\Brochures;
 use App\Modules\Core\Companies\VatRegime;
 use App\Modules\Core\Tenancy\TenantStorage;
+use App\Modules\Core\Users\User;
 use App\Modules\Crm\Brochures\BrochureAttachments;
 use App\Modules\Crm\Opportunities\Opportunity;
 use App\Modules\Crm\Opportunities\OpportunityStage;
@@ -13,6 +14,7 @@ use App\Modules\Crm\Organisations\Organisation;
 use App\Modules\Crm\People\Person;
 use App\Modules\Crm\Timeline\LastContact;
 use Carbon\CarbonImmutable;
+use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\ValidationException;
@@ -27,7 +29,7 @@ use Illuminate\Validation\ValidationException;
  * Sending and reminding count as a contact of the account and of the
  * recipient (LastContact, source registered by the CrmServiceProvider).
  *
- * @phpstan-type Message array{to: string, cc: list<string>, subject: string, body: string}
+ * @phpstan-type Message array{to: string, cc: list<string>, subject: string, body: string, sign_token?: string}
  */
 final class QuoteTransitions
 {
@@ -93,9 +95,9 @@ final class QuoteTransitions
      * @param  Message  $message
      * @param  list<string>  $brochureVersionIds  brochure versions joined to the e-mail (and to its reminders)
      */
-    public function send(Quote $quote, array $message, array $brochureVersionIds = []): void
+    public function send(Quote $quote, array $message, array $brochureVersionIds = [], ?User $signBy = null): void
     {
-        $this->transition($quote, function (Quote $locked) use ($message, $brochureVersionIds): void {
+        $this->transition($quote, function (Quote $locked) use ($message, $brochureVersionIds, $signBy): void {
             if (! $locked->isDraft()) {
                 throw new UserFacingHttpException(409, self::NOT_DRAFT);
             }
@@ -114,6 +116,10 @@ final class QuoteTransitions
             $now = CarbonImmutable::now();
             $locked->status = QuoteStatus::Sent;
             $locked->forceFill(['sent_at' => $now]);
+            if ($signBy !== null) {
+                // The « Bon pour accord » link travels in the quote's own e-mail; its token only encrypted until sent.
+                $message['sign_token'] = Crypt::encryptString(app(QuoteSignatures::class)->prepare($signBy, $locked, $message['to']));
+            }
             $this->queueMail($locked, QuoteMail::KIND_SEND, $message);
 
             $this->advanceOpportunity($locked);

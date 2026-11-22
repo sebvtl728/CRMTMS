@@ -58,7 +58,7 @@ interface PlanningProps {
     can_report: boolean;
 }
 
-const breadcrumbs: BreadcrumbItem[] = [{ title: 'Planning', href: '/crm/planning' }];
+const breadcrumbs: BreadcrumbItem[] = [{ title: 'Agenda commercial', href: '/crm/planning' }];
 
 /** « 1 h 30 », « 45 min ». */
 function formatDuration(minutes: number | null): string | null {
@@ -196,11 +196,11 @@ export default function Planning(props: PlanningProps) {
 
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
-            <Head title="Planning" />
+            <Head title="Agenda commercial" />
 
             <div className="flex min-w-0 flex-col gap-4 p-4">
                 <div className="flex flex-wrap items-start justify-between gap-4">
-                    <Heading title="Planning" description={`Semaine ${week.slice(-2)} · ${range}${can_team ? ` · ${user_name}` : ''}`} />
+                    <Heading title="Agenda commercial" description={`Semaine ${week.slice(-2)} · ${range}${can_team ? ` · ${user_name}` : ''}`} />
                     {can_report && (
                         <Button asChild>
                             <Link href={route('crm.report')}>

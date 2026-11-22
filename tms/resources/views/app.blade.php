@@ -6,7 +6,7 @@
         {{-- Lets the Vite dev client tag the <style> elements it injects with the CSP nonce. --}}
         <meta property="csp-nonce" nonce="{{ \Illuminate\Support\Facades\Vite::cspNonce() }}">
 
-        <title inertia>{{ config('app.name', 'Laravel') }}</title>
+        <title inertia>{{ config('app.name', 'TMS') }}</title>
 
         @routes(null, \Illuminate\Support\Facades\Vite::cspNonce())
         @viteReactRefresh
