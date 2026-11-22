@@ -198,8 +198,8 @@ class CandidatureController extends Controller
             'funding_types' => $items(ReferenceList::FundingType),
             'users' => User::query()->whereNull('deactivated_at')->orderBy('name')->get(['id', 'name'])
                 ->map(fn (User $u) => ['value' => $u->id, 'label' => $u->name])->values()->all(),
-            'training_options' => array_map(fn (TrainingData $t) => ['value' => $t->id, 'label' => $t->title, 'rncp_code' => $t->rncp_code], app(Trainings::class)->options()),
-            'sessions' => $candidature?->training_id !== null ? Admission::sessionOptions($candidature->training_id) : [],
+            'training_options' => array_map(fn (TrainingData $t) => ['value' => $t->id, 'label' => $t->title, 'rncp_code' => $t->rncp_code, 'das_id' => $t->das_id], app(Trainings::class)->options()),
+            'sessions' => $candidature?->training_id !== null ? Admission::sessionOptions($candidature->training_id, $candidature->das_id) : [],
         ];
     }
 }

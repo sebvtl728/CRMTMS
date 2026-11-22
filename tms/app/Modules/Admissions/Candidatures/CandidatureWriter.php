@@ -144,6 +144,9 @@ final class CandidatureWriter
                 $trainingId = array_key_exists('training_id', $present) ? $present['training_id'] : $current?->training_id;
                 if ($session === null || $session['trashed'] || $session['training_id'] !== $trainingId) {
                     $v->errors()->add('target_session_id', 'Choisissez une session de la formation visée.');
+                } elseif ($session['das_id'] !== app(Trainings::class)->find($session['training_id'])?->das_id) {
+                    // The session belongs to its training (checked above), whose DAS is the candidature's.
+                    $v->errors()->add('target_session_id', 'Choisissez une session du DAS de la candidature.');
                 }
             }
             if (($present['prescriber_organisation_id'] ?? null) !== null && app(Fiches::class)->organisation($present['prescriber_organisation_id']) === null) {

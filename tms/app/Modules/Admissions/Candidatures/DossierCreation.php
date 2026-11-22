@@ -22,9 +22,12 @@ final class DossierCreation
 {
     /**
      * The dialog prefilled: the employer of the contract as contractant (its
-     * company price), else the person when she is a particulier (individual
-     * price), else none; the targeted session; a funding by the OPCO of the
-     * contract (type and amount left to the user).
+     * company price), else the entreprise of an intra targeted session (only
+     * its own trainees may join it), else the person when she is a
+     * particulier (individual price), else none; the targeted session; a
+     * funding by the OPCO of the contract (type and amount left to the user).
+     * The user may still switch: person_account (the candidate as particulier,
+     * null when she is not one) and both prices come along.
      *
      * @return array<string, mixed>
      */
@@ -32,23 +35,29 @@ final class DossierCreation
     {
         $contract = AlternanceContract::query()->where('candidature_id', $candidature->id)->first();
         $training = $candidature->training_id !== null ? app(Trainings::class)->find($candidature->training_id) : null;
+        $session = $candidature->target_session_id !== null ? Admission::session($candidature->target_session_id) : null;
+        $intraOf = $session !== null && $session['kind'] === 'intra' ? $session['organisation_id'] : null;
+        $person = app(Fiches::class)->individual($candidature->person_id) !== null ? ['type' => 'person', 'id' => $candidature->person_id] : null;
         $account = match (true) {
             $contract !== null => ['type' => 'organisation', 'id' => $contract->employer_organisation_id],
-            app(Fiches::class)->individual($candidature->person_id) !== null => ['type' => 'person', 'id' => $candidature->person_id],
-            default => null,
+            $intraOf !== null => ['type' => 'organisation', 'id' => $intraOf],
+            default => $person,
         };
-        $cents = $account === null || $training === null ? null
-            : ($account['type'] === 'organisation' ? $training->price_company_cents : $training->price_individual_cents);
+        $price = fn (?int $cents): string => $cents === null ? '' : sprintf('%d.%02d', intdiv($cents, 100), $cents % 100);
+        $prices = ['organisation' => $price($training?->price_company_cents), 'person' => $price($training?->price_individual_cents)];
 
         return [
             'account' => $account,
+            'account_label' => $account !== null && $account['type'] === 'organisation' ? app(Fiches::class)->organisation($account['id'])['label'] ?? null : null,
+            'person_account' => $person,
+            'prices' => $prices,
             'das_id' => $candidature->das_id,
             'responsible_user_id' => $candidature->responsible_user_id,
             'training_id' => $candidature->training_id,
             'label' => $training->title ?? '',
             'quantity' => '1',
             'unit' => 'stagiaire',
-            'unit_price' => $cents === null ? '' : sprintf('%d.%02d', intdiv($cents, 100), $cents % 100),
+            'unit_price' => $account === null ? '' : $prices[$account['type']],
             'session_id' => $candidature->target_session_id,
             'funding' => $contract?->opco_organisation_id === null ? null : [
                 'funder_organisation_id' => $contract->opco_organisation_id,

@@ -5,6 +5,18 @@ Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) ; ve
 
 ## [Non publié]
 
+## [0.14.5] - 2026-11-22
+
+### Modifié
+
+- **Créer le dossier de formation** : le contractant se choisit (une entreprise ou le candidat comme particulier, au
+  prix correspondant) ; pour une session intra visée, son entreprise est proposée d'office.
+- **Créer le dossier de formation** (candidature admise) : un refus de l'inscription (session intra d'une autre
+  entreprise, session complète…) s'affiche sous « Session » ; toute autre erreur s'affiche dans la fenêtre, plus de clic
+  sans effet.
+- **Fiche candidat** : le DAS vient avant la formation visée, qui ne propose que les formations de ce DAS ; la session
+  visée doit appartenir au DAS de la candidature.
+
 ## [0.14.4] - 2026-11-22
 
 ### Ajouté

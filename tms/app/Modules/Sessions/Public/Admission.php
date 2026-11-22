@@ -31,7 +31,7 @@ final class Admission
      *
      * @return list<array{id: string, label: string, starts_on: string}>
      */
-    public static function sessionOptions(string $trainingId): array
+    public static function sessionOptions(string $trainingId, ?string $dasId = null): array
     {
         if (! Str::isUuid($trainingId)) {
             return [];
@@ -39,6 +39,7 @@ final class Admission
         $title = app(Trainings::class)->find($trainingId)?->title;
 
         return TrainingSession::query()->where('training_id', $trainingId)
+            ->when($dasId !== null, fn ($q) => $q->where('das_id', $dasId))
             ->whereIn('status', [SessionStatus::Planned->value, SessionStatus::Confirmed->value])
             ->whereDate('ends_on', '>=', TrainingSession::today()->toDateString())
             ->orderBy('starts_on')->orderBy('number')->get()
@@ -49,7 +50,7 @@ final class Admission
     /**
      * A session (trashed included) as a candidature shows it; null when unknown.
      *
-     * @return array{id: string, label: string, training_id: string, starts_on: string, ends_on: string, trashed: bool}|null
+     * @return array{id: string, label: string, training_id: string, das_id: string, kind: string, organisation_id: string|null, starts_on: string, ends_on: string, trashed: bool}|null
      */
     public static function session(string $sessionId): ?array
     {
@@ -62,6 +63,9 @@ final class Admission
             'id' => $session->id,
             'label' => $session->label(app(Trainings::class)->find($session->training_id)?->title),
             'training_id' => $session->training_id,
+            'das_id' => $session->das_id,
+            'kind' => $session->kind,
+            'organisation_id' => $session->organisation_id,
             'starts_on' => $session->starts_on->toDateString(),
             'ends_on' => $session->ends_on->toDateString(),
             'trashed' => $session->trashed(),
@@ -127,7 +131,12 @@ final class Admission
                 if ($session === null || $session->training_id !== $data['training_id']) {
                     throw ValidationException::withMessages(['session_id' => 'Choisissez une session de la formation.']);
                 }
-                app(Enrolments::class)->enrol($dossier, $dossier->lines()->firstOrFail(), $session, $data['person_id']);
+                try {
+                    app(Enrolments::class)->enrol($dossier, $dossier->lines()->firstOrFail(), $session, $data['person_id']);
+                } catch (ValidationException $e) {
+                    // The admission form has one « session » field: every refusal of the enrolment shows there.
+                    throw ValidationException::withMessages(['session_id' => array_values(array_unique(array_merge(...array_values($e->errors()))))]);
+                }
             }
 
             if (($data['funding'] ?? null) !== null) {

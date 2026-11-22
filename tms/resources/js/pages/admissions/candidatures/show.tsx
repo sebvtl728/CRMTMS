@@ -263,10 +263,28 @@ export default function CandidatureShow({ candidature: c, custom_fields, history
                     <Card title="Orientation">
                         <div className="grid gap-3 sm:grid-cols-2">
                             <OptionSelect
+                                id="das_id"
+                                label="DAS"
+                                value={orientation.str('das_id') || null}
+                                options={options.das}
+                                onChange={(v) => {
+                                    orientation.set('das_id', v);
+                                    // A training (and its session) of another DAS no longer fits.
+                                    const training = options.training_options.find((t) => t.value === orientation.values.training_id);
+                                    if (training && v !== null && training.das_id !== v) {
+                                        orientation.set('training_id', null);
+                                        orientation.set('rncp_code', null);
+                                        orientation.set('target_session_id', null);
+                                    }
+                                }}
+                                error={errors.das_id}
+                                disabled={disabled}
+                            />
+                            <OptionSelect
                                 id="training_id"
                                 label="Formation visée"
                                 value={orientation.str('training_id') || null}
-                                options={options.training_options}
+                                options={options.training_options.filter((t) => !orientation.values.das_id || t.das_id === orientation.values.das_id)}
                                 disabled={disabled}
                                 onChange={(v) => {
                                     orientation.set('training_id', v);
@@ -291,7 +309,9 @@ export default function CandidatureShow({ candidature: c, custom_fields, history
                                 options={sessions}
                                 onChange={(v) => orientation.set('target_session_id', v)}
                                 error={errors.target_session_id}
-                                disabled={disabled || orientation.values.training_id !== (c.training?.id ?? null)}
+                                disabled={
+                                    disabled || orientation.values.training_id !== (c.training?.id ?? null) || orientation.values.das_id !== c.das.id
+                                }
                             />
                             <div className="grid gap-1">
                                 <OptionSelect
@@ -310,15 +330,6 @@ export default function CandidatureShow({ candidature: c, custom_fields, history
                                     </p>
                                 )}
                             </div>
-                            <OptionSelect
-                                id="das_id"
-                                label="DAS"
-                                value={orientation.str('das_id') || null}
-                                options={options.das}
-                                onChange={(v) => orientation.set('das_id', v)}
-                                error={errors.das_id}
-                                disabled={disabled}
-                            />
                             <OptionSelect
                                 id="responsible_user_id"
                                 label="Responsable"
