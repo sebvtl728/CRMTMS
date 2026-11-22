@@ -131,6 +131,8 @@ final class FundingRows
             'status' => FundingStatus::options(),
             'line' => $dossier->lines->map(fn (DossierLine $l) => ['value' => $l->id, 'label' => $l->label])->values()->all(),
             'enrolment' => $enrolments->map(fn (Enrolment $e) => ['value' => $e->id, 'label' => $labels[$e->id]])->values()->all(),
+            // The OPCO of the contractant's collective agreement (IDCC), proposed for a new funding.
+            'suggested_opco' => $dossier->account_organisation_id === null ? null : app(Fiches::class)->opcoFor($dossier->account_organisation_id),
         ];
     }
 

@@ -57,6 +57,9 @@ class OrganisationRequest extends FormRequest
         if (is_string($clean['idcc'] ?? null) && preg_match('/^\d{1,4}$/', $clean['idcc'])) {
             $clean['idcc'] = str_pad($clean['idcc'], 4, '0', STR_PAD_LEFT);
         }
+        if (array_key_exists('covered_idcc', $input)) {
+            $clean['covered_idcc'] = self::idccList($input['covered_idcc']);
+        }
         if (is_string($clean['country'] ?? null)) {
             $clean['country'] = mb_strtoupper($clean['country']);
         }
@@ -80,6 +83,15 @@ class OrganisationRequest extends FormRequest
             'siret' => ['nullable', 'string', new Siret],
             'naf_code' => ['nullable', 'string', 'regex:/^\d{2}\.?\d{2}[A-Z]$/'],
             'idcc' => ['nullable', 'string', 'regex:/^\d{4}$/'],
+            'covered_idcc' => ['nullable', 'array', function (string $attribute, mixed $value, \Closure $fail): void {
+                foreach ((array) $value as $code) {
+                    if (! is_string($code) || preg_match('/^\d{4}$/', $code) !== 1) {
+                        $fail('Indiquez des IDCC de 4 chiffres, séparés par des virgules (ex. 1979, 0843).');
+
+                        return;
+                    }
+                }
+            }],
             'status' => ['sometimes', Rule::enum(OrganisationStatus::class)],
             'email' => ['nullable', 'string', 'email', 'max:255'],
             'phone' => ['nullable', 'string', 'max:30'],
@@ -179,5 +191,30 @@ class OrganisationRequest extends FormRequest
         if ($user instanceof User && CrmVisibility::organisations(Organisation::query(), $user)->whereKey($existing->getKey())->exists()) {
             $validator->errors()->add('siret_existing_id', $existing->getKey());
         }
+    }
+
+    /**
+     * « 1979, 843 ; 1979 » → ['1979', '0843']: split on commas, semicolons
+     * and spaces, padded to 4 digits, without duplicates; an empty input is
+     * null. An invalid code is kept as typed so the rule refuses it.
+     *
+     * @return list<string>|null
+     */
+    private static function idccList(mixed $value): ?array
+    {
+        $parts = is_array($value) ? $value : preg_split('/[\s,;]+/', is_string($value) ? trim($value) : '');
+        $codes = [];
+        foreach ($parts ?: [] as $part) {
+            $part = is_string($part) ? trim($part) : '';
+            if ($part === '') {
+                continue;
+            }
+            $code = preg_match('/^\d{1,4}$/', $part) === 1 ? str_pad($part, 4, '0', STR_PAD_LEFT) : $part;
+            if (! in_array($code, $codes, true)) {
+                $codes[] = $code;
+            }
+        }
+
+        return $codes === [] ? null : $codes;
     }
 }

@@ -311,6 +311,7 @@ class OrganisationController extends Controller
             'siret' => $o->siret,
             'naf_code' => $o->naf_code,
             'idcc' => $o->idcc,
+            'covered_idcc' => implode(', ', $o->covered_idcc ?? []),
             'legal_form_id' => $o->legal_form_id,
             'sector_id' => $o->sector_id,
             'establishment_type_id' => $o->establishment_type_id,

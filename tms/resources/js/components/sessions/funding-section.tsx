@@ -74,6 +74,8 @@ export interface FundingOptions {
     status: Option[];
     line: Option[];
     enrolment: Option[];
+    /** OPCO of the contractant's collective agreement, proposed for a new funding. */
+    suggested_opco?: { id: string; label: string; idcc: string } | null;
 }
 
 function statusVariant(status: FundingStatus): 'default' | 'secondary' | 'outline' | 'destructive' {
@@ -115,12 +117,15 @@ function FundingDialog({
 }) {
     const input = funding?.input;
     const [funderType, setFunderType] = useState<'organisation' | 'person'>(funding?.funder.type ?? 'organisation');
-    const [funder, setFunder] = useState<Picked | null>(funding ? { id: funding.funder.id, label: funding.funder.label } : null);
+    const suggested = funding ? null : (options.suggested_opco ?? null);
+    const [funder, setFunder] = useState<Picked | null>(
+        funding ? { id: funding.funder.id, label: funding.funder.label } : suggested ? { id: suggested.id, label: suggested.label } : null,
+    );
     const [targetKind, setTargetKind] = useState<'none' | 'line' | 'enrolment'>(
         input?.dossier_line_id ? 'line' : input?.enrolment_id ? 'enrolment' : 'none',
     );
     const { data, setData, setError, clearErrors, transform, post, put, processing, errors } = useForm({
-        funder_organisation_id: input?.funder_organisation_id ?? '',
+        funder_organisation_id: input?.funder_organisation_id ?? suggested?.id ?? '',
         funder_person_id: input?.funder_person_id ?? '',
         funding_type_id: input?.funding_type_id ?? '',
         dossier_line_id: input?.dossier_line_id ?? '',
@@ -213,6 +218,11 @@ function FundingDialog({
                             onPick={(p) => pick(funderType, p)}
                             placeholder={funderType === 'organisation' ? 'Rechercher une entreprise (OPCO, client…)' : 'Rechercher une personne'}
                         />
+                        {suggested && funder?.id === suggested.id && (
+                            <p className="text-muted-foreground text-xs">
+                                OPCO proposé d'après la convention collective du contractant (IDCC {suggested.idcc}).
+                            </p>
+                        )}
                         <InputError message={fieldErrors.funder ?? fieldErrors.funder_organisation_id ?? fieldErrors.funder_person_id} />
                     </div>
 
@@ -289,7 +299,8 @@ function FundingDialog({
                             Paie directement l'organisme
                         </label>
                         <p className="text-muted-foreground text-xs">
-                            Le financeur règle l'organisme et reçoit sa propre facture pour sa part. Pour le contractant, la case est sans effet : il reçoit déjà la facture du reste à charge.
+                            Le financeur règle l'organisme et reçoit sa propre facture pour sa part. Pour le contractant, la case est sans effet : il
+                            reçoit déjà la facture du reste à charge.
                         </p>
                         <InputError message={fieldErrors.pays_directly} />
                     </div>

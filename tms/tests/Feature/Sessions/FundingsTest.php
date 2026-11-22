@@ -437,3 +437,11 @@ it('takes the contractant as funder even when « paie directement » is ticked: 
     expect($funding->funder_organisation_id)->toBe($dossier->account_organisation_id)
         ->and($funding->pays_directly)->toBeFalse();
 });
+
+it('proposes the OPCO of the contractant\'s collective agreement on the dossier page', function () {
+    $opco = Organisation::query()->create(['name' => 'AKTO', 'covered_idcc' => ['1979']]);
+    $dossier = l2Dossier(Organisation::query()->create(['name' => 'Hôtel du Lac', 'idcc' => '1979']));
+
+    $this->actingAs(admin(twoFactor: true))->get("/dossiers/{$dossier->id}")->assertInertia(fn ($p) => $p
+        ->where('funding_options.suggested_opco', ['id' => $opco->id, 'label' => 'AKTO', 'idcc' => '1979']));
+});
