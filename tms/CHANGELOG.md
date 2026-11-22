@@ -5,6 +5,8 @@ Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) ; ve
 
 ## [Non publié]
 
+## [0.13.0] - 2026-11-22
+
 ### Ajouté
 
 - **Automatismes** (Administration › Automatismes) : chaque matin, **convocations** des sessions confirmées à J-7
@@ -25,6 +27,17 @@ Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) ; ve
   direction et Responsable de DAS par défaut ; mois clôturé refusé ; noté dans l'historique du dossier).
 - Feuille d'émargement signée : bouton **Aperçu** (ouvre le PDF archivé dans un nouvel onglet) à côté de
   **Télécharger**.
+- Rattrapage d'un jour passé **jamais ouvert** : bouton **Faire un rattrapage** dans les présences de la séance
+  (gestionnaires seulement). L'ouverture d'un rattrapage est réservée aux gestionnaires des présences (jamais « Ses
+  séances »).
+- Onglet Suivi, **Séances du mois** : tableau qui défile, ouvert sur la semaine en cours (surlignée) ; voyant sur le
+  bouton **Présences** : **vert** quand toutes les demi-journées du jour sont validées, **orange** quand une seule
+  l'est.
+
+### Corrigé
+
+- Émargement : le badge d'un rattrapage suit sa confirmation (« à confirmer », « confirmé » avec voyant vert,
+  « refusé ») au lieu de rester « à confirmer ».
 
 ## [0.12.0] - 2026-11-21
 
