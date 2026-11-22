@@ -48,6 +48,13 @@ use Tests\TestCase;
 
 pest()->extend(TestCase::class)
     ->use(RefreshDatabaseAsOwner::class)
+    // TMS_TEST_NOW=2026-12-02 runs the suite « as if » on that day (a test that travels itself wins): finds the tests
+    // that would break when the real date moves.
+    ->beforeEach(function () {
+        if (is_string($now = getenv('TMS_TEST_NOW')) && $now !== '') {
+            $this->travelTo(\Carbon\CarbonImmutable::parse($now.' 10:00', 'Europe/Paris'));
+        }
+    })
     ->in('Feature', 'Unit', 'Arch');
 
 /*
