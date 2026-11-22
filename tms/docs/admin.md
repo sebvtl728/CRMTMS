@@ -313,7 +313,7 @@ Ce traitement repose sur le **planificateur** (service `scheduler` de `compose.p
 Les imports de fichiers (CRM) s'exécutent en arrière-plan.
 
 - **Simulation** : file `imports` (superviseur Horizon `supervisor-imports`, connexion `redis-long`, 1 processus en développement, 2 en production, délai maximal de 15 minutes par fichier). L'**exécution** et l'**annulation** d'un import passent par la file par défaut, par tranches, et reprennent là où elles se sont arrêtées en cas d'interruption.
-- **Suivre l'activité** : le tableau de bord **Horizon** (`/horizon`) de l'installation montre les files `default` et `imports` et les tâches en échec. Il est réservé à l'opérateur de la plateforme, désigné depuis le serveur : `docker compose exec app php artisan tms:platform-admin <e-mail>` (`--revoke` pour retirer). Un import qui n'avance plus affiche un message d'arrêt et peut être relancé ou marqué en échec depuis son rapport.
+- **Suivre l'activité** : le tableau de bord **Horizon** (`/horizon`) de l'installation montre les files `default` et `imports` et les tâches en échec. Il est réservé à l'opérateur de la plateforme, désigné depuis le serveur : `docker compose exec app php artisan tms:platform-admin <e-mail>` (compte actif avec double authentification ; `--revoke` pour retirer). Un import qui n'avance plus affiche un message d'arrêt et peut être relancé ou marqué en échec depuis son rapport.
 - **Surveillance** : toutes les 10 minutes, le traitement `tms:crm:import-watchdog` reprend **une fois**, depuis la dernière tranche enregistrée, un import en cours sans avancement depuis **15 minutes** (processus arrêté, serveur redémarré) ; s'il se bloque de nouveau, l'import est marqué **échoué** avec la raison (ce qu'il a créé reste annulable). Les deux évènements figurent dans le journal d'audit. Un import encore traité par son processus n'est jamais repris en double.
 - **Lignes refusées par la base** : une ligne qu'une contrainte de la base refuse passe **en erreur** (code de l'erreur dans le rapport, aucune valeur dans les journaux techniques) ; l'import continue.
 - **Type de fichier** : le contenu réel est vérifié au dépôt (un `.xlsx` doit être un classeur Office, un `.csv` du texte UTF-8 ou Windows-1252) ; un fichier renommé est refusé avec un message.
@@ -439,7 +439,7 @@ Guide utilisateur : `admissions.md`.
     *N* jours (3 par défaut, 0 = désactivé), au plus *M* fois (2 par défaut, de 1 à 5). Chaque relance envoie un
     **nouveau lien** qui remplace le précédent ; pas de relance si le signataire a demandé son code dans les 24 h.
   - **Attestations et certificats de réalisation** (désactivé par défaut) : émis et envoyés le matin qui suit la
-    **clôture du mois** du dernier jour de la session (heures réalisées définitives) ; un document annulé n'est jamais
+    **clôture de tous les mois** de la session (heures réalisées définitives ; jamais pour un stagiaire à 0 h réalisée) ; un document annulé n'est jamais
     refait ; un stagiaire sans e-mail : émis, non envoyé.
   - **Exécuter maintenant** lance les mêmes automatismes tout de suite (mêmes règles). Rien ne part deux fois : chaque
     envoi automatique est noté (`automation_sends`). Les réglages sont journalisés (`automation.settings.updated`).

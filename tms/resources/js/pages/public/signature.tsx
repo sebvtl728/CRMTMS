@@ -105,7 +105,7 @@ export default function Signature({ state, organisme, title, signer, email, dead
                             <SignaturePad id="drawing" onChange={(uri) => setData('drawing', uri)} invalid={!!errors.drawing} />
                             <InputError message={errors.drawing} />
                         </div>
-                        <Button type="submit" disabled={processing || data.code.length !== 6 || data.drawing === ''}>
+                        <Button type="submit" disabled={processing || !data.accept || data.code.length !== 6 || data.drawing === ''}>
                             {processing ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <PenLine className="h-4 w-4" />}
                             Signer
                         </Button>

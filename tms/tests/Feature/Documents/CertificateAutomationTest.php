@@ -6,6 +6,7 @@ use App\Modules\Documents\Document;
 use App\Modules\Documents\DocumentIssuer;
 use App\Modules\Documents\DocumentStatus;
 use App\Modules\Documents\Texts\DocumentType;
+use App\Modules\Sessions\Attendance\Attendance;
 use App\Modules\Sessions\Attendance\Closures;
 use App\Modules\Sessions\Sessions\TrainingSession;
 use Carbon\CarbonImmutable;
@@ -22,6 +23,13 @@ beforeEach(function () {
     AutomationSettings::save(['certificates' => true]);
 });
 
+/** Every séance of the session attended by all. */
+function ctPresent(TrainingSession $session): void
+{
+    \App\Modules\Sessions\Planning\Seance::query()->where('training_session_id', $session->id)->get()
+        ->each(fn ($seance) => app(\App\Modules\Sessions\Attendance\Attendances::class)->allPresent($seance));
+}
+
 function ctRun(): int
 {
     return app(CertificateAutomation::class)->run(CarbonImmutable::now('Europe/Paris'));
@@ -29,6 +37,7 @@ function ctRun(): int
 
 it('issues and sends the certificates once the month of the last day is closed', function () {
     $x = docFinishedSession();
+    ctPresent($x['session']);
     expect(ctRun())->toBe(0);
 
     app(Closures::class)->close(TrainingSession::query()->findOrFail($x['session']->id), '2026-11');
@@ -43,6 +52,7 @@ it('issues and sends the certificates once the month of the last day is closed',
 
 it('never issues again a cancelled certificate, and does nothing when off', function () {
     $x = docFinishedSession();
+    ctPresent($x['session']);
     $doc = app(DocumentIssuer::class)->issueForEnrolment(admin(), DocumentType::CompletionCertificate, $x['lea']->id);
     app(DocumentIssuer::class)->cancel(admin(), $doc, 'Erreur');
     app(Closures::class)->close(TrainingSession::query()->findOrFail($x['session']->id), '2026-11');
@@ -53,4 +63,27 @@ it('never issues again a cancelled certificate, and does nothing when off', func
     AutomationSettings::save(['certificates' => true]);
     ctRun();
     expect(Document::query()->where('enrolment_id', $x['lea']->id)->where('type', DocumentType::CompletionCertificate->value)->count())->toBe(1);
+});
+
+it('waits until every month of the session is closed', function () {
+    $dossier = l2Dossier();
+    $session = l2Session(null, ['starts_on' => '2026-10-28', 'ends_on' => '2026-11-04', 'planned_hours' => '7', 'location_kind' => 'address', 'location_text' => 'Salle B']);
+    $module = plModule($session);
+    plSeance($module, '2026-10-28', '09:00', '12:30');
+    plSeance($module, '2026-11-03', '13:30', '17:00');
+    l2Enrol($dossier, $session, makePerson('Durand', ['first_name' => 'Léa', 'email' => 'lea.durand@example.test']));
+    ctPresent($session);
+    app(Closures::class)->close($session, '2026-11');
+
+    expect(ctRun())->toBe(0);
+    app(Closures::class)->close($session, '2026-10');
+    expect(ctRun())->toBe(2);
+});
+
+it('leaves a trainee with no realised hour to a manager', function () {
+    $x = docFinishedSession();
+    Attendance::query()->delete();
+    app(Closures::class)->close(TrainingSession::query()->findOrFail($x['session']->id), '2026-11');
+
+    expect(ctRun())->toBe(0)->and(Document::query()->count())->toBe(0);
 });

@@ -232,7 +232,7 @@ it('keeps the permission team in step with the tenant context', function () {
 
 it('opens Horizon to platform administrators only', function () {
     $admin = admin(twoFactor: true);
-    $platform = User::factory()->create();
+    $platform = userWithRole(Role::Assistant, twoFactor: true);
     $platform->forceFill(['is_platform_admin' => true])->save();
 
     expect(Gate::forUser($admin)->allows('viewHorizon'))->toBeFalse()

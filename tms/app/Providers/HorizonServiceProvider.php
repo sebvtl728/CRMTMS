@@ -28,7 +28,7 @@ class HorizonServiceProvider extends HorizonApplicationServiceProvider
      */
     protected function gate(): void
     {
-        // Platform operators only (queues of every organisme), never by e-mail list.
-        Gate::define('viewHorizon', fn ($user = null): bool => $user instanceof User && $user->is_platform_admin);
+        // Platform operators only (queues of every organisme), active and with 2FA, never by e-mail list.
+        Gate::define('viewHorizon', fn ($user = null): bool => $user instanceof User && $user->is_platform_admin && $user->isActive() && $user->hasTwoFactorEnabled());
     }
 }

@@ -591,7 +591,8 @@ function ReopenDialog({
                     <DialogHeader>
                         <DialogTitle>Rouvrir {month}</DialogTitle>
                         <DialogDescription>
-                            Les présences, les heures et les séances du mois redeviennent modifiables. La réouverture est journalisée.
+                            Les présences, les heures et les séances du mois redeviennent modifiables. La réouverture est journalisée. Les
+                            attestations et certificats déjà émis ne changent pas : si les heures changent, annulez-les puis émettez-les de nouveau.
                         </DialogDescription>
                     </DialogHeader>
                     <div className="grid gap-2">

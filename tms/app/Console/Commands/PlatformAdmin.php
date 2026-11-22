@@ -3,7 +3,6 @@
 namespace App\Console\Commands;
 
 use App\Console\Commands\Concerns\ResolvesTenantOption;
-use App\Modules\Core\Audit\AuditRecorder;
 use App\Modules\Core\Tenancy\Tenant;
 use App\Modules\Core\Tenancy\TenantContext;
 use App\Modules\Core\Users\User;
@@ -25,7 +24,7 @@ class PlatformAdmin extends Command
 
     protected $description = 'Désigne (ou retire) l\'opérateur de la plateforme, qui peut ouvrir Horizon';
 
-    public function handle(TenantContext $tenants, AuditRecorder $audit): int
+    public function handle(TenantContext $tenants): int
     {
         $email = mb_strtolower(trim((string) $this->argument('email')));
         $tenant = $this->tenantFromOption();
@@ -33,10 +32,10 @@ class PlatformAdmin extends Command
             return self::FAILURE;
         }
 
-        return $tenants->run($tenant, fn () => $this->apply($tenant, $email, $audit));
+        return $tenants->run($tenant, fn () => $this->apply($tenant, $email));
     }
 
-    private function apply(Tenant $tenant, string $email, AuditRecorder $audit): int
+    private function apply(Tenant $tenant, string $email): int
     {
         $user = User::query()->where('email', $email)->first();
         if ($user === null) {
@@ -45,8 +44,13 @@ class PlatformAdmin extends Command
             return self::FAILURE;
         }
         $grant = ! $this->option('revoke');
+        if ($grant && (! $user->isActive() || ! $user->hasTwoFactorEnabled())) {
+            $this->error("Le compte « {$email} » doit être actif et avoir activé la double authentification avant de devenir opérateur.");
+
+            return self::FAILURE;
+        }
+        // The change itself is journaled by the user's audit (is_platform_admin).
         $user->forceFill(['is_platform_admin' => $grant])->save();
-        $audit->record($grant ? 'platform.admin_granted' : 'platform.admin_revoked', $user, [], ['by' => 'console']);
         $this->info($grant ? "{$email} peut maintenant ouvrir Horizon (/horizon)." : "{$email} ne peut plus ouvrir Horizon.");
 
         return self::SUCCESS;

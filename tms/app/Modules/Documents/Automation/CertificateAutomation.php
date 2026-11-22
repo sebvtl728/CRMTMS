@@ -17,10 +17,10 @@ use Illuminate\Support\Facades\Log;
 use Throwable;
 
 /**
- * The automatic certificates (2026-11-22, off by default): once the month of
- * the last day of a session is closed (the attendance is final), each trainee
+ * The automatic certificates (2026-11-22, off by default): once every month
+ * of a session is closed (the attendance is final), each trainee
  * who never had one gets the completion certificate and the certificate of
- * realisation (realised hours), issued without author then sent (without a
+ * realisation (realised hours, never 0: a manager decides), issued without author then sent (without a
  * valid address: issued only). A certificate cancelled by a manager is never
  * issued again; one closed month is caught up within CATCH_UP_DAYS.
  */
@@ -40,16 +40,24 @@ final class CertificateAutomation
         }
         $sent = 0;
         foreach (Paperwork::sessionsFinallyClosedSince($today->subDays(self::CATCH_UP_DAYS)) as $sessionId) {
-            $enrolmentIds = Paperwork::sessionEnrolments($sessionId);
+            // Those who already have both documents (cancelled ones included) cost nothing more.
+            $done = Document::query()->whereIn('enrolment_id', Paperwork::sessionEnrolments($sessionId))
+                ->whereIn('type', array_map(fn (DocumentType $t) => $t->value, self::TYPES))
+                ->toBase()->selectRaw('enrolment_id, count(distinct type) as n')->groupBy('enrolment_id')->pluck('n', 'enrolment_id');
+            $enrolmentIds = array_values(array_filter(Paperwork::sessionEnrolments($sessionId), fn (string $id) => (int) ($done[$id] ?? 0) < count(self::TYPES)));
             $personIds = [];
+            $realised = [];
             foreach ($enrolmentIds as $id) {
-                $personIds[$id] = (string) (Paperwork::enrolment($id)['person_id'] ?? '');
+                $enrolment = Paperwork::enrolment($id);
+                $personIds[$id] = (string) ($enrolment['person_id'] ?? '');
+                $realised[$id] = (int) ($enrolment['realised_minutes'] ?? 0);
             }
             $people = $this->fiches->personLabels(array_values($personIds));
             $anonymised = $this->fiches->anonymisedIds(array_values($personIds));
             foreach ($enrolmentIds as $enrolmentId) {
                 $person = $personIds[$enrolmentId];
-                if (($people[$person]['trashed'] ?? true) || in_array($person, $anonymised, true)) {
+                // In the trash, anonymised, or never attended (0 h realised: a manager decides): nothing.
+                if (($people[$person]['trashed'] ?? true) || in_array($person, $anonymised, true) || $realised[$enrolmentId] === 0) {
                     continue;
                 }
                 foreach (self::TYPES as $type) {
