@@ -16,6 +16,7 @@ use App\Modules\Sessions\Permissions as SessionsPermissions;
 use App\Modules\Sessions\Public\Admission;
 use App\Modules\Sessions\Sessions\SessionWriter;
 use App\Modules\Sessions\Sessions\TrainingSession;
+use Illuminate\Validation\ValidationException;
 use Inertia\Testing\AssertableInertia as Assert;
 use Symfony\Component\HttpKernel\Exception\HttpException;
 
@@ -158,4 +159,23 @@ it('needs both the candidature and the dossier rights through the route', functi
     expect($c->fresh()->dossier_id)->not->toBeNull();
 
     expect(commercial()->can(SessionsPermissions::DOSSIERS_UPDATE))->toBeTrue();
+});
+
+it('answers on the session field when the enrolment is refused (intra session of another entreprise)', function () {
+    $entreprise = Organisation::query()->create(['name' => 'Brasserie du Port']);
+    $intra = app(SessionWriter::class)->create([
+        'training_id' => adTraining()->id, 'kind' => 'intra', 'organisation_id' => $entreprise->id,
+        'starts_on' => '2027-01-04', 'ends_on' => '2027-06-30', 'planned_hours' => '', 'location_kind' => 'remote',
+        'location_text' => null, 'capacity' => null, 'responsible_user_id' => null, 'status' => 'planned', 'notes' => null,
+    ]);
+    $c = adAdmitted(['target_session_id' => $intra->id]);
+
+    try {
+        app(DossierCreation::class)->create($c, adDossierData($c), admin());
+        test()->fail('expected a validation error');
+    } catch (ValidationException $e) {
+        expect(array_keys($e->errors()))->toBe(['session_id'])
+            ->and($e->errors()['session_id'][0])->toBe('Cette session intra est réservée à son entreprise : le contractant de ce dossier est différent.');
+    }
+    expect(Dossier::query()->count())->toBe(0);
 });

@@ -129,7 +129,12 @@ final class Admission
                 if ($session === null || $session->training_id !== $data['training_id']) {
                     throw ValidationException::withMessages(['session_id' => 'Choisissez une session de la formation.']);
                 }
-                app(Enrolments::class)->enrol($dossier, $dossier->lines()->firstOrFail(), $session, $data['person_id']);
+                try {
+                    app(Enrolments::class)->enrol($dossier, $dossier->lines()->firstOrFail(), $session, $data['person_id']);
+                } catch (ValidationException $e) {
+                    // The admission form has one « session » field: every refusal of the enrolment shows there.
+                    throw ValidationException::withMessages(['session_id' => array_values(array_unique(array_merge(...array_values($e->errors()))))]);
+                }
             }
 
             if (($data['funding'] ?? null) !== null) {

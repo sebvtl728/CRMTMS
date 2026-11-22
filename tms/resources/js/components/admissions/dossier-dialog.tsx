@@ -74,10 +74,30 @@ export function DossierDialog({
     }
 
     const isPerson = data.account?.type === 'person';
+    /** Errors shown next to a field; any other one is listed above the buttons, so a click never looks ignored. */
+    const SHOWN = [
+        'account',
+        'account.id',
+        'account_organisation_id',
+        'account_person_id',
+        'label',
+        'unit_price',
+        'lines.0.unit_price',
+        'session_id',
+        'person_id',
+        'funding.funding_type_id',
+        'funding_type_id',
+        'funding.amount',
+        'amount',
+    ];
+    const others = Object.entries(errors)
+        .filter(([key]) => !SHOWN.includes(key))
+        .map(([, message]) => message);
     const set = (changes: Partial<Defaults>) => setData({ ...data, ...changes });
 
     const submit = () => {
         setProcessing(true);
+        setErrors({});
         const account = isPerson ? data.account : organisation ? { type: 'organisation', id: organisation.id } : null;
         router.post(
             `/admissions/candidatures/${candidatureId}/dossier`,
@@ -92,6 +112,11 @@ export function DossierDialog({
             },
             {
                 onError: (errs) => setErrors(errs as Record<string, string>),
+                onSuccess: (page) => {
+                    // A refusal answered as a message (409) comes back as the flash « error ».
+                    const flash = (page.props as { flash?: { error?: string | null } }).flash;
+                    if (flash?.error) setErrors({ dossier: flash.error });
+                },
                 onFinish: () => setProcessing(false),
             },
         );
@@ -173,6 +198,13 @@ export function DossierDialog({
                     )}
                 </div>
 
+                {others.length > 0 && (
+                    <div role="alert" className="grid gap-1">
+                        {others.map((message) => (
+                            <InputError key={message} message={message} />
+                        ))}
+                    </div>
+                )}
                 <DialogFooter>
                     <Button type="button" variant="ghost" onClick={() => onOpenChange(false)}>
                         Annuler
