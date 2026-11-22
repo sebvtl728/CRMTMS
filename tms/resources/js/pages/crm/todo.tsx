@@ -46,7 +46,7 @@ interface TodoProps {
     status?: string;
 }
 
-const breadcrumbs: BreadcrumbItem[] = [{ title: 'À faire', href: '/crm/todo' }];
+const breadcrumbs: BreadcrumbItem[] = [{ title: 'Mes actions commerciales', href: '/crm/todo' }];
 
 const SECTIONS = [
     { key: 'overdue', title: 'En retard', empty: 'Rien en retard.', tone: 'text-red-600 dark:text-red-400' },
@@ -206,11 +206,11 @@ export default function Todo({ sections, team, can_team, can_edit, status }: Tod
 
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
-            <Head title="À faire" />
+            <Head title="Mes actions commerciales" />
 
             <div className="flex flex-col gap-6 p-4">
                 <div className="flex flex-wrap items-start justify-between gap-4">
-                    <Heading title="À faire" description={team ? "Les actions à faire de l'équipe" : 'Vos actions à faire'} />
+                    <Heading title="Mes actions commerciales" description={team ? "Les actions à faire de l'équipe" : 'Vos actions à faire'} />
                     {can_team && (
                         <Button type="button" variant={team ? 'default' : 'outline'} aria-pressed={team} onClick={toggleTeam}>
                             <Users className="h-4 w-4" />

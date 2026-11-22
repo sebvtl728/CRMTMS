@@ -46,6 +46,8 @@ final class SessionSurveysBlock
             'props' => [
                 'session_id' => $sessionId,
                 'can_launch' => ! $session['cancelled'] && Surveys::allows($viewer, $sessionId, true),
+                // The trainees a launch e-mails (confirmation of the button).
+                'trainee_count' => count(Surveys::trainees($sessionId)),
                 'ended' => $session['ends_on'] <= CarbonImmutable::now('Europe/Paris')->toDateString(),
                 'qr_url' => $campaigns->contains(fn (SurveyCampaign $c) => $c->qr_token_hash !== null) ? "/sessions/{$sessionId}/questionnaire-qr" : null,
                 'campaigns' => $campaigns->map(fn (SurveyCampaign $c) => [

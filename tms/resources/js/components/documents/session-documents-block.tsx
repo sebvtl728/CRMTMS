@@ -44,6 +44,20 @@ export function SessionDocumentsBlock({ session_id, can_manage, types, trainees,
         }
         post(`/sessions/${session_id}/documents`, type, `issue-${type}`);
     };
+    // « Envoyer à tous »: says how many trainees receive it, first.
+    const sendAll = (type: string, label: string) => {
+        const n = trainees.filter((tr) => {
+            const doc = tr.documents[type];
+            return doc !== null && doc.status === 'issued' && (doc.email_status === null || doc.email_status === 'failed');
+        }).length;
+        if (n === 0) {
+            window.alert(`Aucun document « ${label} » émis à envoyer : émettez-les d'abord.`);
+            return;
+        }
+        if (window.confirm(`Envoyer « ${label} » par e-mail à ${n} stagiaire${n > 1 ? 's' : ''} ?`)) {
+            post(`/sessions/${session_id}/documents/send`, type, `send-${type}`);
+        }
+    };
     const issueAndSendNow = () => {
         setAsking(false);
         post(`/sessions/${session_id}/documents`, 'convocation', 'issue-convocation', () =>
@@ -67,12 +81,7 @@ export function SessionDocumentsBlock({ session_id, can_manage, types, trainees,
                                     )}
                                     Émettre pour tous
                                 </Button>
-                                <Button
-                                    size="sm"
-                                    variant="outline"
-                                    disabled={busy !== null}
-                                    onClick={() => post(`/sessions/${session_id}/documents/send`, t.value, `send-${t.value}`)}
-                                >
+                                <Button size="sm" variant="outline" disabled={busy !== null} onClick={() => sendAll(t.value, t.label)}>
                                     {busy === `send-${t.value}` ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
                                     Envoyer à tous
                                 </Button>

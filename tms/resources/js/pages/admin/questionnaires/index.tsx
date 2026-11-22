@@ -20,7 +20,7 @@ interface TemplateRow {
     questions_count: number;
 }
 
-const breadcrumbs: BreadcrumbItem[] = [{ title: 'Questionnaires', href: '/admin/questionnaires' }];
+const breadcrumbs: BreadcrumbItem[] = [{ title: 'Modèles de questionnaires', href: '/admin/questionnaires' }];
 
 export default function QuestionnairesIndex({ templates, cold_months, status }: { templates: TemplateRow[]; cold_months: number; status?: string }) {
     const delay = useForm({ months: String(cold_months) });
@@ -31,7 +31,7 @@ export default function QuestionnairesIndex({ templates, cold_months, status }: 
 
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
-            <Head title="Questionnaires" />
+            <Head title="Modèles de questionnaires" />
             <div className="flex flex-col gap-6 p-4">
                 <Heading
                     title="Questionnaires de satisfaction"

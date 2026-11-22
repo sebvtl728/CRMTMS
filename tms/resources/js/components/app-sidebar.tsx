@@ -58,9 +58,9 @@ const commercialNavItems: (NavItem & { permission: string })[] = [
     { title: 'Opportunités', url: '/crm/opportunities', icon: Handshake, permission: 'crm.opportunities.view' },
     { title: 'Devis', url: '/crm/quotes', icon: FileText, permission: 'crm.quotes.view' },
     { title: "Chiffre d'affaires", url: '/crm/revenue', icon: Euro, permission: 'crm.revenue.view' },
-    { title: 'À faire', url: '/crm/todo', icon: CalendarCheck, permission: 'crm.activities.view' },
+    { title: 'Mes actions commerciales', url: '/crm/todo', icon: CalendarCheck, permission: 'crm.activities.view' },
     { title: 'Tableaux de bord', url: '/crm/dashboards', icon: Gauge, permission: 'crm.dashboards.view' },
-    { title: 'Planning', url: '/crm/planning', icon: CalendarRange, permission: 'crm.activities.view' },
+    { title: 'Agenda commercial', url: '/crm/planning', icon: CalendarRange, permission: 'crm.activities.view' },
     { title: 'Compte rendu de RDV', url: '/crm/report', icon: ClipboardPen, permission: 'crm.activities.update' },
     { title: 'Catalogue', url: '/catalogue', icon: BookOpen, permission: 'catalogue.view' },
     { title: 'Entreprises', url: '/crm/organisations', icon: Factory, permission: 'crm.fiches.view' },
@@ -92,7 +92,7 @@ const financeNavItems: (NavItem & { permission: string })[] = [
 // « Qualité »: the Qualiopi file.
 const qualityNavItems: (NavItem & { permission: string })[] = [
     { title: 'Qualiopi', url: '/qualite/qualiopi', icon: BadgeCheck, permission: 'qualite.view' },
-    { title: 'Questionnaires', url: '/qualite/questionnaires', icon: Smile, permission: 'questionnaires.view' },
+    { title: 'Résultats des questionnaires', url: '/qualite/questionnaires', icon: Smile, permission: 'questionnaires.view' },
 ];
 
 const myPlanningItem: NavItem = { title: 'Mon planning', url: '/mon-planning', icon: CalendarClock };
@@ -114,7 +114,7 @@ const adminNavItems: (NavItem & { permission: string })[] = [
     { title: 'Salles et fermetures', url: '/admin/sessions-settings', icon: DoorOpen, permission: 'sessions.rooms.manage' },
     { title: "Modèles d'e-mails", url: '/admin/mail-templates', icon: Mail, permission: 'settings.manage' },
     { title: 'Modèles de documents', url: '/admin/document-texts', icon: FileSignature, permission: 'settings.manage' },
-    { title: 'Questionnaires', url: '/admin/questionnaires', icon: Smile, permission: 'questionnaires.manage' },
+    { title: 'Modèles de questionnaires', url: '/admin/questionnaires', icon: Smile, permission: 'questionnaires.manage' },
     // Local sandbox only (shown when the shared prop « sandbox » is true; never on a server).
     { title: 'Bac à sable', url: '/admin/sandbox', icon: RotateCcw, permission: 'settings.manage' },
 ];
