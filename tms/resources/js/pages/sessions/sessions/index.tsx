@@ -1,6 +1,7 @@
 import { FilterSelect } from '@/components/crm/filter-select';
 import Heading from '@/components/heading';
 import { SessionBoard, type BoardColumn } from '@/components/sessions/session-board';
+import { SessionColorDot } from '@/components/sessions/session-color-dot';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -299,7 +300,11 @@ export default function SessionsIndex({ view, sessions, board, with_cancelled, f
                                     {sessions.data.map((s) => (
                                         <tr key={s.id} className="hover:bg-muted/30 border-t">
                                             <td className="px-3 py-2 whitespace-nowrap">
-                                                <Link href={route('sessions.show', s.id)} className="font-medium hover:underline">
+                                                <Link
+                                                    href={route('sessions.show', s.id)}
+                                                    className="inline-flex items-center gap-1.5 font-medium hover:underline"
+                                                >
+                                                    <SessionColorDot color={s.color} />
                                                     {s.number}
                                                 </Link>
                                             </td>
@@ -328,7 +333,11 @@ export default function SessionsIndex({ view, sessions, board, with_cancelled, f
                             {sessions.data.map((s) => (
                                 <li key={s.id} className="grid gap-1 rounded-xl border p-3 text-sm">
                                     <div className="flex items-center justify-between gap-2">
-                                        <Link href={route('sessions.show', s.id)} className="font-medium hover:underline">
+                                        <Link
+                                            href={route('sessions.show', s.id)}
+                                            className="inline-flex items-center gap-1.5 font-medium hover:underline"
+                                        >
+                                            <SessionColorDot color={s.color} />
                                             {s.number}
                                         </Link>
                                         {statusBadge(s)}

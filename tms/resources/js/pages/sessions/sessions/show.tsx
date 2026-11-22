@@ -4,6 +4,7 @@ import { SessionBlocks, type SessionBlock } from '@/components/session-blocks';
 import { EnrolDialog, type EnrolDossierOption } from '@/components/sessions/enrolment-dialog';
 import { EnrolmentList, type EnrolmentReferences, type EnrolmentRow } from '@/components/sessions/enrolment-list';
 import { SessionAttendance } from '@/components/sessions/session-attendance';
+import { SessionColorDot } from '@/components/sessions/session-color-dot';
 import { SessionModules, type SessionPlanning } from '@/components/sessions/session-modules';
 import { SessionNotesPanel, type NotesPanel } from '@/components/sessions/session-notes-panel';
 import { SessionPlanningSeances } from '@/components/sessions/session-planning';
@@ -156,6 +157,12 @@ export default function SessionShow({
             <div className="flex flex-col gap-6 p-4">
                 <div className="flex flex-wrap items-start justify-between gap-4">
                     <div className="grid gap-2">
+                        {session.color && (
+                            <div className="flex items-center gap-2 text-xs">
+                                <SessionColorDot color={session.color} className="h-3 w-3" />
+                                <span className="text-muted-foreground">Couleur de la session dans le planning</span>
+                            </div>
+                        )}
                         <Heading
                             title={session.title ?? `Session ${session.number}`}
                             description={

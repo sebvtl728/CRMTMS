@@ -81,6 +81,7 @@ final class PlanningRows
                     'id' => $s->training_session_id,
                     'label' => $labels[$s->training_session_id] ?? 'Session introuvable',
                     'cancelled' => $session?->isCancelled() ?? false,
+                    'color' => $session?->color,
                     'href' => isset($openable[$s->training_session_id]) ? route('sessions.show', $s->training_session_id, false) : null,
                 ],
                 'module' => $modules[$s->session_module_id] ?? '-',

@@ -13,7 +13,8 @@ export interface PlanningSeance {
     end: string;
     minutes: number;
     duration: string;
-    session: { id: string; label: string; cancelled: boolean; href: string | null };
+    /** color: the session's colour (« #2563eb »), null before it had one. */
+    session: { id: string; label: string; cancelled: boolean; href: string | null; color?: string | null };
     module: string;
     trainer: { id: string; label: string } | null;
     room: { id: string; name: string; address: string | null } | null;
@@ -74,7 +75,9 @@ function SeanceButton({
             ]
                 .filter(Boolean)
                 .join('\n')}
-            className={`bg-primary/10 hover:bg-primary/20 grid w-full grid-cols-[minmax(0,1fr)] overflow-hidden rounded border-l-4 border-l-blue-500 px-1 text-left text-xs ${cancelled ? 'line-through opacity-60' : ''}`}
+            // The session's colour: a solid edge and a light tint (« 1f » ≈ 12 % opacity), the theme's otherwise.
+            style={seance.session.color ? { borderLeftColor: seance.session.color, backgroundColor: `${seance.session.color}1f` } : undefined}
+            className={`grid w-full grid-cols-[minmax(0,1fr)] overflow-hidden rounded border-l-4 px-1 text-left text-xs hover:brightness-95 ${seance.session.color ? '' : 'bg-primary/10 hover:bg-primary/20 border-l-blue-500'} ${cancelled ? 'line-through opacity-60' : ''}`}
         >
             <span className="block truncate">
                 {alerts.length > 0 && <AlertTriangle className="mr-0.5 inline h-3 w-3 text-amber-600" aria-label="Alertes" />}

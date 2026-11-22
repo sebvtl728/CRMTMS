@@ -107,7 +107,11 @@ function DraggableCard({ card, status, onMove }: { card: BoardCard; status: stri
     const other: Movable | null = status === 'planned' ? 'confirmed' : status === 'confirmed' ? 'planned' : null;
 
     return (
-        <li ref={setNodeRef} className={`bg-background flex gap-1 rounded-lg border p-2 shadow-xs ${isDragging ? 'opacity-40' : ''}`}>
+        <li
+            ref={setNodeRef}
+            style={card.color ? { borderLeftColor: card.color } : undefined}
+            className={`bg-background flex gap-1 rounded-lg border p-2 shadow-xs ${card.color ? 'border-l-4' : ''} ${isDragging ? 'opacity-40' : ''}`}
+        >
             {card.can_move && (
                 <button
                     type="button"

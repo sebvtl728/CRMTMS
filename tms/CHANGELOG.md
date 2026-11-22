@@ -5,10 +5,16 @@ Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) ; ve
 
 ## [Non publié]
 
-## [0.14.1] - 2026-11-22
+## [0.14.2] - 2026-11-22
+
+La 0.14.1 n'a pas été publiée (formatage refusé par la CI) : son contenu est livré ici.
 
 ### Ajouté
 
+- **Planning des séances aux couleurs des sessions** : chaque session reçoit une couleur à son enregistrement (12
+  couleurs à tour de rôle, les sessions existantes colorées par ordre de création) ; ses séances la portent dans le
+  planning et « Mon planning », et la session l'affiche aussi (pastille dans la liste, bord de sa carte dans les
+  colonnes, en tête de sa page).
 - **Devis en un seul e-mail** : à l'envoi, la case **Joindre un lien de signature en ligne** (cochée par défaut) met le
   lien « bon pour accord » dans l'e-mail du devis, au lieu d'un second e-mail.
 - **Bandeau des messages** : le résultat d'une action (enregistré, envoyé, refusé) s'affiche en bas de l'écran, là où
