@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\DashboardController;
+use App\Modules\Core\Todo\TodoController;
 use Illuminate\Support\Facades\Route;
 
 // No public landing page: guests go to the login, signed-in users to the dashboard.
@@ -8,6 +9,7 @@ Route::get('/', fn () => auth()->check() ? to_route('dashboard') : to_route('log
 
 Route::middleware(['auth'])->group(function () {
     Route::get('dashboard', DashboardController::class)->name('dashboard');
+    Route::get('a-traiter', [TodoController::class, 'index'])->name('todo.index');
 });
 
 require __DIR__.'/settings.php';

@@ -63,6 +63,7 @@ use App\Modules\Sessions\Resources\Rooms;
 use App\Modules\Sessions\Sessions\SessionPolicy;
 use App\Modules\Sessions\Sessions\TrainingSession;
 use App\Modules\Sessions\Summary\TrainingSessionsBlock;
+use App\Modules\Sessions\Todo\SessionsTodo;
 use App\Modules\Sessions\Trainers\Trainer;
 use App\Modules\Sessions\Trainers\TrainerDas;
 use App\Modules\Sessions\Trainers\TrainerRows;
@@ -138,6 +139,7 @@ class SessionsServiceProvider extends ServiceProvider
         // E-mails of the remote signing catch-up (2026-11-21).
         CatchUpMailTemplates::register();
         DayBeforeMailTemplates::register();
+        SessionsTodo::register();
         DailyAutomations::register('day_before', fn (CarbonImmutable $today): int => app(DayBeforeReminders::class)->run($today));
         self::registerReferenceUsage();
         self::registerTrainingUsage();

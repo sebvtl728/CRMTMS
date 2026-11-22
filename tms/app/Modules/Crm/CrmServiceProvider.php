@@ -67,6 +67,7 @@ use App\Modules\Crm\Timeline\ModuleHistoryProvider;
 use App\Modules\Crm\Timeline\Note;
 use App\Modules\Crm\Timeline\NotesProvider;
 use App\Modules\Crm\Timeline\Timeline;
+use App\Modules\Crm\Todo\CrmTodo;
 use App\Modules\Crm\Visibility\CrmVisibility;
 use App\Modules\Crm\Visibility\FollowedDas;
 use Carbon\CarbonImmutable;
@@ -141,6 +142,7 @@ class CrmServiceProvider extends ServiceProvider
 
     public function boot(): void
     {
+        CrmTodo::register();
         // Lot 1e: the dashboard cards of the CRM.
         foreach ([...ActivityIndicators::all(), ...PipelineIndicators::all(), ...QuoteIndicators::all(), ...MonthIndicators::all()] as $indicator) {
             Indicators::register($indicator);

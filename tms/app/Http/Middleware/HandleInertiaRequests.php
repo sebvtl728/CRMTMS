@@ -9,6 +9,7 @@ use App\Modules\Core\Access\Scopes;
 use App\Modules\Core\Backups\BackupStatus;
 use App\Modules\Core\Companies\Brand;
 use App\Modules\Core\Platform\Sandbox;
+use App\Modules\Core\Todo\TodoSources;
 use App\Modules\Core\Users\User;
 use App\Modules\Crm\Activities\TodoQuery;
 use App\Modules\Crm\Permissions as CrmPermissions;
@@ -77,6 +78,8 @@ class HandleInertiaRequests extends Middleware
             // Menu badge of « À faire »: overdue + today, cached 60 s (lazy: skipped by partial reloads).
             'todo_count' => fn () => $user !== null && $user->can(CrmPermissions::ACTIVITIES_VIEW) ? TodoQuery::badge($user) : 0,
             // Menu counter of « Candidats »: candidatures still « Identifié » in a DAS responsible's DAS (lazy, cached 60 s).
+            // Menu entry and counter of « À traiter » (lazy, cached 60 s); null: no source for this user.
+            'todo_total' => fn () => $user !== null && TodoSources::any($user) ? TodoSources::total($user) : null,
             'candidates_badge' => fn () => $user !== null ? IdentifiedBadge::count($user) : 0,
             'backups_enabled' => config('tms.mode') !== 'multi',
             // « Bac à sable » in the menu: a local sandbox only (never a server).

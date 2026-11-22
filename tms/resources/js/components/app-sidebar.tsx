@@ -120,7 +120,7 @@ const adminNavItems: (NavItem & { permission: string })[] = [
 ];
 
 export function AppSidebar() {
-    const { auth, todo_count, candidates_badge, backups_enabled, backup_alert, sandbox } = usePage<SharedData>().props;
+    const { auth, todo_count, todo_total, candidates_badge, backups_enabled, backup_alert, sandbox } = usePage<SharedData>().props;
     const commercialItems = commercialNavItems
         .filter((item) => auth.permissions.includes(item.permission))
         .map((item) => (item.url === '/crm/todo' ? { ...item, badge: todo_count } : item));
@@ -172,7 +172,13 @@ export function AppSidebar() {
                     <NavMain items={[myPlanningItem, ...commercialItems.filter((item) => item.url === '/crm/todo')]} label="Navigation" />
                 ) : (
                     <>
-                        <NavMain items={homeNavItems} label="Navigation" />
+                        <NavMain
+                            items={[
+                                ...homeNavItems,
+                                ...(todo_total === null ? [] : [{ title: 'À traiter', url: '/a-traiter', icon: ListChecks, badge: todo_total }]),
+                            ]}
+                            label="Navigation"
+                        />
                         {commercialItems.length > 0 && <NavMain items={commercialItems} label="Commercial" />}
                         {trainingItems.length > 0 && <NavMain items={trainingItems} label="Formation" />}
                         {financeItems.length > 0 && <NavMain items={financeItems} label="Finance" />}
