@@ -161,6 +161,7 @@ Conventions communes : UUID v7, `tenant_id`, suppression logique (`deleted_at`) 
 | `name` | string | Raison sociale (seul champ obligatoire) |
 | `siret` | char(14), null | 14 chiffres (CHECK) ; **unique par organisme** parmi les fiches non supprimées (`organisations_siret_unique`) |
 | `naf_code` | string(6), null | Code NAF |
+| `idcc` | string(4), null | IDCC (convention collective), 4 chiffres |
 | `legal_form_id`, `sector_id`, `establishment_type_id`, `company_size_id`, `origin_id` | uuid, null | FK `reference_items` (listes `legal_form_org`, `sector`, `establishment_type`, `company_size`, `contact_origin`) |
 | `status` | string | `prospect` (défaut), `client`, `inactif` (CHECK) |
 | `responsible_user_id` | uuid, null | FK `users` (`SET NULL`) |

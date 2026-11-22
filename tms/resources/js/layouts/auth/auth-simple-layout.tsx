@@ -5,12 +5,14 @@ interface AuthLayoutProps {
     name?: string;
     title?: string;
     description?: string;
+    /** Uses the screen width (online tests on a computer) instead of a narrow centred column. */
+    wide?: boolean;
 }
 
-export default function AuthSimpleLayout({ children, title, description }: AuthLayoutProps) {
+export default function AuthSimpleLayout({ children, title, description, wide = false }: AuthLayoutProps) {
     return (
-        <div className="bg-background flex min-h-svh flex-col items-center justify-center gap-6 p-6 md:p-10">
-            <div className="w-full max-w-sm">
+        <div className={`bg-background flex min-h-svh flex-col items-center gap-6 p-6 md:p-10 ${wide ? 'justify-start' : 'justify-center'}`}>
+            <div className={wide ? 'w-full max-w-6xl' : 'w-full max-w-sm'}>
                 <div className="flex flex-col gap-8">
                     <div className="flex flex-col items-center gap-4">
                         <div className="flex flex-col items-center gap-2 font-medium">

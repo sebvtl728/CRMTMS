@@ -18,7 +18,7 @@ final class AuditProvider implements TimelineProvider
 {
     /** @var array<string, string> */
     private const FIELDS = [
-        'name' => 'Raison sociale', 'siret' => 'SIRET', 'naf_code' => 'Code NAF',
+        'name' => 'Raison sociale', 'siret' => 'SIRET', 'naf_code' => 'Code NAF', 'idcc' => 'IDCC',
         'legal_form_id' => 'Forme juridique', 'sector_id' => "Secteur d'activité", 'establishment_type_id' => "Type d'établissement",
         'company_size_id' => 'Taille', 'origin_id' => 'Origine', 'status' => 'Statut', 'responsible_user_id' => 'Responsable',
         'email' => 'E-mail', 'email_secondary' => 'E-mail secondaire', 'phone' => 'Téléphone', 'mobile' => 'Mobile', 'website' => 'Site web',

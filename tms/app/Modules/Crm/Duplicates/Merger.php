@@ -40,7 +40,7 @@ class Merger
 {
     /** @var array<string, string> mergeable fields of an entreprise => French label */
     public const ORGANISATION_FIELDS = [
-        'name' => 'Raison sociale', 'siret' => 'SIRET', 'naf_code' => 'Code NAF', 'status' => 'Statut',
+        'name' => 'Raison sociale', 'siret' => 'SIRET', 'naf_code' => 'Code NAF', 'idcc' => 'IDCC', 'status' => 'Statut',
         'responsible_user_id' => 'Responsable', 'legal_form_id' => 'Forme juridique', 'sector_id' => "Secteur d'activité",
         'establishment_type_id' => "Type d'établissement", 'company_size_id' => 'Taille', 'origin_id' => 'Origine',
         'email' => 'E-mail', 'phone' => 'Téléphone', 'website' => 'Site web',

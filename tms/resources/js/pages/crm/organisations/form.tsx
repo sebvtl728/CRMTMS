@@ -17,6 +17,7 @@ type OrganisationForm = {
     name: string;
     siret: string;
     naf_code: string;
+    idcc: string;
     status: string;
     legal_form_id: string;
     sector_id: string;
@@ -119,6 +120,7 @@ export default function OrganisationFormPage({ organisation, options, duplicates
         name: str('name'),
         siret: str('siret'),
         naf_code: str('naf_code'),
+        idcc: str('idcc'),
         status: str('status', 'prospect'),
         legal_form_id: str('legal_form_id'),
         sector_id: str('sector_id'),
@@ -282,6 +284,7 @@ export default function OrganisationFormPage({ organisation, options, duplicates
                         </div>
                     </Field>
                     {text('naf_code', 'Code NAF', { placeholder: '5610A', maxLength: 6 })}
+                    {text('idcc', 'IDCC (convention collective)', { placeholder: '1979', maxLength: 4 })}
                     {pick('status', 'Statut', options.status, 'Prospect')}
                     {pick('responsible_user_id', 'Responsable', options.responsible, 'Sans responsable')}
                 </Section>

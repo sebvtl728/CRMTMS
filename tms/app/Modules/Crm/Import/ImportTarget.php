@@ -20,7 +20,7 @@ enum ImportTarget: string
     case Trainings = 'trainings';
 
     private const ORGANISATION = [
-        'name' => 'Raison sociale', 'siret' => 'SIRET', 'naf_code' => 'Code NAF', 'legal_form' => 'Forme juridique',
+        'name' => 'Raison sociale', 'siret' => 'SIRET', 'naf_code' => 'Code NAF', 'idcc' => 'IDCC', 'legal_form' => 'Forme juridique',
         'sector' => "Secteur d'activité", 'establishment_type' => "Type d'établissement", 'company_size' => 'Taille',
         'origin' => 'Origine', 'status' => 'Statut', 'responsible' => 'Responsable', 'email' => 'E-mail', 'phone' => 'Téléphone',
         'website' => 'Site web', 'address_line1' => 'Adresse', 'address_line2' => "Complément d'adresse", 'postal_code' => 'Code postal',
@@ -64,6 +64,7 @@ enum ImportTarget: string
         'name' => ['raison sociale', 'nom entreprise', 'nom de l entreprise', 'entreprise', 'societe', 'denomination', 'organisation', 'structure', 'etablissement', 'client', 'raison social', 'nom societe', 'nom de la societe', 'nom client', 'nom du client', 'enseigne', 'nom commercial', 'denomination sociale'],
         'siret' => ['siret', 'n siret', 'no siret', 'num siret', 'numero siret', 'numero de siret', 'n de siret', 'siret etablissement'],
         'naf_code' => ['naf', 'code naf', 'ape', 'code ape', 'naf ape'],
+        'idcc' => ['idcc', 'convention collective', 'code idcc'],
         'email' => ['mail', 'email', 'e mail', 'courriel', 'adresse mail', 'adresse e mail', 'adresse email', 'mel', 'adresse electronique', 'adresse courriel'],
         'email_secondary' => ['email 2', 'e mail 2', 'mail 2', 'autre e mail', 'autre email'],
         'phone' => ['tel', 'telephone', 'tel fixe', 'telephone fixe', 'fixe', 'standard', 'n tel', 'ligne fixe', 'numero de telephone', 'n telephone', 'tel bureau', 'telephone bureau'],
