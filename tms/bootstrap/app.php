@@ -1,5 +1,6 @@
 <?php
 
+use App\Exceptions\UserFacingHttpException;
 use App\Http\Middleware\HandleInertiaRequests;
 use App\Modules\Core\Security\DatabaseErrorLog;
 use App\Modules\Core\Security\EnforceIdleTimeout;
@@ -64,7 +65,7 @@ return Application::configure(basePath: dirname(__DIR__))
         });
         // A business refusal (409, 410, 503…) of an Inertia action (a button, a form): a message on the
         // page it came from, never an error page in a modal. Plain visits and fetch() keep theirs.
-        $exceptions->render(function (\App\Exceptions\UserFacingHttpException $e, Request $request) {
+        $exceptions->render(function (UserFacingHttpException $e, Request $request) {
             if (! $request->header('X-Inertia') || $request->isMethod('GET') || in_array($e->getStatusCode(), [401, 403, 404], true)) {
                 return null;
             }
