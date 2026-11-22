@@ -127,7 +127,7 @@ final class Paperwork
         return Seance::query()->where('status', '!=', Seance::CANCELLED)
             ->whereIn('training_session_id', TrainingSession::query()->where('status', 'confirmed')->select('id'))
             ->groupBy('training_session_id')->selectRaw('training_session_id, min(date) as first_day')
-            ->havingRaw('min(date) between ? and ?', [$from, $to])->orderBy('first_day')->get()
+            ->havingRaw('min(date) between ? and ?', [$from, $to])->orderBy('first_day')->toBase()->get()
             ->map(fn ($row) => ['session_id' => (string) $row->training_session_id, 'starts_on' => CarbonImmutable::parse($row->first_day)->toDateString()])
             ->values()->all();
     }
