@@ -15,7 +15,6 @@ use App\Modules\Sessions\Sessions\TrainingSession;
 use App\Modules\Sessions\SessionsVisibility;
 use App\Modules\Sessions\Summary\SessionChecklist;
 use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Database\Eloquent\Builder;
 
 /** What the Sessions module declares to « À traiter » (2026-11-22). */
 final class SessionsTodo
