@@ -27,10 +27,12 @@ interface Props {
     trainees: Trainee[];
     /** When the convocations leave by themselves (Administration › Automatismes), else null. */
     auto_convocation: string | null;
+    /** Certificates issued and sent by themselves once the last month is closed. */
+    auto_certificates?: boolean;
 }
 
 /** « Documents » of a session: convocations, attestations and certificates of each trainee, one by one or for all. */
-export function SessionDocumentsBlock({ session_id, can_manage, types, trainees, auto_convocation }: Props) {
+export function SessionDocumentsBlock({ session_id, can_manage, types, trainees, auto_convocation, auto_certificates = false }: Props) {
     const [busy, setBusy] = useState<string | null>(null);
     const [asking, setAsking] = useState(false);
     const post = (url: string, type: string, key: string, then?: () => void) =>
@@ -92,6 +94,12 @@ export function SessionDocumentsBlock({ session_id, can_manage, types, trainees,
                                     Envoyer à tous
                                 </Button>
                             </div>
+                            {t.value !== 'convocation' && auto_certificates && (
+                                <p className="text-muted-foreground flex items-start gap-1 text-xs">
+                                    <Clock className="mt-0.5 h-3 w-3 shrink-0" />
+                                    Émis et envoyés automatiquement le matin qui suit la clôture du mois de fin.
+                                </p>
+                            )}
                             {t.value === 'convocation' && auto_convocation && (
                                 <p className="text-muted-foreground flex items-start gap-1 text-xs">
                                     <Clock className="mt-0.5 h-3 w-3 shrink-0" />

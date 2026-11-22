@@ -5,6 +5,12 @@ Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) ; ve
 
 ## [Non publié]
 
+### Ajouté
+
+- **Attestations et certificats de réalisation automatiques** (Administration › Automatismes, désactivé par
+  défaut) : émis et envoyés le matin qui suit la clôture du mois du dernier jour de la session ; un document annulé
+  n'est jamais refait.
+
 ### Modifié
 
 - **Signature en ligne** : on demande d'abord son code, puis on dessine ; sous « Signer », ce qu'il reste à faire.

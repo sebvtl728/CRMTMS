@@ -8,6 +8,7 @@ use App\Modules\Core\Automation\DailyAutomations;
 use App\Modules\Core\Signatures\Events\SignatureCompleted;
 use App\Modules\Core\Users\User;
 use App\Modules\Crm\Public\FicheLinks;
+use App\Modules\Documents\Automation\CertificateAutomation;
 use App\Modules\Documents\Automation\ConvocationAutomation;
 use App\Modules\Documents\Gdpr\DocumentAnonymisation;
 use App\Modules\Documents\Texts\DocumentText;
@@ -42,6 +43,7 @@ class DocumentsServiceProvider extends ServiceProvider
     public function boot(): void
     {
         DailyAutomations::register('convocations', fn (CarbonImmutable $today): int => app(ConvocationAutomation::class)->run($today));
+        DailyAutomations::register('certificates', fn (CarbonImmutable $today): int => app(CertificateAutomation::class)->run($today));
         DocumentMailTemplates::register();
         Event::listen(SignatureCompleted::class, fn (SignatureCompleted $e) => DocumentSignatures::completed($e, app(Paperwork::class)));
         RateLimiter::for('document-mail', fn (Request $request) => Limit::perMinute(20)->by('document-mail:'.($request->user()?->getAuthIdentifier() ?? $request->ip())));

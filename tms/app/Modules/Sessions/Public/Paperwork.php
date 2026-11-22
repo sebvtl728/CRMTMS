@@ -4,6 +4,7 @@ namespace App\Modules\Sessions\Public;
 
 use App\Modules\Catalogue\Trainings;
 use App\Modules\Core\Users\User;
+use App\Modules\Sessions\Attendance\AttendanceClosure;
 use App\Modules\Sessions\Dossiers\Dossier;
 use App\Modules\Sessions\Dossiers\DossierStatus;
 use App\Modules\Sessions\Dossiers\DossierTransitions;
@@ -130,6 +131,31 @@ final class Paperwork
             ->havingRaw('min(date) between ? and ?', [$from, $to])->orderBy('first_day')->toBase()->get()
             ->map(fn ($row) => ['session_id' => (string) $row->training_session_id, 'starts_on' => CarbonImmutable::parse($row->first_day)->toDateString()])
             ->values()->all();
+    }
+
+    /**
+     * The live sessions (never cancelled nor trashed) whose last live séance
+     * is in a month closed since $since (the attendance is final): the
+     * automatic certificates (2026-11-22).
+     *
+     * @return list<string>
+     */
+    public static function sessionsFinallyClosedSince(CarbonImmutable $since): array
+    {
+        $last = Seance::query()->where('status', '!=', Seance::CANCELLED)
+            ->whereIn('training_session_id', TrainingSession::query()->where('status', '!=', 'cancelled')->select('id'))
+            ->groupBy('training_session_id')->selectRaw('training_session_id, max(date) as last_day')->toBase()->get();
+        $out = [];
+        foreach ($last as $row) {
+            $month = CarbonImmutable::parse((string) $row->last_day)->startOfMonth()->toDateString();
+            $closed = AttendanceClosure::query()->where('training_session_id', $row->training_session_id)->where('month', $month)
+                ->whereNotNull('closed_at')->where('closed_at', '>=', $since)->exists();
+            if ($closed) {
+                $out[] = (string) $row->training_session_id;
+            }
+        }
+
+        return $out;
     }
 
     /**

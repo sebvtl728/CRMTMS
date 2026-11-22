@@ -11,7 +11,13 @@ import { Play } from 'lucide-react';
 import { FormEventHandler, useState } from 'react';
 
 interface AutomationProps {
-    settings: { convocation_days: number; day_before: boolean; signature_reminder_days: number; signature_reminder_max: number };
+    settings: {
+        convocation_days: number;
+        day_before: boolean;
+        signature_reminder_days: number;
+        signature_reminder_max: number;
+        certificates: boolean;
+    };
     status?: string;
 }
 
@@ -24,6 +30,7 @@ export default function Automation({ settings, status }: AutomationProps) {
         day_before: settings.day_before,
         signature_reminder_days: String(settings.signature_reminder_days),
         signature_reminder_max: String(settings.signature_reminder_max),
+        certificates: settings.certificates,
     });
     const [running, setRunning] = useState(false);
     const number = (v: string) => (v === '' ? null : Number(v));
@@ -35,6 +42,7 @@ export default function Automation({ settings, status }: AutomationProps) {
             day_before: d.day_before,
             signature_reminder_days: number(d.signature_reminder_days),
             signature_reminder_max: number(d.signature_reminder_max),
+            certificates: d.certificates,
         }));
         put(route('admin.automation.update'), { preserveScroll: true });
     };
@@ -50,7 +58,7 @@ export default function Automation({ settings, status }: AutomationProps) {
             <div className="flex flex-col gap-6 p-4">
                 <Heading
                     title="Automatismes"
-                    description="Ce qui part tout seul chaque matin à 7 h 15 : convocations, rappels de la veille et relances de signature. Les textes se règlent dans les modèles d'e-mails."
+                    description="Ce qui part tout seul chaque matin à 7 h 15 : convocations, rappels de la veille, attestations et relances de signature. Les textes se règlent dans les modèles d'e-mails."
                 />
                 {status && <div className="text-sm font-medium text-green-600">{status}</div>}
 
@@ -80,6 +88,19 @@ export default function Automation({ settings, status }: AutomationProps) {
                         </div>
                         <p className="text-muted-foreground text-xs">Horaires, module et lieu ; jamais de prix ni la liste des autres stagiaires.</p>
                         <InputError message={errors.day_before} />
+                    </section>
+
+                    <section className="grid gap-2 rounded-md border p-4">
+                        <h3 className="font-medium">Attestations et certificats de réalisation</h3>
+                        <div className="flex items-center gap-2">
+                            <Checkbox id="certificates" checked={data.certificates} onCheckedChange={(v) => setData('certificates', v === true)} />
+                            <Label htmlFor="certificates">Émettre et envoyer automatiquement à la fin de la formation</Label>
+                        </div>
+                        <p className="text-muted-foreground text-xs">
+                            Le matin qui suit la clôture du mois du dernier jour de la session (les heures réalisées sont alors définitives). Un
+                            document annulé à la main n'est jamais refait. Désactivé par défaut.
+                        </p>
+                        <InputError message={errors.certificates} />
                     </section>
 
                     <section className="grid gap-2 rounded-md border p-4">

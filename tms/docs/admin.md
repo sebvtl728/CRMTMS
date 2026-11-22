@@ -438,6 +438,9 @@ Guide utilisateur : `admissions.md`.
   - **Relance des signatures en attente** : une convention, un contrat ou un devis non signé en ligne est relancé après
     *N* jours (3 par défaut, 0 = désactivé), au plus *M* fois (2 par défaut, de 1 à 5). Chaque relance envoie un
     **nouveau lien** qui remplace le précédent ; pas de relance si le signataire a demandé son code dans les 24 h.
+  - **Attestations et certificats de réalisation** (désactivé par défaut) : émis et envoyés le matin qui suit la
+    **clôture du mois** du dernier jour de la session (heures réalisées définitives) ; un document annulé n'est jamais
+    refait ; un stagiaire sans e-mail : émis, non envoyé.
   - **Exécuter maintenant** lance les mêmes automatismes tout de suite (mêmes règles). Rien ne part deux fois : chaque
     envoi automatique est noté (`automation_sends`). Les réglages sont journalisés (`automation.settings.updated`).
 - **Modèles d'e-mails** : « Rappel la veille (stagiaire) », « Rappel la veille (formateur) », « Relance de signature en

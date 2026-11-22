@@ -19,6 +19,8 @@ final class AutomationSends
 
     public const SIGNATURE_REMINDER = 'signature_reminder';
 
+    public const CERTIFICATE = 'certificate';
+
     public static function claim(string $kind, string $subjectId, string $occurrence): bool
     {
         return DB::table('automation_sends')->insertOrIgnore([
