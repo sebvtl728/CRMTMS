@@ -175,6 +175,9 @@
         <h2>Conditions de paiement</h2>
         <div class="small">{{ $payment['terms'] }} {{ $payment['no_discount'] }}</div>
         @if ($payment['penalties'])<div class="small">{{ $payment['penalties'] }}</div>@endif
+        @if ($payment['bank'])
+            <div class="small">Règlement par virement{{ $payment['bank']['name'] ? ' - '.$payment['bank']['name'] : '' }} : IBAN : {{ $payment['bank']['iban'] }}{{ $payment['bank']['bic'] ? ' - BIC : '.$payment['bank']['bic'] : '' }}</div>
+        @endif
     </section>
 @endif
 

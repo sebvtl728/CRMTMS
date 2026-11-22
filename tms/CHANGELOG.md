@@ -5,6 +5,11 @@ Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) ; ve
 
 ## [Non publié]
 
+### Ajouté
+
+- **Coordonnées bancaires** de la société (Administration › Sociétés) : banque, IBAN (clé vérifiée) et BIC, imprimés
+  sur chaque facture (« Règlement par virement »), jamais sur un avoir.
+
 ## [0.14.5] - 2026-11-22
 
 ### Modifié

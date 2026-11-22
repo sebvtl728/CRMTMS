@@ -87,7 +87,7 @@ Un **avoir corrige toujours une facture** validée du même destinataire. Il est
 
 ## 8. Le PDF et ses mentions
 
-Le PDF reprend la charte des devis. Mentions : société émettrice (identité, SIRET, n° de TVA, **n° de déclaration d'activité**, mentions légales, pied de facture), client (nom, adresse, SIREN/TVA si connus), numéro, dates d'émission et d'échéance, période de formation, désignation (dates, heures réalisées / prévues, stagiaires pour un financeur), quantités, prix unitaires HT, TVA par taux, totaux HT et TTC, référence du dossier et du financement (numéro d'accord), conditions de paiement et « pas d'escompte pour paiement anticipé ».
+Le PDF reprend la charte des devis. Mentions : société émettrice (identité, SIRET, n° de TVA, **n° de déclaration d'activité**, mentions légales, pied de facture), client (nom, adresse, SIREN/TVA si connus), numéro, dates d'émission et d'échéance, période de formation, désignation (dates, heures réalisées / prévues, stagiaires pour un financeur), quantités, prix unitaires HT, TVA par taux, totaux HT et TTC, référence du dossier et du financement (numéro d'accord), conditions de paiement et « pas d'escompte pour paiement anticipé », coordonnées bancaires de la société (« Règlement par virement », banque, IBAN par groupes de quatre, BIC) quand elles sont renseignées.
 
 - Société **exonérée** : « Exonération de TVA, art. 261, 4-4° a du CGI » jusqu'au 31/12/2026, « Exonération de TVA, art. L. 213-93 du CIBS » à partir du 1er janvier 2027 (date de validation ; un brouillon porte celle du jour) et « Net à payer ».
 - Le dédit porte « Indemnité hors champ de la TVA ».
@@ -110,7 +110,7 @@ Avant la première facture réelle :
 - le **régime de TVA** de chaque société (exonération de la formation professionnelle continue — art. 261, 4-4° a du CGI, art. L. 213-93 du CIBS dès 2027 —, ou assujettie) ;
 - le **traitement du dédit** (ligne distincte, hors champ de la TVA, facturée au seul contractant) et des **absences non justifiées** facturées ;
 - le **CPF facturé hors du TMS** (réglé par EDOF, coché d'origine sur le type « CPF ») : sa part n'apparaît que comme mention sur la facture du contractant ;
-- les mentions de pied de facture (pénalités, indemnité de 40 €, RIB) et l'absence de n° de TVA et d'e-mail de facturation dédié dans les fiches du CRM (le TMS utilise l'e-mail de la fiche) ;
+- les mentions de pied de facture et l'absence de n° de TVA et d'e-mail de facturation dédié dans les fiches du CRM (le TMS utilise l'e-mail de la fiche) ;
 - la **conservation 10 ans** des pièces (le TMS n'efface jamais une facture validée, l'anonymisation RGPD d'une personne non plus ; voir `admin.md` § 11) ;
 - les **règles du particulier** (délai de rétractation de 14 jours, acompte de 30 % au plus, § 15) et le texte des **relances** (mention des pénalités et de l'indemnité de 40 € pour les seuls professionnels, § 14).
 

@@ -50,6 +50,9 @@ use Illuminate\Support\Facades\DB;
  * @property string $invoice_prefix ^[A-Z0-9]{1,10}$, numbering of the invoices (0.9)
  * @property string $credit_note_prefix ^[A-Z0-9]{1,10}$, other than invoice_prefix
  * @property int $payment_terms_days 0 to 60, due date of an invoice
+ * @property string|null $bank_name
+ * @property string|null $iban without spaces, checked (App\Rules\Iban)
+ * @property string|null $bic 8 or 11 characters
  * @property string|null $invoice_footer mentions of the invoices (penalties, 40 € indemnity, bank details)
  * @property Carbon|null $deleted_at
  */
@@ -67,6 +70,7 @@ class Company extends Model
         'email', 'phone', 'is_default',
         'quote_prefix', 'quote_validity_days', 'quote_terms', 'quote_footer',
         'invoice_prefix', 'credit_note_prefix', 'payment_terms_days', 'invoice_footer',
+        'bank_name', 'iban', 'bic',
     ];
 
     /**

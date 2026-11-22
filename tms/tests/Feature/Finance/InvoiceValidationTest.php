@@ -1062,3 +1062,17 @@ it('refuses to delete a funding already invoiced', function () {
     $fundings->delete($free);
     expect(Funding::query()->whereKey($free->id)->exists())->toBeFalse();
 });
+
+it('prints the bank details of the company on an invoice, never on a credit note', function () {
+    $x = fiSeed();
+    fvIdentities();
+    Company::query()->where('is_default', true)->update(['bank_name' => 'Crédit Coopératif', 'iban' => 'FR7630006000011234567890189', 'bic' => 'BNPAFRPPXXX', 'invoice_footer' => null]);
+    $user = fvAccountant();
+    $invoice = fvValidate(fvDraft($x, 'contractor', $user), $user);
+
+    expect(fvSentText())->toContain('Règlement par virement')->toContain('Crédit Coopératif')
+        ->toContain('IBAN : FR76 3000 6000 0112 3456 7890 189')->toContain('BIC : BNPAFRPPXXX');
+
+    fvValidate(app(CreditNotes::class)->create($user, $invoice), $user);
+    expect(fvSentText())->toContain('AVOIR')->not->toContain('IBAN');
+});
