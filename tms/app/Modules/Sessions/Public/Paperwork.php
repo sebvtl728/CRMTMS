@@ -133,6 +133,22 @@ final class Paperwork
     }
 
     /**
+     * The trainees to convene automatically (2026-11-22): enrolled or
+     * confirmed (never waitlisted, abandoned nor cancelled), not left before
+     * the first day $startsOn, in order of entry.
+     *
+     * @return list<array{id: string, person_id: string}>
+     */
+    public static function convocable(string $sessionId, string $startsOn): array
+    {
+        return Enrolment::query()->where('training_session_id', $sessionId)
+            ->whereIn('status', EnrolmentStatus::values([EnrolmentStatus::Enrolled, EnrolmentStatus::Confirmed]))
+            ->where(fn ($q) => $q->whereNull('left_on')->orWhere('left_on', '>=', $startsOn))
+            ->orderByRaw('entered_on asc nulls first')->orderBy('created_at')->orderBy('id')->get(['id', 'person_id'])
+            ->map(fn (Enrolment $e) => ['id' => (string) $e->id, 'person_id' => (string) $e->person_id])->values()->all();
+    }
+
+    /**
      * The trainees of a session who receive documents (enrolled, confirmed,
      * left), in order of entry.
      *

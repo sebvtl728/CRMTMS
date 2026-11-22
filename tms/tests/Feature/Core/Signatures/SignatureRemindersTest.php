@@ -8,6 +8,9 @@ use App\Modules\Core\Tenancy\TenantStorage;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Storage;
+use Symfony\Component\Mailer\Exception\TransportException;
+
+require_once __DIR__.'/../../Documents/Support/documents.php';
 
 beforeEach(function () {
     fakeImportDisk();
@@ -88,4 +91,24 @@ it('never reminds a refused, cancelled or turned-off request', function () {
     $this->travelTo(CarbonImmutable::parse('2026-12-08 10:00', 'Europe/Paris'));
     AutomationSettings::save(['signature_reminder_days' => 0]);
     expect(srRun())->toBe(0);
+});
+
+it('checks again under the lock that the signer did not just ask for a code', function () {
+    [$request] = srRequest($this);
+    $this->travelTo(CarbonImmutable::parse('2026-12-04 10:00', 'Europe/Paris'));
+    $request->forceFill(['code_sent_at' => CarbonImmutable::now()->subMinute()])->save();
+
+    expect(SignatureReminders::eligible($request->fresh(), CarbonImmutable::now()))->toBeFalse()
+        ->and(SignatureReminders::eligible($request->fresh()->forceFill(['code_sent_at' => null]), CarbonImmutable::now()))->toBeTrue();
+});
+
+it('keeps the old link working when the reminder e-mail is refused', function () {
+    [$request, $old] = srRequest($this);
+    $this->travelTo(CarbonImmutable::parse('2026-12-04 10:00', 'Europe/Paris'));
+    Mail::swap(app('mail.manager'));
+    docSmtp(fn () => throw new TransportException('550 refused'));
+
+    expect(srRun())->toBe(0)
+        ->and(Signatures::find($old)?->id)->toBe($request->id)
+        ->and($request->fresh()->reminders_sent)->toBe(0);
 });

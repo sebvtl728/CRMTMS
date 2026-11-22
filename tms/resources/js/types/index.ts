@@ -45,8 +45,10 @@ export interface SharedData {
     /** Menu badge of « À faire »: overdue + today. */
     todo_count: number;
     candidates_badge: number;
-    /** « À traiter »: the total of the menu, null when the user has no source. */
-    todo_total: number | null;
+    /** « À traiter » in the menu. */
+    todo_menu: boolean;
+    /** Its counter, loaded after the page (deferred). */
+    todo_total?: number;
     sandbox: boolean;
     /** The « Sauvegardes » page exists (self-hosted install). */
     backups_enabled: boolean;

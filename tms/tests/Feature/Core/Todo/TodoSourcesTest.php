@@ -60,3 +60,8 @@ it('answers every declared module source for an administrator', function () {
     expect($rows->pluck('key')->all())->toContain('sessions.catch_ups', 'crm.silent_quotes', 'finance.reminders', 'admissions.identified')
         ->and($rows->whereNull('count')->pluck('key')->all())->toBe([]);
 });
+
+it('defers the menu counter out of the page load', function () {
+    $this->actingAs(admin(twoFactor: true))->get('/dashboard')->assertOk()
+        ->assertInertia(fn (AssertableInertia $p) => $p->missing('todo_total')->where('todo_menu', true));
+});

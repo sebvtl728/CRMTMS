@@ -1,6 +1,8 @@
 <?php
 
 use App\Modules\Core\Automation\AutomationSettings;
+use App\Modules\Core\References\ReferenceList;
+use App\Modules\Crm\People\Person;
 use App\Modules\Documents\Automation\ConvocationAutomation;
 use App\Modules\Documents\Document;
 use App\Modules\Documents\DocumentIssuer;
@@ -91,4 +93,24 @@ it('does nothing when the setting is 0', function () {
     AutomationSettings::save(['convocation_days' => 0]);
 
     expect(cvRun())->toBe(0)->and(Document::query()->count())->toBe(0);
+});
+
+it('never convenes an abandoned trainee nor a person in the trash', function () {
+    $x = cvSession('2026-12-08');
+    $x['lea']->forceFill(['status' => EnrolmentStatus::Abandoned->value, 'entered_on' => null, 'left_on' => '2026-11-30',
+        'abandon_reason_id' => crmItem(ReferenceList::AbandonReason, 'Maladie')->id])->save();
+    Person::query()->whereKey($x['tom']->person_id)->firstOrFail()->delete();
+
+    expect(cvRun())->toBe(0)->and(Document::query()->count())->toBe(0);
+    Mail::assertNothingSent();
+});
+
+it('issues without sending for a malformed address and goes on with the others', function () {
+    $x = cvSession('2026-12-08');
+    Person::query()->whereKey($x['lea']->person_id)->update(['email' => 'lea@']);
+    $y = cvSession('2026-12-07');
+
+    expect(cvRun())->toBe(1);
+    expect(Document::query()->where('enrolment_id', $x['lea']->id)->sole()->status)->toBe(DocumentStatus::Issued)
+        ->and(Document::query()->where('enrolment_id', $y['lea']->id)->sole()->status)->toBe(DocumentStatus::Sent);
 });

@@ -55,6 +55,8 @@ class MailServiceProvider extends ServiceProvider
     {
         SignatureMailTemplates::register();
         DailyAutomations::register('signature_reminders', fn (CarbonImmutable $today): int => app(SignatureReminders::class)->run(CarbonImmutable::now()));
+        // « Exécuter maintenant » (Administration › Automatismes): 6 a minute per administrator.
+        RateLimiter::for('automation-run', fn (Request $request) => Limit::perMinute(6)->by('automation-run:'.($request->user()?->getAuthIdentifier() ?? $request->ip())));
         // Saves, resets and previews: 60 a minute per administrator.
         RateLimiter::for('mail-templates-write', fn (Request $request) => Limit::perMinute(60)->by('mail-templates-write:'.($request->user()?->getAuthIdentifier() ?? $request->ip())));
         // « Envoyer un e-mail de test »: 10 a minute per administrator.

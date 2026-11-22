@@ -7,5 +7,5 @@ use Illuminate\Support\Facades\Route;
 Route::middleware(['auth', 'can:settings.manage'])->prefix('admin/automation')->name('admin.automation.')->group(function () {
     Route::get('/', [AutomationSettingsController::class, 'edit'])->name('edit');
     Route::put('/', [AutomationSettingsController::class, 'update'])->name('update');
-    Route::post('run', [AutomationSettingsController::class, 'run'])->middleware('throttle:6,1')->name('run');
+    Route::post('run', [AutomationSettingsController::class, 'run'])->middleware('throttle:automation-run')->name('run');
 });

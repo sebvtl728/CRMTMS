@@ -30,4 +30,11 @@ final class AutomationSends
             'sent_at' => CarbonImmutable::now(),
         ]) === 1;
     }
+
+    /** Gives a claim back when its sending could not leave (the next run tries again). */
+    public static function release(string $kind, string $subjectId, string $occurrence): void
+    {
+        DB::table('automation_sends')->where('tenant_id', app(TenantContext::class)->id())
+            ->where('kind', $kind)->where('subject_id', $subjectId)->where('occurrence', $occurrence)->delete();
+    }
 }
