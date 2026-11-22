@@ -81,6 +81,8 @@ class HandleInertiaRequests extends Middleware
             // Menu counter of « Candidats »: candidatures still « Identifié » in a DAS responsible's DAS (lazy, cached 60 s).
             // « À traiter » in the menu (a cheap check), and its counter loaded after the page (deferred, cached 60 s):
             // never computed in the path of the request.
+            // The success and error messages of the last action, shown in a banner by every page.
+            'flash' => fn () => ['status' => $request->session()->get('status'), 'error' => $request->session()->get('error')],
             'todo_menu' => fn () => $user !== null && TodoSources::any($user),
             'todo_total' => Inertia::defer(fn () => $user !== null && TodoSources::any($user) ? TodoSources::total($user) : 0),
             'candidates_badge' => fn () => $user !== null ? IdentifiedBadge::count($user) : 0,

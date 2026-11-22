@@ -5,6 +5,27 @@ Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) ; ve
 
 ## [Non publié]
 
+## [0.14.1] - 2026-11-22
+
+### Ajouté
+
+- **Devis en un seul e-mail** : à l'envoi, la case **Joindre un lien de signature en ligne** (cochée par défaut) met le
+  lien « bon pour accord » dans l'e-mail du devis, au lieu d'un second e-mail.
+- **Bandeau des messages** : le résultat d'une action (enregistré, envoyé, refusé) s'affiche en bas de l'écran, là où
+  l'on regarde ; un refus métier (document annulé, moteur PDF indisponible…) devient un message, plus une page
+  d'erreur.
+- **Confirmation des envois groupés** : « Envoyer à tous » et « Lancer le questionnaire » indiquent le nombre de
+  stagiaires avant d'envoyer.
+- Bloc **Documents** d'une session : sous « Convocation », la date de l'envoi automatique (ou « trop tard », ou « une
+  fois la session confirmée ») ; **Émettre pour tous** les convocations propose alors de **laisser l'envoi automatique**
+  ou d'**émettre et envoyer maintenant**, pour que les deux ne se croisent jamais.
+
+### Modifié
+
+- Logo neutre (plus de logo du kit de départ) sur la connexion et les pages publiques.
+- Menu : « À faire » devient **Mes actions commerciales**, « Planning » (commercial) **Agenda commercial**,
+  « Questionnaires » **Résultats des questionnaires** (Qualité) et **Modèles de questionnaires** (Administration).
+
 ## [0.14.0] - 2026-11-22
 
 ### Ajouté

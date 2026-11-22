@@ -114,3 +114,17 @@ it('issues without sending for a malformed address and goes on with the others',
     expect(Document::query()->where('enrolment_id', $x['lea']->id)->sole()->status)->toBe(DocumentStatus::Issued)
         ->and(Document::query()->where('enrolment_id', $y['lea']->id)->sole()->status)->toBe(DocumentStatus::Sent);
 });
+
+it('tells when the convocations of a session will leave by themselves', function () {
+    $planned = cvSession('2026-12-12')['session'];
+    $late = cvSession('2026-12-02')['session'];
+    $draft = cvSession('2026-12-12', 'planned')['session'];
+    $soon = cvSession('2026-12-05')['session'];
+
+    expect(ConvocationAutomation::notice($planned->id))->toBe('Envoi automatique des convocations prévu le samedi 5 décembre 2026 à 7 h 15 (7 jours avant le début).')
+        ->and(ConvocationAutomation::notice($soon->id))->toBe('Envoi automatique des convocations prévu le mercredi 2 décembre 2026 à 7 h 15.')
+        ->and(ConvocationAutomation::notice($late->id))->toBe('Trop tard pour l\'envoi automatique des convocations : envoyez-les vous-même.')
+        ->and(ConvocationAutomation::notice($draft->id))->toBe('Les convocations partiront automatiquement 7 jours avant le début, une fois la session confirmée.');
+    AutomationSettings::save(['convocation_days' => 0]);
+    expect(ConvocationAutomation::notice($planned->id))->toBeNull();
+});

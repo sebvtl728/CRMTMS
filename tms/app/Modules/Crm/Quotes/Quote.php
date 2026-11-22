@@ -48,7 +48,7 @@ use Illuminate\Support\Facades\Auth;
  * @property string|null $signed_name its original file name (personal)
  * @property Carbon|null $signed_at when it was attached
  * @property string|null $notes mentions particulières
- * @property array{kind?: string, to?: string, cc?: list<string>, subject?: string, body?: string}|null $email_message last e-mail (sending or reminder), kept to send it again
+ * @property array{kind?: string, to?: string, cc?: list<string>, subject?: string, body?: string, sign_token?: string}|null $email_message last e-mail (sending or reminder), kept to send it again; sign_token: the encrypted « Bon pour accord » token until sent
  * @property string|null $email_status pending|sent|failed (SendQuote)
  * @property Carbon|null $email_sent_at
  * @property string|null $email_error fixed French message, never the server's text

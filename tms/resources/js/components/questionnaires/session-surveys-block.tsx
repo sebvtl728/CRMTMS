@@ -38,6 +38,8 @@ interface Campaign {
 interface Props {
     session_id: string;
     can_launch: boolean;
+    /** The trainees a launch e-mails. */
+    trainee_count: number;
     ended: boolean;
     qr_url: string | null;
     campaigns: Campaign[];
@@ -53,16 +55,25 @@ const EMAIL: Record<string, string> = {
 const percent = (v: number | null) => (v === null ? '-' : `${v} %`);
 
 /** « Questionnaires » of a session: launch the hot / cold questionnaire, show the QR code, read the results. */
-export function SessionSurveysBlock({ session_id, can_launch, ended, qr_url, campaigns }: Props) {
+export function SessionSurveysBlock({ session_id, can_launch, trainee_count, ended, qr_url, campaigns }: Props) {
     const [busy, setBusy] = useState<string | null>(null);
     const hot = campaigns.find((c) => c.kind === 'hot' && c.audience === 'trainee');
     const cold = campaigns.find((c) => c.kind === 'cold' && c.audience === 'trainee');
-    const launch = (kind: 'hot' | 'cold') =>
+    const launch = (kind: 'hot' | 'cold') => {
+        const what = kind === 'hot' ? 'à chaud' : 'à froid';
+        if (
+            !window.confirm(
+                `Envoyer le questionnaire ${what} par e-mail à ${trainee_count} stagiaire${trainee_count > 1 ? 's' : ''} ? Ceux qui l'ont déjà reçu ne le reçoivent pas deux fois.`,
+            )
+        ) {
+            return;
+        }
         router.post(
             `/sessions/${session_id}/questionnaires/${kind}`,
             {},
             { preserveScroll: true, onStart: () => setBusy(kind), onFinish: () => setBusy(null) },
         );
+    };
 
     return (
         <div className="grid gap-3">
