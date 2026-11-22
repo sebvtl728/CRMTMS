@@ -12,6 +12,7 @@ use App\Modules\Core\Tenancy\Tenant;
 use App\Modules\Core\Tenancy\TenantAwareJob;
 use App\Modules\Core\Tenancy\TenantContext;
 use App\Modules\Core\Tenancy\TenantStorage;
+use App\Modules\Core\Tenancy\TenantUrl;
 use App\Modules\Crm\Brochures\BrochureAttachments;
 use Carbon\CarbonImmutable;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -19,6 +20,7 @@ use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\Jobs\SyncJob;
+use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use RuntimeException;
@@ -94,15 +96,20 @@ class SendQuote implements ShouldQueue
             return;
         }
 
+        $body = $message['body'];
+        if (isset($message['sign_token'])) {
+            $body .= "\n\nPour accepter ce devis, signez-le en ligne (bon pour accord) :\n".TenantUrl::route('signature.show', Crypt::decryptString($message['sign_token']));
+        }
+
         $error = null;
-        $send = function () use ($quote, $message, $archived, $joined, &$error): string {
+        $send = function () use ($quote, $message, $body, $archived, $joined, &$error): string {
             try {
                 $bytes = (string) Storage::disk(TenantStorage::DISK)->get($archived);
 
                 TenantMailer::for($quote->company)
                     ->to($message['to'])
                     ->cc($message['cc'] ?? [])
-                    ->send(new QuoteMail($message['subject'], $message['body'], $bytes, QuotePdf::fileName($quote), $joined));
+                    ->send(new QuoteMail($message['subject'], $body, $bytes, QuotePdf::fileName($quote), $joined));
             } catch (Throwable $e) {
                 $error = $e;
 
@@ -139,8 +146,10 @@ class SendQuote implements ShouldQueue
             throw $failure; // retried (backoff), then failed()
         }
 
-        Quote::query()->whereKey($quote->id)->toBase()
-            ->update(['email_status' => 'sent', 'email_sent_at' => CarbonImmutable::now(), 'email_error' => null]);
+        // Sent: the signature token is no more kept, even encrypted.
+        $kept = $message;
+        unset($kept['sign_token']);
+        Quote::query()->whereKey($quote->id)->update(['email_status' => 'sent', 'email_sent_at' => CarbonImmutable::now(), 'email_error' => null, 'email_message' => $kept]);
     }
 
     /**

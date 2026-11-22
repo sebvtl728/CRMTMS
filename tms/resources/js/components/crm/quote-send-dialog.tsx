@@ -64,6 +64,8 @@ export function QuoteSendDialog({
         body: defaults.body,
     });
 
+    // « Signer en ligne » joined to the e-mail: ticked by default (one e-mail, the quote and its « Bon pour accord »).
+    const [signOnline, setSignOnline] = useState(true);
     // « Joindre les plaquettes »: ticked by default, each brochure can be unticked, others added by search.
     const [join, setJoin] = useState(true);
     const [list, setList] = useState<BrochureChoice[]>(choices);
@@ -116,7 +118,7 @@ export function QuoteSendDialog({
 
     transform((d) => ({
         ...d,
-        ...(kind === 'send' ? { brochure_version_ids: join ? picked : [] } : {}),
+        ...(kind === 'send' ? { brochure_version_ids: join ? picked : [], sign_online: signOnline } : {}),
         cc: d.cc
             .split(/[\s,;]+/)
             .map((c) => c.trim())
@@ -189,6 +191,18 @@ export function QuoteSendDialog({
                         <InputError message={errs.body} />
                     </div>
 
+                    {kind === 'send' && (
+                        <div className="grid gap-1 rounded-md border p-3">
+                            <div className="flex items-center gap-2">
+                                <Checkbox id="quote-sign-online" checked={signOnline} onCheckedChange={(c) => setSignOnline(c === true)} />
+                                <Label htmlFor="quote-sign-online">Joindre un lien de signature en ligne (bon pour accord)</Label>
+                            </div>
+                            <p className="text-muted-foreground text-xs">
+                                Le client signe depuis le même e-mail, avec un code reçu par e-mail ; le devis passe alors « Accepté ». L'opportunité
+                                passe à l'étape « Proposition » dès l'envoi.
+                            </p>
+                        </div>
+                    )}
                     {kind === 'send' && (
                         <div className="grid gap-2 rounded-md border p-3">
                             <div className="flex items-center gap-2">

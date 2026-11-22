@@ -20,7 +20,7 @@ class QuoteMail extends Mailable
 
     public function __construct(
         private readonly string $mailSubject,
-        private readonly string $text,
+        public readonly string $text,
         private readonly string $pdf,
         private readonly string $fileName,
         /** @var list<array{bytes: string, name: string}> brochures joined after the quote */
