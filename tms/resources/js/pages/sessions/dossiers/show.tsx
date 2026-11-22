@@ -292,10 +292,19 @@ export default function DossierShow({
                         <li>Convention signée : {formatDay(dossier.convention_signed_on)}</li>
                         <li>Convocations envoyées : {formatDay(dossier.convocations_sent_on)}</li>
                     </ol>
+                    {blocks.some((b) => b.key === 'documents.dossier') && (
+                        <p className="text-muted-foreground text-xs">
+                            Ces étapes se mettent à jour seules quand vous envoyez ou faites signer la convention depuis le bloc{' '}
+                            <a href="#documents" className="underline">
+                                Documents
+                            </a>{' '}
+                            plus bas. Les boutons ci-dessous servent seulement à indiquer une date à la main (document envoyé hors du TMS).
+                        </p>
+                    )}
                     <div className="flex flex-wrap gap-2">
                         {DATED.filter((d) => can.steps[d.step]).map((d) => (
-                            <Button key={d.step} type="button" size="sm" onClick={() => setDated(d)}>
-                                {d.label}…
+                            <Button key={d.step} type="button" size="sm" variant="ghost" onClick={() => setDated(d)}>
+                                Indiquer à la main : {d.label.toLowerCase()}…
                             </Button>
                         ))}
                         {can.steps.running && (
@@ -419,7 +428,12 @@ export default function DossierShow({
                 </section>
 
                 {blocks.map((b) => (
-                    <section key={b.key} aria-label={b.title} className="grid gap-3">
+                    <section
+                        key={b.key}
+                        id={b.key === 'documents.dossier' ? 'documents' : undefined}
+                        aria-label={b.title}
+                        className="grid scroll-mt-4 gap-3"
+                    >
                         <h2 className="text-sm font-semibold">{b.title}</h2>
                         <DossierBlockPanel block={b} />
                     </section>

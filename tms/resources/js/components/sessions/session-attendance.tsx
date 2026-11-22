@@ -726,6 +726,13 @@ export function SessionAttendance({ sessionId }: { sessionId: string }) {
     const closed = data.closure.closed;
 
     const close = async () => {
+        if (
+            !window.confirm(
+                `Clôturer ${label} ? Les présences du mois ne pourront plus être modifiées (sauf réouverture motivée) et servent à la facturation.`,
+            )
+        ) {
+            return;
+        }
         setBusy(true);
         const answer = await sendJson<SessionAttendance>('POST', route('sessions.closures.store', sessionId), { month: data.month });
         setBusy(false);

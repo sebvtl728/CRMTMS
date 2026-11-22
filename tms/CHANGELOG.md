@@ -5,6 +5,14 @@ Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) ; ve
 
 ## [Non publié]
 
+### Modifié
+
+- **Signature en ligne** : on demande d'abord son code, puis on dessine ; sous « Signer », ce qu'il reste à faire.
+- **Clôture du mois** des présences : confirmation avant de clôturer.
+- Bloc **Documents** : une ligne explique « Émettre » (numéro définitif) et « Envoyer » (e-mail).
+- **Page du dossier** : les étapes indiquent qu'elles se mettent à jour seules depuis le bloc Documents ; les boutons de
+  date à la main deviennent discrets (« Indiquer à la main… »).
+
 ## [0.14.2] - 2026-11-22
 
 La 0.14.1 n'a pas été publiée (formatage refusé par la CI) : son contenu est livré ici.

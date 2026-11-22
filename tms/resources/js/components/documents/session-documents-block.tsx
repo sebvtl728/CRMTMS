@@ -68,6 +68,12 @@ export function SessionDocumentsBlock({ session_id, can_manage, types, trainees,
     return (
         <div className="grid gap-3">
             {can_manage && (
+                <p className="text-muted-foreground text-xs">
+                    <strong>Émettre</strong> crée le document avec son numéro définitif (il ne se modifie plus : une erreur se corrige en l'annulant)
+                    ; <strong>Envoyer</strong> l'adresse par e-mail à chaque stagiaire.
+                </p>
+            )}
+            {can_manage && (
                 <div className="grid gap-2 sm:grid-cols-3">
                     {types.map((t) => (
                         <div key={t.value} className="grid gap-1 rounded-md border p-2">
