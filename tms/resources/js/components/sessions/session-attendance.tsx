@@ -174,6 +174,8 @@ interface SessionAttendance {
         recorded: number;
         needs_review: number;
         expected: number;
+        /** Every half-day the séance touches has its online signing validated. */
+        signing_validated: boolean;
     }[];
     monthly: {
         modules: { id: string; title: string; planned: string }[];
@@ -857,9 +859,18 @@ export function SessionAttendance({ sessionId }: { sessionId: string }) {
                                         </td>
                                         <td className="py-2 text-right">
                                             {s.can_record && (
-                                                <Button type="button" size="sm" variant="outline" onClick={() => setSeanceId(s.id)}>
+                                                <Button
+                                                    type="button"
+                                                    size="sm"
+                                                    variant="outline"
+                                                    onClick={() => setSeanceId(s.id)}
+                                                    title={s.signing_validated ? 'Signatures validées' : undefined}
+                                                >
                                                     <ClipboardCheck className="h-4 w-4" />
                                                     Présences
+                                                    {s.signing_validated && (
+                                                        <span className="h-2 w-2 rounded-full bg-green-600" aria-label="Signatures validées" />
+                                                    )}
                                                 </Button>
                                             )}
                                         </td>
