@@ -26,6 +26,7 @@ type OrganisationForm = {
     origin_id: string;
     responsible_user_id: string;
     das_ids: string[];
+    type_ids: string[];
     email: string;
     phone: string;
     website: string;
@@ -52,6 +53,7 @@ interface FormProps {
         company_size: Option[];
         origin: Option[];
         das: Option[];
+        types: Option[];
         responsible: Option[];
     };
     duplicates: DuplicateCandidate[];
@@ -133,6 +135,7 @@ export default function OrganisationFormPage({ organisation, options, duplicates
         origin_id: str('origin_id'),
         responsible_user_id: str('responsible_user_id'),
         das_ids: organisation?.das_ids ?? [],
+        type_ids: (organisation?.type_ids as string[] | undefined) ?? [],
         email: str('email'),
         phone: str('phone'),
         website: str('website'),
@@ -239,6 +242,8 @@ export default function OrganisationFormPage({ organisation, options, duplicates
         </Field>
     );
 
+    const toggleType = (id: string, checked: boolean) =>
+        setData('type_ids', checked ? [...data.type_ids, id] : data.type_ids.filter((d) => d !== id));
     const toggleDas = (id: string, checked: boolean) => setData('das_ids', checked ? [...data.das_ids, id] : data.das_ids.filter((d) => d !== id));
 
     return (
@@ -302,6 +307,18 @@ export default function OrganisationFormPage({ organisation, options, duplicates
                     {pick('establishment_type_id', "Type d'établissement", options.establishment_type)}
                     {pick('company_size_id', 'Taille', options.company_size)}
                     {pick('origin_id', 'Origine', options.origin)}
+                    <div className="grid gap-2">
+                        <Label>Types</Label>
+                        <div className="grid gap-2">
+                            {options.types.map((t) => (
+                                <Label key={t.value} className="flex items-center gap-2 font-normal">
+                                    <Checkbox checked={data.type_ids.includes(t.value)} onCheckedChange={(c) => toggleType(t.value, c === true)} />
+                                    {t.label}
+                                </Label>
+                            ))}
+                        </div>
+                        <InputError message={errors.type_ids ?? itemError(errors, 'type_ids')} />
+                    </div>
                     <div className="grid gap-2">
                         <Label>DAS</Label>
                         <div className="grid gap-2">

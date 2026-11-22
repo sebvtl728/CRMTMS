@@ -177,6 +177,9 @@ class Merger
             // References held by other modules (Sessions: sessions, dossiers, inscriptions, financements).
             FicheLinks::merge($isPerson ? 'person' : 'organisation', $k->id, $d->id);
             $this->uniteDas($k, $d, $isPerson);
+            if (! $isPerson) {
+                $this->uniteTypes($k, $d);
+            }
             $this->interests->merge($k, $d);
             // Calendars (Outlook) now show the kept fiche (moves above are raw SQL).
             CalendarAnnouncements::announceFor($isPerson ? 'person_id' : 'organisation_id', [$k->id, $d->id]);
@@ -352,6 +355,18 @@ class Merger
     {
         $column = $keep instanceof Person ? 'person_id' : 'organisation_id';
         Activity::withTrashed()->where($column, $drop->id)->toBase()->update([$column => $keep->id, 'updated_at' => now()]);
+    }
+
+    /** The kept entreprise takes the types of the dropped one too (organisation_types). */
+    private function uniteTypes(Organisation|Person $keep, Organisation|Person $drop): void
+    {
+        $have = DB::table('organisation_types')->where('organisation_id', $keep->id)->pluck('type_id')->all();
+        foreach (DB::table('organisation_types')->where('organisation_id', $drop->id)->pluck('type_id') as $typeId) {
+            if (! in_array($typeId, $have, true)) {
+                DB::table('organisation_types')->insert(['tenant_id' => $this->tenants->id(), 'organisation_id' => $keep->id, 'type_id' => $typeId]);
+            }
+        }
+        DB::table('organisation_types')->where('organisation_id', $drop->id)->delete();
     }
 
     private function uniteDas(Organisation|Person $keep, Organisation|Person $drop, bool $isPerson): void

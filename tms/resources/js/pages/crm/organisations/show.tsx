@@ -38,6 +38,7 @@ interface OrganisationData {
     origin: Ref | null;
     responsible: { id: string; name: string } | null;
     das: Ref[];
+    types: Ref[];
     email: string | null;
     phone: string | null;
     website: string | null;
@@ -145,6 +146,11 @@ export default function OrganisationShow({
                         <div className="flex flex-wrap items-center gap-2">
                             <Badge variant={statusVariant(o.status.value)}>{o.status.label}</Badge>
                             {o.deleted && <Badge variant="destructive">Supprimée</Badge>}
+                            {o.types.map((t) => (
+                                <Badge key={t.id} variant="secondary">
+                                    {t.label}
+                                </Badge>
+                            ))}
                             {o.das.map((d) => (
                                 <Badge key={d.id} variant="outline">
                                     {d.label}

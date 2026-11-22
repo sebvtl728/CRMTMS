@@ -63,6 +63,7 @@ class OrganisationController extends Controller
                 'sector' => $o->sector?->label,
                 'responsible' => $o->responsible?->name,
                 'das' => $o->das->pluck('label')->all(),
+                'types' => $o->types->pluck('label')->all(),
                 'last_contact_at' => $o->last_contact_at?->toIso8601String(),
                 'created_at' => $o->created_at?->toIso8601String(),
                 'deleted' => $o->trashed(),
@@ -72,6 +73,7 @@ class OrganisationController extends Controller
             'options' => [
                 'status' => OrganisationStatus::options(),
                 'das' => $this->options(ReferenceList::Das),
+                'type' => $this->options(ReferenceList::OrganisationType),
                 'sector' => $this->options(ReferenceList::Sector),
                 'origin' => $this->options(ReferenceList::ContactOrigin),
                 'responsible' => User::query()->whereNull('deactivated_at')->orderBy('name')->get(['id', 'name'])
@@ -123,7 +125,7 @@ class OrganisationController extends Controller
         Gate::authorize('view', $organisation);
         RecentViews::record($user, $organisation);
 
-        $organisation->load(['legalForm', 'sector', 'establishmentType', 'companySize', 'origin', 'responsible', 'das']);
+        $organisation->load(['legalForm', 'sector', 'establishmentType', 'companySize', 'origin', 'responsible', 'das', 'types']);
         $label = fn (?ReferenceItem $i) => $i === null ? null : ['id' => $i->id, 'label' => $i->label];
 
         // Interlocuteurs: referents first, then by name. Ended ones apart.
@@ -160,6 +162,7 @@ class OrganisationController extends Controller
                 'origin' => $label($organisation->origin),
                 'responsible' => $organisation->responsible === null ? null : ['id' => $organisation->responsible->id, 'name' => $organisation->responsible->name],
                 'das' => $organisation->das->map($label)->all(),
+                'types' => $organisation->types->map($label)->all(),
                 'last_contact_at' => $organisation->last_contact_at?->toIso8601String(),
                 'created_at' => $organisation->created_at?->toIso8601String(),
                 'updated_at' => $organisation->updated_at?->toIso8601String(),
@@ -200,6 +203,7 @@ class OrganisationController extends Controller
                 ...$this->fields($organisation),
                 'status' => $organisation->status->value,
                 'das_ids' => $organisation->das()->pluck('reference_items.id')->all(),
+                'type_ids' => $organisation->types()->pluck('reference_items.id')->all(),
             ],
             'options' => $this->formOptions($organisation),
             'duplicates' => DuplicateGuard::flashed($request),
@@ -264,13 +268,19 @@ class OrganisationController extends Controller
     {
         $validated = $request->validated();
         $dasIds = array_key_exists('das_ids', $validated) ? array_values($validated['das_ids']) : null;
-        unset($validated['das_ids']);
+        $typeIds = array_key_exists('type_ids', $validated) ? array_values(array_unique($validated['type_ids'])) : null;
+        unset($validated['das_ids'], $validated['type_ids']);
         $validated['country'] ??= 'FR';
         $validated['status'] ??= $organisation->exists ? $organisation->status->value : OrganisationStatus::Prospect->value;
 
         try {
-            DB::transaction(function () use ($organisation, $validated, $dasIds): void {
+            DB::transaction(function () use ($organisation, $validated, $dasIds, $typeIds): void {
                 $organisation->fill($validated)->save();
+
+                if ($typeIds !== null) {
+                    $tenantId = $organisation->tenant_id;
+                    $organisation->types()->sync(collect($typeIds)->mapWithKeys(fn (string $id) => [$id => ['tenant_id' => $tenantId]])->all());
+                }
 
                 if ($dasIds !== null) {
                     $this->das->sync($organisation, $dasIds);
@@ -336,6 +346,7 @@ class OrganisationController extends Controller
             'company_size' => $this->options(ReferenceList::CompanySize, $current?->company_size_id),
             'origin' => $this->options(ReferenceList::ContactOrigin, $current?->origin_id),
             'das' => $this->options(ReferenceList::Das, null, $current === null ? [] : $current->das()->pluck('reference_items.id')->all()),
+            'types' => $this->options(ReferenceList::OrganisationType, null, $current === null ? [] : $current->types()->pluck('reference_items.id')->all()),
             'responsible' => FormOptions::responsible($current?->responsible_user_id),
         ];
     }

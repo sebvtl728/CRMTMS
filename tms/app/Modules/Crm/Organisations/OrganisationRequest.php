@@ -109,6 +109,8 @@ class OrganisationRequest extends FormRequest
             'company_size_id' => ['nullable', ...ReferenceRules::item(ReferenceList::CompanySize, $current?->company_size_id)],
             'origin_id' => ['nullable', ...ReferenceRules::item(ReferenceList::ContactOrigin, $current?->origin_id)],
             'responsible_user_id' => ['nullable', ...ReferenceRules::responsible($current?->responsible_user_id)],
+            'type_ids' => ['sometimes', 'array'],
+            'type_ids.*' => ['distinct', ...ReferenceRules::item(ReferenceList::OrganisationType, $current?->types()->pluck('reference_items.id')->all())],
             'das_ids' => ['sometimes', 'array'],
             'das_ids.*' => ['distinct', ...ReferenceRules::item(ReferenceList::Das, $current?->das()->pluck('reference_items.id')->all())],
         ];

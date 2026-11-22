@@ -176,6 +176,10 @@ Conventions communes : UUID v7, `tenant_id`, suppression logique (`deleted_at`) 
 | `dup_email`, `dup_phone`, `dup_postal_code`, `dup_city` | text, générées | Clés de détection des doublons (e-mail en minuscules, téléphone en chiffres, code postal, ville sans accents) |
 | `created_at`, `updated_at`, `deleted_at` | timestamp | |
 
+### `organisation_types` — types d'une entreprise
+
+`tenant_id`, `organisation_id` (→ `organisations`, cascade), `type_id` (→ `reference_items`, liste `organisation_type`, `meta.funder` pour les financeurs) ; clé primaire (`organisation_id`, `type_id`). Écrit par la fiche (`type_ids`), réuni par la fusion (`Merger::uniteTypes`).
+
 ### `organisation_das` — DAS d'une entreprise
 `tenant_id` · `organisation_id` (FK, cascade) · `das_id` (FK `reference_items`) ; PK (`organisation_id`, `das_id`).
 
