@@ -47,7 +47,11 @@ final class SessionsTodo
             fn (User $u): string => '/sessions', $manager);
     }
 
-    /** The live sessions whose attendance the user manages. */
+    /**
+     * The live sessions whose attendance the user manages.
+     *
+     * @return Builder<TrainingSession>
+     */
     private static function managed(User $user): Builder
     {
         return SessionsVisibility::sessions(TrainingSession::query(), $user, Permissions::ATTENDANCE_MANAGE)

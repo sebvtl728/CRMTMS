@@ -307,3 +307,10 @@ voir `questionnaires.md`).
 présences de **ses propres séances** (bouton « Présences »). Les autres séances, les heures mensuelles et la clôture du
 mois restent réservées aux gestionnaires.
 
+## 12. Convocations et rappels automatiques
+
+Chaque matin, le TMS envoie seul les **convocations** des sessions confirmées qui démarrent dans 7 jours (ou le
+lendemain de leur confirmation si elle est tardive) et un **rappel la veille** aux stagiaires et aux formateurs.
+Réglages et règles : Administration › Automatismes (`admin.md`, § 23). Ce qui reste à faire apparaît dans **À
+traiter** (menu).
+

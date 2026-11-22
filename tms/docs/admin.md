@@ -424,3 +424,26 @@ Guide utilisateur : `admissions.md`.
 - La commande `tms:questionnaires:daily` (7 h, heure de Paris) lance les questionnaires à chaud non lancés (lendemain du
   dernier jour) et les questionnaires à froid dus, organisme par organisme.
 
+## 23. Automatismes et « À traiter »
+
+- **Administration › Automatismes** (droit « Paramétrer l'organisme ») : ce qui part tout seul chaque matin à 7 h 15
+  (commande `tms:automation:daily`, organisme par organisme) :
+  - **Convocations** : émises et envoyées aux stagiaires des sessions **confirmées** dont la première séance est dans
+    *N* jours (7 par défaut, de 0 à 30 ; 0 = désactivé). Une session confirmée plus tard reçoit ses convocations le
+    lendemain matin ; la veille du début, plus rien ne part. Une convocation déjà émise, envoyée à la main ou
+    **annulée** n'est jamais refaite ; un stagiaire sans e-mail reçoit une convocation émise mais non envoyée.
+  - **Rappel la veille** (activé par défaut) : un e-mail à chaque stagiaire attendu et à chaque formateur des séances
+    du lendemain (horaires, module, lieu ; jamais de prix ni la liste des autres stagiaires). Sessions confirmées
+    seulement.
+  - **Relance des signatures en attente** : une convention, un contrat ou un devis non signé en ligne est relancé après
+    *N* jours (3 par défaut, 0 = désactivé), au plus *M* fois (2 par défaut, de 1 à 5). Chaque relance envoie un
+    **nouveau lien** qui remplace le précédent ; pas de relance si le signataire a demandé son code dans les 24 h.
+  - **Exécuter maintenant** lance les mêmes automatismes tout de suite (mêmes règles). Rien ne part deux fois : chaque
+    envoi automatique est noté (`automation_sends`). Les réglages sont journalisés (`automation.settings.updated`).
+- **Modèles d'e-mails** : « Rappel la veille (stagiaire) », « Rappel la veille (formateur) », « Relance de signature en
+  ligne » (`{lien}` obligatoire) ; la convocation reprend le modèle « Convocation ».
+- **À traiter** (menu, sous Accueil, avec un compteur) : ce qui attend l'utilisateur selon ses droits et son périmètre —
+  sessions qui démarrent dans 7 jours avec des étapes à faire, rattrapages d'émargement à confirmer, demi-journées
+  passées non validées, devis sans réponse depuis plus de 15 jours, actions commerciales à faire, candidatures
+  identifiées, montants à facturer, factures à relancer. Lecture seule ; chaque ligne mène à l'écran concerné.
+
