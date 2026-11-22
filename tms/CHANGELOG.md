@@ -7,6 +7,12 @@ Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) ; ve
 
 ### Ajouté
 
+- Bloc **Documents** d'une session : sous « Convocation », la date de l'envoi automatique (ou « trop tard », ou « une
+  fois la session confirmée ») ; **Émettre pour tous** les convocations propose alors de **laisser l'envoi automatique**
+  ou d'**émettre et envoyer maintenant**, pour que les deux ne se croisent jamais.
+
+### Ajouté
+
 - **Automatismes** (Administration › Automatismes) : chaque matin, **convocations** des sessions confirmées à J-7
   (ou le lendemain d'une confirmation tardive), **rappel la veille** aux stagiaires et aux formateurs, **relance des
   signatures en ligne** en attente (nouveau lien, 2 fois au plus) ; délais réglables, bouton **Exécuter maintenant**.
