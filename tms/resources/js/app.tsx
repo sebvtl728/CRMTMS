@@ -10,7 +10,7 @@ declare global {
     const route: typeof routeFn;
 }
 
-const appName = import.meta.env.VITE_APP_NAME || 'Laravel';
+const appName = import.meta.env.VITE_APP_NAME || 'TMS';
 
 // Tab title: the organisme's name (default company) once signed in, else the application's.
 let siteName = appName;

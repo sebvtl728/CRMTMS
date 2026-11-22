@@ -45,6 +45,8 @@ export interface SharedData {
     /** Menu badge of « À faire »: overdue + today. */
     todo_count: number;
     candidates_badge: number;
+    /** The success and error messages of the last action (banner). */
+    flash?: { status: string | null; error: string | null };
     /** « À traiter » in the menu. */
     todo_menu: boolean;
     /** Its counter, loaded after the page (deferred). */
