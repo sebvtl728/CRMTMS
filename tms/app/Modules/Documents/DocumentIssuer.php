@@ -64,7 +64,7 @@ class DocumentIssuer
      * A per-trainee document (convocation, attestation, certificate) of an
      * enrolment, under the lock of its dossier.
      */
-    public function issueForEnrolment(User $by, DocumentType $type, string $enrolmentId): Document
+    public function issueForEnrolment(?User $by, DocumentType $type, string $enrolmentId): Document
     {
         if (! $type->perEnrolment()) {
             throw new \InvalidArgumentException("{$type->value} is a document of the dossier.");
@@ -90,7 +90,7 @@ class DocumentIssuer
     /**
      * @param  array<string, mixed>  $recipient
      */
-    private function store(User $by, DocumentType $type, string $dossierId, ?string $enrolmentId, Company $company, string $number, CarbonImmutable $issuedAt, array $recipient, PdfSource $source): Document
+    private function store(?User $by, DocumentType $type, string $dossierId, ?string $enrolmentId, Company $company, string $number, CarbonImmutable $issuedAt, array $recipient, PdfSource $source): Document
     {
         $content = $this->pdf->renderSource($source);
         $path = TenantStorage::path('documents', $issuedAt->setTimezone('Europe/Paris')->format('Y').'/'.Str::uuid7().'.pdf');
@@ -113,7 +113,7 @@ class DocumentIssuer
                 'pdf_sha256' => hash('sha256', $content),
                 'status' => DocumentStatus::Issued,
                 'issued_at' => $issuedAt,
-                'issued_by' => $by->id,
+                'issued_by' => $by?->id,
             ]);
         } catch (Throwable $e) {
             $disk->delete($path);

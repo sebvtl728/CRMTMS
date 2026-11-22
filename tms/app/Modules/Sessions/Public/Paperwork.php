@@ -116,6 +116,23 @@ final class Paperwork
     }
 
     /**
+     * The confirmed sessions (stored state, never cancelled nor trashed)
+     * whose first live séance falls between $from and $to (Paris days,
+     * inclusive): the automatic convocations (2026-11-22).
+     *
+     * @return list<array{session_id: string, starts_on: string}>
+     */
+    public static function confirmedSessionsStartingBetween(string $from, string $to): array
+    {
+        return Seance::query()->where('status', '!=', Seance::CANCELLED)
+            ->whereIn('training_session_id', TrainingSession::query()->where('status', 'confirmed')->select('id'))
+            ->groupBy('training_session_id')->selectRaw('training_session_id, min(date) as first_day')
+            ->havingRaw('min(date) between ? and ?', [$from, $to])->orderBy('first_day')->get()
+            ->map(fn ($row) => ['session_id' => (string) $row->training_session_id, 'starts_on' => CarbonImmutable::parse($row->first_day)->toDateString()])
+            ->values()->all();
+    }
+
+    /**
      * The trainees of a session who receive documents (enrolled, confirmed,
      * left), in order of entry.
      *
