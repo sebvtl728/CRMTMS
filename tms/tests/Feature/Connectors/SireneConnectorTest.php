@@ -411,3 +411,14 @@ it('gives the IDCC of the establishment, the others apart, and never the DSN pla
     $this->actingAs(commercial())->getJson('/crm/sirene/'.SIEGE_SIRET)
         ->assertOk()->assertJsonPath('data.idcc', null)->assertJsonPath('data.other_idcc', []);
 });
+
+it('asks the directory again when the cached answer predates the IDCC', function () {
+    fakeSirene();
+    Cache::put(SireneClient::cacheKey(tenant()->id, SIEGE_SIRET), ['found' => true, 'data' => [
+        'name' => 'DASSAULT SYSTEMES', 'siret' => SIEGE_SIRET, 'nafCode' => '5829C', 'legalFormLabel' => null,
+        'addressLine1' => null, 'postalCode' => null, 'city' => null, 'employeeRangeLabel' => null,
+    ]], now()->addHours(24));
+
+    $this->actingAs(commercial())->getJson('/crm/sirene/'.SIEGE_SIRET)->assertOk()->assertJsonPath('data.idcc', '3248');
+    Http::assertSentCount(1);
+});

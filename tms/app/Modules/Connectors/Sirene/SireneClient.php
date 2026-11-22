@@ -59,6 +59,10 @@ class SireneClient
         $key = self::cacheKey($tenantId, $siret);
 
         $cached = Cache::get($key);
+        // An answer cached before the IDCC was read (0.14.4) is asked again.
+        if (is_array($cached) && ($cached['found'] ?? false) && ! array_key_exists('idccCodes', (array) ($cached['data'] ?? []))) {
+            $cached = null;
+        }
         if (is_array($cached)) {
             if ($cached['hidden'] ?? false) {
                 throw SireneUnavailable::notDiffusible();
