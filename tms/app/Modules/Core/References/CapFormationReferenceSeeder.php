@@ -75,6 +75,8 @@ final class CapFormationReferenceSeeder
         'candidature_refusal_reason' => ['Niveau insuffisant', 'Projet non adapté', 'Pas d\'entreprise d\'accueil', 'Places complètes', 'Autre'],
         'education_level' => ['Sans diplôme', 'Niveau 3 (CAP, BEP)', 'Niveau 4 (baccalauréat)', 'Niveau 5 (bac +2)', 'Niveau 6 (bac +3, bac +4)', 'Niveau 7 (bac +5)', 'Niveau 8 (doctorat)'],
         'payment_method' => ['Virement', 'Chèque', 'Carte bancaire', 'Espèces', 'Prélèvement'],
+        'complaint_channel' => ['E-mail', 'Téléphone', 'Courrier', 'Questionnaire', 'Oral', 'Autre'],
+        'improvement_source' => ['Réclamation', 'Questionnaire', 'Audit', 'Interne', 'Veille'],
         'organisation_type' => ['Entreprise cliente', 'OPCO', 'Financeur public', 'Sous-traitant', 'Co-traitant', 'Prescripteur'],
         'training_modality' => ['Présentiel', 'Distanciel (classe virtuelle)', 'FOAD / e-learning', 'Mixte'],
         'sector' => ['Hôtellerie-restauration', 'Commerce', 'Industrie', 'Services', 'Santé-social', 'Collectivité', 'Autre'],

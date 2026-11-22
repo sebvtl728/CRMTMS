@@ -34,6 +34,7 @@ import {
     LayoutGrid,
     ListChecks,
     Mail,
+    MessageSquareWarning,
     Plug,
     ReceiptEuro,
     RotateCcw,
@@ -42,6 +43,7 @@ import {
     ShieldCheck,
     SlidersHorizontal,
     Smile,
+    TrendingUp,
     Upload,
     UserMinus,
     UserRoundCheck,
@@ -92,6 +94,8 @@ const financeNavItems: (NavItem & { permission: string })[] = [
 // « Qualité »: the Qualiopi file.
 const qualityNavItems: (NavItem & { permission: string })[] = [
     { title: 'Qualiopi', url: '/qualite/qualiopi', icon: BadgeCheck, permission: 'qualite.view' },
+    { title: 'Réclamations', url: '/qualite/reclamations', icon: MessageSquareWarning, permission: 'qualite.view' },
+    { title: 'Amélioration continue', url: '/qualite/amelioration', icon: TrendingUp, permission: 'qualite.view' },
     { title: 'Résultats des questionnaires', url: '/qualite/questionnaires', icon: Smile, permission: 'questionnaires.view' },
 ];
 

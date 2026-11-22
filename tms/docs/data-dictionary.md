@@ -790,6 +790,14 @@ Permissions : `documents.view`, `documents.manage` (à périmètre, celui du dos
 ### `quality_indicators` — suivi d'un indicateur Qualiopi
 `referential_version` (`2026`) · `number` (1–33) · unique (`tenant_id`, `referential_version`, `number`) · `applicable` · `not_applicable_reason` (obligatoire si non applicable, CHECK) · `status` (`todo`, `in_progress`, `ready`, `to_review`, CHECK) · `responsible_user_id` (FK `users`, null) · `review_on` · `notes` · `updated_by`. Ligne créée à la première modification ; sans ligne : applicable, à faire. Le texte des indicateurs est dans le code (`QualiopiReferential`), jamais en base.
 
+### `quality_complaints` — réclamations (indicateur 31)
+
+`received_on` (date), `channel_id` (→ `reference_items`, liste `complaint_channel`), `complainant` (string(200), personnel), `subject` (string(200)), `description` (text, null, personnel), `status` (`open` | `processing` | `closed`, CHECK), `response` (text, null, personnel), `responded_on` (date, null), `created_by`. CHECK : une réclamation close a sa réponse et sa date.
+
+### `quality_actions` — actions d'amélioration (indicateur 32)
+
+`title` (string(200)), `description` (text, null), `source_id` (→ `reference_items`, liste `improvement_source`), `complaint_id` (→ `quality_complaints`, null), `responsible_user_id` (→ `users`, null), `due_on`, `status` (`planned` | `in_progress` | `done` | `abandoned`, CHECK), `done_on`, `result` (CHECK : une action réalisée a sa date et son résultat), `created_by`.
+
 ### `quality_proofs` — preuves
 `referential_version` · `number` · `kind` (`file`, `link`, `note`, CHECK) · `title` · `url` (http/https) · `note` · `path` (zone `quality` de `TenantStorage`), `original_name`, `size` · `created_by`. Supprimée par qui tient le dossier (fichier effacé).
 

@@ -31,6 +31,8 @@ enum ReferenceList: string
     case CandidatureRefusalReason = 'candidature_refusal_reason';
     case PaymentMethod = 'payment_method';
     case OrganisationType = 'organisation_type';
+    case ComplaintChannel = 'complaint_channel';
+    case ImprovementSource = 'improvement_source';
 
     public function label(): string
     {
@@ -58,6 +60,8 @@ enum ReferenceList: string
             self::CandidatureRefusalReason => 'Motifs de non-admission (candidatures)',
             self::PaymentMethod => 'Modes de règlement (factures)',
             self::OrganisationType => 'Types d\'organisation (entreprises, financeurs…)',
+            self::ComplaintChannel => 'Canaux de réception des réclamations (Qualité)',
+            self::ImprovementSource => 'Origines des actions d\'amélioration (Qualité)',
         };
     }
 

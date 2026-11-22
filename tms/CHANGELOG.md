@@ -12,6 +12,9 @@ Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) ; ve
 
 ### Ajouté
 
+- **Registres Qualiopi** (menu Qualité) : **Réclamations** (indicateur 31 : canal, réponse obligatoire pour clore) et
+  **Amélioration continue** (indicateur 32 : origine, réclamation liée, responsable, échéance, résultat), avec leurs
+  mesures automatiques sur 12 mois sur la fiche de l'indicateur.
 - **Types d'organisation** (référentiel paramétrable) : Entreprise cliente, OPCO, Financeur public, Sous-traitant,
   Co-traitant, Prescripteur, plusieurs par fiche ; filtre de la liste, export, réunis à la fusion.
 - **Coordonnées bancaires** de la société (Administration › Sociétés) : banque, IBAN (clé vérifiée) et BIC, imprimés
