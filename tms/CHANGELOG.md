@@ -12,6 +12,8 @@ Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) ; ve
 
 ### Ajouté
 
+- **Types d'organisation** (référentiel paramétrable) : Entreprise cliente, OPCO, Financeur public, Sous-traitant,
+  Co-traitant, Prescripteur, plusieurs par fiche ; filtre de la liste, export, réunis à la fusion.
 - **Coordonnées bancaires** de la société (Administration › Sociétés) : banque, IBAN (clé vérifiée) et BIC, imprimés
   sur chaque facture (« Règlement par virement »), jamais sur un avoir.
 

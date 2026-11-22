@@ -30,6 +30,7 @@ enum ReferenceList: string
     case TrainingModality = 'training_modality';
     case CandidatureRefusalReason = 'candidature_refusal_reason';
     case PaymentMethod = 'payment_method';
+    case OrganisationType = 'organisation_type';
 
     public function label(): string
     {
@@ -56,6 +57,7 @@ enum ReferenceList: string
             self::TrainingModality => 'Modalités de formation',
             self::CandidatureRefusalReason => 'Motifs de non-admission (candidatures)',
             self::PaymentMethod => 'Modes de règlement (factures)',
+            self::OrganisationType => 'Types d\'organisation (entreprises, financeurs…)',
         };
     }
 

@@ -42,6 +42,9 @@ final class CapFormationReferenceSeeder
     /** Funding types billed outside the TMS (meta.external_billing, 0.9: the CPF, through EDOF), by code. */
     private const EXTERNAL_BILLING = ['cpf'];
 
+    /** Organisation types that fund dossiers (meta.funder), by code. */
+    private const FUNDERS = ['opco', 'financeur-public'];
+
     /** The stage a sent quote brings its opportunity to (meta.quote_stage). */
     private const QUOTE_STAGE = 'Proposition';
 
@@ -72,6 +75,7 @@ final class CapFormationReferenceSeeder
         'candidature_refusal_reason' => ['Niveau insuffisant', 'Projet non adapté', 'Pas d\'entreprise d\'accueil', 'Places complètes', 'Autre'],
         'education_level' => ['Sans diplôme', 'Niveau 3 (CAP, BEP)', 'Niveau 4 (baccalauréat)', 'Niveau 5 (bac +2)', 'Niveau 6 (bac +3, bac +4)', 'Niveau 7 (bac +5)', 'Niveau 8 (doctorat)'],
         'payment_method' => ['Virement', 'Chèque', 'Carte bancaire', 'Espèces', 'Prélèvement'],
+        'organisation_type' => ['Entreprise cliente', 'OPCO', 'Financeur public', 'Sous-traitant', 'Co-traitant', 'Prescripteur'],
         'training_modality' => ['Présentiel', 'Distanciel (classe virtuelle)', 'FOAD / e-learning', 'Mixte'],
         'sector' => ['Hôtellerie-restauration', 'Commerce', 'Industrie', 'Services', 'Santé-social', 'Collectivité', 'Autre'],
     ];
@@ -95,6 +99,9 @@ final class CapFormationReferenceSeeder
                     }
                     if ($list === ReferenceList::FundingType->value && in_array($code, self::EXTERNAL_BILLING, true)) {
                         $meta = [...$meta ?? [], 'external_billing' => true];
+                    }
+                    if ($list === ReferenceList::OrganisationType->value && in_array($code, self::FUNDERS, true)) {
+                        $meta = ['funder' => true];
                     }
                     self::ensure(ReferenceList::from($list), $code, $label, $i + 1, $meta);
                 }

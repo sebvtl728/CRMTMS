@@ -33,6 +33,7 @@ interface Filters {
     q: string;
     status: string | null;
     das: string | null;
+    type: string | null;
     sector: string | null;
     responsible: string | null;
     origin: string | null;
@@ -46,7 +47,7 @@ interface Filters {
 interface IndexProps {
     organisations: Paginated<Row>;
     filters: Filters;
-    options: { status: Option[]; das: Option[]; sector: Option[]; origin: Option[]; responsible: Option[]; training: Option[] };
+    options: { status: Option[]; das: Option[]; type: Option[]; sector: Option[]; origin: Option[]; responsible: Option[]; training: Option[] };
     can: { create: boolean; delete: boolean; export: boolean; import: boolean };
     savedFilters: SavedFilterRow[];
     activeSavedId: string | null;
@@ -65,7 +66,7 @@ export default function OrganisationsIndex({ organisations, filters, options, ca
         const next = { ...filters, ...changes };
         const query: Record<string, string> = {};
         if (next.q) query.q = next.q;
-        (['status', 'das', 'sector', 'responsible', 'origin', 'training'] as const).forEach((k) => {
+        (['status', 'das', 'type', 'sector', 'responsible', 'origin', 'training'] as const).forEach((k) => {
             if (next[k]) query[k] = String(next[k]);
         });
         if (next.mine) query.mine = '1';
@@ -95,6 +96,7 @@ export default function OrganisationsIndex({ organisations, filters, options, ca
         filters.q ||
             filters.status ||
             filters.das ||
+            filters.type ||
             filters.sector ||
             filters.responsible ||
             filters.origin ||
@@ -157,6 +159,7 @@ export default function OrganisationsIndex({ organisations, filters, options, ca
                         />
                     </div>
                     <FilterSelect label="Statut" value={filters.status} options={options.status} onChange={(v) => visit({ status: v })} />
+                    <FilterSelect label="Type" value={filters.type} options={options.type} onChange={(v) => visit({ type: v })} />
                     <FilterSelect label="DAS" value={filters.das} options={options.das} onChange={(v) => visit({ das: v })} />
                     <FilterSelect label="Secteur" value={filters.sector} options={options.sector} onChange={(v) => visit({ sector: v })} />
                     <FilterSelect

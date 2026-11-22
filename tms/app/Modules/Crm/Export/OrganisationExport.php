@@ -43,6 +43,7 @@ final class OrganisationExport implements ExportResource
             'origin' => 'Origine',
             'responsible' => 'Responsable',
             'das' => 'DAS',
+            'types' => 'Types',
             'interest_trainings' => "Formations d'intérêt",
             'email' => 'E-mail',
             'phone' => 'Téléphone',
@@ -63,7 +64,7 @@ final class OrganisationExport implements ExportResource
 
     public function with(User $user): array
     {
-        return ['legalForm', 'sector', 'establishmentType', 'companySize', 'origin', 'responsible', 'das', 'interestTrainings'];
+        return ['legalForm', 'sector', 'establishmentType', 'companySize', 'origin', 'responsible', 'das', 'types', 'interestTrainings'];
     }
 
     public function value(Model $model, string $column): string|ExportCell|null
@@ -83,6 +84,7 @@ final class OrganisationExport implements ExportResource
             'origin' => $model->origin?->label,
             'responsible' => $model->responsible?->name,
             'das' => $model->das->pluck('label')->implode(', ') ?: null,
+            'types' => $model->types->pluck('label')->implode(', ') ?: null,
             'email' => $model->email,
             'phone' => $model->phone,
             'website' => $model->website,

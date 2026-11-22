@@ -127,6 +127,16 @@ class Organisation extends Model
     }
 
     /**
+     * Types of the organisation (organisation_type: entreprise cliente, OPCO…).
+     *
+     * @return BelongsToMany<ReferenceItem, $this>
+     */
+    public function types(): BelongsToMany
+    {
+        return $this->belongsToMany(ReferenceItem::class, 'organisation_types', 'organisation_id', 'type_id')->withPivot('tenant_id')->orderBy('reference_items.position');
+    }
+
+    /**
      * @return BelongsToMany<ReferenceItem, $this>
      */
     public function das(): BelongsToMany

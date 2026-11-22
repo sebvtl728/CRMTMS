@@ -20,11 +20,11 @@ final class OrganisationListQuery
     public const SORTS = ['name', 'city', 'last_contact_at', 'created_at'];
 
     /** Filters a saved filter may hold (trashed is a view, never saved). */
-    public const SAVABLE = ['q', 'status', 'das', 'sector', 'responsible', 'origin', 'training', 'mine', 'sort', 'dir'];
+    public const SAVABLE = ['q', 'status', 'das', 'type', 'sector', 'responsible', 'origin', 'training', 'mine', 'sort', 'dir'];
 
     /**
      * @param  array<array-key, mixed>  $input  query string or saved filter
-     * @return array{q: string, status: ?string, das: ?string, sector: ?string, responsible: ?string, origin: ?string, training: ?string, mine: bool, trashed: bool, sort: string, dir: string}
+     * @return array{q: string, status: ?string, das: ?string, type: ?string, sector: ?string, responsible: ?string, origin: ?string, training: ?string, mine: bool, trashed: bool, sort: string, dir: string}
      */
     public static function filters(array $input, User $user): array
     {
@@ -32,6 +32,7 @@ final class OrganisationListQuery
             'q' => FilterInput::text($input['q'] ?? null),
             'status' => FilterInput::oneOf($input['status'] ?? null, array_column(OrganisationStatus::cases(), 'value')),
             'das' => FilterInput::id($input['das'] ?? null),
+            'type' => FilterInput::id($input['type'] ?? null),
             'sector' => FilterInput::id($input['sector'] ?? null),
             'responsible' => FilterInput::id($input['responsible'] ?? null),
             'training' => FilterInput::id($input['training'] ?? null),
@@ -54,6 +55,7 @@ final class OrganisationListQuery
             'q' => ['string', 'max:100'],
             'status' => [Rule::in(array_column(OrganisationStatus::cases(), 'value'))],
             'das' => ['uuid'],
+            'type' => ['uuid'],
             'sector' => ['uuid'],
             'responsible' => ['uuid'],
             'training' => ['uuid'],
@@ -65,7 +67,7 @@ final class OrganisationListQuery
     }
 
     /**
-     * @param  array{q: string, status: ?string, das: ?string, sector: ?string, responsible: ?string, origin: ?string, training: ?string, mine: bool, trashed: bool, sort: string, dir: string}  $filters
+     * @param  array{q: string, status: ?string, das: ?string, type: ?string, sector: ?string, responsible: ?string, origin: ?string, training: ?string, mine: bool, trashed: bool, sort: string, dir: string}  $filters
      * @return Builder<Organisation>
      */
     public static function build(array $filters, User $user): Builder
@@ -79,7 +81,8 @@ final class OrganisationListQuery
             ->when($filters['responsible'], fn (Builder $q, string $v) => $q->where('responsible_user_id', $v))
             ->when($filters['training'], fn (Builder $q, string $v) => FicheTrainings::filter($q, $v, 'organisations'))
             ->when($filters['mine'], fn (Builder $q) => $q->where('responsible_user_id', $user->getKey()))
-            ->when($filters['das'], fn (Builder $q, string $v) => $q->whereIn('id', DB::table('organisation_das')->select('organisation_id')->where('das_id', $v)));
+            ->when($filters['das'], fn (Builder $q, string $v) => $q->whereIn('id', DB::table('organisation_das')->select('organisation_id')->where('das_id', $v)))
+            ->when($filters['type'], fn (Builder $q, string $v) => $q->whereIn('id', DB::table('organisation_types')->select('organisation_id')->where('type_id', $v)));
 
         if ($filters['sort'] === 'last_contact_at') {
             $query->orderByRaw('organisations.last_contact_at '.$filters['dir'].' nulls last');

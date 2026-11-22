@@ -262,7 +262,7 @@ it('renders the administration page', function () {
         ->assertOk()
         ->assertInertia(fn (Assert $page) => $page
             ->component('admin/references/index')
-            ->has('lists', 22)
+            ->has('lists', 23)
             ->where('lists.pipeline_stage.label', 'Étapes du pipeline')
             ->where('lists.pipeline_stage.items.0.meta.probability', 10)
             ->where('lists.pipeline_stage.items.5.is_system', true));
@@ -313,7 +313,7 @@ it('the dev DatabaseSeeder provisions a demo tenant with CAP FORMATION reference
 
     $tenant = Tenant::sole();
     expect($tenant->slug)->toBe(config('tms.default_tenant'))
-        ->and(app(TenantContext::class)->run($tenant, fn () => ReferenceItem::query()->count()))->toBe(133);
+        ->and(app(TenantContext::class)->run($tenant, fn () => ReferenceItem::query()->count()))->toBe(139);
 });
 
 it('flags the CAP FORMATION meeting and call types for the planning', function () {
