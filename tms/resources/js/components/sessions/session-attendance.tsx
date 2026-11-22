@@ -671,6 +671,7 @@ export function SessionAttendance({ sessionId }: { sessionId: string }) {
     const [seanceId, setSeanceId] = useState<string | null>(null);
     const [reopen, setReopen] = useState(false);
     const [busy, setBusy] = useState(false);
+    const [allSeances, setAllSeances] = useState(false);
 
     const load = useCallback(
         (m: string | null) => {
@@ -696,6 +697,12 @@ export function SessionAttendance({ sessionId }: { sessionId: string }) {
             <LoaderCircle className="h-5 w-5 animate-spin" aria-label="Chargement" />
         );
     }
+
+    // Folded by default: the past séances whose attendance is still to complete (or to review).
+    const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Paris' }).format(new Date());
+    const shownSeances = allSeances
+        ? data.seances
+        : data.seances.filter((s) => !s.cancelled && s.date <= today && (s.recorded < s.expected || s.needs_review > 0));
 
     const current = data.months.find((m) => m.value === data.month);
     const label = current ? monthLabel(current.label) : data.month;
@@ -794,9 +801,18 @@ export function SessionAttendance({ sessionId }: { sessionId: string }) {
             </section>
 
             <section className="grid gap-2">
-                <h3 className="font-medium">Séances du mois</h3>
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                    <h3 className="font-medium">Séances du mois</h3>
+                    {data.seances.length > 0 && (
+                        <Button type="button" variant="ghost" size="sm" onClick={() => setAllSeances(!allSeances)}>
+                            {allSeances ? 'Seulement les séances à compléter' : `Afficher les ${data.seances.length} séances`}
+                        </Button>
+                    )}
+                </div>
                 {data.seances.length === 0 ? (
                     <p className="text-muted-foreground text-sm">Aucune séance ce mois-ci.</p>
+                ) : shownSeances.length === 0 ? (
+                    <p className="text-muted-foreground text-sm">Aucune séance passée à compléter : les présences sont saisies.</p>
                 ) : (
                     <div className="overflow-x-auto">
                         <table className="w-full text-sm">
@@ -813,7 +829,7 @@ export function SessionAttendance({ sessionId }: { sessionId: string }) {
                                 </tr>
                             </thead>
                             <tbody>
-                                {data.seances.map((s) => (
+                                {shownSeances.map((s) => (
                                     <tr key={s.id} className={`border-t ${s.cancelled ? 'text-muted-foreground line-through' : ''}`}>
                                         <td className="py-2 pr-3">{formatDay(s.date)}</td>
                                         <td className="py-2 pr-3">
