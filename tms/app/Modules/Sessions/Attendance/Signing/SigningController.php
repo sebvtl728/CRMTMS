@@ -41,6 +41,23 @@ class SigningController extends Controller
         return self::json(['slot_id' => $slot->id, 'url' => route('sessions.signing.show', $slot->id), 'public_url' => SlotQr::publicUrl($token)], 201);
     }
 
+    /**
+     * Prepares the catch-up of a past half-day of the séance's day (created
+     * closed when never opened): a manager's act (SlotRows::mayCatchUpOn),
+     * 403 otherwise; the séance reached, else 404.
+     */
+    public function prepareCatchUp(Request $request, Seance $seance): JsonResponse
+    {
+        $user = self::user($request);
+        abort_unless(self::reaches($user, [$seance->id]), 404);
+        abort_unless(SlotRows::mayCatchUpOn($seance->training_session_id, $user), 403);
+        $data = $request->validate(['half' => ['required', 'in:'.implode(',', SignSlot::HALVES)]], ['half.*' => 'Demi-journée inconnue.']);
+        $session = TrainingSession::query()->findOrFail($seance->training_session_id);
+        $slot = $this->onsite->prepare($session, $seance->date->toDateString(), $data['half'], $user);
+
+        return self::json(['slot_id' => $slot->id, 'url' => route('sessions.signing.show', $slot->id)]);
+    }
+
     public function show(Request $request, string $slot): Response
     {
         $found = self::slot($request, $slot);

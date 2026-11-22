@@ -107,8 +107,13 @@ final class SlotRows
      */
     public static function mayCatchUp(SignSlot $slot, User $user): bool
     {
+        return self::mayCatchUpOn($slot->training_session_id, $user);
+    }
+
+    public static function mayCatchUpOn(string $sessionId, User $user): bool
+    {
         return Scopes::of($user, Permissions::ATTENDANCE_MANAGE) !== AccessScope::Trainer
-            && SessionsVisibility::sessions(TrainingSession::query()->whereKey($slot->training_session_id), $user, Permissions::ATTENDANCE_MANAGE)->exists();
+            && SessionsVisibility::sessions(TrainingSession::query()->whereKey($sessionId), $user, Permissions::ATTENDANCE_MANAGE)->exists();
     }
 
     /** The user holds « Faire entrer un stagiaire en formation » on the slot's session. */
@@ -120,11 +125,12 @@ final class SlotRows
     /**
      * The half-days of the séance's day for its session.
      *
-     * @return list<array{half: string, label: string, status: string|null, slot_id: string|null, signed: int, expected: int, is_today: bool, is_future: bool}>
+     * @return list<array{half: string, label: string, status: string|null, slot_id: string|null, signed: int, expected: int, is_today: bool, is_future: bool, can_catch_up: bool}>
      */
-    public static function forSeance(Seance $seance): array
+    public static function forSeance(Seance $seance, ?User $user = null): array
     {
         $date = $seance->date->toDateString();
+        $catchUp = $user !== null && $date < TrainingSession::today()->toDateString() && self::mayCatchUpOn($seance->training_session_id, $user);
         $slots = SignSlot::query()->where('training_session_id', $seance->training_session_id)->where('date', $date)->get()->keyBy('half');
         $counts = self::counts($slots->pluck('id')->all());
         $rows = [];
@@ -142,6 +148,7 @@ final class SlotRows
                 'expected' => Attendances::expected($seance)->count(),
                 'is_today' => $date === TrainingSession::today()->toDateString(),
                 'is_future' => $date > TrainingSession::today()->toDateString(),
+                'can_catch_up' => $catchUp,
             ];
         }
 

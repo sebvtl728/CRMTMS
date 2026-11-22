@@ -5,6 +5,7 @@ use App\Modules\Core\Tenancy\TenantStorage;
 use App\Modules\Sessions\Attendance\Attendance;
 use App\Modules\Sessions\Attendance\Closures;
 use App\Modules\Sessions\Attendance\Signing\AttendanceSignature;
+use App\Modules\Sessions\Attendance\Signing\SignSlot;
 use App\Modules\Sessions\Public\AttendanceSigning;
 use App\Modules\Sessions\Trainers\Trainers;
 use Carbon\CarbonImmutable;
@@ -134,4 +135,34 @@ it('reserves opening a catch-up to managers: a trainer sees the half-day, never 
 
     $this->flushSession();
     $this->actingAs(atManager())->getJson("/sessions/emargement/{$slotId}/state")->assertOk()->assertJsonPath('can_catch_up', true);
+});
+
+it('lets a manager prepare the catch-up of a past half-day never opened, never a trainer', function () {
+    $formateur = userWithRole(Role::Formateur);
+    $trainer = Trainers::forUser($formateur) ?? Trainers::ensureForUser($formateur);
+    $session = plSession();
+    $seance = plSeance(plModule($session), '2026-09-10', '09:00', '12:00', ['trainer_id' => $trainer->id]);
+    atEnrol($session, 'Durand');
+    $manager = atManager();
+
+    $this->actingAs($manager)->postJson("/seances/{$seance->id}/catch-up-slots", ['half' => 'morning'])->assertStatus(409)
+        ->assertJsonPath('message', 'Le jour même, utilisez l\'émargement en ligne.');
+    sgNow('2026-09-11 10:00');
+    $this->flushSession();
+    $this->actingAs($manager)->getJson("/seances/{$seance->id}/attendance")->assertOk()
+        ->assertJsonPath('slots.0.slot_id', null)->assertJsonPath('slots.0.can_catch_up', true);
+    $this->flushSession();
+    $this->actingAs($formateur)->getJson("/seances/{$seance->id}/attendance")->assertOk()->assertJsonPath('slots.0.can_catch_up', false);
+    $this->postJson("/seances/{$seance->id}/catch-up-slots", ['half' => 'morning'])->assertForbidden();
+
+    $this->flushSession();
+    $url = $this->actingAs($manager)->postJson("/seances/{$seance->id}/catch-up-slots", ['half' => 'morning'])->assertOk()->json('url');
+    $slot = SignSlot::query()->sole();
+    expect($slot->status)->toBe(SignSlot::CLOSED)->and($slot->token_hash)->toBeNull()->and($url)->toContain($slot->id);
+    $this->postJson("/seances/{$seance->id}/catch-up-slots", ['half' => 'morning'])->assertOk()->assertJsonPath('url', $url);
+    $this->postJson("/seances/{$seance->id}/catch-up-slots", ['half' => 'afternoon'])->assertStatus(409);
+
+    $token = osOpen($slot->id);
+    auth()->logout();
+    $this->get("/emargement/r/{$token}")->assertOk();
 });

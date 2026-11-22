@@ -69,6 +69,8 @@ interface DaySlot {
     is_today: boolean;
     /** The séance's day is still to come: signing opens that day. */
     is_future: boolean;
+    /** A past day the user (a manager) may open a catch-up for. */
+    can_catch_up: boolean;
 }
 
 const SLOT_STATUS: Record<string, string> = { open: 'Ouvert', closed: 'Lien fermé', validated: 'Validé' };
@@ -82,6 +84,15 @@ function OnlineSigning({ seanceId, slots }: { seanceId: string; slots: DaySlot[]
     const open = async (half: string) => {
         setBusy(half);
         const answer = await sendJson<{ url: string }>('POST', route('seances.signing-slots', seanceId), { half });
+        setBusy(null);
+        if (answer.ok && answer.data) window.location.assign(answer.data.url);
+        else setError(answer.errors.half ?? answer.message);
+    };
+
+    const catchUp = async (half: string) => {
+        setBusy(half);
+        setError(null);
+        const answer = await sendJson<{ url: string }>('POST', route('seances.catch-up-slots', seanceId), { half });
         setBusy(null);
         if (answer.ok && answer.data) window.location.assign(answer.data.url);
         else setError(answer.errors.half ?? answer.message);
@@ -116,6 +127,14 @@ function OnlineSigning({ seanceId, slots }: { seanceId: string; slots: DaySlot[]
                                 {busy === s.half ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <QrCode className="h-4 w-4" />}
                                 {s.status === 'open' ? 'Afficher le QR code' : s.status === 'closed' ? 'Rouvrir' : "Ouvrir l'émargement"}
                             </Button>
+                        ) : s.can_catch_up ? (
+                            <span className="flex items-center gap-2">
+                                <span className="text-muted-foreground text-xs">Pas d'émargement en ligne ce jour-là</span>
+                                <Button variant="outline" size="sm" disabled={busy !== null} onClick={() => catchUp(s.half)}>
+                                    {busy === s.half && <LoaderCircle className="h-4 w-4 animate-spin" />}
+                                    Faire un rattrapage
+                                </Button>
+                            </span>
                         ) : (
                             <span className="text-muted-foreground text-xs">
                                 {s.is_future ? "S'ouvre le jour de la séance" : "Pas d'émargement en ligne ce jour-là"}

@@ -15,7 +15,7 @@ use Illuminate\Support\Str;
 /**
  * The on-site catch-up of a past half-day (2026-11-21): an attendance
  * manager opens a link of its own (never the normal one, only its SHA-256
- * kept) on a half-day opened at least once, in an open month; the device
+ * kept) on a past half-day (prepared when never opened), in an open month; the device
  * passed round lists the expected trainees who have not signed. The link
  * dies when closed, at the end of the opening day (Paris), or when the
  * month is closed. Each signature waits for a confirmation.
@@ -23,6 +23,39 @@ use Illuminate\Support\Str;
 final class OnsiteCatchUp
 {
     public const TODAY = 'Le jour même, utilisez l\'émargement en ligne.';
+
+    /**
+     * The half-day of a past day for a catch-up, created closed (no signing
+     * link) when it was never opened; the existing one otherwise.
+     *
+     * @throws UserFacingHttpException
+     */
+    public function prepare(TrainingSession $session, string $date, string $half, User $by): SignSlot
+    {
+        if ($date >= TrainingSession::today()->toDateString()) {
+            throw new UserFacingHttpException(409, self::TODAY);
+        }
+
+        return DB::transaction(function () use ($session, $date, $half, $by): SignSlot {
+            $locked = TrainingSession::query()->lockForUpdate()->findOrFail($session->id);
+            if ($locked->isCancelled()) {
+                throw new UserFacingHttpException(409, AttendanceSigning::CANCELLED_SESSION);
+            }
+            $slot = SignSlot::query()->where('training_session_id', $locked->id)->where('date', $date)->where('half', $half)->first();
+            if ($slot !== null) {
+                return $slot;
+            }
+            if (SlotSeances::of($locked->id, $date, $half)->isEmpty()) {
+                throw new UserFacingHttpException(409, $half === SignSlot::MORNING ? 'Aucune séance ce matin.' : 'Aucune séance cet après-midi.');
+            }
+            Closures::assertOpen($locked->id, $date);
+
+            return SignSlot::query()->create([
+                'training_session_id' => $locked->id, 'date' => $date, 'half' => $half,
+                'status' => SignSlot::CLOSED, 'opened_at' => CarbonImmutable::now(), 'opened_by' => $by->id,
+            ]);
+        });
+    }
 
     /**
      * Opens (or renews) the catch-up: a new token, the previous one dead.

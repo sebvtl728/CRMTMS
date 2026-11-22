@@ -139,6 +139,8 @@ Route::middleware(['auth', 'can:sessions.attendance.manage'])->prefix('seances/{
 
 // Online signing (émargement en ligne): a half-day of the séance's day, opened from the séance
 // (sessions.attendance.manage within its scope on one séance of the half-day, else 404).
+Route::post('seances/{seance}/catch-up-slots', [SigningController::class, 'prepareCatchUp'])
+    ->middleware(['auth', 'can:sessions.attendance.manage', 'throttle:attendance-signing-open'])->name('seances.catch-up-slots');
 Route::post('seances/{seance}/signing-slots', [SigningController::class, 'open'])
     ->middleware(['auth', 'can:sessions.attendance.manage', 'throttle:attendance-signing-open'])->name('seances.signing-slots');
 
