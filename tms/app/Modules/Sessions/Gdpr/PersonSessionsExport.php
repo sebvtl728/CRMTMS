@@ -65,6 +65,12 @@ final class PersonSessionsExport
                 'demi_journee' => SignSlot::label((string) $slots[$sig->slot_id]?->half),
                 'signe_le' => $sig->signed_at->toIso8601String(),
                 'source' => $sig->source,
+                'type' => match ($sig->kind) {
+                    AttendanceSignature::KIND_ONSITE => 'Rattrapage sur place',
+                    AttendanceSignature::KIND_REMOTE => 'Rattrapage à distance',
+                    default => 'À l\'heure',
+                },
+                'confirme' => $sig->kind === AttendanceSignature::KIND_ON_TIME ? null : $sig->confirmed_at !== null,
             ])->values()->all(),
             'presences' => $attendances->sortBy(fn (Attendance $a) => $seances[$a->seance_id]->date->toDateString().$seances[$a->seance_id]->starts_at.$a->id)
                 ->map(fn (Attendance $a): array => [

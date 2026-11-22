@@ -2,8 +2,11 @@
 
 namespace App\Modules\Sessions\Attendance\Signing;
 
+use App\Modules\Core\Access\AccessScope;
+use App\Modules\Core\Access\Scopes;
 use App\Modules\Core\Users\User;
 use App\Modules\Crm\Public\Fiches;
+use App\Modules\Sessions\Attendance\Attendance;
 use App\Modules\Sessions\Attendance\Attendances;
 use App\Modules\Sessions\Enrolments\Enrolment;
 use App\Modules\Sessions\Permissions;
@@ -29,6 +32,8 @@ final class SlotRows
         $late = self::lateEntrants($slot);
         $signatures = AttendanceSignature::query()->where('slot_id', $slot->id)->get()->keyBy('enrolment_id');
         $labels = app(Fiches::class)->personLabels($expected->concat($late)->pluck('person_id')->map(fn ($id) => (string) $id)->unique()->values()->all());
+        $emails = app(Fiches::class)->personEmails($expected->pluck('person_id')->map(fn ($id) => (string) $id)->unique()->values()->all());
+        $links = CatchUpLink::query()->where('slot_id', $slot->id)->whereNull('revoked_at')->orderBy('created_at')->get()->keyBy('enrolment_id');
         $session = TrainingSession::withTrashed()->find($slot->training_session_id);
         $token = $slot->token();
         $url = $token === null ? null : SlotQr::publicUrl($token);
@@ -47,11 +52,27 @@ final class SlotRows
             'is_today' => $slot->date->toDateString() === TrainingSession::today()->toDateString(),
             'validated_at' => $slot->validated_at?->toIso8601String(),
             'validated_by' => $slot->trainer_name,
+            // On-site catch-up of a past half-day (the link is shown once, when opened).
+            'can_catch_up' => $user !== null && $slot->date->toDateString() < TrainingSession::today()->toDateString() && self::mayCatchUp($slot, $user),
+            'catch_up' => [
+                'open' => $slot->catch_up_token_hash !== null && $slot->catch_up_expires_at?->isFuture() === true,
+                'public_url' => null,
+                'expires_at' => $slot->catch_up_expires_at?->toIso8601String(),
+            ],
             'rows' => $expected->map(fn ($e) => [
                 'enrolment_id' => $e->id,
                 'name' => $labels[$e->person_id]['label'] ?? 'Stagiaire',
                 'signed_at' => $signatures->get($e->id)?->signed_at?->toIso8601String(),
                 'signature_id' => $signatures->get($e->id)?->id,
+                // A catch-up (its kind and state: pending, confirmed, refused), and the remote link last sent.
+                'catch_up_kind' => $signatures->get($e->id)?->kind === AttendanceSignature::KIND_ON_TIME ? null : $signatures->get($e->id)?->kind,
+                'catch_up_state' => self::catchUpState($signatures->get($e->id)),
+                'email' => $emails[$e->person_id] ?? null,
+                'catch_up_link' => ($l = $links->get($e->id)) === null ? null : [
+                    'sent_at' => $l->created_at?->toIso8601String(),
+                    'email_status' => $l->email_status,
+                    'expires_at' => $l->expires_at->toIso8601String(),
+                ],
             ])->sortBy(fn (array $r) => mb_strtolower($r['name']).$r['enrolment_id'])->values()->all(),
             // Enrolled but entering the training after this day: not expected, may be brought in.
             'late_entrants' => $slot->status === SignSlot::VALIDATED ? [] : $late->map(fn (Enrolment $e) => [
@@ -80,6 +101,22 @@ final class SlotRows
             ->orderBy('id')->get()->values();
     }
 
+    /**
+     * Opening a catch-up (on-site QR, remote link) is a manager's act:
+     * « Saisir les présences » on a scope other than « Ses séances », reaching
+     * the slot's session. A trainer still sees the half-day.
+     */
+    public static function mayCatchUp(SignSlot $slot, User $user): bool
+    {
+        return self::mayCatchUpOn($slot->training_session_id, $user);
+    }
+
+    public static function mayCatchUpOn(string $sessionId, User $user): bool
+    {
+        return Scopes::of($user, Permissions::ATTENDANCE_MANAGE) !== AccessScope::Trainer
+            && SessionsVisibility::sessions(TrainingSession::query()->whereKey($sessionId), $user, Permissions::ATTENDANCE_MANAGE)->exists();
+    }
+
     /** The user holds « Faire entrer un stagiaire en formation » on the slot's session. */
     public static function mayAdvanceEntry(SignSlot $slot, User $user): bool
     {
@@ -89,11 +126,12 @@ final class SlotRows
     /**
      * The half-days of the séance's day for its session.
      *
-     * @return list<array{half: string, label: string, status: string|null, slot_id: string|null, signed: int, expected: int, is_today: bool, is_future: bool}>
+     * @return list<array{half: string, label: string, status: string|null, slot_id: string|null, signed: int, expected: int, is_today: bool, is_future: bool, can_catch_up: bool}>
      */
-    public static function forSeance(Seance $seance): array
+    public static function forSeance(Seance $seance, ?User $user = null): array
     {
         $date = $seance->date->toDateString();
+        $catchUp = $user !== null && $date < TrainingSession::today()->toDateString() && self::mayCatchUpOn($seance->training_session_id, $user);
         $slots = SignSlot::query()->where('training_session_id', $seance->training_session_id)->where('date', $date)->get()->keyBy('half');
         $counts = self::counts($slots->pluck('id')->all());
         $rows = [];
@@ -111,6 +149,7 @@ final class SlotRows
                 'expected' => Attendances::expected($seance)->count(),
                 'is_today' => $date === TrainingSession::today()->toDateString(),
                 'is_future' => $date > TrainingSession::today()->toDateString(),
+                'can_catch_up' => $catchUp,
             ];
         }
 
@@ -144,12 +183,65 @@ final class SlotRows
     }
 
     /**
+     * The catch-ups of a Paris month of the session neither confirmed nor
+     * refused (« Rattrapages à confirmer »), the oldest half-day first.
+     *
+     * @return list<array<string, mixed>>
+     */
+    public static function pendingCatchUps(string $sessionId, CarbonImmutable $first): array
+    {
+        $slots = SignSlot::query()->where('training_session_id', $sessionId)
+            ->whereBetween('date', [$first->toDateString(), $first->endOfMonth()->toDateString()])->get()->keyBy('id');
+        $pending = AttendanceSignature::query()->whereIn('slot_id', $slots->keys()->all())
+            ->where('kind', '<>', AttendanceSignature::KIND_ON_TIME)->whereNull('confirmed_at')->whereNull('refused_at')
+            ->orderBy('signed_at')->get();
+        if ($pending->isEmpty()) {
+            return [];
+        }
+        $enrolments = Enrolment::query()->whereKey($pending->pluck('enrolment_id')->all())->get()->keyBy('id');
+        $labels = app(Fiches::class)->personLabels($enrolments->pluck('person_id')->map(fn ($id) => (string) $id)->unique()->values()->all());
+        $manual = Attendance::query()->whereIn('enrolment_id', $enrolments->keys()->all())->whereNull('source')
+            ->join('seances', 'seances.id', '=', 'attendances.seance_id')
+            ->toBase()->get(['attendances.enrolment_id', 'seances.date'])
+            ->map(fn ($r) => $r->enrolment_id.'|'.CarbonImmutable::parse($r->date)->toDateString())->all();
+
+        return $pending->map(function (AttendanceSignature $s) use ($slots, $enrolments, $labels, $manual): array {
+            $slot = $slots[$s->slot_id];
+            $enrolment = $enrolments[$s->enrolment_id] ?? null;
+
+            return [
+                'signature_id' => $s->id,
+                'enrolment_id' => $s->enrolment_id,
+                'name' => $enrolment === null ? 'Stagiaire' : ($labels[$enrolment->person_id]['label'] ?? 'Stagiaire'),
+                'date' => $slot->date->toDateString(),
+                'half' => $slot->half,
+                'half_label' => SignSlot::label($slot->half),
+                'kind' => $s->kind,
+                'kind_label' => $s->kind === AttendanceSignature::KIND_ONSITE ? 'Sur place' : 'À distance',
+                'signed_at' => $s->signed_at->toIso8601String(),
+                'drawing_url' => $s->drawing_path === null ? null : route('sessions.catch-ups.drawing', $s->id),
+                'manual_attendance' => in_array($s->enrolment_id.'|'.$slot->date->toDateString(), $manual, true),
+            ];
+        })->sortBy(fn (array $r) => $r['date'].($r['half'] === SignSlot::AFTERNOON ? '1' : '0').$r['signed_at'])->values()->all();
+    }
+
+    /**
      * @param  list<string>  $slotIds
      * @return array<string, int>
      */
     private static function counts(array $slotIds): array
     {
-        return AttendanceSignature::query()->whereIn('slot_id', $slotIds)->selectRaw('slot_id, count(*) as n')->groupBy('slot_id')
+        return AttendanceSignature::query()->counted()->whereIn('slot_id', $slotIds)->selectRaw('slot_id, count(*) as n')->groupBy('slot_id')
             ->toBase()->pluck('n', 'slot_id')->map(fn ($n) => (int) $n)->all();
+    }
+
+    private static function catchUpState(?AttendanceSignature $signature): ?string
+    {
+        return match (true) {
+            $signature === null, $signature->kind === AttendanceSignature::KIND_ON_TIME => null,
+            $signature->refused_at !== null => 'refused',
+            $signature->confirmed_at !== null => 'confirmed',
+            default => 'pending',
+        };
     }
 }

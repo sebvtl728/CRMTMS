@@ -4,12 +4,14 @@ import SignaturePad from '@/components/signature-pad';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import AppLayout from '@/layouts/app-layout';
 import { formatDateTime, formatDay } from '@/lib/crm';
 import { sendJson } from '@/lib/sessions';
 import { type BreadcrumbItem } from '@/types';
 import { Head } from '@inertiajs/react';
-import { CheckCircle2, Clock, ExternalLink, LoaderCircle, Lock, LogIn, PenLine, Trash2 } from 'lucide-react';
+import { CheckCircle2, Clock, ExternalLink, LoaderCircle, Lock, LogIn, Mail, PenLine, Tablet, Trash2 } from 'lucide-react';
 import { useEffect, useState } from 'react';
 
 /** The live state of a half-day (SlotRows::state): full names, the trainer is authenticated. */
@@ -24,7 +26,20 @@ interface SlotState {
     is_today: boolean;
     validated_at: string | null;
     validated_by: string | null;
-    rows: { enrolment_id: string; name: string; signed_at: string | null; signature_id: string | null }[];
+    rows: {
+        enrolment_id: string;
+        name: string;
+        signed_at: string | null;
+        signature_id: string | null;
+        /** A catch-up waiting for its confirmation (« Présences » tab). */
+        catch_up_kind: 'catch_up_onsite' | 'catch_up_remote' | null;
+        catch_up_state: 'pending' | 'confirmed' | 'refused' | null;
+        email: string | null;
+        catch_up_link: { sent_at: string | null; email_status: string | null; expires_at: string } | null;
+    }[];
+    /** A past half-day: catch-up on site or by an e-mailed link (2026-11-21). */
+    can_catch_up: boolean;
+    catch_up: { open: boolean; public_url: string | null; expires_at: string | null };
     /** Enrolled, but entering the training after this day: not expected yet. */
     late_entrants: { enrolment_id: string; name: string; entered_on: string | null }[];
     /** « Faire entrer un stagiaire en formation » on this session. */
@@ -45,17 +60,26 @@ export default function AttendanceSigning({ state: initial }: { state: SlotState
     const [drawing, setDrawing] = useState('');
     const [drawingError, setDrawingError] = useState<string | undefined>();
     const [busy, setBusy] = useState(false);
+    const [linkFor, setLinkFor] = useState<SlotState['rows'][number] | null>(null);
+    const [linkEmail, setLinkEmail] = useState('');
+    const [linkError, setLinkError] = useState<string | undefined>();
 
     useEffect(() => {
-        if (state.status !== 'open') return;
+        if (state.status !== 'open' && !state.catch_up?.open) return;
         const timer = window.setInterval(() => {
             sendJson<SlotState>('GET', route('sessions.signing.state', state.id)).then((answer) => {
-                if (answer.ok && answer.data) setState(answer.data);
+                if (answer.ok && answer.data) {
+                    const next = answer.data;
+                    setState((prev) => ({
+                        ...next,
+                        catch_up: { ...next.catch_up, public_url: next.catch_up.open ? (prev.catch_up?.public_url ?? null) : null },
+                    }));
+                }
             });
         }, 5000);
 
         return () => window.clearInterval(timer);
-    }, [state.id, state.status]);
+    }, [state.id, state.status, state.catch_up?.open]);
 
     const act = async (method: 'POST' | 'DELETE', url: string, body?: unknown): Promise<boolean> => {
         setBusy(true);
@@ -129,6 +153,46 @@ export default function AttendanceSigning({ state: initial }: { state: SlotState
                                 Signer et valider
                             </Button>
                         )}
+                        {state.can_catch_up && (
+                            <div className="grid gap-2 border-t pt-3">
+                                <p className="font-medium">Rattrapage</p>
+                                <p className="text-muted-foreground text-sm">
+                                    Un stagiaire présent n'a pas signé ? Faites-le signer sur cet appareil (rattrapage sur place, jusqu'à ce soir
+                                    minuit) ou envoyez-lui un lien par e-mail (bouton « Envoyer un lien » sur sa ligne, dans la liste ci-dessous).
+                                    Chaque rattrapage est à confirmer dans l'onglet « Présences » de la session.
+                                </p>
+                                {state.catch_up.open && state.catch_up.public_url ? (
+                                    <div className="flex flex-wrap gap-2">
+                                        <Button asChild size="sm">
+                                            <a href={state.catch_up.public_url} target="_blank" rel="noreferrer">
+                                                <ExternalLink className="h-4 w-4" />
+                                                Ouvrir la page de signature ici
+                                            </a>
+                                        </Button>
+                                        <Button
+                                            variant="outline"
+                                            size="sm"
+                                            disabled={busy}
+                                            onClick={() => act('POST', route('sessions.signing.catch-up.close', state.id))}
+                                        >
+                                            <Lock className="h-4 w-4" />
+                                            Fermer le rattrapage
+                                        </Button>
+                                    </div>
+                                ) : (
+                                    <Button
+                                        variant="outline"
+                                        size="sm"
+                                        className="justify-self-start"
+                                        disabled={busy}
+                                        onClick={() => act('POST', route('sessions.signing.catch-up', state.id))}
+                                    >
+                                        <Tablet className="h-4 w-4" />
+                                        {state.catch_up.open ? 'Rouvrir le rattrapage sur place' : 'Rattrapage sur place'}
+                                    </Button>
+                                )}
+                            </div>
+                        )}
                     </section>
 
                     <section className="grid content-start gap-2" aria-live="polite">
@@ -184,6 +248,13 @@ export default function AttendanceSigning({ state: initial }: { state: SlotState
                                             <Badge variant="secondary">
                                                 <CheckCircle2 className="h-3 w-3" /> {formatDateTime(r.signed_at).split(' ').pop()}
                                             </Badge>
+                                        ) : r.catch_up_link ? (
+                                            <Badge variant="outline">
+                                                <Mail className="h-3 w-3" />
+                                                {r.catch_up_link.email_status === 'failed'
+                                                    ? 'Lien non parti'
+                                                    : `Lien envoyé${r.catch_up_link.sent_at ? ` le ${formatDateTime(r.catch_up_link.sent_at)}` : ''}`}
+                                            </Badge>
                                         ) : state.status === 'validated' ? (
                                             <Badge variant="destructive">Absent</Badge>
                                         ) : (
@@ -191,7 +262,30 @@ export default function AttendanceSigning({ state: initial }: { state: SlotState
                                                 <Clock className="h-3 w-3" /> En attente
                                             </Badge>
                                         )}
-                                        {r.signature_id && state.status !== 'validated' && (
+                                        {r.catch_up_state === 'pending' && <Badge variant="outline">Rattrapage à confirmer (onglet Présences)</Badge>}
+                                        {r.catch_up_state === 'confirmed' && (
+                                            <Badge variant="secondary">
+                                                <span className="h-2 w-2 rounded-full bg-green-600" aria-hidden="true" />
+                                                Rattrapage confirmé
+                                            </Badge>
+                                        )}
+                                        {r.catch_up_state === 'refused' && <Badge variant="destructive">Rattrapage refusé</Badge>}
+                                        {!r.signed_at && state.can_catch_up && (
+                                            <Button
+                                                variant="outline"
+                                                size="sm"
+                                                disabled={busy}
+                                                onClick={() => {
+                                                    setLinkFor(r);
+                                                    setLinkEmail(r.email ?? '');
+                                                    setLinkError(undefined);
+                                                }}
+                                            >
+                                                <Mail className="h-4 w-4" />
+                                                {r.catch_up_link ? 'Renvoyer un lien' : 'Envoyer un lien'}
+                                            </Button>
+                                        )}
+                                        {r.signature_id && state.status !== 'validated' && !r.catch_up_kind && (
                                             <Button
                                                 variant="ghost"
                                                 size="icon"
@@ -213,6 +307,49 @@ export default function AttendanceSigning({ state: initial }: { state: SlotState
                     </section>
                 </div>
             </div>
+
+            <Dialog open={linkFor !== null} onOpenChange={(o) => !o && setLinkFor(null)}>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>Lien de rattrapage – {linkFor?.name}</DialogTitle>
+                        <DialogDescription>
+                            Le stagiaire reçoit un lien personnel (7 jours, une seule utilisation), puis un code par e-mail pour signer sa présence du{' '}
+                            {state.date_label}, {state.half_label.toLowerCase()}. Un nouveau lien remplace le précédent.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <div className="grid gap-1">
+                        <Label htmlFor="catch-up-email">Adresse e-mail</Label>
+                        <Input id="catch-up-email" type="email" value={linkEmail} onChange={(e) => setLinkEmail(e.target.value)} />
+                        <InputError message={linkError} />
+                    </div>
+                    <DialogFooter>
+                        <Button variant="outline" onClick={() => setLinkFor(null)}>
+                            Annuler
+                        </Button>
+                        <Button
+                            disabled={busy || linkEmail.trim() === ''}
+                            onClick={async () => {
+                                if (!linkFor) return;
+                                setBusy(true);
+                                const answer = await sendJson<SlotState>('POST', route('sessions.signing.catch-up-links', state.id), {
+                                    enrolment_id: linkFor.enrolment_id,
+                                    email: linkEmail,
+                                });
+                                setBusy(false);
+                                if (answer.ok && answer.data) {
+                                    setState(answer.data);
+                                    setLinkFor(null);
+                                } else {
+                                    setLinkError(answer.errors.email ?? answer.errors.enrolment_id ?? answer.message);
+                                }
+                            }}
+                        >
+                            <Mail className="h-4 w-4" />
+                            Envoyer
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
 
             <Dialog open={validating} onOpenChange={setValidating}>
                 <DialogContent>

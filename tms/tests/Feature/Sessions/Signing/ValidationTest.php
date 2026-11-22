@@ -187,3 +187,26 @@ it('locks the session before the slot when validating, as when opening (no lost 
         ->values()->all();
     expect($locks[0])->toBe('session')->and(array_search('slot', $locks, true))->toBeGreaterThan(0);
 });
+
+it('flags in the month list the days whose half-days are validated, all or some', function () {
+    $session = plSession();
+    plSeance(plModule($session), '2026-09-10', '09:00', '12:00');
+    plSeance(plModule($session), '2026-09-10', '14:00', '17:00');
+    plSeance(plModule($session), '2026-09-11', '09:00', '17:00');
+    atEnrol($session, 'Durand');
+    $morning = sgOpen($session)['slot'];
+    $afternoon = sgOpen($session, '2026-09-10', SignSlot::AFTERNOON)['slot'];
+    $manager = atManager();
+    $flags = fn () => collect($this->flushSession()->actingAs($manager)->getJson("/sessions/{$session->id}/attendance?month=2026-09")->assertOk()->json('seances'))
+        ->map(fn (array $s) => $s['signing'])->all();
+
+    expect($flags())->toBe([null, null, null]);
+    app(App\Modules\Sessions\Public\AttendanceSigning::class)->validateExternal($morning->id, 'fake', null, 'Marie Martin');
+    expect($flags())->toBe(['partial', 'partial', null]);
+    app(App\Modules\Sessions\Public\AttendanceSigning::class)->validateExternal($afternoon->id, 'fake', null, 'Marie Martin');
+    expect($flags())->toBe(['validated', 'validated', null]);
+    sgNow('2026-09-11 09:30');
+    $next = sgOpen($session, '2026-09-11')['slot'];
+    app(App\Modules\Sessions\Public\AttendanceSigning::class)->validateExternal($next->id, 'fake', null, 'Marie Martin');
+    expect($flags())->toBe(['validated', 'validated', 'partial']);
+});

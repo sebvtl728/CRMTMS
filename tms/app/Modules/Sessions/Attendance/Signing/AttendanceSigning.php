@@ -123,14 +123,16 @@ final class AttendanceSigning
      * @throws ValidationException
      * @throws UserFacingHttpException
      */
-    public function sign(SignSlot $slot, string $enrolmentId, string $drawing, string $ip, string $agent, string $source = AttendanceSignature::ONLINE, ?CarbonImmutable $signedAt = null, bool $requireOpen = true): AttendanceSignature
+    public function sign(SignSlot $slot, string $enrolmentId, string $drawing, string $ip, string $agent, string $source = AttendanceSignature::ONLINE, ?CarbonImmutable $signedAt = null, bool $requireOpen = true, string $kind = AttendanceSignature::KIND_ON_TIME): AttendanceSignature
     {
         $png = $drawing === '' && $source !== AttendanceSignature::ONLINE ? null : SignatureDrawing::decode($drawing);
         $path = null;
         try {
-            return DB::transaction(function () use ($slot, $enrolmentId, $png, $ip, $agent, $source, $signedAt, $requireOpen, &$path): AttendanceSignature {
+            return DB::transaction(function () use ($slot, $enrolmentId, $png, $ip, $agent, $source, $signedAt, $requireOpen, $kind, &$path): AttendanceSignature {
                 $locked = SignSlot::query()->lockForUpdate()->findOrFail($slot->id);
-                if ($locked->isValidated() || ($requireOpen && $locked->status !== SignSlot::OPEN)) {
+                // A catch-up (on site, remote) signs a past half-day, validated or not; it waits for a confirmation.
+                $catchUp = $kind !== AttendanceSignature::KIND_ON_TIME;
+                if (! $catchUp && ($locked->isValidated() || ($requireOpen && $locked->status !== SignSlot::OPEN))) {
                     throw new UserFacingHttpException(409, $locked->isValidated() ? self::ALREADY_VALIDATED : self::NOT_OPEN);
                 }
                 $enrolment = Str::isUuid($enrolmentId) ? SlotSeances::expected($locked)->firstWhere('id', $enrolmentId) : null;
@@ -145,6 +147,7 @@ final class AttendanceSigning
                     'enrolment_id' => $enrolment->id,
                     'signed_at' => $signedAt ?? CarbonImmutable::now(),
                     'source' => $source,
+                    'kind' => $kind,
                     'ip' => $ip === '' ? null : mb_substr($ip, 0, 45),
                     'user_agent' => $agent === '' ? null : mb_substr($agent, 0, 300),
                 ]);

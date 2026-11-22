@@ -7,7 +7,7 @@ import { Label } from '@/components/ui/label';
 import { formatDateTime, formatDay, type Option } from '@/lib/crm';
 import { sendJson } from '@/lib/sessions';
 import { CheckCheck, ClipboardCheck, FileText, LoaderCircle, Lock, LockOpen, QrCode, Trash2 } from 'lucide-react';
-import { FormEventHandler, useCallback, useEffect, useState } from 'react';
+import { FormEventHandler, useCallback, useEffect, useRef, useState } from 'react';
 
 /** Attendance of a trainee at a séance (AttendanceRows::grid): names only, never needs, notes nor prices. */
 interface GridRow {
@@ -69,6 +69,8 @@ interface DaySlot {
     is_today: boolean;
     /** The séance's day is still to come: signing opens that day. */
     is_future: boolean;
+    /** A past day the user (a manager) may open a catch-up for. */
+    can_catch_up: boolean;
 }
 
 const SLOT_STATUS: Record<string, string> = { open: 'Ouvert', closed: 'Lien fermé', validated: 'Validé' };
@@ -82,6 +84,15 @@ function OnlineSigning({ seanceId, slots }: { seanceId: string; slots: DaySlot[]
     const open = async (half: string) => {
         setBusy(half);
         const answer = await sendJson<{ url: string }>('POST', route('seances.signing-slots', seanceId), { half });
+        setBusy(null);
+        if (answer.ok && answer.data) window.location.assign(answer.data.url);
+        else setError(answer.errors.half ?? answer.message);
+    };
+
+    const catchUp = async (half: string) => {
+        setBusy(half);
+        setError(null);
+        const answer = await sendJson<{ url: string }>('POST', route('seances.catch-up-slots', seanceId), { half });
         setBusy(null);
         if (answer.ok && answer.data) window.location.assign(answer.data.url);
         else setError(answer.errors.half ?? answer.message);
@@ -116,6 +127,14 @@ function OnlineSigning({ seanceId, slots }: { seanceId: string; slots: DaySlot[]
                                 {busy === s.half ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <QrCode className="h-4 w-4" />}
                                 {s.status === 'open' ? 'Afficher le QR code' : s.status === 'closed' ? 'Rouvrir' : "Ouvrir l'émargement"}
                             </Button>
+                        ) : s.can_catch_up ? (
+                            <span className="flex items-center gap-2">
+                                <span className="text-muted-foreground text-xs">Pas d'émargement en ligne ce jour-là</span>
+                                <Button variant="outline" size="sm" disabled={busy !== null} onClick={() => catchUp(s.half)}>
+                                    {busy === s.half && <LoaderCircle className="h-4 w-4 animate-spin" />}
+                                    Faire un rattrapage
+                                </Button>
+                            </span>
                         ) : (
                             <span className="text-muted-foreground text-xs">
                                 {s.is_future ? "S'ouvre le jour de la séance" : "Pas d'émargement en ligne ce jour-là"}
@@ -155,6 +174,8 @@ interface SessionAttendance {
         recorded: number;
         needs_review: number;
         expected: number;
+        /** Online signing of the half-days the séance touches: all validated, some, or none (null). */
+        signing: 'validated' | 'partial' | null;
     }[];
     monthly: {
         modules: { id: string; title: string; planned: string }[];
@@ -176,6 +197,22 @@ interface SessionAttendance {
     }[];
     /** Archived signed sheets of the session, the latest first. */
     signed_sheets: { id: string; month: string; month_label: string; generated_at: string | null; sha256: string; url: string }[];
+    /** Catch-ups of the month waiting for a confirmation (attendance managers only). */
+    catch_ups: CatchUp[];
+}
+
+interface CatchUp {
+    signature_id: string;
+    enrolment_id: string;
+    name: string;
+    date: string;
+    half: string;
+    half_label: string;
+    kind: string;
+    kind_label: string;
+    signed_at: string;
+    drawing_url: string | null;
+    manual_attendance: boolean;
 }
 
 /** 750 → « 12:30 ». */
@@ -441,10 +478,14 @@ export function AttendanceDialog({ seanceId, open, onClose }: { seanceId: string
                             })}
                         </ul>
                         <OnlineSigning seanceId={grid.seance.id} slots={grid.slots ?? []} />
-                        <section aria-labelledby="sheet-title" className="grid gap-3 rounded-md border p-3">
-                            <h3 id="sheet-title" className="font-medium">
-                                Feuille d'émargement
-                            </h3>
+                        <details className="group grid gap-3 rounded-md border p-3">
+                            <summary id="sheet-title" className="cursor-pointer font-medium">
+                                Émargement papier (secours)
+                            </summary>
+                            <p className="text-muted-foreground mt-2 text-sm">
+                                Sans réseau, sans téléphone ou à la demande d'un financeur : imprimez la feuille, faites-la signer, puis déposez le
+                                scan.
+                            </p>
                             <div className="flex flex-wrap gap-2">
                                 <Button asChild variant="outline" size="sm" disabled={grid.seance.cancelled}>
                                     <a href={route('seances.sheet', { seance: grid.seance.id })} target="_blank" rel="noreferrer">
@@ -503,7 +544,7 @@ export function AttendanceDialog({ seanceId, open, onClose }: { seanceId: string
                                 </label>
                                 <InputError message={scanError ?? undefined} />
                             </div>
-                        </section>
+                        </details>
                     </div>
                 )}
                 <DialogFooter>
@@ -625,6 +666,16 @@ function MonthlyCell({
  * hours, and its closure (closing locks attendance, hours and séances of
  * the month; reopening needs a reason).
  */
+/** Monday to Sunday of the current week, Paris days (YYYY-MM-DD). */
+function currentWeek(): { from: string; to: string } {
+    const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Paris' }).format(new Date());
+    const day = new Date(`${today}T12:00:00Z`);
+    const monday = new Date(day.getTime() - ((day.getUTCDay() + 6) % 7) * 86400000);
+    const sunday = new Date(monday.getTime() + 6 * 86400000);
+
+    return { from: monday.toISOString().slice(0, 10), to: sunday.toISOString().slice(0, 10) };
+}
+
 export function SessionAttendance({ sessionId }: { sessionId: string }) {
     const [data, setData] = useState<SessionAttendance | null>(null);
     const [month, setMonth] = useState<string | null>(null);
@@ -632,6 +683,7 @@ export function SessionAttendance({ sessionId }: { sessionId: string }) {
     const [seanceId, setSeanceId] = useState<string | null>(null);
     const [reopen, setReopen] = useState(false);
     const [busy, setBusy] = useState(false);
+    const seancesBox = useRef<HTMLDivElement>(null);
 
     const load = useCallback(
         (m: string | null) => {
@@ -650,6 +702,15 @@ export function SessionAttendance({ sessionId }: { sessionId: string }) {
 
     useEffect(() => load(null), [load]);
 
+    // The scroll area opens on the current week (the month's start otherwise), without moving the page.
+    useEffect(() => {
+        const box = seancesBox.current;
+        if (!box) return;
+        const row = box.querySelector<HTMLElement>('[data-this-week]');
+        const head = box.querySelector('thead')?.getBoundingClientRect().height ?? 0;
+        box.scrollTop = row ? row.offsetTop - head : 0;
+    }, [data?.month]);
+
     if (!data) {
         return error ? (
             <p className="text-destructive text-sm">{error}</p>
@@ -657,6 +718,8 @@ export function SessionAttendance({ sessionId }: { sessionId: string }) {
             <LoaderCircle className="h-5 w-5 animate-spin" aria-label="Chargement" />
         );
     }
+
+    const week = currentWeek();
 
     const current = data.months.find((m) => m.value === data.month);
     const label = current ? monthLabel(current.label) : data.month;
@@ -759,11 +822,11 @@ export function SessionAttendance({ sessionId }: { sessionId: string }) {
                 {data.seances.length === 0 ? (
                     <p className="text-muted-foreground text-sm">Aucune séance ce mois-ci.</p>
                 ) : (
-                    <div className="overflow-x-auto">
+                    <div ref={seancesBox} className="max-h-80 overflow-auto rounded-md border">
                         <table className="w-full text-sm">
-                            <thead className="text-muted-foreground text-left">
+                            <thead className="text-muted-foreground bg-background sticky top-0 z-10 text-left">
                                 <tr>
-                                    <th className="py-2 pr-3 font-normal">Date</th>
+                                    <th className="py-2 pr-3 pl-2 font-normal">Date</th>
                                     <th className="py-2 pr-3 font-normal">Horaires</th>
                                     <th className="py-2 pr-3 font-normal">Module</th>
                                     <th className="py-2 pr-3 font-normal">Formateur</th>
@@ -775,8 +838,12 @@ export function SessionAttendance({ sessionId }: { sessionId: string }) {
                             </thead>
                             <tbody>
                                 {data.seances.map((s) => (
-                                    <tr key={s.id} className={`border-t ${s.cancelled ? 'text-muted-foreground line-through' : ''}`}>
-                                        <td className="py-2 pr-3">{formatDay(s.date)}</td>
+                                    <tr
+                                        key={s.id}
+                                        data-this-week={s.date >= week.from && s.date <= week.to ? '' : undefined}
+                                        className={`border-t ${s.date >= week.from && s.date <= week.to ? 'bg-muted/50' : ''} ${s.cancelled ? 'text-muted-foreground line-through' : ''}`}
+                                    >
+                                        <td className="py-2 pr-3 pl-2">{formatDay(s.date)}</td>
                                         <td className="py-2 pr-3">
                                             {s.start}–{s.end} ({s.duration})
                                         </td>
@@ -792,9 +859,31 @@ export function SessionAttendance({ sessionId }: { sessionId: string }) {
                                         </td>
                                         <td className="py-2 text-right">
                                             {s.can_record && (
-                                                <Button type="button" size="sm" variant="outline" onClick={() => setSeanceId(s.id)}>
+                                                <Button
+                                                    type="button"
+                                                    size="sm"
+                                                    variant="outline"
+                                                    onClick={() => setSeanceId(s.id)}
+                                                    title={
+                                                        s.signing === 'validated'
+                                                            ? 'Signatures validées'
+                                                            : s.signing === 'partial'
+                                                              ? 'Signatures validées pour une demi-journée seulement'
+                                                              : undefined
+                                                    }
+                                                >
                                                     <ClipboardCheck className="h-4 w-4" />
                                                     Présences
+                                                    {s.signing && (
+                                                        <span
+                                                            className={`h-2 w-2 rounded-full ${s.signing === 'validated' ? 'bg-green-600' : 'bg-orange-500'}`}
+                                                            aria-label={
+                                                                s.signing === 'validated'
+                                                                    ? 'Signatures validées'
+                                                                    : 'Signatures validées pour une demi-journée seulement'
+                                                            }
+                                                        />
+                                                    )}
                                                 </Button>
                                             )}
                                         </td>
@@ -876,6 +965,7 @@ export function SessionAttendance({ sessionId }: { sessionId: string }) {
                         ))}
                     </ul>
                 )}
+                {data.catch_ups.length > 0 && <CatchUps catchUps={data.catch_ups} onChange={() => load(data.month)} />}
                 <SignedSheets
                     sessionId={sessionId}
                     month={data.month}
@@ -995,6 +1085,103 @@ function SignedSheets({
                 </ul>
             )}
             <InputError message={error ?? undefined} />
+        </div>
+    );
+}
+
+/** « Rattrapages à confirmer »: a catch-up counts as attendance once confirmed; refused, it stays as a trace. */
+function CatchUps({ catchUps, onChange }: { catchUps: CatchUp[]; onChange: () => void }) {
+    const [busy, setBusy] = useState<string | null>(null);
+    const [error, setError] = useState<string | null>(null);
+    const [refusing, setRefusing] = useState<CatchUp | null>(null);
+    const [reason, setReason] = useState('');
+    const [reasonError, setReasonError] = useState<string | undefined>();
+
+    const confirm = async (c: CatchUp) => {
+        setBusy(c.signature_id);
+        const answer = await sendJson('POST', route('sessions.catch-ups.confirm', c.signature_id));
+        setBusy(null);
+        if (answer.ok) {
+            setError(null);
+            onChange();
+        } else setError(answer.message);
+    };
+    const refuse = async () => {
+        if (!refusing) return;
+        setBusy(refusing.signature_id);
+        const answer = await sendJson('POST', route('sessions.catch-ups.refuse', refusing.signature_id), { reason });
+        setBusy(null);
+        if (answer.ok) {
+            setRefusing(null);
+            onChange();
+        } else setReasonError(answer.errors.reason ?? answer.message);
+    };
+
+    return (
+        <div className="grid gap-2 rounded-md border border-amber-300 p-3">
+            <span className="flex items-center gap-2 text-sm font-medium">
+                Rattrapages à confirmer <Badge variant="destructive">{catchUps.length}</Badge>
+            </span>
+            <p className="text-muted-foreground text-xs">
+                Signatures faites après coup (sur place ou à distance). Confirmer écrit la présence ; refuser garde la signature sans présence.
+            </p>
+            <ul className="divide-y rounded-md border text-sm">
+                {catchUps.map((c) => (
+                    <li key={c.signature_id} className="flex flex-wrap items-center justify-between gap-2 p-2">
+                        <span className="flex items-center gap-2">
+                            {c.drawing_url && (
+                                <img src={c.drawing_url} alt={`Signature de ${c.name}`} className="h-8 w-16 rounded border bg-white object-contain" />
+                            )}
+                            <span>
+                                {c.name} · {formatDay(c.date)} {c.half_label.toLowerCase()}
+                                <span className="text-muted-foreground block text-xs">
+                                    {c.kind_label}, signé le {formatDateTime(c.signed_at)}
+                                    {c.manual_attendance && ' · Présence saisie à la main : non modifiée'}
+                                </span>
+                            </span>
+                        </span>
+                        <span className="flex gap-2">
+                            <Button size="sm" disabled={busy !== null} onClick={() => confirm(c)}>
+                                Confirmer
+                            </Button>
+                            <Button
+                                size="sm"
+                                variant="outline"
+                                disabled={busy !== null}
+                                onClick={() => {
+                                    setRefusing(c);
+                                    setReason('');
+                                    setReasonError(undefined);
+                                }}
+                            >
+                                Refuser
+                            </Button>
+                        </span>
+                    </li>
+                ))}
+            </ul>
+            <InputError message={error ?? undefined} />
+            <Dialog open={refusing !== null} onOpenChange={(o) => !o && setRefusing(null)}>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>Refuser le rattrapage – {refusing?.name}</DialogTitle>
+                        <DialogDescription>La signature est gardée comme trace, sans présence. Indiquez pourquoi.</DialogDescription>
+                    </DialogHeader>
+                    <div className="grid gap-1">
+                        <Label htmlFor="refusal-reason">Motif</Label>
+                        <Input id="refusal-reason" maxLength={300} value={reason} onChange={(e) => setReason(e.target.value)} />
+                        <InputError message={reasonError} />
+                    </div>
+                    <DialogFooter>
+                        <Button variant="outline" onClick={() => setRefusing(null)}>
+                            Annuler
+                        </Button>
+                        <Button disabled={busy !== null || reason.trim() === ''} onClick={refuse}>
+                            Refuser
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
         </div>
     );
 }

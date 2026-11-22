@@ -28,6 +28,9 @@ final class SigningAnonymisation
             $paths = $signatures->clone()->whereNotNull('drawing_path')->pluck('drawing_path')->all();
             $signatures->clone()->where(fn ($q) => $q->whereNotNull('drawing_path')->orWhereNotNull('ip')->orWhereNotNull('user_agent'))
                 ->update(['drawing_path' => null, 'ip' => null, 'user_agent' => null, 'updated_at' => now()]);
+            // Remote catch-up links: the address erased, any live link closed.
+            DB::table('attendance_catch_up_links')->whereIn('enrolment_id', $enrolmentIds)
+                ->update(['email' => null, 'revoked_at' => DB::raw('coalesce(revoked_at, now())'), 'code_hash' => null, 'updated_at' => now()]);
         }
         if ($individualSessionIds !== []) {
             $sheets = DB::table('attendance_signed_sheets')->whereIn('training_session_id', $individualSessionIds);

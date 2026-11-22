@@ -138,6 +138,11 @@ final class AttendanceRows
             'realised' => SessionModules::label($r['realised_minutes']),
         ], RealisedHours::forSession($session->id, $month));
         usort($realised, fn (array $a, array $b) => strcmp(mb_strtolower($a['name']).$a['enrolment_id'], mb_strtolower($b['name']).$b['enrolment_id']));
+        // The validated half-days of the month: a day is « validated » when every half its séances touch is, « partial » when some are.
+        $validated = Signing\SignSlot::query()->where('training_session_id', $session->id)
+            ->whereBetween('date', [$first->toDateString(), $first->endOfMonth()->toDateString()])
+            ->where('status', Signing\SignSlot::VALIDATED)->get(['date', 'half'])
+            ->mapWithKeys(fn (Signing\SignSlot $slot) => [$slot->date->toDateString().'|'.$slot->half => true]);
 
         return [
             'month' => $month,
@@ -167,6 +172,7 @@ final class AttendanceRows
                 'recorded' => (int) ($counts[$s->id]->recorded ?? 0),
                 'needs_review' => (int) ($counts[$s->id]->review ?? 0),
                 'expected' => $enrolments->filter(fn (Enrolment $e) => self::attendsDay($e, $s->date))->count(),
+                'signing' => self::signing($s, $seances, $validated),
             ])->values()->all(),
             'monthly' => [
                 'modules' => $interval->map(fn (SessionModule $m) => [
@@ -183,6 +189,8 @@ final class AttendanceRows
             'realised' => $realised,
             'slots' => Signing\SlotRows::forMonth($session->id, $first),
             'signed_sheets' => Signing\SignedSheetController::list($session->id),
+            // Catch-ups to confirm: attendance managers only (never « Ses séances »).
+            'catch_ups' => $manage ? Signing\SlotRows::pendingCatchUps($session->id, $first) : [],
         ];
     }
 
@@ -217,5 +225,27 @@ final class AttendanceRows
     {
         return AttendanceClosure::query()->where('training_session_id', $sessionId)
             ->where('month', Months::of($date->toDateString())->toDateString())->whereNotNull('closed_at')->exists();
+    }
+
+    /**
+     * The day of the séance: « validated » when every half-day touched by its
+     * live séances that day is validated, « partial » when some are, null
+     * otherwise (a morning séance and an afternoon séance share their day).
+     *
+     * @param  Collection<int, Seance>  $seances  the month's séances
+     * @param  Collection<string, bool>  $validated  keys « date|half »
+     */
+    private static function signing(Seance $seance, Collection $seances, Collection $validated): ?string
+    {
+        $date = $seance->date->toDateString();
+        $halves = $seances->filter(fn (Seance $s) => $s->date->toDateString() === $date && ! $s->isCancelled())
+            ->flatMap(fn (Seance $s) => Signing\Halves::of($s->start(), $s->end()))->unique()->values()->all();
+        $done = count(array_filter($halves, fn (string $half) => $validated->has($date.'|'.$half)));
+
+        return match (true) {
+            $done === 0 => null,
+            $done === count($halves) => 'validated',
+            default => 'partial',
+        };
     }
 }

@@ -24,7 +24,7 @@ use Inertia\Response;
  */
 class SigningController extends Controller
 {
-    public function __construct(private readonly AttendanceSigning $signing, private readonly SlotValidation $validation) {}
+    public function __construct(private readonly AttendanceSigning $signing, private readonly SlotValidation $validation, private readonly OnsiteCatchUp $onsite, private readonly RemoteCatchUp $remote) {}
 
     /** Opens (or renews) a half-day of the séance's day; the séance reached, else 404. */
     public function open(Request $request, Seance $seance): JsonResponse
@@ -39,6 +39,23 @@ class SigningController extends Controller
         ['slot' => $slot, 'token' => $token] = $this->signing->open($session, $date, $data['half'], $user);
 
         return self::json(['slot_id' => $slot->id, 'url' => route('sessions.signing.show', $slot->id), 'public_url' => SlotQr::publicUrl($token)], 201);
+    }
+
+    /**
+     * Prepares the catch-up of a past half-day of the séance's day (created
+     * closed when never opened): a manager's act (SlotRows::mayCatchUpOn),
+     * 403 otherwise; the séance reached, else 404.
+     */
+    public function prepareCatchUp(Request $request, Seance $seance): JsonResponse
+    {
+        $user = self::user($request);
+        abort_unless(self::reaches($user, [$seance->id]), 404);
+        abort_unless(SlotRows::mayCatchUpOn($seance->training_session_id, $user), 403);
+        $data = $request->validate(['half' => ['required', 'in:'.implode(',', SignSlot::HALVES)]], ['half.*' => 'Demi-journée inconnue.']);
+        $session = TrainingSession::query()->findOrFail($seance->training_session_id);
+        $slot = $this->onsite->prepare($session, $seance->date->toDateString(), $data['half'], $user);
+
+        return self::json(['slot_id' => $slot->id, 'url' => route('sessions.signing.show', $slot->id)]);
     }
 
     public function show(Request $request, string $slot): Response
@@ -97,6 +114,36 @@ class SigningController extends Controller
         $enrolments->update($enrolment, ['entered_on' => $found->date->toDateString()]);
 
         return self::json(SlotRows::state($found, $user));
+    }
+
+    /** Opens (or renews) the on-site catch-up of a past half-day: the state and the public link, once. */
+    public function openCatchUp(Request $request, string $slot): JsonResponse
+    {
+        $found = self::slot($request, $slot);
+        abort_unless(SlotRows::mayCatchUp($found, self::user($request)), 403);
+        $token = $this->onsite->open($found, self::user($request));
+        $state = SlotRows::state($found->fresh() ?? $found, self::user($request));
+
+        return self::json([...$state, 'catch_up' => [...$state['catch_up'], 'public_url' => url('/emargement/r/'.$token)]]);
+    }
+
+    /** Sends one trainee the personal link of a remote catch-up. */
+    public function sendCatchUpLink(Request $request, string $slot): JsonResponse
+    {
+        $found = self::slot($request, $slot);
+        abort_unless(SlotRows::mayCatchUp($found, self::user($request)), 403);
+        $this->remote->send($found, (string) $request->input('enrolment_id', ''), (string) $request->input('email', ''), self::user($request));
+
+        return self::json(SlotRows::state($found->fresh() ?? $found, self::user($request)));
+    }
+
+    public function closeCatchUp(Request $request, string $slot): JsonResponse
+    {
+        $found = self::slot($request, $slot);
+        abort_unless(SlotRows::mayCatchUp($found, self::user($request)), 403);
+        $this->onsite->close($found);
+
+        return self::json(SlotRows::state($found->fresh() ?? $found, self::user($request)));
     }
 
     /** The slot reached by the user (one of its séances within the scope of sessions.attendance.manage), else 404. */

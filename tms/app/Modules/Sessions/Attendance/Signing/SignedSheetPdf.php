@@ -76,6 +76,8 @@ final class SignedSheetPdf
         $image = fn (?string $path) => $path !== null && $disk->exists($path) ? 'data:image/png;base64,'.base64_encode((string) $disk->get($path)) : null;
         $hour = fn ($at) => $at === null ? null : CarbonImmutable::parse($at)->setTimezone('Europe/Paris')->format('H:i');
         $annex = [];
+        $reviewers = User::query()->whereKey($signatures->pluck('confirmed_by')->filter()->unique()->values()->all())->pluck('name', 'id');
+        $catchUps = false;
 
         $days = [];
         foreach ($seances->groupBy(fn (Seance $s) => $s->date->toDateString()) as $date => $daySeances) {
@@ -104,6 +106,14 @@ final class SignedSheetPdf
                 $cells = [];
                 foreach ($halves as $half => $h) {
                     $sig = $h['slot'] === null ? null : ($signatures[$h['slot']->id.'|'.$e->id] ?? null);
+                    $catchUp = $sig !== null && $sig->kind !== AttendanceSignature::KIND_ON_TIME;
+                    $catchUps = $catchUps || $catchUp;
+                    if ($catchUp && $sig->refused_at !== null) {
+                        $sig = null;
+                        $cells[$half] = ['state' => 'catch_up_refused', 'image' => null, 'hour' => null, 'source' => null, 'mention' => 'Rattrapage refusé'];
+
+                        continue;
+                    }
                     if ($sig?->drawing_sha256 !== null) {
                         $annex[] = ['name' => $names[$e->id] ?? 'Stagiaire', 'when' => $date.' '.$h['label'], 'sha256' => $sig->drawing_sha256];
                     }
@@ -117,6 +127,10 @@ final class SignedSheetPdf
                         'image' => $image($sig?->drawing_path),
                         'hour' => $hour($sig?->signed_at),
                         'source' => $sig?->source,
+                        'mention' => ! $catchUp ? null : ($sig->confirmed_at === null ? 'Rattrapage à confirmer'
+                            : 'Signé en rattrapage le '.$sig->signed_at->setTimezone('Europe/Paris')->format('d/m/Y à H:i')
+                                .($sig->kind === AttendanceSignature::KIND_ONSITE ? ' (sur place)' : ' (à distance, code e-mail)')
+                                .', confirmé par '.($reviewers[$sig->confirmed_by] ?? '-').' le '.$sig->confirmed_at->setTimezone('Europe/Paris')->format('d/m/Y')),
                     ];
                 }
                 $mine = ($attendance[$e->id] ?? collect())->whereIn('seance_id', $daySeances->pluck('id')->all());
@@ -147,6 +161,7 @@ final class SignedSheetPdf
             'closed' => $closure !== null && $closure->isClosed() ? 'Mois clôturé le '.$closure->closed_at?->setTimezone('Europe/Paris')->format('d/m/Y') : 'Mois non clôturé',
             'days' => $days,
             'annex' => $annex,
+            'catch_ups' => $catchUps,
             'generated' => CarbonImmutable::now('Europe/Paris')->format('d/m/Y à H:i'),
         ])->render();
     }
