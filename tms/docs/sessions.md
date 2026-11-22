@@ -259,7 +259,7 @@ Les stagiaires signent leur présence **sur leur téléphone**, sans compte, une
 
 **Qui valide** : le formateur de la séance, ou un gestionnaire des présences (droit « Saisir les présences » sur un autre périmètre que « Ses séances ») ; la feuille indique le nom et la qualité du valideur. Si une demi-journée réunit les séances de deux formateurs, seul un gestionnaire la valide. La validation reste possible **les jours suivants** tant que le mois n'est pas clôturé ; l'onglet Présences de la session liste les demi-journées du mois et signale en rouge celles **à valider**. Un mois clôturé refuse ouverture et validation (409).
 
-**Rattrapage** (un stagiaire présent n'a pas signé) : sur l'écran d'une demi-journée **passée** (ouverte au moins une fois, mois non clôturé), le bloc **Rattrapage** propose :
+**Rattrapage** (un stagiaire présent n'a pas signé) : sur l'écran d'une demi-journée **passée** (ouverte au moins une fois, mois non clôturé), le bloc **Rattrapage** propose, aux seuls gestionnaires des présences (jamais « Ses séances » : un formateur ne lance pas de rattrapage) :
 - **Rattrapage sur place** : un lien propre au rattrapage, valable jusqu'à minuit, à ouvrir sur l'appareil qu'on passe au stagiaire (**Ouvrir la page de signature ici**) ; la page ne liste que les stagiaires attendus qui n'ont pas signé ; **Fermer le rattrapage** le coupe ;
 - **Envoyer un lien** (sur la ligne du stagiaire, adresse de sa fiche préremplie) : un lien personnel par e-mail, valable 7 jours et utilisable une fois (un nouvel envoi remplace le précédent). Le stagiaire coche « Je confirme avoir été présent(e) à cette demi-journée. », reçoit un **code à 6 chiffres** par e-mail (10 minutes, 5 essais, un nouveau code au plus par minute), dessine sa signature et signe.
 

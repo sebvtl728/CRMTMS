@@ -103,6 +103,7 @@ class SigningController extends Controller
     public function openCatchUp(Request $request, string $slot): JsonResponse
     {
         $found = self::slot($request, $slot);
+        abort_unless(SlotRows::mayCatchUp($found, self::user($request)), 403);
         $token = $this->onsite->open($found, self::user($request));
         $state = SlotRows::state($found->fresh() ?? $found, self::user($request));
 
@@ -113,6 +114,7 @@ class SigningController extends Controller
     public function sendCatchUpLink(Request $request, string $slot): JsonResponse
     {
         $found = self::slot($request, $slot);
+        abort_unless(SlotRows::mayCatchUp($found, self::user($request)), 403);
         $this->remote->send($found, (string) $request->input('enrolment_id', ''), (string) $request->input('email', ''), self::user($request));
 
         return self::json(SlotRows::state($found->fresh() ?? $found, self::user($request)));
@@ -121,6 +123,7 @@ class SigningController extends Controller
     public function closeCatchUp(Request $request, string $slot): JsonResponse
     {
         $found = self::slot($request, $slot);
+        abort_unless(SlotRows::mayCatchUp($found, self::user($request)), 403);
         $this->onsite->close($found);
 
         return self::json(SlotRows::state($found->fresh() ?? $found, self::user($request)));

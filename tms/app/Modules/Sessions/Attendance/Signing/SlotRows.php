@@ -2,6 +2,8 @@
 
 namespace App\Modules\Sessions\Attendance\Signing;
 
+use App\Modules\Core\Access\AccessScope;
+use App\Modules\Core\Access\Scopes;
 use App\Modules\Core\Users\User;
 use App\Modules\Crm\Public\Fiches;
 use App\Modules\Sessions\Attendance\Attendance;
@@ -51,7 +53,7 @@ final class SlotRows
             'validated_at' => $slot->validated_at?->toIso8601String(),
             'validated_by' => $slot->trainer_name,
             // On-site catch-up of a past half-day (the link is shown once, when opened).
-            'can_catch_up' => $slot->date->toDateString() < TrainingSession::today()->toDateString(),
+            'can_catch_up' => $user !== null && $slot->date->toDateString() < TrainingSession::today()->toDateString() && self::mayCatchUp($slot, $user),
             'catch_up' => [
                 'open' => $slot->catch_up_token_hash !== null && $slot->catch_up_expires_at?->isFuture() === true,
                 'public_url' => null,
@@ -96,6 +98,17 @@ final class SlotRows
             ->where('entered_on', '>', $date)
             ->where(fn ($q) => $q->whereNull('left_on')->orWhere('left_on', '>=', $date))
             ->orderBy('id')->get()->values();
+    }
+
+    /**
+     * Opening a catch-up (on-site QR, remote link) is a manager's act:
+     * « Saisir les présences » on a scope other than « Ses séances », reaching
+     * the slot's session. A trainer still sees the half-day.
+     */
+    public static function mayCatchUp(SignSlot $slot, User $user): bool
+    {
+        return Scopes::of($user, Permissions::ATTENDANCE_MANAGE) !== AccessScope::Trainer
+            && SessionsVisibility::sessions(TrainingSession::query()->whereKey($slot->training_session_id), $user, Permissions::ATTENDANCE_MANAGE)->exists();
     }
 
     /** The user holds « Faire entrer un stagiaire en formation » on the slot's session. */

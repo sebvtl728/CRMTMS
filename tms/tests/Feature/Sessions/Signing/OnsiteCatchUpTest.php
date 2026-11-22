@@ -1,10 +1,12 @@
 <?php
 
+use App\Modules\Core\Access\Role;
 use App\Modules\Core\Tenancy\TenantStorage;
 use App\Modules\Sessions\Attendance\Attendance;
 use App\Modules\Sessions\Attendance\Closures;
 use App\Modules\Sessions\Attendance\Signing\AttendanceSignature;
 use App\Modules\Sessions\Public\AttendanceSigning;
+use App\Modules\Sessions\Trainers\Trainers;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\Storage;
 use Inertia\Testing\AssertableInertia;
@@ -114,4 +116,22 @@ it('never lets the normal link of a past day be used for signing', function () {
 
     $this->get("/emargement/{$token}")->assertNotFound();
     $this->get("/emargement/r/{$token}")->assertNotFound();
+});
+
+it('reserves opening a catch-up to managers: a trainer sees the half-day, never opens one', function () {
+    $formateur = userWithRole(Role::Formateur);
+    $trainer = Trainers::forUser($formateur) ?? Trainers::ensureForUser($formateur);
+    $session = plSession();
+    plSeance(plModule($session), '2026-09-10', '09:00', '12:00', ['trainer_id' => $trainer->id]);
+    $lea = atEnrol($session, 'Durand');
+    $slotId = sgOpen($session)['slot']->id;
+    sgNow('2026-09-11 10:00');
+
+    $this->actingAs($formateur)->getJson("/sessions/emargement/{$slotId}/state")->assertOk()->assertJsonPath('can_catch_up', false);
+    $this->postJson("/sessions/emargement/{$slotId}/catch-up")->assertForbidden();
+    $this->postJson("/sessions/emargement/{$slotId}/catch-up/close")->assertForbidden();
+    $this->postJson("/sessions/emargement/{$slotId}/catch-up-links", ['enrolment_id' => $lea->id, 'email' => 'lea@example.test'])->assertForbidden();
+
+    $this->flushSession();
+    $this->actingAs(atManager())->getJson("/sessions/emargement/{$slotId}/state")->assertOk()->assertJsonPath('can_catch_up', true);
 });
