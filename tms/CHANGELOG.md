@@ -5,13 +5,14 @@ Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) ; ve
 
 ## [Non publié]
 
+## [0.14.3] - 2026-11-22
+
 ### Ajouté
 
 - Commande `tms:platform-admin <e-mail>` : désigne l'opérateur de la plateforme, qui ouvre **Horizon** (suivi des
   tâches en échec), depuis le serveur seulement.
 - La vérification d'intégrité des factures (`tms:finance:verify`) tourne chaque nuit à 4 h 10 ; une rupture alerte
   l'administrateur de l'instance.
-
 - **Attestations et certificats de réalisation automatiques** (Administration › Automatismes, désactivé par
   défaut) : émis et envoyés le matin qui suit la clôture du mois du dernier jour de la session ; un document annulé
   n'est jamais refait.

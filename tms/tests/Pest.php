@@ -25,6 +25,7 @@ use App\Modules\Crm\Organisations\Organisation;
 use App\Modules\Crm\People\Person;
 use App\Modules\Crm\Quotes\Quote;
 use App\Modules\Crm\Quotes\QuoteWriter;
+use Carbon\CarbonImmutable;
 use Illuminate\Filesystem\Filesystem;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
@@ -52,7 +53,7 @@ pest()->extend(TestCase::class)
     // that would break when the real date moves.
     ->beforeEach(function () {
         if (is_string($now = getenv('TMS_TEST_NOW')) && $now !== '') {
-            $this->travelTo(\Carbon\CarbonImmutable::parse($now.' 10:00', 'Europe/Paris'));
+            $this->travelTo(CarbonImmutable::parse($now.' 10:00', 'Europe/Paris'));
         }
     })
     ->in('Feature', 'Unit', 'Arch');

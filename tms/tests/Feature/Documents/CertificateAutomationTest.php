@@ -7,7 +7,9 @@ use App\Modules\Documents\DocumentIssuer;
 use App\Modules\Documents\DocumentStatus;
 use App\Modules\Documents\Texts\DocumentType;
 use App\Modules\Sessions\Attendance\Attendance;
+use App\Modules\Sessions\Attendance\Attendances;
 use App\Modules\Sessions\Attendance\Closures;
+use App\Modules\Sessions\Planning\Seance;
 use App\Modules\Sessions\Sessions\TrainingSession;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\Mail;
@@ -26,8 +28,8 @@ beforeEach(function () {
 /** Every séance of the session attended by all. */
 function ctPresent(TrainingSession $session): void
 {
-    \App\Modules\Sessions\Planning\Seance::query()->where('training_session_id', $session->id)->get()
-        ->each(fn ($seance) => app(\App\Modules\Sessions\Attendance\Attendances::class)->allPresent($seance));
+    Seance::query()->where('training_session_id', $session->id)->get()
+        ->each(fn ($seance) => app(Attendances::class)->allPresent($seance));
 }
 
 function ctRun(): int
