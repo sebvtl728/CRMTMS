@@ -5,10 +5,7 @@ Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) ; ve
 
 ## [Non publié]
 
-### Modifié
-
-- **Financement par le contractant** : cocher « Paie directement l'organisme » n'est plus refusé ; la case est sans
-  effet pour lui (il reçoit déjà la facture du reste à charge).
+## [0.15.0] - 2026-11-23
 
 ### Ajouté
 
@@ -17,8 +14,16 @@ Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) ; ve
   mesures automatiques sur 12 mois sur la fiche de l'indicateur.
 - **Types d'organisation** (référentiel paramétrable) : Entreprise cliente, OPCO, Financeur public, Sous-traitant,
   Co-traitant, Prescripteur, plusieurs par fiche ; filtre de la liste, export, réunis à la fusion.
+- **OPCO proposé depuis l'IDCC** : la fiche d'un OPCO liste les conventions collectives qu'il couvre ; à l'ajout d'un
+  financement, l'OPCO de la convention du contractant est proposé d'office.
+- **Convention de formation** : le SIRET et l'IDCC de l'entreprise contractante s'impriment sous son nom.
 - **Coordonnées bancaires** de la société (Administration › Sociétés) : banque, IBAN (clé vérifiée) et BIC, imprimés
   sur chaque facture (« Règlement par virement »), jamais sur un avoir.
+
+### Modifié
+
+- **Financement par le contractant** : cocher « Paie directement l'organisme » n'est plus refusé ; la case est sans
+  effet pour lui (il reçoit déjà la facture du reste à charge).
 
 ## [0.14.5] - 2026-11-22
 

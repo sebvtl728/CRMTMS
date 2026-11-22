@@ -3,6 +3,7 @@
 use App\Exceptions\UserFacingHttpException;
 use App\Modules\Core\Companies\Company;
 use App\Modules\Core\Tenancy\TenantStorage;
+use App\Modules\Crm\Organisations\Organisation;
 use App\Modules\Documents\Document;
 use App\Modules\Documents\DocumentIssuer;
 use App\Modules\Documents\DocumentPdf;
@@ -125,4 +126,14 @@ it('answers 410 when the archive is lost or altered', function () {
 
     Storage::disk(TenantStorage::DISK)->delete($doc->pdf_path);
     expect(fn () => DocumentPdf::archived($doc))->toThrow(fn (UserFacingHttpException $e) => expect($e->getStatusCode())->toBe(410));
+});
+
+it('prints the SIRET and the IDCC of the entreprise on its convention', function () {
+    $dossier = docCompanyDossier();
+    Organisation::query()->whereKey($dossier->account_organisation_id)->update(['siret' => '73282932000074', 'idcc' => '1979']);
+
+    $doc = app(DocumentIssuer::class)->issue(admin(), DocumentType::Convention, $dossier->id);
+
+    expect($doc->recipient_snapshot)->toMatchArray(['siret' => '73282932000074', 'idcc' => '1979'])
+        ->and(docSentHtml())->toContain('SIRET 732 829 320 00074', 'IDCC 1979 (convention collective)');
 });

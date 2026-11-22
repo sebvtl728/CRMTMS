@@ -250,6 +250,7 @@ class DocumentIssuer
             'city' => $identity['city'],
             'email' => $email ?? ($type === DocumentType::Convention ? $identity['email'] : null),
             'person_id' => $contactId,
+            ...($contractor['type'] === 'organisation' ? ($this->fiches->organisationCodes($contractor['id']) ?? []) : []),
         ];
     }
 }
