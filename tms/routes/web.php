@@ -32,6 +32,7 @@ require __DIR__.'/crm-quotes.php';
 require __DIR__.'/crm-brochures.php';
 require __DIR__.'/crm-revenue.php';
 require __DIR__.'/crm-settings.php';
+require __DIR__.'/automation.php';
 require __DIR__.'/catalogue.php';
 require __DIR__.'/sessions.php';
 require __DIR__.'/finance.php';
