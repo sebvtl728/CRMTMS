@@ -49,3 +49,11 @@ alternance, sous-traitance…). Les boutons filtrent par statut ou n'affichent q
 
 Chaque export est inscrit au journal d'audit. Si le moteur PDF est indisponible, l'export répond « service
 indisponible » et rien n'est téléchargé.
+
+## 5. Registres : réclamations et amélioration continue
+
+Menu **Qualité › Réclamations** et **Qualité › Amélioration continue** : lecture avec « Voir le dossier Qualiopi », saisie avec « Tenir le dossier Qualiopi ».
+
+- **Réclamations** (indicateur 31) : date de réception, canal (référentiel « Canaux de réception des réclamations » : E-mail, Téléphone, Courrier, Questionnaire, Oral, Autre), émise par, objet, description, état (**Ouverte**, **En cours**, **Close**), réponse apportée et sa date. Une réclamation ne se clôt qu'avec sa réponse et sa date, qui ne précède jamais la réception. « Émise par », la description et la réponse peuvent contenir des données personnelles : jamais en clair dans le journal.
+- **Actions d'amélioration** (indicateur 32) : action, description, origine (référentiel « Origines des actions d'amélioration » : Réclamation, Questionnaire, Audit, Interne, Veille), réclamation liée, responsable, échéance, état (**Prévue**, **En cours**, **Réalisée**, **Abandonnée**), date de réalisation et résultat (obligatoires pour une action réalisée). Une échéance dépassée s'affiche « en retard ».
+- **Mesures automatiques** sur la fiche de l'indicateur, sur 12 mois : réclamations reçues (closes, délai moyen de réponse, ouvertes) pour le 31 ; actions réalisées sur le total et actions en retard pour le 32 (les abandonnées ne comptent pas).
