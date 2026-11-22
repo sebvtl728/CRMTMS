@@ -3,7 +3,7 @@
 Fil rouge : **une entreprise cliente demande une formation pour trois salariés**. On suit l'affaire du premier contact
 à l'encaissement, puis on montre la qualité (Qualiopi). Durée visée : **45 minutes** + questions.
 
-> Version à installer sur le serveur avant la démo : **v0.13.0** (`sudo /opt/tms/ops/update.sh`).
+> Version à installer sur le serveur avant la démo : **v0.14.3** (`sudo /opt/tms/ops/update.sh`).
 
 ---
 
@@ -24,8 +24,10 @@ Sur le Mac ou le serveur de démonstration :
    **450 € HT par stagiaire**, DAS renseigné, une plaquette PDF jointe.
 6. **Fiches** : une entreprise « Restaurant Le Bon Goût » (SIRET fictif) avec un interlocuteur (toi) et trois salariés
    (Léa Durand, Marc Petit, Sami Benali).
-7. **Comptes** : un compte formateur fictif (rôle Formateur) relié à une fiche formateur, pour montrer « Mon planning ».
-8. Ouvrir à l'avance, dans des onglets : Accueil, Pipeline, la fiche entreprise.
+7. **Automatismes** (Administration › Automatismes) : convocations à **7 jours**, rappel de la veille coché,
+   relance des signatures à 3 jours (2 relances au plus), **attestations automatiques cochées** pour la démo.
+8. **Comptes** : un compte formateur fictif (rôle Formateur) relié à une fiche formateur, pour montrer « Mon planning ».
+9. Ouvrir à l'avance, dans des onglets : Accueil, Pipeline, la fiche entreprise.
 
 Pour gagner du temps le jour J, **préparer deux exemplaires** de l'affaire : un « vierge » pour le déroulé en direct,
 un « terminé » (session passée, mois clôturé, facture validée) pour montrer la fin sans attendre.
@@ -36,6 +38,10 @@ un « terminé » (session passée, mois clôturé, facture validée) pour montr
 
 - **Accueil** : relances du jour, pipeline pondéré du mois, taux de réussite des devis, prochains rendez-vous, sessions
   qui démarrent dans les 7 jours. Message : « chacun voit d'abord ce qu'il a à faire aujourd'hui ».
+- **À traiter** (menu, avec son total) : une seule page regroupe ce qui attend quelqu'un : devis sans réponse,
+  actions commerciales, sessions proches avec des étapes à faire, rattrapages à confirmer, demi-journées non validées,
+  candidatures, montants à facturer, factures à relancer. Chaque ligne ouvre
+  l'écran filtré. Message : « rien ne tombe entre deux chaises ».
 - **Ctrl K** : rechercher « Bon Goût » → fiche entreprise : interlocuteurs, historique, formations d'intérêt.
 - Point fort à dire : **droits par périmètre** (ses fiches, son DAS, tout) et double authentification pour la
   direction.
@@ -46,17 +52,20 @@ un « terminé » (session passée, mois clôturé, facture validée) pour montr
 2. **Pipeline** : glisser la carte d'une étape à l'autre (motif demandé pour « Perdu »).
 3. Depuis l'opportunité : **Nouveau devis** → lignes préremplies depuis le catalogue (3 × 450 € HT), TVA (ou
    exonération selon la société), totaux au centime.
-4. **Aperçu PDF** (filigrane BROUILLON), puis **Envoyer** avec la plaquette cochée → l'opportunité passe d'elle-même à
-   « Proposition ». Montrer l'e-mail reçu sur ton téléphone.
-5. **Faire signer en ligne** → sur le téléphone : ouvrir le lien, cocher, recevoir le code, **dessiner la signature**,
-   signer. Revenir : le devis est **Accepté**, PDF signé avec page de preuve.
+4. **Aperçu PDF** (filigrane BROUILLON), puis **Envoyer** avec la plaquette cochée et **Joindre un lien de signature
+   en ligne** (cochée par défaut) → un **seul e-mail** porte le devis, la plaquette et le lien « bon pour accord » ;
+   l'opportunité passe d'elle-même à « Proposition ». Le bandeau en bas de l'écran confirme l'envoi.
+5. Sur le téléphone : ouvrir l'e-mail, le lien, **recevoir le code** puis **dessiner la signature**, accepter, signer.
+   Revenir : le devis est **Accepté**, PDF signé avec page de preuve. Dire : sans réponse, le client est relancé seul
+   (nouveau lien à chaque relance).
 6. Passer l'opportunité en **Gagné** (montant repris du devis).
 
 ## 3. Du devis au dossier (5 min)
 
 1. Sur le devis accepté : **Créer le dossier** → assistant en trois écrans : récapitulatif, **nouvelle session** intra
    pour l'entreprise (intitulé « HACCP — Le Bon Goût — décembre »), les **trois stagiaires** choisis parmi les salariés.
-2. Tout est créé d'un coup : dossier `D-2026-…`, session `S-2026-…`, inscriptions, financement initial.
+2. Tout est créé d'un coup : dossier `D-2026-…`, session `S-2026-…`, inscriptions, financement initial. La session
+   reçoit **sa couleur** (pastille dans la liste, bord de sa carte dans les colonnes, en tête de sa page).
 3. Montrer : un devis ne donne qu'un dossier (le bouton devient **Voir le dossier**).
 
 ## 4. Préparer la session (7 min)
@@ -66,12 +75,16 @@ Page de la session, barre d'étapes :
 1. **Synthèse** : cartes d'avancement (heures planifiées, formateurs, salles, inscriptions, financements…), toutes « À
    faire » au départ. Message : « la session dit elle-même ce qui manque ».
 2. **Planning** : l'assistant de séances génère 2 jours de 9 h–12 h 30 / 13 h 30–17 h, formateur et salle → les cartes
-   passent au vert ; un conflit (formateur pris ailleurs) est signalé.
+   passent au vert ; un conflit (formateur pris ailleurs) est signalé. **Planning des séances** : chaque séance porte
+   la couleur de sa session, on repère d'un coup d'œil ce qui appartient à quoi.
 3. **Financements** (page du dossier) : ajouter l'OPCO, montant, « Paie directement l'organisme », état « Accordé » →
    « Reste à financer » se met à jour.
 4. **Documents** (page du dossier) : **Émettre : convention de formation** → PDF numéroté, archivé ; **Demander la
    signature** (même parcours que le devis).
-5. **Documents des stagiaires** (étape Stagiaires) : **Émettre pour tous** les convocations, **Envoyer à tous**.
+5. **Documents des stagiaires** (étape Stagiaires) : l'encart annonce **« Envoi automatique »** des convocations
+   (7 jours avant le début, session confirmée). Cliquer **Émettre pour tous** : la fenêtre propose **Laisser l'envoi
+   automatique** ou **Émettre et envoyer maintenant** → choisir maintenant pour la démo. Dire : la veille de chaque
+   journée, stagiaires et formateurs reçoivent un rappel seuls.
 6. Se connecter en **formateur** (autre navigateur) : « Mon planning » ne montre que ses séances et ses stagiaires,
    jamais les prix ni les financements.
 
@@ -82,6 +95,9 @@ Sur l'exemplaire « terminé » :
 1. Étape **Suivi**, onglet **Présences** : **Tous présents**, puis une exception (Sami : partiel 5 h).
 2. **Clôturer le mois** → plus rien ne bouge ; la session passe **Terminée**.
 3. **Documents des stagiaires** : attestations et certificats de réalisation (heures réalisées reprises des présences).
+   Dire : avec l'automatisme coché, ils sont **émis et envoyés seuls** le matin qui suit la clôture du mois de fin
+   (jamais pour un stagiaire à 0 h). Pour le montrer sans attendre : Administration › Automatismes › **Exécuter
+   maintenant**.
 
 ## 6. Émargement en ligne et rattrapage (7 min)
 
@@ -132,7 +148,9 @@ Sur l'exemplaire « terminé » :
 - Hébergé chez CAP FORMATION (Proxmox), sauvegarde chiffrée chaque nuit, mise à jour en une commande avec retour
   arrière automatique.
 - **Test réel début décembre** avec l'équipe : comptes, rôles, double authentification, e-mails.
-- Déjà prévu ensuite : acomptes par financeur, dépôt Chorus, export Sage.
+- **Déroulement automatique** : convocations, rappel de la veille, relance des signatures, attestations ; chaque
+  envoi ne part qu'une fois, réglable dans Administration › Automatismes.
+- Déjà prévu ensuite : import Formevol, acomptes par financeur, dépôt Chorus, export Sage.
 
 ---
 
@@ -145,4 +163,5 @@ Sur l'exemplaire « terminé » :
 | Lien ou QR code qui ne s'ouvre pas sur le téléphone | Vérifier le Wi-Fi commun et `APP_URL` ; sinon ouvrir le lien sur le Mac. |
 | PDF qui ne se génère pas | Gotenberg arrêté : `docker compose up -d` dans `tms/`, réessayer (aucun numéro n'est perdu). |
 | Page blanche | Le serveur Vite tourne : `docker compose stop vite && rm -f public/hot`. |
+| Un automatisme n'a rien envoyé | Session **confirmée** ? Première séance dans la fenêtre (J+2 à J+7) ? Puis **Exécuter maintenant** (Administration › Automatismes). |
 | Lenteur ou erreur au milieu | Basculer sur l'exemplaire « terminé » préparé la veille. |
