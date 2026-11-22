@@ -814,7 +814,8 @@ Colonnes ajoutées (lot 1e) : `organisations` et `people` : `future_needs` (text
 ### `automation_sends` — envois automatiques (2026-11-22)
 
 `kind` (`convocation` : sujet = inscription, occurrence `1` ; `day_before` : sujet = inscription ou formateur,
-occurrence = date du lendemain ; `signature_reminder` : sujet = demande de signature, occurrence = numéro de relance) ·
+occurrence = date du lendemain ; `signature_reminder` : sujet = demande de signature, occurrence = numéro de relance ;
+`certificate` : sujet = inscription, occurrence `completion` ou `realisation`) ·
 `subject_id` · `occurrence` · `sent_at`. Unique (`kind`, `subject_id`, `occurrence`) : un envoi automatique ne part
 qu'une fois, même si la tâche est relancée. Aucune donnée personnelle.
 

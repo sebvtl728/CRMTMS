@@ -1,5 +1,6 @@
 <?php
 
+use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Schedule;
 
 // Console commands are classes in app/Console/Commands (auto-discovered).
@@ -34,3 +35,7 @@ Schedule::command('tms:sessions:follow-ups')->dailyAt('06:30')->timezone('Europe
 // 0.11: the hot questionnaires nobody launched and the cold ones due today.
 Schedule::command('tms:questionnaires:daily')->dailyAt('07:00')->timezone('Europe/Paris')->withoutOverlapping()->onOneServer();
 Schedule::command('tms:automation:daily')->dailyAt('07:15')->timezone('Europe/Paris')->withoutOverlapping()->onOneServer();
+// Inaltérabilité des factures (NF203) : la chaîne du journal et les archives PDF sont vérifiées chaque nuit ; une
+// rupture alerte l'administrateur de l'instance.
+Schedule::command('tms:finance:verify')->dailyAt('04:10')->timezone('Europe/Paris')->withoutOverlapping()->onOneServer()
+    ->onFailure(fn () => Artisan::call('tms:alert', ['--subject' => 'Vérification des factures en échec', 'message' => 'La commande tms:finance:verify a échoué ou détecté une rupture du journal des factures ou une archive PDF modifiée. Lancez-la à la main pour le détail.']));

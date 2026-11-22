@@ -19,6 +19,7 @@ final class AutomationSettings
         'day_before' => true,
         'signature_reminder_days' => 3,
         'signature_reminder_max' => 2,
+        'certificates' => false,
     ];
 
     public const MAX_DAYS = 30;
@@ -37,6 +38,14 @@ final class AutomationSettings
         return is_bool($value) ? $value : self::DEFAULTS['day_before'];
     }
 
+    /** Certificates (completion, realisation) issued and sent once the month of the last day is closed: off by default. */
+    public static function certificates(): bool
+    {
+        $value = data_get(self::settings(), 'automation.certificates');
+
+        return is_bool($value) ? $value : self::DEFAULTS['certificates'];
+    }
+
     public static function signatureReminderDays(): int
     {
         return self::int('signature_reminder_days', self::MAX_DAYS);
@@ -47,7 +56,7 @@ final class AutomationSettings
         return self::int('signature_reminder_max', self::MAX_REMINDERS);
     }
 
-    /** @return array{convocation_days: int, day_before: bool, signature_reminder_days: int, signature_reminder_max: int} */
+    /** @return array{convocation_days: int, day_before: bool, signature_reminder_days: int, signature_reminder_max: int, certificates: bool} */
     public static function all(): array
     {
         return [
@@ -55,6 +64,7 @@ final class AutomationSettings
             'day_before' => self::dayBefore(),
             'signature_reminder_days' => self::signatureReminderDays(),
             'signature_reminder_max' => self::signatureReminderMax(),
+            'certificates' => self::certificates(),
         ];
     }
 
@@ -72,6 +82,7 @@ final class AutomationSettings
             'day_before' => ['sometimes', 'boolean'],
             'signature_reminder_days' => ['sometimes', 'integer', 'min:0', 'max:'.self::MAX_DAYS],
             'signature_reminder_max' => ['sometimes', 'integer', 'min:1', 'max:'.self::MAX_REMINDERS],
+            'certificates' => ['sometimes', 'boolean'],
         ], [
             '*.integer' => 'Indiquez un nombre entier.',
             '*.min' => 'Indiquez un nombre positif.',

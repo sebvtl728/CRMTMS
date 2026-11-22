@@ -4,6 +4,8 @@ namespace App\Modules\Sessions\Public;
 
 use App\Modules\Catalogue\Trainings;
 use App\Modules\Core\Users\User;
+use App\Modules\Sessions\Attendance\AttendanceClosure;
+use App\Modules\Sessions\Attendance\Months;
 use App\Modules\Sessions\Dossiers\Dossier;
 use App\Modules\Sessions\Dossiers\DossierStatus;
 use App\Modules\Sessions\Dossiers\DossierTransitions;
@@ -130,6 +132,37 @@ final class Paperwork
             ->havingRaw('min(date) between ? and ?', [$from, $to])->orderBy('first_day')->toBase()->get()
             ->map(fn ($row) => ['session_id' => (string) $row->training_session_id, 'starts_on' => CarbonImmutable::parse($row->first_day)->toDateString()])
             ->values()->all();
+    }
+
+    /**
+     * The live sessions (never cancelled nor trashed) whose attendance is
+     * final: every month from their first to their last live séance closed,
+     * the last closing since $since (the automatic certificates, 2026-11-22).
+     * Starts from the few closures since $since.
+     *
+     * @return list<string>
+     */
+    public static function sessionsFinallyClosedSince(CarbonImmutable $since): array
+    {
+        $candidates = AttendanceClosure::query()->whereNotNull('closed_at')->where('closed_at', '>=', $since)
+            ->distinct()->pluck('training_session_id')->map(fn ($id) => (string) $id)->all();
+        if ($candidates === []) {
+            return [];
+        }
+        $spans = Seance::query()->where('status', '!=', Seance::CANCELLED)->whereIn('training_session_id', $candidates)
+            ->whereIn('training_session_id', TrainingSession::query()->where('status', '!=', 'cancelled')->select('id'))
+            ->groupBy('training_session_id')->selectRaw('training_session_id, min(date) as first_day, max(date) as last_day')->toBase()->get();
+        $out = [];
+        foreach ($spans as $span) {
+            $months = Months::between(CarbonImmutable::parse((string) $span->first_day), CarbonImmutable::parse((string) $span->last_day));
+            $closed = AttendanceClosure::query()->where('training_session_id', $span->training_session_id)->whereNotNull('closed_at')
+                ->whereIn('month', array_map(fn (string $m) => $m.'-01', $months))->count();
+            if ($closed === count($months)) {
+                $out[] = (string) $span->training_session_id;
+            }
+        }
+
+        return $out;
     }
 
     /**

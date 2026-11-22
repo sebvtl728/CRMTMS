@@ -72,24 +72,18 @@ export default function Signature({ state, organisme, title, signer, email, dead
                 ) : (
                     <form onSubmit={submit} className="grid gap-4" noValidate>
                         <p className="text-muted-foreground text-sm">
-                            {signer}, lisez le document, signez dans le cadre puis validez avec le code envoyé à {email}. Ce lien est valable jusqu'au{' '}
-                            {deadline}.
+                            {signer}, lisez le document, demandez votre code (envoyé à {email}), puis signez dans le cadre et validez. Ce lien est
+                            valable jusqu'au {deadline}.
                         </p>
                         <Label className="flex items-start gap-2 font-normal">
                             <input type="checkbox" className="mt-1" checked={data.accept} onChange={(e) => setData('accept', e.target.checked)} />
                             J'ai lu le document et j'accepte de le signer électroniquement.
                         </Label>
                         <InputError message={errors.accept} />
-                        <div className="grid gap-1">
-                            <Label htmlFor="drawing">Votre signature</Label>
-                            <p className="text-muted-foreground text-xs">Signez dans le cadre avec le doigt, la souris ou un stylet.</p>
-                            <SignaturePad id="drawing" onChange={(uri) => setData('drawing', uri)} invalid={!!errors.drawing} />
-                            <InputError message={errors.drawing} />
-                        </div>
                         <div className="grid gap-2">
                             <Button type="button" variant="outline" onClick={askCode} disabled={sending}>
                                 {sending ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <Mail className="h-4 w-4" />}
-                                {code_sent ? 'Recevoir un nouveau code' : 'Recevoir mon code par e-mail'}
+                                {code_sent ? 'Recevoir un nouveau code' : '1. Recevoir mon code par e-mail'}
                             </Button>
                             <InputError message={errs.message} />
                         </div>
@@ -105,10 +99,29 @@ export default function Signature({ state, organisme, title, signer, email, dead
                             />
                             <InputError message={errors.code} />
                         </div>
-                        <Button type="submit" disabled={processing || data.code.length !== 6 || data.drawing === ''}>
+                        <div className="grid gap-1">
+                            <Label htmlFor="drawing">2. Votre signature</Label>
+                            <p className="text-muted-foreground text-xs">Signez dans le cadre avec le doigt, la souris ou un stylet.</p>
+                            <SignaturePad id="drawing" onChange={(uri) => setData('drawing', uri)} invalid={!!errors.drawing} />
+                            <InputError message={errors.drawing} />
+                        </div>
+                        <Button type="submit" disabled={processing || !data.accept || data.code.length !== 6 || data.drawing === ''}>
                             {processing ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <PenLine className="h-4 w-4" />}
                             Signer
                         </Button>
+                        {!processing && (data.code.length !== 6 || data.drawing === '' || !data.accept) && (
+                            <p className="text-muted-foreground text-center text-xs">
+                                Pour signer :{' '}
+                                {[
+                                    !data.accept ? 'cochez la case' : null,
+                                    data.code.length !== 6 ? 'saisissez le code à 6 chiffres' : null,
+                                    data.drawing === '' ? 'dessinez votre signature' : null,
+                                ]
+                                    .filter(Boolean)
+                                    .join(', ')}
+                                .
+                            </p>
+                        )}
                     </form>
                 )}
             </div>

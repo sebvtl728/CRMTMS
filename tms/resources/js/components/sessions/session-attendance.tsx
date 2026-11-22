@@ -591,7 +591,8 @@ function ReopenDialog({
                     <DialogHeader>
                         <DialogTitle>Rouvrir {month}</DialogTitle>
                         <DialogDescription>
-                            Les présences, les heures et les séances du mois redeviennent modifiables. La réouverture est journalisée.
+                            Les présences, les heures et les séances du mois redeviennent modifiables. La réouverture est journalisée. Les
+                            attestations et certificats déjà émis ne changent pas : si les heures changent, annulez-les puis émettez-les de nouveau.
                         </DialogDescription>
                     </DialogHeader>
                     <div className="grid gap-2">
@@ -726,6 +727,13 @@ export function SessionAttendance({ sessionId }: { sessionId: string }) {
     const closed = data.closure.closed;
 
     const close = async () => {
+        if (
+            !window.confirm(
+                `Clôturer ${label} ? Les présences du mois ne pourront plus être modifiées (sauf réouverture motivée) et servent à la facturation.`,
+            )
+        ) {
+            return;
+        }
         setBusy(true);
         const answer = await sendJson<SessionAttendance>('POST', route('sessions.closures.store', sessionId), { month: data.month });
         setBusy(false);
