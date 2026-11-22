@@ -33,3 +33,4 @@ Schedule::command('tms:sessions:follow-ups')->dailyAt('06:30')->timezone('Europe
 
 // 0.11: the hot questionnaires nobody launched and the cold ones due today.
 Schedule::command('tms:questionnaires:daily')->dailyAt('07:00')->timezone('Europe/Paris')->withoutOverlapping()->onOneServer();
+Schedule::command('tms:automation:daily')->dailyAt('07:15')->timezone('Europe/Paris')->withoutOverlapping()->onOneServer();

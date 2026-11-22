@@ -1,0 +1,148 @@
+# Démonstration du TMS — 30 novembre 2026
+
+Fil rouge : **une entreprise cliente demande une formation pour trois salariés**. On suit l'affaire du premier contact
+à l'encaissement, puis on montre la qualité (Qualiopi). Durée visée : **45 minutes** + questions.
+
+> Version à installer sur le serveur avant la démo : **v0.13.0** (`sudo /opt/tms/ops/update.sh`).
+
+---
+
+## 0. Préparation (la veille, 30 minutes)
+
+Sur le Mac ou le serveur de démonstration :
+
+1. **Bac à sable** : Administration › Bac à sable › « Repartir de zéro » (organisme et société fictifs). Sur le serveur
+   réel, ne rien effacer : créer seulement les fiches ci-dessous avec des noms fictifs.
+2. **`APP_URL`** = `http://MacBook-Pro-de-Sebvtl.local:8080` (Mac) pour que liens et QR codes s'ouvrent depuis un
+   téléphone. Vérifier sur le téléphone : la page de connexion s'affiche (pas de page blanche).
+3. **E-mails** : un serveur SMTP configuré (Administration › Connecteurs) avec **ta propre adresse** comme
+   destinataire de tous les envois de la démo (contact de l'entreprise, stagiaires) : tu montres les e-mails reçus en
+   direct.
+4. **Société** (Administration › Sociétés) : logo, signature et cachet, déclaration d'activité, préfixes devis et
+   factures.
+5. **Catalogue** : une formation complète, par exemple « Hygiène alimentaire HACCP — 14 h », tarif entreprise
+   **450 € HT par stagiaire**, DAS renseigné, une plaquette PDF jointe.
+6. **Fiches** : une entreprise « Restaurant Le Bon Goût » (SIRET fictif) avec un interlocuteur (toi) et trois salariés
+   (Léa Durand, Marc Petit, Sami Benali).
+7. **Comptes** : un compte formateur fictif (rôle Formateur) relié à une fiche formateur, pour montrer « Mon planning ».
+8. Ouvrir à l'avance, dans des onglets : Accueil, Pipeline, la fiche entreprise.
+
+Pour gagner du temps le jour J, **préparer deux exemplaires** de l'affaire : un « vierge » pour le déroulé en direct,
+un « terminé » (session passée, mois clôturé, facture validée) pour montrer la fin sans attendre.
+
+---
+
+## 1. Accueil et fiches (5 min)
+
+- **Accueil** : relances du jour, pipeline pondéré du mois, taux de réussite des devis, prochains rendez-vous, sessions
+  qui démarrent dans les 7 jours. Message : « chacun voit d'abord ce qu'il a à faire aujourd'hui ».
+- **Ctrl K** : rechercher « Bon Goût » → fiche entreprise : interlocuteurs, historique, formations d'intérêt.
+- Point fort à dire : **droits par périmètre** (ses fiches, son DAS, tout) et double authentification pour la
+  direction.
+
+## 2. Opportunité et devis (8 min)
+
+1. Sur la fiche : **nouvelle opportunité** « HACCP — 3 salariés », formation HACCP, montant estimé.
+2. **Pipeline** : glisser la carte d'une étape à l'autre (motif demandé pour « Perdu »).
+3. Depuis l'opportunité : **Nouveau devis** → lignes préremplies depuis le catalogue (3 × 450 € HT), TVA (ou
+   exonération selon la société), totaux au centime.
+4. **Aperçu PDF** (filigrane BROUILLON), puis **Envoyer** avec la plaquette cochée → l'opportunité passe d'elle-même à
+   « Proposition ». Montrer l'e-mail reçu sur ton téléphone.
+5. **Faire signer en ligne** → sur le téléphone : ouvrir le lien, cocher, recevoir le code, **dessiner la signature**,
+   signer. Revenir : le devis est **Accepté**, PDF signé avec page de preuve.
+6. Passer l'opportunité en **Gagné** (montant repris du devis).
+
+## 3. Du devis au dossier (5 min)
+
+1. Sur le devis accepté : **Créer le dossier** → assistant en trois écrans : récapitulatif, **nouvelle session** intra
+   pour l'entreprise (intitulé « HACCP — Le Bon Goût — décembre »), les **trois stagiaires** choisis parmi les salariés.
+2. Tout est créé d'un coup : dossier `D-2026-…`, session `S-2026-…`, inscriptions, financement initial.
+3. Montrer : un devis ne donne qu'un dossier (le bouton devient **Voir le dossier**).
+
+## 4. Préparer la session (7 min)
+
+Page de la session, barre d'étapes :
+
+1. **Synthèse** : cartes d'avancement (heures planifiées, formateurs, salles, inscriptions, financements…), toutes « À
+   faire » au départ. Message : « la session dit elle-même ce qui manque ».
+2. **Planning** : l'assistant de séances génère 2 jours de 9 h–12 h 30 / 13 h 30–17 h, formateur et salle → les cartes
+   passent au vert ; un conflit (formateur pris ailleurs) est signalé.
+3. **Financements** (page du dossier) : ajouter l'OPCO, montant, « Paie directement l'organisme », état « Accordé » →
+   « Reste à financer » se met à jour.
+4. **Documents** (page du dossier) : **Émettre : convention de formation** → PDF numéroté, archivé ; **Demander la
+   signature** (même parcours que le devis).
+5. **Documents des stagiaires** (étape Stagiaires) : **Émettre pour tous** les convocations, **Envoyer à tous**.
+6. Se connecter en **formateur** (autre navigateur) : « Mon planning » ne montre que ses séances et ses stagiaires,
+   jamais les prix ni les financements.
+
+## 5. Présences et clôture (5 min)
+
+Sur l'exemplaire « terminé » :
+
+1. Étape **Suivi**, onglet **Présences** : **Tous présents**, puis une exception (Sami : partiel 5 h).
+2. **Clôturer le mois** → plus rien ne bouge ; la session passe **Terminée**.
+3. **Documents des stagiaires** : attestations et certificats de réalisation (heures réalisées reprises des présences).
+
+## 6. Émargement en ligne et rattrapage (7 min)
+
+1. Le jour de la séance, onglet **Présences** : **Ouvrir l'émargement** du matin → QR code plein écran.
+2. Sur le téléphone : scanner, choisir son nom, **signer au doigt**. Le nom disparaît de la liste ; l'écran du
+   formateur se met à jour.
+3. Le formateur signe et **valide** → la grille des présences se remplit seule ; feuille d'émargement PDF signée et
+   scellée, téléchargeable (preuve Qualiopi et financeur).
+4. **Suivi › Séances du mois** : le bouton **Présences** porte un voyant **vert** (journée validée) ou **orange**
+   (une seule demi-journée validée) ; le tableau s'ouvre sur la semaine en cours.
+5. **Rattrapage** (sur l'exemplaire « terminé », une demi-journée passée où Sami n'a pas signé) : sur l'écran de la
+   demi-journée, **Envoyer un lien** à Sami → sur le téléphone, ouvrir l'e-mail, demander le code, signer. Revenir :
+   « Rattrapage à confirmer » ; onglet **Présences** de la session → **Confirmer** → badge « Rattrapage confirmé »
+   (voyant vert), présence écrite, mention sur la feuille signée. Variante : **Ouvrir le rattrapage sur place**
+   (QR jusqu'à minuit). Jour jamais ouvert : **Faire un rattrapage** depuis les présences de la séance.
+6. Inscrit qui entre plus tard : **Faire entrer ce jour-là** sur l'écran de la demi-journée.
+
+## 7. Questionnaires de satisfaction (4 min)
+
+1. Étape **Stagiaires**, bloc **Questionnaires** : **Lancer le questionnaire à chaud** (e-mail à chaque stagiaire) et
+   **Afficher le QR code**.
+2. Sur le téléphone : répondre (notes sur 5, commentaire).
+3. Résultats sur la session (taux de réponse, moyenne, satisfaits), carte « Satisfaction » de la synthèse ; le
+   questionnaire à froid part seul 3 mois plus tard.
+
+## 8. Facturer et encaisser (7 min)
+
+1. **Finance › À facturer** : le dossier apparaît avec le montant dû par destinataire (entreprise et OPCO), détail
+   dépliable (heures réalisées, part de chaque financeur). **Préparer les brouillons**.
+2. Ouvrir un brouillon, ajouter une ligne libre (frais), **Valider** → numéro définitif `F-2026-…`, PDF archivé,
+   facture **immuable** (une correction = un avoir). Dire : journal chaîné vérifiable (Finance › Factures ›
+   intégrité).
+3. **Envoyer** la facture par e-mail.
+4. **Enregistrer un règlement** depuis la facture (virement) → facture **Soldée**.
+5. Montrer **À relancer** (relances à 7, 30, 60 jours, automatiques si on le veut).
+6. Si le public est concerné par les groupements : **Facture libre** comme mandataire, ligne « Réalisé par [co-traitant] », puis
+   **À reverser** (dû, reversé, reste).
+
+## 9. Pilotage et qualité (4 min)
+
+1. **Tableaux de bord** (Commercial) : semaine / mois, export CSV ou PDF.
+2. **Chiffre d'affaires** : par DAS, objectifs, taux atteint.
+3. **Qualité › Qualiopi** : 33 indicateurs, mesures automatiques (fiches formation complètes, taux d'abandon,
+   satisfaction si livrée), preuves jointes, **dossier d'audit** en ZIP.
+
+## 10. Conclusion (2 min)
+
+- Hébergé chez CAP FORMATION (Proxmox), sauvegarde chiffrée chaque nuit, mise à jour en une commande avec retour
+  arrière automatique.
+- **Test réel début décembre** avec l'équipe : comptes, rôles, double authentification, e-mails.
+- Déjà prévu ensuite : acomptes par financeur, dépôt Chorus, export Sage.
+
+---
+
+## Plan B si quelque chose casse
+
+| Problème | Que faire |
+|---|---|
+| E-mail qui ne part pas | Montrer le bandeau « L'e-mail n'est pas parti » et **Renvoyer** ; c'est aussi une fonction. |
+| Rattrapage impossible (« Pas d'émargement en ligne ce jour-là ») | Se connecter en gestionnaire (pas formateur) : bouton **Faire un rattrapage**. |
+| Lien ou QR code qui ne s'ouvre pas sur le téléphone | Vérifier le Wi-Fi commun et `APP_URL` ; sinon ouvrir le lien sur le Mac. |
+| PDF qui ne se génère pas | Gotenberg arrêté : `docker compose up -d` dans `tms/`, réessayer (aucun numéro n'est perdu). |
+| Page blanche | Le serveur Vite tourne : `docker compose stop vite && rm -f public/hot`. |
+| Lenteur ou erreur au milieu | Basculer sur l'exemplaire « terminé » préparé la veille. |

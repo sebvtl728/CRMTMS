@@ -2,7 +2,10 @@
 
 namespace App\Modules\Core\Mail;
 
+use App\Modules\Core\Automation\DailyAutomations;
 use App\Modules\Core\Signatures\SignatureMailTemplates;
+use App\Modules\Core\Signatures\SignatureReminders;
+use Carbon\CarbonImmutable;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\RateLimiter;
@@ -51,6 +54,9 @@ class MailServiceProvider extends ServiceProvider
     public function boot(): void
     {
         SignatureMailTemplates::register();
+        DailyAutomations::register('signature_reminders', fn (CarbonImmutable $today): int => app(SignatureReminders::class)->run(CarbonImmutable::now()));
+        // « Exécuter maintenant » (Administration › Automatismes): 6 a minute per administrator.
+        RateLimiter::for('automation-run', fn (Request $request) => Limit::perMinute(6)->by('automation-run:'.($request->user()?->getAuthIdentifier() ?? $request->ip())));
         // Saves, resets and previews: 60 a minute per administrator.
         RateLimiter::for('mail-templates-write', fn (Request $request) => Limit::perMinute(60)->by('mail-templates-write:'.($request->user()?->getAuthIdentifier() ?? $request->ip())));
         // « Envoyer un e-mail de test »: 10 a minute per administrator.

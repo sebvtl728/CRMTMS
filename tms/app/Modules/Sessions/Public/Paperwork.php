@@ -116,6 +116,39 @@ final class Paperwork
     }
 
     /**
+     * The confirmed sessions (stored state, never cancelled nor trashed)
+     * whose first live séance falls between $from and $to (Paris days,
+     * inclusive): the automatic convocations (2026-11-22).
+     *
+     * @return list<array{session_id: string, starts_on: string}>
+     */
+    public static function confirmedSessionsStartingBetween(string $from, string $to): array
+    {
+        return Seance::query()->where('status', '!=', Seance::CANCELLED)
+            ->whereIn('training_session_id', TrainingSession::query()->where('status', 'confirmed')->select('id'))
+            ->groupBy('training_session_id')->selectRaw('training_session_id, min(date) as first_day')
+            ->havingRaw('min(date) between ? and ?', [$from, $to])->orderBy('first_day')->toBase()->get()
+            ->map(fn ($row) => ['session_id' => (string) $row->training_session_id, 'starts_on' => CarbonImmutable::parse($row->first_day)->toDateString()])
+            ->values()->all();
+    }
+
+    /**
+     * The trainees to convene automatically (2026-11-22): enrolled or
+     * confirmed (never waitlisted, abandoned nor cancelled), not left before
+     * the first day $startsOn, in order of entry.
+     *
+     * @return list<array{id: string, person_id: string}>
+     */
+    public static function convocable(string $sessionId, string $startsOn): array
+    {
+        return Enrolment::query()->where('training_session_id', $sessionId)
+            ->whereIn('status', EnrolmentStatus::values([EnrolmentStatus::Enrolled, EnrolmentStatus::Confirmed]))
+            ->where(fn ($q) => $q->whereNull('left_on')->orWhere('left_on', '>=', $startsOn))
+            ->orderByRaw('entered_on asc nulls first')->orderBy('created_at')->orderBy('id')->get(['id', 'person_id'])
+            ->map(fn (Enrolment $e) => ['id' => (string) $e->id, 'person_id' => (string) $e->person_id])->values()->all();
+    }
+
+    /**
      * The trainees of a session who receive documents (enrolled, confirmed,
      * left), in order of entry.
      *

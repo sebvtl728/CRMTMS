@@ -15,6 +15,7 @@ use App\Modules\Admissions\OnlineTests\OnlineAttempt;
 use App\Modules\Admissions\OnlineTests\OnlineTest;
 use App\Modules\Admissions\Positioning\PositioningSending;
 use App\Modules\Admissions\Positioning\PositioningSendings;
+use App\Modules\Admissions\Todo\AdmissionsTodo;
 use App\Modules\Catalogue\Brochures;
 use App\Modules\Catalogue\TrainingUsage;
 use App\Modules\Core\Access\Permissions as CorePermissions;
@@ -72,6 +73,7 @@ class AdmissionsServiceProvider extends ServiceProvider
 
     public function boot(): void
     {
+        AdmissionsTodo::register();
         self::registerReferenceUsage();
         self::registerTrainingUsage();
         self::registerCrm();

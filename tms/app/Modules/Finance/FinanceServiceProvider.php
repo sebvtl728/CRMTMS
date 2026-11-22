@@ -25,6 +25,7 @@ use App\Modules\Finance\Plans\BillingPlan;
 use App\Modules\Finance\Plans\BillingPlans;
 use App\Modules\Finance\Reminders\ReminderPause;
 use App\Modules\Finance\Settings\FinanceSettings;
+use App\Modules\Finance\Todo\FinanceTodo;
 use App\Modules\Sessions\Public\BillingGuards;
 use App\Modules\Sessions\Public\DossierBlocks;
 use Illuminate\Cache\RateLimiting\Limit;
@@ -65,6 +66,7 @@ class FinanceServiceProvider extends ServiceProvider
 
     public function boot(): void
     {
+        FinanceTodo::register();
         // A payment method in use is never deleted.
         ReferenceUsage::register(ReferenceList::PaymentMethod, 'payments', 'method_id');
 

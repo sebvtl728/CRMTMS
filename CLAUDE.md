@@ -227,6 +227,16 @@ Code dans `tms/app/Modules/Questionnaires/` (`Surveys`, `Templates`, `Campaigns`
 - **Planifié** : `tms:questionnaires:daily` (7 h Paris, `ForEachTenant`, `DailySurveys`) : à chaud non lancé le lendemain du dernier jour, à froid à `ColdDelay::months()` (`tenants.settings.questionnaires.cold_months`, défaut 3, 0 = jamais) ; rattrapage 30 jours.
 - **RGPD** (`Gdpr\SurveyPersonData` via `FicheLinks`) : données liées, fusion (une invitation par campagne, la répondue gagne), anonymisation (e-mail et réponses texte effacés, notes gardées, lien fermé par un nouveau hash), export (`questionnaires.view` requis sur « Tout »). Invitations et réponses ne sont pas `Auditable`.
 
+## Automatismes et « À traiter » (2026-11-22) : points d'architecture à connaître
+
+Guide : `tms/docs/admin.md` (§ 23) ; tables : `tms/docs/data-dictionary.md`. Spec : `docs/superpowers/specs/2026-11-22-deroulement-automatique-design.md`.
+
+- **Socle** (`Core\Automation`) : `tms:automation:daily` (7 h 15 Paris, `ForEachTenant`) appelle le registre `DailyAutomations::register('cle', fn (CarbonImmutable $today): int)` ; chaque module déclare le sien dans son `boot` (Documents `convocations`, Sessions `day_before`, Core `signature_reminders`) ; une erreur d'un automatisme est journalisée (clé, classe) sans arrêter les autres. `AutomationSends::claim(kind, subjectId, occurrence)` (`automation_sends`, unique, `insertOrIgnore`) dans la transaction qui met l'envoi en file : rien ne part deux fois. Réglages `tenants.settings.automation` (`AutomationSettings`, relus à chaque appel), écran Administration › Automatismes + « Exécuter maintenant » (`RunAutomationsNow`).
+- **Convocations** (`Documents\Automation\ConvocationAutomation`) : sessions **confirmées** dont la 1re séance est dans `[J+2, J+N]` (`Paperwork::confirmedSessionsStartingBetween`), stagiaires `Paperwork::sessionEnrolments` sans aucune convocation (une annulée n'est jamais refaite) ; émission et envoi **sans auteur** (`DocumentIssuer` / `DocumentSender` acceptent `?User`).
+- **Rappel la veille** (`Sessions\Automation\DayBeforeReminders`) : sessions confirmées, séances non annulées du lendemain ; stagiaires de `Attendances::expected`, formateurs (un e-mail par jour toutes sessions) ; personne à la corbeille, anonymisée ou sans e-mail : rien ; job `SendDayBeforeReminder` (`ShouldBeEncrypted`), jamais de prix ni d'autres stagiaires.
+- **Relance des signatures** (`Core\Signatures\SignatureReminders`) : nouveau jeton à chaque relance (l'ancien lien meurt), `reminders_sent`, `last_sent_at`, garde du module (`Signatures::refusal`), pas de relance si code demandé < 24 h ; e-mail dans la transaction (échec = tout annulé).
+- **À traiter** (`Core\Todo\TodoSources::register(key, group, label, permission, count, link, ?visible)`) : chaque module déclare ses lignes dans son `boot` (`SessionsTodo`, `CrmTodo`, `AdmissionsTodo`, `FinanceTodo`) avec la **même requête que l'écran lié** et le périmètre du droit ; une source en erreur = « Indisponible » ; total du menu en cache 60 s (`tenant:<id>:todo:<user>`, prop `todo_total`, null = pas d'entrée). Page `/a-traiter` en lecture seule.
+
 ## Conventions
 
 - Identifiants UUID v7 ; suppression logique sur les fiches métier.

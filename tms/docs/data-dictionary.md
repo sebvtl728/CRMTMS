@@ -762,7 +762,7 @@ Clé (`tenant_id`, `year`) : `last_number` (année de Paris, incrémenté dans l
 `companies.signature_path` : image de signature et cachet (disque privé).
 
 ### `signature_requests` — signatures en ligne (socle)
-`subject_type` (alias : `document`, `quote`) · `subject_id` · `title` · `pdf_path`, `pdf_sha256` (le PDF à signer, jamais modifié) · `signer_name`, `signer_email`, `signer_person_id` (personnels, effacés par l'anonymisation) · `token_hash` (sha256 du lien, unique) · `expires_at` (30 jours, fin de journée de Paris) · `status` (`pending`, `signed`, `cancelled`) · `code_hash` (HMAC du code), `code_expires_at`, `code_attempts`, `code_sent_at` · `signed_at`, `signed_ip`, `signed_user_agent` · `signed_pdf_path`, `signed_pdf_sha256` (document signé + page de preuve) · `source_path`, `source_sha256` (HTML figé du document, `<pdf>.source.json`, rendu à nouveau avec le dessin ; vide pour un document émis avant la 0.10.1) · `drawing_path`, `drawing_sha256` (signature dessinée, PNG ; effacée par l'anonymisation) · `created_by`.
+`subject_type` (alias : `document`, `quote`) · `subject_id` · `title` · `pdf_path`, `pdf_sha256` (le PDF à signer, jamais modifié) · `signer_name`, `signer_email`, `signer_person_id` (personnels, effacés par l'anonymisation) · `token_hash` (sha256 du lien, unique) · `expires_at` (30 jours, fin de journée de Paris) · `status` (`pending`, `signed`, `cancelled`) · `code_hash` (HMAC du code), `code_expires_at`, `code_attempts`, `code_sent_at` · `signed_at`, `signed_ip`, `signed_user_agent` · `signed_pdf_path`, `signed_pdf_sha256` (document signé + page de preuve) · `source_path`, `source_sha256` (HTML figé du document, `<pdf>.source.json`, rendu à nouveau avec le dessin ; vide pour un document émis avant la 0.10.1) · `drawing_path`, `drawing_sha256` (signature dessinée, PNG ; effacée par l'anonymisation) · `reminders_sent` (relances automatiques envoyées), `last_sent_at` (dernière relance ; nouveau lien à chaque relance) · `created_by`.
 
 Permissions : `documents.view`, `documents.manage` (à périmètre, celui du dossier).
 
@@ -809,4 +809,11 @@ une échéance n'est traitée qu'une fois. Aucune donnée personnelle.
 
 Colonnes ajoutées (lot 1e) : `organisations` et `people` : `future_needs` (texte, personnel pour une personne),
 `future_needs_updated_at`, `future_needs_updated_by` ; `reference_items.meta.reached` (résultats d'action « joint »).
+
+### `automation_sends` — envois automatiques (2026-11-22)
+
+`kind` (`convocation` : sujet = inscription, occurrence `1` ; `day_before` : sujet = inscription ou formateur,
+occurrence = date du lendemain ; `signature_reminder` : sujet = demande de signature, occurrence = numéro de relance) ·
+`subject_id` · `occurrence` · `sent_at`. Unique (`kind`, `subject_id`, `occurrence`) : un envoi automatique ne part
+qu'une fois, même si la tâche est relancée. Aucune donnée personnelle.
 

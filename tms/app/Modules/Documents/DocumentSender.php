@@ -27,7 +27,7 @@ final class DocumentSender
     /**
      * @param  array<string, mixed>  $message  to, subject, body
      */
-    public function send(User $user, Document $document, array $message): DocumentSending
+    public function send(?User $user, Document $document, array $message): DocumentSending
     {
         $values = Validator::make($message, [
             'to' => ['required', 'email:rfc', 'max:254'],
@@ -57,7 +57,7 @@ final class DocumentSender
                 'subject' => $values['subject'],
                 'body' => $values['body'],
                 'status' => 'pending',
-                'sent_by' => $user->id,
+                'sent_by' => $user?->id,
             ]);
             Document::query()->whereKey($locked->id)->toBase()
                 ->update(['email_status' => 'pending', 'email_error_code' => null, 'updated_at' => CarbonImmutable::now()]);

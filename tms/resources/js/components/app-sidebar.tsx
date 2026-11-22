@@ -25,9 +25,9 @@ import {
     Factory,
     FileSignature,
     FileText,
-    HandCoins,
     Gauge,
     GraduationCap,
+    HandCoins,
     Handshake,
     History,
     KeyRound,
@@ -46,6 +46,7 @@ import {
     UserMinus,
     UserRoundCheck,
     Users,
+    Workflow,
 } from 'lucide-react';
 import AppLogo from './app-logo';
 
@@ -109,6 +110,7 @@ const adminNavItems: (NavItem & { permission: string })[] = [
     { title: 'Sauvegardes', url: '/admin/backups', icon: DatabaseBackup, permission: 'settings.manage' },
     { title: "Règle d'abandon et suivi", url: '/admin/abandon-rule', icon: UserMinus, permission: 'settings.manage' },
     { title: 'Réglages du CRM', url: '/admin/crm-settings', icon: Settings2, permission: 'settings.manage' },
+    { title: 'Automatismes', url: '/admin/automation', icon: Workflow, permission: 'settings.manage' },
     { title: 'Salles et fermetures', url: '/admin/sessions-settings', icon: DoorOpen, permission: 'sessions.rooms.manage' },
     { title: "Modèles d'e-mails", url: '/admin/mail-templates', icon: Mail, permission: 'settings.manage' },
     { title: 'Modèles de documents', url: '/admin/document-texts', icon: FileSignature, permission: 'settings.manage' },
@@ -118,7 +120,7 @@ const adminNavItems: (NavItem & { permission: string })[] = [
 ];
 
 export function AppSidebar() {
-    const { auth, todo_count, candidates_badge, backups_enabled, backup_alert, sandbox } = usePage<SharedData>().props;
+    const { auth, todo_count, todo_menu, todo_total, candidates_badge, backups_enabled, backup_alert, sandbox } = usePage<SharedData>().props;
     const commercialItems = commercialNavItems
         .filter((item) => auth.permissions.includes(item.permission))
         .map((item) => (item.url === '/crm/todo' ? { ...item, badge: todo_count } : item));
@@ -170,7 +172,13 @@ export function AppSidebar() {
                     <NavMain items={[myPlanningItem, ...commercialItems.filter((item) => item.url === '/crm/todo')]} label="Navigation" />
                 ) : (
                     <>
-                        <NavMain items={homeNavItems} label="Navigation" />
+                        <NavMain
+                            items={[
+                                ...homeNavItems,
+                                ...(todo_menu ? [{ title: 'À traiter', url: '/a-traiter', icon: ListChecks, badge: todo_total }] : []),
+                            ]}
+                            label="Navigation"
+                        />
                         {commercialItems.length > 0 && <NavMain items={commercialItems} label="Commercial" />}
                         {trainingItems.length > 0 && <NavMain items={trainingItems} label="Formation" />}
                         {financeItems.length > 0 && <NavMain items={financeItems} label="Finance" />}
