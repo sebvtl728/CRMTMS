@@ -174,8 +174,8 @@ interface SessionAttendance {
         recorded: number;
         needs_review: number;
         expected: number;
-        /** Every half-day the séance touches has its online signing validated. */
-        signing_validated: boolean;
+        /** Online signing of the half-days the séance touches: all validated, some, or none (null). */
+        signing: 'validated' | 'partial' | null;
     }[];
     monthly: {
         modules: { id: string; title: string; planned: string }[];
@@ -864,12 +864,25 @@ export function SessionAttendance({ sessionId }: { sessionId: string }) {
                                                     size="sm"
                                                     variant="outline"
                                                     onClick={() => setSeanceId(s.id)}
-                                                    title={s.signing_validated ? 'Signatures validées' : undefined}
+                                                    title={
+                                                        s.signing === 'validated'
+                                                            ? 'Signatures validées'
+                                                            : s.signing === 'partial'
+                                                              ? 'Signatures validées pour une demi-journée seulement'
+                                                              : undefined
+                                                    }
                                                 >
                                                     <ClipboardCheck className="h-4 w-4" />
                                                     Présences
-                                                    {s.signing_validated && (
-                                                        <span className="h-2 w-2 rounded-full bg-green-600" aria-label="Signatures validées" />
+                                                    {s.signing && (
+                                                        <span
+                                                            className={`h-2 w-2 rounded-full ${s.signing === 'validated' ? 'bg-green-600' : 'bg-orange-500'}`}
+                                                            aria-label={
+                                                                s.signing === 'validated'
+                                                                    ? 'Signatures validées'
+                                                                    : 'Signatures validées pour une demi-journée seulement'
+                                                            }
+                                                        />
                                                     )}
                                                 </Button>
                                             )}
