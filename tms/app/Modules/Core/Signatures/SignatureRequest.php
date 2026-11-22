@@ -12,6 +12,8 @@ use Illuminate\Database\Eloquent\Model;
  * An online signature of a PDF (Signatures).
  *
  * @property string $id
+ * @property int $reminders_sent
+ * @property CarbonImmutable|null $last_sent_at
  * @property string $subject_type morph alias of what is signed (document, quote…)
  * @property string $subject_id
  * @property string $title « Convention de formation DOC-2026-00001 »
@@ -48,7 +50,7 @@ class SignatureRequest extends Model
     protected array $auditPersonal = ['signer_name', 'signer_email', 'signed_ip', 'signed_user_agent'];
 
     /** @var list<string> */
-    protected array $auditIgnore = ['token_hash', 'code_hash', 'code_expires_at', 'code_attempts', 'code_sent_at', 'updated_at'];
+    protected array $auditIgnore = ['token_hash', 'code_hash', 'code_expires_at', 'code_attempts', 'code_sent_at', 'last_sent_at', 'updated_at'];
 
     /** @var list<string> */
     protected $fillable = ['subject_type', 'subject_id', 'title', 'pdf_path', 'pdf_sha256', 'signer_name', 'signer_email', 'signer_person_id', 'token_hash', 'expires_at', 'status', 'created_by', 'source_path', 'source_sha256'];
@@ -60,6 +62,8 @@ class SignatureRequest extends Model
             'code_expires_at' => 'immutable_datetime',
             'code_sent_at' => 'immutable_datetime',
             'signed_at' => 'immutable_datetime',
+            'last_sent_at' => 'immutable_datetime',
+            'reminders_sent' => 'integer',
             'code_attempts' => 'integer',
         ];
     }

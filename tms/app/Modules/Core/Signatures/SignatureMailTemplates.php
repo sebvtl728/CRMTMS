@@ -14,6 +14,8 @@ final class SignatureMailTemplates
 
     public const DONE = 'signature_done';
 
+    public const REMINDER = 'signature_reminder';
+
     public static function register(): void
     {
         MailTemplateRegistry::register(new MailTemplateDefinition(
@@ -26,6 +28,21 @@ final class SignatureMailTemplates
                 'document' => ['document à signer', 'Convention de formation DOC-2026-00001'],
                 'destinataire' => ['nom du signataire', 'Claire Martin'],
                 'lien' => ['lien personnel de signature', 'https://tms.example/signature/…'],
+                'echeance' => ['date de fin de validité du lien', '19/12/2026'],
+                'organisme' => ["nom de l'organisme", 'CAP FORMATION'],
+            ],
+            required: ['lien'],
+        ));
+        MailTemplateRegistry::register(new MailTemplateDefinition(
+            key: self::REMINDER,
+            label: 'Relance de signature en ligne',
+            description: 'Envoyé automatiquement quand un document attend sa signature (Administration › Automatismes) ; le nouveau lien remplace le précédent ; {lien} est obligatoire.',
+            subject: 'Rappel – document à signer : {document}',
+            body: "Bonjour {destinataire},\n\n{organisme} attend toujours votre signature : {document}.\n\nSignez avec ce nouveau lien personnel (valable jusqu'au {echeance}) ; il remplace le précédent :\n{lien}\n\nCordialement,\n{organisme}",
+            variables: [
+                'document' => ['document à signer', 'Convention de formation DOC-2026-00001'],
+                'destinataire' => ['nom du signataire', 'Claire Martin'],
+                'lien' => ['nouveau lien personnel de signature', 'https://tms.example/signature/…'],
                 'echeance' => ['date de fin de validité du lien', '19/12/2026'],
                 'organisme' => ["nom de l'organisme", 'CAP FORMATION'],
             ],
