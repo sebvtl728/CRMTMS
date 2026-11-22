@@ -11,7 +11,8 @@ use Illuminate\Validation\ValidationException;
  * fields of the organisme and normalised (number as a decimal string, date
  * Y-m-d, boolean, a choice among the options). Unknown, hidden and « file »
  * fields are dropped (a file goes through CandidatureFiles); an empty value
- * removes the key.
+ * removes the key. A sensitive field (social security number) is dropped
+ * for a user without admissions.sensitive.view, and absent from his page.
  */
 final class CustomFieldValues
 {
@@ -21,7 +22,7 @@ final class CustomFieldValues
      *
      * @throws ValidationException
      */
-    public static function validate(string $entity, array $values): array
+    public static function validate(string $entity, array $values, bool $sensitive = true): array
     {
         $fields = app(CustomFieldDefinitions::class)->active($entity)->keyBy('id');
         $clean = [];
@@ -29,7 +30,7 @@ final class CustomFieldValues
 
         foreach ($values as $id => $value) {
             $field = $fields->get((string) $id);
-            if ($field === null || $field->type === CustomFieldType::File) {
+            if ($field === null || $field->type === CustomFieldType::File || (! $sensitive && $field->type->sensitive())) {
                 continue;
             }
             $value = is_string($value) ? trim($value) : $value;
@@ -84,6 +85,14 @@ final class CustomFieldValues
                         $clean[$field->id] = $value;
                     }
                     break;
+                case CustomFieldType::Nir:
+                    $nir = is_string($value) ? self::nir($value) : null;
+                    if ($nir === null) {
+                        $errors[$key] = ["Le numéro de sécurité sociale « {$label} » n'est pas valide : vérifiez les 15 chiffres, clé comprise."];
+                    } else {
+                        $clean[$field->id] = $nir;
+                    }
+                    break;
                 case CustomFieldType::File:
                     break;
             }
@@ -94,6 +103,23 @@ final class CustomFieldValues
         }
 
         return $clean;
+    }
+
+    /**
+     * The social security number (NIR) without spaces, dots nor dashes, in
+     * capitals, when it is valid: sex 1, 2, 3, 4, 7 or 8, year, month,
+     * department (2A / 2B for Corsica, counted 19 / 18), town, order, then
+     * the key 97 − (13 first digits mod 97). Null otherwise.
+     */
+    public static function nir(string $value): ?string
+    {
+        $nir = mb_strtoupper(preg_replace('/[\s.\-]/u', '', $value) ?? '');
+        if (preg_match('/^[1-478]\d{4}(\d{2}|2A|2B)\d{8}$/', $nir) !== 1) {
+            return null;
+        }
+        $body = substr($nir, 0, 5).strtr(substr($nir, 5, 2), ['2A' => '19', '2B' => '18']).substr($nir, 7, 6);
+
+        return 97 - ((int) $body % 97) === (int) substr($nir, 13, 2) ? $nir : null;
     }
 
     /**
@@ -144,18 +170,25 @@ final class CustomFieldValues
     /**
      * The visible fields with the value of $candidature, for its page.
      *
-     * @return list<array{id: string, label: string, type: string, options: list<string>|null, required_for_admission: bool, value: mixed}>
+     * A sensitive field is listed without its value (hidden) when $sensitive is false.
+     *
+     * @return list<array{id: string, label: string, type: string, options: list<string>|null, required_for_admission: bool, value: mixed, hidden: bool}>
      */
-    public static function forPage(Candidature $candidature): array
+    public static function forPage(Candidature $candidature, bool $sensitive = true): array
     {
         return app(CustomFieldDefinitions::class)->active(CustomFieldDefinition::CANDIDATURE)
-            ->map(fn (CustomFieldDefinition $f) => [
-                'id' => $f->id,
-                'label' => $f->label,
-                'type' => $f->type->value,
-                'options' => $f->options,
-                'required_for_admission' => $f->required_for_admission,
-                'value' => ($candidature->custom_values ?? [])[$f->id] ?? null,
-            ])->values()->all();
+            ->map(function (CustomFieldDefinition $f) use ($candidature, $sensitive): array {
+                $hidden = ! $sensitive && $f->type->sensitive();
+
+                return [
+                    'id' => $f->id,
+                    'label' => $f->label,
+                    'type' => $f->type->value,
+                    'options' => $f->options,
+                    'required_for_admission' => $f->required_for_admission,
+                    'value' => $hidden ? null : (($candidature->custom_values ?? [])[$f->id] ?? null),
+                    'hidden' => $hidden,
+                ];
+            })->values()->all();
     }
 }

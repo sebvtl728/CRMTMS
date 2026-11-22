@@ -166,7 +166,7 @@ final class CandidatureWriter
             if (! is_array($data['custom_values'])) {
                 throw ValidationException::withMessages(['custom_values' => 'Valeur invalide.']);
             }
-            $custom = CustomFieldValues::merge($current->custom_values ?? [], CustomFieldValues::validate(CustomFieldDefinition::CANDIDATURE, $data['custom_values']));
+            $custom = CustomFieldValues::merge($current->custom_values ?? [], CustomFieldValues::validate(CustomFieldDefinition::CANDIDATURE, $data['custom_values'], AdmissionsVisibility::sensitive($by)));
         }
 
         $profile = array_intersect_key($validated, array_flip(self::PROFILE));

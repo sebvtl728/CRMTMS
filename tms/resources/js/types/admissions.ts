@@ -87,10 +87,12 @@ export interface Candidature {
 export interface CustomField {
     id: string;
     label: string;
-    type: 'text' | 'textarea' | 'number' | 'date' | 'boolean' | 'choice' | 'file';
+    type: 'text' | 'textarea' | 'number' | 'date' | 'boolean' | 'choice' | 'file' | 'nir';
     options: string[] | null;
     required_for_admission: boolean;
     value: string | boolean | null;
+    /** Sensitive (social security number) and the viewer lacks the right: no value sent. */
+    hidden?: boolean;
 }
 
 /** A row of the candidature list (CandidatureRows::row). */

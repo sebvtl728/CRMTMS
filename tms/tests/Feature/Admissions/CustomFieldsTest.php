@@ -142,7 +142,7 @@ it('manages the fields through the admin screen, for settings.manage only', func
         ->component('admin/custom-fields')
         ->where('fields.0.label', 'Permis')
         ->where('fields.0.used', false)
-        ->has('types', 7));
+        ->has('types', 8));
     $this->put("/admin/custom-fields/{$field->id}", ['label' => 'Permis de conduire'])->assertRedirect();
     $this->post("/admin/custom-fields/{$field->id}/hide")->assertRedirect();
     expect($field->fresh()->hidden_at)->not->toBeNull();
@@ -170,4 +170,36 @@ it('explains that a long identifier (social security number) belongs in a text f
     expect($errors["custom_values.{$number->id}"][0])->toBe(
         'Le champ « Numéro de sécurité sociale » attend un nombre de 12 chiffres au plus. Pour un numéro (sécurité sociale, téléphone…), donnez-lui le type Texte dans Administration › Champs personnalisés.'
     );
+});
+
+it('checks a social security number: 15 characters, Corsica, control key', function () {
+    $nir = adField(['label' => 'N° de sécurité sociale', 'type' => 'nir']);
+
+    $c = adCandidature(['custom_values' => [$nir->id => '1 85 05 78 006 084 91']]);
+    expect($c->custom_values[$nir->id])->toBe('185057800608491');
+
+    $corse = adCandidature(['custom_values' => [$nir->id => '2 69 02 2a 005 123 33']]);
+    expect($corse->custom_values[$nir->id])->toBe('269022A00512333');
+
+    foreach (['185057800608490', '18505780060849', 'abcdefghijklmno', '585057800608491'] as $wrong) {
+        $errors = adErrors(fn () => app(CandidatureWriter::class)->update($c, ['custom_values' => [$nir->id => $wrong]], admin()));
+        expect($errors["custom_values.{$nir->id}"][0])->toBe('Le numéro de sécurité sociale « N° de sécurité sociale » n\'est pas valide : vérifiez les 15 chiffres, clé comprise.');
+    }
+});
+
+it('keeps a social security number away from users without the sensitive data right', function () {
+    $nir = adField(['label' => 'N° de sécurité sociale', 'type' => 'nir']);
+    $c = adCandidature(['custom_values' => [$nir->id => '185057800608491']]);
+
+    $this->actingAs(commercial())->get("/admissions/candidatures/{$c->id}")->assertInertia(fn (Assert $p) => $p
+        ->where('custom_fields.0.type', 'nir')
+        ->where('custom_fields.0.value', null)
+        ->where('custom_fields.0.hidden', true));
+    $this->actingAs(admin(twoFactor: true))->get("/admissions/candidatures/{$c->id}")->assertInertia(fn (Assert $p) => $p
+        ->where('custom_fields.0.value', '185057800608491')
+        ->where('custom_fields.0.hidden', false));
+
+    // Written without the right: ignored, the stored number stays.
+    app(CandidatureWriter::class)->update($c, ['custom_values' => [$nir->id => '269022A00512333']], commercial());
+    expect($c->refresh()->custom_values[$nir->id])->toBe('185057800608491');
 });
