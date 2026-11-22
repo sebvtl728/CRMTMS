@@ -5,6 +5,7 @@ use App\Modules\Core\Tenancy\TenantStorage;
 use App\Modules\Sessions\Attendance\Attendance;
 use App\Modules\Sessions\Attendance\Closures;
 use App\Modules\Sessions\Attendance\Signing\AttendanceSignature;
+use App\Modules\Sessions\Attendance\Signing\CatchUpConfirmation;
 use App\Modules\Sessions\Attendance\Signing\SignSlot;
 use App\Modules\Sessions\Public\AttendanceSigning;
 use App\Modules\Sessions\Trainers\Trainers;
@@ -165,4 +166,26 @@ it('lets a manager prepare the catch-up of a past half-day never opened, never a
     $token = osOpen($slot->id);
     auth()->logout();
     $this->get("/emargement/r/{$token}")->assertOk();
+});
+
+it('tells the trainer whether a catch-up waits, was confirmed or refused', function () {
+    $session = plSession();
+    plSeance(plModule($session), '2026-09-10', '09:00', '12:00');
+    $lea = atEnrol($session, 'Durand');
+    $paul = atEnrol($session, 'Petit');
+    $slotId = sgOpen($session)['slot']->id;
+    sgNow('2026-09-11 10:00');
+    $token = osOpen($slotId);
+    auth()->logout();
+    $this->postJson("/emargement/r/{$token}", ['enrolment_id' => $lea->id, 'drawing' => sigDrawing()])->assertCreated();
+    $this->postJson("/emargement/r/{$token}", ['enrolment_id' => $paul->id, 'drawing' => sigDrawing()])->assertCreated();
+    $manager = atManager();
+    $state = fn () => collect($this->actingAs($manager)->getJson("/sessions/emargement/{$slotId}/state")->assertOk()->json('rows'))
+        ->mapWithKeys(fn (array $r) => [$r['enrolment_id'] => $r['catch_up_state']])->all();
+
+    expect($state())->toBe([$lea->id => 'pending', $paul->id => 'pending']);
+    $confirmation = app(CatchUpConfirmation::class);
+    $confirmation->confirm(AttendanceSignature::query()->where('enrolment_id', $lea->id)->sole(), $manager);
+    $confirmation->refuse(AttendanceSignature::query()->where('enrolment_id', $paul->id)->sole(), $manager, 'Absent');
+    expect($state())->toBe([$lea->id => 'confirmed', $paul->id => 'refused']);
 });

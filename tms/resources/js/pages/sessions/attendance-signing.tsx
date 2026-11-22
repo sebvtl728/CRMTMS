@@ -33,6 +33,7 @@ interface SlotState {
         signature_id: string | null;
         /** A catch-up waiting for its confirmation (« Présences » tab). */
         catch_up_kind: 'catch_up_onsite' | 'catch_up_remote' | null;
+        catch_up_state: 'pending' | 'confirmed' | 'refused' | null;
         email: string | null;
         catch_up_link: { sent_at: string | null; email_status: string | null; expires_at: string } | null;
     }[];
@@ -261,7 +262,9 @@ export default function AttendanceSigning({ state: initial }: { state: SlotState
                                                 <Clock className="h-3 w-3" /> En attente
                                             </Badge>
                                         )}
-                                        {r.catch_up_kind && <Badge variant="outline">Rattrapage à confirmer</Badge>}
+                                        {r.catch_up_state === 'pending' && <Badge variant="outline">Rattrapage à confirmer (onglet Présences)</Badge>}
+                                        {r.catch_up_state === 'confirmed' && <Badge variant="secondary">Rattrapage confirmé</Badge>}
+                                        {r.catch_up_state === 'refused' && <Badge variant="destructive">Rattrapage refusé</Badge>}
                                         {!r.signed_at && state.can_catch_up && (
                                             <Button
                                                 variant="outline"

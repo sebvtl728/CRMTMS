@@ -64,8 +64,9 @@ final class SlotRows
                 'name' => $labels[$e->person_id]['label'] ?? 'Stagiaire',
                 'signed_at' => $signatures->get($e->id)?->signed_at?->toIso8601String(),
                 'signature_id' => $signatures->get($e->id)?->id,
-                // A catch-up waiting for its confirmation, and the remote link last sent.
+                // A catch-up (its kind and state: pending, confirmed, refused), and the remote link last sent.
                 'catch_up_kind' => $signatures->get($e->id)?->kind === AttendanceSignature::KIND_ON_TIME ? null : $signatures->get($e->id)?->kind,
+                'catch_up_state' => self::catchUpState($signatures->get($e->id)),
                 'email' => $emails[$e->person_id] ?? null,
                 'catch_up_link' => ($l = $links->get($e->id)) === null ? null : [
                     'sent_at' => $l->created_at?->toIso8601String(),
@@ -232,5 +233,15 @@ final class SlotRows
     {
         return AttendanceSignature::query()->counted()->whereIn('slot_id', $slotIds)->selectRaw('slot_id, count(*) as n')->groupBy('slot_id')
             ->toBase()->pluck('n', 'slot_id')->map(fn ($n) => (int) $n)->all();
+    }
+
+    private static function catchUpState(?AttendanceSignature $signature): ?string
+    {
+        return match (true) {
+            $signature === null, $signature->kind === AttendanceSignature::KIND_ON_TIME => null,
+            $signature->refused_at !== null => 'refused',
+            $signature->confirmed_at !== null => 'confirmed',
+            default => 'pending',
+        };
     }
 }
