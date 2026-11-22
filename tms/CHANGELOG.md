@@ -5,7 +5,7 @@ Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) ; ve
 
 ## [Non publié]
 
-## [0.14.0] - 2026-11-22
+## [0.14.1] - 2026-11-22
 
 ### Ajouté
 
@@ -16,6 +16,9 @@ Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) ; ve
   d'erreur.
 - **Confirmation des envois groupés** : « Envoyer à tous » et « Lancer le questionnaire » indiquent le nombre de
   stagiaires avant d'envoyer.
+- Bloc **Documents** d'une session : sous « Convocation », la date de l'envoi automatique (ou « trop tard », ou « une
+  fois la session confirmée ») ; **Émettre pour tous** les convocations propose alors de **laisser l'envoi automatique**
+  ou d'**émettre et envoyer maintenant**, pour que les deux ne se croisent jamais.
 
 ### Modifié
 
@@ -23,9 +26,7 @@ Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) ; ve
 - Menu : « À faire » devient **Mes actions commerciales**, « Planning » (commercial) **Agenda commercial**,
   « Questionnaires » **Résultats des questionnaires** (Qualité) et **Modèles de questionnaires** (Administration).
 
-- Bloc **Documents** d'une session : sous « Convocation », la date de l'envoi automatique (ou « trop tard », ou « une
-  fois la session confirmée ») ; **Émettre pour tous** les convocations propose alors de **laisser l'envoi automatique**
-  ou d'**émettre et envoyer maintenant**, pour que les deux ne se croisent jamais.
+## [0.14.0] - 2026-11-22
 
 ### Ajouté
 
