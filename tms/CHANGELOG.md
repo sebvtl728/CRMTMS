@@ -5,6 +5,10 @@ Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) ; ve
 
 ## [Non publié]
 
+### Ajouté
+
+- **Convention de formation** : le SIRET et l'IDCC de l'entreprise contractante s'impriment sous son nom.
+
 ### Modifié
 
 - **Financement par le contractant** : cocher « Paie directement l'organisme » n'est plus refusé ; la case est sans

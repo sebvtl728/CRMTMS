@@ -80,6 +80,13 @@
         @if ($recipient['address_line1'])<div>{{ $recipient['address_line1'] }}</div>@endif
         @if ($recipient['address_line2'])<div>{{ $recipient['address_line2'] }}</div>@endif
         @if ($recipient['postal_code'] || $recipient['city'])<div>{{ trim(($recipient['postal_code'] ?? '').' '.($recipient['city'] ?? '')) }}</div>@endif
+        @if (($recipient['siret'] ?? null) || ($recipient['idcc'] ?? null))
+            <div class="muted small">
+                @if ($recipient['siret'] ?? null)SIRET {{ trim(chunk_split(substr($recipient['siret'], 0, 9), 3, ' ')).' '.substr($recipient['siret'], 9) }}@endif
+                @if (($recipient['siret'] ?? null) && ($recipient['idcc'] ?? null)) - @endif
+                @if ($recipient['idcc'] ?? null)IDCC {{ $recipient['idcc'] }} (convention collective)@endif
+            </div>
+        @endif
     </div>
 </div>
 

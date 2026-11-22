@@ -72,6 +72,19 @@ final class Fiches
     }
 
     /**
+     * SIRET and IDCC (collective agreement) of an entreprise, trashed ones
+     * too, for the documents of its dossiers; null when unknown.
+     *
+     * @return array{siret: ?string, idcc: ?string}|null
+     */
+    public function organisationCodes(string $id): ?array
+    {
+        $organisation = Str::isUuid($id) ? Organisation::withTrashed()->find($id) : null;
+
+        return $organisation === null ? null : ['siret' => $organisation->siret, 'idcc' => $organisation->idcc];
+    }
+
+    /**
      * Who an invoice is addressed to, as it is copied onto the invoice when
      * it is validated (the invoicing): name, postal address, SIRET and SIREN
      * of an entreprise, its e-mail as the billing e-mail. A trashed fiche
