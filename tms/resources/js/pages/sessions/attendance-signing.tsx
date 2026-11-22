@@ -263,7 +263,12 @@ export default function AttendanceSigning({ state: initial }: { state: SlotState
                                             </Badge>
                                         )}
                                         {r.catch_up_state === 'pending' && <Badge variant="outline">Rattrapage à confirmer (onglet Présences)</Badge>}
-                                        {r.catch_up_state === 'confirmed' && <Badge variant="secondary">Rattrapage confirmé</Badge>}
+                                        {r.catch_up_state === 'confirmed' && (
+                                            <Badge variant="secondary">
+                                                <span className="h-2 w-2 rounded-full bg-green-600" aria-hidden="true" />
+                                                Rattrapage confirmé
+                                            </Badge>
+                                        )}
                                         {r.catch_up_state === 'refused' && <Badge variant="destructive">Rattrapage refusé</Badge>}
                                         {!r.signed_at && state.can_catch_up && (
                                             <Button
