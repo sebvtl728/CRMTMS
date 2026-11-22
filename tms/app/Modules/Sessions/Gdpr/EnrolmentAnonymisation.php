@@ -2,6 +2,7 @@
 
 namespace App\Modules\Sessions\Gdpr;
 
+use App\Modules\Sessions\Attendance\AttendanceProofs;
 use App\Modules\Sessions\Attendance\AttendanceScans;
 use App\Modules\Sessions\Attendance\Signing\SigningAnonymisation;
 use App\Modules\Sessions\Sessions\SessionKind;
@@ -51,6 +52,7 @@ final class EnrolmentAnonymisation
         $individual = DB::table('training_sessions')->where('kind', SessionKind::Individual->value)
             ->whereIn('id', $enrolments->clone()->select('training_session_id'))->pluck('id')->all();
         AttendanceScans::purgeOfSessions($individual);
+        AttendanceProofs::purgeOfEnrolments($enrolments->clone()->pluck('id')->all());
         SigningAnonymisation::scrub($enrolments->clone()->pluck('id')->all(), $individual);
 
         $ownDossiers = DB::table('dossiers')->whereIn('account_person_id', $personIds);

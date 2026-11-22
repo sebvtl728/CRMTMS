@@ -1,6 +1,7 @@
 <?php
 
 use App\Modules\Sessions\Attendance\AttendanceController;
+use App\Modules\Sessions\Attendance\AttendanceProofController;
 use App\Modules\Sessions\Attendance\AttendanceSheetController;
 use App\Modules\Sessions\Attendance\Signing\CatchUpController;
 use App\Modules\Sessions\Attendance\Signing\PublicSigningController;
@@ -150,6 +151,10 @@ Route::middleware(['auth', 'can:sessions.attendance.manage'])->prefix('seances/{
     Route::post('scans', [AttendanceSheetController::class, 'store'])->middleware('throttle:attendance-scan')->name('scans.store');
     Route::get('scans/{scan}', [AttendanceSheetController::class, 'show'])->name('scans.show');
     Route::delete('scans/{scan}', [AttendanceSheetController::class, 'destroy'])->name('scans.destroy');
+    // Proofs of an absence: managers only (scope other than « Ses séances »).
+    Route::post('enrolments/{proofEnrolment}/proofs', [AttendanceProofController::class, 'store'])->middleware('throttle:attendance-scan')->name('proofs.store');
+    Route::get('proofs/{proof}', [AttendanceProofController::class, 'show'])->name('proofs.show');
+    Route::delete('proofs/{proof}', [AttendanceProofController::class, 'destroy'])->name('proofs.destroy');
 });
 
 // An enrolment: sessions.sessions.update on its session (EnrolmentPolicy).
