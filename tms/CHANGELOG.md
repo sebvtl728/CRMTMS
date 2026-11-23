@@ -5,6 +5,8 @@ Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) ; ve
 
 ## [Non publié]
 
+## [0.15.8] - 2026-11-23
+
 ### Ajouté
 
 - **Rattrapage de plusieurs demi-journées** (émargement) : un stagiaire, ses demi-journées passées encore à signer (jamais une absence notée ou excusée), un seul e-mail, un seul code, une seule signature pour toutes ; **Tout confirmer** par stagiaire.
