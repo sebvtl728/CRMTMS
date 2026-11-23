@@ -36,6 +36,7 @@ class ReferenceController extends Controller
                 'has_reached' => $list->hasReached(),
                 'has_default_for' => $list->hasDefaultFor(),
                 'has_external_billing' => $list->hasExternalBilling(),
+                'has_client' => $list->hasClient(),
                 'items' => ($items[$list->value] ?? collect())->map(fn (ReferenceItem $i) => [
                     'id' => $i->id,
                     'code' => $i->code,
@@ -166,6 +167,7 @@ class ReferenceController extends Controller
             'meta.reached' => ['nullable', 'boolean'],
             'meta.default_for' => ['nullable', Rule::in(array_keys(ReferenceItem::DEFAULT_FOR))],
             'meta.external_billing' => ['nullable', 'boolean'],
+            'meta.client' => ['nullable', 'boolean'],
         ], [
             'label.required' => 'Le libellé est obligatoire.',
             'label.unique' => 'Une valeur portant ce libellé existe déjà dans cette liste.',
@@ -246,6 +248,14 @@ class ReferenceController extends Controller
                 $meta['external_billing'] = true;
             } else {
                 unset($meta['external_billing']);
+            }
+        }
+        // Organisation type showing the commercial status: kept unless the form sends it.
+        if ($list->hasClient() && array_key_exists('client', $input)) {
+            if ((bool) $input['client']) {
+                $meta['client'] = true;
+            } else {
+                unset($meta['client']);
             }
         }
         if (array_key_exists('color', $input)) {

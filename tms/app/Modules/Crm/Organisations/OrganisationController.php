@@ -164,6 +164,8 @@ class OrganisationController extends Controller
                 'responsible' => $organisation->responsible === null ? null : ['id' => $organisation->responsible->id, 'name' => $organisation->responsible->name],
                 'das' => $organisation->das->map($label)->all(),
                 'types' => $organisation->types->map($label)->all(),
+                // The commercial status matters for a « cliente » role, or when no role is set (not for an OPCO…).
+                'shows_status' => $organisation->types->isEmpty() || $organisation->types->contains(fn (ReferenceItem $t) => ($t->meta['client'] ?? false) === true),
                 'last_contact_at' => $organisation->last_contact_at?->toIso8601String(),
                 'created_at' => $organisation->created_at?->toIso8601String(),
                 'updated_at' => $organisation->updated_at?->toIso8601String(),
@@ -359,7 +361,7 @@ class OrganisationController extends Controller
             'company_size' => $this->options(ReferenceList::CompanySize, $current?->company_size_id),
             'origin' => $this->options(ReferenceList::ContactOrigin, $current?->origin_id),
             'das' => $this->options(ReferenceList::Das, null, $current === null ? [] : $current->das()->pluck('reference_items.id')->all()),
-            'types' => $this->options(ReferenceList::OrganisationType, null, $current === null ? [] : $current->types()->pluck('reference_items.id')->all()),
+            'types' => FormOptions::roles($current === null ? [] : $current->types()->pluck('reference_items.id')->all()),
             'responsible' => FormOptions::responsible($current?->responsible_user_id),
         ];
     }

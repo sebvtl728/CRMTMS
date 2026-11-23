@@ -31,6 +31,27 @@ final class FormOptions
     }
 
     /**
+     * Roles of an entreprise (organisation types) with their « cliente »
+     * flag: the form shows the commercial status when a checked role has it,
+     * or when none is checked.
+     *
+     * @param  list<string>  $currentIds
+     * @return list<array{value: string, label: string, client: bool}>
+     */
+    public static function roles(array $currentIds = []): array
+    {
+        return ReferenceItem::query()->where('list', ReferenceList::OrganisationType)
+            ->where(fn ($q) => $q->where('is_active', true)->orWhereIn('id', $currentIds))
+            ->orderBy('position')->orderBy('label')->get()
+            ->map(fn (ReferenceItem $i) => [
+                'value' => $i->id,
+                'label' => $i->is_active ? $i->label : $i->label.' (inactif)',
+                'client' => ($i->meta['client'] ?? false) === true,
+            ])
+            ->values()->all();
+    }
+
+    /**
      * Active users, plus the current responsible when deactivated.
      *
      * @return list<array{value: string, label: string}>
