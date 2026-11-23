@@ -5,10 +5,19 @@ Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) ; ve
 
 ## [Non publié]
 
+## [0.15.13] - 2026-11-23
+
 ### Ajouté
 
 - **Fiche formation** : **heures en centre** et **heures en entreprise** (formulaire, page, export, programme PDF) ; durée en heures et en jours remplies l'une depuis l'autre (7 h par jour) ; bouton **Répartir les heures** entre les modules.
 - **Assistant IA du catalogue** : il propose aussi heures en centre et en entreprise, tarifs HT, et la durée manquante (heures ou jours) ; les heures sont réparties entre les modules au lieu d'être mises sur le premier.
+
+## [0.15.12] - 2026-11-23
+
+### Modifié
+
+- **Import** : un export Entreprises ou Personnes se **réimporte tel quel**. Toutes les colonnes sont reconnues : rôles, formations d'intérêt, base légale, type particulier ou interlocuteur. Les entreprises, la fonction et les coordonnées pro d'une personne créent son rattachement, l'entreprise étant retrouvée par son nom exact. Dans l'export Personnes, les entreprises sont maintenant séparées par « ; ».
+- **Menu Administration** rangé en quatre sections : Organisme, Listes et réglages, Modèles, Technique et sécurité.
 
 ## [0.15.11] - 2026-11-23
 

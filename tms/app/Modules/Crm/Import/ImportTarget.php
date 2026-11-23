@@ -25,6 +25,7 @@ enum ImportTarget: string
         'origin' => 'Origine', 'status' => 'Statut', 'responsible' => 'Responsable', 'email' => 'E-mail', 'phone' => 'Téléphone',
         'website' => 'Site web', 'address_line1' => 'Adresse', 'address_line2' => "Complément d'adresse", 'postal_code' => 'Code postal',
         'city' => 'Ville', 'country' => 'Pays', 'notes_summary' => 'Notes', 'das' => 'DAS', 'source_id' => 'Identifiant source',
+        'types' => 'Rôles', 'interest_trainings' => "Formations d'intérêt",
     ];
 
     private const PERSON = [
@@ -34,6 +35,7 @@ enum ImportTarget: string
         'is_individual' => 'Particulier', 'project' => 'Projet', 'professional_situation' => 'Situation professionnelle',
         'funding_mode' => 'Mode de financement', 'origin' => 'Origine', 'status' => 'Statut', 'responsible' => 'Responsable',
         'das' => 'DAS', 'source_id' => 'Identifiant source',
+        'legal_basis' => 'Base légale', 'interest_trainings' => "Formations d'intérêt",
     ];
 
     private const AFFILIATION = [
@@ -89,7 +91,10 @@ enum ImportTarget: string
         'last_name' => ['nom', 'nom de famille', 'nom de naissance', 'nom usuel', 'patronyme', 'nom du contact', 'nom contact'],
         'first_name' => ['prenom', 'prenoms', 'prenom du contact', 'prenom contact'],
         'birth_date' => ['date de naissance', 'naissance', 'ne le', 'nee le', 'date naissance', 'ddn'],
-        'is_individual' => ['particulier'],
+        'is_individual' => ['particulier', 'type', 'type de fiche'],
+        'types' => ['types', 'roles', 'role de l entreprise', 'type d organisation', 'types d organisation'],
+        'interest_trainings' => ['formations d interet', 'formation d interet', 'interets', 'centres d interet'],
+        'legal_basis' => ['base legale', 'base juridique', 'base legale rgpd'],
         'project' => ['projet', 'projet de formation'],
         'professional_situation' => ['situation', 'situation professionnelle'],
         'funding_mode' => ['financement', 'mode de financement'],
@@ -99,7 +104,7 @@ enum ImportTarget: string
         'work_phone' => ['tel pro', 'telephone pro', 'telephone professionnel', 'ligne directe'],
         'is_referent' => ['referent', 'contact principal'],
         'started_on' => ['depuis', 'date d entree', 'debut', 'arrivee'],
-        'organisation.name' => ['entreprise', 'raison sociale', 'societe', 'nom entreprise', 'nom de l entreprise', 'organisation', 'structure', 'etablissement', 'employeur'],
+        'organisation.name' => ['entreprises', 'entreprise', 'raison sociale', 'societe', 'nom entreprise', 'nom de l entreprise', 'organisation', 'structure', 'etablissement', 'employeur'],
         'organisation.siret' => ['siret', 'n siret', 'no siret', 'numero siret', 'siret entreprise'],
         'organisation.source_id' => ['id entreprise', 'identifiant entreprise', 'code entreprise'],
         'organisation.postal_code' => ['cp entreprise', 'code postal entreprise'],
@@ -119,6 +124,15 @@ enum ImportTarget: string
         'funding_modes' => ['financements', 'financement', 'modes de financement', 'mode de financement', 'dispositifs'],
         'is_active' => ['active', 'actif', 'en catalogue', 'disponible'],
         'body' => ['note', 'notes', 'commentaire', 'commentaires', 'texte', 'compte rendu', 'echange', 'contenu', 'description', 'observations'],
+    ];
+
+    /**
+     * Headers recognised only when they are exactly this (never loosely):
+     * « Nom » of an entreprises export is the raison sociale, but « Nom du
+     * responsable » must stay ambiguous.
+     */
+    private const EXACT_ONLY = [
+        'name' => ['nom'],
     ];
 
     /**
@@ -180,7 +194,8 @@ enum ImportTarget: string
     {
         return match ($this) {
             self::Organisations => self::ORGANISATION,
-            self::People => self::PERSON,
+            // A people export names the entreprises and the function: the row links the person too.
+            self::People => self::PERSON + self::AFFILIATION + ['organisation.name' => 'Entreprises'],
             self::Affiliations => array_diff_key(self::PERSON, ['is_individual' => true]) + self::AFFILIATION + $this->organisationFields(),
             self::Notes => self::NOTE,
             self::Trainings => self::TRAINING,
@@ -205,6 +220,14 @@ enum ImportTarget: string
     }
 
     /**
+     * @return list<string> header keys that name $field only when equal
+     */
+    public function exactSynonyms(string $field): array
+    {
+        return self::EXACT_ONLY[$field] ?? [];
+    }
+
+    /**
      * @return list<string> comparison keys a header may use for $field
      */
     public function synonyms(string $field): array
@@ -221,9 +244,10 @@ enum ImportTarget: string
     {
         $lists = match ($this) {
             self::Organisations => ['legal_form' => ReferenceList::LegalFormOrg, 'sector' => ReferenceList::Sector, 'establishment_type' => ReferenceList::EstablishmentType,
-                'company_size' => ReferenceList::CompanySize, 'origin' => ReferenceList::ContactOrigin, 'das' => ReferenceList::Das],
+                'company_size' => ReferenceList::CompanySize, 'origin' => ReferenceList::ContactOrigin, 'das' => ReferenceList::Das,
+                'types' => ReferenceList::OrganisationType],
             self::People => ['professional_situation' => ReferenceList::ProfessionalSituation, 'funding_mode' => ReferenceList::FundingMode,
-                'origin' => ReferenceList::ContactOrigin, 'das' => ReferenceList::Das],
+                'origin' => ReferenceList::ContactOrigin, 'das' => ReferenceList::Das, 'decision_role' => ReferenceList::DecisionRole],
             self::Affiliations => ['professional_situation' => ReferenceList::ProfessionalSituation, 'funding_mode' => ReferenceList::FundingMode,
                 'origin' => ReferenceList::ContactOrigin, 'das' => ReferenceList::Das, 'decision_role' => ReferenceList::DecisionRole,
                 'organisation.sector' => ReferenceList::Sector],
