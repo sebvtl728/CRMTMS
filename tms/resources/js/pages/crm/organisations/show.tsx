@@ -40,6 +40,8 @@ interface OrganisationData {
     responsible: { id: string; name: string } | null;
     das: Ref[];
     types: Ref[];
+    /** Commercial status shown: a « cliente » role, or no role. */
+    shows_status: boolean;
     email: string | null;
     phone: string | null;
     website: string | null;
@@ -145,7 +147,7 @@ export default function OrganisationShow({
                     <div className="space-y-1">
                         <h1 className="text-xl font-semibold tracking-tight">{o.name}</h1>
                         <div className="flex flex-wrap items-center gap-2">
-                            <Badge variant={statusVariant(o.status.value)}>{o.status.label}</Badge>
+                            {o.shows_status && <Badge variant={statusVariant(o.status.value)}>{o.status.label}</Badge>}
                             {o.deleted && <Badge variant="destructive">Supprimée</Badge>}
                             {o.types.map((t) => (
                                 <Badge key={t.id} variant="secondary">

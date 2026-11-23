@@ -129,4 +129,14 @@ enum ReferenceList: string
     {
         return $this === self::FundingType;
     }
+
+    /**
+     * Organisation types carry a « cliente » flag (meta.client): an
+     * entreprise with such a role, or with no role, shows its commercial
+     * status (prospect, client, inactif); an OPCO or a sous-traitant does not.
+     */
+    public function hasClient(): bool
+    {
+        return $this === self::OrganisationType;
+    }
 }

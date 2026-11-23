@@ -55,7 +55,8 @@ interface FormProps {
         company_size: Option[];
         origin: Option[];
         das: Option[];
-        types: Option[];
+        /** client: a checked role with it (or none checked) shows the commercial status. */
+        types: (Option & { client: boolean })[];
         responsible: Option[];
     };
     duplicates: DuplicateCandidate[];
@@ -245,6 +246,9 @@ export default function OrganisationFormPage({ organisation, options, official_o
         </Field>
     );
 
+    const checkedRoles = options.types.filter((t) => data.type_ids.includes(t.value));
+    const showsStatus = checkedRoles.length === 0 || checkedRoles.some((t) => t.client);
+
     const toggleType = (id: string, checked: boolean) =>
         setData('type_ids', checked ? [...data.type_ids, id] : data.type_ids.filter((d) => d !== id));
     const toggleDas = (id: string, checked: boolean) => setData('das_ids', checked ? [...data.das_ids, id] : data.das_ids.filter((d) => d !== id));
@@ -324,7 +328,7 @@ export default function OrganisationFormPage({ organisation, options, official_o
                             Laissé vide, l'OPCO proposé dans un financement suit la table officielle de France compétences.
                         </p>
                     </Field>
-                    {pick('status', 'Statut', options.status, 'Prospect')}
+                    {showsStatus && pick('status', 'Statut commercial', options.status, 'Prospect')}
                     {pick('responsible_user_id', 'Responsable', options.responsible, 'Sans responsable')}
                 </Section>
 
@@ -335,7 +339,11 @@ export default function OrganisationFormPage({ organisation, options, official_o
                     {pick('company_size_id', 'Taille', options.company_size)}
                     {pick('origin_id', 'Origine', options.origin)}
                     <div className="grid gap-2">
-                        <Label>Types</Label>
+                        <Label>Rôle(s)</Label>
+                        <p className="text-muted-foreground text-xs">
+                            Un ou plusieurs. Les OPCO et financeurs sont proposés dans les financements, les co-traitants dans la facturation. Le
+                            statut commercial ne s'affiche que pour une entreprise cliente (ou sans rôle).
+                        </p>
                         <div className="grid gap-2">
                             {options.types.map((t) => (
                                 <Label key={t.value} className="flex items-center gap-2 font-normal">

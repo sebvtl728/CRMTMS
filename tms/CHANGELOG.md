@@ -5,6 +5,16 @@ Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) ; ve
 
 ## [Non publié]
 
+## [0.15.9] - 2026-11-23
+
+### Ajouté
+
+- **Prochaine action** des opportunités : colonne de la liste et ligne des cartes du pipeline (date, type, objet ; en rouge si en retard), comme le demande le cahier des charges.
+
+### Modifié
+
+- **Fiche entreprise** : « Types » devient **Rôle(s)** (avec une aide) ; le **statut commercial** (prospect, client, inactif) ne s'affiche que pour une entreprise cliente ou sans rôle, plus pour un OPCO, un financeur ou un sous-traitant. Le rôle qui l'affiche se règle dans Administration › Référentiels (« Rôle client »).
+
 ## [0.15.8] - 2026-11-23
 
 ### Ajouté
