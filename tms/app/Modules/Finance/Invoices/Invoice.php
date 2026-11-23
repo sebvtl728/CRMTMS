@@ -92,7 +92,7 @@ class Invoice extends Model
         'company_id', 'kind', 'dossier_id', 'recipient_type', 'recipient_id', 'funding_id',
         'period_from', 'period_to', 'cut_off', 'rhythm', 'basis', 'vat_mention', 'corrected_invoice_id', 'notes',
         'total_ht_cents', 'total_vat_cents', 'total_ttc_cents', 'created_by', 'updated_by',
-        'origin', 'buyer_reference', 'service_code',
+        'origin', 'buyer_reference', 'service_code', 'is_advance',
     ];
 
     /** @var array<string, mixed> */
@@ -108,6 +108,7 @@ class Invoice extends Model
     {
         return [
             'status' => InvoiceStatus::class,
+            'is_advance' => 'boolean',
             'recipient_snapshot' => 'array',
             'issued_on' => 'date',
             'due_on' => 'date',

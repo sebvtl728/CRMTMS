@@ -20,6 +20,7 @@ use App\Modules\Sessions\Enrolments\GroupEnrolment;
 use App\Modules\Sessions\Fundings\FundingStatus;
 use App\Modules\Sessions\Fundings\FundingWriter;
 use App\Modules\Sessions\Permissions;
+use App\Modules\Sessions\Public\DossierHooks;
 use App\Modules\Sessions\Sessions\SessionKind;
 use App\Modules\Sessions\Sessions\SessionStatus;
 use App\Modules\Sessions\Sessions\SessionWriter;
@@ -192,6 +193,8 @@ final class DossierFromQuote
                 }
 
                 $this->fund($dossier, $quote);
+                // Other modules act once it is committed (the automatic convention…).
+                DossierHooks::createdFromQuote($dossier->id, $user);
 
                 return $dossier;
             });

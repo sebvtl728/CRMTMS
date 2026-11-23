@@ -115,6 +115,14 @@
     @if ($invoice['buyer_reference'])<div><strong>N° d'engagement :</strong> {{ $invoice['buyer_reference'] }}</div>@endif
     @if ($invoice['service_code'])<div><strong>Code service :</strong> {{ $invoice['service_code'] }}</div>@endif
     @if ($invoice['period'])<div><strong>Période de formation :</strong> {{ $invoice['period'] }}</div>@endif
+    @if ($invoice['advances'])
+        <div><strong>Acomptes déjà facturés :</strong>
+            @foreach ($invoice['advances'] as $advance)
+                {{ $advance['number'] }}@if ($advance['issued_on']) du {{ $advance['issued_on'] }}@endif ({{ $advance['ttc'] }} TTC){{ $loop->last ? '' : ' ;' }}
+            @endforeach
+            - déduits du montant de cette facture.
+        </div>
+    @endif
     @if ($invoice['grouping'])<div>Facture émise par {{ $company['name'] }}, mandataire du groupement.</div>@endif
 </div>
 

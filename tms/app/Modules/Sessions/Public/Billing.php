@@ -134,6 +134,8 @@ final class Billing
                 'status' => $f->status->value,
                 'agreement_number' => $f->agreement_number,
                 'pays_directly' => $f->pays_directly,
+                'advance_percent' => $f->advance_percent,
+                'advance_on' => $f->advance_on?->toDateString(),
                 'line_id' => $f->dossier_line_id,
                 'enrolment_id' => $f->enrolment_id,
             ])->values()->all(),

@@ -20,6 +20,7 @@ final class AutomationSettings
         'signature_reminder_days' => 3,
         'signature_reminder_max' => 2,
         'certificates' => false,
+        'convention_on_quote' => false,
     ];
 
     public const MAX_DAYS = 30;
@@ -46,6 +47,14 @@ final class AutomationSettings
         return is_bool($value) ? $value : self::DEFAULTS['certificates'];
     }
 
+    /** The convention issued and sent for signature when a dossier is created from a signed quote: off by default. */
+    public static function conventionOnQuote(): bool
+    {
+        $value = data_get(self::settings(), 'automation.convention_on_quote');
+
+        return is_bool($value) ? $value : self::DEFAULTS['convention_on_quote'];
+    }
+
     public static function signatureReminderDays(): int
     {
         return self::int('signature_reminder_days', self::MAX_DAYS);
@@ -56,7 +65,7 @@ final class AutomationSettings
         return self::int('signature_reminder_max', self::MAX_REMINDERS);
     }
 
-    /** @return array{convocation_days: int, day_before: bool, signature_reminder_days: int, signature_reminder_max: int, certificates: bool} */
+    /** @return array{convocation_days: int, day_before: bool, signature_reminder_days: int, signature_reminder_max: int, certificates: bool, convention_on_quote: bool} */
     public static function all(): array
     {
         return [
@@ -65,6 +74,7 @@ final class AutomationSettings
             'signature_reminder_days' => self::signatureReminderDays(),
             'signature_reminder_max' => self::signatureReminderMax(),
             'certificates' => self::certificates(),
+            'convention_on_quote' => self::conventionOnQuote(),
         ];
     }
 
@@ -83,6 +93,7 @@ final class AutomationSettings
             'signature_reminder_days' => ['sometimes', 'integer', 'min:0', 'max:'.self::MAX_DAYS],
             'signature_reminder_max' => ['sometimes', 'integer', 'min:1', 'max:'.self::MAX_REMINDERS],
             'certificates' => ['sometimes', 'boolean'],
+            'convention_on_quote' => ['sometimes', 'boolean'],
         ], [
             '*.integer' => 'Indiquez un nombre entier.',
             '*.min' => 'Indiquez un nombre positif.',

@@ -70,6 +70,7 @@ final class FundingRows
                 'agreed_on' => $f->agreed_on?->toDateString(),
                 'notes' => $f->notes,
                 'pays_directly' => $f->pays_directly,
+                'advance' => $f->advance_percent === null ? null : "Acompte {$f->advance_percent} % à partir du ".$f->advance_on?->format('d/m/Y'),
                 'input' => $canUpdate ? FundingWriter::input($f) : null,
             ];
         })->values()->all();

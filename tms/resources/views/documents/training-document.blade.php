@@ -4,7 +4,8 @@
     are typed by the organisme). Self-contained: inline styles, images as
     data URIs; the CSP below forbids any fetch.
     Parameters: $title, $number, $issued_on, $company, $recipient,
-    $dossier_number, $lines, $price, $sessions, $trainees, $blocks,
+    $dossier_number, $lines, $price, $sessions, $trainees, $blocks, $fundings
+    (DocumentPdf::fundings, null without funding),
     $partyLabel (« Le contractant » / « Le stagiaire »).
 --}}
 <!DOCTYPE html>
@@ -125,6 +126,28 @@
     </table>
     @if ($company['vat_notice'])<p class="small muted">{{ $company['vat_notice'] }}</p>@endif
 </section>
+
+@if (! empty($fundings))
+<section>
+    <h2>Financement</h2>
+    <table class="grid">
+        <thead><tr><th>Financeur</th><th class="num" style="text-align: right">Montant</th></tr></thead>
+        <tbody>
+        @foreach ($fundings['rows'] as $funding)
+            <tr>
+                <td>{{ $funding['funder'] }} - {{ $funding['status'] }}{{ $funding['direct'] ? " ; réglé directement à l'organisme de formation" : '' }}</td>
+                <td class="num">{{ $funding['amount'] }}</td>
+            </tr>
+        @endforeach
+        <tr><td><strong>Reste à la charge du contractant</strong>
+                @if ($fundings['pending'])
+                    <span class="small muted">(sous réserve des accords en cours)</span>
+                @endif
+            </td><td class="num"><strong>{{ $fundings['left'] }}</strong></td></tr>
+        </tbody>
+    </table>
+</section>
+@endif
 
 <div class="signatures">
     <div>

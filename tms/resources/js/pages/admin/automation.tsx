@@ -17,6 +17,7 @@ interface AutomationProps {
         signature_reminder_days: number;
         signature_reminder_max: number;
         certificates: boolean;
+        convention_on_quote: boolean;
     };
     status?: string;
 }
@@ -31,6 +32,7 @@ export default function Automation({ settings, status }: AutomationProps) {
         signature_reminder_days: String(settings.signature_reminder_days),
         signature_reminder_max: String(settings.signature_reminder_max),
         certificates: settings.certificates,
+        convention_on_quote: settings.convention_on_quote,
     });
     const [running, setRunning] = useState(false);
     const number = (v: string) => (v === '' ? null : Number(v));
@@ -43,6 +45,7 @@ export default function Automation({ settings, status }: AutomationProps) {
             signature_reminder_days: number(d.signature_reminder_days),
             signature_reminder_max: number(d.signature_reminder_max),
             certificates: d.certificates,
+            convention_on_quote: d.convention_on_quote,
         }));
         put(route('admin.automation.update'), { preserveScroll: true });
     };
@@ -88,6 +91,25 @@ export default function Automation({ settings, status }: AutomationProps) {
                         </div>
                         <p className="text-muted-foreground text-xs">Horaires, module et lieu ; jamais de prix ni la liste des autres stagiaires.</p>
                         <InputError message={errors.day_before} />
+                    </section>
+
+                    <section className="grid gap-2 rounded-md border p-4">
+                        <h3 className="font-medium">Convention de formation</h3>
+                        <div className="flex items-center gap-2">
+                            <Checkbox
+                                id="convention_on_quote"
+                                checked={data.convention_on_quote}
+                                onCheckedChange={(v) => setData('convention_on_quote', v === true)}
+                            />
+                            <Label htmlFor="convention_on_quote">Émettre et envoyer en signature à la création du dossier depuis un devis signé</Label>
+                        </div>
+                        <p className="text-muted-foreground text-xs">
+                            Tout de suite, au nom de qui crée le dossier, pour une entreprise seulement (le contrat d'un particulier s'émet à la
+                            main). Le lien de signature part au contact du dossier ; les financements y figurent « sous réserve des accords en
+                            cours », l'OPCO demandant souvent la convention signée pour accorder sa prise en charge. Jamais de seconde convention.
+                            Désactivé par défaut.
+                        </p>
+                        <InputError message={errors.convention_on_quote} />
                     </section>
 
                     <section className="grid gap-2 rounded-md border p-4">

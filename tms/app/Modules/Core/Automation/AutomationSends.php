@@ -21,6 +21,8 @@ final class AutomationSends
 
     public const CERTIFICATE = 'certificate';
 
+    public const CONVENTION = 'convention';
+
     public static function claim(string $kind, string $subjectId, string $occurrence): bool
     {
         return DB::table('automation_sends')->insertOrIgnore([

@@ -79,6 +79,7 @@ final class Integrity
             ])->values()->all(),
             ...($invoice->origin === Invoice::ORIGIN_FREE ? ['origin' => Invoice::ORIGIN_FREE] : []),
             ...($invoice->buyer_reference !== null ? ['buyer_reference' => $invoice->buyer_reference] : []),
+            ...($invoice->is_advance ? ['is_advance' => true] : []),
             ...($invoice->service_code !== null ? ['service_code' => $invoice->service_code] : []),
             'totals' => [
                 'ht' => $invoice->total_ht_cents,

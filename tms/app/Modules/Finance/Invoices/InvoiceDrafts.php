@@ -313,6 +313,7 @@ final class InvoiceDrafts
             'rhythm' => $row['rhythm'],
             'basis' => $row['basis'],
             'corrected_invoice_id' => $row['corrected_invoice_id'],
+            'is_advance' => $row['kind'] === Invoice::INVOICE && ($row['advance'] ?? false),
         ];
     }
 

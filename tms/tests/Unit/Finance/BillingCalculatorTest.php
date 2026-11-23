@@ -399,3 +399,78 @@ it('reads a cut-off as a Paris day or a month', function () {
         ->and(fn () => bcRun(bcDossier([bcLine('l1', 100000)], []), bcHours([]), bcPlan('monthly'), cut: CutOff::on('2026-10-15')))
         ->toThrow(InvalidArgumentException::class);
 });
+
+// ------------------------------------------------------------ advances (acomptes)
+
+it('flags the instalments before the last one as advances of the contractor', function () {
+    $dossier = bcDossier([bcLine('l1', 100000)], [bcEnrolment('e1', 'l1', 100000)]);
+    $plan = bcPlan('schedule', 'realised', [['due_on' => '2026-09-01', 'percent' => 30], ['due_on' => '2026-12-01', 'percent' => 70]]);
+
+    $shares = bcRun($dossier, bcHours(['e1' => [1200, 600]]), $plan);
+
+    expect($shares->byRecipient['contractor']['advance'])->toBeTrue()
+        ->and(bcTraining($shares))->toBe(['contractor' => 30000]);
+});
+
+it('bills the advance of a funder before the training is over, the contractor nothing yet', function () {
+    $opco = bcFunding('f1', 60000, ['advance_percent' => 30, 'advance_on' => '2026-09-01']);
+    $dossier = bcDossier([bcLine('l1', 100000)], [bcEnrolment('e1', 'l1', 100000)], [$opco]);
+
+    $shares = bcRun($dossier, bcHours(['e1' => [1200, 600]], [], ['s1' => []], ['s1' => false]));
+
+    expect($shares->ready)->toBeTrue()
+        ->and(bcTraining($shares))->toBe(['contractor' => 0, 'funding:f1' => 18000])
+        ->and($shares->byRecipient['funding:f1']['advance'])->toBeTrue()
+        ->and($shares->billableCents)->toBe(18000)
+        ->and(array_sum(array_column($shares->detail, 'amount_cents')))->toBeGreaterThan(0);
+});
+
+it('waits for the date of the advance', function () {
+    $opco = bcFunding('f1', 60000, ['advance_percent' => 30, 'advance_on' => '2026-11-01']);
+    $dossier = bcDossier([bcLine('l1', 100000)], [bcEnrolment('e1', 'l1', 100000)], [$opco]);
+
+    $shares = bcRun($dossier, bcHours(['e1' => [1200, 600]], [], ['s1' => []], ['s1' => false]));
+
+    expect($shares->ready)->toBeFalse()->and($shares->reason)->toBe(BillingCalculator::NOT_FINISHED);
+});
+
+it('bills the funder at the realised once the training is over, whatever its advance', function () {
+    $opco = bcFunding('f1', 60000, ['advance_percent' => 30, 'advance_on' => '2026-09-01']);
+    $dossier = bcDossier([bcLine('l1', 100000)], [bcEnrolment('e1', 'l1', 100000)], [$opco]);
+
+    $shares = bcRun($dossier, bcHours(['e1' => [1200, 1200]]));
+
+    expect(bcTraining($shares))->toBe(['contractor' => 40000, 'funding:f1' => 60000])
+        ->and($shares->byRecipient['funding:f1']['advance'])->toBeFalse();
+});
+
+it('keeps at least the advance of a funder in a month billed before the end', function () {
+    $opco = bcFunding('f1', 60000, ['advance_percent' => 50, 'advance_on' => '2026-09-01']);
+    $dossier = bcDossier([bcLine('l1', 100000)], [bcEnrolment('e1', 'l1', 100000)], [$opco],
+        ['sessions' => [['id' => 's1', 'starts_on' => '2026-09-01', 'ends_on' => '2026-10-31', 'status' => 'planned']]]);
+
+    $shares = bcRun($dossier, bcHours(['e1' => [1200, 240]], [], ['s1' => ['2026-09']], ['s1' => false]), bcPlan('monthly'), cut: CutOff::month('2026-09'));
+
+    // Realised 20 %: 200 €, the OPCO 120 € of it, raised to its advance (300 €); the contractor keeps 80 €.
+    expect(bcTraining($shares))->toBe(['contractor' => 8000, 'funding:f1' => 30000])
+        ->and($shares->byRecipient['funding:f1']['advance'])->toBeTrue()
+        ->and($shares->byRecipient['contractor']['advance'])->toBeFalse();
+});
+
+it('gives the funder its advance on an instalment of a schedule', function () {
+    $opco = bcFunding('f1', 60000, ['advance_percent' => 30, 'advance_on' => '2026-09-01']);
+    $dossier = bcDossier([bcLine('l1', 100000)], [bcEnrolment('e1', 'l1', 100000)], [$opco]);
+    $plan = bcPlan('schedule', 'realised', [['due_on' => '2026-09-01', 'percent' => 30], ['due_on' => '2026-12-01', 'percent' => 70]]);
+
+    $shares = bcRun($dossier, bcHours(['e1' => [1200, 600]]), $plan);
+
+    // Contractor: (1 000 − 600) × 30 % = 120 €; OPCO: 600 × 30 % = 180 €.
+    expect(bcTraining($shares))->toBe(['contractor' => 12000, 'funding:f1' => 18000]);
+});
+
+it('never asks an advance of a funding not agreed', function () {
+    $opco = bcFunding('f1', 60000, ['status' => 'requested', 'advance_percent' => 30, 'advance_on' => '2026-09-01']);
+    $dossier = bcDossier([bcLine('l1', 100000)], [bcEnrolment('e1', 'l1', 100000)], [$opco]);
+
+    expect(bcRun($dossier, bcHours(['e1' => [1200, 600]], [], ['s1' => []], ['s1' => false]))->ready)->toBeFalse();
+});

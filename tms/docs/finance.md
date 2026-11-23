@@ -20,7 +20,8 @@ Chaque dossier a son **rythme**, réglé dans le bloc **Facturation** de la page
 
 - **Fin de formation** (par défaut) : une facture quand toutes les sessions du dossier sont terminées et leurs mois de présences clôturés.
 - **Mensuel au réalisé** : une facture par mois clôturé. **Seules les heures réalisées d'un mois clôturé sont facturées** : un mois non clôturé n'est jamais facturé, et le mensuel ne se combine pas avec la base « au prévu ».
-- **Échéancier** : des échéances (date et pourcentage, 100 % au total, 24 au plus). Les échéances intermédiaires ne portent que sur la **part du contractant** ; **les financeurs ne sont jamais facturés d'avance** : ils sont facturés à la **dernière échéance**, au réalisé, qui régularise tout.
+- **Échéancier** : des échéances (date et pourcentage, 100 % au total, 24 au plus). Les échéances intermédiaires ne portent que sur la **part du contractant** et sortent en **« Facture d'acompte »** ; les financeurs sont facturés à la **dernière échéance**, au réalisé, qui régularise tout — sauf l'acompte qu'on leur demande (ci-dessous).
+- **Acompte demandé à un financeur** : sur un financement **accordé** qui **paie directement l'organisme**, « Acompte demandé au financeur (%) » et « Facturé à partir du » (date). Dès cette date et tant que la formation n'est pas terminée, le financeur doit au moins ce pourcentage de son montant : il reçoit une **« Facture d'acompte »**, quel que soit le rythme (fin de formation, mensuel, échéancier). Une fois la formation terminée, sa part redevient celle du réalisé : la facture suivante déduit l'acompte (un avoir si l'acompte dépassait le réalisé) et rappelle les **acomptes déjà facturés** (numéro, date, TTC).
 
 La **base** de calcul :
 

@@ -91,11 +91,52 @@ class DocumentPdf
             'sessions' => array_map(fn (array $s) => ['label' => $s['label'], 'period' => self::period($s['starts_on'], $s['ends_on']),
                 'hours' => $s['planned_minutes'] === null ? null : self::hours((int) $s['planned_minutes']), 'place' => $s['place']], $sessions),
             'trainees' => $names,
+            'fundings' => $this->fundings($dossier),
             'blocks' => collect($this->texts->resolve($type, $company->id))->map(fn (string $text, string $key) => [
                 'title' => DocumentTexts::blocks($type)[$key]['label'],
                 'text' => DocumentTexts::fill($text, $values),
             ])->values()->all(),
         ])->render();
+    }
+
+    /**
+     * The fundings asked or agreed for the dossier (never a refused one, nor
+     * the contractant funding itself), and what is left to the contractant:
+     * the price minus them (« sous réserve » while one is not agreed). Null
+     * without such a funding.
+     *
+     * @param  array<string, mixed>  $dossier  Paperwork::dossier()
+     * @return array{rows: list<array{funder: string, status: string, amount: string, direct: bool}>, left: string, pending: bool}|null
+     */
+    private function fundings(array $dossier): ?array
+    {
+        $contractor = $dossier['contractor'];
+        $fundings = array_values(array_filter($dossier['fundings'] ?? [], fn (array $f) => $f['status'] !== 'refused'
+            && ! ($f['funder']['type'] === $contractor['type'] && $f['funder']['id'] === $contractor['id'])));
+        if ($fundings === []) {
+            return null;
+        }
+        $ids = fn (string $type) => array_values(array_map(fn (array $f) => (string) $f['funder']['id'], array_filter($fundings, fn (array $f) => $f['funder']['type'] === $type)));
+        $names = [...$this->fiches->organisationLabels($ids('organisation')), ...$this->fiches->personLabels($ids('person'))];
+        $total = 0;
+        $rows = [];
+        foreach ($fundings as $f) {
+            $total += (int) $f['amount_cents'];
+            $rows[] = [
+                'funder' => $names[$f['funder']['id']]['label'] ?? '-',
+                'status' => $f['status'] === 'agreed'
+                    ? 'prise en charge accordée'.($f['agreement_number'] ? ', accord n° '.$f['agreement_number'] : '')
+                    : 'demande en cours',
+                'amount' => self::euros((int) $f['amount_cents']),
+                'direct' => (bool) $f['pays_directly'],
+            ];
+        }
+
+        return [
+            'rows' => $rows,
+            'left' => self::euros(max(0, (int) $dossier['price_cents'] - $total)),
+            'pending' => array_filter($fundings, fn (array $f) => $f['status'] !== 'agreed') !== [],
+        ];
     }
 
     /**

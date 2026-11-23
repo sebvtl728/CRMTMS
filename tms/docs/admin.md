@@ -442,6 +442,12 @@ Guide utilisateur : `admissions.md`.
   - **Attestations et certificats de réalisation** (désactivé par défaut) : émis et envoyés le matin qui suit la
     **clôture de tous les mois** de la session (heures réalisées définitives ; jamais pour un stagiaire à 0 h réalisée) ; un document annulé n'est jamais
     refait ; un stagiaire sans e-mail : émis, non envoyé.
+  - **Convention de formation** (désactivé par défaut) : à la création d'un dossier depuis un devis signé, pour une
+    entreprise, la convention est émise au nom de qui crée le dossier puis envoyée en **signature en ligne** au contact
+    du dossier (sans e-mail valide : émise seulement). Les financements y figurent « sous réserve des accords en
+    cours ». Jamais de seconde convention (une annulée compte) ; le contrat d'un particulier reste émis à la main.
+    Immédiat (pas à 7 h 15) : crochet `Sessions\Public\DossierHooks::onCreatedFromQuote`, une erreur journalisée
+    n'annule jamais le dossier.
   - **Exécuter maintenant** lance les mêmes automatismes tout de suite (mêmes règles). Rien ne part deux fois : chaque
     envoi automatique est noté (`automation_sends`). Les réglages sont journalisés (`automation.settings.updated`).
 - **Modèles d'e-mails** : « Rappel la veille (stagiaire) », « Rappel la veille (formateur) », « Relance de signature en

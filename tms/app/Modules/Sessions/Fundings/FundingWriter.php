@@ -44,6 +44,8 @@ use Illuminate\Validation\ValidationException;
  */
 final class FundingWriter
 {
+    public const ADVANCE_NOT_DIRECT = 'Un acompte ne se demande qu\'à un financeur qui règle directement l\'organisme : cochez « Paie directement l\'organisme ».';
+
     /** What the funding pays, as the form says it (« target »): the ids follow. */
     public const TARGETS = ['dossier', 'line', 'enrolment'];
 
@@ -127,6 +129,8 @@ final class FundingWriter
             'agreed_on' => $funding->agreed_on?->toDateString(),
             'notes' => $funding->notes,
             'pays_directly' => $funding->pays_directly,
+            'advance_percent' => $funding->advance_percent === null ? null : (string) $funding->advance_percent,
+            'advance_on' => $funding->advance_on?->toDateString(),
         ];
     }
 
@@ -176,11 +180,16 @@ final class FundingWriter
             'agreed_on' => ['nullable', 'date_format:Y-m-d'],
             'notes' => ['nullable', 'string', 'max:5000'],
             'pays_directly' => ['boolean'],
+            'advance_percent' => ['nullable', 'integer', 'between:1,100'],
+            'advance_on' => ['nullable', 'required_with:advance_percent', 'date_format:Y-m-d'],
         ], self::messages());
 
         $validator->after(function ($v) use ($data, $dossier, $current): void {
             $this->checkFunder($v, $data, $current);
             $this->checkTarget($v, $data, $dossier, $current);
+            if ($data['advance_percent'] !== null && ! filter_var($data['pays_directly'], FILTER_VALIDATE_BOOLEAN)) {
+                $v->errors()->add('advance_percent', self::ADVANCE_NOT_DIRECT);
+            }
         });
         $validator->validate();
         // The contractant already receives the invoice of what is left: « paie directement » means nothing for him (ignored, never refused).
@@ -199,6 +208,9 @@ final class FundingWriter
             'agreed_on' => $data['agreed_on'],
             'notes' => $data['notes'],
             'pays_directly' => ! $contractor && filter_var($data['pays_directly'], FILTER_VALIDATE_BOOLEAN),
+            // The contractant's own funding asks no advance (it receives the invoices anyway).
+            'advance_percent' => $contractor || $data['advance_percent'] === null ? null : (int) $data['advance_percent'],
+            'advance_on' => $contractor || $data['advance_percent'] === null ? null : $data['advance_on'],
         ];
     }
 
@@ -273,7 +285,7 @@ final class FundingWriter
      */
     private static function normalise(array $data): array
     {
-        foreach (['target', 'funder_organisation_id', 'funder_person_id', 'funding_type_id', 'dossier_line_id', 'enrolment_id', 'amount', 'status', 'agreement_number', 'agreed_on', 'notes'] as $key) {
+        foreach (['target', 'funder_organisation_id', 'funder_person_id', 'funding_type_id', 'dossier_line_id', 'enrolment_id', 'amount', 'status', 'agreement_number', 'agreed_on', 'notes', 'advance_percent', 'advance_on'] as $key) {
             $value = $data[$key] ?? null;
             if (is_string($value)) {
                 $value = trim($value);
@@ -319,6 +331,9 @@ final class FundingWriter
             'agreed_on.*' => 'Date d\'accord invalide.',
             'notes.*' => 'Les notes ne doivent pas dépasser 5 000 caractères.',
             'pays_directly.*' => 'Cochez ou décochez la case.',
+            'advance_percent.*' => 'Indiquez un pourcentage d\'acompte de 1 à 100.',
+            'advance_on.required_with' => 'Indiquez la date à partir de laquelle l\'acompte est facturé.',
+            'advance_on.*' => 'Date d\'acompte invalide.',
         ];
     }
 }

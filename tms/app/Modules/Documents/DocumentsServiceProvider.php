@@ -9,10 +9,12 @@ use App\Modules\Core\Signatures\Events\SignatureCompleted;
 use App\Modules\Core\Users\User;
 use App\Modules\Crm\Public\FicheLinks;
 use App\Modules\Documents\Automation\CertificateAutomation;
+use App\Modules\Documents\Automation\ConventionAutomation;
 use App\Modules\Documents\Automation\ConvocationAutomation;
 use App\Modules\Documents\Gdpr\DocumentAnonymisation;
 use App\Modules\Documents\Texts\DocumentText;
 use App\Modules\Sessions\Public\DossierBlocks;
+use App\Modules\Sessions\Public\DossierHooks;
 use App\Modules\Sessions\Public\Paperwork;
 use App\Modules\Sessions\Public\SessionBlocks;
 use App\Modules\Sessions\Public\SessionCards;
@@ -44,6 +46,9 @@ class DocumentsServiceProvider extends ServiceProvider
     {
         DailyAutomations::register('convocations', fn (CarbonImmutable $today): int => app(ConvocationAutomation::class)->run($today));
         DailyAutomations::register('certificates', fn (CarbonImmutable $today): int => app(CertificateAutomation::class)->run($today));
+        DossierHooks::onCreatedFromQuote('documents.convention', function (string $dossierId, User $by): void {
+            app(ConventionAutomation::class)->forDossier($dossierId, $by);
+        });
         DocumentMailTemplates::register();
         Event::listen(SignatureCompleted::class, fn (SignatureCompleted $e) => DocumentSignatures::completed($e, app(Paperwork::class)));
         RateLimiter::for('document-mail', fn (Request $request) => Limit::perMinute(20)->by('document-mail:'.($request->user()?->getAuthIdentifier() ?? $request->ip())));

@@ -156,9 +156,9 @@ it('describes a dossier for invoicing: lines, enrolments, fundings and sessions 
             'session_id' => $x['s2']->id, 'entered_on' => '2026-10-01', 'left_on' => null, 'abandoned' => false, 'force_majeure' => false],
     ])->and($data['fundings'])->toBe([
         ['id' => $x['opco']->id, 'funder' => ['type' => 'organisation', 'id' => $x['opco']->funder_organisation_id], 'type_id' => crmItem(ReferenceList::FundingType, 'OPCO')->id,
-            'external_billing' => false, 'amount_cents' => 120000, 'status' => 'agreed', 'agreement_number' => 'PEC-2026-42', 'pays_directly' => true, 'line_id' => null, 'enrolment_id' => null],
+            'external_billing' => false, 'amount_cents' => 120000, 'status' => 'agreed', 'agreement_number' => 'PEC-2026-42', 'pays_directly' => true, 'advance_percent' => null, 'advance_on' => null, 'line_id' => null, 'enrolment_id' => null],
         ['id' => $x['cpfFunding']->id, 'funder' => ['type' => 'organisation', 'id' => $x['cpfFunding']->funder_organisation_id], 'type_id' => $x['cpf']->id,
-            'external_billing' => true, 'amount_cents' => 50000, 'status' => 'requested', 'agreement_number' => null, 'pays_directly' => false, 'line_id' => null, 'enrolment_id' => $x['lea']->id],
+            'external_billing' => true, 'amount_cents' => 50000, 'status' => 'requested', 'agreement_number' => null, 'pays_directly' => false, 'advance_percent' => null, 'advance_on' => null, 'line_id' => null, 'enrolment_id' => $x['lea']->id],
     ])->and($data['sessions'])->toBe([
         ['id' => $x['s1']->id, 'starts_on' => '2026-09-01', 'ends_on' => '2026-11-30', 'status' => 'running', 'label' => "HACCP 3 jours ({$x['s1']->number})"],
         ['id' => $x['s2']->id, 'starts_on' => '2026-10-01', 'ends_on' => '2026-11-30', 'status' => 'running', 'label' => "Sauveteur secouriste du travail ({$x['s2']->number})"],
