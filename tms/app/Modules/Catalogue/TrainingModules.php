@@ -15,6 +15,7 @@ final class TrainingModules
     {
         $existing = $training->modules()->get()->keyBy('id');
         $kept = [];
+        $changed = false;
 
         foreach ($modules as $position => $row) {
             $values = [
@@ -27,8 +28,11 @@ final class TrainingModules
             $module = isset($row['id']) ? $existing->get($row['id']) : null;
             if ($module === null) {
                 $module = $training->modules()->create($values);
+                $changed = true;
             } else {
-                $module->update($values);
+                $module->fill($values);
+                $changed = $changed || $module->isDirty();
+                $module->save();
             }
             $kept[] = $module->id;
         }
@@ -36,7 +40,13 @@ final class TrainingModules
         foreach ($existing as $id => $module) {
             if (! in_array($id, $kept, true)) {
                 $module->delete();
+                $changed = true;
             }
+        }
+
+        // The programme is dated by the training: a module change dates it too.
+        if ($changed) {
+            $training->touch();
         }
     }
 

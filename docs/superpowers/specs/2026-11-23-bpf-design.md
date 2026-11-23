@@ -55,7 +55,7 @@ Chaque organisme déclare chaque année son BPF (Cerfa n° 10443) sur la platefo
   - `bpf_category.meta.bpf_line` ;
   - valeurs par défaut posées par migration pour chaque organisme existant ;
   - réglables dans Administration › Référentiels.
-- **Catalogue** : `trainings.bpf_objective` (enum) et `trainings.nsf_code` (3 chiffres et une lettre, liste officielle des spécialités de formation embarquée dans le code), saisis sur la fiche formation.
+- **Catalogue** : `trainings.bpf_objective` (enum) et `trainings.nsf_code` (groupe de spécialités à 3 chiffres, liste officielle INSEE niveau 100 embarquée dans `Catalogue\Nsf` — fait en 0.15.10), saisis sur la fiche formation.
 
 ## Questions pour Sébastien
 

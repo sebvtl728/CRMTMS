@@ -46,6 +46,8 @@ final class TrainingExport implements ExportResource
             'accessibility' => 'Accessibilité',
             'access_terms' => 'Modalités et délais d\'accès',
             'results' => 'Résultats',
+            'bpf_objective' => 'Objectif BPF',
+            'nsf_code' => 'Code NSF',
         ];
     }
 
@@ -94,6 +96,8 @@ final class TrainingExport implements ExportResource
             'accessibility' => $model->accessibility,
             'access_terms' => $model->access_terms,
             'results' => $model->results,
+            'bpf_objective' => $model->bpf_objective?->label(),
+            'nsf_code' => Nsf::display($model->nsf_code),
             default => null,
         };
     }

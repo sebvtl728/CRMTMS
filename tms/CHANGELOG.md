@@ -5,6 +5,13 @@ Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) ; ve
 
 ## [Non publié]
 
+## [0.15.10] - 2026-11-23
+
+### Ajouté
+
+- **Fiche formation** : **Objectif (BPF)** et **Spécialité NSF** (liste officielle des 93 groupes), préparation du bilan pédagogique et financier ; colonnes de l'export.
+- **Programme (PDF)** de chaque formation, mis en page depuis sa fiche et **daté de sa dernière mise à jour** (Qualiopi, indicateur 1).
+
 ## [0.15.9] - 2026-11-23
 
 ### Ajouté

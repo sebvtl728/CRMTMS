@@ -39,6 +39,8 @@ use Illuminate\Support\Facades\Auth;
  * @property string|null $access_terms
  * @property string|null $rncp_code « RNCP » followed by digits, uppercase
  * @property string|null $results
+ * @property BpfObjective|null $bpf_objective BPF cadre F-3
+ * @property string|null $nsf_code NSF group of specialities (Nsf::CODES), BPF cadre F-4
  * @property bool $is_active
  * @property string|null $created_by
  * @property string|null $updated_by
@@ -59,7 +61,7 @@ class Training extends Model
     protected $fillable = [
         'code', 'title', 'das_id', 'duration_hours', 'duration_days', 'audience', 'prerequisites',
         'price_company', 'price_individual', 'is_active',
-        'description', 'objectives', 'methods', 'evaluation', 'sanction', 'accessibility', 'access_terms', 'results', 'rncp_code',
+        'description', 'objectives', 'methods', 'evaluation', 'sanction', 'accessibility', 'access_terms', 'results', 'rncp_code', 'bpf_objective', 'nsf_code',
     ];
 
     /** @var array<string, mixed> */
@@ -95,6 +97,7 @@ class Training extends Model
             'price_individual' => 'decimal:2',
             'is_active' => 'boolean',
             'objectives' => 'array',
+            'bpf_objective' => BpfObjective::class,
         ];
     }
 
