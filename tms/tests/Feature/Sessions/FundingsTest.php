@@ -443,5 +443,5 @@ it('proposes the OPCO of the contractant\'s collective agreement on the dossier 
     $dossier = l2Dossier(Organisation::query()->create(['name' => 'Hôtel du Lac', 'idcc' => '1979']));
 
     $this->actingAs(admin(twoFactor: true))->get("/dossiers/{$dossier->id}")->assertInertia(fn ($p) => $p
-        ->where('funding_options.suggested_opco', ['id' => $opco->id, 'label' => 'AKTO', 'idcc' => '1979']));
+        ->where('funding_options.suggested_opco', ['id' => $opco->id, 'label' => 'AKTO', 'idcc' => '1979', 'official' => null]));
 });

@@ -75,7 +75,7 @@ export interface FundingOptions {
     line: Option[];
     enrolment: Option[];
     /** OPCO of the contractant's collective agreement, proposed for a new funding. */
-    suggested_opco?: { id: string; label: string; idcc: string } | null;
+    suggested_opco?: { id: string | null; label: string; idcc: string; official: string | null } | null;
 }
 
 function statusVariant(status: FundingStatus): 'default' | 'secondary' | 'outline' | 'destructive' {
@@ -119,7 +119,7 @@ function FundingDialog({
     const [funderType, setFunderType] = useState<'organisation' | 'person'>(funding?.funder.type ?? 'organisation');
     const suggested = funding ? null : (options.suggested_opco ?? null);
     const [funder, setFunder] = useState<Picked | null>(
-        funding ? { id: funding.funder.id, label: funding.funder.label } : suggested ? { id: suggested.id, label: suggested.label } : null,
+        funding ? { id: funding.funder.id, label: funding.funder.label } : suggested?.id ? { id: suggested.id, label: suggested.label } : null,
     );
     const [targetKind, setTargetKind] = useState<'none' | 'line' | 'enrolment'>(
         input?.dossier_line_id ? 'line' : input?.enrolment_id ? 'enrolment' : 'none',
@@ -218,9 +218,16 @@ function FundingDialog({
                             onPick={(p) => pick(funderType, p)}
                             placeholder={funderType === 'organisation' ? 'Rechercher une entreprise (OPCO, client…)' : 'Rechercher une personne'}
                         />
-                        {suggested && funder?.id === suggested.id && (
+                        {suggested?.id && funder?.id === suggested.id && (
                             <p className="text-muted-foreground text-xs">
-                                OPCO proposé d'après la convention collective du contractant (IDCC {suggested.idcc}).
+                                OPCO proposé d'après la convention collective du contractant (IDCC {suggested.idcc}
+                                {suggested.official ? ', table officielle de France compétences' : ''}).
+                            </p>
+                        )}
+                        {suggested && !suggested.id && !funder && (
+                            <p className="text-muted-foreground text-xs">
+                                Selon la table officielle de France compétences, l'OPCO de la convention IDCC {suggested.idcc} est{' '}
+                                {suggested.label}. Aucune fiche entreprise à ce nom : créez-la pour la choisir.
                             </p>
                         )}
                         <InputError message={fieldErrors.funder ?? fieldErrors.funder_organisation_id ?? fieldErrors.funder_person_id} />

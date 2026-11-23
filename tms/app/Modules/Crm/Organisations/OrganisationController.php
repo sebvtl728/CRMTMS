@@ -93,6 +93,7 @@ class OrganisationController extends Controller
         return Inertia::render('crm/organisations/form', [
             'organisation' => null,
             'options' => $this->formOptions(null),
+            'official_opcos' => self::officialOpcos(),
             'duplicates' => DuplicateGuard::flashed($request),
             'canMerge' => $this->user($request)->can(Permissions::MERGE),
         ]);
@@ -206,6 +207,7 @@ class OrganisationController extends Controller
                 'type_ids' => $organisation->types()->pluck('reference_items.id')->all(),
             ],
             'options' => $this->formOptions($organisation),
+            'official_opcos' => self::officialOpcos(),
             'duplicates' => DuplicateGuard::flashed($request),
             'canMerge' => $this->user($request)->can(Permissions::MERGE),
         ]);
@@ -328,6 +330,16 @@ class OrganisationController extends Controller
             'country' => $o->country,
             'notes_summary' => $o->notes_summary,
         ];
+    }
+
+    /**
+     * The eleven OPCO and their official IDCC, for « Reprendre les IDCC officiels ».
+     *
+     * @return list<array{key: string, label: string, idcc: string}>
+     */
+    private static function officialOpcos(): array
+    {
+        return array_map(fn (array $o) => ['key' => $o['key'], 'label' => $o['label'], 'idcc' => implode(', ', $o['idcc'])], OfficialOpcos::options());
     }
 
     /**

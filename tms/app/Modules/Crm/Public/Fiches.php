@@ -4,6 +4,7 @@ namespace App\Modules\Crm\Public;
 
 use App\Modules\Core\Users\User;
 use App\Modules\Crm\Opportunities\Opportunity;
+use App\Modules\Crm\Organisations\OfficialOpcos;
 use App\Modules\Crm\Organisations\Organisation;
 use App\Modules\Crm\Organisations\OrganisationStatus;
 use App\Modules\Crm\People\Person;
@@ -86,10 +87,13 @@ final class Fiches
 
     /**
      * The OPCO of an entreprise: the live organisation whose covered
-     * agreements (covered_idcc) hold the entreprise's IDCC, by name; null
-     * without IDCC or without such an OPCO.
+     * agreements (covered_idcc) hold the entreprise's IDCC, by name;
+     * otherwise the OPCO of the official table (OfficialOpcos) and its live
+     * fiche found by name (id null without one). `official` = label of the
+     * official OPCO, null when a fiche's covered agreements decided. Null
+     * without IDCC or when neither knows it.
      *
-     * @return array{id: string, label: string, idcc: string}|null
+     * @return array{id: ?string, label: string, idcc: string, official: ?string}|null
      */
     public function opcoFor(string $organisationId): ?array
     {
@@ -98,8 +102,24 @@ final class Fiches
             return null;
         }
         $opco = Organisation::query()->whereJsonContains('covered_idcc', $idcc)->orderBy('name')->first(['id', 'name']);
+        if ($opco !== null) {
+            return ['id' => $opco->id, 'label' => $opco->name, 'idcc' => $idcc, 'official' => null];
+        }
+        $key = OfficialOpcos::of($idcc);
+        if ($key === null) {
+            return null;
+        }
+        $label = OfficialOpcos::label($key);
+        $fiche = Organisation::query()
+            ->where(function ($query) use ($key): void {
+                foreach (OfficialOpcos::searchTerms($key) as $term) {
+                    $query->orWhere(fn ($q) => $q->search($term));
+                }
+            })
+            ->orderByRaw('length(name)')->orderBy('name')->limit(20)->get(['id', 'name'])
+            ->first(fn (Organisation $o) => OfficialOpcos::names($key, $o->name));
 
-        return $opco === null ? null : ['id' => $opco->id, 'label' => $opco->name, 'idcc' => $idcc];
+        return ['id' => $fiche?->id, 'label' => $fiche === null ? $label : $fiche->name, 'idcc' => $idcc, 'official' => $label];
     }
 
     /**
