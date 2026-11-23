@@ -62,10 +62,13 @@ class SendCatchUpMail implements ShouldBeEncrypted, ShouldQueue
         $session = TrainingSession::withTrashed()->findOrFail($slot->training_session_id);
         $personId = (string) Enrolment::query()->whereKey($link->enrolment_id)->value('person_id');
         $person = app(Fiches::class)->personLabels([$personId])[$personId] ?? null;
+        // A grouped catch-up lists its half-days in {date}, their number in {demi_journee}.
+        $slots = count($link->slotIds()) > 1 ? SignSlot::query()->whereKey($link->slotIds())->orderBy('date')->orderBy('half', 'desc')->get() : null;
         $text = app(MailTemplates::class)->render(CatchUpMailTemplates::LINK, [
             'stagiaire' => (string) ($person['label'] ?? ''),
-            'date' => $slot->date->locale('fr')->isoFormat('dddd D MMMM YYYY'),
-            'demi_journee' => mb_strtolower(SignSlot::label($slot->half)),
+            'date' => $slots === null ? $slot->date->locale('fr')->isoFormat('dddd D MMMM YYYY')
+                : $slots->map(fn (SignSlot $s) => GroupCatchUp::label($s->date->toDateString(), $s->half))->implode(', '),
+            'demi_journee' => $slots === null ? mb_strtolower(SignSlot::label($slot->half)) : $slots->count().' demi-journées',
             'session' => PlanningRows::sessionLabels([$session])[$session->id] ?? $session->number,
             'echeance' => $link->expires_at->timezone('Europe/Paris')->format('d/m/Y'),
             'organisme' => (string) (app(TenantContext::class)->current()->name ?? ''),

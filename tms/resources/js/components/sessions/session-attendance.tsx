@@ -173,7 +173,7 @@ interface SessionAttendance {
         reopened_by: string | null;
         reopen_reason: string | null;
     };
-    can: { manage: boolean; close: boolean };
+    can: { manage: boolean; close: boolean; catch_up: boolean };
     seances: {
         id: string;
         date: string;
@@ -1056,7 +1056,10 @@ export function SessionAttendance({ sessionId }: { sessionId: string }) {
                         ))}
                     </ul>
                 )}
-                {data.catch_ups.length > 0 && <CatchUps catchUps={data.catch_ups} onChange={() => load(data.month)} />}
+                {data.can.catch_up && data.realised.length > 0 && (
+                    <GroupCatchUpButton sessionId={sessionId} trainees={data.realised} onSent={() => load(data.month)} />
+                )}
+                {data.catch_ups.length > 0 && <CatchUps sessionId={sessionId} catchUps={data.catch_ups} onChange={() => load(data.month)} />}
                 <SignedSheets
                     sessionId={sessionId}
                     month={data.month}
@@ -1181,7 +1184,137 @@ function SignedSheets({
 }
 
 /** « Rattrapages à confirmer »: a catch-up counts as attendance once confirmed; refused, it stays as a trace. */
-function CatchUps({ catchUps, onChange }: { catchUps: CatchUp[]; onChange: () => void }) {
+type Half = { date: string; half: string; label: string };
+
+/**
+ * « Rattrapage de plusieurs demi-journées »: a trainee, the half-days he
+ * can still sign (never one entered absent or excused), one e-mail with one
+ * link and one code, one drawing for all.
+ */
+function GroupCatchUpButton({ sessionId, trainees, onSent }: { sessionId: string; trainees: { enrolment_id: string; name: string }[]; onSent: () => void }) {
+    const [open, setOpen] = useState(false);
+    const [enrolmentId, setEnrolmentId] = useState('');
+    const [halves, setHalves] = useState<Half[] | null>(null);
+    const [chosen, setChosen] = useState<string[]>([]);
+    const [email, setEmail] = useState('');
+    const [busy, setBusy] = useState(false);
+    const [errors, setErrors] = useState<Record<string, string>>({});
+    const [done, setDone] = useState<string | null>(null);
+    const key = (h: Half) => `${h.date}|${h.half}`;
+
+    const pick = async (id: string) => {
+        setEnrolmentId(id);
+        setHalves(null);
+        setErrors({});
+        if (!id) return;
+        const answer = await sendJson<{ halves: Half[]; email: string | null }>('GET', route('sessions.catch-ups.halves', { trainingSession: sessionId, enrolment: id }));
+        if (answer.ok && answer.data) {
+            setHalves(answer.data.halves);
+            setChosen(answer.data.halves.map(key));
+            setEmail(answer.data.email ?? '');
+        } else setErrors({ halves: answer.message ?? 'Une erreur est survenue.' });
+    };
+    const send = async () => {
+        setBusy(true);
+        const answer = await sendJson<{ count: number }>('POST', route('sessions.catch-ups.group', sessionId), {
+            enrolment_id: enrolmentId,
+            email,
+            halves: (halves ?? []).filter((h) => chosen.includes(key(h))).map((h) => ({ date: h.date, half: h.half })),
+        });
+        setBusy(false);
+        if (answer.ok) {
+            setDone(`Lien envoyé pour ${answer.data?.count ?? 0} demi-journée(s).`);
+            setOpen(false);
+            onSent();
+        } else setErrors(Object.keys(answer.errors).length > 0 ? answer.errors : { halves: answer.message ?? 'Une erreur est survenue.' });
+    };
+
+    return (
+        <div className="flex flex-wrap items-center gap-2">
+            <Button
+                size="sm"
+                variant="outline"
+                onClick={() => {
+                    setOpen(true);
+                    setDone(null);
+                    void pick('');
+                }}
+            >
+                <ClipboardCheck className="h-4 w-4" />
+                Rattrapage de plusieurs demi-journées
+            </Button>
+            {done && <span className="text-sm text-green-600">{done}</span>}
+            <Dialog open={open} onOpenChange={setOpen}>
+                <DialogContent className="max-h-[90vh] overflow-y-auto">
+                    <DialogHeader>
+                        <DialogTitle>Rattrapage de plusieurs demi-journées</DialogTitle>
+                        <DialogDescription>
+                            Un seul e-mail, un seul code, une seule signature pour toutes les demi-journées cochées. Une demi-journée notée absente
+                            ou excusée n'est jamais proposée.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <div className="grid gap-3 text-sm">
+                        <div className="grid gap-1">
+                            <Label htmlFor="gcu-trainee">Stagiaire</Label>
+                            <select
+                                id="gcu-trainee"
+                                className="border-input bg-background rounded-md border px-3 py-2"
+                                value={enrolmentId}
+                                onChange={(e) => void pick(e.target.value)}
+                            >
+                                <option value="">Choisir…</option>
+                                {trainees.map((t) => (
+                                    <option key={t.enrolment_id} value={t.enrolment_id}>
+                                        {t.name}
+                                    </option>
+                                ))}
+                            </select>
+                        </div>
+                        {halves !== null &&
+                            (halves.length === 0 ? (
+                                <p className="text-muted-foreground">Aucune demi-journée à rattraper pour ce stagiaire (mois ouverts).</p>
+                            ) : (
+                                <fieldset className="grid gap-1">
+                                    <legend className="mb-1 font-medium">Demi-journées à signer</legend>
+                                    {halves.map((h) => (
+                                        <label key={key(h)} className="flex items-center gap-2">
+                                            <input
+                                                type="checkbox"
+                                                checked={chosen.includes(key(h))}
+                                                onChange={(e) =>
+                                                    setChosen((c) => (e.target.checked ? [...c, key(h)] : c.filter((k) => k !== key(h))))
+                                                }
+                                            />
+                                            {h.label}
+                                        </label>
+                                    ))}
+                                </fieldset>
+                            ))}
+                        <InputError message={errors.halves ?? errors.enrolment_id} />
+                        {halves !== null && halves.length > 0 && (
+                            <div className="grid gap-1">
+                                <Label htmlFor="gcu-email">Adresse e-mail du stagiaire</Label>
+                                <Input id="gcu-email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
+                                <InputError message={errors.email} />
+                            </div>
+                        )}
+                    </div>
+                    <DialogFooter>
+                        <Button variant="outline" onClick={() => setOpen(false)}>
+                            Annuler
+                        </Button>
+                        <Button disabled={busy || chosen.length === 0 || !halves?.length} onClick={send}>
+                            {busy && <LoaderCircle className="h-4 w-4 animate-spin" />}
+                            Envoyer le lien ({chosen.length})
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+        </div>
+    );
+}
+
+function CatchUps({ sessionId, catchUps, onChange }: { sessionId: string; catchUps: CatchUp[]; onChange: () => void }) {
     const [busy, setBusy] = useState<string | null>(null);
     const [error, setError] = useState<string | null>(null);
     const [refusing, setRefusing] = useState<CatchUp | null>(null);
@@ -1191,6 +1324,15 @@ function CatchUps({ catchUps, onChange }: { catchUps: CatchUp[]; onChange: () =>
     const confirm = async (c: CatchUp) => {
         setBusy(c.signature_id);
         const answer = await sendJson('POST', route('sessions.catch-ups.confirm', c.signature_id));
+        setBusy(null);
+        if (answer.ok) {
+            setError(null);
+            onChange();
+        } else setError(answer.message);
+    };
+    const confirmAll = async (enrolmentId: string) => {
+        setBusy(enrolmentId);
+        const answer = await sendJson('POST', route('sessions.catch-ups.confirm-all', sessionId), { enrolment_id: enrolmentId });
         setBusy(null);
         if (answer.ok) {
             setError(null);
@@ -1216,6 +1358,19 @@ function CatchUps({ catchUps, onChange }: { catchUps: CatchUp[]; onChange: () =>
             <p className="text-muted-foreground text-xs">
                 Signatures faites après coup (sur place ou à distance). Confirmer écrit la présence ; refuser garde la signature sans présence.
             </p>
+            {Object.entries(
+                catchUps.reduce<Record<string, { name: string; n: number }>>((acc, c) => {
+                    acc[c.enrolment_id] = { name: c.name, n: (acc[c.enrolment_id]?.n ?? 0) + 1 };
+                    return acc;
+                }, {}),
+            )
+                .filter(([, t]) => t.n > 1)
+                .map(([id, t]) => (
+                    <Button key={id} size="sm" variant="outline" className="justify-self-start" disabled={busy !== null} onClick={() => confirmAll(id)}>
+                        <CheckCheck className="h-4 w-4" />
+                        Tout confirmer pour {t.name} ({t.n})
+                    </Button>
+                ))}
             <ul className="divide-y rounded-md border text-sm">
                 {catchUps.map((c) => (
                     <li key={c.signature_id} className="flex flex-wrap items-center justify-between gap-2 p-2">

@@ -48,6 +48,8 @@ final class RemoteCatchUp
 
     public const WRONG = 'Code incorrect.';
 
+    public const NOTHING_LEFT = 'Toutes ces demi-journées sont déjà signées.';
+
     public const MAIL_FAILED = 'Le code n\'a pas pu être envoyé : réessayez dans un instant.';
 
     public function __construct(private readonly AttendanceSigning $signing, private readonly MailTemplates $templates) {}
@@ -98,6 +100,82 @@ final class RemoteCatchUp
     }
 
     /**
+     * One link for several half-days of the trainee (GroupCatchUp checked
+     * them): each must still be signable; the active links of these
+     * half-days for the trainee are revoked.
+     *
+     * @param  list<string>  $slotIds
+     *
+     * @throws ValidationException
+     */
+    public function sendGroup(array $slotIds, string $enrolmentId, string $email, User $by): CatchUpLink
+    {
+        $email = trim($email);
+        if ($email === '' || filter_var($email, FILTER_VALIDATE_EMAIL) === false || mb_strlen($email) > 254) {
+            throw ValidationException::withMessages(['email' => self::EMAIL]);
+        }
+        $token = Str::random(40);
+        $link = DB::transaction(function () use ($slotIds, $enrolmentId, $email, $by, $token): CatchUpLink {
+            $slots = SignSlot::query()->lockForUpdate()->whereKey($slotIds)->get()->keyBy('id');
+            foreach ($slotIds as $id) {
+                $slot = $slots[$id] ?? throw ValidationException::withMessages(['halves' => AttendanceSigning::UNKNOWN_TRAINEE]);
+                Closures::assertOpen($slot->training_session_id, $slot->date->toDateString());
+                if (! SlotSeances::expected($slot)->contains('id', $enrolmentId)) {
+                    throw ValidationException::withMessages(['enrolment_id' => AttendanceSigning::UNKNOWN_TRAINEE]);
+                }
+                if (AttendanceSignature::query()->where('slot_id', $id)->where('enrolment_id', $enrolmentId)->exists()) {
+                    throw ValidationException::withMessages(['halves' => self::ALREADY_SIGNED]);
+                }
+            }
+            foreach (CatchUpLink::query()->where('enrolment_id', $enrolmentId)->whereNull('used_at')->whereNull('revoked_at')->get() as $other) {
+                if (array_intersect($other->slotIds(), $slotIds) !== []) {
+                    $other->forceFill(['revoked_at' => CarbonImmutable::now()])->save();
+                }
+            }
+            $link = CatchUpLink::query()->create([
+                'slot_id' => $slotIds[0],
+                'extra_slot_ids' => array_slice($slotIds, 1) ?: null,
+                'enrolment_id' => $enrolmentId,
+                'email' => $email,
+                'token_hash' => hash('sha256', $token),
+                'expires_at' => CarbonImmutable::now()->addDays(self::LINK_DAYS),
+                'created_by' => $by->id,
+            ]);
+            $link->forceFill(['email_status' => 'pending'])->save();
+
+            return $link;
+        });
+        SendCatchUpMail::dispatch($link->id, $token)->afterCommit();
+
+        return $link;
+    }
+
+    /**
+     * The half-days of the link the trainee can still sign: month open,
+     * session live, trainee expected, not signed yet.
+     *
+     * @return list<SignSlot>
+     */
+    public static function signableSlots(CatchUpLink $link): array
+    {
+        $out = [];
+        foreach (SignSlot::query()->whereKey($link->slotIds())->orderBy('date')->orderBy('half', 'desc')->get() as $slot) {
+            $session = TrainingSession::query()->find($slot->training_session_id);
+            if ($session === null || $session->isCancelled()) {
+                continue;
+            }
+            $closed = AttendanceClosure::query()->where('training_session_id', $slot->training_session_id)
+                ->where('month', Months::of($slot->date->toDateString())->toDateString())->whereNotNull('closed_at')->exists();
+            $signed = AttendanceSignature::query()->where('slot_id', $slot->id)->where('enrolment_id', $link->enrolment_id)->exists();
+            if (! $closed && ! $signed && SlotSeances::expected($slot)->contains('id', $link->enrolment_id)) {
+                $out[] = $slot;
+            }
+        }
+
+        return $out;
+    }
+
+    /**
      * The live link of a token; null for an unknown, malformed, used,
      * revoked or expired link, a closed month, a cancelled or trashed
      * session, a trainee no more expected or already signed: one 404.
@@ -111,17 +189,9 @@ final class RemoteCatchUp
         if ($link === null || ! $link->isActive()) {
             return null;
         }
-        $slot = SignSlot::query()->find($link->slot_id);
-        $session = $slot === null ? null : TrainingSession::query()->find($slot->training_session_id);
-        if ($slot === null || $session === null || $session->isCancelled()) {
-            return null;
-        }
-        $closed = AttendanceClosure::query()->where('training_session_id', $slot->training_session_id)
-            ->where('month', Months::of($slot->date->toDateString())->toDateString())->whereNotNull('closed_at')->exists();
-        $expected = SlotSeances::expected($slot)->contains('id', $link->enrolment_id);
-        $signed = AttendanceSignature::query()->where('slot_id', $slot->id)->where('enrolment_id', $link->enrolment_id)->exists();
 
-        return $closed || ! $expected || $signed ? null : $link;
+        // A grouped link lives while one of its half-days can still be signed.
+        return self::signableSlots($link) === [] ? null : $link;
     }
 
     public function sendCode(CatchUpLink $link): void
@@ -180,9 +250,14 @@ final class RemoteCatchUp
 
                 return null;
             }
-            $slot = SignSlot::query()->findOrFail($locked->slot_id);
-            // Signed and used together: a refused signature never burns the link.
-            $signature = $this->signing->sign($slot, $locked->enrolment_id, $drawing, $ip, $agent, requireOpen: false, kind: AttendanceSignature::KIND_REMOTE);
+            // Signed and used together: a refused signature never burns the link. One drawing for every half-day of the link.
+            $signature = null;
+            foreach (self::signableSlots($locked) as $slot) {
+                $signature = $this->signing->sign($slot, $locked->enrolment_id, $drawing, $ip, $agent, requireOpen: false, kind: AttendanceSignature::KIND_REMOTE);
+            }
+            if ($signature === null) {
+                throw ValidationException::withMessages(['code' => self::NOTHING_LEFT]);
+            }
             $locked->forceFill(['used_at' => CarbonImmutable::now(), 'code_hash' => null])->save();
 
             return $signature;

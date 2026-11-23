@@ -31,6 +31,7 @@ use Illuminate\Support\Carbon;
  * @property string|null $email_status
  * @property string|null $email_error_code
  * @property string|null $created_by
+ * @property list<string>|null $extra_slot_ids the other half-days of a grouped catch-up
  */
 class CatchUpLink extends Model
 {
@@ -47,7 +48,7 @@ class CatchUpLink extends Model
     protected array $auditPersonal = ['email'];
 
     /** @var list<string> */
-    protected $fillable = ['slot_id', 'enrolment_id', 'email', 'token_hash', 'expires_at', 'created_by'];
+    protected $fillable = ['slot_id', 'enrolment_id', 'email', 'token_hash', 'expires_at', 'created_by', 'extra_slot_ids'];
 
     /** @var array<string, mixed> */
     protected $attributes = ['code_attempts' => 0];
@@ -55,6 +56,7 @@ class CatchUpLink extends Model
     protected function casts(): array
     {
         return [
+            'extra_slot_ids' => 'array',
             'expires_at' => 'datetime',
             'used_at' => 'datetime',
             'revoked_at' => 'datetime',
@@ -62,6 +64,16 @@ class CatchUpLink extends Model
             'code_sent_at' => 'datetime',
             'code_attempts' => 'integer',
         ];
+    }
+
+    /**
+     * Every half-day of the link: its slot, then those of a grouped catch-up.
+     *
+     * @return list<string>
+     */
+    public function slotIds(): array
+    {
+        return [(string) $this->slot_id, ...array_map('strval', $this->extra_slot_ids ?? [])];
     }
 
     public function isActive(): bool

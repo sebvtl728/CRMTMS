@@ -68,6 +68,10 @@ class PublicSigningController extends Controller
             'session' => PlanningRows::sessionLabels([$session])[$session->id] ?? $session->number,
             'date' => $slot->date->locale('fr')->isoFormat('dddd D MMMM YYYY'),
             'half_label' => SignSlot::label($slot->half),
+            // A grouped catch-up: every half-day the one drawing signs.
+            'halves' => count($link->slotIds()) > 1
+                ? array_map(fn (SignSlot $s) => GroupCatchUp::label($s->date->toDateString(), $s->half), RemoteCatchUp::signableSlots($link))
+                : null,
             'trainee_first_name' => trim((string) ($person['first_name'] ?? '')),
             'code_url' => url('/emargement/l/'.$token.'/code'),
             'post_url' => url('/emargement/l/'.$token),

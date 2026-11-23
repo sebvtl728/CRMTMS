@@ -4,6 +4,7 @@ use App\Modules\Sessions\Attendance\AttendanceController;
 use App\Modules\Sessions\Attendance\AttendanceProofController;
 use App\Modules\Sessions\Attendance\AttendanceSheetController;
 use App\Modules\Sessions\Attendance\Signing\CatchUpController;
+use App\Modules\Sessions\Attendance\Signing\GroupCatchUpController;
 use App\Modules\Sessions\Attendance\Signing\PublicSigningController;
 use App\Modules\Sessions\Attendance\Signing\SignedSheetController;
 use App\Modules\Sessions\Attendance\Signing\SigningController;
@@ -52,6 +53,9 @@ Route::middleware(['auth'])->prefix('sessions')->name('sessions.')->group(functi
     Route::get('{trainingSession}/trainees', [EnrolmentController::class, 'trainees'])->middleware(['can:sessions.sessions.update', 'throttle:sessions-trainees'])->name('trainees');
     Route::post('{trainingSession}/trainees', [EnrolmentController::class, 'createTrainee'])->middleware(['can:sessions.sessions.update', 'throttle:sessions-trainees'])->name('trainees.store');
     Route::post('{trainingSession}/enrolments', [EnrolmentController::class, 'store'])->middleware('can:sessions.sessions.update')->name('enrolments.store');
+    Route::get('{trainingSession}/rattrapages/demi-journees', [GroupCatchUpController::class, 'halves'])->middleware('can:sessions.attendance.manage')->name('catch-ups.halves');
+    Route::post('{trainingSession}/rattrapages/groupe', [GroupCatchUpController::class, 'send'])->middleware(['can:sessions.attendance.manage', 'throttle:attendance-signing-open'])->name('catch-ups.group');
+    Route::post('{trainingSession}/rattrapages/confirmer-tout', [GroupCatchUpController::class, 'confirmAll'])->middleware('can:sessions.attendance.manage')->name('catch-ups.confirm-all');
     Route::post('{trainingSession}/enrolments/group', [EnrolmentController::class, 'storeGroup'])->middleware(['can:sessions.sessions.update', 'throttle:sessions-trainees'])->name('enrolments.group');
     // Modules of the « Planning » tab: sessions.sessions.update on the session (SessionPolicy).
     Route::post('{trainingSession}/modules', [SessionModuleController::class, 'store'])->middleware('can:sessions.sessions.update')->name('modules.store');
