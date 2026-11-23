@@ -845,11 +845,18 @@ function BookletPanel({
         <div className="grid gap-2 rounded-lg border p-3">
             <div className="flex flex-wrap items-center justify-between gap-2">
                 <Label>Livret d'apprentissage</Label>
-                <Button asChild size="sm" variant="outline">
-                    <a href={`/admissions/candidatures/${candidatureId}/livret.pdf`} target="_blank" rel="noopener">
-                        Livret d'apprentissage (PDF)
-                    </a>
-                </Button>
+                <div className="flex flex-wrap gap-2">
+                    <Button asChild size="sm" variant="outline">
+                        <a href={`/admissions/candidatures/${candidatureId}/livret.pdf`} target="_blank" rel="noopener">
+                            Livret d'apprentissage (PDF)
+                        </a>
+                    </Button>
+                    <Button asChild size="sm" variant="outline">
+                        <a href={`/admissions/candidatures/${candidatureId}/cerfa.pdf`} target="_blank" rel="noopener">
+                            Fiche Cerfa (PDF)
+                        </a>
+                    </Button>
+                </div>
             </div>
             <p className="text-muted-foreground text-xs">
                 Déjà rempli : partenaires, équipe, parcours, planning, pages de suivi datées mois par mois et grilles de compétences de la formation.

@@ -5,6 +5,10 @@ Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) ; ve
 
 ## [Non publié]
 
+### Ajouté
+
+- **Fiche Cerfa du contrat d'apprentissage (PDF)** sur la carte Alternance : toutes les rubriques du Cerfa, dans son ordre, remplies avec les données du TMS (dont le code RNCP), le reste marqué « à compléter », à recopier sur le portail de l'OPCO.
+
 ## [0.15.13] - 2026-11-23
 
 ### Ajouté

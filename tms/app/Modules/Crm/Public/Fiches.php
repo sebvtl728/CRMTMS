@@ -113,13 +113,13 @@ final class Fiches
      * SIRET and IDCC (collective agreement) of an entreprise, trashed ones
      * too, for the documents of its dossiers; null when unknown.
      *
-     * @return array{siret: ?string, idcc: ?string}|null
+     * @return array{siret: ?string, idcc: ?string, naf_code: ?string}|null
      */
     public function organisationCodes(string $id): ?array
     {
         $organisation = Str::isUuid($id) ? Organisation::withTrashed()->find($id) : null;
 
-        return $organisation === null ? null : ['siret' => $organisation->siret, 'idcc' => $organisation->idcc];
+        return $organisation === null ? null : ['siret' => $organisation->siret, 'idcc' => $organisation->idcc, 'naf_code' => $organisation->naf_code];
     }
 
     /**
