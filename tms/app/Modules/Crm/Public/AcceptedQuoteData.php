@@ -10,6 +10,7 @@ final readonly class AcceptedQuoteData
 {
     /**
      * @param  array{type: 'organisation'|'person', id: string, label: string}  $account
+     * @param  ?string  $funding_mode_id  planned funding (« Modes de financement »): the quote's, else its opportunity's
      * @param  list<array{training_id: ?string, das_id: ?string, label: string, quantity: string, unit: string, unit_price_cents: int, discount_percent: string, total_ht_cents: int}>  $lines
      */
     public function __construct(
@@ -21,5 +22,6 @@ final readonly class AcceptedQuoteData
         public string $opportunity_id,
         public string $das_id,
         public array $lines,
+        public ?string $funding_mode_id = null,
     ) {}
 }

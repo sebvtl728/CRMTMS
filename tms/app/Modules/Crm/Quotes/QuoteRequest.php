@@ -5,6 +5,8 @@ namespace App\Modules\Crm\Quotes;
 use App\Modules\Catalogue\Trainings;
 use App\Modules\Core\Companies\Company;
 use App\Modules\Core\Companies\VatRegime;
+use App\Modules\Core\References\ReferenceList;
+use App\Modules\Core\Tenancy\TenantContext;
 use App\Modules\Core\Users\User;
 use App\Modules\Crm\Opportunities\Amount;
 use App\Modules\Crm\Opportunities\Opportunity;
@@ -73,7 +75,7 @@ class QuoteRequest extends FormRequest
     protected function prepareForValidation(): void
     {
         $clean = [];
-        foreach (['opportunity_id', 'company_id', 'contact_person_id', 'issued_on', 'valid_until', 'notes'] as $key) {
+        foreach (['opportunity_id', 'company_id', 'contact_person_id', 'funding_mode_id', 'issued_on', 'valid_until', 'notes'] as $key) {
             if ($this->has($key)) {
                 $value = $this->input($key);
                 $value = is_string($value) ? trim($value) : $value;
@@ -128,6 +130,9 @@ class QuoteRequest extends FormRequest
 
         $rules = [
             'contact_person_id' => ['nullable', 'bail', 'uuid', Rule::in($this->allowedContacts())],
+            'funding_mode_id' => ['nullable', 'bail', 'uuid', Rule::exists('reference_items', 'id')
+                ->where('tenant_id', app(TenantContext::class)->id())->where('list', ReferenceList::FundingMode->value)->whereNull('deleted_at')
+                ->where(fn ($q) => $q->where('is_active', true)->when($this->current()?->funding_mode_id, fn ($q2, $id) => $q2->orWhere('id', $id)))],
             'issued_on' => ['required', 'date_format:Y-m-d'],
             'valid_until' => ['required', 'date_format:Y-m-d', 'after_or_equal:issued_on'],
             'notes' => ['nullable', 'string', 'max:5000'],
@@ -188,6 +193,7 @@ class QuoteRequest extends FormRequest
 
         return [
             'contact_person_id' => $v['contact_person_id'] ?? null,
+            ...($this->has('funding_mode_id') ? ['funding_mode_id' => $v['funding_mode_id'] ?? null] : []),
             'issued_on' => $v['issued_on'],
             'valid_until' => $v['valid_until'],
             'notes' => $v['notes'] ?? null,
@@ -244,6 +250,8 @@ class QuoteRequest extends FormRequest
         return [
             ...PersonRequest::validationMessages(),
             'array' => 'Cette valeur n\'est pas valide.',
+            'funding_mode_id.uuid' => 'Choisissez un mode de financement de la liste.',
+            'funding_mode_id.exists' => 'Choisissez un mode de financement de la liste.',
             'contact_person_id.in' => 'Cette personne n\'est pas un interlocuteur de ce compte.',
             'issued_on.required' => 'Indiquez la date du devis.',
             'issued_on.date_format' => 'La date doit être au format AAAA-MM-JJ.',

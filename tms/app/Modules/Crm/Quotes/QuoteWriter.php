@@ -24,7 +24,7 @@ use LogicException;
  * QuoteTotals::VAT_RATES.
  *
  * @phpstan-type LineData array{training_id: ?string, das_id?: ?string, label: string, description: ?string, quantity: string, unit: string, unit_price: string, discount_percent: string, vat_rate: string}
- * @phpstan-type QuoteData array{contact_person_id: ?string, issued_on: string, valid_until: string, notes: ?string, lines: list<LineData>}
+ * @phpstan-type QuoteData array{contact_person_id: ?string, funding_mode_id?: ?string, issued_on: string, valid_until: string, notes: ?string, lines: list<LineData>}
  */
 final class QuoteWriter
 {
@@ -92,6 +92,7 @@ final class QuoteWriter
             'contact_person_id' => in_array($source->contact_person_id, $contacts, true) ? $source->contact_person_id : null,
             'issued_on' => $today->toDateString(),
             'valid_until' => $today->addDays($company->quote_validity_days)->toDateString(),
+            'funding_mode_id' => $source->funding_mode_id,
             'notes' => $source->notes,
             'lines' => $source->lines()->get()->map(function (QuoteLine $l): array {
                 $active = $l->training_id !== null && $this->trainings->find($l->training_id)?->is_active === true;
@@ -131,6 +132,9 @@ final class QuoteWriter
             throw ValidationException::withMessages(['lines' => 'Le total du devis est trop élevé.']);
         }
 
+        if (array_key_exists('funding_mode_id', $data)) {
+            $quote->funding_mode_id = $data['funding_mode_id'];
+        }
         $quote->fill([
             'contact_person_id' => $data['contact_person_id'],
             'issued_on' => $data['issued_on'],

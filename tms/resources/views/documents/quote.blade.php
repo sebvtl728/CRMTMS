@@ -87,6 +87,7 @@
             <tr><td class="muted">N°</td><td><strong>{{ $quote['number'] }}</strong></td></tr>
             <tr><td class="muted">Date</td><td>{{ $quote['issued_on'] }}</td></tr>
             <tr><td class="muted">Valable jusqu'au</td><td>{{ $quote['valid_until'] }}</td></tr>
+            @if ($quote['funding'])<tr><td class="muted">Financement envisagé</td><td>{{ $quote['funding'] }}</td></tr>@endif
         </table>
     </div>
 </header>

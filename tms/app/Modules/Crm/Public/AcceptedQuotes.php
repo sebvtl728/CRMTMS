@@ -62,6 +62,7 @@ final class AcceptedQuotes
                 'discount_percent' => (string) $line->discount_percent,
                 'total_ht_cents' => QuoteTotals::cents((string) $line->total_ht),
             ])->values()->all(),
+            funding_mode_id: $quote->funding_mode_id ?? $opportunity->funding_mode_id,
         );
     }
 

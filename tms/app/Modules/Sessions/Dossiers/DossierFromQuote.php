@@ -508,15 +508,22 @@ final class DossierFromQuote
 
     /**
      * The whole price, « À demander », paid by the contractant, as the active
-     * funding type flagged for his kind (meta.default_for organisation|person
-     * of « Types de financeur », first by position): none flagged, or a free
-     * dossier, no initial funding.
+     * funding type the planned funding mode of the quote links to
+     * (meta.funding_type_id of « Modes de financement »: OPCO → OPCO), else
+     * the one flagged for his kind (meta.default_for organisation|person of
+     * « Types de financeur », first by position): none, or a free dossier, no
+     * initial funding.
      */
     private function fund(Dossier $dossier, AcceptedQuoteData $quote): void
     {
         $total = $dossier->load('lines')->priceCents();
         $organisation = $quote->account['type'] === 'organisation';
-        $type = ReferenceItem::query()->where('list', ReferenceList::FundingType)->where('meta->default_for', $organisation ? 'organisation' : 'person')
+        $linked = $quote->funding_mode_id === null ? null
+            : ReferenceItem::query()->where('list', ReferenceList::FundingMode)->whereKey($quote->funding_mode_id)->first()?->meta['funding_type_id'] ?? null;
+        $type = is_string($linked)
+            ? ReferenceItem::query()->where('list', ReferenceList::FundingType)->whereKey($linked)->where('is_active', true)->value('id')
+            : null;
+        $type ??= ReferenceItem::query()->where('list', ReferenceList::FundingType)->where('meta->default_for', $organisation ? 'organisation' : 'person')
             ->where('is_active', true)->orderBy('position')->orderBy('id')->value('id');
         if ($total <= 0 || ! is_string($type)) {
             return;

@@ -48,6 +48,9 @@ final class CapFormationReferenceSeeder
     /** Organisation types showing the commercial status (meta.client), by code. */
     private const CLIENTS = ['entreprise-cliente'];
 
+    /** @var list<string> funding modes created by the current run (linked to their funding type). */
+    private static array $created = [];
+
     /** The stage a sent quote brings its opportunity to (meta.quote_stage). */
     private const QUOTE_STAGE = 'Proposition';
 
@@ -127,6 +130,15 @@ final class CapFormationReferenceSeeder
                 );
             }
 
+            // A new funding mode gives the dossier the funding type of the same code (meta.funding_type_id).
+            $types = ReferenceItem::query()->where('list', ReferenceList::FundingType)->pluck('id', 'code');
+            foreach (ReferenceItem::query()->where('list', ReferenceList::FundingMode)->whereIn('code', self::$created)->get() as $mode) {
+                if (isset($types[$mode->code])) {
+                    $mode->update(['meta' => [...$mode->meta ?? [], 'funding_type_id' => $types[$mode->code]]]);
+                }
+            }
+            self::$created = [];
+
             // Organisation legal forms mirror the LegalForm enum labels.
             foreach (LegalForm::cases() as $i => $form) {
                 self::ensure(ReferenceList::LegalFormOrg, Str::slug($form->label()), $form->label(), $i + 1);
@@ -146,6 +158,9 @@ final class CapFormationReferenceSeeder
             return;
         }
 
+        if ($list === ReferenceList::FundingMode) {
+            self::$created[] = $code;
+        }
         ReferenceItem::create([
             'list' => $list,
             'code' => $code,

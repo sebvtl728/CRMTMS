@@ -583,6 +583,7 @@ class CrmServiceProvider extends ServiceProvider
         ReferenceUsage::register(ReferenceList::ActionType, 'activities', 'type_id');
         ReferenceUsage::register(ReferenceList::ActionResult, 'activities', 'result_id');
         ReferenceUsage::register(ReferenceList::Das, 'quote_lines', 'das_id');
+        ReferenceUsage::register(ReferenceList::FundingMode, 'quotes', 'funding_mode_id');
         ReferenceUsage::register(ReferenceList::Das, 'revenue_targets', 'das_id');
     }
 }

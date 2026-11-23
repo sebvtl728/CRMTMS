@@ -339,3 +339,11 @@ it('renders a real pdf with gotenberg', function () {
     $archived = Storage::disk(TenantStorage::DISK)->get((string) $quote->refresh()->pdf_path);
     expect(substr((string) $archived, 0, 5))->toBe('%PDF-');
 })->group('slow');
+
+it('prints the planned funding of the quote, and nothing without one', function () {
+    $quote = pdfQuote();
+    expect(app(QuotePdf::class)->html($quote))->not->toContain('Financement envisagé');
+
+    $quote->forceFill(['funding_mode_id' => crmItem(ReferenceList::FundingMode, 'OPCO')->id])->save();
+    expect(app(QuotePdf::class)->html($quote->refresh()))->toContain('Financement envisagé')->toContain('OPCO');
+});

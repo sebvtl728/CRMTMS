@@ -7,9 +7,11 @@ use App\Modules\Catalogue\TrainingData;
 use App\Modules\Catalogue\Trainings;
 use App\Modules\Core\Companies\Company;
 use App\Modules\Core\Companies\VatRegime;
+use App\Modules\Core\References\ReferenceList;
 use App\Modules\Crm\Opportunities\Opportunity;
 use App\Modules\Crm\Opportunities\OpportunityAccounts;
 use App\Modules\Crm\Opportunities\OpportunityTrainings;
+use App\Modules\Crm\Support\FormOptions;
 use Carbon\CarbonImmutable;
 
 /**
@@ -61,6 +63,7 @@ final class QuoteForm
                 'number' => null,
                 'company_id' => $company->id,
                 'contact_person_id' => $this->defaultContact($opportunity),
+                'funding_mode_id' => $opportunity->funding_mode_id,
                 'issued_on' => $today->toDateString(),
                 'valid_until' => $today->addDays($company->quote_validity_days)->toDateString(),
                 'notes' => null,
@@ -86,6 +89,7 @@ final class QuoteForm
                 'number' => $quote->number,
                 'company_id' => $quote->company_id,
                 'contact_person_id' => $quote->contact_person_id,
+                'funding_mode_id' => $quote->funding_mode_id,
                 'issued_on' => $quote->issued_on->toDateString(),
                 'valid_until' => $quote->valid_until->toDateString(),
                 'notes' => $quote->notes,
@@ -137,6 +141,7 @@ final class QuoteForm
                         'validity_days' => $c->quote_validity_days,
                     ])->values()->all(),
                 'contacts' => $contacts,
+                'funding_modes' => FormOptions::reference(ReferenceList::FundingMode, $quote?->funding_mode_id ?? $opportunity->funding_mode_id),
                 'units' => QuoteLine::unitOptions(),
                 'vat_rates' => array_map(fn (string $r) => ['value' => $r, 'label' => str_replace('.', ',', rtrim(rtrim($r, '0'), '.')).' %'], QuoteTotals::VAT_RATES),
                 'training' => $this->trainingOptions($kept, $opportunity->isIndividual()),
