@@ -54,7 +54,14 @@ interface Plan {
 interface Props {
     existing: { number: string; url: string | null } | null;
     plan: Plan | null;
-    options: { kind: Option[]; modality: Option[]; default_modality: string | null; location: Option[]; pricing_mode: Option[] };
+    options: {
+        kind: Option[];
+        modality: Option[];
+        default_modality: string | null;
+        location: Option[];
+        location_companies: Option[];
+        pricing_mode: Option[];
+    };
     can: { sessions: boolean };
 }
 
@@ -66,6 +73,7 @@ interface NewSession {
     modality_id: string;
     location_kind: string;
     location_text: string;
+    location_company_id: string;
     capacity: string;
 }
 
@@ -143,6 +151,7 @@ export default function DossierFromQuote({ existing, plan, options, can }: Props
                 modality_id: options.default_modality ?? '',
                 location_kind: 'client',
                 location_text: '',
+                location_company_id: options.location_companies[0]?.value ?? '',
                 capacity: '',
             },
             pricing_mode: l.pricing_mode ?? '',
@@ -698,6 +707,24 @@ function NewSessionFields({
                 </Select>
                 <InputError message={error('location_kind')} />
             </div>
+            {value.location_kind === 'company' && (
+                <div className="grid gap-2">
+                    <Label htmlFor={`location_company_${index}`}>Société *</Label>
+                    <Select value={value.location_company_id} onValueChange={(v) => onChange({ location_company_id: v })}>
+                        <SelectTrigger id={`location_company_${index}`}>
+                            <SelectValue placeholder="Choisir" />
+                        </SelectTrigger>
+                        <SelectContent>
+                            {options.location_companies.map((o) => (
+                                <SelectItem key={o.value} value={o.value}>
+                                    {o.label}
+                                </SelectItem>
+                            ))}
+                        </SelectContent>
+                    </Select>
+                    <InputError message={error('location_company_id')} />
+                </div>
+            )}
             {value.location_kind === 'address' && (
                 <div className="grid gap-2 md:col-span-2">
                     <Label htmlFor={`location_text_${index}`}>Adresse *</Label>

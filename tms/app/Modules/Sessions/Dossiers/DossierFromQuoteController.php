@@ -10,6 +10,7 @@ use App\Modules\Sessions\Permissions;
 use App\Modules\Sessions\Sessions\SessionKind;
 use App\Modules\Sessions\Sessions\SessionListQuery;
 use App\Modules\Sessions\Sessions\SessionLocation;
+use App\Modules\Sessions\Sessions\SessionPlace;
 use App\Modules\Sessions\Sessions\SessionWriter;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -49,6 +50,7 @@ class DossierFromQuoteController extends Controller
                 'modality' => SessionListQuery::reference(ReferenceList::TrainingModality),
                 'default_modality' => SessionWriter::defaultModalityId(),
                 'location' => SessionLocation::options(),
+                'location_companies' => SessionPlace::companyOptions(),
                 'pricing_mode' => array_map(fn ($v, $l) => ['value' => $v, 'label' => $l], array_keys(DossierLine::PRICING_MODES), DossierLine::PRICING_MODES),
             ],
             'can' => ['sessions' => $user->can(Permissions::SESSIONS_UPDATE)],

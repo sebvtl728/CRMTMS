@@ -197,6 +197,25 @@ it('funds a new dossier with the funding type flagged for its contractant, or no
     expect(Dossier::query()->where('account_person_id', $person->id)->sole()->fundings()->count())->toBe(0);
 });
 
+it('plans a new session in the premises of one of our companies', function () {
+    $quote = dfqQuote(Organisation::query()->create(['name' => 'Hôtel du Parc']));
+    $company = Company::query()->firstWhere('is_default', true) ?? Company::query()->create(['name' => 'CAP FORMATION', 'vat_regime' => 'exempt']);
+
+    $this->actingAs(admin(true))->postJson(route('dossiers.from-quote.store', $quote->id), ['lines' => [
+        ['new_session' => dfqNewSession(['location_kind' => 'company', 'location_company_id' => $company->id])], [], [],
+    ]])->assertSuccessful();
+
+    expect(TrainingSession::query()->sole()->location_company_id)->toBe($company->id);
+});
+
+it('asks which company for a new session in our premises', function () {
+    $quote = dfqQuote(Organisation::query()->create(['name' => 'Hôtel du Parc']));
+
+    $this->actingAs(admin(true))->postJson(route('dossiers.from-quote.store', $quote->id), ['lines' => [
+        ['new_session' => dfqNewSession(['location_kind' => 'company'])], [], [],
+    ]])->assertUnprocessable()->assertJsonPath('errors', fn ($e) => ($e['lines.0.new_session.location_company_id'][0] ?? null) === 'Choisissez la société.');
+});
+
 it('refuses an intra session to a particulier', function () {
     $quote = dfqQuote(makePerson('Durand', ['is_individual' => true]));
 

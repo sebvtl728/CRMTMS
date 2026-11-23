@@ -5,6 +5,16 @@ Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) ; ve
 
 ## [Non publié]
 
+## [0.15.2] - 2026-11-23
+
+### Ajouté
+
+- **Lieu « Dans nos locaux »** pour une session (fiche session et **Créer le dossier** depuis un devis) : on choisit la société ; son nom et son adresse s'impriment sur la convention, les convocations, le rappel de la veille et les calendriers.
+
+### Modifié
+
+- Page d'un dossier : le bloc **Documents** passe avant **Facturation** (la convention précède la facture) ; les blocs des autres modules ont une position (`DossierBlocks::register(..., $position)`).
+
 ## [0.15.1] - 2026-11-23
 
 ### Ajouté

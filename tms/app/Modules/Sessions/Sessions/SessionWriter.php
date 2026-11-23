@@ -121,7 +121,7 @@ final class SessionWriter
             }
             $locked->fill($values);
             // What the Outlook copies of its séances show: the label and the place.
-            $shown = $locked->isDirty(['title', 'training_id', 'kind', 'location_kind', 'location_text']);
+            $shown = $locked->isDirty(['title', 'training_id', 'kind', 'location_kind', 'location_text', 'location_company_id']);
             $locked->save();
             if ($retrained) {
                 $this->modules->replaceFromTraining($locked);
@@ -262,6 +262,9 @@ final class SessionWriter
             'planned_hours' => ['nullable', 'regex:/^\d{1,4}(\.\d{1,2})?$/'],
             'location_kind' => ['required', Rule::enum(SessionLocation::class)],
             'location_text' => ['nullable', 'required_if:location_kind,address', 'string', 'max:500'],
+            'location_company_id' => ['bail', 'nullable', 'required_if:location_kind,company', 'uuid', Rule::exists('companies', 'id')
+                ->where('tenant_id', app(TenantContext::class)->id())
+                ->where(fn ($q) => $q->whereNull('deleted_at')->when($current?->location_company_id, fn ($q2, $id) => $q2->orWhere('id', $id)))],
             'capacity' => ['nullable', 'required_if:kind,inter', 'integer', 'between:1,1000'],
             'responsible_user_id' => ['nullable', 'bail', 'uuid', Rule::exists('users', 'id')
                 ->where('tenant_id', app(TenantContext::class)->id())
@@ -314,6 +317,7 @@ final class SessionWriter
             'planned_hours' => $hours,
             'location_kind' => $data['location_kind'],
             'location_text' => $data['location_text'] ?? null,
+            'location_company_id' => $data['location_kind'] === SessionLocation::Company->value ? $data['location_company_id'] : null,
             'capacity' => $kind === SessionKind::Inter ? (int) $data['capacity'] : null,
             'responsible_user_id' => $data['responsible_user_id'] ?? ($current === null ? Auth::id() : null),
             'status' => $data['status'],
@@ -345,7 +349,7 @@ final class SessionWriter
      */
     private static function normalise(array $data): array
     {
-        foreach (['title', 'training_id', 'kind', 'organisation_id', 'modality_id', 'starts_on', 'ends_on', 'planned_hours', 'location_kind', 'location_text', 'capacity', 'responsible_user_id', 'status', 'notes'] as $key) {
+        foreach (['title', 'training_id', 'kind', 'organisation_id', 'modality_id', 'starts_on', 'ends_on', 'planned_hours', 'location_kind', 'location_text', 'location_company_id', 'capacity', 'responsible_user_id', 'status', 'notes'] as $key) {
             $value = $data[$key] ?? null;
             if (is_string($value)) {
                 $value = trim($value);
@@ -408,6 +412,8 @@ final class SessionWriter
             'planned_hours.regex' => 'Heures prévues invalides (ex. 21 ou 17,5).',
             'location_kind.required' => 'Choisissez le lieu.',
             'location_kind.*' => 'Lieu inconnu.',
+            'location_company_id.required_if' => 'Choisissez la société.',
+            'location_company_id.*' => 'Société inconnue.',
             'location_text.required_if' => 'Indiquez l\'adresse.',
             'location_text.max' => 'Le lieu ne doit pas dépasser 500 caractères.',
             'capacity.required_if' => 'Indiquez le nombre de places de la session inter.',
