@@ -22,6 +22,7 @@ type ReferenceMeta = {
     reached?: boolean;
     default_for?: 'organisation' | 'person' | null;
     external_billing?: boolean;
+    client?: boolean;
 };
 
 /** Place of an action type in the CRM planning (meta.planning). */
@@ -51,6 +52,7 @@ interface ReferenceListData {
     has_reached: boolean;
     has_default_for: boolean;
     has_external_billing: boolean;
+    has_client: boolean;
     items: ReferenceItem[];
 }
 
@@ -70,6 +72,7 @@ interface EditorState {
     reached: boolean;
     defaultFor: string; // '' = none
     externalBilling: boolean;
+    client: boolean;
 }
 
 const breadcrumbs: BreadcrumbItem[] = [{ title: 'Référentiels', href: '/admin/references' }];
@@ -112,6 +115,7 @@ export default function ReferencesIndex({ lists, status }: ReferencesIndexProps)
             reached: item?.meta.reached === true,
             defaultFor: item?.meta.default_for ?? '',
             externalBilling: item?.meta.external_billing === true,
+            client: item?.meta.client === true,
         });
 
     const closing = editor?.item?.meta.outcome != null; // won / lost: fixed probability
@@ -128,6 +132,7 @@ export default function ReferencesIndex({ lists, status }: ReferencesIndexProps)
         if (list.has_reached) meta.reached = editor.reached;
         if (list.has_default_for) meta.default_for = editor.defaultFor === '' ? null : (editor.defaultFor as 'organisation' | 'person');
         if (list.has_external_billing) meta.external_billing = editor.externalBilling;
+        if (list.has_client) meta.client = editor.client;
         const payload = { label: editor.label, meta };
         const options = {
             preserveScroll: true,
@@ -246,6 +251,7 @@ export default function ReferencesIndex({ lists, status }: ReferencesIndexProps)
                                     <Badge variant="outline">Par défaut : {DEFAULT_FOR[item.meta.default_for]}</Badge>
                                 )}
                                 {list.has_external_billing && item.meta.external_billing && <Badge variant="outline">Facturé hors du TMS</Badge>}
+                                {list.has_client && item.meta.client && <Badge variant="outline">Affiche le statut commercial</Badge>}
                                 {item.is_system && <Badge variant="secondary">Système</Badge>}
                                 {item.in_use && <Badge variant="secondary">Utilisée</Badge>}
                                 {!item.is_active && (
@@ -434,6 +440,24 @@ export default function ReferencesIndex({ lists, status }: ReferencesIndexProps)
                                     cas ; aucune : pas de financement initial.
                                 </p>
                                 <InputError message={errors['meta.default_for']} />
+                            </div>
+                        )}
+
+                        {list.has_client && (
+                            <div className="grid gap-1">
+                                <label className="flex items-center gap-2 text-sm">
+                                    <input
+                                        type="checkbox"
+                                        checked={editor?.client ?? false}
+                                        onChange={(e) => setEditor((s) => s && { ...s, client: e.target.checked })}
+                                    />
+                                    Rôle client : affiche le statut commercial
+                                </label>
+                                <p className="text-muted-foreground text-xs">
+                                    Une entreprise avec ce rôle (ou sans rôle) montre son statut prospect, client ou inactif ; un OPCO ou un
+                                    sous-traitant ne le montre pas.
+                                </p>
+                                <InputError message={errors['meta.client']} />
                             </div>
                         )}
 

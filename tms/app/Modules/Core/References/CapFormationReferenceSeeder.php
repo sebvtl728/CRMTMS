@@ -45,6 +45,9 @@ final class CapFormationReferenceSeeder
     /** Organisation types that fund dossiers (meta.funder), by code. */
     private const FUNDERS = ['opco', 'financeur-public'];
 
+    /** Organisation types showing the commercial status (meta.client), by code. */
+    private const CLIENTS = ['entreprise-cliente'];
+
     /** The stage a sent quote brings its opportunity to (meta.quote_stage). */
     private const QUOTE_STAGE = 'Proposition';
 
@@ -104,6 +107,9 @@ final class CapFormationReferenceSeeder
                     }
                     if ($list === ReferenceList::OrganisationType->value && in_array($code, self::FUNDERS, true)) {
                         $meta = ['funder' => true];
+                    }
+                    if ($list === ReferenceList::OrganisationType->value && in_array($code, self::CLIENTS, true)) {
+                        $meta = ['client' => true];
                     }
                     self::ensure(ReferenceList::from($list), $code, $label, $i + 1, $meta);
                 }
