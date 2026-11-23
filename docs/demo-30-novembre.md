@@ -1,9 +1,23 @@
 # Démonstration du TMS — 30 novembre 2026
 
 Fil rouge : **une entreprise cliente demande une formation pour trois salariés**. On suit l'affaire du premier contact
-à l'encaissement, puis on montre la qualité (Qualiopi). Durée visée : **45 minutes** + questions.
+à l'encaissement, puis on montre le parcours d'une personne qui postule et la qualité (Qualiopi). Durée visée :
+**50 minutes** + questions.
 
-> Version à installer sur le serveur avant la démo : **v0.14.3** (`sudo /opt/tms/ops/update.sh`).
+> Version à installer sur le serveur avant la démo : **v0.15.2** (`sudo /opt/tms/ops/update.sh`).
+
+**Deux parcours, à nommer dès le début** (ils répondent d'avance à « où sont les candidats après un devis ? ») :
+
+| | L'entreprise achète | La personne postule |
+|---|---|---|
+| Point de départ | Devis signé | Candidature |
+| Qui sont les stagiaires | Salariés désignés par l'entreprise | Alternant, particulier, demandeur d'emploi |
+| Admission | Aucune : inscription directe | Entretien, test de positionnement, « Admis » |
+| Chemin | Devis → **Créer le dossier** → inscriptions | Candidature → **Créer le dossier** |
+| Contractant | L'entreprise | L'employeur du contrat, ou la personne (particulier) |
+| Sections de la démo | 2 à 8 | 8 bis |
+
+Un devis ne crée pas de candidatures : quand l'entreprise achète, il n'y a personne à admettre.
 
 ---
 
@@ -22,8 +36,10 @@ Sur le Mac ou le serveur de démonstration :
    factures.
 5. **Catalogue** : une formation complète, par exemple « Hygiène alimentaire HACCP — 14 h », tarif entreprise
    **450 € HT par stagiaire**, DAS renseigné, une plaquette PDF jointe.
-6. **Fiches** : une entreprise « Restaurant Le Bon Goût » (SIRET fictif) avec un interlocuteur (toi) et trois salariés
-   (Léa Durand, Marc Petit, Sami Benali).
+6. **Fiches** : une entreprise « Restaurant Le Bon Goût » (SIRET fictif, **IDCC 1979**) avec un interlocuteur (toi)
+   et trois salariés (Léa Durand, Marc Petit, Sami Benali). Une fiche **AKTO** (type OPCO, conventions couvertes
+   reprises par « Reprendre les IDCC officiels de… »). Pour le parcours individuel : une personne « Inès Martin »
+   (ton adresse e-mail), une session inter à venir du même DAS que la formation, un test de positionnement publié.
 7. **Automatismes** (Administration › Automatismes) : convocations à **7 jours**, rappel de la veille coché,
    relance des signatures à 3 jours (2 relances au plus), **attestations automatiques cochées** pour la démo.
 8. **Comptes** : un compte formateur fictif (rôle Formateur) relié à une fiche formateur, pour montrer « Mon planning ».
@@ -77,8 +93,9 @@ Page de la session, barre d'étapes :
 2. **Planning** : l'assistant de séances génère 2 jours de 9 h–12 h 30 / 13 h 30–17 h, formateur et salle → les cartes
    passent au vert ; un conflit (formateur pris ailleurs) est signalé. **Planning des séances** : chaque séance porte
    la couleur de sa session, on repère d'un coup d'œil ce qui appartient à quoi.
-3. **Financements** (page du dossier) : ajouter l'OPCO, montant, « Paie directement l'organisme », état « Accordé » →
-   « Reste à financer » se met à jour.
+3. **Financements** (page du dossier) : **Ajouter un financement** → **AKTO est déjà proposé**, d'après l'IDCC de
+   l'entreprise (table officielle de France compétences). Montant, « Paie directement l'organisme », état « Accordé »
+   → « Reste à financer » se met à jour.
 4. **Documents** (page du dossier) : **Émettre : convention de formation** → PDF numéroté, archivé ; **Demander la
    signature** (même parcours que le devis).
 5. **Documents des stagiaires** (étape Stagiaires) : l'encart annonce **« Envoi automatique »** des convocations
@@ -136,12 +153,26 @@ Sur l'exemplaire « terminé » :
 6. Si le public est concerné par les groupements : **Facture libre** comme mandataire, ligne « Réalisé par [co-traitant] », puis
    **À reverser** (dû, reversé, reste).
 
+## 8 bis. Parcours individuel : la personne postule (5 min)
+
+Dire : « autre porte d'entrée, sans devis : une personne qui veut se former ».
+
+1. **Admissions › Nouvelle candidature** pour Inès Martin : formation, puis **DAS** puis **session visée** (seules les
+   sessions du DAS sont proposées), parcours (alternance ou stagiaire). Informations complémentaires : N° de sécurité
+   sociale contrôlé (clé), visible seulement avec le droit « données sensibles ».
+2. **Envoyer le test de positionnement** → sur le téléphone, passer le test (plein écran) ; revenir : « Reçu le », note.
+3. Passer l'étape à **Admis**.
+4. **Créer le dossier** : choisir le **contractant** (l'employeur pour une alternance, le candidat pour un
+   particulier), inscription dans la session visée, financement. Le dossier rejoint ensuite le même circuit que
+   l'entreprise (convention ou contrat, présences, facture).
+
 ## 9. Pilotage et qualité (4 min)
 
 1. **Tableaux de bord** (Commercial) : semaine / mois, export CSV ou PDF.
 2. **Chiffre d'affaires** : par DAS, objectifs, taux atteint.
 3. **Qualité › Qualiopi** : 33 indicateurs, mesures automatiques (fiches formation complètes, taux d'abandon,
-   satisfaction si livrée), preuves jointes, **dossier d'audit** en ZIP.
+   satisfaction si livrée), preuves jointes, **dossier d'audit** en ZIP. **Réclamations** (indicateur 31) et
+   **Amélioration continue** (indicateur 32) : registres tenus dans l'outil, comptés dans les mesures.
 
 ## 10. Conclusion (2 min)
 
@@ -164,4 +195,5 @@ Sur l'exemplaire « terminé » :
 | PDF qui ne se génère pas | Gotenberg arrêté : `docker compose up -d` dans `tms/`, réessayer (aucun numéro n'est perdu). |
 | Page blanche | Le serveur Vite tourne : `docker compose stop vite && rm -f public/hot`. |
 | Un automatisme n'a rien envoyé | Session **confirmée** ? Première séance dans la fenêtre (J+2 à J+7) ? Puis **Exécuter maintenant** (Administration › Automatismes). |
+| « Créer le dossier » d'une candidature refusé | Lire le message sous le bouton : contractant (entreprise ou particulier) ou session visée à revoir. |
 | Lenteur ou erreur au milieu | Basculer sur l'exemplaire « terminé » préparé la veille. |
