@@ -110,6 +110,8 @@ Sur la page d'une opportunité, **Changer d'étape** ouvre la même fenêtre.
 
 - Tout le monde voit le catalogue ; seuls l'administrateur et la direction le modifient (droit `catalogue.manage`, voir `admin.md`) : **Nouvelle formation**, **Modifier**, **Désactiver** / **Activer**, **Supprimer**.
 - Montants et durées se saisissent à la française (« 1 250,50 », « 7,5 »).
+- **Objectif (BPF)** et **Spécialité NSF (BPF)** : deux listes de la fiche, utilisées par le bilan pédagogique et financier (cadres F-3 et F-4). La liste NSF est la nomenclature officielle des 93 groupes de spécialités (ex. 221 « Agro-alimentaire, alimentation, cuisine », 334 « Accueil, hôtellerie, tourisme ») ; les deux colonnes sont dans l'export.
+- **Programme (PDF)** (page de la formation, droit `catalogue.view`) : le programme mis en page depuis la fiche (en-tête de la société par défaut, objectifs, modules, public, prérequis, méthodes, évaluation, sanction, délais d'accès, accessibilité, résultats, tarifs), **daté du jour de la dernière modification** de la fiche ou de ses modules (indicateur Qualiopi 1). Il est toujours rendu à la demande, jamais archivé : il reflète la fiche du moment. Gotenberg indisponible = message d'erreur, rien n'est perdu.
 - Filtres : recherche (intitulé ou code, sans souci d'accents), **DAS**, **Financement**, **État** ; tri par intitulé, code ou tarif entreprise.
 - Une formation **désactivée** n'est plus proposée sur les nouvelles opportunités ni les nouveaux devis, mais reste sur ceux qui l'ont déjà. Une formation **utilisée** (par une opportunité ou un devis, même supprimés) ne peut pas être supprimée : désactivez-la.
 - **Exporter (.xlsx)** (avec le droit d'export) : la liste filtrée, tarifs et durées en vrais nombres.

@@ -2,7 +2,7 @@ import Heading from '@/components/heading';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import AppLayout from '@/layouts/app-layout';
-import { formatDate, formatSize } from '@/lib/crm';
+import { formatDate, formatDay, formatSize } from '@/lib/crm';
 import { type BreadcrumbItem } from '@/types';
 import { Head, Link } from '@inertiajs/react';
 import { Plus } from 'lucide-react';
@@ -35,6 +35,9 @@ interface ShowProps {
         id: string;
         code: string | null;
         rncp_code: string | null;
+        bpf_objective: string | null;
+        nsf: string | null;
+        updated_on: string;
         title: string;
         das: string | null;
         duration_hours: string | null;
@@ -117,6 +120,9 @@ export default function TrainingShowPage({ training, brochures, blocks, can, sta
     const facts: [string, string][] = [
         ['Code', training.code ?? '-'],
         ['Code RNCP', training.rncp_code ?? '-'],
+        ['Objectif (BPF)', training.bpf_objective ?? '-'],
+        ['Spécialité NSF', training.nsf ?? '-'],
+        ['Programme mis à jour le', formatDay(training.updated_on)],
         ['DAS', training.das ?? '-'],
         ['Durée', duration || '-'],
         ['Modalité', training.modalities.length > 0 ? training.modalities.join(', ') : '-'],
@@ -135,11 +141,18 @@ export default function TrainingShowPage({ training, brochures, blocks, can, sta
                         <Heading title={training.title} />
                         <Badge variant={training.is_active ? 'secondary' : 'outline'}>{training.is_active ? 'Active' : 'Désactivée'}</Badge>
                     </div>
-                    {can.manage && (
+                    <div className="flex flex-wrap gap-2">
                         <Button asChild variant="outline" size="sm">
-                            <Link href={route('catalogue.edit', training.id)}>Modifier</Link>
+                            <a href={route('catalogue.programme', training.id)} target="_blank" rel="noopener">
+                                Programme (PDF)
+                            </a>
                         </Button>
-                    )}
+                        {can.manage && (
+                            <Button asChild variant="outline" size="sm">
+                                <Link href={route('catalogue.edit', training.id)}>Modifier</Link>
+                            </Button>
+                        )}
+                    </div>
                 </div>
 
                 <dl className="grid gap-x-6 gap-y-2 text-sm sm:grid-cols-2 lg:grid-cols-3">

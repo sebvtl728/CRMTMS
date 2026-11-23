@@ -37,6 +37,11 @@ class TrainingRequest extends FormRequest
                 $clean[$key] = $value === '' ? null : $value;
             }
         }
+        foreach (['bpf_objective', 'nsf_code'] as $key) {
+            if ($this->input($key) === '') {
+                $clean[$key] = null;
+            }
+        }
         if ($this->has('rncp_code')) {
             $rncp = $this->input('rncp_code');
             $rncp = is_string($rncp) ? mb_strtoupper((string) preg_replace('/\s+/', '', $rncp)) : $rncp;
@@ -156,6 +161,8 @@ class TrainingRequest extends FormRequest
                 ->where('tenant_id', $tenantId)->whereNull('deleted_at')->ignore($current?->id)],
             'title' => ['required', 'string', 'max:200'],
             'rncp_code' => ['nullable', 'string', 'regex:/^RNCP\d{1,6}$/'],
+            'bpf_objective' => ['nullable', Rule::enum(BpfObjective::class)],
+            'nsf_code' => ['nullable', 'string', Rule::in(array_keys(Nsf::CODES))],
             'das_id' => ['required', ...self::reference(ReferenceList::Das, array_filter([$current?->das_id]))],
             'duration_hours' => ['nullable', 'numeric', 'decimal:0,2', 'min:0', 'max:9999.99'],
             'duration_days' => ['nullable', 'numeric', 'decimal:0,2', 'min:0', 'max:999.99'],
@@ -203,6 +210,8 @@ class TrainingRequest extends FormRequest
     {
         return [
             'required' => 'Ce champ est obligatoire.',
+            'bpf_objective.enum' => 'Objectif BPF inconnu.',
+            'nsf_code.in' => 'Code NSF inconnu : choisissez une spécialité de la liste.',
             'rncp_code.regex' => 'Le code RNCP doit s\'écrire RNCP suivi de chiffres (ex. RNCP36004).',
             'max' => 'Ce champ est trop long.',
             'string' => 'Cette valeur n\'est pas valide.',

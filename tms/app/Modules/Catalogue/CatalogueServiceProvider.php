@@ -42,6 +42,8 @@ class CatalogueServiceProvider extends ServiceProvider
         self::registerReferenceUsage();
         Quality\CatalogueMeasures::register();
 
+        // Programme PDFs (Gotenberg): 30 a minute per user.
+        RateLimiter::for('catalogue-programme', fn (Request $request) => Limit::perMinute(30)->by('catalogue-programme:'.($request->user()?->getAuthIdentifier() ?? $request->ip())));
         RateLimiter::for('catalogue-export', fn (Request $request) => Limit::perMinute(10)->by('catalogue-export:'.($request->user()?->getAuthIdentifier() ?? $request->ip()))
             ->response(fn (Request $request, array $headers) => response()->json(['message' => 'Trop d\'exports en peu de temps. Réessayez dans une minute.'], 429, $headers)));
 

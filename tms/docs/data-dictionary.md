@@ -768,6 +768,8 @@ Clé (`tenant_id`, `year`) : `last_number` (année de Paris, incrémenté dans l
 ### Catalogue
 `trainings.rncp_code` (string(20), null) : code RNCP de la certification (`RNCP` + chiffres).
 
+`trainings.bpf_objective` (string(20), null, CHECK) : objectif de la formation au cadre F-3 du BPF (`Catalogue\BpfObjective` : `rncp_6_8`, `rncp_5`, `rncp_4`, `rncp_3`, `rncp_2`, `rncp_cqp`, `rs`, `cqp`, `other`, `skills_assessment`, `vae`). `trainings.nsf_code` (char(3), null, CHECK) : groupe de spécialités NSF (cadre F-4, liste officielle INSEE niveau 100 dans `Catalogue\Nsf`). `trainings.updated_at` date aussi le **programme PDF** : une modification des modules la met à jour.
+
 ## Module Documents (0.10)
 
 ### `documents` — documents émis
