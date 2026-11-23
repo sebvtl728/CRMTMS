@@ -35,7 +35,7 @@ it('keeps Catalogue free of any import of the Crm module', function () {
 
 it('lets Catalogue reach the connectors through the public AI service only', function () {
     // Ai (configured, structured) and its two exceptions (fixed French messages).
-    expect(moduleFilesMatching('Catalogue', '/App\\\\Modules\\\\Connectors\\\\(?!Ai\\\\(?:Ai|AiUnavailable|AiInvalidResponse)\b)/'))->toBe([]);
+    expect(moduleFilesMatching('Catalogue', '/App\\\\Modules\\\\Connectors\\\\(?!Ai\\\\(?:Ai|AiUnavailable|AiInvalidResponse)\b|OpenData\\\\RncpExport\b)/'))->toBe([]);
 });
 
 it('lets Crm reach the catalogue through its public service only', function () {

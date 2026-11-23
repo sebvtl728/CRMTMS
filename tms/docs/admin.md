@@ -471,3 +471,13 @@ Réglages dans `tenants.settings.admissions.booklet`.
   passées non validées, devis sans réponse depuis plus de 15 jours, actions commerciales à faire, candidatures
   identifiées, montants à facturer, factures à relancer. Lecture seule ; chaque ligne mène à l'écran concerné.
 
+## 24. Répertoire RNCP (données ouvertes)
+
+La table commune `rncp_certifications` contient les certifications RNCP de France compétences (data.gouv.fr, Licence Ouverte). Elle est commune à tous les organismes et ne contient aucune donnée personnelle. La commande **`tms:rncp:sync`** la recharge depuis le dernier export publié : elle retrouve l'export par l'API v2 de data.gouv.fr (son adresse change chaque nuit), télécharge l'export CSV d'environ 10 Mo et remplace la table en une transaction ; un export vide ou illisible garde l'ancienne table. Elle tourne **chaque lundi à 4 h 20** et peut se lancer à la main :
+
+```bash
+docker compose exec app php artisan tms:rncp:sync
+```
+
+Le serveur doit pouvoir joindre `www.data.gouv.fr` et `static.data.gouv.fr`. Tant que la table n'a jamais été chargée, la fiche formation l'indique et « À traiter » ne signale rien.
+

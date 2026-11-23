@@ -5,6 +5,12 @@ Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) ; ve
 
 ## [Non publié]
 
+## [0.15.15] - 2026-11-23
+
+### Ajouté
+
+- **Répertoire RNCP** (données ouvertes de France compétences, rechargées chaque semaine) : sur la fiche formation, la fiche officielle du code saisi (intitulé, niveau, état, fin d'enregistrement) et **Reprendre du RNCP** (objectif BPF, spécialité NSF, grille de compétences par blocs) ; « À traiter » signale les certifications inactives, inconnues ou finissant dans 6 mois.
+
 ## [0.15.14] - 2026-11-23
 
 ### Ajouté
