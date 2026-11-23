@@ -141,7 +141,7 @@ final class QuoteForm
                         'validity_days' => $c->quote_validity_days,
                     ])->values()->all(),
                 'contacts' => $contacts,
-                'funding_modes' => FormOptions::reference(ReferenceList::FundingMode, $quote?->funding_mode_id ?? $opportunity->funding_mode_id),
+                'funding_modes' => FormOptions::reference(ReferenceList::FundingMode, $quote->funding_mode_id ?? $opportunity->funding_mode_id),
                 'units' => QuoteLine::unitOptions(),
                 'vat_rates' => array_map(fn (string $r) => ['value' => $r, 'label' => str_replace('.', ',', rtrim(rtrim($r, '0'), '.')).' %'], QuoteTotals::VAT_RATES),
                 'training' => $this->trainingOptions($kept, $opportunity->isIndividual()),
