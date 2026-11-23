@@ -266,6 +266,8 @@ final class Due
             'cut_off' => $cut['key'],
             'period' => ['from' => $cut['from'], 'to' => $cut['to'], 'label' => $cut['label']],
             'kind' => $kind,
+            // « Facture d'acompte »: an instalment before the last one, or a funder's advance.
+            'advance' => $kind === Invoice::INVOICE && ($shares->byRecipient[$key]['advance'] ?? false),
             'company_id' => $corrected->company_id ?? $dossier['company_id'],
             'total_cents' => $total,
             'components' => $components,

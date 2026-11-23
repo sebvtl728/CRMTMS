@@ -28,6 +28,8 @@ interface FundingInput {
     agreed_on: string | null;
     notes: string | null;
     pays_directly: boolean;
+    advance_percent: string | null;
+    advance_on: string | null;
 }
 
 /** A funding as FundingRows sends it. */
@@ -45,6 +47,8 @@ export interface FundingRow {
     notes: string | null;
     /** The funder pays the organisme and receives its own invoice. */
     pays_directly: boolean;
+    /** « Acompte 30 % à partir du 01/09/2026 », null without advance. */
+    advance: string | null;
     /** The stored values for the form; null without the right to change it. */
     input: FundingInput | null;
 }
@@ -136,6 +140,8 @@ function FundingDialog({
         agreed_on: input?.agreed_on ?? '',
         notes: input?.notes ?? '',
         pays_directly: input?.pays_directly ?? false,
+        advance_percent: input?.advance_percent ?? '',
+        advance_on: input?.advance_on ?? '',
     });
     const fieldErrors = errors as Record<string, string | undefined>;
 
@@ -171,6 +177,9 @@ function FundingDialog({
             target: targetKind === 'none' ? 'dossier' : targetKind,
             dossier_line_id: targetKind === 'line' ? d.dossier_line_id : '',
             enrolment_id: targetKind === 'enrolment' ? d.enrolment_id : '',
+            // An advance is asked only of a funder paying directly.
+            advance_percent: d.pays_directly ? d.advance_percent : '',
+            advance_on: d.pays_directly && d.advance_percent ? d.advance_on : '',
         }));
         const done = { preserveScroll: true, onSuccess: onClose };
         if (funding) {
@@ -311,6 +320,31 @@ function FundingDialog({
                         </p>
                         <InputError message={fieldErrors.pays_directly} />
                     </div>
+
+                    {data.pays_directly && (
+                        <div className="grid gap-4 sm:grid-cols-2">
+                            <div className="grid gap-2">
+                                <Label htmlFor="advance_percent">Acompte demandé au financeur (%)</Label>
+                                <Input
+                                    id="advance_percent"
+                                    inputMode="numeric"
+                                    placeholder="Aucun"
+                                    value={data.advance_percent}
+                                    onChange={(e) => setData('advance_percent', e.target.value.replace(/\D/g, '').slice(0, 3))}
+                                />
+                                <InputError message={fieldErrors.advance_percent} />
+                            </div>
+                            <div className="grid gap-2">
+                                <Label htmlFor="advance_on">Facturé à partir du</Label>
+                                <Input id="advance_on" type="date" value={data.advance_on} onChange={(e) => setData('advance_on', e.target.value)} />
+                                <InputError message={fieldErrors.advance_on} />
+                            </div>
+                            <p className="text-muted-foreground text-xs sm:col-span-2">
+                                Accordé, ce financement reçoit une facture d'acompte (pourcentage de son montant) dès cette date, avant la fin de la
+                                formation ; la facture finale, au réalisé, en tient compte.
+                            </p>
+                        </div>
+                    )}
 
                     <div className="grid gap-2">
                         <Label htmlFor="target">Finance</Label>
@@ -459,6 +493,7 @@ export function FundingSection({
                                                     Paie directement
                                                 </Badge>
                                             )}
+                                            {f.advance && <div className="text-muted-foreground text-xs">{f.advance}</div>}
                                             {f.notes && <div className="text-muted-foreground text-xs whitespace-pre-line">{f.notes}</div>}
                                         </td>
                                         <td className="px-3 py-2">{f.type ?? '-'}</td>

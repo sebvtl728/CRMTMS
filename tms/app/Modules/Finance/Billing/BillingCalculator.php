@@ -55,6 +55,15 @@ use InvalidArgumentException;
  *    (so the detail does not add up to B); at the last one, as « end » on a
  *    realised basis (training over), the planned price otherwise.
  *
+ * Advances (acomptes): an agreed funding paying directly (not external)
+ * with advance_percent and advance_on reached by the cut-off owes, while
+ * the training is not over, at least amount × percent: its share is raised
+ * to it (B grows by the difference, the contractor's part unchanged); with
+ * nothing else billable yet, the advances alone (contractor 0, the detail
+ * of the planned lines). Once over, the realised share again (the next
+ * invoice regularises, a credit note when the advance was more). An
+ * instalment before the last one and a raised share are flagged advance.
+ *
  * @phpstan-import-type Detail from Shares
  * @phpstan-import-type RecipientShare from Shares
  */
@@ -87,9 +96,12 @@ final class BillingCalculator
                 throw new InvalidArgumentException('A monthly plan is cut on a month (CutOff::month()).');
             }
 
-            return self::monthClosed($dossier, $hours, $cut->month)
-                ? self::compute($dossier, $hours, self::REALISED, $absencesRule, $cut)
-                : Shares::notReady(self::MONTH_NOT_CLOSED);
+            if (! self::monthClosed($dossier, $hours, $cut->month)) {
+                return self::advancesOnly($dossier, $cut) ?? Shares::notReady(self::MONTH_NOT_CLOSED);
+            }
+            $shares = self::compute($dossier, $hours, self::REALISED, $absencesRule, $cut);
+
+            return self::finished($dossier, $hours, $cut) ? $shares : self::withAdvances($shares, $dossier, $cut);
         }
 
         if ($plan['rhythm'] === BillingPlans::SCHEDULE) {
@@ -100,10 +112,10 @@ final class BillingCalculator
                 }
             }
             if ($percent === 0) {
-                return Shares::notReady(self::NOT_DUE);
+                return self::advancesOnly($dossier, $cut) ?? Shares::notReady(self::NOT_DUE);
             }
             if ($percent < 100) {
-                return self::instalment($dossier, $percent, $cut);
+                return self::withAdvances(self::instalment($dossier, $percent, $cut), $dossier, $cut);
             }
         }
 
@@ -113,7 +125,87 @@ final class BillingCalculator
 
         return self::finished($dossier, $hours, $cut)
             ? self::compute($dossier, $hours, $planned ? self::PLANNED : self::REALISED, $absencesRule, $cut)
-            : Shares::notReady(self::NOT_FINISHED);
+            : (self::advancesOnly($dossier, $cut) ?? Shares::notReady(self::NOT_FINISHED));
+    }
+
+    /**
+     * The advance due by each funding at the cut-off, by funding id.
+     *
+     * @param  array<string, mixed>  $dossier
+     * @return array<string, int>
+     */
+    private static function advances(array $dossier, CutOff $cut): array
+    {
+        $contractor = $dossier['contractor'];
+        $advances = [];
+        foreach ($dossier['fundings'] as $f) {
+            $percent = (int) ($f['advance_percent'] ?? 0);
+            $on = $f['advance_on'] ?? null;
+            $isContractor = $f['funder']['type'] === $contractor['type'] && $f['funder']['id'] === $contractor['id'];
+            if ($percent > 0 && is_string($on) && $on <= $cut->date && $f['status'] === 'agreed' && $f['pays_directly'] && ! $f['external_billing'] && ! $isContractor) {
+                $advances[(string) $f['id']] = self::prorate((int) $f['amount_cents'], min($percent, 100), 100);
+            }
+        }
+
+        return $advances;
+    }
+
+    /**
+     * $shares with each funder raised to its advance (flagged), B the sum of the training parts.
+     *
+     * @param  array<string, mixed>  $dossier
+     */
+    private static function withAdvances(Shares $shares, array $dossier, CutOff $cut): Shares
+    {
+        $advances = self::advances($dossier, $cut);
+        if ($advances === []) {
+            return $shares;
+        }
+        $recipients = $shares->byRecipient;
+        $fundings = array_column($dossier['fundings'], null, 'id');
+        foreach ($advances as $id => $cents) {
+            $key = "funding:{$id}";
+            $current = $recipients[$key] ?? self::funderRecipient($fundings[$id], $id, 0);
+            if ($cents > $current['training_cents']) {
+                $current = [...$current, 'training_cents' => $cents, 'advance' => true];
+            }
+            $recipients[$key] = $current;
+        }
+
+        return new Shares(true, null, array_sum(array_column($recipients, 'training_cents')), $shares->deditCents, $shares->absencesCents, $recipients, $shares->detail);
+    }
+
+    /**
+     * The advances alone (nothing else billable yet); null without any.
+     *
+     * @param  array<string, mixed>  $dossier
+     */
+    private static function advancesOnly(array $dossier, CutOff $cut): ?Shares
+    {
+        if (self::advances($dossier, $cut) === []) {
+            return null;
+        }
+        $planned = self::compute($dossier, ['enrolments' => [], 'sessions' => []], self::PLANNED, BillingPlans::NOT_BILLED, $cut);
+        $recipients = ['contractor' => [...$planned->byRecipient['contractor'], 'training_cents' => 0]];
+        $empty = new Shares(true, null, 0, 0, 0, $recipients, $planned->detail);
+
+        return self::withAdvances($empty, $dossier, $cut);
+    }
+
+    /**
+     * @param  array<string, mixed>  $funding
+     * @return RecipientShare
+     */
+    private static function funderRecipient(array $funding, string $id, int $cents): array
+    {
+        return [
+            'recipient' => ['type' => 'funder', 'id' => (string) $funding['funder']['id'], 'fiche_type' => (string) $funding['funder']['type'], 'funding_id' => $id],
+            'training_cents' => $cents,
+            'dedit_cents' => 0,
+            'absences_cents' => 0,
+            'external' => (bool) $funding['external_billing'],
+            'advance' => false,
+        ];
     }
 
     /**
@@ -213,6 +305,7 @@ final class BillingCalculator
         $contractor = self::prorate($planned->byRecipient['contractor']['training_cents'], $percent, 100);
         $recipients = array_map(fn (array $r) => [...$r, 'training_cents' => 0], $planned->byRecipient);
         $recipients['contractor']['training_cents'] = $contractor;
+        $recipients['contractor']['advance'] = true;
         $ratio = self::ratio($percent, 100);
         $detail = array_map(fn (array $d) => [...$d, 'ratio' => $ratio, 'amount_cents' => self::prorate($d['amount_cents'], $percent, 100)], $planned->detail);
 
@@ -268,16 +361,10 @@ final class BillingCalculator
             'dedit_cents' => $dedit,
             'absences_cents' => $absences,
             'external' => false,
+            'advance' => false,
         ]];
         foreach ($funders as $id => $share) {
-            $f = $share['funding'];
-            $recipients["funding:{$id}"] = [
-                'recipient' => ['type' => 'funder', 'id' => (string) $f['funder']['id'], 'fiche_type' => (string) $f['funder']['type'], 'funding_id' => (string) $id],
-                'training_cents' => $share['cents'],
-                'dedit_cents' => 0,
-                'absences_cents' => 0,
-                'external' => (bool) $f['external_billing'],
-            ];
+            $recipients["funding:{$id}"] = self::funderRecipient($share['funding'], (string) $id, $share['cents']);
         }
 
         return $recipients;

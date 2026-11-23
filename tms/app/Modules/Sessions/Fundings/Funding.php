@@ -32,6 +32,8 @@ use Illuminate\Support\Carbon;
  * @property CarbonImmutable|null $agreed_on
  * @property string|null $notes
  * @property bool $pays_directly the funder pays the organisme and receives its own invoice (0.9)
+ * @property int|null $advance_percent percent of the amount billed as an advance (acompte)
+ * @property CarbonImmutable|null $advance_on the day the advance is billed from
  * @property Carbon|null $created_at
  */
 class Funding extends Model
@@ -50,7 +52,7 @@ class Funding extends Model
     /** @var list<string> */
     protected $fillable = [
         'dossier_id', 'funder_organisation_id', 'funder_person_id', 'funding_type_id', 'dossier_line_id', 'enrolment_id',
-        'amount', 'status', 'agreement_number', 'agreed_on', 'notes', 'pays_directly',
+        'amount', 'status', 'agreement_number', 'agreed_on', 'notes', 'pays_directly', 'advance_percent', 'advance_on',
     ];
 
     /** @var array<string, mixed> */
@@ -66,6 +68,8 @@ class Funding extends Model
             'amount' => 'decimal:2',
             'agreed_on' => 'immutable_date',
             'pays_directly' => 'boolean',
+            'advance_percent' => 'integer',
+            'advance_on' => 'immutable_date',
         ];
     }
 

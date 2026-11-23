@@ -137,3 +137,22 @@ it('prints the SIRET and the IDCC of the entreprise on its convention', function
     expect($doc->recipient_snapshot)->toMatchArray(['siret' => '73282932000074', 'idcc' => '1979'])
         ->and(docSentHtml())->toContain('SIRET 732 829 320 00074', 'IDCC 1979 (convention collective)');
 });
+
+it('prints the fundings of the dossier and what is left to the contractant on its convention', function () {
+    $dossier = docCompanyDossier();
+    l2Funding($dossier, ['status' => 'agreed', 'agreement_number' => 'ACC-42', 'agreed_on' => '2026-11-10', 'pays_directly' => true]);
+    l2Funding($dossier, ['funder_organisation_id' => Organisation::query()->create(['name' => 'Région'])->id, 'amount' => '100,00', 'status' => 'requested']);
+    l2Funding($dossier, ['funder_organisation_id' => Organisation::query()->create(['name' => 'Agefiph'])->id, 'amount' => '50,00', 'status' => 'refused']);
+
+    app(DocumentIssuer::class)->issue(admin(), DocumentType::Convention, $dossier->id);
+
+    expect(docSentHtml())->toContain('Financement', 'OPCO EP', 'accord n° ACC-42', '600,00', 'réglé directement à l&#039;organisme de formation',
+        'Région', 'demande en cours', '100,00', 'Reste à la charge du contractant', '300,00', 'sous réserve des accords en cours')
+        ->not->toContain('Agefiph');
+});
+
+it('prints no funding section on a convention without funding', function () {
+    app(DocumentIssuer::class)->issue(admin(), DocumentType::Convention, docCompanyDossier()->id);
+
+    expect(docSentHtml())->not->toContain('Reste à la charge du contractant');
+});

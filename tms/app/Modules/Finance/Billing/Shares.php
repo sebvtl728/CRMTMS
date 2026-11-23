@@ -13,6 +13,9 @@ namespace App\Modules\Finance\Billing;
  *  - byRecipient: « contractor », then « funding:<id> » per funding taking a
  *    share (agreed, paying directly or billed outside the TMS: external,
  *    never invoiced by the TMS);
+ *  - advance (per recipient): its share is an advance (« Facture
+ *    d'acompte »): an instalment before the last one, or the advance asked
+ *    of a funder before the training is over;
  *  - detail: how each amount was reached (minutes planned and realised,
  *    ratio), for display;
  *  - ready: false when nothing is billable yet at the cut-off, with the
@@ -20,7 +23,7 @@ namespace App\Modules\Finance\Billing;
  *    « Échéance non atteinte ») and no amount.
  *
  * @phpstan-type Recipient array{type: 'contractor'|'funder', id: string, fiche_type: string, funding_id?: string}
- * @phpstan-type RecipientShare array{recipient: Recipient, training_cents: int, dedit_cents: int, absences_cents: int, external: bool}
+ * @phpstan-type RecipientShare array{recipient: Recipient, training_cents: int, dedit_cents: int, absences_cents: int, external: bool, advance: bool}
  * @phpstan-type Detail array{line_id: string, enrolment_id: ?string, planned: ?int, realised: ?int, ratio: string, amount_cents: int, dedit_cents: int, absences_cents: int}
  */
 final readonly class Shares

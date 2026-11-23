@@ -5,6 +5,12 @@ Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) ; ve
 
 ## [Non publié]
 
+### Ajouté
+
+- **Acompte demandé à un financeur** : sur un financement accordé qui paie directement l'organisme, un pourcentage et une date ; dès cette date et jusqu'à la fin de la formation, le financeur reçoit une **facture d'acompte** ; la facture finale, au réalisé, la déduit (avoir si l'acompte dépassait le réalisé) et rappelle les acomptes déjà facturés.
+- **« Facture d'acompte »** sur le PDF des échéances intermédiaires d'un échéancier et des acomptes de financeur.
+- **Financement sur la convention et le contrat** : financeurs (accord, montant, règlement direct) et reste à la charge du contractant (« sous réserve des accords en cours » tant qu'un financement n'est pas accordé).
+
 ## [0.15.2] - 2026-11-23
 
 ### Ajouté

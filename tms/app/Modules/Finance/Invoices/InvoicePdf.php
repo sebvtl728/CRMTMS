@@ -103,7 +103,7 @@ class InvoicePdf
 
         return view('documents.invoice', [
             'watermark' => $invoice->isDraft(),
-            'title' => $credit ? 'AVOIR' : 'FACTURE',
+            'title' => $credit ? 'AVOIR' : ($invoice->is_advance ? 'FACTURE D\'ACOMPTE' : 'FACTURE'),
             'company' => [
                 'name' => $company->name,
                 'logo' => $this->branding->logoDataUri($company),
@@ -127,6 +127,7 @@ class InvoicePdf
                 'due_on' => $invoice->due_on?->format('d/m/Y'),
                 'period' => $invoice->period_from !== null && $invoice->period_to !== null
                     ? 'du '.$invoice->period_from->format('d/m/Y').' au '.$invoice->period_to->format('d/m/Y') : null,
+                'advances' => self::previousAdvances($invoice),
                 'corrected' => $corrected === null ? null : [
                     'number' => $corrected->number ?? '-',
                     'issued_on' => $corrected->issued_on?->format('d/m/Y'),
@@ -181,8 +182,30 @@ class InvoicePdf
     public function footerHtml(Invoice $invoice): string
     {
         return view('documents.invoice-footer', [
-            'title' => ($invoice->kind === Invoice::CREDIT_NOTE ? 'Avoir' : 'Facture').' '.($invoice->number ?? '(brouillon)'),
+            'title' => ($invoice->kind === Invoice::CREDIT_NOTE ? 'Avoir' : ($invoice->is_advance ? 'Facture d\'acompte' : 'Facture')).' '.($invoice->number ?? '(brouillon)'),
         ])->render();
+    }
+
+    /**
+     * The advance invoices already issued to the same recipient of the same
+     * dossier, before this one (an invoice that is not an advance itself):
+     * « Acomptes déjà facturés : F-… du … (… TTC) ».
+     *
+     * @return list<array{number: string, issued_on: ?string, ttc: string}>
+     */
+    private static function previousAdvances(Invoice $invoice): array
+    {
+        if ($invoice->kind !== Invoice::INVOICE || $invoice->is_advance || $invoice->dossier_id === null) {
+            return [];
+        }
+
+        return Invoice::query()->where('dossier_id', $invoice->dossier_id)->where('recipient_key', $invoice->recipient_key)
+            ->where('is_advance', true)->whereKeyNot($invoice->id)
+            ->whereIn('status', InvoiceStatus::values(InvoiceStatus::ISSUED))
+            ->when($invoice->validated_at !== null, fn ($q) => $q->where('validated_at', '<', $invoice->validated_at))
+            ->orderBy('validated_at')->get()
+            ->map(fn (Invoice $a) => ['number' => (string) $a->number, 'issued_on' => $a->issued_on?->format('d/m/Y'), 'ttc' => self::money($a->total_ttc_cents)])
+            ->values()->all();
     }
 
     private static function money(int $cents): string

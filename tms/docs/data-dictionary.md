@@ -629,6 +629,7 @@ Module `Sessions` (`Funding`, écrit par `FundingWriter` seulement, sous le verr
 | `status` | string(20) | `to_request` (À demander, défaut), `requested` (Demandé), `agreed` (Accordé), `refused` (Refusé) — CHECK. Un financement refusé ne compte plus dans le financé ; aucun report automatique |
 | `agreement_number` | string(100), null | N° de prise en charge |
 | `agreed_on` | date, null | Date d'accord |
+| `advance_percent`, `advance_on` | smallint 1-100, date, null | Acompte demandé au financeur à partir de ce jour (CHECK : les deux ou aucun, `pays_directly` exigé) ; calcul `BillingCalculator` (avances) |
 | `pays_directly` | boolean, défaut faux (0.9) | « Paie directement l'organisme » : le financeur reçoit sa propre facture pour sa part (financement accordé seulement). Refusé quand le financeur est le contractant ; verrouillé dès la première facture validée du dossier (`BillingGuards`) |
 | `notes` | text, null | Journalisé sans valeur (`$auditPersonal`) |
 | `created_at`, `updated_at` | | |
@@ -681,6 +682,7 @@ Une ligne par organisme (`tenant_id` unique), créée au premier changement : `u
 | `number` | string(30), null | `<préfixe>-<AAAA>-<NNNNN>` ; nul **exactement** tant que `status = draft` (CHECK) ; unique (`company_id`, `number`) |
 | `status` | string(10) | `draft`, `validated`, `sent` (CHECK) |
 | `origin` | string(10) | `dossier` (calculée depuis un dossier) / `free` (facture libre) ; CHECK `invoices_origin_check` |
+| `is_advance` | bool, défaut faux | « Facture d'acompte » : échéance avant la dernière, ou acompte d'un financeur ; haché par `Integrity::canonical` seulement s'il est vrai |
 | `dossier_id` | uuid, null (FK `dossiers`) | Dossier ; nul **exactement** pour une facture libre (CHECK `invoices_origin_dossier_check`) |
 | `buyer_reference`, `service_code` | string(60), null | Facture libre : n° d'engagement et code service de l'acheteur (Chorus Pro), dans le contenu haché quand renseignés |
 | `recipient_type`, `recipient_id` | string(12), uuid | `organisation` / `person` et fiche du destinataire |
