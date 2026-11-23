@@ -5,6 +5,10 @@ Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) ; ve
 
 ## [Non publié]
 
+### Corrigé
+
+- **Envoi d'un devis** : le destinataire proposé est l'**e-mail professionnel** de l'interlocuteur dans l'entreprise, sinon son e-mail personnel, sinon l'e-mail de l'entreprise. Il restait vide quand l'interlocuteur n'avait qu'un e-mail pro.
+
 ## [0.15.12] - 2026-11-23
 
 ### Modifié

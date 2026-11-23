@@ -188,6 +188,8 @@ Si la société est **exonérée de TVA** (régime choisi par l'administrateur),
 
 ### Envoyer, relancer
 
+Le destinataire proposé est l'**e-mail professionnel** de l'interlocuteur (rattachement à l'entreprise), sinon son e-mail personnel, sinon l'e-mail de l'entreprise ; pour un particulier, son e-mail.
+
 - **Envoyer** : destinataire (prérempli avec l'e-mail du destinataire, ou à défaut de l'entreprise), jusqu'à 5 adresses en copie, objet et message préremplis, modifiables. Le message part en texte simple avec le PDF joint, par la messagerie de l'organisme (connecteur SMTP de la société, sinon de l'organisme) ; sans serveur d'envoi configuré, la fenêtre prévient que le message ne partira pas réellement. Le devis passe **Envoyé** ; l'opportunité avance d'elle-même à l'étape du devis envoyé (« Proposition » chez CAP FORMATION, réglage de l'administrateur) si elle était à une étape antérieure ; la date de **dernier contact** des fiches est mise à jour.
 - L'envoi se fait en arrière-plan : « E-mail en cours d'envoi… » s'affiche quelques instants. S'il échoue (serveur refusé…), le bandeau **L'e-mail n'est pas parti** donne la raison et **Renvoyer** réessaie le même message. Le devis reste envoyé.
 - **Relancer** (devis envoyé ou déjà relancé) : nouveau message, même PDF ; le devis passe **Relancé**. Impossible tant qu'un envoi est en cours ou en échec (utilisez **Renvoyer**).
