@@ -19,7 +19,7 @@ return new class extends Migration
             DB::statement("select set_config('app.tenant_id', ?, true)", [$tenantId]);
             DB::update(
                 "update reference_items set meta = coalesce(meta, '{}'::jsonb) || '{\"opco\": true}'::jsonb
-                 where list = 'funding_type' and code = 'opco' and deleted_at is null and not (coalesce(meta, '{}'::jsonb) ? 'opco')"
+                 where list = 'funding_type' and code = 'opco' and deleted_at is null and not jsonb_exists(coalesce(meta, '{}'::jsonb), 'opco')"
             );
         }
         DB::statement("select set_config('app.tenant_id', ?, true)", [$previous]);
