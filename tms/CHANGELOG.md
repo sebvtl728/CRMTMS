@@ -5,13 +5,18 @@ Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) ; ve
 
 ## [Non publié]
 
+## [0.15.11] - 2026-11-23
+
+### Ajouté
+
+- **Livret d'apprentissage (PDF)** sur la carte Alternance d'une candidature : déjà rempli (partenaires, équipe, parcours avec dispenses, planning, annexes de l'organisme, pages de suivi datées mois par mois, grilles de compétences, visites). Réglages dans Administration › Livret d'apprentissage.
+- **Grille de compétences** d'une formation (activités types, compétences, savoir-faire), saisie en texte dans la fiche.
+
 ## [0.15.10] - 2026-11-23
 
 ### Ajouté
 
 - **Fiche formation** : **Objectif (BPF)** et **Spécialité NSF** (liste officielle des 93 groupes), préparation du bilan pédagogique et financier ; colonnes de l'export.
-- **Livret d'apprentissage (PDF)** sur la carte Alternance d'une candidature : déjà rempli (partenaires, équipe, parcours avec dispenses, planning, annexes de l'organisme, pages de suivi datées mois par mois, grilles de compétences, visites). Réglages dans Administration › Livret d'apprentissage.
-- **Grille de compétences** d'une formation (activités types, compétences, savoir-faire), saisie en texte dans la fiche.
 - **Programme (PDF)** de chaque formation, mis en page depuis sa fiche et **daté de sa dernière mise à jour** (Qualiopi, indicateur 1).
 
 ## [0.15.9] - 2026-11-23
