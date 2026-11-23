@@ -239,8 +239,8 @@ function FundingDialog({
                         )}
                         {suggested && !suggested.id && !funder && (
                             <p className="text-muted-foreground text-xs">
-                                Selon la table officielle de France compétences, l'OPCO de la convention IDCC {suggested.idcc} est{' '}
-                                {suggested.label}. Aucune fiche entreprise à ce nom : créez-la pour la choisir.
+                                Selon la table officielle de France compétences, l'OPCO de la convention IDCC {suggested.idcc} est {suggested.label}.
+                                Aucune fiche entreprise à ce nom : créez-la pour la choisir.
                             </p>
                         )}
                         <InputError message={fieldErrors.funder ?? fieldErrors.funder_organisation_id ?? fieldErrors.funder_person_id} />

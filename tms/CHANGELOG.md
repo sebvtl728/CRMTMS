@@ -5,6 +5,11 @@ Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) ; ve
 
 ## [Non publié]
 
+### Ajouté
+
+- **Financements d'un dossier** : sous « Reste à financer », la part **Accordé** et la part **En attente d'accord** (« À demander », « Demandé »). Un financement de départ « À demander » couvrait tout le prix et affichait « Reste à financer : 0,00 € » sans rien dire de l'accord.
+- **Financement OPCO** d'un dossier créé depuis un devis : le financeur est l'OPCO de la convention collective (IDCC) de l'entreprise quand sa fiche existe, sinon l'entreprise. Référentiel *Types de financeur* : case **Payé par l'OPCO de la convention collective**, cochée à la mise à jour sur « OPCO ».
+
 ## [0.15.17] - 2026-11-23
 
 ### Ajouté
