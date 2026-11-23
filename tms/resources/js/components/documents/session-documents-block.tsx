@@ -39,6 +39,9 @@ export function SessionDocumentsBlock({ session_id, can_manage, types, trainees,
         router.post(url, { type }, { preserveScroll: true, onStart: () => setBusy(key), onFinish: () => setBusy(null), onSuccess: then });
     // A planned automatic sending: « Émettre pour tous » asks first, so the two never collide.
     const planned = auto_convocation !== null && auto_convocation.startsWith('Envoi automatique');
+    // The documents that leave by themselves (Administration › Automatismes).
+    const isAuto = (type: string) => (type === 'convocation' ? auto_convocation !== null && !auto_convocation.startsWith('Trop tard') : auto_certificates);
+    const waitingConfirmation = auto_convocation !== null && auto_convocation.includes('une fois la session confirmée');
     const issue = (type: string) => {
         if (type === 'convocation' && planned) {
             setAsking(true);
@@ -69,46 +72,63 @@ export function SessionDocumentsBlock({ session_id, can_manage, types, trainees,
 
     return (
         <div className="grid gap-3">
+            <div className="grid gap-2 sm:grid-cols-3">
+                {types.map((t) => {
+                    const auto = isAuto(t.value);
+                    const docs = trainees.map((tr) => tr.documents[t.value]).filter((d): d is Doc => d !== null && d.status !== 'cancelled');
+                    const sent = docs.filter((d) => d.email_status === 'sent').length;
+                    const buttons = (
+                        <div className="flex flex-wrap gap-1">
+                            <Button size="sm" variant="outline" disabled={busy !== null} onClick={() => issue(t.value)}>
+                                {busy === `issue-${t.value}` ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <FileText className="h-4 w-4" />}
+                                Émettre pour tous
+                            </Button>
+                            <Button size="sm" variant="outline" disabled={busy !== null} onClick={() => sendAll(t.value, t.label)}>
+                                {busy === `send-${t.value}` ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+                                Envoyer à tous
+                            </Button>
+                        </div>
+                    );
+                    return (
+                        <div key={t.value} className="grid content-start gap-2 rounded-md border p-2">
+                            <div className="flex flex-wrap items-center justify-between gap-1">
+                                <span className="text-sm font-medium">{t.label}</span>
+                                {auto ? <Badge variant="secondary">Automatique</Badge> : <Badge variant="outline">À faire à la main</Badge>}
+                            </div>
+                            <p className="text-xs tabular-nums">
+                                {docs.length}/{trainees.length} émis · {sent} envoyé{sent > 1 ? 's' : ''}
+                            </p>
+                            <p className="text-muted-foreground flex items-start gap-1 text-xs">
+                                {auto && <Clock className="mt-0.5 h-3 w-3 shrink-0" />}
+                                {auto
+                                    ? t.value === 'convocation'
+                                        ? `${auto_convocation} ${waitingConfirmation ? 'Pensez à confirmer la session.' : "Vous n'avez rien à faire."}`
+                                        : "Émis et envoyés tout seuls le dernier jour à 13 h 30 (après-midi comptée), sinon après la clôture du mois de fin. Vous n'avez rien à faire."
+                                    : t.value === 'convocation'
+                                      ? (auto_convocation ?? 'Émettez puis envoyez les convocations avant le début de la formation.')
+                                      : 'À la fin de la formation (mois clôturé) : émettez puis envoyez.'}
+                            </p>
+                            {can_manage &&
+                                (auto ? (
+                                    <details className="text-xs">
+                                        <summary className="cursor-pointer font-medium">Émettre ou envoyer à la main</summary>
+                                        <p className="mt-1 text-amber-700 dark:text-amber-400">
+                                            Inutile en temps normal : ils partent seuls. Seulement pour les envoyer plus tôt.
+                                        </p>
+                                        <div className="mt-2">{buttons}</div>
+                                    </details>
+                                ) : (
+                                    buttons
+                                ))}
+                        </div>
+                    );
+                })}
+            </div>
             {can_manage && (
                 <p className="text-muted-foreground text-xs">
                     <strong>Émettre</strong> crée le document avec son numéro définitif (il ne se modifie plus : une erreur se corrige en l'annulant)
                     ; <strong>Envoyer</strong> l'adresse par e-mail à chaque stagiaire.
                 </p>
-            )}
-            {can_manage && (
-                <div className="grid gap-2 sm:grid-cols-3">
-                    {types.map((t) => (
-                        <div key={t.value} className="grid gap-1 rounded-md border p-2">
-                            <span className="text-sm font-medium">{t.label}</span>
-                            <div className="flex flex-wrap gap-1">
-                                <Button size="sm" variant="outline" disabled={busy !== null} onClick={() => issue(t.value)}>
-                                    {busy === `issue-${t.value}` ? (
-                                        <LoaderCircle className="h-4 w-4 animate-spin" />
-                                    ) : (
-                                        <FileText className="h-4 w-4" />
-                                    )}
-                                    Émettre pour tous
-                                </Button>
-                                <Button size="sm" variant="outline" disabled={busy !== null} onClick={() => sendAll(t.value, t.label)}>
-                                    {busy === `send-${t.value}` ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
-                                    Envoyer à tous
-                                </Button>
-                            </div>
-                            {t.value !== 'convocation' && auto_certificates && (
-                                <p className="text-muted-foreground flex items-start gap-1 text-xs">
-                                    <Clock className="mt-0.5 h-3 w-3 shrink-0" />
-                                    Émis et envoyés automatiquement le matin qui suit la clôture du mois de fin.
-                                </p>
-                            )}
-                            {t.value === 'convocation' && auto_convocation && (
-                                <p className="text-muted-foreground flex items-start gap-1 text-xs">
-                                    <Clock className="mt-0.5 h-3 w-3 shrink-0" />
-                                    {auto_convocation}
-                                </p>
-                            )}
-                        </div>
-                    ))}
-                </div>
             )}
             <div className="overflow-x-auto rounded-md border">
                 <table className="w-full text-sm">
@@ -148,6 +168,8 @@ export function SessionDocumentsBlock({ session_id, can_manage, types, trainees,
                                                         {doc.email_status === 'failed' ? 'Échec de l’envoi' : doc.status_label}
                                                     </Badge>
                                                 </div>
+                                            ) : isAuto(t.value) ? (
+                                                <span className="text-muted-foreground text-xs">Partira seul</span>
                                             ) : can_manage ? (
                                                 <Button
                                                     size="sm"

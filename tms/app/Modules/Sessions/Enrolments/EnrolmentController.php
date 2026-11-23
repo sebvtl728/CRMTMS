@@ -30,7 +30,8 @@ use Illuminate\Validation\ValidationException;
 class EnrolmentController extends Controller
 {
     /** Route action => method of Enrolments. */
-    public const ACTIONS = ['confirm' => 'confirm', 'promote' => 'promote', 'cancel' => 'cancel'];
+    // « Confirmer » is gone: it triggered nothing and confused (2027-01-30).
+    public const ACTIONS = ['promote' => 'promote', 'cancel' => 'cancel'];
 
     public function __construct(private readonly Enrolments $enrolments) {}
 
@@ -120,8 +121,7 @@ class EnrolmentController extends Controller
         $this->enrolments->{$method}($enrolment);
 
         return back()->with('status', match ($action) {
-            'confirm' => 'Inscription confirmée.',
-            'promote' => 'Stagiaire promu de la liste d\'attente.',
+            'promote' => 'Stagiaire passé de la liste d\'attente aux inscrits.',
             default => 'Inscription annulée.',
         });
     }

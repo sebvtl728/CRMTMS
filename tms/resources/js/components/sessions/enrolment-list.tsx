@@ -267,7 +267,7 @@ export function EnrolmentList({
     const [abandoning, setAbandoning] = useState<EnrolmentRow | null>(null);
     const [editing, setEditing] = useState<EnrolmentRow | null>(null);
 
-    const act = (row: EnrolmentRow, action: 'confirm' | 'promote' | 'cancel') => {
+    const act = (row: EnrolmentRow, action: 'promote' | 'cancel') => {
         if (action === 'cancel' && !window.confirm(`Annuler l'inscription de ${row.person.label} ? Personne n'est promu automatiquement.`)) return;
         router.post(route('enrolments.transition', { enrolment: row.id, action }), {}, { preserveScroll: true });
     };
@@ -325,14 +325,15 @@ export function EnrolmentList({
                         </div>
                         {row.can_update && references && row.status !== 'cancelled' && (
                             <div className="flex flex-wrap gap-1">
-                                {row.status === 'enrolled' && (
-                                    <Button type="button" size="sm" variant="outline" onClick={() => act(row, 'confirm')}>
-                                        Confirmer
-                                    </Button>
-                                )}
                                 {row.status === 'waitlisted' && (
-                                    <Button type="button" size="sm" variant="outline" onClick={() => act(row, 'promote')}>
-                                        Promouvoir
+                                    <Button
+                                        type="button"
+                                        size="sm"
+                                        variant="outline"
+                                        title="Une place s'est libérée : la personne devient inscrite (jamais automatiquement)."
+                                        onClick={() => act(row, 'promote')}
+                                    >
+                                        Passer en inscrit
                                     </Button>
                                 )}
                                 {(row.status === 'enrolled' || row.status === 'confirmed') && (

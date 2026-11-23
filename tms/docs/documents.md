@@ -64,6 +64,7 @@ s'impriment sur les documents émis ensuite.
 Sur la page de la session, étape **Stagiaires**, bloc **Documents** : un tableau des stagiaires (inscrits, confirmés,
 sortis) avec, pour chacun, sa convocation, son attestation et son certificat.
 
+- **Chaque type de document** (convocation, attestation, certificat) dit s'il part **tout seul** (badge « Automatique », avec la date prévue ou ce qui manque, par exemple confirmer la session) ou s'il est **à faire à la main**, et combien sont émis et envoyés. Quand il part seul, les boutons sont repliés sous « Émettre ou envoyer à la main » (seulement pour les envoyer plus tôt) et chaque case vide indique « Partira seul ».
 - **Émettre pour tous** émet le document de chaque stagiaire qui ne l'a pas encore (tout ou rien : si un document
   échoue, aucun n'est émis) ; **Émettre** sur une ligne l'émet pour ce stagiaire seulement.
 - **Envoyer à tous** envoie les documents émis et pas encore envoyés aux stagiaires qui ont une adresse e-mail ; le

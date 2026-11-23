@@ -158,11 +158,11 @@ Sur l'inscription : dates d'entrée (début de la session par défaut) et de sor
 
 ### Liste d'attente
 
-Quand une session inter est complète (inscrits et confirmés au nombre de places), l'inscription suivante passe **En attente**, avec son rang d'arrivée. Une désinscription ne fait monter **personne** automatiquement : **Promouvoir** fait passer un stagiaire en attente sur une place libre (refusé si la session est complète).
+Quand une session inter est complète (inscrits et confirmés au nombre de places), l'inscription suivante passe **En attente**, avec son rang d'arrivée. Une désinscription ne fait monter **personne** automatiquement : **Passer en inscrit** fait passer un stagiaire en attente sur une place libre (refusé si la session est complète).
 
 ### États d'une inscription
 
-*Inscrit*, *En attente*, *Confirmé* (**Confirmer**), *Abandon* (**Abandon**), *Annulé* (**Désinscrire** : retire le stagiaire du groupe et libère la place, sans promouvoir personne). **Modifier** change la date d'entrée, les heures prévues, la catégorie BPF, les besoins d'adaptation et les notes.
+*Inscrit* (suffit pour les convocations, présences, attestations et factures : il n'y a rien à confirmer), *En attente*, *Abandon* (**Abandon**), *Annulé* (**Désinscrire** : retire le stagiaire du groupe et libère la place, sans promouvoir personne). **Modifier** change la date d'entrée, les heures prévues, la catégorie BPF, les besoins d'adaptation et les notes.
 
 ### Prix par stagiaire
 

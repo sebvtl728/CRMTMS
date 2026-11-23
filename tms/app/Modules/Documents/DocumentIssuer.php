@@ -64,16 +64,20 @@ class DocumentIssuer
      * A per-trainee document (convocation, attestation, certificate) of an
      * enrolment, under the lock of its dossier.
      */
-    public function issueForEnrolment(?User $by, DocumentType $type, string $enrolmentId): Document
+    /**
+     * $completeOn: the certificates of the last day (13:30), the séances of
+     * that day not recorded yet counted as realised (Paperwork::enrolment).
+     */
+    public function issueForEnrolment(?User $by, DocumentType $type, string $enrolmentId, ?string $completeOn = null): Document
     {
         if (! $type->perEnrolment()) {
             throw new \InvalidArgumentException("{$type->value} is a document of the dossier.");
         }
         $first = Paperwork::enrolment($enrolmentId) ?? throw new UserFacingHttpException(404, 'Inscription introuvable.');
 
-        return DB::transaction(function () use ($by, $type, $enrolmentId, $first): Document {
+        return DB::transaction(function () use ($by, $type, $enrolmentId, $first, $completeOn): Document {
             Billing::lockDossier($first['dossier_id']);
-            $enrolment = Paperwork::enrolment($enrolmentId) ?? throw new UserFacingHttpException(404, 'Inscription introuvable.');
+            $enrolment = Paperwork::enrolment($enrolmentId, $completeOn) ?? throw new UserFacingHttpException(404, 'Inscription introuvable.');
             $dossier = Paperwork::dossier($enrolment['dossier_id']) ?? throw new UserFacingHttpException(404, 'Dossier introuvable.');
             $this->checkEnrolment($type, $enrolment, $dossier);
 
