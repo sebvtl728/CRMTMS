@@ -9,6 +9,7 @@ use App\Modules\Core\Users\User;
 use App\Modules\Crm\Visibility\CrmVisibility;
 use Brick\Math\BigInteger;
 use Brick\Math\RoundingMode;
+use Illuminate\Database\Query\Builder;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -24,6 +25,7 @@ use Illuminate\Support\Facades\DB;
 final class DasRevenue
 {
     /**
+     * @param  (\Closure(Builder): mixed)|null  $narrow
      * @return array{
      *     rows: list<array{das_id: string, das_label: string, quotes_cents: int, opportunities_cents: int, total_cents: int, target_cents: int|null, rate: float|null}>,
      *     totals: array{quotes_cents: int, opportunities_cents: int, total_cents: int, target_cents: int|null, targeted_total_cents: int, rate: float|null}
@@ -31,20 +33,24 @@ final class DasRevenue
      *
      * totals.rate compares the target with targeted_total_cents, the revenue
      * of the DAS that have a target only (null without any target).
+     *
+     * $narrow (dashboards: one commercial, a target) restricts the sales on
+     * the joined « opportunities »; the targets of the team are then left out.
      */
-    public static function for(User $user, Period $period): array
+    public static function for(User $user, Period $period, ?\Closure $narrow = null): array
     {
         $scope = RevenueSources::scope($user);
+        $narrowed = fn (Builder $q) => $narrow === null ? $q : tap($q, $narrow);
 
-        $quotes = self::sums(RevenueSources::quoteLines($user, $period)
+        $quotes = self::sums($narrowed(RevenueSources::quoteLines($user, $period))
             ->selectRaw(RevenueSources::QUOTE_DAS.' as das, sum(round(quote_lines.total_ht * 100)::bigint) as cents')
             ->groupByRaw(RevenueSources::QUOTE_DAS)
             ->get());
-        $opportunities = self::sums(RevenueSources::wonOpportunities($user, $period)
+        $opportunities = self::sums($narrowed(RevenueSources::wonOpportunities($user, $period))
             ->selectRaw('opportunities.das_id as das, sum(round(opportunities.amount * 100)::bigint) as cents')
             ->groupBy('opportunities.das_id')
             ->get());
-        $targets = self::sums(DB::table('revenue_targets')
+        $targets = $narrow !== null ? [] : self::sums(DB::table('revenue_targets')
             ->where('period_type', $period->type)
             ->whereDate('period_start', $period->start->toDateString())
             ->selectRaw('das_id as das, round(amount * 100)::bigint as cents')
