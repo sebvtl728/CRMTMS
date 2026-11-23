@@ -15,6 +15,7 @@ Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) ; ve
 ### Corrigé
 
 - **Tableaux de bord, Mois / direction** : la carte **CA signé par DAS** suit maintenant les filtres **Commercial** et **Cible**. Elle affichait toujours le CA de toute l'équipe, si bien qu'« Appliquer » semblait sans effet. Filtrée, elle ne montre plus l'objectif de l'équipe.
+- **Erreurs qui s'effaçaient** : le total « À traiter » du menu se chargeait en différé, et ce rechargement effaçait les erreurs lues par certains écrans (avertissement « Fiches similaires » et son bouton « Créer puis fusionner », devis, candidature, référentiels, règlements, fusion…). Il est maintenant calculé avec la page (gardé 60 s en cache).
 - **Messages en double** : le message d'une action (« Formation créée. »…) s'affichait à la fois en haut de la page et dans la bannière en bas à droite ; il ne reste que la bannière (52 pages).
 - **Barre de progression** des chargements : ses styles étaient refusés par la politique de sécurité du navigateur (erreur dans la console sur chaque page) ; ils reçoivent le jeton de la page.
 - **Textes anglais** des composants de base : info-bulle « Toggle Sidebar » du bouton de menu, libellés lus par les lecteurs d'écran (« Close », « More »…).

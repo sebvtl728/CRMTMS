@@ -61,7 +61,7 @@ it('answers every declared module source for an administrator', function () {
         ->and($rows->whereNull('count')->pluck('key')->all())->toBe([]);
 });
 
-it('defers the menu counter out of the page load', function () {
+it('sends the menu counter with the page: a deferred reload would wipe the validation errors the page shows', function () {
     $this->actingAs(admin(twoFactor: true))->get('/dashboard')->assertOk()
-        ->assertInertia(fn (AssertableInertia $p) => $p->missing('todo_total')->where('todo_menu', true));
+        ->assertInertia(fn (AssertableInertia $p) => $p->has('todo_total')->where('todo_menu', true));
 });

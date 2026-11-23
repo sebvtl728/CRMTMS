@@ -15,7 +15,6 @@ use App\Modules\Crm\Activities\TodoQuery;
 use App\Modules\Crm\Permissions as CrmPermissions;
 use App\Modules\Sessions\Trainers\Trainers;
 use Illuminate\Http\Request;
-use Inertia\Inertia;
 use Inertia\Middleware;
 
 class HandleInertiaRequests extends Middleware
@@ -84,7 +83,9 @@ class HandleInertiaRequests extends Middleware
             // The success and error messages of the last action, shown in a banner by every page.
             'flash' => fn () => ['status' => $request->session()->get('status'), 'error' => $request->session()->get('error')],
             'todo_menu' => fn () => $user !== null && TodoSources::any($user),
-            'todo_total' => Inertia::defer(fn () => $user !== null && TodoSources::any($user) ? TodoSources::total($user) : 0),
+            // With the page, never deferred: the reload of a deferred prop answers without the validation errors
+            // and wiped them from the screens that read them (duplicate warning, quote, candidature…). Cached 60 s.
+            'todo_total' => fn () => $user !== null && TodoSources::any($user) ? TodoSources::total($user) : 0,
             'candidates_badge' => fn () => $user !== null ? IdentifiedBadge::count($user) : 0,
             'backups_enabled' => config('tms.mode') !== 'multi',
             // « Bac à sable » in the menu: a local sandbox only (never a server).
