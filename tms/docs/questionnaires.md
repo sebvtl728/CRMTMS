@@ -25,8 +25,12 @@ Page de la session, étape « Stagiaires », bloc **Questionnaires** (droit de m
   parmi ceux qui n'ont pas encore répondu, puis répond. Sa réponse ferme aussi son lien e-mail.
 - **Inviter les nouveaux stagiaires** : un stagiaire ajouté après le lancement reçoit à son tour son invitation (les
   autres ne reçoivent rien de plus).
-- Si personne ne l'a lancé, le questionnaire à chaud part **automatiquement le lendemain du dernier jour** (rattrapage
-  jusqu'à 30 jours après la fin, jamais au-delà).
+- Si personne ne l'a lancé, le questionnaire à chaud part **automatiquement le dernier jour à 13 h 30**
+  (`tms:automation:last-day`) ; le lendemain matin et jusqu'à 30 jours après la fin, l'envoi de 7 h rattrape ceux qui
+  auraient manqué, jamais au-delà.
+- **Le bloc Questionnaires** de la session dit pour chacun (à chaud, à froid) s'il est **envoyé** (date, réponses) ou
+  quand il **part tout seul** (badge « Automatique ») ; lancer à la main, inviter les nouveaux et le QR code (pour le
+  faire remplir en salle) sont repliés sous « Envoyer à la main ».
 - **Envoyer le questionnaire à froid maintenant** : possible une fois la session terminée, sans attendre le délai.
 
 Une session annulée ne reçoit aucun questionnaire et ses liens ne fonctionnent plus.

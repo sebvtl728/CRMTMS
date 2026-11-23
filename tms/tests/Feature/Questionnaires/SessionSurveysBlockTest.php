@@ -3,6 +3,7 @@
 use App\Modules\Questionnaires\Answering\SurveyAnswers;
 use App\Modules\Questionnaires\Campaigns\SurveyLaunch;
 use App\Modules\Questionnaires\Results\SurveyResults;
+use App\Modules\Questionnaires\Settings\ColdDelay;
 use App\Modules\Questionnaires\Surveys\SurveyInvitation;
 use App\Modules\Sessions\Permissions as SessionsPermissions;
 use App\Modules\Sessions\Public\SessionBlocks;
@@ -89,4 +90,16 @@ it('shows the QR code page of the hot questionnaire to who sees the session', fu
 
     $this->actingAs(userWithPermissions(['crm.fiches.view']));
     $this->get("/sessions/{$session->id}/questionnaire-qr")->assertNotFound();
+});
+
+it('says when each questionnaire leaves by itself (no click needed)', function () {
+    [$session] = svSession('2026-08-31');
+    $props = collect(SessionBlocks::for($session->id, admin()))->firstWhere('key', 'questionnaires.session')['props'];
+
+    // Hot: the last day (13:30); cold: 3 months after it (default).
+    expect($props['hot_on'])->toBe('31/08/2026')
+        ->and($props['cold_on'])->toBe('30/11/2026');
+
+    ColdDelay::set(0);
+    expect(collect(SessionBlocks::for($session->id, admin()))->firstWhere('key', 'questionnaires.session')['props']['cold_on'])->toBeNull();
 });

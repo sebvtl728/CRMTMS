@@ -35,8 +35,8 @@ Schedule::command('tms:sessions:follow-ups')->dailyAt('06:30')->timezone('Europe
 // 0.11: the hot questionnaires nobody launched and the cold ones due today.
 Schedule::command('tms:questionnaires:daily')->dailyAt('07:00')->timezone('Europe/Paris')->withoutOverlapping()->onOneServer();
 Schedule::command('tms:automation:daily')->dailyAt('07:15')->timezone('Europe/Paris')->withoutOverlapping()->onOneServer();
-// The certificates of the last day of training, at the start of its afternoon (the afternoon counted).
-Schedule::command('tms:documents:last-day-certificates')->dailyAt('13:30')->timezone('Europe/Paris')->withoutOverlapping()->onOneServer();
+// The last day of training, at the start of its afternoon: the hot questionnaire, the certificates (the afternoon counted).
+Schedule::command('tms:automation:last-day')->dailyAt('13:30')->timezone('Europe/Paris')->withoutOverlapping()->onOneServer();
 // Inaltérabilité des factures (NF203) : la chaîne du journal et les archives PDF sont vérifiées chaque nuit ; une
 // rupture alerte l'administrateur de l'instance.
 Schedule::command('tms:finance:verify')->dailyAt('04:10')->timezone('Europe/Paris')->withoutOverlapping()->onOneServer()

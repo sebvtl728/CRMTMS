@@ -75,3 +75,24 @@ it('runs every morning at 7:00 Paris through tms:questionnaires:daily', function
     $event = collect(Schedule::events())->first(fn ($e) => str_contains((string) $e->command, 'tms:questionnaires:daily'));
     expect($event?->expression)->toBe('0 7 * * *')->and($event?->timezone)->toBe('Europe/Paris');
 });
+
+it('launches the hot questionnaire on the last day at 13:30, the next morning only catching up', function () {
+    [$today] = svSession('2026-12-01');
+    [$tomorrow] = svSession('2026-12-02');
+    $this->travelTo(CarbonImmutable::parse('2026-12-01 13:30', 'Europe/Paris'));
+
+    expect(app(DailySurveys::class)->runLastDay(CarbonImmutable::now('Europe/Paris')))->toBe(1)
+        ->and(SurveyCampaign::query()->where('training_session_id', $today->id)->where('kind', 'hot')->exists())->toBeTrue()
+        ->and(SurveyCampaign::query()->where('training_session_id', $tomorrow->id)->exists())->toBeFalse()
+        ->and(app(DailySurveys::class)->runLastDay(CarbonImmutable::now('Europe/Paris')))->toBe(0);
+
+    // The next morning: nothing left to launch for it.
+    $this->travelTo(CarbonImmutable::parse('2026-12-02 07:00', 'Europe/Paris'));
+    expect(svRun()['hot'])->toBe(0);
+});
+
+it('runs the automations of the last day at 13:30', function () {
+    $event = collect(Schedule::events())->first(fn ($e) => str_contains($e->command ?? '', 'tms:automation:last-day'));
+
+    expect($event)->not->toBeNull()->and($event->expression)->toBe('30 13 * * *');
+});

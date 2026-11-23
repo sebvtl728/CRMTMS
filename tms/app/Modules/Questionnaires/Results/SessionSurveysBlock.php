@@ -4,6 +4,7 @@ namespace App\Modules\Questionnaires\Results;
 
 use App\Modules\Core\Users\User;
 use App\Modules\Crm\Public\Fiches;
+use App\Modules\Questionnaires\Settings\ColdDelay;
 use App\Modules\Questionnaires\Surveys\SurveyCampaign;
 use App\Modules\Questionnaires\Surveys\SurveyInvitation;
 use App\Modules\Questionnaires\Surveys\SurveyResponse;
@@ -49,6 +50,9 @@ final class SessionSurveysBlock
                 // The trainees a launch e-mails (confirmation of the button).
                 'trainee_count' => count(Surveys::trainees($sessionId)),
                 'ended' => $session['ends_on'] <= CarbonImmutable::now('Europe/Paris')->toDateString(),
+                // When each one leaves by itself (hot: last day 13:30; cold: 7:00): the screen says so, nobody needs to click.
+                'hot_on' => CarbonImmutable::parse($session['ends_on'], 'Europe/Paris')->format('d/m/Y'),
+                'cold_on' => ColdDelay::months() === 0 ? null : CarbonImmutable::parse($session['ends_on'], 'Europe/Paris')->addMonthsNoOverflow(ColdDelay::months())->format('d/m/Y'),
                 'qr_url' => $campaigns->contains(fn (SurveyCampaign $c) => $c->qr_token_hash !== null) ? "/sessions/{$sessionId}/questionnaire-qr" : null,
                 'campaigns' => $campaigns->map(fn (SurveyCampaign $c) => [
                     'id' => $c->id,

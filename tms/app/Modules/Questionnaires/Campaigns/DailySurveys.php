@@ -8,8 +8,9 @@ use App\Modules\Sessions\Public\Surveys;
 use Carbon\CarbonImmutable;
 
 /**
+ * The hot questionnaire leaves on the last day at 13:30 (runLastDay).
  * Every morning, in one organisme: the hot questionnaire of the sessions
- * ended since yesterday that nobody launched, and the cold one of the
+ * ended since yesterday that nobody launched (catching up), and the cold one of the
  * sessions ended ColdDelay::months() months ago. A missed day is caught up
  * within CATCH_UP_DAYS, never later (no burst when the module starts); a
  * session gets each questionnaire once (one campaign per session and type).
@@ -32,6 +33,18 @@ final class DailySurveys
         }
 
         return ['hot' => $hot, 'cold' => $cold];
+    }
+
+    /**
+     * The last day of a session, at 13:30 (tms:automation:last-day): its hot
+     * questionnaire, unless launched already; the next morning only
+     * catches up the ones missed.
+     */
+    public function runLastDay(CarbonImmutable $now): int
+    {
+        $today = CarbonImmutable::parse($now->setTimezone('Europe/Paris')->toDateString(), 'Europe/Paris');
+
+        return $this->launchAll(SurveyCampaign::HOT, $today, $today);
     }
 
     private function launchAll(string $kind, CarbonImmutable $from, CarbonImmutable $to): int
