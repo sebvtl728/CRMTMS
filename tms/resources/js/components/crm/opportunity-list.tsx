@@ -1,5 +1,5 @@
 import { Badge } from '@/components/ui/badge';
-import { formatAmount, formatDay } from '@/lib/crm';
+import { formatAmount, formatDateTime, formatDay } from '@/lib/crm';
 import { Link } from '@inertiajs/react';
 
 export interface OpportunityRow {
@@ -16,6 +16,24 @@ export interface OpportunityRow {
     priority: string | null;
     responsible: string | null;
     created_at: string | null;
+    /** Earliest dated action still to do (null: none, or actions not visible). */
+    next_action: { type: string | null; subject: string | null; due_at: string; overdue: boolean } | null;
+}
+
+/** « Prochaine action » of an opportunity: type, subject and date, in red when late. */
+export function NextAction({ action, className = '' }: { action: OpportunityRow['next_action']; className?: string }) {
+    if (action === null) {
+        return <span className={`text-muted-foreground text-xs ${className}`}>Aucune action prévue</span>;
+    }
+    const what = [action.type, action.subject].filter(Boolean).join(' : ');
+
+    return (
+        <span className={`text-xs ${action.overdue ? 'text-destructive font-medium' : ''} ${className}`}>
+            {action.overdue ? 'En retard · ' : ''}
+            {formatDateTime(action.due_at)}
+            {what && ` · ${what}`}
+        </span>
+    );
 }
 
 export function StageBadge({ stage }: { stage: OpportunityRow['stage'] }) {
@@ -46,6 +64,10 @@ export function OpportunityCards({ rows, showAccount = true }: { rows: Opportuni
                         <p className="text-muted-foreground mt-1 text-xs">
                             {[o.das, o.priority, o.responsible ?? 'Sans responsable'].filter(Boolean).join(' · ')} · Clôture prévue :{' '}
                             {formatDay(o.expected_close_on)}
+                        </p>
+                        <p className="mt-1">
+                            <span className="text-muted-foreground text-xs">Prochaine action : </span>
+                            <NextAction action={o.next_action} />
                         </p>
                     </Link>
                 </li>

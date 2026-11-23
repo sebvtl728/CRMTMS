@@ -92,6 +92,11 @@ class KanbanController extends Controller
     {
         $updatable = CrmVisibility::allowedIds($user, Permissions::OPPORTUNITIES_UPDATE, $opportunities);
 
-        return $opportunities->map(fn (Opportunity $o) => [...OpportunityRows::row($o), 'can_update' => isset($updatable[(string) $o->id])])->values()->all();
+        $next = OpportunityRows::nextActions($opportunities, $user);
+
+        return $opportunities->map(fn (Opportunity $o) => [
+            ...OpportunityRows::row($o, $next[(string) $o->id] ?? null),
+            'can_update' => isset($updatable[(string) $o->id]),
+        ])->values()->all();
     }
 }

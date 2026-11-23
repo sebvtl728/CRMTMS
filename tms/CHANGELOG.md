@@ -5,12 +5,24 @@ Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) ; ve
 
 ## [Non publié]
 
+## [0.15.10] - 2026-11-23
+
 ### Ajouté
 
 - **Fiche formation** : **Objectif (BPF)** et **Spécialité NSF** (liste officielle des 93 groupes), préparation du bilan pédagogique et financier ; colonnes de l'export.
 - **Livret d'apprentissage (PDF)** sur la carte Alternance d'une candidature : déjà rempli (partenaires, équipe, parcours avec dispenses, planning, annexes de l'organisme, pages de suivi datées mois par mois, grilles de compétences, visites). Réglages dans Administration › Livret d'apprentissage.
 - **Grille de compétences** d'une formation (activités types, compétences, savoir-faire), saisie en texte dans la fiche.
 - **Programme (PDF)** de chaque formation, mis en page depuis sa fiche et **daté de sa dernière mise à jour** (Qualiopi, indicateur 1).
+
+## [0.15.9] - 2026-11-23
+
+### Ajouté
+
+- **Prochaine action** des opportunités : colonne de la liste et ligne des cartes du pipeline (date, type, objet ; en rouge si en retard), comme le demande le cahier des charges.
+
+### Modifié
+
+- **Fiche entreprise** : « Types » devient **Rôle(s)** (avec une aide) ; le **statut commercial** (prospect, client, inactif) ne s'affiche que pour une entreprise cliente ou sans rôle, plus pour un OPCO, un financeur ou un sous-traitant. Le rôle qui l'affiche se règle dans Administration › Référentiels (« Rôle client »).
 
 ## [0.15.8] - 2026-11-23
 
