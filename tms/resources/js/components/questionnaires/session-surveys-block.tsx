@@ -122,11 +122,18 @@ export function SessionSurveysBlock({ session_id, can_launch, trainee_count, end
                     sent={cold ? `Envoyé le ${cold.opened_on} · ${cold.results.answered}/${cold.results.invited} réponses` : null}
                     auto={cold_on ? `Part tout seul par e-mail le ${cold_on} à 7 h. Vous n'avez rien à faire.` : null}
                     manual={
-                        can_launch && ended && (!cold || cold.open) ? (
-                            <Button size="sm" variant="outline" disabled={busy !== null} onClick={() => launch('cold')}>
-                                {busy === 'cold' ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
-                                {cold ? 'Inviter les nouveaux stagiaires' : 'Envoyer maintenant'}
-                            </Button>
+                        can_launch && (!cold || cold.open) ? (
+                            <>
+                                <Button size="sm" variant="outline" disabled={busy !== null || !ended} onClick={() => launch('cold')}>
+                                    {busy === 'cold' ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+                                    {cold ? 'Inviter les nouveaux stagiaires' : 'Envoyer maintenant'}
+                                </Button>
+                                <p className="text-muted-foreground">
+                                    {ended
+                                        ? "En cas de problème d'envoi automatique, ou pour ne pas attendre le délai."
+                                        : 'Possible à partir du dernier jour de la session.'}
+                                </p>
+                            </>
                         ) : null
                     }
                 />
