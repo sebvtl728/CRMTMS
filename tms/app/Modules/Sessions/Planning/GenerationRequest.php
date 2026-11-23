@@ -12,7 +12,8 @@ use Illuminate\Validation\ValidationException;
 /**
  * What the « Générer les séances » assistant asks: days of the week (ISO,
  * 1 = Monday … 7 = Sunday), one or more slots of the day (« H:i », a break
- * in minutes, not overlapping), a period within the session's dates
+ * in minutes, not overlapping on a common day; « days »: the weekdays of
+ * that slot only, among the ticked ones — empty: every ticked day), a period within the session's dates
  * (default: the module's, else the session's), trainer, room, free place.
  * « until » = hours: no end date, the assistant goes on from the start
  * until the planned hours of the module are reached (at the latest the
@@ -25,7 +26,7 @@ final readonly class GenerationRequest
 
     /**
      * @param  list<int>  $weekdays
-     * @param  list<array{start: string, end: string, break_minutes: int}>  $slots
+     * @param  list<array{start: string, end: string, break_minutes: int, days: list<int>}>  $slots  days: empty = every weekday
      */
     public function __construct(
         public array $weekdays,
@@ -73,6 +74,7 @@ final readonly class GenerationRequest
                 'start' => self::time($slot['start'] ?? null),
                 'end' => self::time($slot['end'] ?? null),
                 'break_minutes' => $blank($slot['break_minutes'] ?? null) ?? '0',
+                'days' => is_array($slot['days'] ?? null) ? array_values($slot['days']) : [],
             ] : $slot, $data['slots']));
         }
         $tenant = app(TenantContext::class)->id();
@@ -85,6 +87,8 @@ final readonly class GenerationRequest
             'slots.*.start' => ['bail', 'required', 'regex:/^([01]\d|2[0-3]):[0-5]\d$/'],
             'slots.*.end' => ['bail', 'required', 'regex:/^([01]\d|2[0-3]):[0-5]\d$/'],
             'slots.*.break_minutes' => ['bail', 'integer', 'between:0,1439'],
+            'slots.*.days' => ['array'],
+            'slots.*.days.*' => ['integer', 'between:1,7'],
             'from' => ['bail', 'required', 'date_format:Y-m-d'],
             'to' => ['bail', 'required', 'date_format:Y-m-d'],
             'trainer_id' => ['bail', 'nullable', 'uuid', Rule::exists('trainers', 'id')->where('tenant_id', $tenant)->whereNull('deleted_at')->where('active', true)],
@@ -103,6 +107,7 @@ final readonly class GenerationRequest
             'slots.*.start.regex' => 'Heure invalide (ex. 09:00).',
             'slots.*.end.regex' => 'Heure invalide (ex. 09:00).',
             'slots.*.break_minutes.*' => 'La pause doit être un nombre entier de minutes.',
+            'slots.*.days.*' => 'Jour de la semaine inconnu.',
             'from.required' => 'Indiquez le début de la période.',
             'from.*' => 'Date de début invalide.',
             'to.required' => 'Indiquez la fin de la période.',
@@ -115,10 +120,18 @@ final readonly class GenerationRequest
             $errors = $v->errors();
             if (is_array($data['slots'])) {
                 $previous = [];
+                $ticked = is_array($data['weekdays']) ? array_map('intval', $data['weekdays']) : [];
                 foreach ($data['slots'] as $i => $slot) {
                     if (! is_array($slot) || $errors->hasAny(["slots.{$i}.start", "slots.{$i}.end"])) {
                         continue;
                     }
+                    $days = array_map('intval', is_array($slot['days'] ?? null) ? $slot['days'] : []);
+                    if (array_diff($days, $ticked) !== [] && ! $errors->has("slots.{$i}.days")) {
+                        $errors->add("slots.{$i}.days", 'Cochez aussi ce jour dans les jours de la semaine.');
+
+                        continue;
+                    }
+                    $days = $days === [] ? $ticked : $days;
                     $length = Seances::minutesBetween((string) $slot['start'], (string) $slot['end']);
                     if ($length <= 0) {
                         $errors->add("slots.{$i}.end", 'La fin du créneau doit suivre son début.');
@@ -128,14 +141,14 @@ final readonly class GenerationRequest
                     if (! $errors->has("slots.{$i}.break_minutes") && (int) $slot['break_minutes'] >= $length) {
                         $errors->add("slots.{$i}.break_minutes", 'La pause doit être plus courte que le créneau.');
                     }
-                    foreach ($previous as [$start, $end]) {
-                        if ($slot['start'] < $end && $slot['end'] > $start) {
+                    foreach ($previous as [$start, $end, $otherDays]) {
+                        if ($slot['start'] < $end && $slot['end'] > $start && array_intersect($days, $otherDays) !== []) {
                             $errors->add("slots.{$i}.start", 'Les créneaux ne doivent pas se chevaucher.');
 
                             break;
                         }
                     }
-                    $previous[] = [$slot['start'], $slot['end']];
+                    $previous[] = [$slot['start'], $slot['end'], $days];
                 }
             }
             if ($errors->hasAny(['from', 'to'])) {
@@ -157,7 +170,7 @@ final readonly class GenerationRequest
         });
         $validator->validate();
 
-        /** @var list<array{start: string, end: string, break_minutes: string|int}> $slots */
+        /** @var list<array{start: string, end: string, break_minutes: string|int, days: list<int|string>}> $slots */
         $slots = $data['slots'];
         usort($slots, fn (array $a, array $b) => strcmp($a['start'], $b['start']));
         $weekdays = array_values(array_unique(array_map('intval', (array) $data['weekdays'])));
@@ -165,7 +178,8 @@ final readonly class GenerationRequest
 
         return new self(
             $weekdays,
-            array_map(fn (array $s) => ['start' => $s['start'], 'end' => $s['end'], 'break_minutes' => (int) $s['break_minutes']], $slots),
+            array_map(fn (array $s) => ['start' => $s['start'], 'end' => $s['end'], 'break_minutes' => (int) $s['break_minutes'],
+                'days' => array_values(array_unique(array_map('intval', $s['days'])))], $slots),
             (string) $data['from'],
             (string) $data['to'],
             is_string($data['trainer_id']) ? $data['trainer_id'] : null,

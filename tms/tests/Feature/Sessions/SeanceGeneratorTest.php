@@ -293,3 +293,47 @@ it('needs planned hours to estimate the end', function () {
     expect(fn () => genRequest($module, genInput('2026-09-01', '', ['until' => 'hours'])))
         ->toThrow(fn (ValidationException $e) => expect($e->errors())->toBe(['until' => ['Ce module n\'a pas d\'heures prévues : indiquez la date de fin.']]));
 });
+
+it('gives a slot its own days of the week: another timetable on Fridays', function () {
+    $session = plSession('2026-09-01', '2026-09-30');
+    $module = plModule($session);
+    $input = genInput('2026-09-07', '2026-09-11', ['weekdays' => [1, 2, 3, 4, 5], 'slots' => [
+        ['start' => '09:00', 'end' => '12:30', 'break_minutes' => 0, 'days' => [1, 2, 3, 4]],
+        ['start' => '13:30', 'end' => '17:00', 'break_minutes' => 0, 'days' => [1, 2, 3, 4]],
+        ['start' => '08:30', 'end' => '12:00', 'break_minutes' => 0, 'days' => [5]],
+    ]]);
+
+    $kept = array_values(array_filter(app(SeanceGenerator::class)->preview($module, genRequest($module, $input))->seances, fn (array $s) => $s['skipped_reason'] === null));
+
+    // Mon. 7 → Thu. 10: two slots a day; Fri. 11: the morning slot of Friday only.
+    expect($kept)->toHaveCount(9)
+        ->and(array_values(array_filter($kept, fn (array $s) => $s['date'] === '2026-09-11')))->toBe([
+            ['date' => '2026-09-11', 'start' => '08:30', 'end' => '12:00', 'minutes' => 210, 'skipped_reason' => null],
+        ]);
+});
+
+it('lets two slots overlap when they never share a day, never otherwise', function () {
+    $session = plSession('2026-09-01', '2026-09-30');
+    $module = plModule($session);
+
+    $apart = genInput(overrides: ['weekdays' => [1, 5], 'slots' => [
+        ['start' => '09:00', 'end' => '12:30', 'break_minutes' => 0, 'days' => [1]],
+        ['start' => '08:30', 'end' => '12:00', 'break_minutes' => 0, 'days' => [5]],
+    ]]);
+    expect(genRequest($module, $apart)->slots)->toHaveCount(2);
+
+    $together = genInput(overrides: ['weekdays' => [1, 5], 'slots' => [
+        ['start' => '09:00', 'end' => '12:30', 'break_minutes' => 0],
+        ['start' => '08:30', 'end' => '12:00', 'break_minutes' => 0, 'days' => [5]],
+    ]]);
+    expect(fn () => genRequest($module, $together))->toThrow(fn (ValidationException $e) => expect($e->errors()['slots.1.start'][0])->toBe('Les créneaux ne doivent pas se chevaucher.'));
+});
+
+it('refuses a slot on a day not ticked', function () {
+    $session = plSession('2026-09-01', '2026-09-30');
+    $module = plModule($session);
+
+    $input = genInput(overrides: ['weekdays' => [1, 2], 'slots' => [['start' => '09:00', 'end' => '12:00', 'break_minutes' => 0, 'days' => [5]]]]);
+
+    expect(fn () => genRequest($module, $input))->toThrow(fn (ValidationException $e) => expect($e->errors()['slots.0.days'][0])->toBe('Cochez aussi ce jour dans les jours de la semaine.'));
+});

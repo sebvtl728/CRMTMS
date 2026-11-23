@@ -81,6 +81,10 @@ final class SeanceGenerator
             }
             $date = $day->toDateString();
             foreach ($request->slots as $slot) {
+                // A slot of some days only (« another timetable on Fridays »).
+                if ($slot['days'] !== [] && ! in_array($day->isoWeekday(), $slot['days'], true)) {
+                    continue;
+                }
                 $reason = match (true) {
                     ! $monthOpen($date) => 'Mois clôturé',
                     isset($holidays[$date]) => "Férié : {$holidays[$date]}",
