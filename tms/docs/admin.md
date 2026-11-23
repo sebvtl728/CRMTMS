@@ -422,8 +422,9 @@ Guide utilisateur : `admissions.md`.
 - Droit « Consulter les résultats des questionnaires » : par défaut administrateur, direction, responsable de DAS,
   assistant. Il est aussi exigé (sur tout l'organisme) pour télécharger l'export RGPD d'une personne.
 - **Modèles d'e-mails** : « Questionnaire de satisfaction à chaud », « à froid », « entreprise » (`{lien}` obligatoire).
-- La commande `tms:questionnaires:daily` (7 h, heure de Paris) lance les questionnaires à chaud non lancés (lendemain du
-  dernier jour) et les questionnaires à froid dus, organisme par organisme.
+- Le questionnaire à chaud part le **dernier jour à 13 h 30** (`tms:automation:last-day`, avec les attestations) ; la
+  commande `tms:questionnaires:daily` (7 h, heure de Paris) rattrape les questionnaires à chaud non lancés et lance les
+  questionnaires à froid dus, organisme par organisme.
 
 ## 23. Automatismes et « À traiter »
 
@@ -440,7 +441,7 @@ Guide utilisateur : `admissions.md`.
     *N* jours (3 par défaut, 0 = désactivé), au plus *M* fois (2 par défaut, de 1 à 5). Chaque relance envoie un
     **nouveau lien** qui remplace le précédent ; pas de relance si le signataire a demandé son code dans les 24 h.
   - **Attestations et certificats de réalisation** (désactivé par défaut) : émis et envoyés **le dernier jour de
-    formation à 13 h 30** (`tms:documents:last-day-certificates`) aux stagiaires encore là (ni sortis, ni notés absents
+    formation à 13 h 30** (`tms:automation:last-day`) aux stagiaires encore là (ni sortis, ni notés absents
     ce jour-là) : les séances du jour pas encore saisies (l'après-midi) comptent comme réalisées ; un stagiaire qui part
     l'après-midi : annuler puis réémettre à la main. Les autres (sessions sans séances, oubliés) : le matin qui suit la
     **clôture de tous les mois** de la session (heures définitives ; jamais à 0 h réalisée). Un document annulé n'est

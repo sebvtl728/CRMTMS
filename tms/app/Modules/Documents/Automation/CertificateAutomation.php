@@ -71,7 +71,7 @@ final class CertificateAutomation
     }
 
     /**
-     * The last day of a session, at 13:30 (tms:documents:last-day-certificates):
+     * The last day of a session, at 13:30 (tms:automation:last-day):
      * each trainee still there gets both documents, the séances of the day
      * not recorded yet counted as realised (the afternoon ahead). Left out:
      * a trainee who left, entered absent that day, in the trash or

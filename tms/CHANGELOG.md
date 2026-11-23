@@ -5,6 +5,11 @@ Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) ; ve
 
 ## [Non publié]
 
+### Modifié
+
+- **Questionnaire à chaud** : part tout seul **le dernier jour à 13 h 30** (avec les attestations, commande `tms:automation:last-day`) ; l'envoi du lendemain 7 h ne fait plus que rattraper.
+- **Bloc Questionnaires de la session** : chaque questionnaire dit s'il est envoyé (date, réponses) ou quand il part tout seul (badge « Automatique ») ; « Lancer », « Inviter les nouveaux » et le QR code sont repliés sous « Envoyer à la main ».
+
 ## [0.15.6] - 2026-11-23
 
 ### Modifié
