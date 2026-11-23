@@ -102,6 +102,9 @@ Un formateur **désactivé** mais toujours lié à son compte garde « Mon plann
 
 La **page d'une session** (onglet **Session**) montre ses informations, les **places restantes** d'une session inter, les inscrits regroupés par dossier et la liste d'attente dans son ordre. Les noms des inscrits de tous les dossiers sont visibles ; le prix, les financements et le contractant d'un dossier ne le sont qu'avec le droit de consulter ce dossier.
 
+
+**Date de fin estimée** : à la saisie du début, la fin est proposée d'après les heures (heures prévues, sinon somme des modules, sinon durée de la formation) à 7 h par jour ouvré, week-ends et jours fériés exclus. Elle suit le début tant qu'elle n'a pas été modifiée à la main. C'est une estimation : pour une alternance ou un planning irrégulier, ajustez-la.
+
 ## 2. Les dossiers
 
 Un **dossier** de formation porte la vente : qui achète, quoi, à quel prix, et qui finance. Écran **Dossiers** : la liste (numéro, contractant, formations, prix HT, **reste à financer**, responsable, état), ses filtres, son export CSV, bouton « Exporter (.csv) » (droit « Exporter »).

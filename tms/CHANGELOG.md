@@ -21,6 +21,9 @@ Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) ; ve
 
 - **Répertoire RNCP** (données ouvertes de France compétences, rechargées chaque semaine) : sur la fiche formation, la fiche officielle du code saisi (intitulé, niveau, état, fin d'enregistrement) et **Reprendre du RNCP** (objectif BPF, spécialité NSF, grille de compétences par blocs) ; « À traiter » signale les certifications inactives, inconnues ou finissant dans 6 mois.
 - **Tableaux de bord, Mois / direction** : la carte **CA signé par DAS** suit maintenant les filtres **Commercial** et **Cible**. Elle affichait toujours le CA de toute l'équipe, si bien qu'« Appliquer » semblait sans effet. Filtrée, elle ne montre plus l'objectif de l'équipe.
+### Ajouté
+
+- **Date de fin estimée** : à la création d'une session, et dans l'assistant « Créer le dossier » d'un devis, saisir le début propose la fin d'après les heures, à 7 h par jour ouvré, week-ends et jours fériés exclus. Elle reste modifiable et n'écrase jamais une fin saisie à la main.
 
 ## [0.15.14] - 2026-11-23
 

@@ -158,3 +158,75 @@ export async function sendJson<T>(method: 'GET' | 'POST' | 'DELETE', url: string
         message: response.ok ? null : (json?.message ?? 'Une erreur est survenue.'),
     };
 }
+
+/** Hours of a training day: the end of a session is estimated from its hours (as Training::HOURS_PER_DAY). */
+export const HOURS_PER_DAY = 7;
+
+/** « 21 », « 7,5 », « 21.00 » or « 10 h 30 » as hours; NaN otherwise. */
+export function parseHours(value: string | null | undefined): number {
+    const text = (value ?? '').trim();
+    const hm = text.match(/^(\d+)\s*h\s*(\d{1,2})?$/i);
+    if (hm) return Number(hm[1]) + (hm[2] ? Number(hm[2]) / 60 : 0);
+
+    return Number.parseFloat(text.replace(/\s/g, '').replace(',', '.'));
+}
+
+/** French public holidays of a year (as Sessions\Planning\PublicHolidays), « YYYY-MM-DD ». */
+function holidays(year: number): Set<string> {
+    // Easter Sunday (anonymous Gregorian algorithm).
+    const a = year % 19;
+    const b = Math.floor(year / 100);
+    const c = year % 100;
+    const d = Math.floor(b / 4);
+    const e = b % 4;
+    const f = Math.floor((b + 8) / 25);
+    const g = Math.floor((b - f + 1) / 3);
+    const h = (19 * a + b - d - g + 15) % 30;
+    const i = Math.floor(c / 4);
+    const k = c % 4;
+    const l = (32 + 2 * e + 2 * i - h - k) % 7;
+    const m = Math.floor((a + 11 * h + 22 * l) / 451);
+    const month = Math.floor((h + l - 7 * m + 114) / 31);
+    const day = ((h + l - 7 * m + 114) % 31) + 1;
+    const easter = Date.UTC(year, month - 1, day);
+    const shift = (days: number) => new Date(easter + days * 86_400_000).toISOString().slice(0, 10);
+
+    return new Set([
+        `${year}-01-01`,
+        shift(1),
+        `${year}-05-01`,
+        `${year}-05-08`,
+        shift(39),
+        shift(50),
+        `${year}-07-14`,
+        `${year}-08-15`,
+        `${year}-11-01`,
+        `${year}-11-11`,
+        `${year}-12-25`,
+    ]);
+}
+
+/**
+ * The approximate last day of a session starting on $start for $hours: one
+ * day of HOURS_PER_DAY hours per working day (Monday to Friday, French public
+ * holidays left out). Null when the start or the hours are unusable.
+ */
+export function estimateEndDate(start: string, hours: number): string | null {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(start) || !Number.isFinite(hours) || hours <= 0 || hours > 5000) return null;
+    let days = Math.ceil(hours / HOURS_PER_DAY);
+    let date = new Date(`${start}T00:00:00Z`);
+    const cache = new Map<number, Set<string>>();
+    const off = (d: Date) => {
+        const year = d.getUTCFullYear();
+        if (!cache.has(year)) cache.set(year, holidays(year));
+        return d.getUTCDay() === 0 || d.getUTCDay() === 6 || cache.get(year)!.has(d.toISOString().slice(0, 10));
+    };
+    while (off(date)) date = new Date(date.getTime() + 86_400_000);
+    days -= 1;
+    while (days > 0) {
+        date = new Date(date.getTime() + 86_400_000);
+        if (!off(date)) days -= 1;
+    }
+
+    return date.toISOString().slice(0, 10);
+}
