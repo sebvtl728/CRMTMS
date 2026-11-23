@@ -35,6 +35,8 @@ interface ShowProps {
         id: string;
         code: string | null;
         rncp_code: string | null;
+        centre_hours: string | null;
+        company_hours: string | null;
         bpf_objective: string | null;
         nsf: string | null;
         updated_on: string;
@@ -127,6 +129,10 @@ export default function TrainingShowPage({ training, brochures, blocks, can, sta
         ['Compétences (livret)', training.competences_count > 0 ? `${training.competences_count} compétence(s)` : '-'],
         ['DAS', training.das ?? '-'],
         ['Durée', duration || '-'],
+        [
+            'Heures en centre / en entreprise',
+            training.centre_hours || training.company_hours ? `${training.centre_hours ?? '-'} h / ${training.company_hours ?? '-'} h` : '-',
+        ],
         ['Modalité', training.modalities.length > 0 ? training.modalities.join(', ') : '-'],
         ['Tarif entreprise HT', euros(training.price_company)],
         ['Tarif particulier HT', euros(training.price_individual)],

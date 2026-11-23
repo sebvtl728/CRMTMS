@@ -26,6 +26,8 @@ use Illuminate\Support\Facades\Auth;
  * @property string $das_id
  * @property string|null $duration_hours numeric(6,2) as a string
  * @property string|null $duration_days numeric(5,2) as a string
+ * @property string|null $centre_hours numeric(6,2), hours in the centre (alternance)
+ * @property string|null $company_hours numeric(6,2), hours in the company (alternance, placements)
  * @property string|null $audience
  * @property string|null $prerequisites
  * @property string|null $price_company numeric(12,2) as a string, HT per trainee
@@ -53,6 +55,9 @@ use Illuminate\Support\Facades\Auth;
  */
 class Training extends Model
 {
+    /** Hours of a training day: converts a duration in hours to days and back (form, assistant). */
+    public const HOURS_PER_DAY = 7;
+
     use Auditable, BelongsToTenant, HasUuids, SoftDeletes;
 
     /** @var list<string> */
@@ -67,7 +72,7 @@ class Training extends Model
 
     /** @var list<string> */
     protected $fillable = [
-        'code', 'title', 'das_id', 'duration_hours', 'duration_days', 'audience', 'prerequisites',
+        'code', 'title', 'das_id', 'duration_hours', 'duration_days', 'centre_hours', 'company_hours', 'audience', 'prerequisites',
         'price_company', 'price_individual', 'is_active',
         'description', 'objectives', 'methods', 'evaluation', 'sanction', 'accessibility', 'access_terms', 'results', 'rncp_code', 'bpf_objective', 'nsf_code', 'competences',
     ];
@@ -101,6 +106,8 @@ class Training extends Model
         return [
             'duration_hours' => 'decimal:2',
             'duration_days' => 'decimal:2',
+            'centre_hours' => 'decimal:2',
+            'company_hours' => 'decimal:2',
             'price_company' => 'decimal:2',
             'price_individual' => 'decimal:2',
             'is_active' => 'boolean',

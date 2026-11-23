@@ -5,6 +5,14 @@ Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) ; ve
 
 ## [Non publié]
 
+## [0.15.13] - 2026-11-23
+
+### Ajouté
+
+- **Fiche formation** : **heures en centre** et **heures en entreprise** (formulaire, page, export, programme PDF) ; durée en heures et en jours remplies l'une depuis l'autre (7 h par jour) ; bouton **Répartir les heures** entre les modules.
+- **Opportunité** : avertissement quand le mode de financement choisi n'est pas prévu au catalogue pour une de ses formations, dans le formulaire (en direct) et sur la page. Il ne bloque rien.
+- **Assistant IA du catalogue** : il propose aussi heures en centre et en entreprise, tarifs HT, et la durée manquante (heures ou jours) ; les heures sont réparties entre les modules au lieu d'être mises sur le premier.
+
 ## [0.15.12] - 2026-11-23
 
 ### Modifié

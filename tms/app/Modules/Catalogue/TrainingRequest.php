@@ -22,7 +22,7 @@ class TrainingRequest extends FormRequest
 
     public const MAX_MODULES = 30;
 
-    public const DECIMALS = ['duration_hours', 'duration_days', 'price_company', 'price_individual'];
+    public const DECIMALS = ['duration_hours', 'duration_days', 'centre_hours', 'company_hours', 'price_company', 'price_individual'];
 
     public function authorize(): bool
     {
@@ -169,6 +169,8 @@ class TrainingRequest extends FormRequest
             'das_id' => ['required', ...self::reference(ReferenceList::Das, array_filter([$current?->das_id]))],
             'duration_hours' => ['nullable', 'numeric', 'decimal:0,2', 'min:0', 'max:9999.99'],
             'duration_days' => ['nullable', 'numeric', 'decimal:0,2', 'min:0', 'max:999.99'],
+            'centre_hours' => ['nullable', 'numeric', 'decimal:0,2', 'min:0', 'max:9999.99'],
+            'company_hours' => ['nullable', 'numeric', 'decimal:0,2', 'min:0', 'max:9999.99'],
             'audience' => ['nullable', 'string', 'max:5000'],
             'prerequisites' => ['nullable', 'string', 'max:5000'],
             'price_company' => ['nullable', 'numeric', 'decimal:0,2', 'min:0', 'max:9999999999.99'],

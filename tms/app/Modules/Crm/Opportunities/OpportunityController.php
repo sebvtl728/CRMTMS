@@ -152,6 +152,7 @@ class OpportunityController extends Controller
             'activities' => ActivityRows::rows(CrmVisibility::activities(Activity::query(), $user)->with(ActivityRows::WITH)
                 ->where('opportunity_id', $opportunity->id)
                 ->orderByDesc('happened_at')->orderByDesc('id')->limit(100)->get(), $user),
+            'funding_warning' => OpportunityTrainings::fundingWarning($opportunity),
             'training_summary' => [
                 'lines' => OpportunityTrainings::lines($opportunity),
                 'estimate' => OpportunityTrainings::proposal($opportunity),

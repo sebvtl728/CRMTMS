@@ -93,6 +93,12 @@
                 <td>{{ implode(' - ', array_filter([$t['duration_hours'] !== null ? $hours($t['duration_hours']).' h' : null, $t['duration_days'] !== null ? $hours($t['duration_days']).' jour(s)' : null])) }}</td>
             </tr>
         @endif
+        @if ($t['centre_hours'] !== null || $t['company_hours'] !== null)
+            <tr>
+                <td class="k">Répartition</td>
+                <td>{{ implode(' - ', array_filter([$t['centre_hours'] !== null ? $hours($t['centre_hours']).' h en centre' : null, $t['company_hours'] !== null ? $hours($t['company_hours']).' h en entreprise' : null])) }}</td>
+            </tr>
+        @endif
         @if ($t['price_company'] !== null)
             <tr><td class="k">Tarif entreprise</td><td>{{ $money($t['price_company']) }} par stagiaire</td></tr>
         @endif
