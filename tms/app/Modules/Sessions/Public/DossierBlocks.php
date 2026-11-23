@@ -26,25 +26,41 @@ final class DossierBlocks
     /** @var array<string, Closure(string, User): (array{title: string, empty: string, rows: list<array<string, mixed>>, component?: string, props?: array<string, mixed>}|null)> */
     private array $blocks = [];
 
+    /** @var array<string, int> */
+    private array $positions = [];
+
     /**
      * @param  string  $key  unique name (module.block); a second registration replaces the first
      * @param  Closure(string, User): (array{title: string, empty: string, rows: list<array<string, mixed>>, component?: string, props?: array<string, mixed>}|null)  $block
+     * @param  int  $position  order on the page, smallest first (the dossier's life: candidature, documents, then billing)
      */
-    public static function register(string $key, Closure $block): void
+    public static function register(string $key, Closure $block, int $position = 100): void
     {
         self::registry()->blocks[$key] = $block;
+        self::registry()->positions[$key] = $position;
+    }
+
+    /** The position a block was registered with; null when it is not registered. */
+    public static function positionOf(string $key): ?int
+    {
+        return self::registry()->positions[$key] ?? null;
     }
 
     /**
-     * The blocks of the dossier $dossierId that $viewer may see, in the order
-     * of registration.
+     * The blocks of the dossier $dossierId that $viewer may see, by position,
+     * then in the order of registration.
      *
      * @return list<array{key: string, title: string, empty: string, rows: list<array<string, mixed>>, component?: string, props?: array<string, mixed>}>
      */
     public static function for(string $dossierId, User $viewer): array
     {
         $blocks = [];
-        foreach (self::registry()->blocks as $key => $block) {
+        $registry = self::registry();
+        $keys = array_keys($registry->blocks);
+        $rank = array_flip($keys);
+        usort($keys, fn (string $a, string $b) => [$registry->positions[$a], $rank[$a]] <=> [$registry->positions[$b], $rank[$b]]);
+        foreach ($keys as $key) {
+            $block = $registry->blocks[$key];
             $data = $block($dossierId, $viewer);
             if ($data !== null) {
                 $blocks[] = ['key' => $key, ...$data];

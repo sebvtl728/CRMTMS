@@ -9,6 +9,7 @@ use App\Modules\Sessions\Permissions;
 use App\Modules\Sessions\Resources\Room;
 use App\Modules\Sessions\Sessions\SessionKind;
 use App\Modules\Sessions\Sessions\SessionLocation;
+use App\Modules\Sessions\Sessions\SessionPlace;
 use App\Modules\Sessions\Sessions\TrainingSession;
 use App\Modules\Sessions\SessionsVisibility;
 use App\Modules\Sessions\Trainers\Trainers;
@@ -121,8 +122,9 @@ final class SeanceCalendar
         }
 
         // Never the address of an individual session: it may be the trainee's home.
-        return $session !== null && $session->kind !== SessionKind::Individual->value && $session->location_kind === SessionLocation::Address->value
-            ? $session->location_text
+        return $session !== null && $session->kind !== SessionKind::Individual->value
+            && in_array($session->location_kind, [SessionLocation::Address->value, SessionLocation::Company->value], true)
+            ? SessionPlace::of($session)
             : null;
     }
 }

@@ -71,7 +71,7 @@ final class DossierFromQuote
 
     private const MAX_TRAINEES = 200;
 
-    private const NEW_SESSION_FIELDS = ['title', 'kind', 'starts_on', 'ends_on', 'modality_id', 'planned_hours', 'location_kind', 'location_text', 'capacity'];
+    private const NEW_SESSION_FIELDS = ['title', 'kind', 'starts_on', 'ends_on', 'modality_id', 'planned_hours', 'location_kind', 'location_text', 'location_company_id', 'capacity'];
 
     private const NEW_PERSON_FIELDS = ['civility', 'first_name', 'last_name', 'email', 'phone', 'mobile', 'birth_date'];
 

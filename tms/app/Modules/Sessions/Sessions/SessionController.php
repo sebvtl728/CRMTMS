@@ -217,6 +217,7 @@ class SessionController extends Controller
                 'planned_hours' => SessionRows::hours($s->planned_hours),
                 'location_kind' => $s->location_kind,
                 'location_text' => $s->location_text,
+                'location_company_id' => $s->location_company_id,
                 'capacity' => $s->capacity,
                 'responsible_user_id' => $s->responsible_user_id,
                 'status' => in_array($s->status, SessionStatus::SETTABLE, true) ? $s->status->value : SessionStatus::Planned->value,
@@ -371,6 +372,7 @@ class SessionController extends Controller
             'modality' => SessionListQuery::reference(ReferenceList::TrainingModality, $current === null ? [] : [$current->modality_id]),
             'default_modality' => SessionWriter::defaultModalityId(),
             'location' => SessionLocation::options(),
+            'location_companies' => SessionPlace::companyOptions($current?->location_company_id),
             'status' => array_map(fn (SessionStatus $s) => $s->toOption(), SessionStatus::SETTABLE),
             'responsible' => SessionListQuery::responsible($current?->responsible_user_id),
         ];

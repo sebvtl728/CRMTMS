@@ -13,6 +13,7 @@ use App\Modules\Sessions\Planning\PlanningRows;
 use App\Modules\Sessions\Planning\Seance;
 use App\Modules\Sessions\Resources\Room;
 use App\Modules\Sessions\Sessions\SessionLocation;
+use App\Modules\Sessions\Sessions\SessionPlace;
 use App\Modules\Sessions\Sessions\TrainingSession;
 use App\Modules\Sessions\Trainers\Trainer;
 use Carbon\CarbonImmutable;
@@ -146,6 +147,6 @@ final class DayBeforeReminders
             return 'À distance';
         }
 
-        return $session->location_text;
+        return SessionPlace::of($session);
     }
 }

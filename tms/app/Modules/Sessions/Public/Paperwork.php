@@ -13,6 +13,7 @@ use App\Modules\Sessions\Enrolments\Enrolment;
 use App\Modules\Sessions\Enrolments\EnrolmentStatus;
 use App\Modules\Sessions\Planning\Seance;
 use App\Modules\Sessions\Sessions\SessionLocation;
+use App\Modules\Sessions\Sessions\SessionPlace;
 use App\Modules\Sessions\Sessions\TrainingSession;
 use Brick\Math\BigDecimal;
 use Brick\Math\RoundingMode;
@@ -269,7 +270,7 @@ final class Paperwork
         return $hours === null || ! is_numeric($hours) ? null : BigDecimal::of($hours)->multipliedBy(60)->toScale(0, RoundingMode::HALF_UP)->toInt();
     }
 
-    /** The address typed on the session; « Distanciel » or « Chez le client » when there is none to print. */
+    /** The address of the session (SessionPlace); « Distanciel » or « Chez le client » when there is none to print. */
     private static function place(TrainingSession $session): ?string
     {
         $text = trim((string) $session->location_text);
@@ -277,7 +278,7 @@ final class Paperwork
         return match ($session->location_kind) {
             SessionLocation::Remote->value => SessionLocation::Remote->label(),
             SessionLocation::Client->value => $text !== '' ? $text : SessionLocation::Client->label(),
-            default => $text !== '' ? $text : null,
+            default => SessionPlace::of($session),
         };
     }
 }

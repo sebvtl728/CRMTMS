@@ -31,8 +31,9 @@ interface FormProps {
         starts_on: string;
         ends_on: string;
         planned_hours: string | null;
-        location_kind: 'address' | 'client' | 'remote';
+        location_kind: 'address' | 'company' | 'client' | 'remote';
         location_text: string | null;
+        location_company_id: string | null;
         capacity: number | null;
         responsible_user_id: string | null;
         status: string;
@@ -46,6 +47,7 @@ interface FormProps {
         modality: Option[];
         default_modality: string | null;
         location: Option[];
+        location_companies: Option[];
         status: Option[];
         responsible: Option[];
     };
@@ -62,6 +64,7 @@ type SessionForm = {
     planned_hours: string;
     location_kind: string;
     location_text: string;
+    location_company_id: string;
     capacity: string;
     responsible_user_id: string;
     status: string;
@@ -171,6 +174,7 @@ export default function SessionFormPage({ session, defaults, options }: FormProp
         planned_hours: hoursInput(session?.planned_hours ?? (preselected && !preselected.modules_hours ? preselected.hours : null)),
         location_kind: session?.location_kind ?? 'address',
         location_text: session?.location_text ?? '',
+        location_company_id: session?.location_company_id ?? options.location_companies[0]?.value ?? '',
         capacity: session?.capacity ? String(session.capacity) : '',
         responsible_user_id: session?.responsible_user_id ?? defaults?.responsible_user_id ?? '',
         status: session?.status ?? 'planned',
@@ -355,9 +359,16 @@ export default function SessionFormPage({ session, defaults, options }: FormProp
                         </div>
                         {select('modality_id', 'Modalité *', options.modality)}
                         {select('location_kind', 'Lieu *', options.location)}
+                        {data.location_kind === 'company' && select('location_company_id', 'Société *', options.location_companies)}
                         <div className="grid gap-2 md:col-span-2">
                             <Label htmlFor="location_text">
-                                {data.location_kind === 'address' ? 'Adresse *' : data.location_kind === 'remote' ? 'Lien ou précision' : 'Précision'}
+                                {data.location_kind === 'address'
+                                    ? 'Adresse *'
+                                    : data.location_kind === 'remote'
+                                      ? 'Lien ou précision'
+                                      : data.location_kind === 'company'
+                                        ? 'Précision (salle…)'
+                                        : 'Précision'}
                             </Label>
                             <Input
                                 id="location_text"

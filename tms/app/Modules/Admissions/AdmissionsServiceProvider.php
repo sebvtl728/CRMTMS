@@ -93,7 +93,7 @@ class AdmissionsServiceProvider extends ServiceProvider
                 ->values()->all();
 
             return $rows === [] ? null : ['title' => 'Candidature', 'empty' => 'Aucune candidature.', 'rows' => $rows];
-        });
+        }, 10);
 
         // 404 outside the view scope; the trash too for who may restore.
         Route::bind('candidature', function (string $value): Candidature {

@@ -18,7 +18,7 @@ Une **session** est une formation du catalogue donnée à des dates précises. �
   - **Individuel (un seul stagiaire)** : un seul stagiaire (inscription non annulée), sans liste d'attente ; **Entreprise (facultatif)** ;
 - **Modalité** : Présentiel, Distanciel (classe virtuelle), FOAD / e-learning, Mixte (liste paramétrable, *Administration › Référentiels*) ;
 - **Dates** de début et de fin (jours de Paris ; la fin n'est pas avant le début) ;
-- **Lieu** : une adresse (obligatoire), **chez le client** ou **distanciel**, avec une précision ou un lien ;
+- **Lieu** : une adresse (obligatoire), **dans nos locaux** (une des sociétés d'Administration › Sociétés : son nom et son adresse s'impriment sur la convention, les convocations, les rappels et le calendrier ; précision facultative, par exemple la salle), **chez le client** ou **distanciel**, avec une précision ou un lien ; même choix dans **Créer le dossier** depuis un devis ;
 - **Responsable** (vous par défaut), **État** (*Planifiée* ou *Confirmée*) et notes.
 
 Chaque session reçoit un numéro `S-2026-0001` (séquence par organisme et par année de Paris).

@@ -51,7 +51,7 @@ class DocumentsServiceProvider extends ServiceProvider
         FicheLinks::registerExport('documents', fn (string $personId): array => DocumentAnonymisation::export($personId), [Permissions::VIEW]);
         SessionBlocks::register('documents.session', fn (string $sessionId, User $viewer) => SessionDocumentsBlock::for($sessionId, $viewer));
         SessionCards::register('documents', fn (array $sessionIds, User $viewer) => SessionDocumentsBlock::cards($sessionIds, $viewer));
-        DossierBlocks::register('documents.dossier', fn (string $dossierId, User $viewer) => DossierDocumentsBlock::for($dossierId, $viewer));
+        DossierBlocks::register('documents.dossier', fn (string $dossierId, User $viewer) => DossierDocumentsBlock::for($dossierId, $viewer), 20);
 
         // A document out of the viewer's documents.view scope (read on its dossier) is a 404.
         Route::bind('document', function (string $value): Document {

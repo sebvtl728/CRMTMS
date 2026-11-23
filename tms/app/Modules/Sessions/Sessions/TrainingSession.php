@@ -32,7 +32,8 @@ use Illuminate\Support\Facades\Auth;
  * @property CarbonImmutable $starts_on
  * @property CarbonImmutable $ends_on
  * @property string|null $planned_hours numeric(6,2) as a string
- * @property string $location_kind address|client|remote (SessionLocation)
+ * @property string $location_kind address|company|client|remote (SessionLocation)
+ * @property string|null $location_company_id the company whose premises host it (company)
  * @property string|null $location_text
  * @property string|null $color the planning colour (SessionColors)
  * @property int|null $capacity places of an inter session
@@ -67,7 +68,7 @@ class TrainingSession extends Model
     /** @var list<string> */
     protected $fillable = [
         'title', 'training_id', 'das_id', 'kind', 'modality_id', 'organisation_id', 'starts_on', 'ends_on', 'planned_hours',
-        'location_kind', 'location_text', 'capacity', 'responsible_user_id', 'status', 'notes',
+        'location_kind', 'location_text', 'location_company_id', 'capacity', 'responsible_user_id', 'status', 'notes',
     ];
 
     /** @var array<string, mixed> */

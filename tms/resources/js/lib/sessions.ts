@@ -19,7 +19,7 @@ export interface SessionRow {
     ends_on: string;
     /** French decimal (« 21,00 »). */
     planned_hours: string | null;
-    location_kind: 'address' | 'client' | 'remote';
+    location_kind: 'address' | 'company' | 'client' | 'remote';
     location_label: string;
     location_text: string | null;
     capacity: number | null;

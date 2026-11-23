@@ -71,7 +71,7 @@ class FinanceServiceProvider extends ServiceProvider
         ReferenceUsage::register(ReferenceList::PaymentMethod, 'payments', 'method_id');
 
         // « Facturation » block of the dossier page.
-        DossierBlocks::register('finance.billing', fn (string $dossierId, User $viewer) => BillingBlock::for($dossierId, $viewer));
+        DossierBlocks::register('finance.billing', fn (string $dossierId, User $viewer) => BillingBlock::for($dossierId, $viewer), 30);
 
         // A validated invoice freezes who pays directly, the issuing company and the contractor,
         // and keeps the dossier out of the trash; an invoiced funding keeps its funder.
