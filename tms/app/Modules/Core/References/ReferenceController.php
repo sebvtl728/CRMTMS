@@ -38,6 +38,7 @@ class ReferenceController extends Controller
                 'has_default_for' => $list->hasDefaultFor(),
                 'has_external_billing' => $list->hasExternalBilling(),
                 'has_funding_type' => $list->hasFundingType(),
+                'has_opco' => $list->hasOpco(),
                 'has_client' => $list->hasClient(),
                 'items' => ($items[$list->value] ?? collect())->map(fn (ReferenceItem $i) => [
                     'id' => $i->id,
@@ -169,6 +170,7 @@ class ReferenceController extends Controller
             'meta.reached' => ['nullable', 'boolean'],
             'meta.default_for' => ['nullable', Rule::in(array_keys(ReferenceItem::DEFAULT_FOR))],
             'meta.external_billing' => ['nullable', 'boolean'],
+            'meta.opco' => ['nullable', 'boolean'],
             'meta.funding_type_id' => ['nullable', 'uuid', Rule::exists('reference_items', 'id')
                 ->where('tenant_id', app(TenantContext::class)->id())->where('list', ReferenceList::FundingType->value)->whereNull('deleted_at')],
             'meta.client' => ['nullable', 'boolean'],
@@ -254,6 +256,14 @@ class ReferenceController extends Controller
                 $meta['external_billing'] = true;
             } else {
                 unset($meta['external_billing']);
+            }
+        }
+        // Funding type paid by the OPCO of the collective agreement: kept unless the form sends it.
+        if ($list->hasOpco() && array_key_exists('opco', $input)) {
+            if ((bool) $input['opco']) {
+                $meta['opco'] = true;
+            } else {
+                unset($meta['opco']);
             }
         }
         // Funding type a funding mode gives the dossier: kept unless the form sends it (null clears it).

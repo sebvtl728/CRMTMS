@@ -244,3 +244,24 @@ it('links by migration the funding modes of each organisme to the funding type o
         ->and($mode('cpf')->meta)->toBe(['funding_type_id' => $type('personnel')->id])
         ->and($mode('autre')->meta)->toBeNull();
 });
+
+it('flags the funding type « OPCO » as paid by the OPCO of the collective agreement, editable, and once by migration', function () {
+    inTenant();
+    CapFormationReferenceSeeder::run(tenant());
+    $type = fn (string $code) => ReferenceItem::query()->where('list', ReferenceList::FundingType)->where('code', $code)->firstOrFail();
+    expect($type('opco')->meta)->toBe(['opco' => true])
+        ->and($type('region')->meta)->toBeNull();
+
+    $this->actingAs(admin(twoFactor: true))->get('/admin/references')->assertInertia(fn (Assert $page) => $page
+        ->where('lists.funding_type.has_opco', true)->where('lists.funding_mode.has_opco', false));
+    $this->put("/admin/references/funding_type/{$type('opco')->id}", ['label' => 'OPCO', 'meta' => ['opco' => false]])->assertRedirect();
+    expect($type('opco')->meta)->toBeNull();
+
+    // The migration flags it again only where the key was never set.
+    $type('opco')->update(['meta' => null]);
+    lot2aMigration('2027_01_30_000020_flag_opco_funding_type')->up();
+    expect($type('opco')->meta)->toBe(['opco' => true]);
+    $type('opco')->update(['meta' => ['opco' => false]]);
+    lot2aMigration('2027_01_30_000020_flag_opco_funding_type')->up();
+    expect($type('opco')->meta)->toBe(['opco' => false]);
+});

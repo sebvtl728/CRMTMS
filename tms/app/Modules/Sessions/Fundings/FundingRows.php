@@ -98,6 +98,9 @@ final class FundingRows
         return [
             'price' => Amounts::display($balance['price_cents']),
             'funded' => Amounts::display($balance['funded_cents']),
+            'agreed' => Amounts::display($balance['agreed_cents']),
+            'pending' => Amounts::display($balance['pending_cents']),
+            'pending_cents' => $balance['pending_cents'],
             'remaining_cents' => $balance['remaining_cents'],
             'message' => FundingBalance::message($balance['remaining_cents']),
             'balanced' => $balance['remaining_cents'] === 0,

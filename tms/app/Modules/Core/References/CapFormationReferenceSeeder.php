@@ -42,6 +42,9 @@ final class CapFormationReferenceSeeder
     /** Funding types billed outside the TMS (meta.external_billing, 0.9: the CPF, through EDOF), by code. */
     private const EXTERNAL_BILLING = ['cpf'];
 
+    /** Funding types paid by the OPCO of the contractant's collective agreement (meta.opco), by code. */
+    private const OPCO_FUNDED = ['opco'];
+
     /** Organisation types that fund dossiers (meta.funder), by code. */
     private const FUNDERS = ['opco', 'financeur-public'];
 
@@ -107,6 +110,9 @@ final class CapFormationReferenceSeeder
                     }
                     if ($list === ReferenceList::FundingType->value && in_array($code, self::EXTERNAL_BILLING, true)) {
                         $meta = [...$meta ?? [], 'external_billing' => true];
+                    }
+                    if ($list === ReferenceList::FundingType->value && in_array($code, self::OPCO_FUNDED, true)) {
+                        $meta = [...$meta ?? [], 'opco' => true];
                     }
                     if ($list === ReferenceList::OrganisationType->value && in_array($code, self::FUNDERS, true)) {
                         $meta = ['funder' => true];

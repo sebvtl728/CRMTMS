@@ -17,11 +17,12 @@ use App\Modules\Sessions\Enrolments\Enrolment;
  * enrolment against its share of a
  * line priced per trainee (price_share; a cancelled enrolment has no share
  * any more and is flagged). A negative remainder means the fundings exceed
- * the price. The list of the dossiers reads only the dossier remainder,
+ * the price. Of the amount funded, agreed_cents is « Accordé » and
+ * pending_cents waits for an agreement (À demander, Demandé). The list of the dossiers reads only the dossier remainder,
  * for a whole page at once (fundedOf).
  *
  * @phpstan-type Part array{price_cents: int, funded_cents: int, remaining_cents: int}
- * @phpstan-type Balance array{price_cents: int, funded_cents: int, remaining_cents: int, lines: array<string, Part>, enrolments: array<string, array{price_cents: int, funded_cents: int, remaining_cents: int, cancelled: bool}>}
+ * @phpstan-type Balance array{price_cents: int, funded_cents: int, agreed_cents: int, pending_cents: int, remaining_cents: int, lines: array<string, Part>, enrolments: array<string, array{price_cents: int, funded_cents: int, remaining_cents: int, cancelled: bool}>}
  */
 final class FundingBalance
 {
@@ -67,6 +68,8 @@ final class FundingBalance
         return [
             'price_cents' => $price,
             'funded_cents' => $fundedCents,
+            'agreed_cents' => $funded($counted->filter(fn (Funding $f) => $f->status === FundingStatus::Agreed)),
+            'pending_cents' => $funded($counted->filter(fn (Funding $f) => $f->status !== FundingStatus::Agreed)),
             'remaining_cents' => $price - $fundedCents,
             'lines' => $lines,
             'enrolments' => $enrolments,

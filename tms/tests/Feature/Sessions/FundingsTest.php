@@ -445,3 +445,17 @@ it('proposes the OPCO of the contractant\'s collective agreement on the dossier 
     $this->actingAs(admin(twoFactor: true))->get("/dossiers/{$dossier->id}")->assertInertia(fn ($p) => $p
         ->where('funding_options.suggested_opco', ['id' => $opco->id, 'label' => 'AKTO', 'idcc' => '1979', 'official' => null]));
 });
+
+it('says how much of the funded amount is agreed and how much still waits for an agreement', function () {
+    $dossier = funDossier();
+    $this->actingAs(admin(twoFactor: true));
+    $this->post("/dossiers/{$dossier->id}/fundings", funPayload(['amount' => '2 000,00', 'status' => 'to_request']))->assertSessionHasNoErrors();
+    $this->post("/dossiers/{$dossier->id}/fundings", funPayload(['amount' => '600,00', 'status' => 'agreed', 'agreed_on' => '2026-11-20']))->assertSessionHasNoErrors();
+    $this->post("/dossiers/{$dossier->id}/fundings", funPayload(['amount' => '400,00', 'status' => 'refused']))->assertSessionHasNoErrors();
+
+    $this->get("/dossiers/{$dossier->id}")->assertOk()->assertInertia(fn (Assert $page) => $page
+        ->where('balance.remaining_cents', 40000)
+        ->where('balance.agreed', '600,00 €')
+        ->where('balance.pending', '2 000,00 €')
+        ->where('balance.pending_cents', 200000));
+});
