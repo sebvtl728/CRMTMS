@@ -285,14 +285,19 @@ export default function OpportunityFormPage({ opportunity, account, defaults, co
                                 pick('stage_id', 'Étape *', options.stage, null)
                             )}
                             <div className="grid gap-2">
-                                <Label htmlFor="amount">Montant estimé (€)</Label>
+                                <Label htmlFor="amount">Montant estimé HT (€)</Label>
                                 <Input
                                     id="amount"
                                     inputMode="decimal"
                                     value={data.amount}
                                     onChange={(e) => setData('amount', e.target.value)}
                                     placeholder="12 500,00"
+                                    aria-describedby="amount_help"
                                 />
+                                <p id="amount_help" className="text-muted-foreground text-xs">
+                                    Ce que l’affaire devrait rapporter. Il donne le pipeline pondéré (montant × probabilité) et le CA prévisionnel ;
+                                    gagnée, l’affaire prend le montant du devis accepté.
+                                </p>
                                 <InputError message={errors.amount} />
                             </div>
                             <div className="grid gap-2">
