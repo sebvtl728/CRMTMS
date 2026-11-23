@@ -80,6 +80,18 @@ Les pages de suivi, les grilles et les visites se remplissent encore **à la mai
 
 **Modules dispensés** : sous le bouton, cochez les modules dont l'apprenti est dispensé, puis **Enregistrer les dispenses** (droit « Modifier les candidatures »).
 
+## 4 ter. Fiche Cerfa du contrat d'apprentissage
+
+À côté du livret, **Fiche Cerfa (PDF)** (droit « Consulter les candidatures ») reprend les rubriques du Cerfa du contrat d'apprentissage, dans son ordre, pour les recopier sur le portail de l'OPCO :
+
+- **employeur** : dénomination, SIRET, NAF, IDCC, adresse, contacts, OPCO ;
+- **apprenti** : identité, date de naissance, adresse, contacts, situation, diplômes, RQTH (montrée seulement à qui voit les données sensibles), représentant légal ;
+- **maître d'apprentissage** ;
+- **contrat** : type et dates ;
+- **formation et CFA** : société par défaut (SIRET, n° de déclaration d'activité, adresse), titre visé, **code RNCP**, heures en centre (sinon durée totale), dates de la session.
+
+Ce que le TMS ne connaît pas (NIR, nationalité, effectif, salaire, durée hebdomadaire, UAI…) est marqué **« à compléter »**. La fiche est générée à chaque clic, jamais stockée.
+
 ## 5. Liste « Candidats »
 
 Onglets **Candidats** (sans dossier en cours ; non retenus et désistés seulement avec le filtre d'étape), **Stagiaires** (dossier sans contrat), **Alternants** (dossier et contrat), **Tous** ; filtres étape, formation, DAS, responsable, **parcours** (dont *À définir*), type de contrat ; recherche par nom ou numéro. **Exporter (.csv)** (droit « Exporter ») : numéro, nom, prénom, étape, parcours, formation, code RNCP, DAS, responsable, contrat, employeur, dates, dossier — jamais de donnée sensible.

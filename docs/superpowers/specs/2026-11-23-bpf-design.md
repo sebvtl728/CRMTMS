@@ -57,6 +57,12 @@ Chaque organisme déclare chaque année son BPF (Cerfa n° 10443) sur la platefo
   - réglables dans Administration › Référentiels.
 - **Catalogue** : `trainings.bpf_objective` (enum) et `trainings.nsf_code` (groupe de spécialités à 3 chiffres, liste officielle INSEE niveau 100 embarquée dans `Catalogue\Nsf` — fait en 0.15.10), saisis sur la fiche formation.
 
+## Réponses (23/11/2026)
+
+- **Exercice** : ce n'est pas l'année civile. Les dates d'exercice se règlent par société.
+- **Code RNCP** : il sert au cadre F-3 (avec l'objectif BPF) et à la fiche Cerfa d'apprentissage.
+- **Charges (D) et sous-traitance (F-2 reçue, G)** : la saisie à la main est refusée, la source reste à discuter.
+
 ## Questions pour Sébastien
 
 1. **Exercice** : l'exercice comptable de CAP FORMATION est-il l'année civile ? Sinon, je règle les dates d'exercice par société.

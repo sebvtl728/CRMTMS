@@ -2,6 +2,8 @@
 
 namespace App\Modules\Crm\Quotes;
 
+use App\Modules\Crm\Affiliations\Affiliation;
+
 /**
  * Who a quote is addressed to, as printed: the entreprise (with the
  * interlocuteur as « à l'attention de ») or the particulier. Copied into
@@ -46,6 +48,11 @@ final class QuoteRecipient
         $organisation = $quote->organisation_id !== null ? $quote->organisation : null;
 
         if ($organisation !== null) {
+            // The interlocuteur's work e-mail at this entreprise first (a B2B quote), then her own, then the entreprise's.
+            $workEmail = $contact === null ? null : Affiliation::query()
+                ->where('person_id', $contact->id)->where('organisation_id', $organisation->id)
+                ->whereNull('ended_on')->whereNotNull('work_email')->value('work_email');
+
             return [
                 'name' => $organisation->name,
                 'attention' => $contact?->fullName(),
@@ -53,7 +60,7 @@ final class QuoteRecipient
                 'address_line2' => $organisation->address_line2,
                 'postal_code' => $organisation->postal_code,
                 'city' => $organisation->city,
-                'email' => $contact->email ?? $organisation->email,
+                'email' => $workEmail ?? $contact->email ?? $organisation->email,
             ];
         }
 
