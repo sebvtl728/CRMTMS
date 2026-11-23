@@ -55,6 +55,6 @@ it('finds the OPCO of an entreprise from its IDCC', function () {
     $hotel = Organisation::query()->create(['name' => 'Hôtel du Parc', 'idcc' => '1979']);
     $other = Organisation::query()->create(['name' => 'Garage', 'idcc' => '1090']);
 
-    expect(app(Fiches::class)->opcoFor($hotel->id))->toBe(['id' => $opco->id, 'label' => 'AKTO', 'idcc' => '1979'])
-        ->and(app(Fiches::class)->opcoFor($other->id))->toBeNull();
+    expect(app(Fiches::class)->opcoFor($hotel->id))->toBe(['id' => $opco->id, 'label' => 'AKTO', 'idcc' => '1979', 'official' => null])
+        ->and(app(Fiches::class)->opcoFor($other->id))->toBe(['id' => null, 'label' => 'OPCO Mobilités', 'idcc' => '1090', 'official' => 'OPCO Mobilités']);
 });

@@ -46,6 +46,7 @@ interface OrganisationData extends Record<string, string | string[] | null> {
 
 interface FormProps {
     organisation: OrganisationData | null;
+    official_opcos: { key: string; label: string; idcc: string }[];
     options: {
         status: Option[];
         legal_form: Option[];
@@ -119,7 +120,7 @@ function Section({ title, children }: { title: string; children: React.ReactNode
     );
 }
 
-export default function OrganisationFormPage({ organisation, options, duplicates, canMerge }: FormProps) {
+export default function OrganisationFormPage({ organisation, options, official_opcos, duplicates, canMerge }: FormProps) {
     const editing = organisation !== null;
     const str = (key: string, fallback = '') => (organisation?.[key] as string | null | undefined) ?? fallback;
 
@@ -299,7 +300,30 @@ export default function OrganisationFormPage({ organisation, options, duplicates
                     </Field>
                     {text('naf_code', 'Code NAF', { placeholder: '5610A', maxLength: 6 })}
                     {text('idcc', 'IDCC (convention collective)', { placeholder: '1979', maxLength: 4 })}
-                    {text('covered_idcc', 'Conventions couvertes, pour un OPCO (IDCC)', { placeholder: '1979, 1501, 0843', maxLength: 2000 })}
+                    <Field id="covered_idcc" label="Conventions couvertes, pour un OPCO (IDCC)" error={errors.covered_idcc}>
+                        <Input
+                            id="covered_idcc"
+                            value={data.covered_idcc}
+                            onChange={(e) => setData('covered_idcc', e.target.value)}
+                            placeholder="1979, 1501, 0843"
+                            maxLength={2000}
+                        />
+                        <Select value="" onValueChange={(key) => setData('covered_idcc', official_opcos.find((o) => o.key === key)?.idcc ?? '')}>
+                            <SelectTrigger aria-label="Reprendre les IDCC officiels d'un OPCO" className="w-fit">
+                                <SelectValue placeholder="Reprendre les IDCC officiels de…" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                {official_opcos.map((o) => (
+                                    <SelectItem key={o.key} value={o.key}>
+                                        {o.label}
+                                    </SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
+                        <p className="text-muted-foreground text-xs">
+                            Laissé vide, l'OPCO proposé dans un financement suit la table officielle de France compétences.
+                        </p>
+                    </Field>
                     {pick('status', 'Statut', options.status, 'Prospect')}
                     {pick('responsible_user_id', 'Responsable', options.responsible, 'Sans responsable')}
                 </Section>

@@ -14,24 +14,29 @@ class CompanyFactory extends Factory
 {
     protected $model = Company::class;
 
+    /**
+     * Neutral values: a random company name, street or e-mail may hold a
+     * person's name (« Durand SARL ») and fail the personal-trace checks of
+     * the RGPD tests.
+     */
     public function definition(): array
     {
         return [
-            'name' => fake()->unique()->company(),
+            'name' => 'Organisme '.fake()->unique()->numerify('#####'),
             'legal_form' => LegalForm::Sas,
             'scop_underlying_form' => null,
             'capital_amount' => '10000.00',
             'capital_variable' => false,
             'siret' => self::siret(),
-            'rcs_city' => fake()->city(),
+            'rcs_city' => 'Lyon',
             'vat_number' => null,
             'vat_regime' => VatRegime::Subject,
             'nda_number' => null,
-            'address_line1' => fake()->streetAddress(),
+            'address_line1' => fake()->numerify('## avenue des Tests'),
             'address_postal_code' => fake()->numerify('#####'),
-            'address_city' => fake()->city(),
+            'address_city' => 'Lyon',
             'address_country' => 'FR',
-            'email' => fake()->safeEmail(),
+            'email' => fake()->numerify('contact#####').'@organisme.test',
             'phone' => null,
             'is_default' => false,
         ];

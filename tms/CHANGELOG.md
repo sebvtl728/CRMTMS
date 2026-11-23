@@ -5,6 +5,12 @@ Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) ; ve
 
 ## [Non publié]
 
+## [0.15.1] - 2026-11-23
+
+### Ajouté
+
+- **OPCO officiel d'une convention collective** : table IDCC → OPCO tirée de la table SIRET-OPCO de France compétences (data.gouv.fr, mise à jour d'août 2026, 953 conventions, OPCO majoritaire de chaque IDCC). À l'ajout d'un financement, l'OPCO proposé suit cette table quand aucune fiche ne liste l'IDCC dans ses conventions couvertes (fiche retrouvée par son nom, sinon nom de l'OPCO indiqué). Sur la fiche d'un OPCO, **Reprendre les IDCC officiels de…** remplit les conventions couvertes.
+
 ## [0.15.0] - 2026-11-23
 
 ### Ajouté
