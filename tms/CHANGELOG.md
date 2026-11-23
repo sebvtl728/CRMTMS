@@ -5,6 +5,8 @@ Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) ; ve
 
 ## [Non publié]
 
+## [0.15.7] - 2026-11-23
+
 ### Modifié
 
 - **Questionnaire à chaud** : part tout seul **le dernier jour à 13 h 30** (avec les attestations, commande `tms:automation:last-day`) ; l'envoi du lendemain 7 h ne fait plus que rattraper.
