@@ -116,6 +116,7 @@ test('convention: issued from the dossier, previewed, sent, then cancelled with 
     await documents.getByRole('button', { name: 'Émettre pour tous' }).first().click();
     await expect(page.getByText('2 documents émis.')).toBeVisible();
     await expect(documents.getByText(/DOC-\d{4}-\d{5}/)).toHaveCount(2);
+    page.once('dialog', (d) => d.accept());
     await documents.getByRole('button', { name: 'Envoyer à tous' }).first().click();
     await expect(page.getByText(/envoi(s)? en cours|sans adresse e-mail|Aucun envoi/)).toBeVisible();
 
