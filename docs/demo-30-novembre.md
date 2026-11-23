@@ -35,7 +35,9 @@ Sur le Mac ou le serveur de démonstration :
 4. **Société** (Administration › Sociétés) : logo, signature et cachet, déclaration d'activité, préfixes devis et
    factures.
 5. **Catalogue** : une formation complète, par exemple « Hygiène alimentaire HACCP — 14 h », tarif entreprise
-   **450 € HT par stagiaire**, DAS renseigné, une plaquette PDF jointe.
+   **450 € HT par stagiaire**, DAS renseigné, une plaquette PDF jointe. Pour une formation certifiante : saisir le
+   **code RNCP** (encadré vert de la fiche officielle) puis **Reprendre du RNCP** (objectif BPF, NSF, grille de
+   compétences). Sur le serveur, lancer une fois `tms:rncp:sync` (voir `tms/docs/admin.md` § 24).
 6. **Fiches** : une entreprise « Restaurant Le Bon Goût » (SIRET fictif, **IDCC 1979**) avec un interlocuteur (toi)
    et trois salariés (Léa Durand, Marc Petit, Sami Benali). Une fiche **AKTO** (type OPCO, conventions couvertes
    reprises par « Reprendre les IDCC officiels de… »). Pour le parcours individuel : une personne « Inès Martin »
@@ -98,9 +100,9 @@ Page de la session, barre d'étapes :
    → « Reste à financer » se met à jour.
 4. **Documents** (page du dossier) : **Émettre : convention de formation** → PDF numéroté, archivé ; **Demander la
    signature** (même parcours que le devis).
-5. **Documents des stagiaires** (étape Stagiaires) : l'encart annonce **« Envoi automatique »** des convocations
-   (7 jours avant le début, session confirmée). Cliquer **Émettre pour tous** : la fenêtre propose **Laisser l'envoi
-   automatique** ou **Émettre et envoyer maintenant** → choisir maintenant pour la démo. Dire : la veille de chaque
+5. **Documents des stagiaires** (étape Stagiaires) : chaque document dit s'il part **« Automatique »** (convocations
+   7 jours avant le début, session confirmée : « Partira seul » avec sa date) ou **« À faire à la main »**. Pour la
+   démo, ouvrir **Émettre ou envoyer à la main** et envoyer les convocations tout de suite. Dire : la veille de chaque
    journée, stagiaires et formateurs reçoivent un rappel seuls.
 6. Se connecter en **formateur** (autre navigateur) : « Mon planning » ne montre que ses séances et ses stagiaires,
    jamais les prix ni les financements.
@@ -112,9 +114,9 @@ Sur l'exemplaire « terminé » :
 1. Étape **Suivi**, onglet **Présences** : **Tous présents**, puis une exception (Sami : partiel 5 h).
 2. **Clôturer le mois** → plus rien ne bouge ; la session passe **Terminée**.
 3. **Documents des stagiaires** : attestations et certificats de réalisation (heures réalisées reprises des présences).
-   Dire : avec l'automatisme coché, ils sont **émis et envoyés seuls** le matin qui suit la clôture du mois de fin
-   (jamais pour un stagiaire à 0 h). Pour le montrer sans attendre : Administration › Automatismes › **Exécuter
-   maintenant**.
+   Dire : avec l'automatisme coché, ils sont **émis et envoyés seuls le dernier jour à 13 h 30** (l'après-midi compté),
+   jamais pour un stagiaire absent ce jour-là ni à 0 h. Pour le montrer sans attendre : Administration › Automatismes ›
+   **Exécuter maintenant**.
 
 ## 6. Émargement en ligne et rattrapage (7 min)
 
@@ -130,15 +132,19 @@ Sur l'exemplaire « terminé » :
    « Rattrapage à confirmer » ; onglet **Présences** de la session → **Confirmer** → badge « Rattrapage confirmé »
    (voyant vert), présence écrite, mention sur la feuille signée. Variante : **Ouvrir le rattrapage sur place**
    (QR jusqu'à minuit). Jour jamais ouvert : **Faire un rattrapage** depuis les présences de la séance.
-6. Inscrit qui entre plus tard : **Faire entrer ce jour-là** sur l'écran de la demi-journée.
+6. **Plusieurs demi-journées à rattraper** pour un même stagiaire : onglet **Présences**, **Rattrapage de plusieurs
+   demi-journées** → choisir le stagiaire, cocher les demi-journées (jamais une absence notée ou excusée) → un seul
+   e-mail, un seul code, **une seule signature** pour toutes ; au retour, **Tout confirmer pour …**.
+7. Inscrit qui entre plus tard : **Faire entrer ce jour-là** sur l'écran de la demi-journée.
 
 ## 7. Questionnaires de satisfaction (4 min)
 
-1. Étape **Stagiaires**, bloc **Questionnaires** : **Lancer le questionnaire à chaud** (e-mail à chaque stagiaire) et
-   **Afficher le QR code**.
+1. Étape **Stagiaires**, bloc **Questionnaires** : le questionnaire à chaud est **« Automatique »** : il part seul
+   **le dernier jour à 13 h 30** ; le questionnaire à froid part seul 3 mois après. Pour la démo, ouvrir **Envoyer à la
+   main** → **Lancer maintenant** (e-mail à chaque stagiaire) et **Afficher le QR code**.
 2. Sur le téléphone : répondre (notes sur 5, commentaire).
-3. Résultats sur la session (taux de réponse, moyenne, satisfaits), carte « Satisfaction » de la synthèse ; le
-   questionnaire à froid part seul 3 mois plus tard.
+3. Résultats sur la session (taux de réponse, moyenne, satisfaits), carte « Satisfaction » de la synthèse. Le
+   questionnaire à froid s'envoie aussi à la main une fois la session terminée (bouton grisé avant, avec la raison).
 
 ## 8. Facturer et encaisser (7 min)
 
@@ -165,6 +171,9 @@ Dire : « autre porte d'entrée, sans devis : une personne qui veut se former »
 4. **Créer le dossier** : choisir le **contractant** (l'employeur pour une alternance, le candidat pour un
    particulier), inscription dans la session visée, financement. Le dossier rejoint ensuite le même circuit que
    l'entreprise (convention ou contrat, présences, facture).
+5. Alternance : carte **Alternance** de la candidature → **Livret d'apprentissage (PDF)** déjà rempli (partenaires,
+   parcours avec dispenses, planning, pages de suivi datées mois par mois, grilles de compétences) et **Fiche Cerfa
+   (PDF)** : toutes les rubriques du Cerfa remplies, le reste en « à compléter », à recopier sur le portail de l'OPCO.
 
 ## 9. Pilotage et qualité (4 min)
 
