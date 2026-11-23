@@ -12,6 +12,10 @@ Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) ; ve
 - Devis : **Financement envisagé** (OPCO, CPF…), repris du mode de financement de l'opportunité, modifiable sur le brouillon, affiché sur le devis et imprimé dans son PDF.
 - Dossier créé depuis un devis : le financement de départ suit ce mode (OPCO → financement OPCO « À demander », CPF → CPF). Référentiel *Modes de financement* : champ **Financement du dossier** (lien vers un type de financeur), posé à la mise à jour sur la valeur du même nom ; sans lien, le type par défaut du contractant comme avant.
 
+### Modifié
+
+- **Opportunité** : le **montant proposé** par les formations se calcule en direct dans le formulaire, sans enregistrer d'abord (plus de bouton « Calculer ») ; le champ s'appelle **Montant estimé HT** et dit à quoi il sert.
+
 ### Corrigé
 
 - Tests de bout en bout alignés sur les libellés actuels (bouton du menu, « Changer le suivi… », confirmation d'« Envoyer à tous ») ; le test de visite n'attend plus indéfiniment une page qui se rafraîchit seule.

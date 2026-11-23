@@ -97,7 +97,7 @@ test('pipeline: opportunity from an entreprise, kanban, loss reason, quick call,
     await page.getByLabel('DAS *').click();
     await page.getByRole('option').first().click();
     await choose(page, page.getByLabel('Étape *'), 'Nouveau');
-    await page.getByLabel('Montant estimé (€)').fill('10 000');
+    await page.getByLabel('Montant estimé HT (€)').fill('10 000');
     await page.getByLabel('Clôture prévue').fill(parisDay());
     await page.getByRole('button', { name: 'Enregistrer' }).click();
     await expect(page.getByText('Opportunité créée.')).toBeVisible();

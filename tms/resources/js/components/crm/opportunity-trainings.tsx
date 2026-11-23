@@ -4,8 +4,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { type Option } from '@/lib/crm';
-import { Calculator, LoaderCircle, Trash2 } from 'lucide-react';
-import { useState } from 'react';
+import { Trash2 } from 'lucide-react';
 
 export interface TrainingOption extends Option {
     das_id: string;
@@ -52,12 +51,6 @@ export function quantityInput(value: string): string {
     return value.includes('.') ? value.replace(/\.?0+$/, '').replace('.', ',') : value;
 }
 
-function xsrfToken(): string {
-    const match = document.cookie.match(/(?:^|; )XSRF-TOKEN=([^;]+)/);
-
-    return match ? decodeURIComponent(match[1]) : '';
-}
-
 const ADD = 'add';
 
 /**
@@ -69,7 +62,6 @@ export function OpportunityTrainingsField({
     lines,
     options,
     errors,
-    opportunityId,
     onChange,
     onAdded,
     onApplyAmount,
@@ -77,57 +69,36 @@ export function OpportunityTrainingsField({
     lines: TrainingLineInput[];
     options: TrainingOption[];
     errors: Record<string, string | undefined>;
-    opportunityId: string | null;
+    /** Unused since the amount is computed in the form (kept for the callers). */
+    opportunityId?: string | null;
     onChange: (lines: TrainingLineInput[]) => void;
     /** A training was added (prefills the DAS when none is chosen). */
     onAdded: (option: TrainingOption) => void;
     onApplyAmount: (amount: string) => void;
 }) {
-    const [estimate, setEstimate] = useState<TrainingEstimate | null>(null);
-    const [computing, setComputing] = useState(false);
-    const [failure, setFailure] = useState<string | null>(null);
-
     const byId = new Map(options.map((o) => [o.value, o]));
     const available = options.filter((o) => !lines.some((l) => l.training_id === o.value) && o.is_active);
 
-    const change = (next: TrainingLineInput[]) => {
-        setEstimate(null);
-        onChange(next);
-    };
+    const change = (next: TrainingLineInput[]) => onChange(next);
+
+    // Proposed amount, live: quantity × catalogue price for the account (entreprise or particulier), half up to the cent.
+    const missing: string[] = [];
+    const total = lines.reduce((sum, l) => {
+        const option = byId.get(l.training_id);
+        const quantity = Number.parseFloat(l.quantity.replace(/\s/g, '').replace(',', '.'));
+        if (!option || !Number.isFinite(quantity) || quantity <= 0) return sum;
+        if (option.price_cents === null) {
+            missing.push(option.label);
+            return sum;
+        }
+
+        return sum + Math.round(quantity * option.price_cents);
+    }, 0);
     const add = (id: string) => {
         const option = byId.get(id);
         if (!option) return;
         change([...lines, { training_id: id, quantity: '1' }]);
         onAdded(option);
-    };
-
-    const compute = async () => {
-        if (!opportunityId) return;
-        setFailure(null);
-        setComputing(true);
-        try {
-            const response = await fetch(route('crm.opportunities.estimate', opportunityId), {
-                method: 'POST',
-                credentials: 'same-origin',
-                headers: { 'Content-Type': 'application/json', Accept: 'application/json', 'X-XSRF-TOKEN': xsrfToken() },
-                body: JSON.stringify({ training_lines: lines }),
-            });
-            const json = (await response.json().catch(() => ({}))) as Partial<TrainingEstimate> & { message?: string };
-            if (!response.ok) {
-                setFailure(
-                    response.status === 422
-                        ? 'Corrigez les formations avant de calculer le montant.'
-                        : (json.message ?? 'Le calcul a échoué, réessayez.'),
-                );
-
-                return;
-            }
-            setEstimate(json as TrainingEstimate);
-        } catch {
-            setFailure('Le calcul a échoué, réessayez.');
-        } finally {
-            setComputing(false);
-        }
     };
 
     return (
@@ -200,42 +171,17 @@ export function OpportunityTrainingsField({
                 </div>
             )}
 
-            {lines.length > 0 &&
-                (opportunityId ? (
-                    <div className="grid gap-2 text-sm">
-                        <div>
-                            <Button type="button" variant="outline" size="sm" onClick={compute} disabled={computing}>
-                                {computing ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <Calculator className="h-4 w-4" />}
-                                Calculer le montant proposé
-                            </Button>
-                        </div>
-                        {failure && (
-                            <p role="alert" className="text-destructive">
-                                {failure}
-                            </p>
-                        )}
-                        {estimate && (
-                            <div className="flex flex-wrap items-center gap-2" aria-live="polite">
-                                <span>
-                                    Montant proposé : <strong>{estimate.amount_display}</strong>
-                                </span>
-                                <Button
-                                    type="button"
-                                    variant="secondary"
-                                    size="sm"
-                                    onClick={() => onApplyAmount(estimate.amount_display.replace(/\s*€$/, ''))}
-                                >
-                                    Reporter dans le montant estimé
-                                </Button>
-                            </div>
-                        )}
-                        {estimate && estimate.missing.length > 0 && <MissingPrices titles={estimate.missing} />}
-                    </div>
-                ) : (
-                    <p className="text-muted-foreground text-sm">
-                        Le montant proposé par les formations se calcule une fois l'opportunité enregistrée.
-                    </p>
-                ))}
+            {lines.length > 0 && (
+                <div className="flex flex-wrap items-center gap-2 text-sm" aria-live="polite">
+                    <span>
+                        Montant proposé : <strong>{formatCents(total)}</strong> HT
+                    </span>
+                    <Button type="button" variant="secondary" size="sm" onClick={() => onApplyAmount((total / 100).toFixed(2).replace('.', ','))}>
+                        Reporter dans le montant estimé
+                    </Button>
+                    {missing.length > 0 && <MissingPrices titles={missing} />}
+                </div>
+            )}
         </fieldset>
     );
 }
