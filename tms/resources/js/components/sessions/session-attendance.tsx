@@ -988,7 +988,7 @@ export function SessionAttendance({ sessionId }: { sessionId: string }) {
 
             {data.monthly.modules.length > 0 && (
                 <section className="grid gap-2">
-                    <h3 className="font-medium">Heures du mois (modules en intervalle)</h3>
+                    <h3 className="font-medium">Heures du mois (modules suivis sur une période)</h3>
                     <p className="text-muted-foreground text-sm">
                         Heures réalisées en {current?.label ?? data.month}, au format 12:30. Videz une case pour effacer ses heures.
                     </p>

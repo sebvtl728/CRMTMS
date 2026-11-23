@@ -5,6 +5,10 @@ Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) ; ve
 
 ## [Non publié]
 
+### Modifié
+
+- **Suivi d'un module de session** : « Intervalle de dates » devient **« Période, heures saisies chaque mois »**, « Séances » devient **« Séances planifiées »**, chacun expliqué à l'écran ; « Passer en intervalle / en séances » devient **« Changer le suivi… »**, une fenêtre qui décrit le nouveau suivi (et pourquoi le bouton est grisé quand il y a déjà des séances ou des heures).
+
 ## [0.15.4] - 2026-11-23
 
 ### Modifié

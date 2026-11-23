@@ -147,7 +147,7 @@ function PlanningCalendar({
             !tall && intervals.length > 1
                 ? [
                       ...all.filter((i) => i.kind !== 'interval'),
-                      { kind: 'interval', title: `${intervals.length} modules en intervalle`, detail: intervals.map((i) => i.title).join('\n') },
+                      { kind: 'interval', title: `${intervals.length} modules sur une période`, detail: intervals.map((i) => i.title).join('\n') },
                   ]
                 : all;
         const limit = tall ? grouped.length : MONTH_ITEMS;
@@ -283,7 +283,7 @@ function PlanningCalendar({
                 </table>
             </div>
             <p className="text-muted-foreground text-xs">
-                Bleu : séances · gris : modules en intervalle (jours ouvrés) · vert : stages (jours ouvrés) · fond grisé : week-end, jour férié ou
+                Bleu : séances · gris : modules suivis sur une période (jours ouvrés) · vert : stages (jours ouvrés) · fond grisé : week-end, jour férié ou
                 fermeture.
             </p>
         </section>

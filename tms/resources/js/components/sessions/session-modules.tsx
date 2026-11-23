@@ -54,7 +54,7 @@ export interface SessionPlanning {
         placement_days: Record<string, string[]>;
     };
     options:
-        | ({ modality: Option[]; dating_mode: Option[] } & Partial<{
+        | ({ modality: Option[]; dating_mode: (Option & { description: string })[] } & Partial<{
               trainers: (Option & { das_match?: boolean })[];
               rooms: Option[];
               slots: { start: string; end: string; break_minutes: number }[];
@@ -184,7 +184,7 @@ function ModuleDialog({
                     </div>
                     {!module && (
                         <div className="grid gap-2">
-                            <Label htmlFor="module_mode">Mode de datation *</Label>
+                            <Label htmlFor="module_mode">Suivi du module *</Label>
                             <Select value={data.dating_mode} onValueChange={(v) => setData('dating_mode', v as 'interval' | 'seances')}>
                                 <SelectTrigger id="module_mode">
                                     <SelectValue />
@@ -197,6 +197,9 @@ function ModuleDialog({
                                     ))}
                                 </SelectContent>
                             </Select>
+                            <p className="text-muted-foreground text-xs">
+                                {options.dating_mode.find((o) => o.value === data.dating_mode)?.description}
+                            </p>
                             <InputError message={errors.dating_mode} />
                         </div>
                     )}
@@ -346,11 +349,11 @@ export function SessionModules({
         }
     };
 
-    const switchMode = (m: SessionModuleRow) => {
-        const target = m.dating_mode === 'interval' ? 'seances' : 'interval';
-        const label = target === 'seances' ? 'séances' : 'intervalle de dates';
-        if (window.confirm(`Passer le module « ${m.title} » en ${label} ?`)) {
-            router.post(route('sessions.modules.mode', [sessionId, m.id]), { dating_mode: target }, visit);
+    const [switching, setSwitching] = useState<SessionModuleRow | null>(null);
+    const target = switching === null ? null : planning.options?.dating_mode.find((o) => o.value !== switching.dating_mode);
+    const switchMode = () => {
+        if (switching && target) {
+            router.post(route('sessions.modules.mode', [sessionId, switching.id]), { dating_mode: target.value }, { ...visit, onFinish: () => setSwitching(null) });
         }
     };
 
@@ -391,7 +394,7 @@ export function SessionModules({
                         <thead className="bg-muted/50 text-left">
                             <tr>
                                 <th className="px-3 py-2 font-medium">Module</th>
-                                <th className="px-3 py-2 font-medium">Mode</th>
+                                <th className="px-3 py-2 font-medium">Suivi</th>
                                 <th className="px-3 py-2 font-medium">Heures prévues</th>
                                 <th className="px-3 py-2 font-medium">Planifiées</th>
                                 <th className="px-3 py-2 font-medium">Dates</th>
@@ -432,9 +435,14 @@ export function SessionModules({
                                                     size="sm"
                                                     variant="ghost"
                                                     disabled={m.has_activity}
-                                                    onClick={() => switchMode(m)}
+                                                    title={
+                                                        m.has_activity
+                                                            ? 'Impossible : ce module a déjà des séances ou des heures saisies.'
+                                                            : 'Changer la façon de suivre ce module'
+                                                    }
+                                                    onClick={() => setSwitching(m)}
                                                 >
-                                                    {m.dating_mode === 'interval' ? 'Passer en séances' : 'Passer en intervalle'}
+                                                    Changer le suivi…
                                                 </Button>
                                                 <Button
                                                     type="button"
@@ -458,6 +466,35 @@ export function SessionModules({
             )}
 
             {catalogue && <CatalogueDialog sessionId={sessionId} onClose={() => setCatalogue(false)} />}
+
+            <Dialog open={switching !== null} onOpenChange={(open) => !open && setSwitching(null)}>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>Changer le suivi du module</DialogTitle>
+                        <DialogDescription>« {switching?.title} »</DialogDescription>
+                    </DialogHeader>
+                    <div className="grid gap-3 text-sm">
+                        <p>
+                            Aujourd'hui : <strong>{switching?.dating_mode_label}</strong>
+                        </p>
+                        <div className="rounded-md border p-3">
+                            <p className="font-medium">Nouveau suivi : {target?.label}</p>
+                            <p className="text-muted-foreground mt-1 text-xs">{target?.description}</p>
+                        </div>
+                        <p className="text-muted-foreground text-xs">
+                            Possible tant que le module n'a ni séance ni heure saisie ; ensuite le suivi ne change plus.
+                        </p>
+                    </div>
+                    <DialogFooter>
+                        <Button type="button" variant="outline" onClick={() => setSwitching(null)}>
+                            Retour
+                        </Button>
+                        <Button type="button" onClick={switchMode}>
+                            Passer en « {target?.label} »
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
             {editing !== null && planning.options && (
                 <ModuleDialog
                     sessionId={sessionId}
