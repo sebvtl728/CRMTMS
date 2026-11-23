@@ -5,6 +5,10 @@ Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) ; ve
 
 ## [Non publié]
 
+### Modifié
+
+- **Carte « Étapes » du dossier** : chaque étape dit si elle est faite (date), laquelle vient ensuite et comment elle avance seule (bloc Documents, signature en ligne, convocations automatiques, dates des sessions, factures) ; les corrections à la main (document envoyé hors du TMS, « Forcer En cours / Réalisé ») sont repliées sous « Corriger une étape à la main », avec un avertissement.
+
 ## [0.15.3] - 2026-11-23
 
 ### Ajouté

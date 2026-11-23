@@ -131,8 +131,11 @@ La page du dossier porte un bloc **Facturation** (droit « Consulter les facture
 
 *Créé* → *Convention envoyée* → *Convention signée* → *Convocations envoyées* → *En cours* → *Réalisé* ; *Annulé*. Avec la facturation (0.9), le dossier réalisé passe à *Facturé* quand tout est facturé.
 
-- Les trois premières étapes se posent à la main, avec leur **date** (chacune pas avant la précédente).
-- *En cours* et *Réalisé* se calculent d'après les sessions de ses inscriptions (du premier jour de la première au dernier jour de la dernière) ; vous pouvez aussi les poser à la main, ils ne sont alors plus recalculés.
+- **Toutes les étapes avancent seules** ; la carte **Étapes** le dit pour chacune (coche verte et date quand elle est faite, « Prochaine étape », et comment elle se fait) :
+  - *Convention envoyée* / *signée* : en envoyant ou en faisant signer la convention depuis le bloc **Documents** (ou par l'automatisme « Convention de formation » pour un dossier créé depuis un devis signé) ;
+  - *Convocations envoyées* : quand chaque stagiaire a reçu sa convocation (automatisme des convocations ou « Documents des stagiaires » de la session) ;
+  - *En cours* et *Réalisé* : calculés d'après les sessions de ses inscriptions (du premier jour de la première au dernier jour de la dernière) ; *Facturé* : à la validation des factures.
+- **Corriger une étape à la main** (repliée, avec un avertissement) : seulement pour un document envoyé ou signé **hors du TMS** — la date se pose à la main (chacune pas avant la précédente) ; « Forcer En cours / Réalisé » fige l'état, qui n'est alors plus recalculé.
 - **Annuler le dossier** demande un motif, est possible jusqu'à *Réalisé* et annule ses inscriptions encore actives.
 - Un dossier qui a des inscriptions actives ne va pas à la corbeille : annulez-le d'abord.
 
