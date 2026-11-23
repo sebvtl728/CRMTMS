@@ -5,6 +5,8 @@ Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) ; ve
 
 ## [Non publié]
 
+## [0.15.5] - 2026-11-23
+
 ### Modifié
 
 - **Générer les séances** : un créneau peut être limité à certains jours de la semaine (« un autre horaire le vendredi ») ; deux créneaux peuvent se chevaucher s'ils n'ont aucun jour en commun.
