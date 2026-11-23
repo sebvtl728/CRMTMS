@@ -31,6 +31,8 @@ interface Filters {
     das: string | null;
     status: string | null;
     funding: string | null;
+    /** « alerte »: certifications RNCP to watch (« À traiter »). */
+    rncp: string | null;
     sort: string;
     dir: 'asc' | 'desc';
 }
@@ -49,7 +51,7 @@ const breadcrumbs: BreadcrumbItem[] = [{ title: 'Catalogue', href: '/catalogue' 
 function catalogueQuery(filters: Filters): Record<string, string> {
     const query: Record<string, string> = {};
     if (filters.q) query.q = filters.q;
-    (['das', 'status', 'funding'] as const).forEach((k) => {
+    (['das', 'status', 'funding', 'rncp'] as const).forEach((k) => {
         if (filters[k]) query[k] = String(filters[k]);
     });
     if (filters.sort !== 'title' || filters.dir !== 'asc') {
@@ -99,7 +101,7 @@ export default function CatalogueIndex({ trainings, filters, options, can, statu
         </th>
     );
 
-    const filtered = Boolean(filters.q || filters.das || filters.status || filters.funding);
+    const filtered = Boolean(filters.q || filters.das || filters.status || filters.funding || filters.rncp);
 
     const toggle = (row: TrainingRow) => router.post(route('catalogue.toggle', row.id), {}, { preserveScroll: true });
     // One copy per click: the buttons stay disabled until the request ends.
@@ -177,6 +179,11 @@ export default function CatalogueIndex({ trainings, filters, options, can, statu
                     <FilterSelect label="DAS" value={filters.das} options={options.das} onChange={(v) => visit({ das: v })} />
                     <FilterSelect label="Financement" value={filters.funding} options={options.funding} onChange={(v) => visit({ funding: v })} />
                     <FilterSelect label="État" value={filters.status} options={options.status} onChange={(v) => visit({ status: v })} />
+                    {filters.rncp === 'alerte' && (
+                        <Button type="button" variant="outline" size="sm" onClick={() => visit({ rncp: null })}>
+                            Certifications RNCP à surveiller · retirer
+                        </Button>
+                    )}
                     <div className="flex items-end">
                         {filtered && (
                             <Button type="button" variant="ghost" size="sm" onClick={() => router.get(route('catalogue.index'))}>

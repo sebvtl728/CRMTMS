@@ -1,3 +1,4 @@
+import { RncpPanel } from '@/components/catalogue/rncp-panel';
 import TrainingAssistant, { type AssistantPatch } from '@/components/catalogue/training-assistant';
 import Heading from '@/components/heading';
 import InputError from '@/components/input-error';
@@ -324,6 +325,17 @@ export default function TrainingFormPage({ training, options, assistant, brochur
                             </div>
                             {text('code', 'Code', { maxLength: 20, placeholder: 'Ex. HACCP-3J' })}
                             {text('rncp_code', 'Code RNCP', { maxLength: 20, placeholder: 'Ex. RNCP36004' })}
+                            <RncpPanel
+                                code={data.rncp_code}
+                                onApply={(s) =>
+                                    setData((d) => ({
+                                        ...d,
+                                        bpf_objective: d.bpf_objective || (s.bpf_objective ?? ''),
+                                        nsf_code: d.nsf_code || (s.nsf_code ?? ''),
+                                        competences_text: d.competences_text.trim() !== '' ? d.competences_text : s.competences_text,
+                                    }))
+                                }
+                            />
                             <div className="grid gap-2">
                                 <Label htmlFor="das_id">DAS *</Label>
                                 <Select value={data.das_id || undefined} onValueChange={(v) => setData('das_id', v)}>

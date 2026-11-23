@@ -853,3 +853,6 @@ occurrence = date du lendemain ; `signature_reminder` : sujet = demande de signa
 `subject_id` · `occurrence` · `sent_at`. Unique (`kind`, `subject_id`, `occurrence`) : un envoi automatique ne part
 qu'une fois, même si la tâche est relancée. Aucune donnée personnelle.
 
+### `rncp_certifications` — répertoire RNCP (commun, sans tenant)
+
+`code` (PK, `RNCP` + chiffres) · `title` · `level` (3 à 8, null) · `active` · `end_on` (fin d'enregistrement) · `nsf_codes` (jsonb, codes NSF de la fiche) · `blocks` (jsonb, `[{code, label}]`) · `synced_at`. Remplie par `tms:rncp:sync` (`Catalogue\Rncp\RncpSync`, téléchargement par `Connectors\OpenData\RncpExport`), lue par `Catalogue\Rncp\RncpDirectory`. Dans `tms.tenancy.unscoped_tables`.

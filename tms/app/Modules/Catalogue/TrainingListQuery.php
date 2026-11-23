@@ -22,7 +22,7 @@ final class TrainingListQuery
      * becomes « no filter ».
      *
      * @param  array<array-key, mixed>  $input
-     * @return array{q: string, das: ?string, status: ?string, funding: ?string, sort: string, dir: string}
+     * @return array{q: string, das: ?string, status: ?string, funding: ?string, rncp: ?string, sort: string, dir: string}
      */
     public static function filters(array $input): array
     {
@@ -33,6 +33,8 @@ final class TrainingListQuery
             'das' => self::id($input['das'] ?? null),
             'status' => self::oneOf($input['status'] ?? null, self::STATUSES),
             'funding' => self::id($input['funding'] ?? null),
+            // « alerte »: active trainings whose RNCP certification is unknown, inactive or ending soon.
+            'rncp' => ($input['rncp'] ?? null) === 'alerte' ? 'alerte' : null,
             'sort' => self::oneOf($input['sort'] ?? null, self::SORTS) ?? 'title',
             'dir' => ($input['dir'] ?? null) === 'desc' ? 'desc' : 'asc',
         ];
@@ -58,7 +60,7 @@ final class TrainingListQuery
     }
 
     /**
-     * @param  array{q: string, das: ?string, status: ?string, funding: ?string, sort: string, dir: string}  $filters
+     * @param  array{q: string, das: ?string, status: ?string, funding: ?string, rncp: ?string, sort: string, dir: string}  $filters
      * @return Builder<Training>
      */
     public static function build(array $filters): Builder
@@ -67,6 +69,7 @@ final class TrainingListQuery
             ->when($filters['das'], fn (Builder $q, string $v) => $q->where('trainings.das_id', $v))
             ->when($filters['status'] === 'active', fn (Builder $q) => $q->where('trainings.is_active', true))
             ->when($filters['status'] === 'inactive', fn (Builder $q) => $q->where('trainings.is_active', false))
+            ->when($filters['rncp'] === 'alerte', fn (Builder $q) => self::rncpAlerts($q))
             ->when($filters['funding'], fn (Builder $q, string $v) => $q->whereIn('trainings.id',
                 DB::table('training_funding_modes')->select('training_id')->where('funding_mode_id', $v)));
 
@@ -122,5 +125,19 @@ final class TrainingListQuery
     private static function oneOf(mixed $value, array $allowed): ?string
     {
         return is_string($value) && in_array($value, $allowed, true) ? $value : null;
+    }
+
+    /**
+     * Active trainings whose RNCP code needs attention (Rncp\RncpDirectory::alerts).
+     *
+     * @param  Builder<Training>  $query
+     * @return Builder<Training>
+     */
+    public static function rncpAlerts(Builder $query): Builder
+    {
+        $codes = Training::query()->where('is_active', true)->whereNotNull('rncp_code')->distinct()->pluck('rncp_code')->map(fn ($c) => (string) $c)->all();
+        $alerts = app(Rncp\RncpDirectory::class)->alerts($codes);
+
+        return $query->where('trainings.is_active', true)->whereIn('trainings.rncp_code', $alerts === [] ? ['-'] : $alerts);
     }
 }

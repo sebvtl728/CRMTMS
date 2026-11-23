@@ -18,7 +18,7 @@ use Throwable;
  */
 final class TodoSources
 {
-    public const GROUPS = ['Sessions', 'Documents', 'Commercial', 'Admissions', 'Finance'];
+    public const GROUPS = ['Sessions', 'Documents', 'Commercial', 'Admissions', 'Catalogue', 'Finance'];
 
     public const TTL = 60;
 

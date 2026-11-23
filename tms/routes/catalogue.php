@@ -2,6 +2,7 @@
 
 use App\Modules\Catalogue\Assistant\TrainingAssistantController;
 use App\Modules\Catalogue\Brochures\BrochureController;
+use App\Modules\Catalogue\Rncp\RncpController;
 use App\Modules\Catalogue\TrainingController;
 use Illuminate\Support\Facades\Route;
 
@@ -29,6 +30,7 @@ Route::middleware(['auth'])->prefix('catalogue')->name('catalogue.')->group(func
     Route::put('{training}/edit', [TrainingController::class, 'update'])->middleware('can:catalogue.manage')->name('update');
     Route::post('{training}/duplicate', [TrainingController::class, 'duplicate'])->middleware('can:catalogue.manage')->name('duplicate');
     Route::post('{training}/toggle', [TrainingController::class, 'toggle'])->middleware('can:catalogue.manage')->name('toggle');
+    Route::get('rncp/{code}', [RncpController::class, 'show'])->middleware(['can:catalogue.view', 'throttle:crm-search'])->where('code', '[A-Za-z0-9]{1,20}')->name('rncp');
     Route::get('{training}/programme.pdf', [TrainingController::class, 'programme'])->middleware(['can:catalogue.view', 'throttle:catalogue-programme'])->name('programme');
     Route::get('{training}', [TrainingController::class, 'show'])->middleware('can:catalogue.view')->name('show');
     Route::delete('{training}', [TrainingController::class, 'destroy'])->middleware('can:catalogue.delete')->name('destroy');

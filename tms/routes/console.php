@@ -41,3 +41,6 @@ Schedule::command('tms:automation:last-day')->dailyAt('13:30')->timezone('Europe
 // rupture alerte l'administrateur de l'instance.
 Schedule::command('tms:finance:verify')->dailyAt('04:10')->timezone('Europe/Paris')->withoutOverlapping()->onOneServer()
     ->onFailure(fn () => Artisan::call('tms:alert', ['--subject' => 'Vérification des factures en échec', 'message' => 'La commande tms:finance:verify a échoué ou détecté une rupture du journal des factures ou une archive PDF modifiée. Lancez-la à la main pour le détail.']));
+
+// RNCP directory (France compétences open data, published nightly): every Monday.
+Schedule::command('tms:rncp:sync')->weeklyOn(1, '04:20')->timezone('Europe/Paris')->withoutOverlapping()->onOneServer();

@@ -65,6 +65,8 @@ return [
             // spatie permission catalogue: global names, no tenant data (the
             // role matrix, role_has_permissions, is tenant-scoped under RLS).
             'permissions',
+            // RNCP certifications (France compétences open data): public, shared by every organisme.
+            'rncp_certifications',
         ],
     ],
 

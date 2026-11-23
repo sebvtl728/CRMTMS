@@ -9,6 +9,7 @@ use App\Modules\Core\Access\Permissions as CorePermissions;
 use App\Modules\Core\Audit\MorphAliases;
 use App\Modules\Core\References\ReferenceList;
 use App\Modules\Core\References\ReferenceUsage;
+use App\Modules\Core\Todo\TodoSources;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Http\Request;
@@ -41,6 +42,10 @@ class CatalogueServiceProvider extends ServiceProvider
     {
         self::registerReferenceUsage();
         Quality\CatalogueMeasures::register();
+        // « À traiter »: the RNCP certifications to watch (inactive, ending, unknown).
+        TodoSources::register('catalogue.rncp', 'Catalogue', 'Certifications RNCP à surveiller (inactives, inconnues ou finissant dans 6 mois)', Permissions::MANAGE,
+            fn (): int => TrainingListQuery::rncpAlerts(Training::query())->count(),
+            fn (): string => '/catalogue?rncp=alerte');
 
         // Programme PDFs (Gotenberg): 30 a minute per user.
         RateLimiter::for('catalogue-programme', fn (Request $request) => Limit::perMinute(30)->by('catalogue-programme:'.($request->user()?->getAuthIdentifier() ?? $request->ip())));
