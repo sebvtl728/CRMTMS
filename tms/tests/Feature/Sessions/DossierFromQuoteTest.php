@@ -7,6 +7,7 @@ use App\Modules\Core\Access\Scopes;
 use App\Modules\Core\Companies\Company;
 use App\Modules\Core\References\CapFormationReferenceSeeder;
 use App\Modules\Core\References\ReferenceList;
+use App\Modules\Core\Users\User;
 use App\Modules\Crm\Affiliations\Affiliation;
 use App\Modules\Crm\CrmServiceProvider;
 use App\Modules\Crm\Organisations\Organisation;
@@ -25,6 +26,7 @@ use App\Modules\Sessions\Fundings\Funding;
 use App\Modules\Sessions\Fundings\FundingRows;
 use App\Modules\Sessions\Fundings\FundingStatus;
 use App\Modules\Sessions\Permissions;
+use App\Modules\Sessions\Public\DossierHooks;
 use App\Modules\Sessions\Sessions\SessionWriter;
 use App\Modules\Sessions\Sessions\TrainingSession;
 use App\Modules\Sessions\SessionsServiceProvider;
@@ -195,6 +197,19 @@ it('funds a new dossier with the funding type flagged for its contractant, or no
     $person = makePerson('Durand', ['first_name' => 'Paul', 'is_individual' => true]);
     $this->postJson(route('dossiers.from-quote.store', dfqQuote($person)->id), ['lines' => [[], [], []]])->assertCreated();
     expect(Dossier::query()->where('account_person_id', $person->id)->sole()->fundings()->count())->toBe(0);
+});
+
+it('tells the other modules once the dossier is created from the quote', function () {
+    $seen = [];
+    DossierHooks::onCreatedFromQuote('test.spy', function (string $id, User $by) use (&$seen): void {
+        $seen[] = [$id, $by->id];
+    });
+    $admin = admin(true);
+    $quote = dfqQuote(Organisation::query()->create(['name' => 'Hôtel du Parc']));
+
+    $this->actingAs($admin)->postJson(route('dossiers.from-quote.store', $quote->id), ['lines' => [['new_session' => dfqNewSession()], [], []]])->assertSuccessful();
+
+    expect($seen)->toBe([[Dossier::query()->sole()->id, $admin->id]]);
 });
 
 it('plans a new session in the premises of one of our companies', function () {
