@@ -5,6 +5,7 @@ namespace App\Modules\Sessions\Dossiers;
 use App\Http\Controllers\Controller;
 use App\Modules\Catalogue\Trainings;
 use App\Modules\Core\Audit\AuditRecorder;
+use App\Modules\Core\Automation\AutomationSettings;
 use App\Modules\Core\Companies\Company;
 use App\Modules\Core\Exports\CsvExporter;
 use App\Modules\Core\Exports\XlsxExporter;
@@ -209,6 +210,11 @@ class DossierController extends Controller
                 'restore' => $user->can('restore', $dossier),
             ],
             'today' => $today->toDateString(),
+            // What moves the steps by itself (the « Étapes » card says so, so nobody marks them by hand).
+            'automation' => [
+                'convention_on_quote' => AutomationSettings::conventionOnQuote() && $dossier->quote_id !== null,
+                'convocation_days' => AutomationSettings::convocationDays(),
+            ],
             'cancel_reasons' => SessionListQuery::reference(ReferenceList::CancelReason),
             'enrolments' => EnrolmentRows::forDossier($dossier, $user),
             'fundings' => FundingRows::rows($dossier, $user, $update),

@@ -1,4 +1,5 @@
 import { DossierBlockPanel, type DossierBlock } from '@/components/dossier-blocks';
+import { DossierSteps, type DossierStepsData } from '@/components/sessions/dossier-steps';
 import Heading from '@/components/heading';
 import InputError from '@/components/input-error';
 import { EnrolDialog, type EnrolSessionOption } from '@/components/sessions/enrolment-dialog';
@@ -53,6 +54,7 @@ interface ShowProps {
     };
     can: { update: boolean; steps: Record<Step, boolean>; cancel: boolean; fund: boolean; delete: boolean; restore: boolean };
     today: string;
+    automation: DossierStepsData['automation'];
     cancel_reasons: Option[];
     enrolments: EnrolmentRow[];
     /** Null without sessions.sessions.update or on a closed dossier. */
@@ -186,6 +188,7 @@ export default function DossierShow({
     dossier,
     can,
     today,
+    automation,
     cancel_reasons,
     enrolments,
     enrol,
@@ -285,40 +288,38 @@ export default function DossierShow({
                     </div>
                 )}
 
-                <section aria-label="Étapes" className="grid gap-3 rounded-xl border p-4">
-                    <h2 className="text-sm font-semibold">Étapes</h2>
-                    <ol className="grid gap-2 text-sm sm:grid-cols-3">
-                        <li>Convention envoyée : {formatDay(dossier.convention_sent_on)}</li>
-                        <li>Convention signée : {formatDay(dossier.convention_signed_on)}</li>
-                        <li>Convocations envoyées : {formatDay(dossier.convocations_sent_on)}</li>
-                    </ol>
-                    {blocks.some((b) => b.key === 'documents.dossier') && (
-                        <p className="text-muted-foreground text-xs">
-                            Ces étapes se mettent à jour seules quand vous envoyez ou faites signer la convention depuis le bloc{' '}
-                            <a href="#documents" className="underline">
-                                Documents
-                            </a>{' '}
-                            plus bas. Les boutons ci-dessous servent seulement à indiquer une date à la main (document envoyé hors du TMS).
-                        </p>
-                    )}
-                    <div className="flex flex-wrap gap-2">
-                        {DATED.filter((d) => can.steps[d.step]).map((d) => (
-                            <Button key={d.step} type="button" size="sm" variant="ghost" onClick={() => setDated(d)}>
-                                Indiquer à la main : {d.label.toLowerCase()}…
-                            </Button>
-                        ))}
-                        {can.steps.running && (
-                            <Button type="button" size="sm" variant="outline" onClick={() => mark('running', 'En cours')}>
-                                Passer « En cours »
-                            </Button>
-                        )}
-                        {can.steps.done && (
-                            <Button type="button" size="sm" variant="outline" onClick={() => mark('done', 'Réalisé')}>
-                                Passer « Réalisé »
-                            </Button>
-                        )}
-                    </div>
-                </section>
+                <DossierSteps
+                    data={{
+                        status: dossier.status,
+                        particulier: dossier.account.type === 'person',
+                        convention_sent_on: dossier.convention_sent_on,
+                        convention_signed_on: dossier.convention_signed_on,
+                        convocations_sent_on: dossier.convocations_sent_on,
+                        automation,
+                        hasDocuments: blocks.some((b) => b.key === 'documents.dossier'),
+                    }}
+                    corrections={
+                        DATED.some((d) => can.steps[d.step]) || can.steps.running || can.steps.done ? (
+                            <>
+                                {DATED.filter((d) => can.steps[d.step]).map((d) => (
+                                    <Button key={d.step} type="button" size="sm" variant="outline" onClick={() => setDated(d)}>
+                                        {d.label} hors du TMS…
+                                    </Button>
+                                ))}
+                                {can.steps.running && (
+                                    <Button type="button" size="sm" variant="outline" onClick={() => mark('running', 'En cours')}>
+                                        Forcer « En cours »
+                                    </Button>
+                                )}
+                                {can.steps.done && (
+                                    <Button type="button" size="sm" variant="outline" onClick={() => mark('done', 'Réalisé')}>
+                                        Forcer « Réalisé »
+                                    </Button>
+                                )}
+                            </>
+                        ) : null
+                    }
+                />
 
                 <section aria-label="Informations" className="rounded-xl border p-4">
                     <dl className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
