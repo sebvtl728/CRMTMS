@@ -12,6 +12,8 @@ export interface TrainingOption extends Option {
     /** Price HT per unit for the account (entreprise or particulier), null when missing. */
     price_cents: number | null;
     is_active: boolean;
+    /** Funding modes the catalogue offers for this training (empty: no constraint). */
+    funding_mode_ids: string[];
 }
 
 // A type, not an interface: useForm needs an index-compatible shape.

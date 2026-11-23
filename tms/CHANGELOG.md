@@ -5,6 +5,10 @@ Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) ; ve
 
 ## [Non publié]
 
+### Ajouté
+
+- **Opportunité** : avertissement quand le mode de financement choisi n'est pas prévu au catalogue pour une de ses formations, dans le formulaire (en direct) et sur la page. Il ne bloque rien.
+
 ## [0.15.11] - 2026-11-23
 
 ### Ajouté
