@@ -72,10 +72,9 @@ test('quotes: training in the catalogue, amount of the opportunity, quote, pdf, 
     await expect(page.getByText('Opportunité créée.')).toBeVisible();
     const opportunityUrl = page.url();
 
-    // « Calculer le montant proposé »: 2 trainees × 1 200 €, carried into the estimated amount.
+    // Proposed amount, live: 2 trainees × 1 200 €, carried into the estimated amount.
     await page.getByRole('link', { name: 'Modifier' }).click();
     await page.getByLabel('Quantité').fill('2');
-    await page.getByRole('button', { name: 'Calculer le montant proposé' }).click();
     await expect(page.getByText(/Montant proposé : 2\s400,00\s€/)).toBeVisible();
     await page.getByRole('button', { name: 'Reporter dans le montant estimé' }).click();
     await expect(page.getByLabel('Montant estimé HT (€)')).toHaveValue(/^2\s400,00$/);

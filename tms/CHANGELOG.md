@@ -5,6 +5,10 @@ Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) ; ve
 
 ## [Non publié]
 
+### Modifié
+
+- **Opportunité** : le **montant proposé** par les formations se calcule en direct dans le formulaire, sans enregistrer d'abord (plus de bouton « Calculer ») ; le champ s'appelle **Montant estimé HT** et dit à quoi il sert.
+
 ## [0.15.15] - 2026-11-23
 
 ### Ajouté
