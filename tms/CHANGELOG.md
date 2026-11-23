@@ -5,6 +5,10 @@ Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) ; ve
 
 ## [Non publié]
 
+### Ajouté
+
+- **Date de fin estimée** : à la création d'une session, et dans l'assistant « Créer le dossier » d'un devis, saisir le début propose la fin d'après les heures, à 7 h par jour ouvré, week-ends et jours fériés exclus. Elle reste modifiable et n'écrase jamais une fin saisie à la main.
+
 ## [0.15.14] - 2026-11-23
 
 ### Ajouté

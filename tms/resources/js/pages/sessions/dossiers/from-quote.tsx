@@ -8,6 +8,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import AppLayout from '@/layouts/app-layout';
 import { formatDay, type Option } from '@/lib/crm';
+import { estimateEndDate, HOURS_PER_DAY, parseHours } from '@/lib/sessions';
 import { type BreadcrumbItem } from '@/types';
 import { Head, Link, router } from '@inertiajs/react';
 import { LoaderCircle, Plus, X } from 'lucide-react';
@@ -448,6 +449,7 @@ export default function DossierFromQuote({ existing, plan, options, can }: Props
                                                     accountLabel={plan.quote.account.type === 'organisation' ? plan.quote.account.label : null}
                                                     options={options}
                                                     error={(field) => err(`lines.${i}.new_session.${field}`)}
+                                                    hours={plan.lines[i].training?.hours ?? null}
                                                 />
                                             )}
                                             {lines[i].choice !== 'existing' && <InputError message={err(`lines.${i}.session_id`)} />}
@@ -620,6 +622,7 @@ function NewSessionFields({
     accountLabel,
     options,
     error,
+    hours = null,
 }: {
     index: number;
     value: NewSession;
@@ -627,6 +630,8 @@ function NewSessionFields({
     accountLabel: string | null;
     options: Props['options'];
     error: (field: string) => string | undefined;
+    /** Hours of the training: the end is estimated from them (7 h a working day). */
+    hours?: string | null;
 }) {
     const kinds = options.kind.filter((k) => k.value !== 'intra' || accountLabel !== null);
 
@@ -666,9 +671,20 @@ function NewSessionFields({
                     id={`starts_on_${index}`}
                     type="date"
                     value={value.starts_on}
-                    onChange={(e) => onChange({ starts_on: e.target.value, ends_on: value.ends_on === '' ? e.target.value : value.ends_on })}
+                    onChange={(e) => {
+                        // The end follows the start while it is empty or still the previous estimate.
+                        const estimate = estimateEndDate(e.target.value, parseHours(hours)) ?? e.target.value;
+                        const previous = estimateEndDate(value.starts_on, parseHours(hours)) ?? value.starts_on;
+                        onChange({
+                            starts_on: e.target.value,
+                            ends_on: value.ends_on === '' || value.ends_on === previous ? estimate : value.ends_on,
+                        });
+                    }}
                 />
                 <InputError message={error('starts_on')} />
+                {hours && value.starts_on && (
+                    <p className="text-muted-foreground text-xs">Fin estimée à {HOURS_PER_DAY} h par jour ouvré (jours fériés exclus) : à ajuster.</p>
+                )}
             </div>
             <div className="grid gap-2">
                 <Label htmlFor={`ends_on_${index}`}>Fin *</Label>
