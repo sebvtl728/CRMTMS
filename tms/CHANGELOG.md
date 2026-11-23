@@ -5,9 +5,15 @@ Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) ; ve
 
 ## [Non publié]
 
+## [0.15.14] - 2026-11-23
+
 ### Ajouté
 
 - **Fiche Cerfa du contrat d'apprentissage (PDF)** sur la carte Alternance : toutes les rubriques du Cerfa, dans son ordre, remplies avec les données du TMS (dont le code RNCP), le reste marqué « à compléter », à recopier sur le portail de l'OPCO.
+
+### Corrigé
+
+- **Envoi d'un devis** : le destinataire proposé est l'**e-mail professionnel** de l'interlocuteur dans l'entreprise, sinon son e-mail personnel, sinon l'e-mail de l'entreprise. Il restait vide quand l'interlocuteur n'avait qu'un e-mail pro.
 
 ## [0.15.13] - 2026-11-23
 
