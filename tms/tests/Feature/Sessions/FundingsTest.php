@@ -459,3 +459,16 @@ it('says how much of the funded amount is agreed and how much still waits for an
         ->where('balance.pending', '2 000,00 €')
         ->where('balance.pending_cents', 200000));
 });
+
+it('says « Entièrement financé » for a line covered by the fundings of the line and of the whole dossier', function () {
+    $dossier = funDossier();
+    $line = $dossier->lines()->firstOrFail();
+    $this->actingAs(admin(twoFactor: true));
+    $this->post("/dossiers/{$dossier->id}/fundings", funPayload(['amount' => '1 000,00', 'dossier_line_id' => $line->id]))->assertSessionHasNoErrors();
+    $this->post("/dossiers/{$dossier->id}/fundings", funPayload(['amount' => '2 000,00']))->assertSessionHasNoErrors();
+
+    $this->get("/dossiers/{$dossier->id}")->assertInertia(fn (Assert $page) => $page
+        ->where('balance.remaining_cents', 0)
+        ->where('balance.parts.0.remaining_cents', 0)
+        ->where('balance.parts.0.message', 'Entièrement financé'));
+});

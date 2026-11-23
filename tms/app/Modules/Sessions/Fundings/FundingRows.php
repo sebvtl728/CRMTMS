@@ -92,7 +92,7 @@ final class FundingRows
             'price' => Amounts::display($p['price_cents']),
             'funded' => Amounts::display($p['funded_cents']),
             'remaining_cents' => $p['remaining_cents'],
-            'message' => FundingBalance::message($p['remaining_cents'], $cancelled, $p['funded_cents']),
+            'message' => $p['remaining_cents'] === 0 && ! $cancelled ? 'Entièrement financé' : FundingBalance::message($p['remaining_cents'], $cancelled, $p['funded_cents']),
         ];
 
         return [
