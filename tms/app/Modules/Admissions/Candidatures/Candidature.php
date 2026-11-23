@@ -46,6 +46,7 @@ use Illuminate\Support\Facades\Auth;
  * @property string|null $interview_report
  * @property string|null $decision_reason_id référentiel candidature_refusal_reason
  * @property string|null $dossier_id
+ * @property list<string>|null $dispensed_module_ids training modules the candidate is exempted from (booklet)
  * @property array<string, mixed> $custom_values
  * @property Carbon|null $anonymised_at
  * @property Carbon|null $created_at
@@ -107,6 +108,7 @@ class Candidature extends Model
             'positioning_received_on' => 'immutable_date',
             'interview_at' => 'datetime',
             'custom_values' => 'array',
+            'dispensed_module_ids' => 'array',
             'anonymised_at' => 'datetime',
         ];
     }

@@ -35,6 +35,19 @@ final class Trainings
     }
 
     /**
+     * Competence grid of a training (activity types → competences → skills),
+     * empty when none or unknown.
+     *
+     * @return list<array{title: string, competences: list<array{title: string, skills: list<string>}>}>
+     */
+    public function competences(string $id): array
+    {
+        $training = Str::isUuid($id) ? Training::query()->find($id) : null;
+
+        return $training === null ? [] : ($training->competences ?? []);
+    }
+
+    /**
      * The trainings of these ids (active or not, as find()), keyed by id;
      * unknown ids are left out. One query, for lists and exports.
      *

@@ -38,6 +38,7 @@ interface ShowProps {
         bpf_objective: string | null;
         nsf: string | null;
         updated_on: string;
+        competences_count: number;
         title: string;
         das: string | null;
         duration_hours: string | null;
@@ -123,6 +124,7 @@ export default function TrainingShowPage({ training, brochures, blocks, can, sta
         ['Objectif (BPF)', training.bpf_objective ?? '-'],
         ['Spécialité NSF', training.nsf ?? '-'],
         ['Programme mis à jour le', formatDay(training.updated_on)],
+        ['Compétences (livret)', training.competences_count > 0 ? `${training.competences_count} compétence(s)` : '-'],
         ['DAS', training.das ?? '-'],
         ['Durée', duration || '-'],
         ['Modalité', training.modalities.length > 0 ? training.modalities.join(', ') : '-'],

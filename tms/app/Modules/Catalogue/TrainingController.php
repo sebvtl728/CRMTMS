@@ -64,6 +64,7 @@ class TrainingController extends Controller
                 'rncp_code' => $training->rncp_code,
                 'bpf_objective' => $training->bpf_objective?->label(),
                 'nsf' => Nsf::display($training->nsf_code),
+                'competences_count' => Competences::count($training->competences),
                 'updated_on' => TrainingProgramme::updatedOn($training)->toDateString(),
                 'modalities' => ReferenceItem::query()->withTrashed()->whereKey($modalityIds)->orderBy('position')->orderBy('label')->pluck('label')->values()->all(),
             ],
@@ -107,6 +108,10 @@ class TrainingController extends Controller
 
         $modules = array_key_exists('modules', $validated) ? array_values($validated['modules'] ?? []) : null;
         unset($validated['modules']);
+        if (array_key_exists('competences_text', $validated)) {
+            $validated['competences'] = Competences::parse((string) ($validated['competences_text'] ?? ''));
+            unset($validated['competences_text']);
+        }
 
         DB::transaction(function () use ($validated, $funding, $modules): void {
             $training = Training::query()->create($validated);
@@ -145,6 +150,7 @@ class TrainingController extends Controller
                 'access_terms' => $training->access_terms,
                 'rncp_code' => $training->rncp_code,
                 'bpf_objective' => $training->bpf_objective?->value,
+                'competences_text' => Competences::toText($training->competences),
                 'nsf_code' => $training->nsf_code,
                 'results' => $training->results,
                 'modules' => app(Trainings::class)->modules($training->id),
@@ -170,6 +176,10 @@ class TrainingController extends Controller
 
         $modules = array_key_exists('modules', $validated) ? array_values($validated['modules'] ?? []) : null;
         unset($validated['modules']);
+        if (array_key_exists('competences_text', $validated)) {
+            $validated['competences'] = Competences::parse((string) ($validated['competences_text'] ?? ''));
+            unset($validated['competences_text']);
+        }
 
         DB::transaction(function () use ($training, $validated, $funding, $modules): void {
             $training->update($validated);

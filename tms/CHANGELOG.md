@@ -5,6 +5,13 @@ Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) ; ve
 
 ## [Non publié]
 
+## [0.15.11] - 2026-11-23
+
+### Ajouté
+
+- **Livret d'apprentissage (PDF)** sur la carte Alternance d'une candidature : déjà rempli (partenaires, équipe, parcours avec dispenses, planning, annexes de l'organisme, pages de suivi datées mois par mois, grilles de compétences, visites). Réglages dans Administration › Livret d'apprentissage.
+- **Grille de compétences** d'une formation (activités types, compétences, savoir-faire), saisie en texte dans la fiche.
+
 ## [0.15.10] - 2026-11-23
 
 ### Ajouté

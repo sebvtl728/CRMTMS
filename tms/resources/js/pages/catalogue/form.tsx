@@ -20,6 +20,7 @@ interface FormProps {
         rncp_code: string | null;
         bpf_objective: string | null;
         nsf_code: string | null;
+        competences_text: string;
         title: string;
         das_id: string;
         duration_hours: string | null;
@@ -67,6 +68,7 @@ type TrainingForm = {
     rncp_code: string;
     bpf_objective: string;
     nsf_code: string;
+    competences_text: string;
     title: string;
     das_id: string;
     duration_hours: string;
@@ -102,6 +104,7 @@ export default function TrainingFormPage({ training, options, assistant, brochur
         rncp_code: training?.rncp_code ?? '',
         bpf_objective: training?.bpf_objective ?? '',
         nsf_code: training?.nsf_code ?? '',
+        competences_text: training?.competences_text ?? '',
         title: training?.title ?? '',
         das_id: training?.das_id ?? '',
         duration_hours: decimalInput(training?.duration_hours),
@@ -541,6 +544,25 @@ export default function TrainingFormPage({ training, options, assistant, brochur
                             <legend className="px-2 text-sm font-semibold">Accessibilité et accès</legend>
                             {area('accessibility', 'Accessibilité aux personnes en situation de handicap')}
                             {area('access_terms', 'Modalités et délais d’accès')}
+                        </fieldset>
+
+                        <fieldset className="grid gap-2 rounded-xl border p-4" aria-label="Compétences">
+                            <legend className="px-2 text-sm font-semibold">Compétences (grilles du livret d’apprentissage)</legend>
+                            <p className="text-muted-foreground text-xs">
+                                Une ligne par élément : « AT » pour une activité type, « CP » pour une compétence, un tiret pour un savoir-faire.
+                                Collez la grille depuis Word puis ajoutez les préfixes.
+                            </p>
+                            <textarea
+                                id="competences_text"
+                                rows={12}
+                                value={data.competences_text}
+                                onChange={(e) => setData('competences_text', e.target.value)}
+                                className={`${textareaClass} font-mono text-xs`}
+                                placeholder={
+                                    'AT Préparer et dresser des entrées et des desserts\nCP Réaliser la mise en place des entrées et des desserts\n- Peser les produits'
+                                }
+                            />
+                            <InputError message={errors.competences_text} />
                         </fieldset>
 
                         <fieldset className="grid gap-4 rounded-xl border p-4 md:grid-cols-2" aria-label="Résultats">

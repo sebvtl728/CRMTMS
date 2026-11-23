@@ -40,6 +40,7 @@ use Illuminate\Support\Facades\Auth;
  * @property string|null $rncp_code « RNCP » followed by digits, uppercase
  * @property string|null $results
  * @property BpfObjective|null $bpf_objective BPF cadre F-3
+ * @property list<array{title: string, competences: list<array{title: string, skills: list<string>}>}>|null $competences grid (Competences)
  * @property string|null $nsf_code NSF group of specialities (Nsf::CODES), BPF cadre F-4
  * @property bool $is_active
  * @property string|null $created_by
@@ -57,11 +58,18 @@ class Training extends Model
     /** @var list<string> */
     protected array $auditIgnore = ['created_by', 'updated_by'];
 
+    /**
+     * The journal records that the competence grid changed, never its (long) content.
+     *
+     * @var list<string>
+     */
+    protected array $auditExclude = ['competences'];
+
     /** @var list<string> */
     protected $fillable = [
         'code', 'title', 'das_id', 'duration_hours', 'duration_days', 'audience', 'prerequisites',
         'price_company', 'price_individual', 'is_active',
-        'description', 'objectives', 'methods', 'evaluation', 'sanction', 'accessibility', 'access_terms', 'results', 'rncp_code', 'bpf_objective', 'nsf_code',
+        'description', 'objectives', 'methods', 'evaluation', 'sanction', 'accessibility', 'access_terms', 'results', 'rncp_code', 'bpf_objective', 'nsf_code', 'competences',
     ];
 
     /** @var array<string, mixed> */
@@ -98,6 +106,7 @@ class Training extends Model
             'is_active' => 'boolean',
             'objectives' => 'array',
             'bpf_objective' => BpfObjective::class,
+            'competences' => 'array',
         ];
     }
 

@@ -6,6 +6,8 @@ use App\Modules\Core\References\ReferenceList;
 use App\Modules\Core\Tenancy\TenantContext;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
+use Illuminate\Validation\Validator;
 
 /**
  * Validation of a training (create and update). Authorisation is done by the
@@ -161,6 +163,7 @@ class TrainingRequest extends FormRequest
                 ->where('tenant_id', $tenantId)->whereNull('deleted_at')->ignore($current?->id)],
             'title' => ['required', 'string', 'max:200'],
             'rncp_code' => ['nullable', 'string', 'regex:/^RNCP\d{1,6}$/'],
+            'competences_text' => ['nullable', 'string', 'max:300000'],
             'bpf_objective' => ['nullable', Rule::enum(BpfObjective::class)],
             'nsf_code' => ['nullable', 'string', Rule::in(array_keys(Nsf::CODES))],
             'das_id' => ['required', ...self::reference(ReferenceList::Das, array_filter([$current?->das_id]))],
@@ -198,6 +201,27 @@ class TrainingRequest extends FormRequest
     /**
      * @return array<string, string>
      */
+    /**
+     * The competence grid must parse (line by line message).
+     *
+     * @return list<\Closure>
+     */
+    public function after(): array
+    {
+        return [function (Validator $validator): void {
+            $text = $this->input('competences_text');
+            if (! is_string($text) || $validator->errors()->has('competences_text')) {
+                return;
+            }
+            try {
+                Competences::parse($text);
+            } catch (ValidationException $e) {
+                $messages = $e->errors()['competences_text'] ?? [];
+                $validator->errors()->add('competences_text', (string) ($messages[0] ?? 'Grille de compétences invalide.'));
+            }
+        }];
+    }
+
     public function messages(): array
     {
         return self::validationMessages();

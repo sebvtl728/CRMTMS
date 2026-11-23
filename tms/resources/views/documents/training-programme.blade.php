@@ -41,7 +41,7 @@
         .updated { text-align: right; }
         h1 { font-size: 18pt; margin: 16pt 0 4pt; }
         h2 { font-size: 11pt; margin: 14pt 0 4pt; color: #102a43; border-bottom: 0.5pt solid #e4e7eb; padding-bottom: 2pt; }
-        .facts { width: 100%; border-collapse: collapse; margin-top: 8pt; }
+        .facts { width: 99.5%; border-collapse: collapse; margin-top: 8pt; }
         .facts td { padding: 3pt 6pt; border: 0.5pt solid #e4e7eb; vertical-align: top; }
         .facts td.k { width: 32%; color: #52606d; }
         ul { margin: 2pt 0; padding-left: 14pt; }
