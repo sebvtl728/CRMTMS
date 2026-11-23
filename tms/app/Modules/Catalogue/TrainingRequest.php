@@ -161,6 +161,7 @@ class TrainingRequest extends FormRequest
                 ->where('tenant_id', $tenantId)->whereNull('deleted_at')->ignore($current?->id)],
             'title' => ['required', 'string', 'max:200'],
             'rncp_code' => ['nullable', 'string', 'regex:/^RNCP\d{1,6}$/'],
+            'competences_text' => ['nullable', 'string', 'max:300000'],
             'bpf_objective' => ['nullable', Rule::enum(BpfObjective::class)],
             'nsf_code' => ['nullable', 'string', Rule::in(array_keys(Nsf::CODES))],
             'das_id' => ['required', ...self::reference(ReferenceList::Das, array_filter([$current?->das_id]))],
@@ -198,6 +199,26 @@ class TrainingRequest extends FormRequest
     /**
      * @return array<string, string>
      */
+    /**
+     * The competence grid must parse (line by line message).
+     *
+     * @return list<\Closure>
+     */
+    public function after(): array
+    {
+        return [function (\Illuminate\Validation\Validator $validator): void {
+            $text = $this->input('competences_text');
+            if (! is_string($text) || $validator->errors()->has('competences_text')) {
+                return;
+            }
+            try {
+                Competences::parse($text);
+            } catch (\Illuminate\Validation\ValidationException $e) {
+                $validator->errors()->add('competences_text', (string) collect($e->errors()['competences_text'] ?? [])->first());
+            }
+        }];
+    }
+
     public function messages(): array
     {
         return self::validationMessages();
