@@ -25,7 +25,7 @@ interface Props {
 
 const breadcrumbs: BreadcrumbItem[] = [{ title: 'Mon planning', href: '/mon-planning' }];
 
-export default function MyPlanning({ trainer, period, holidays, closures, seances, unavailabilities, calendar_feed, status }: Props) {
+export default function MyPlanning({ trainer, period, holidays, closures, seances, unavailabilities, calendar_feed }: Props) {
     const [open, setOpen] = useState<PlanningSeance | null>(null);
     const [attendance, setAttendance] = useState<string | null>(null);
 
@@ -50,8 +50,6 @@ export default function MyPlanning({ trainer, period, holidays, closures, seance
                         </Button>
                     )}
                 </div>
-
-                {status && <div className="text-sm font-medium text-green-600">{status}</div>}
 
                 {trainer === null ? (
                     <p className="text-sm">

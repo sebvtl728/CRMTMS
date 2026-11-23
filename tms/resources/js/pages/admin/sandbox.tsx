@@ -12,7 +12,7 @@ import { FormEventHandler } from 'react';
 const breadcrumbs: BreadcrumbItem[] = [{ title: 'Bac à sable', href: '/admin/sandbox' }];
 
 /** Administration › Bac à sable: reset the local sandbox (demo), never on a server. */
-export default function Sandbox({ status }: { status?: string }) {
+export default function Sandbox() {
     const { data, setData, post, processing, errors, reset } = useForm({ mode: 'work', confirmation: '' });
 
     const submit: FormEventHandler = (e) => {
@@ -28,7 +28,6 @@ export default function Sandbox({ status }: { status?: string }) {
                     title="Bac à sable"
                     description="Ce TMS est un bac à sable local (démonstration et essais). Cette page n'existe jamais sur un serveur."
                 />
-                {status && <div className="text-sm font-medium text-green-600">{status}</div>}
 
                 <form onSubmit={submit} className="flex max-w-xl flex-col gap-5">
                     <fieldset className="grid gap-3">

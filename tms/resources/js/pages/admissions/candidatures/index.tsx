@@ -53,7 +53,7 @@ function listQuery(filters: Filters): Record<string, string> {
     return query;
 }
 
-export default function CandidaturesIndex({ rows, filters, counts, options, can, status }: IndexProps) {
+export default function CandidaturesIndex({ rows, filters, counts, options, can }: IndexProps) {
     const [search, setSearch] = useState(filters.q ?? '');
     const first = useRef(true);
 
@@ -101,8 +101,6 @@ export default function CandidaturesIndex({ rows, filters, counts, options, can,
                         )}
                     </div>
                 </div>
-
-                {status && <div className="text-sm font-medium text-green-600">{status}</div>}
 
                 <div role="tablist" aria-label="Vues" className="flex flex-wrap gap-1 border-b">
                     {TABS.map((tab) => (

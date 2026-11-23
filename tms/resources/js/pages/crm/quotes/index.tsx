@@ -138,7 +138,7 @@ function SuccessRateBanner({ rate, onPeriod }: { rate: SuccessRate; onPeriod: (p
     );
 }
 
-export default function QuotesIndex({ quotes, filters, options, success_rate, can, status }: IndexProps) {
+export default function QuotesIndex({ quotes, filters, options, success_rate, can }: IndexProps) {
     const [search, setSearch] = useState(filters.q);
     const first = useRef(true);
 
@@ -182,8 +182,6 @@ export default function QuotesIndex({ quotes, filters, options, success_rate, ca
                     <Heading title="Devis" description="Propositions commerciales, créées depuis les opportunités" />
                     {can.export && <QuoteExportButton filters={filters} />}
                 </div>
-
-                {status && <div className="text-sm font-medium text-green-600">{status}</div>}
 
                 <section aria-label="Filtres" className="grid gap-3 rounded-xl border p-3 sm:grid-cols-2 lg:grid-cols-4">
                     <div className="grid gap-1 sm:col-span-2 lg:col-span-4">

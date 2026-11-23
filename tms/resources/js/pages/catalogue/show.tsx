@@ -112,7 +112,7 @@ function SessionsBlock({ data }: { data: SessionsBlockData }) {
     );
 }
 
-export default function TrainingShowPage({ training, brochures, blocks, can, status }: ShowProps) {
+export default function TrainingShowPage({ training, brochures, blocks, can }: ShowProps) {
     const breadcrumbs: BreadcrumbItem[] = [
         { title: 'Catalogue', href: '/catalogue' },
         { title: training.title, href: '#' },
@@ -143,7 +143,6 @@ export default function TrainingShowPage({ training, brochures, blocks, can, sta
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title={training.title} />
             <div className="flex flex-col gap-4 p-4">
-                {status && <div className="text-sm font-medium text-green-600">{status}</div>}
                 <div className="flex flex-wrap items-start justify-between gap-2">
                     <div className="flex flex-wrap items-center gap-2">
                         <Heading title={training.title} />

@@ -25,7 +25,7 @@ interface ReminderRow {
 const breadcrumbs: BreadcrumbItem[] = [{ title: 'À relancer', href: '/finance/reminders' }];
 
 /** Finance › À relancer: the unpaid invoices whose next reminder level is reached. */
-export default function RemindersIndex({ reminders, status }: { reminders: ReminderRow[]; status?: string }) {
+export default function RemindersIndex({ reminders }: { reminders: ReminderRow[]; status?: string }) {
     const sendable = reminders.filter((r) => r.email !== null).map((r) => r.id);
     const [chosen, setChosen] = useState<string[]>(sendable);
     const [sending, setSending] = useState(false);
@@ -55,8 +55,6 @@ export default function RemindersIndex({ reminders, status }: { reminders: Remin
                         Envoyer les relances ({chosen.length})
                     </Button>
                 </div>
-
-                {status && <div className="text-sm font-medium text-green-600">{status}</div>}
 
                 {reminders.length === 0 ? (
                     <div className="text-muted-foreground rounded-xl border p-8 text-center text-sm">Aucune facture à relancer aujourd'hui.</div>

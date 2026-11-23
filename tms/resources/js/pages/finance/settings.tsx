@@ -84,7 +84,7 @@ function RemindersForm({ reminders }: { reminders: FinanceSettingsProps['reminde
     );
 }
 
-export default function FinanceSettings({ settings, reminders, status }: FinanceSettingsProps) {
+export default function FinanceSettings({ settings, reminders }: FinanceSettingsProps) {
     const { data, setData, put, processing, errors } = useForm({ unjustified_absences: settings.unjustified_absences });
 
     const submit: FormEventHandler = (e) => {
@@ -101,8 +101,6 @@ export default function FinanceSettings({ settings, reminders, status }: Finance
                     title="Réglages de facturation"
                     description="Règles appliquées à tous les dossiers ; chaque dossier peut les remplacer par les siennes."
                 />
-
-                {status && <div className="text-sm font-medium text-green-600">{status}</div>}
 
                 <form onSubmit={submit} className="flex max-w-xl flex-col gap-6">
                     <fieldset className="grid gap-3">

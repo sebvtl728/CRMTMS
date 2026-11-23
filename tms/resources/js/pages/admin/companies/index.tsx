@@ -23,7 +23,7 @@ interface CompaniesIndexProps {
 
 const breadcrumbs: BreadcrumbItem[] = [{ title: 'Sociétés', href: '/admin/companies' }];
 
-export default function CompaniesIndex({ companies, status }: CompaniesIndexProps) {
+export default function CompaniesIndex({ companies }: CompaniesIndexProps) {
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Sociétés" />
@@ -38,8 +38,6 @@ export default function CompaniesIndex({ companies, status }: CompaniesIndexProp
                         </Link>
                     </Button>
                 </div>
-
-                {status && <div className="text-sm font-medium text-green-600">{status}</div>}
 
                 <section className="overflow-x-auto rounded-xl border">
                     <table className="w-full text-sm">

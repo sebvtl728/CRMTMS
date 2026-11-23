@@ -182,7 +182,7 @@ function Detail({ row }: { row: DueRow }) {
     );
 }
 
-export default function ToInvoice({ rows, soon, filters, options, can, status }: ToInvoiceProps) {
+export default function ToInvoice({ rows, soon, filters, options, can }: ToInvoiceProps) {
     const [selected, setSelected] = useState<string[]>([]);
     const [open, setOpen] = useState<string[]>([]);
     const [processing, setProcessing] = useState(false);
@@ -223,8 +223,6 @@ export default function ToInvoice({ rows, soon, filters, options, can, status }:
                         </Button>
                     )}
                 </div>
-
-                {status && <div className="text-sm font-medium text-green-600">{status}</div>}
 
                 <section aria-label="Filtres" className="grid gap-3 rounded-xl border p-3 sm:grid-cols-2 lg:grid-cols-5">
                     <FilterSelect label="Société" value={filters.company} options={options.company} onChange={(v) => visit({ company: v })} />

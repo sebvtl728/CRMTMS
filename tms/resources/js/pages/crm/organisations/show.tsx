@@ -120,7 +120,6 @@ export default function OrganisationShow({
     ficheDasIds,
     similar,
     can,
-    status,
 }: ShowProps) {
     const [tab, setTab] = useState<string>('Informations');
     const [confirming, setConfirming] = useState(false);
@@ -187,7 +186,6 @@ export default function OrganisationShow({
                     </div>
                 </div>
 
-                {status && <div className="text-sm font-medium text-green-600">{status}</div>}
                 {can.merge && <SimilarFiches type="organisation" currentId={o.id} similar={similar} />}
                 {errors.restore && (
                     <div

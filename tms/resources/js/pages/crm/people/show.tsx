@@ -136,7 +136,6 @@ export default function PersonShow({
     trainingOptions,
     ficheDasIds,
     can,
-    status,
 }: ShowProps) {
     const [confirming, setConfirming] = useState(false);
     const [tab, setTab] = useState<string>('Informations');
@@ -227,7 +226,6 @@ export default function PersonShow({
                     </div>
                 </div>
 
-                {status && <div className="text-sm font-medium text-green-600">{status}</div>}
                 {can.merge && <SimilarFiches type="person" currentId={p.id} similar={similar} />}
 
                 <div role="tablist" aria-label="Sections de la fiche" className="flex gap-1 overflow-x-auto border-b">

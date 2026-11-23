@@ -53,7 +53,7 @@ function FromPdf() {
 
 const breadcrumbs: BreadcrumbItem[] = [{ title: 'Tests en ligne', href: '/admissions/online-tests' }];
 
-export default function OnlineTestsIndex({ tests, status }: { tests: Row[]; status?: string }) {
+export default function OnlineTestsIndex({ tests }: { tests: Row[]; status?: string }) {
     const { data, setData, post, processing, errors } = useForm({ title: '' });
     const submit: FormEventHandler = (e) => {
         e.preventDefault();
@@ -68,7 +68,6 @@ export default function OnlineTestsIndex({ tests, status }: { tests: Row[]; stat
                     title="Tests en ligne"
                     description="Tests de positionnement passés à l’écran par les candidats (ordinateur seulement), corrigés dans le TMS."
                 />
-                {status && <div className="text-sm font-medium text-green-600">{status}</div>}
                 <form onSubmit={submit} className="flex max-w-xl flex-wrap items-start gap-2">
                     <div className="grid flex-1 gap-1">
                         <Input

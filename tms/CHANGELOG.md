@@ -5,6 +5,21 @@ Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) ; ve
 
 ## [Non publié]
 
+## [0.15.16] - 2026-11-23
+
+### Ajouté
+
+- **Date de fin estimée** : à la création d'une session, et dans l'assistant « Créer le dossier » d'un devis, saisir le début propose la fin d'après les heures, à 7 h par jour ouvré, week-ends et jours fériés exclus. Elle reste modifiable et n'écrase jamais une fin saisie à la main.
+- **Test de visite** (`tests/e2e/zz-smoke.spec.ts`) : chaque page du menu et la première fiche de chaque liste s'ouvrent sans erreur serveur, sans erreur JavaScript ni texte cassé.
+
+### Corrigé
+
+- **Tableaux de bord, Mois / direction** : la carte **CA signé par DAS** suit maintenant les filtres **Commercial** et **Cible**. Elle affichait toujours le CA de toute l'équipe, si bien qu'« Appliquer » semblait sans effet. Filtrée, elle ne montre plus l'objectif de l'équipe.
+- **Erreurs qui s'effaçaient** : le total « À traiter » du menu se chargeait en différé, et ce rechargement effaçait les erreurs lues par certains écrans (avertissement « Fiches similaires » et son bouton « Créer puis fusionner », devis, candidature, référentiels, règlements, fusion…). Il est maintenant calculé avec la page (gardé 60 s en cache).
+- **Messages en double** : le message d'une action (« Formation créée. »…) s'affichait à la fois en haut de la page et dans la bannière en bas à droite ; il ne reste que la bannière (52 pages).
+- **Barre de progression** des chargements : ses styles étaient refusés par la politique de sécurité du navigateur (erreur dans la console sur chaque page) ; ils reçoivent le jeton de la page.
+- **Textes anglais** des composants de base : info-bulle « Toggle Sidebar » du bouton de menu, libellés lus par les lecteurs d'écran (« Close », « More »…).
+
 ## [0.15.15] - 2026-11-23
 
 ### Ajouté

@@ -98,7 +98,7 @@ let newModuleCount = 0;
 
 const textareaClass = 'border-input bg-background focus:ring-ring w-full rounded-md border px-3 py-2 text-sm focus:ring-2 focus:outline-hidden';
 
-export default function TrainingFormPage({ training, options, assistant, brochures = [], can, status }: FormProps) {
+export default function TrainingFormPage({ training, options, assistant, brochures = [], can }: FormProps) {
     const editing = training !== null;
     // One copy per click: « Dupliquer » stays disabled until the request ends.
     const [duplicating, setDuplicating] = useState(false);
@@ -287,15 +287,6 @@ export default function TrainingFormPage({ training, options, assistant, brochur
                     title={title}
                     description={editing && !training.is_active ? 'Formation désactivée : elle n’est plus proposée.' : undefined}
                 />
-
-                {status && (
-                    <p
-                        role="status"
-                        className="rounded-md border border-green-600/30 bg-green-50 p-3 text-sm text-green-800 dark:bg-green-950 dark:text-green-200"
-                    >
-                        {status}
-                    </p>
-                )}
 
                 <TrainingAssistant
                     configured={assistant?.configured ?? false}

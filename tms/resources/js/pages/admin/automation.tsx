@@ -25,7 +25,7 @@ interface AutomationProps {
 const breadcrumbs: BreadcrumbItem[] = [{ title: 'Automatismes', href: '/admin/automation' }];
 
 /** Administration › Automatismes: what leaves by itself every morning at 7:15, and « Exécuter maintenant ». */
-export default function Automation({ settings, status }: AutomationProps) {
+export default function Automation({ settings }: AutomationProps) {
     const { data, setData, transform, put, processing, errors } = useForm({
         convocation_days: String(settings.convocation_days),
         day_before: settings.day_before,
@@ -63,7 +63,6 @@ export default function Automation({ settings, status }: AutomationProps) {
                     title="Automatismes"
                     description="Ce qui part tout seul chaque matin à 7 h 15 : convocations, rappels de la veille, attestations et relances de signature. Les textes se règlent dans les modèles d'e-mails."
                 />
-                {status && <div className="text-sm font-medium text-green-600">{status}</div>}
 
                 <form onSubmit={submit} className="flex max-w-xl flex-col gap-6">
                     <section className="grid gap-2 rounded-md border p-4">
@@ -101,13 +100,15 @@ export default function Automation({ settings, status }: AutomationProps) {
                                 checked={data.convention_on_quote}
                                 onCheckedChange={(v) => setData('convention_on_quote', v === true)}
                             />
-                            <Label htmlFor="convention_on_quote">Émettre et envoyer en signature à la création du dossier depuis un devis signé</Label>
+                            <Label htmlFor="convention_on_quote">
+                                Émettre et envoyer en signature à la création du dossier depuis un devis signé
+                            </Label>
                         </div>
                         <p className="text-muted-foreground text-xs">
                             Tout de suite, au nom de qui crée le dossier, pour une entreprise seulement (le contrat d'un particulier s'émet à la
-                            main). Le lien de signature part au contact du dossier ; les financements y figurent « sous réserve des accords en
-                            cours », l'OPCO demandant souvent la convention signée pour accorder sa prise en charge. Jamais de seconde convention.
-                            Désactivé par défaut.
+                            main). Le lien de signature part au contact du dossier ; les financements y figurent « sous réserve des accords en cours
+                            », l'OPCO demandant souvent la convention signée pour accorder sa prise en charge. Jamais de seconde convention. Désactivé
+                            par défaut.
                         </p>
                         <InputError message={errors.convention_on_quote} />
                     </section>
@@ -120,9 +121,9 @@ export default function Automation({ settings, status }: AutomationProps) {
                         </div>
                         <p className="text-muted-foreground text-xs">
                             Le dernier jour de formation à 13 h 30, aux stagiaires présents (pas notés absents ce jour-là) : les heures de
-                            l'après-midi sont comptées comme réalisées. Un stagiaire qui part l'après-midi : annulez puis réémettez ses
-                            documents. Les autres (sessions sans séances, stagiaires oubliés) partent le matin qui suit la clôture du mois de
-                            fin. Un document annulé à la main n'est jamais refait. Désactivé par défaut.
+                            l'après-midi sont comptées comme réalisées. Un stagiaire qui part l'après-midi : annulez puis réémettez ses documents. Les
+                            autres (sessions sans séances, stagiaires oubliés) partent le matin qui suit la clôture du mois de fin. Un document annulé
+                            à la main n'est jamais refait. Désactivé par défaut.
                         </p>
                         <InputError message={errors.certificates} />
                     </section>
