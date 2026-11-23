@@ -1,6 +1,7 @@
 <?php
 
 use App\Modules\Catalogue\Training;
+use App\Modules\Core\Access\Role;
 use App\Modules\Core\References\CapFormationReferenceSeeder;
 use App\Modules\Core\References\ReferenceList;
 use App\Modules\Core\Users\User;
@@ -141,4 +142,22 @@ it('shows the revenue by DAS and its target, only with crm.revenue.view', functi
     expect($revenue['value'])->toBe(100000)->and($revenue['target_cents'])->toBe(500000)
         ->and(collect($revenue['breakdown'])->firstWhere('label', 'Hôtellerie-restauration')['value'])->toBe(100000)
         ->and(Indicators::get('crm.das_revenue')->permission())->toBe(Permissions::REVENUE_VIEW);
+});
+
+it('follows the commercial and the target filters in the revenue by DAS, without the team target', function () {
+    $boss = userWithRole(Role::Direction);
+    $lea = commercial();
+    $hotel = Organisation::query()->create(['name' => 'Hôtel du Parc']);
+    dashWon($hotel, '1000', '2026-11-12', ['responsible_user_id' => $lea->id]);
+    dashWon($hotel, '3000', '2026-11-12');
+    dashWon(makePerson('Durand', ['is_individual' => true]), '500', '2026-11-12', ['responsible_user_id' => $lea->id]);
+    $this->actingAs(admin());
+    app(RevenueTargets::class)->set(crmItem(ReferenceList::Das, 'Hôtellerie-restauration')->id, Period::of('month', '2026-11'), 500000);
+
+    expect(dashMonth('crm.das_revenue', $boss)['value'])->toBe(450000)
+        ->and(dashMonth('crm.das_revenue', $boss)['target_cents'])->toBe(500000);
+    $hers = dashMonth('crm.das_revenue', $boss, ['responsible' => $lea->id]);
+    expect($hers['value'])->toBe(150000)->and($hers['target_cents'])->toBeNull()
+        ->and(dashMonth('crm.das_revenue', $boss, ['target' => 'person'])['value'])->toBe(50000)
+        ->and(dashMonth('crm.das_revenue', $boss, ['responsible' => $lea->id, 'target' => 'organisation'])['value'])->toBe(100000);
 });
