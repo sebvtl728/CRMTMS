@@ -227,6 +227,19 @@ export default function OpportunityFormPage({ opportunity, account, defaults, co
               : route('crm.people.show', account.id)
           : route('crm.opportunities.index');
 
+    // The catalogue does not offer the chosen funding mode for some trainings: said, never blocking.
+    const fundingLabel = options.funding_mode.find((o) => o.value === data.funding_mode_id)?.label;
+    const notOffered = data.funding_mode_id
+        ? data.training_lines
+              .map((l) => options.training.find((t) => t.value === l.training_id))
+              .filter(
+                  (t): t is TrainingOption => t !== undefined && t.funding_mode_ids.length > 0 && !t.funding_mode_ids.includes(data.funding_mode_id),
+              )
+              .map((t) => t.label)
+        : [];
+    const fundingWarning =
+        notOffered.length > 0 ? `Mode de financement « ${fundingLabel ?? '?'} » non prévu au catalogue pour : ${notOffered.join(', ')}.` : null;
+
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title={editing ? "Modifier l'opportunité" : 'Nouvelle opportunité'} />
@@ -310,6 +323,11 @@ export default function OpportunityFormPage({ opportunity, account, defaults, co
                                 'funding_mode_id',
                                 account.individual ? 'Mode de financement (particulier)' : 'Mode de financement',
                                 options.funding_mode,
+                            )}
+                            {fundingWarning && (
+                                <p className="text-xs text-amber-700 sm:col-span-2 dark:text-amber-400" role="status">
+                                    {fundingWarning}
+                                </p>
                             )}
                             {pick('responsible_user_id', 'Responsable', options.responsible, 'Sans responsable')}
                         </fieldset>

@@ -63,6 +63,27 @@ final class Trainings
     }
 
     /**
+     * Funding modes offered by these trainings (catalogue), keyed by training
+     * id; a training that lists none gets an empty list. One query.
+     *
+     * @param  list<string>  $ids
+     * @return array<string, list<string>>
+     */
+    public function fundingModes(array $ids): array
+    {
+        $ids = array_values(array_filter($ids, fn (string $id) => Str::isUuid($id)));
+        $modes = array_fill_keys($ids, []);
+        if ($ids === []) {
+            return $modes;
+        }
+        foreach (Training::query()->whereKey($ids)->with('fundingModes:id')->get(['id']) as $training) {
+            $modes[$training->id] = $training->fundingModes->pluck('id')->map(fn ($id) => (string) $id)->values()->all();
+        }
+
+        return $modes;
+    }
+
+    /**
      * Competence grid of a training (activity types → competences → skills),
      * empty when none or unknown.
      *

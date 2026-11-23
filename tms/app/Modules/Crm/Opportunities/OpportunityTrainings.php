@@ -132,7 +132,7 @@ final class OpportunityTrainings
      * $current already has (« (inactive) »), by title; with their DAS (to
      * prefill the opportunity's) and their price for the account.
      *
-     * @return list<array{value: string, label: string, das_id: string, price_cents: ?int, is_active: bool}>
+     * @return list<array{value: string, label: string, das_id: string, price_cents: ?int, is_active: bool, funding_mode_ids: list<string>}>
      */
     public static function options(?Opportunity $current, bool $individual): array
     {
@@ -151,13 +151,38 @@ final class OpportunityTrainings
             usort($all, fn (TrainingData $a, TrainingData $b) => strnatcasecmp($a->title, $b->title));
         }
 
+        $modes = $trainings->fundingModes(array_map(fn (TrainingData $t) => $t->id, $all));
+
         return array_map(fn (TrainingData $t) => [
             'value' => $t->id,
             'label' => self::label($t),
             'das_id' => $t->das_id,
             'price_cents' => self::price($t, $individual),
             'is_active' => $t->is_active,
+            'funding_mode_ids' => $modes[$t->id] ?? [],
         ], $all);
+    }
+
+    /**
+     * The funding mode of the opportunity is not offered, in the catalogue,
+     * by some of its trainings (those listing at least one mode): a warning
+     * for the commercial, never a refusal; null when nothing to say.
+     */
+    public static function fundingWarning(Opportunity $opportunity): ?string
+    {
+        if ($opportunity->funding_mode_id === null) {
+            return null;
+        }
+        $lines = self::stored($opportunity);
+        $modes = app(Trainings::class)->fundingModes(array_column($lines, 'training_id'));
+        $missing = array_keys(array_filter($modes, fn (array $ids) => $ids !== [] && ! in_array($opportunity->funding_mode_id, $ids, true)));
+        if ($missing === []) {
+            return null;
+        }
+        $titles = array_map(fn (TrainingData $t) => $t->title, app(Trainings::class)->findMany($missing));
+        natcasesort($titles);
+
+        return 'Mode de financement « '.($opportunity->fundingMode->label ?? '?').' » non prévu au catalogue pour : '.implode(', ', $titles).'.';
     }
 
     /**

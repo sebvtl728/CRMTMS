@@ -35,6 +35,8 @@ interface ShowProps {
     brochure_send: BrochureSendProps | null;
     brochure_sendings: BrochureSendingRow[];
     training_summary: { lines: TrainingLine[]; estimate: TrainingEstimate };
+    /** The funding mode is not offered by some trainings in the catalogue (warning only). */
+    funding_warning: string | null;
     stages: StageOption[];
     lossReasons: Option[];
     can: { update: boolean; delete: boolean; createQuote: boolean };
@@ -58,6 +60,7 @@ export default function OpportunityShow({
     brochure_send,
     brochure_sendings,
     training_summary: trainings,
+    funding_warning: fundingWarning,
     stages,
     lossReasons,
     can,
@@ -119,6 +122,15 @@ export default function OpportunityShow({
                 </div>
 
                 {status && <div className="text-sm font-medium text-green-600">{status}</div>}
+
+                {fundingWarning && (
+                    <div
+                        className="rounded-xl border border-amber-300 bg-amber-50 p-3 text-sm text-amber-950 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-50"
+                        role="status"
+                    >
+                        {fundingWarning}
+                    </div>
+                )}
 
                 {o.target === 'individual' && (
                     <div className="rounded-xl border border-blue-300 bg-blue-50 p-3 text-sm text-blue-950 dark:border-blue-800 dark:bg-blue-950 dark:text-blue-50">
