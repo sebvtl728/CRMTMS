@@ -3,6 +3,7 @@
 use App\Modules\Catalogue\CatalogueServiceProvider;
 use App\Modules\Catalogue\Training;
 use App\Modules\Catalogue\TrainingExport;
+use App\Modules\Catalogue\TrainingModules;
 use App\Modules\Core\References\CapFormationReferenceSeeder;
 use App\Modules\Core\References\ReferenceList;
 use Inertia\Testing\AssertableInertia as Assert;
@@ -36,7 +37,7 @@ it('compares the modules with the centre hours when they are given', function ()
     $this->actingAs(admin(twoFactor: true));
     $training = Training::query()->create(['title' => 'Commis', 'das_id' => crmItem(ReferenceList::Das, 'Hôtellerie-restauration')->id,
         'duration_hours' => '100', 'centre_hours' => '70', 'company_hours' => '30']);
-    App\Modules\Catalogue\TrainingModules::sync($training, [['title' => 'A', 'duration_hours' => '35'], ['title' => 'B', 'duration_hours' => '35']]);
+    TrainingModules::sync($training, [['title' => 'A', 'duration_hours' => '35'], ['title' => 'B', 'duration_hours' => '35']]);
 
     $this->get("/catalogue/{$training->id}/edit")->assertInertia(fn (Assert $p) => $p->where('training.modules_gap', false));
     $training->update(['centre_hours' => null]);
