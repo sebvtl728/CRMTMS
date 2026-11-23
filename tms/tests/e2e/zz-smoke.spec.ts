@@ -22,6 +22,11 @@ const DETAIL_LISTS = [
 
 const BROKEN_TEXT = /\b(undefined|NaN|Invalid Date|\[object Object\])\b/;
 
+/** The page is loaded and its first requests are back; never waits forever on a page that polls. */
+async function settle(page: Page): Promise<void> {
+    await page.waitForLoadState('networkidle', { timeout: 5_000 }).catch(() => undefined);
+}
+
 async function check(page: Page, url: string, problems: string[]): Promise<void> {
     const errors: string[] = [];
     const onConsole = (m: { type(): string; text(): string }) => {
@@ -31,7 +36,7 @@ async function check(page: Page, url: string, problems: string[]): Promise<void>
     page.on('console', onConsole);
     page.on('pageerror', onPageError);
     const response = await page.goto(url);
-    await page.waitForLoadState('networkidle');
+    await settle(page);
     const status = response?.status() ?? 0;
     if (status >= 500) problems.push(`${url} : HTTP ${status}`);
     const text = await page.locator('body').innerText();
@@ -62,13 +67,14 @@ test('every page of the menu and the first record of each list open without erro
 
     for (const list of DETAIL_LISTS) {
         await page.goto(list);
-        await page.waitForLoadState('networkidle');
+        await settle(page);
         const first = await page
             .locator('main table tbody tr a[href^="/"], main ul li a[href^="/"]')
             .evaluateAll((links, base) => links.map((a) => (a as HTMLAnchorElement).getAttribute('href') ?? '').find((h) => h.startsWith(base + '/') && !/\/(create|new|export)/.test(h)), list);
         if (!first) continue;
         await check(page, first, problems);
-        const edit = await page.getByRole('link', { name: 'Modifier', exact: true }).first().getAttribute('href').catch(() => null);
+        const editLink = page.getByRole('link', { name: 'Modifier', exact: true });
+        const edit = (await editLink.count()) > 0 ? await editLink.first().getAttribute('href') : null;
         if (edit && edit.startsWith('/')) await check(page, edit, problems);
     }
 

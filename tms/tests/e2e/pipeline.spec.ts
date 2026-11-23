@@ -189,7 +189,7 @@ test('phone: meeting report on a fiche without a planned meeting, 375 px wide', 
 
     // Reached from the menu (the sidebar is a sheet on the phone).
     await page.goto('/dashboard');
-    await page.getByRole('button', { name: 'Toggle Sidebar' }).click();
+    await page.getByRole('button', { name: 'Afficher ou masquer le menu' }).click();
     await page.getByRole('link', { name: 'Compte rendu de RDV' }).click();
     await expect(page).toHaveURL(/\/crm\/report$/);
     expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBeLessThanOrEqual(1);

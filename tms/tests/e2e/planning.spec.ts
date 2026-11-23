@@ -106,9 +106,9 @@ test('planning: a manager generates séances with the assistant, a trainer marks
 
     // 3. The manager: module in séances, assistant (preview, then create), séances on the calendar.
     await steps.getByRole('link', { name: 'Configuration' }).click();
-    page.once('dialog', (d) => d.accept());
-    await page.getByRole('button', { name: 'Passer en séances' }).click();
-    await expect(page.getByRole('button', { name: 'Passer en intervalle' })).toBeVisible();
+    await page.getByRole('button', { name: 'Changer le suivi…' }).first().click();
+    await page.getByRole('dialog', { name: 'Changer le suivi du module' }).getByRole('button', { name: 'Passer en « Séances planifiées »' }).click();
+    await expect(page.getByRole('cell', { name: 'Séances planifiées' }).first()).toBeVisible();
     // Still on « Configuration » after the redirect.
     await expect(page).toHaveURL(/etape=configuration/);
     await expect(steps.getByRole('link', { name: 'Configuration' })).toHaveAttribute('aria-current', 'step');
