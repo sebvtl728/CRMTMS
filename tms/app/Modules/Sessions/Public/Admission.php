@@ -4,15 +4,23 @@ namespace App\Modules\Sessions\Public;
 
 use App\Modules\Catalogue\Trainings;
 use App\Modules\Core\Users\User;
+use App\Modules\Crm\Public\Fiches;
 use App\Modules\Sessions\Dossiers\Dossier;
 use App\Modules\Sessions\Dossiers\DossierLine;
 use App\Modules\Sessions\Dossiers\DossierWriter;
+use App\Modules\Sessions\Enrolments\Enrolment;
 use App\Modules\Sessions\Enrolments\Enrolments;
+use App\Modules\Sessions\Enrolments\EnrolmentStatus;
 use App\Modules\Sessions\Fundings\FundingWriter;
+use App\Modules\Sessions\Modules\SessionModule;
 use App\Modules\Sessions\Permissions;
+use App\Modules\Sessions\Planning\PlacementPeriod;
+use App\Modules\Sessions\Planning\PlacementPeriods;
+use App\Modules\Sessions\Planning\Seance;
 use App\Modules\Sessions\Sessions\SessionStatus;
 use App\Modules\Sessions\Sessions\TrainingSession;
 use App\Modules\Sessions\SessionsVisibility;
+use App\Modules\Sessions\Trainers\Trainer;
 use Illuminate\Database\Query\Builder;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -157,5 +165,83 @@ final class Admission
 
             return $dossier->id;
         });
+    }
+
+    /**
+     * What the apprenticeship booklet prints of a trainee's session: the
+     * session, the planned séances (between his entry and leaving days) by
+     * month of Paris and in total, his trainers with the modules they teach,
+     * and his placements (at his own dates) with their host. Null when the
+     * person has no live enrolment in the dossier.
+     *
+     * @return array{session: string, starts_on: string, ends_on: string, centre_minutes: int, months: array<string, int>, trainers: list<array{name: string, modules: list<string>}>, placements: list<array{label: string, from: string, to: string, host: ?string}>}|null
+     */
+    public static function booklet(string $dossierId, string $personId): ?array
+    {
+        if (! Str::isUuid($dossierId) || ! Str::isUuid($personId)) {
+            return null;
+        }
+        $enrolment = Enrolment::query()->where('dossier_id', $dossierId)->where('person_id', $personId)
+            ->whereNotIn('status', [EnrolmentStatus::Cancelled->value, EnrolmentStatus::Waitlisted->value])
+            ->orderByDesc('created_at')->first();
+        $session = $enrolment === null ? null : TrainingSession::withTrashed()->find($enrolment->training_session_id);
+        if ($enrolment === null || $session === null) {
+            return null;
+        }
+        $from = $enrolment->entered_on?->toDateString();
+        $to = $enrolment->left_on?->toDateString();
+        $seances = Seance::query()->where('training_session_id', $session->id)->where('status', Seance::PLANNED)
+            ->when($from !== null, fn ($q) => $q->where('date', '>=', $from))
+            ->when($to !== null, fn ($q) => $q->where('date', '<=', $to))
+            ->orderBy('date')->orderBy('starts_at')->get(['id', 'date', 'session_module_id', 'trainer_id', 'duration_minutes']);
+
+        $months = [];
+        foreach ($seances as $seance) {
+            $month = $seance->date->format('Y-m');
+            $months[$month] = ($months[$month] ?? 0) + (int) $seance->duration_minutes;
+        }
+        $modules = SessionModule::withTrashed()->whereIn('id', $seances->pluck('session_module_id')->unique()->values()->all())->pluck('title', 'id');
+        $trainers = Trainer::withTrashed()->whereIn('id', $seances->pluck('trainer_id')->filter()->unique()->values()->all())->pluck('person_id', 'id');
+        $names = app(Fiches::class)->personLabels(array_values(array_map('strval', $trainers->all())));
+        $taught = [];
+        foreach ($seances as $seance) {
+            if ($seance->trainer_id === null || ! isset($trainers[$seance->trainer_id])) {
+                continue;
+            }
+            $name = $names[$trainers[$seance->trainer_id]]['label'] ?? null;
+            if ($name === null) {
+                continue;
+            }
+            $taught[$name] ??= [];
+            $title = $modules[$seance->session_module_id] ?? null;
+            if ($title !== null && ! in_array($title, $taught[$name], true)) {
+                $taught[$name][] = $title;
+            }
+        }
+
+        $periods = PlacementPeriod::query()->with('hosts')->where('training_session_id', $session->id)->orderBy('starts_on')->orderBy('id')->get();
+        $hostIds = $periods->flatMap(fn (PlacementPeriod $p) => $p->hosts)->where('enrolment_id', $enrolment->id)->pluck('organisation_id')->filter()->map(fn ($id) => (string) $id)->values()->all();
+        $hosts = app(Fiches::class)->organisationLabels($hostIds);
+        $placements = $periods->map(function (PlacementPeriod $period) use ($enrolment, $hosts): array {
+            $dates = PlacementPeriods::datesFor($period, $enrolment->id);
+            $host = $period->hosts->firstWhere('enrolment_id', $enrolment->id);
+
+            return [
+                'label' => $period->label,
+                'from' => $dates['from'],
+                'to' => $dates['to'],
+                'host' => $host?->organisation_id === null ? null : ($hosts[$host->organisation_id]['label'] ?? null),
+            ];
+        })->values()->all();
+
+        return [
+            'session' => $session->label(app(Trainings::class)->find($session->training_id)?->title),
+            'starts_on' => $session->starts_on->toDateString(),
+            'ends_on' => $session->ends_on->toDateString(),
+            'centre_minutes' => (int) $seances->sum('duration_minutes'),
+            'months' => $months,
+            'trainers' => array_map(fn (string $name, array $mods) => ['name' => $name, 'modules' => $mods], array_keys($taught), array_values($taught)),
+            'placements' => $placements,
+        ];
     }
 }

@@ -6,6 +6,8 @@ use App\Modules\Core\References\ReferenceList;
 use App\Modules\Core\Tenancy\TenantContext;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
+use Illuminate\Validation\Validator;
 
 /**
  * Validation of a training (create and update). Authorisation is done by the
@@ -206,14 +208,14 @@ class TrainingRequest extends FormRequest
      */
     public function after(): array
     {
-        return [function (\Illuminate\Validation\Validator $validator): void {
+        return [function (Validator $validator): void {
             $text = $this->input('competences_text');
             if (! is_string($text) || $validator->errors()->has('competences_text')) {
                 return;
             }
             try {
                 Competences::parse($text);
-            } catch (\Illuminate\Validation\ValidationException $e) {
+            } catch (ValidationException $e) {
                 $validator->errors()->add('competences_text', (string) collect($e->errors()['competences_text'] ?? [])->first());
             }
         }];

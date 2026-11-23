@@ -1,6 +1,7 @@
 <?php
 
 use App\Modules\Admissions\Alternance\AlternanceController;
+use App\Modules\Admissions\Booklet\BookletController;
 use App\Modules\Admissions\Booklet\BookletSettingsController;
 use App\Modules\Admissions\Booklet\DispensesController;
 use App\Modules\Admissions\Candidatures\CandidatureController;
@@ -40,6 +41,7 @@ Route::middleware(['auth'])->prefix('admissions/candidatures')->name('admissions
     Route::post('{candidature}/positioning/link', [PositioningController::class, 'link'])->middleware(['can:admissions.candidatures.update', 'throttle:positioning-send'])->name('positioning.link');
     Route::post('{candidature}/positioning/send', [PositioningController::class, 'send'])->middleware(['can:admissions.candidatures.update', 'throttle:positioning-send'])->name('positioning.send');
     Route::put('{candidature}/alternance', [AlternanceController::class, 'update'])->middleware('can:admissions.candidatures.update')->name('alternance.update');
+    Route::get('{candidature}/livret.pdf', [BookletController::class, 'show'])->middleware(['can:admissions.candidatures.view', 'throttle:admissions-booklet'])->name('booklet');
     Route::put('{candidature}/dispenses', [DispensesController::class, 'update'])->middleware('can:admissions.candidatures.update')->name('dispenses.update');
     Route::delete('{candidature}/alternance', [AlternanceController::class, 'destroy'])->middleware('can:admissions.candidatures.update')->name('alternance.destroy');
     Route::get('{candidature}/dossier/defaults', [DossierCreationController::class, 'defaults'])->middleware('can:admissions.candidatures.update')->name('dossier.defaults');

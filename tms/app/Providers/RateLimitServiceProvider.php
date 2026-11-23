@@ -30,6 +30,8 @@ class RateLimitServiceProvider extends ServiceProvider
         'outlook-oauth' => 10,
         'connector-test' => 5,
         'attendance-sheet' => 60,
+        // Apprenticeship booklet PDF (Gotenberg, several renders and a merge).
+        'admissions-booklet' => 20,
         'attendance-scan' => 30,
         // Upload link of a positioning test (candidate, no account: per address).
         'positioning-upload' => 20,
