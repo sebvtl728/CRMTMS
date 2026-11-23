@@ -119,8 +119,10 @@ export default function Automation({ settings, status }: AutomationProps) {
                             <Label htmlFor="certificates">Émettre et envoyer automatiquement à la fin de la formation</Label>
                         </div>
                         <p className="text-muted-foreground text-xs">
-                            Le matin qui suit la clôture du mois du dernier jour de la session (les heures réalisées sont alors définitives). Un
-                            document annulé à la main n'est jamais refait. Désactivé par défaut.
+                            Le dernier jour de formation à 13 h 30, aux stagiaires présents (pas notés absents ce jour-là) : les heures de
+                            l'après-midi sont comptées comme réalisées. Un stagiaire qui part l'après-midi : annulez puis réémettez ses
+                            documents. Les autres (sessions sans séances, stagiaires oubliés) partent le matin qui suit la clôture du mois de
+                            fin. Un document annulé à la main n'est jamais refait. Désactivé par défaut.
                         </p>
                         <InputError message={errors.certificates} />
                     </section>

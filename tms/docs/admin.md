@@ -439,9 +439,12 @@ Guide utilisateur : `admissions.md`.
   - **Relance des signatures en attente** : une convention, un contrat ou un devis non signé en ligne est relancé après
     *N* jours (3 par défaut, 0 = désactivé), au plus *M* fois (2 par défaut, de 1 à 5). Chaque relance envoie un
     **nouveau lien** qui remplace le précédent ; pas de relance si le signataire a demandé son code dans les 24 h.
-  - **Attestations et certificats de réalisation** (désactivé par défaut) : émis et envoyés le matin qui suit la
-    **clôture de tous les mois** de la session (heures réalisées définitives ; jamais pour un stagiaire à 0 h réalisée) ; un document annulé n'est jamais
-    refait ; un stagiaire sans e-mail : émis, non envoyé.
+  - **Attestations et certificats de réalisation** (désactivé par défaut) : émis et envoyés **le dernier jour de
+    formation à 13 h 30** (`tms:documents:last-day-certificates`) aux stagiaires encore là (ni sortis, ni notés absents
+    ce jour-là) : les séances du jour pas encore saisies (l'après-midi) comptent comme réalisées ; un stagiaire qui part
+    l'après-midi : annuler puis réémettre à la main. Les autres (sessions sans séances, oubliés) : le matin qui suit la
+    **clôture de tous les mois** de la session (heures définitives ; jamais à 0 h réalisée). Un document annulé n'est
+    jamais refait ; un stagiaire sans e-mail : émis, non envoyé.
   - **Convention de formation** (désactivé par défaut) : à la création d'un dossier depuis un devis signé, pour une
     entreprise, la convention est émise au nom de qui crée le dossier puis envoyée en **signature en ligne** au contact
     du dossier (sans e-mail valide : émise seulement). Les financements y figurent « sous réserve des accords en

@@ -12,6 +12,7 @@ use App\Modules\Sessions\Attendance\Closures;
 use App\Modules\Sessions\Planning\Seance;
 use App\Modules\Sessions\Sessions\TrainingSession;
 use Carbon\CarbonImmutable;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Mail;
 
 require_once __DIR__.'/Support/documents.php';
@@ -88,4 +89,62 @@ it('leaves a trainee with no realised hour to a manager', function () {
     app(Closures::class)->close(TrainingSession::query()->findOrFail($x['session']->id), '2026-11');
 
     expect(ctRun())->toBe(0)->and(Document::query()->count())->toBe(0);
+});
+
+// ------------------------------------------------------- last day, 13:30
+
+/** A session ending on Wed. 25/11/2026: Mon. 23 (3 h 30, attended), Wed. 25 morning and afternoon (3 h 30 each). */
+function ctLastDaySession(): array
+{
+    $dossier = l2Dossier();
+    $session = l2Session(null, ['starts_on' => '2026-11-23', 'ends_on' => '2026-11-25', 'planned_hours' => '10.5', 'location_kind' => 'address', 'location_text' => 'Salle B, Nantes']);
+    $module = plModule($session);
+    $monday = plSeance($module, '2026-11-23', '09:00', '12:30');
+    $morning = plSeance($module, '2026-11-25', '09:00', '12:30');
+    plSeance($module, '2026-11-25', '13:30', '17:00');
+    $lea = l2Enrol($dossier, $session, makePerson('Durand', ['first_name' => 'Léa', 'email' => 'lea.durand@example.test']));
+    $tom = l2Enrol($dossier, $session, makePerson('Petit', ['first_name' => 'Tom', 'email' => 'tom.petit@example.test']));
+    app(Attendances::class)->allPresent($monday);
+
+    return compact('dossier', 'session', 'lea', 'tom', 'morning');
+}
+
+function ctLastDayRun(): int
+{
+    return app(CertificateAutomation::class)->runLastDay(CarbonImmutable::now('Europe/Paris'));
+}
+
+it('sends the certificates at 13:30 on the last day, the afternoon planned counted', function () {
+    $x = ctLastDaySession();
+    $this->travelTo(CarbonImmutable::parse('2026-11-25 13:30', 'Europe/Paris'));
+
+    expect(ctLastDayRun())->toBe(4);
+
+    $doc = Document::query()->where('enrolment_id', $x['lea']->id)->where('type', DocumentType::RealisationCertificate->value)->sole();
+    expect($doc->status)->toBe(DocumentStatus::Sent)
+        // Monday 3 h 30 recorded + Wednesday morning (not recorded yet) and afternoon: 10 h 30.
+        ->and(collect(Http::recorded())->map(fn ($pair) => collect($pair[0]->data())->firstWhere('filename', 'index.html')['contents'] ?? '')
+            ->filter(fn (string $html) => str_contains($html, 'Léa'))->implode(''))->toMatch('/10\s*h\s*30/u');
+    expect(ctLastDayRun())->toBe(0);
+});
+
+it('leaves out a trainee marked absent this morning', function () {
+    $x = ctLastDaySession();
+    app(Attendances::class)->record($x['morning'], $x['tom']->id, 'absent', null, null);
+    $this->travelTo(CarbonImmutable::parse('2026-11-25 13:30', 'Europe/Paris'));
+
+    ctLastDayRun();
+
+    expect(Document::query()->where('enrolment_id', $x['tom']->id)->count())->toBe(0)
+        ->and(Document::query()->where('enrolment_id', $x['lea']->id)->count())->toBe(2);
+});
+
+it('does nothing on another day than the last one, nor when the automatism is off', function () {
+    ctLastDaySession();
+    $this->travelTo(CarbonImmutable::parse('2026-11-23 13:30', 'Europe/Paris'));
+    expect(ctLastDayRun())->toBe(0);
+
+    AutomationSettings::save(['certificates' => false]);
+    $this->travelTo(CarbonImmutable::parse('2026-11-25 13:30', 'Europe/Paris'));
+    expect(ctLastDayRun())->toBe(0)->and(Document::query()->count())->toBe(0);
 });

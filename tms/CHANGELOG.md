@@ -7,6 +7,8 @@ Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) ; ve
 
 ### Modifié
 
+- **Attestations et certificats de réalisation automatiques** : envoyés **le dernier jour de formation à 13 h 30** aux stagiaires présents (l'après-midi comptée comme réalisée ; les absents du jour et les sortis exclus) ; la clôture du mois reste le rattrapage.
+
 - **Documents des stagiaires** (session) : chaque type dit s'il part tout seul (badge « Automatique », date prévue ou « pensez à confirmer la session ») ou s'il est à faire à la main, avec le nombre émis et envoyés ; les boutons manuels sont repliés quand l'envoi est automatique, les cases vides disent « Partira seul ».
 - **Inscrits** : « Inscrit » suffit (convocations, présences, attestations, factures) ; **« Confirmer » disparaît** (il ne déclenchait rien) et les inscriptions « Confirmé » redeviennent « Inscrit » (migration) ; « Promouvoir » devient **« Passer en inscrit »**.
 

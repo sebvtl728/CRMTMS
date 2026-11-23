@@ -103,7 +103,7 @@ export function SessionDocumentsBlock({ session_id, can_manage, types, trainees,
                                 {auto
                                     ? t.value === 'convocation'
                                         ? `${auto_convocation} ${waitingConfirmation ? 'Pensez à confirmer la session.' : "Vous n'avez rien à faire."}`
-                                        : "Émis et envoyés tout seuls le matin qui suit la clôture du mois de fin. Vous n'avez rien à faire."
+                                        : "Émis et envoyés tout seuls le dernier jour à 13 h 30 (après-midi comptée), sinon après la clôture du mois de fin. Vous n'avez rien à faire."
                                     : t.value === 'convocation'
                                       ? (auto_convocation ?? 'Émettez puis envoyez les convocations avant le début de la formation.')
                                       : 'À la fin de la formation (mois clôturé) : émettez puis envoyez.'}

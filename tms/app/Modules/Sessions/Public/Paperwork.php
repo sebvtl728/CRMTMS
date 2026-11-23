@@ -4,6 +4,7 @@ namespace App\Modules\Sessions\Public;
 
 use App\Modules\Catalogue\Trainings;
 use App\Modules\Core\Users\User;
+use App\Modules\Sessions\Attendance\Attendance;
 use App\Modules\Sessions\Attendance\AttendanceClosure;
 use App\Modules\Sessions\Attendance\Months;
 use App\Modules\Sessions\Dossiers\Dossier;
@@ -77,10 +78,13 @@ final class Paperwork
      * One trainee for the per-trainee documents (convocation, attestation,
      * certificate): the session (cancelled or not), the planned séances
      * (date order), the planned and realised minutes (RealisedHours).
+     * $completeOn (the last day, at 13:30, the automatic certificates): the
+     * live séances of that day not recorded yet for the trainee count as
+     * realised (its afternoon, and a morning not entered yet).
      *
      * @return array<string, mixed>|null
      */
-    public static function enrolment(string $enrolmentId): ?array
+    public static function enrolment(string $enrolmentId, ?string $completeOn = null): ?array
     {
         $enrolment = Str::isUuid($enrolmentId) ? Enrolment::query()->find($enrolmentId) : null;
         if ($enrolment === null) {
@@ -90,6 +94,11 @@ final class Paperwork
         $hours = RealisedHours::forEnrolment($enrolment->id);
         $seances = Seance::query()->where('training_session_id', $session->id)->where('status', 'planned')
             ->orderBy('date')->orderBy('starts_at')->get();
+        if ($completeOn !== null) {
+            $recorded = Attendance::query()->where('enrolment_id', $enrolment->id)->pluck('seance_id')->map(fn ($id) => (string) $id)->all();
+            $hours['realised_minutes'] = (int) $hours['realised_minutes'] + (int) $seances
+                ->filter(fn (Seance $s) => $s->date->toDateString() === $completeOn && ! in_array($s->id, $recorded, true))->sum('duration_minutes');
+        }
 
         return [
             'id' => $enrolment->id,
@@ -194,6 +203,26 @@ final class Paperwork
             ->where(fn ($q) => $q->whereNull('left_on')->orWhere('left_on', '>=', $startsOn))
             ->orderByRaw('entered_on asc nulls first')->orderBy('created_at')->orderBy('id')->get(['id', 'person_id'])
             ->map(fn (Enrolment $e) => ['id' => (string) $e->id, 'person_id' => (string) $e->person_id])->values()->all();
+    }
+
+    /**
+     * The live sessions (never cancelled nor trashed) ending on $date with a
+     * live séance that day (the certificates of the last day, at 13:30).
+     *
+     * @return list<string>
+     */
+    public static function sessionsEndingWithSeanceOn(string $date): array
+    {
+        return Seance::query()->where('status', '!=', Seance::CANCELLED)->where('date', $date)
+            ->whereIn('training_session_id', TrainingSession::query()->where('status', '!=', 'cancelled')->where('ends_on', $date)->select('id'))
+            ->distinct()->pluck('training_session_id')->map(fn ($id) => (string) $id)->all();
+    }
+
+    /** Whether the trainee was entered absent at a séance of $date. */
+    public static function absentOn(string $enrolmentId, string $date): bool
+    {
+        return Attendance::query()->where('enrolment_id', $enrolmentId)->where('status', 'absent')
+            ->whereIn('seance_id', Seance::query()->where('date', $date)->select('id'))->exists();
     }
 
     /**
