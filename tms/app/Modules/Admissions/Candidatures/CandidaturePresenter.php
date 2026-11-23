@@ -4,6 +4,7 @@ namespace App\Modules\Admissions\Candidatures;
 
 use App\Modules\Admissions\AdmissionsVisibility;
 use App\Modules\Admissions\Alternance\AlternanceWriter;
+use App\Modules\Admissions\Booklet\DispensesController;
 use App\Modules\Catalogue\Trainings;
 use App\Modules\Core\References\ReferenceItem;
 use App\Modules\Core\Users\User;
@@ -74,6 +75,7 @@ final class CandidaturePresenter
             'dossier_id' => $c->dossier_id,
             'dossier' => self::dossier($c),
             'alternance' => AlternanceWriter::forPage($c),
+            'booklet' => ['modules' => DispensesController::modules($c)],
             'files' => CandidatureFile::query()->where('candidature_id', $c->id)->orderBy('created_at')->get()
                 ->map(fn (CandidatureFile $f) => [
                     'id' => $f->id, 'kind' => $f->kind, 'name' => $f->name, 'size' => $f->size,

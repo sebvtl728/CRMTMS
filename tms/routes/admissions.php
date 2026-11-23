@@ -1,6 +1,8 @@
 <?php
 
 use App\Modules\Admissions\Alternance\AlternanceController;
+use App\Modules\Admissions\Booklet\BookletSettingsController;
+use App\Modules\Admissions\Booklet\DispensesController;
 use App\Modules\Admissions\Candidatures\CandidatureController;
 use App\Modules\Admissions\Candidatures\CandidatureFileController;
 use App\Modules\Admissions\Candidatures\CandidatureStatusController;
@@ -38,11 +40,19 @@ Route::middleware(['auth'])->prefix('admissions/candidatures')->name('admissions
     Route::post('{candidature}/positioning/link', [PositioningController::class, 'link'])->middleware(['can:admissions.candidatures.update', 'throttle:positioning-send'])->name('positioning.link');
     Route::post('{candidature}/positioning/send', [PositioningController::class, 'send'])->middleware(['can:admissions.candidatures.update', 'throttle:positioning-send'])->name('positioning.send');
     Route::put('{candidature}/alternance', [AlternanceController::class, 'update'])->middleware('can:admissions.candidatures.update')->name('alternance.update');
+    Route::put('{candidature}/dispenses', [DispensesController::class, 'update'])->middleware('can:admissions.candidatures.update')->name('dispenses.update');
     Route::delete('{candidature}/alternance', [AlternanceController::class, 'destroy'])->middleware('can:admissions.candidatures.update')->name('alternance.destroy');
     Route::get('{candidature}/dossier/defaults', [DossierCreationController::class, 'defaults'])->middleware('can:admissions.candidatures.update')->name('dossier.defaults');
     Route::post('{candidature}/dossier', [DossierCreationController::class, 'store'])->middleware('can:admissions.candidatures.update')->name('dossier.store');
     Route::delete('{candidature}', [CandidatureController::class, 'destroy'])->middleware('can:admissions.candidatures.delete')->name('destroy');
     Route::post('{candidature}/restore', [CandidatureController::class, 'restore'])->middleware('can:admissions.candidatures.delete')->name('restore');
+});
+
+Route::middleware(['auth', 'can:settings.manage'])->prefix('admin/livret-apprentissage')->name('admin.booklet.')->group(function () {
+    Route::get('/', [BookletSettingsController::class, 'edit'])->name('edit');
+    Route::put('/', [BookletSettingsController::class, 'update'])->name('update');
+    Route::post('annexes', [BookletSettingsController::class, 'storeAnnex'])->middleware('throttle:import-upload')->name('annexes.store');
+    Route::delete('annexes/{annex}', [BookletSettingsController::class, 'destroyAnnex'])->name('annexes.destroy');
 });
 
 Route::middleware(['auth', 'can:settings.manage'])->prefix('admin/custom-fields')->name('admin.custom-fields.')->group(function () {
