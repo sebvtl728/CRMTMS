@@ -1,12 +1,14 @@
 <?php
 
+use App\Modules\Core\References\CapFormationReferenceSeeder;
 use App\Modules\Crm\Affiliations\Affiliation;
+use App\Modules\Crm\CrmServiceProvider;
 use App\Modules\Crm\Quotes\QuoteMail;
 use App\Modules\Crm\Quotes\QuoteRecipient;
 
 beforeEach(function () {
-    App\Modules\Crm\CrmServiceProvider::registerReferenceUsage();
-    App\Modules\Core\References\CapFormationReferenceSeeder::run(tenant());
+    CrmServiceProvider::registerReferenceUsage();
+    CapFormationReferenceSeeder::run(tenant());
     $this->actingAs(commercial());
 });
 

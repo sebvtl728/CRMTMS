@@ -2,7 +2,6 @@
 
 use App\Modules\Admissions\Alternance\AlternanceController;
 use App\Modules\Admissions\Booklet\BookletController;
-use App\Modules\Admissions\Cerfa\CerfaSheetController;
 use App\Modules\Admissions\Booklet\BookletSettingsController;
 use App\Modules\Admissions\Booklet\DispensesController;
 use App\Modules\Admissions\Candidatures\CandidatureController;
@@ -10,6 +9,7 @@ use App\Modules\Admissions\Candidatures\CandidatureFileController;
 use App\Modules\Admissions\Candidatures\CandidatureStatusController;
 use App\Modules\Admissions\Candidatures\DossierCreationController;
 use App\Modules\Admissions\Candidatures\LookupController;
+use App\Modules\Admissions\Cerfa\CerfaSheetController;
 use App\Modules\Admissions\CustomFields\CustomFieldController;
 use App\Modules\Admissions\OnlineTests\OnlinePassage;
 use App\Modules\Admissions\OnlineTests\OnlineReviewController;
