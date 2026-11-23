@@ -72,6 +72,7 @@ final class SeanceGenerator
         $keptCount = 0;
 
         $rows = [];
+        $named = GenerationRequest::namedDays($request->slots);
         for ($day = WorkingDays::day($request->from); $day->toDateString() <= $request->to; $day = $day->addDay()) {
             if ($remaining !== null && ($added >= $remaining || $keptCount >= GenerationRequest::MAX)) {
                 break;
@@ -80,7 +81,13 @@ final class SeanceGenerator
                 continue;
             }
             $date = $day->toDateString();
+            $weekday = $day->isoWeekday();
+            $namedToday = in_array($weekday, $named, true);
             foreach ($request->slots as $slot) {
+                // A day named by a slot (« another timetable on Fridays »): only the slots naming it.
+                if ($namedToday ? ! in_array($weekday, $slot['days'], true) : $slot['days'] !== []) {
+                    continue;
+                }
                 $reason = match (true) {
                     ! $monthOpen($date) => 'Mois clôturé',
                     isset($holidays[$date]) => "Férié : {$holidays[$date]}",

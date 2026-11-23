@@ -147,7 +147,7 @@ function PlanningCalendar({
             !tall && intervals.length > 1
                 ? [
                       ...all.filter((i) => i.kind !== 'interval'),
-                      { kind: 'interval', title: `${intervals.length} modules en intervalle`, detail: intervals.map((i) => i.title).join('\n') },
+                      { kind: 'interval', title: `${intervals.length} modules sur une période`, detail: intervals.map((i) => i.title).join('\n') },
                   ]
                 : all;
         const limit = tall ? grouped.length : MONTH_ITEMS;
@@ -283,7 +283,7 @@ function PlanningCalendar({
                 </table>
             </div>
             <p className="text-muted-foreground text-xs">
-                Bleu : séances · gris : modules en intervalle (jours ouvrés) · vert : stages (jours ouvrés) · fond grisé : week-end, jour férié ou
+                Bleu : séances · gris : modules suivis sur une période (jours ouvrés) · vert : stages (jours ouvrés) · fond grisé : week-end, jour férié ou
                 fermeture.
             </p>
         </section>
@@ -500,7 +500,8 @@ interface Preview {
     reached: boolean;
 }
 
-type Slot = { start: string; end: string; break_minutes: string };
+/** days: the weekdays of this slot only (empty: every ticked day). */
+type Slot = { start: string; end: string; break_minutes: string; days: number[] };
 
 /** « Générer les séances »: days, slots, period, trainer, room; preview, then create. */
 function GeneratorDialog({ session, planning, onClose }: { session: SessionDates; planning: SessionPlanning; onClose: () => void }) {
@@ -509,7 +510,7 @@ function GeneratorDialog({ session, planning, onClose }: { session: SessionDates
     const module = planning.modules.find((m) => m.id === moduleId);
     const [weekdays, setWeekdays] = useState<number[]>(options?.weekdays ?? [1, 2, 3, 4, 5]);
     const [slots, setSlots] = useState<Slot[]>(
-        (options?.slots ?? [{ start: '09:00', end: '12:30', break_minutes: 0 }]).map((s) => ({ ...s, break_minutes: String(s.break_minutes) })),
+        (options?.slots ?? [{ start: '09:00', end: '12:30', break_minutes: 0 }]).map((s) => ({ ...s, break_minutes: String(s.break_minutes), days: [] })),
     );
     const [from, setFrom] = useState(module?.starts_on ?? session.starts_on);
     const [to, setTo] = useState(module?.ends_on ?? session.ends_on);
@@ -569,7 +570,11 @@ function GeneratorDialog({ session, planning, onClose }: { session: SessionDates
         });
     };
 
-    const toggleDay = (d: number, on: boolean) => setWeekdays((w) => (on ? [...w, d].sort() : w.filter((x) => x !== d)));
+    const toggleDay = (d: number, on: boolean) => {
+        setWeekdays((w) => (on ? [...w, d].sort() : w.filter((x) => x !== d)));
+        // A day no longer ticked leaves the slots that named it.
+        if (!on) setSlots((s) => s.map((slot) => ({ ...slot, days: slot.days.filter((x) => x !== d) })));
+    };
     const setSlot = (i: number, patch: Partial<Slot>) => setSlots((s) => s.map((slot, j) => (j === i ? { ...slot, ...patch } : slot)));
     const skipped = preview?.seances.filter((s) => s.skipped_reason !== null) ?? [];
 
@@ -651,8 +656,33 @@ function GeneratorDialog({ session, planning, onClose }: { session: SessionDates
                                 >
                                     <X className="h-4 w-4" />
                                 </Button>
+                                <div className="col-span-4 flex flex-wrap items-center gap-1 text-xs">
+                                    <span className="text-muted-foreground mr-1">
+                                        {slot.days.length === 0 ? 'Tous les jours cochés · ou seulement :' : 'Seulement (remplace ce jour-là les créneaux de tous les jours) :'}
+                                    </span>
+                                    {weekdays.map((d) => (
+                                        <button
+                                            key={d}
+                                            type="button"
+                                            aria-pressed={slot.days.includes(d)}
+                                            className={`rounded border px-2 py-0.5 ${slot.days.includes(d) ? 'bg-primary text-primary-foreground border-primary' : 'hover:bg-muted'}`}
+                                            onClick={() =>
+                                                setSlot(i, {
+                                                    days: slot.days.includes(d) ? slot.days.filter((x) => x !== d) : [...slot.days, d].sort(),
+                                                })
+                                            }
+                                        >
+                                            {WEEKDAYS_SHORT[d - 1]}
+                                        </button>
+                                    ))}
+                                    <InputError message={errors[`slots.${i}.days`]} />
+                                </div>
                             </div>
                         ))}
+                        <p className="text-muted-foreground text-xs">
+                            Un horaire différent certains jours (par exemple le vendredi) : ajoutez un créneau et cliquez sur ses jours. Ces
+                            jours-là, seuls les créneaux qui les nomment s'appliquent.
+                        </p>
                         <InputError message={errors.slots} />
                         {slots.length < 6 && (
                             <Button
@@ -660,7 +690,7 @@ function GeneratorDialog({ session, planning, onClose }: { session: SessionDates
                                 variant="outline"
                                 size="sm"
                                 className="justify-self-start"
-                                onClick={() => setSlots((s) => [...s, { start: '', end: '', break_minutes: '0' }])}
+                                onClick={() => setSlots((s) => [...s, { start: '', end: '', break_minutes: '0', days: [] }])}
                             >
                                 <Plus className="h-4 w-4" />
                                 Ajouter un créneau
