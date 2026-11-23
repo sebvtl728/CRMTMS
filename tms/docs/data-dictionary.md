@@ -745,6 +745,8 @@ Une facture ou un avoir validé est une **pièce comptable à conserver 10 ans**
 Toutes les tables ont `tenant_id`, RLS et le trait `BelongsToTenant`. Le module ne lit les fiches du CRM, le catalogue et les dossiers que par leurs services publics.
 
 ### `candidatures` — candidatures
+
+`dispensed_module_ids` (jsonb, null) : modules de la formation (`training_modules.id`) dont le candidat est dispensé, imprimés dans le livret d'apprentissage.
 `id`, `tenant_id` · `number` (`C-<AAAA>-<NNNN>`, unique par organisme, `CandidatureNumbering`) · `person_id` (FK `people`) · `status` (`identified`, `positioning_sent`, `positioning_received`, `interview`, `admitted`, `rejected`, `withdrawn`, CHECK) · `pathway` (`alternance`, `trainee`, CHECK ; null = à définir ; `alternance` dès qu'un contrat existe) · `training_id` (FK `trainings`, null) · `rncp_code` · `target_session_id` (FK `training_sessions`, null à la suppression) · `das_id` (FK `reference_items`, périmètre « Ses DAS ») · `responsible_user_id`, `created_by` (périmètre « Ses fiches ») · `origin_id` (référentiel `contact_origin`) · `prescriber_organisation_id` (FK `organisations`) · `france_travail_id`, `last_diploma`, `legal_representative` (jsonb) · `rqth`, `adaptation_needs`, `interview_report` (**sensibles** : droit `admissions.sensitive.view`) · `positioning_sent_on`, `positioning_received_on`, `positioning_result` · `interview_at`, `interviewer_user_id` · `decision_reason_id` (référentiel `candidature_refusal_reason`, si `rejected`) · `dossier_id` (FK `dossiers`, unique partiel) · `custom_values` (jsonb, clé = id du champ personnalisé) · `anonymised_at` · horodatages, corbeille. `$auditPersonal` : représentant légal, RQTH, besoins, compte rendu, résultat du test, identifiant France Travail, dernier diplôme, valeurs personnalisées. Situation professionnelle et niveau de diplôme restent sur `people`.
 
 ### `candidature_sequences` — compteurs
@@ -767,6 +769,8 @@ Clé (`tenant_id`, `year`) : `last_number` (année de Paris, incrémenté dans l
 
 ### Catalogue
 `trainings.rncp_code` (string(20), null) : code RNCP de la certification (`RNCP` + chiffres).
+
+`trainings.bpf_objective` (string(20), null, CHECK) : objectif de la formation au cadre F-3 du BPF (`Catalogue\BpfObjective` : `rncp_6_8`, `rncp_5`, `rncp_4`, `rncp_3`, `rncp_2`, `rncp_cqp`, `rs`, `cqp`, `other`, `skills_assessment`, `vae`). `trainings.nsf_code` (char(3), null, CHECK) : groupe de spécialités NSF (cadre F-4, liste officielle INSEE niveau 100 dans `Catalogue\Nsf`). `trainings.competences` (jsonb, null) : grille de compétences, `[{title, competences: [{title, skills: [..]}]}]` (`Catalogue\Competences`), masquée dans le journal. `trainings.updated_at` date aussi le **programme PDF** : une modification des modules la met à jour.
 
 ## Module Documents (0.10)
 

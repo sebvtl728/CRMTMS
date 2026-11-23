@@ -8,6 +8,7 @@ import {
     Banknote,
     BellRing,
     BookOpen,
+    BookOpenCheck,
     Building2,
     Calculator,
     CalendarCheck,
@@ -101,26 +102,34 @@ const qualityNavItems: (NavItem & { permission: string })[] = [
 
 const myPlanningItem: NavItem = { title: 'Mon planning', url: '/mon-planning', icon: CalendarClock };
 
-// Each entry is shown only when the user holds the permission (the server stays the authority).
-const adminNavItems: (NavItem & { permission: string })[] = [
-    { title: 'Sociétés', url: '/admin/companies', icon: Building2, permission: 'companies.manage' },
-    { title: 'Utilisateurs', url: '/admin/users', icon: Users, permission: 'users.manage' },
-    { title: 'Rôles et droits', url: '/admin/roles', icon: KeyRound, permission: 'roles.manage' },
-    { title: 'Référentiels', url: '/admin/references', icon: ListChecks, permission: 'references.manage' },
-    { title: 'Connecteurs', url: '/admin/connectors', icon: Plug, permission: 'connectors.manage' },
-    { title: "Journal d'audit", url: '/admin/audit', icon: History, permission: 'audit.view' },
-    { title: 'Sécurité', url: '/admin/security', icon: ShieldCheck, permission: 'settings.manage' },
-    { title: 'Champs personnalisés', url: '/admin/custom-fields', icon: SlidersHorizontal, permission: 'settings.manage' },
-    { title: 'Sauvegardes', url: '/admin/backups', icon: DatabaseBackup, permission: 'settings.manage' },
-    { title: "Règle d'abandon et suivi", url: '/admin/abandon-rule', icon: UserMinus, permission: 'settings.manage' },
-    { title: 'Réglages du CRM', url: '/admin/crm-settings', icon: Settings2, permission: 'settings.manage' },
-    { title: 'Automatismes', url: '/admin/automation', icon: Workflow, permission: 'settings.manage' },
-    { title: 'Salles et fermetures', url: '/admin/sessions-settings', icon: DoorOpen, permission: 'sessions.rooms.manage' },
-    { title: "Modèles d'e-mails", url: '/admin/mail-templates', icon: Mail, permission: 'settings.manage' },
-    { title: 'Modèles de documents', url: '/admin/document-texts', icon: FileSignature, permission: 'settings.manage' },
-    { title: 'Modèles de questionnaires', url: '/admin/questionnaires', icon: Smile, permission: 'questionnaires.manage' },
+// Administration, in four sections. Each entry is shown only when the user holds the permission (the server stays the authority).
+type AdminSection = 'organisme' | 'reglages' | 'modeles' | 'technique';
+const adminSections: { key: AdminSection; label: string }[] = [
+    { key: 'organisme', label: 'Organisme' },
+    { key: 'reglages', label: 'Listes et réglages' },
+    { key: 'modeles', label: 'Modèles' },
+    { key: 'technique', label: 'Technique et sécurité' },
+];
+const adminNavItems: (NavItem & { permission: string; section: AdminSection })[] = [
+    { title: 'Sociétés', url: '/admin/companies', icon: Building2, permission: 'companies.manage', section: 'organisme' },
+    { title: 'Utilisateurs', url: '/admin/users', icon: Users, permission: 'users.manage', section: 'organisme' },
+    { title: 'Rôles et droits', url: '/admin/roles', icon: KeyRound, permission: 'roles.manage', section: 'organisme' },
+    { title: 'Référentiels', url: '/admin/references', icon: ListChecks, permission: 'references.manage', section: 'reglages' },
+    { title: 'Champs personnalisés', url: '/admin/custom-fields', icon: SlidersHorizontal, permission: 'settings.manage', section: 'reglages' },
+    { title: 'Réglages du CRM', url: '/admin/crm-settings', icon: Settings2, permission: 'settings.manage', section: 'reglages' },
+    { title: "Règle d'abandon et suivi", url: '/admin/abandon-rule', icon: UserMinus, permission: 'settings.manage', section: 'reglages' },
+    { title: 'Salles et fermetures', url: '/admin/sessions-settings', icon: DoorOpen, permission: 'sessions.rooms.manage', section: 'reglages' },
+    { title: 'Automatismes', url: '/admin/automation', icon: Workflow, permission: 'settings.manage', section: 'reglages' },
+    { title: "Livret d'apprentissage", url: '/admin/livret-apprentissage', icon: BookOpenCheck, permission: 'settings.manage', section: 'reglages' },
+    { title: "Modèles d'e-mails", url: '/admin/mail-templates', icon: Mail, permission: 'settings.manage', section: 'modeles' },
+    { title: 'Modèles de documents', url: '/admin/document-texts', icon: FileSignature, permission: 'settings.manage', section: 'modeles' },
+    { title: 'Modèles de questionnaires', url: '/admin/questionnaires', icon: Smile, permission: 'questionnaires.manage', section: 'modeles' },
+    { title: 'Connecteurs', url: '/admin/connectors', icon: Plug, permission: 'connectors.manage', section: 'technique' },
+    { title: 'Sécurité', url: '/admin/security', icon: ShieldCheck, permission: 'settings.manage', section: 'technique' },
+    { title: 'Sauvegardes', url: '/admin/backups', icon: DatabaseBackup, permission: 'settings.manage', section: 'technique' },
+    { title: "Journal d'audit", url: '/admin/audit', icon: History, permission: 'audit.view', section: 'technique' },
     // Local sandbox only (shown when the shared prop « sandbox » is true; never on a server).
-    { title: 'Bac à sable', url: '/admin/sandbox', icon: RotateCcw, permission: 'settings.manage' },
+    { title: 'Bac à sable', url: '/admin/sandbox', icon: RotateCcw, permission: 'settings.manage', section: 'technique' },
 ];
 
 export function AppSidebar() {
@@ -187,7 +196,11 @@ export function AppSidebar() {
                         {trainingItems.length > 0 && <NavMain items={trainingItems} label="Formation" />}
                         {financeItems.length > 0 && <NavMain items={financeItems} label="Finance" />}
                         {qualityItems.length > 0 && <NavMain items={qualityItems} label="Qualité" />}
-                        {adminItems.length > 0 && <NavMain items={adminItems} label="Administration" />}
+                        {adminSections.map((section) => {
+                            const items = adminItems.filter((item) => item.section === section.key);
+
+                            return items.length > 0 && <NavMain key={section.key} items={items} label={`Admin · ${section.label}`} />;
+                        })}
                     </>
                 )}
             </SidebarContent>

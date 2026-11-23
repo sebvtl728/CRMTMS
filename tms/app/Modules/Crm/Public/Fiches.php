@@ -8,6 +8,7 @@ use App\Modules\Crm\Organisations\OfficialOpcos;
 use App\Modules\Crm\Organisations\Organisation;
 use App\Modules\Crm\Organisations\OrganisationStatus;
 use App\Modules\Crm\People\Person;
+use App\Modules\Crm\People\PhoneNumber;
 use App\Modules\Crm\Permissions;
 use App\Modules\Crm\Visibility\CrmVisibility;
 use Illuminate\Support\Str;
@@ -57,6 +58,42 @@ final class Fiches
         $person = Str::isUuid($id) ? Person::query()->whereNull('people.anonymised_at')->find($id) : null;
 
         return $person === null ? null : ['id' => $person->id, 'label' => $person->fullName(), 'birth_date' => $person->birth_date?->toDateString()];
+    }
+
+    /**
+     * Contact card of an entreprise or a person for a printed document (the
+     * apprenticeship booklet): name, address, phone, e-mail; sector for an
+     * entreprise, birth date for a person. Trashed fiches included; null when
+     * unknown or anonymised.
+     *
+     * @param  'organisation'|'person'  $type
+     * @return array{label: string, first_name: ?string, last_name: ?string, address: ?string, phone: ?string, email: ?string, sector: ?string, birth_date: ?string}|null
+     */
+    public function contactCard(string $type, string $id): ?array
+    {
+        if (! Str::isUuid($id)) {
+            return null;
+        }
+        $fiche = $type === 'organisation'
+            ? Organisation::withTrashed()->with('sector')->find($id)
+            : Person::withTrashed()->whereNull('people.anonymised_at')->find($id);
+        if ($fiche === null) {
+            return null;
+        }
+        $address = trim(implode(' ', array_filter([
+            $fiche->address_line1, $fiche->address_line2, trim(($fiche->postal_code ?? '').' '.($fiche->city ?? '')),
+        ], fn ($part) => is_string($part) && trim($part) !== '')));
+
+        return [
+            'label' => $fiche instanceof Organisation ? $fiche->name : $fiche->fullName(),
+            'first_name' => $fiche instanceof Person ? $fiche->first_name : null,
+            'last_name' => $fiche instanceof Person ? $fiche->last_name : null,
+            'address' => $address === '' ? null : $address,
+            'phone' => PhoneNumber::display($fiche instanceof Person ? ($fiche->mobile ?? $fiche->phone) : $fiche->phone),
+            'email' => $fiche->email,
+            'sector' => $fiche instanceof Organisation ? $fiche->sector?->label : null,
+            'birth_date' => $fiche instanceof Person ? $fiche->birth_date?->toDateString() : null,
+        ];
     }
 
     /**

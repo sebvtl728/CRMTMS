@@ -648,6 +648,7 @@ export default function CandidatureShow({ candidature: c, custom_fields, history
                                             )}
                                         </div>
                                     )}
+                                    {c.alternance && <BookletPanel candidatureId={c.id} modules={c.booklet.modules} canUpdate={can.update} />}
                                     {c.alternance && (
                                         <div className="grid gap-1">
                                             <Label>Contrat signé</Label>
@@ -824,5 +825,71 @@ export default function CandidatureShow({ candidature: c, custom_fields, history
                 />
             )}
         </AppLayout>
+    );
+}
+
+/** Apprenticeship booklet: the PDF already filled, and the modules the apprentice is exempted from. */
+function BookletPanel({
+    candidatureId,
+    modules,
+    canUpdate,
+}: {
+    candidatureId: string;
+    modules: Candidature['booklet']['modules'];
+    canUpdate: boolean;
+}) {
+    const [dispensed, setDispensed] = useState<string[]>(modules.filter((m) => m.dispensed).map((m) => m.id));
+    const changed = dispensed.length !== modules.filter((m) => m.dispensed).length || modules.some((m) => m.dispensed !== dispensed.includes(m.id));
+
+    return (
+        <div className="grid gap-2 rounded-lg border p-3">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+                <Label>Livret d'apprentissage</Label>
+                <Button asChild size="sm" variant="outline">
+                    <a href={`/admissions/candidatures/${candidatureId}/livret.pdf`} target="_blank" rel="noopener">
+                        Livret d'apprentissage (PDF)
+                    </a>
+                </Button>
+            </div>
+            <p className="text-muted-foreground text-xs">
+                Déjà rempli : partenaires, équipe, parcours, planning, pages de suivi datées mois par mois et grilles de compétences de la formation.
+            </p>
+            {modules.length > 0 && (
+                <div className="grid gap-1">
+                    <span className="text-xs font-medium">Modules dispensés (parcours individualisé)</span>
+                    {modules.map((m) => (
+                        <label key={m.id} className="flex items-center gap-2 text-sm">
+                            <input
+                                type="checkbox"
+                                disabled={!canUpdate}
+                                checked={dispensed.includes(m.id)}
+                                onChange={(e) => setDispensed((d) => (e.target.checked ? [...d, m.id] : d.filter((id) => id !== m.id)))}
+                            />
+                            {m.title}
+                            {m.duration_hours !== null && (
+                                <span className="text-muted-foreground text-xs">({m.duration_hours.replace('.00', '').replace('.', ',')} h)</span>
+                            )}
+                        </label>
+                    ))}
+                    {canUpdate && changed && (
+                        <div>
+                            <Button
+                                type="button"
+                                size="sm"
+                                onClick={() =>
+                                    router.put(
+                                        `/admissions/candidatures/${candidatureId}/dispenses`,
+                                        { module_ids: dispensed },
+                                        { preserveScroll: true },
+                                    )
+                                }
+                            >
+                                Enregistrer les dispenses
+                            </Button>
+                        </div>
+                    )}
+                </div>
+            )}
+        </div>
     );
 }

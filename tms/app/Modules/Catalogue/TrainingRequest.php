@@ -6,6 +6,8 @@ use App\Modules\Core\References\ReferenceList;
 use App\Modules\Core\Tenancy\TenantContext;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
+use Illuminate\Validation\Validator;
 
 /**
  * Validation of a training (create and update). Authorisation is done by the
@@ -35,6 +37,11 @@ class TrainingRequest extends FormRequest
                 $value = $this->input($key);
                 $value = is_string($value) ? trim($value) : $value;
                 $clean[$key] = $value === '' ? null : $value;
+            }
+        }
+        foreach (['bpf_objective', 'nsf_code'] as $key) {
+            if ($this->input($key) === '') {
+                $clean[$key] = null;
             }
         }
         if ($this->has('rncp_code')) {
@@ -156,6 +163,9 @@ class TrainingRequest extends FormRequest
                 ->where('tenant_id', $tenantId)->whereNull('deleted_at')->ignore($current?->id)],
             'title' => ['required', 'string', 'max:200'],
             'rncp_code' => ['nullable', 'string', 'regex:/^RNCP\d{1,6}$/'],
+            'competences_text' => ['nullable', 'string', 'max:300000'],
+            'bpf_objective' => ['nullable', Rule::enum(BpfObjective::class)],
+            'nsf_code' => ['nullable', 'string', Rule::in(array_keys(Nsf::CODES))],
             'das_id' => ['required', ...self::reference(ReferenceList::Das, array_filter([$current?->das_id]))],
             'duration_hours' => ['nullable', 'numeric', 'decimal:0,2', 'min:0', 'max:9999.99'],
             'duration_days' => ['nullable', 'numeric', 'decimal:0,2', 'min:0', 'max:999.99'],
@@ -191,6 +201,27 @@ class TrainingRequest extends FormRequest
     /**
      * @return array<string, string>
      */
+    /**
+     * The competence grid must parse (line by line message).
+     *
+     * @return list<\Closure>
+     */
+    public function after(): array
+    {
+        return [function (Validator $validator): void {
+            $text = $this->input('competences_text');
+            if (! is_string($text) || $validator->errors()->has('competences_text')) {
+                return;
+            }
+            try {
+                Competences::parse($text);
+            } catch (ValidationException $e) {
+                $messages = $e->errors()['competences_text'] ?? [];
+                $validator->errors()->add('competences_text', (string) ($messages[0] ?? 'Grille de compétences invalide.'));
+            }
+        }];
+    }
+
     public function messages(): array
     {
         return self::validationMessages();
@@ -203,6 +234,8 @@ class TrainingRequest extends FormRequest
     {
         return [
             'required' => 'Ce champ est obligatoire.',
+            'bpf_objective.enum' => 'Objectif BPF inconnu.',
+            'nsf_code.in' => 'Code NSF inconnu : choisissez une spécialité de la liste.',
             'rncp_code.regex' => 'Le code RNCP doit s\'écrire RNCP suivi de chiffres (ex. RNCP36004).',
             'max' => 'Ce champ est trop long.',
             'string' => 'Cette valeur n\'est pas valide.',

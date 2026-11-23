@@ -14,6 +14,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\Response as HttpResponse;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Validation\ValidationException;
@@ -61,12 +62,28 @@ class TrainingController extends Controller
             'training' => [
                 ...self::row($training, new TrainingExport),
                 'rncp_code' => $training->rncp_code,
+                'bpf_objective' => $training->bpf_objective?->label(),
+                'nsf' => Nsf::display($training->nsf_code),
+                'competences_count' => Competences::count($training->competences),
+                'updated_on' => TrainingProgramme::updatedOn($training)->toDateString(),
                 'modalities' => ReferenceItem::query()->withTrashed()->whereKey($modalityIds)->orderBy('position')->orderBy('label')->pluck('label')->values()->all(),
             ],
             'brochures' => $brochures,
             'blocks' => TrainingBlocks::for($training, $user),
             'can' => ['manage' => $user->can(Permissions::MANAGE), 'brochures' => $user->can(Permissions::VIEW)],
             'status' => $request->session()->get('status'),
+        ]);
+    }
+
+    /**
+     * The programme of the training as a PDF, from its current sheet.
+     */
+    public function programme(Training $training, TrainingProgramme $programme): HttpResponse
+    {
+        return response($programme->pdf($training), 200, [
+            'Content-Type' => 'application/pdf',
+            'Content-Disposition' => 'inline; filename="'.TrainingProgramme::fileName($training).'"',
+            'Cache-Control' => 'private, no-store',
         ]);
     }
 
@@ -91,6 +108,10 @@ class TrainingController extends Controller
 
         $modules = array_key_exists('modules', $validated) ? array_values($validated['modules'] ?? []) : null;
         unset($validated['modules']);
+        if (array_key_exists('competences_text', $validated)) {
+            $validated['competences'] = Competences::parse((string) ($validated['competences_text'] ?? ''));
+            unset($validated['competences_text']);
+        }
 
         DB::transaction(function () use ($validated, $funding, $modules): void {
             $training = Training::query()->create($validated);
@@ -128,6 +149,9 @@ class TrainingController extends Controller
                 'accessibility' => $training->accessibility,
                 'access_terms' => $training->access_terms,
                 'rncp_code' => $training->rncp_code,
+                'bpf_objective' => $training->bpf_objective?->value,
+                'competences_text' => Competences::toText($training->competences),
+                'nsf_code' => $training->nsf_code,
                 'results' => $training->results,
                 'modules' => app(Trainings::class)->modules($training->id),
                 'modules_hours' => TrainingModules::hours($training),
@@ -152,6 +176,10 @@ class TrainingController extends Controller
 
         $modules = array_key_exists('modules', $validated) ? array_values($validated['modules'] ?? []) : null;
         unset($validated['modules']);
+        if (array_key_exists('competences_text', $validated)) {
+            $validated['competences'] = Competences::parse((string) ($validated['competences_text'] ?? ''));
+            unset($validated['competences_text']);
+        }
 
         DB::transaction(function () use ($training, $validated, $funding, $modules): void {
             $training->update($validated);
@@ -280,6 +308,8 @@ class TrainingController extends Controller
         return [
             'das' => TrainingListQuery::reference(ReferenceList::Das, array_filter([$current?->das_id])),
             'funding_mode' => TrainingListQuery::reference(ReferenceList::FundingMode, $current?->fundingModes()->pluck('reference_items.id')->all() ?? []),
+            'bpf_objective' => BpfObjective::options(),
+            'nsf' => Nsf::options(),
             'modality' => TrainingListQuery::reference(ReferenceList::TrainingModality, $current?->modules()->whereNotNull('modality_id')->pluck('modality_id')->all() ?? []),
         ];
     }

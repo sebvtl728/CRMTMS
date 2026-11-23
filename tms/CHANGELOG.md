@@ -5,9 +5,26 @@ Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) ; ve
 
 ## [Non publié]
 
+## [0.15.12] - 2026-11-23
+
 ### Modifié
 
 - **Import** : un export Entreprises ou Personnes se **réimporte tel quel**. Toutes les colonnes sont reconnues : rôles, formations d'intérêt, base légale, type particulier ou interlocuteur. Les entreprises, la fonction et les coordonnées pro d'une personne créent son rattachement, l'entreprise étant retrouvée par son nom exact. Dans l'export Personnes, les entreprises sont maintenant séparées par « ; ».
+- **Menu Administration** rangé en quatre sections : Organisme, Listes et réglages, Modèles, Technique et sécurité.
+
+## [0.15.11] - 2026-11-23
+
+### Ajouté
+
+- **Livret d'apprentissage (PDF)** sur la carte Alternance d'une candidature : déjà rempli (partenaires, équipe, parcours avec dispenses, planning, annexes de l'organisme, pages de suivi datées mois par mois, grilles de compétences, visites). Réglages dans Administration › Livret d'apprentissage.
+- **Grille de compétences** d'une formation (activités types, compétences, savoir-faire), saisie en texte dans la fiche.
+
+## [0.15.10] - 2026-11-23
+
+### Ajouté
+
+- **Fiche formation** : **Objectif (BPF)** et **Spécialité NSF** (liste officielle des 93 groupes), préparation du bilan pédagogique et financier ; colonnes de l'export.
+- **Programme (PDF)** de chaque formation, mis en page depuis sa fiche et **daté de sa dernière mise à jour** (Qualiopi, indicateur 1).
 
 ## [0.15.9] - 2026-11-23
 

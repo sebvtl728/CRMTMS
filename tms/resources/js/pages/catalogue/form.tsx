@@ -18,6 +18,9 @@ interface FormProps {
         id: string;
         code: string | null;
         rncp_code: string | null;
+        bpf_objective: string | null;
+        nsf_code: string | null;
+        competences_text: string;
         title: string;
         das_id: string;
         duration_hours: string | null;
@@ -40,7 +43,7 @@ interface FormProps {
         modules_gap: boolean;
         funding_mode_ids: string[];
     } | null;
-    options: { das: Option[]; funding_mode: Option[]; modality: Option[] };
+    options: { das: Option[]; funding_mode: Option[]; modality: Option[]; bpf_objective: Option[]; nsf: Option[] };
     assistant?: { configured: boolean };
     brochures?: { id: string; title: string; original_name: string; size: number; source: 'training' | 'das' }[];
     can?: { brochures: boolean; manage?: boolean };
@@ -63,6 +66,9 @@ type TrainingForm = {
     modules: ModuleForm[];
     code: string;
     rncp_code: string;
+    bpf_objective: string;
+    nsf_code: string;
+    competences_text: string;
     title: string;
     das_id: string;
     duration_hours: string;
@@ -96,6 +102,9 @@ export default function TrainingFormPage({ training, options, assistant, brochur
     const { data, setData, post, put, processing, errors, isDirty } = useForm<TrainingForm>({
         code: training?.code ?? '',
         rncp_code: training?.rncp_code ?? '',
+        bpf_objective: training?.bpf_objective ?? '',
+        nsf_code: training?.nsf_code ?? '',
+        competences_text: training?.competences_text ?? '',
         title: training?.title ?? '',
         das_id: training?.das_id ?? '',
         duration_hours: decimalInput(training?.duration_hours),
@@ -146,6 +155,23 @@ export default function TrainingFormPage({ training, options, assistant, brochur
         <div className="grid gap-2">
             <Label htmlFor={key}>{label}</Label>
             <Input id={key} value={data[key]} onChange={(e) => setData(key, e.target.value)} {...props} />
+            <InputError message={errors[key]} />
+        </div>
+    );
+
+    // Native select: the NSF list has 93 entries, typing a code jumps to it.
+    const bpfSelect = (key: 'bpf_objective' | 'nsf_code', label: string, list: Option[], help: string) => (
+        <div className="grid gap-2">
+            <Label htmlFor={key}>{label}</Label>
+            <select id={key} value={data[key]} onChange={(e) => setData(key, e.target.value)} className={textareaClass}>
+                <option value="">Non renseigné</option>
+                {list.map((o) => (
+                    <option key={o.value} value={o.value}>
+                        {o.label}
+                    </option>
+                ))}
+            </select>
+            <p className="text-muted-foreground text-xs">{help}</p>
             <InputError message={errors[key]} />
         </div>
     );
@@ -278,6 +304,18 @@ export default function TrainingFormPage({ training, options, assistant, brochur
                                 </Select>
                                 <InputError message={errors.das_id} />
                             </div>
+                            {bpfSelect(
+                                'bpf_objective',
+                                'Objectif (BPF)',
+                                options.bpf_objective,
+                                'Sert au cadre F-3 du bilan pédagogique et financier.',
+                            )}
+                            {bpfSelect(
+                                'nsf_code',
+                                'Spécialité NSF (BPF)',
+                                options.nsf,
+                                "Nomenclature des spécialités de formation, cadre F-4 du BPF. Ex. 334 pour l'hôtellerie.",
+                            )}
                             {text('duration_hours', 'Durée (heures)', { inputMode: 'decimal', placeholder: '21' })}
                             {text('duration_days', 'Durée (jours)', { inputMode: 'decimal', placeholder: '3' })}
                             {text('price_company', 'Tarif entreprise HT par stagiaire (€)', { inputMode: 'decimal', placeholder: '1 250,00' })}
@@ -506,6 +544,25 @@ export default function TrainingFormPage({ training, options, assistant, brochur
                             <legend className="px-2 text-sm font-semibold">Accessibilité et accès</legend>
                             {area('accessibility', 'Accessibilité aux personnes en situation de handicap')}
                             {area('access_terms', 'Modalités et délais d’accès')}
+                        </fieldset>
+
+                        <fieldset className="grid gap-2 rounded-xl border p-4" aria-label="Compétences">
+                            <legend className="px-2 text-sm font-semibold">Compétences (grilles du livret d’apprentissage)</legend>
+                            <p className="text-muted-foreground text-xs">
+                                Une ligne par élément : « AT » pour une activité type, « CP » pour une compétence, un tiret pour un savoir-faire.
+                                Collez la grille depuis Word puis ajoutez les préfixes.
+                            </p>
+                            <textarea
+                                id="competences_text"
+                                rows={12}
+                                value={data.competences_text}
+                                onChange={(e) => setData('competences_text', e.target.value)}
+                                className={`${textareaClass} font-mono text-xs`}
+                                placeholder={
+                                    'AT Préparer et dresser des entrées et des desserts\nCP Réaliser la mise en place des entrées et des desserts\n- Peser les produits'
+                                }
+                            />
+                            <InputError message={errors.competences_text} />
                         </fieldset>
 
                         <fieldset className="grid gap-4 rounded-xl border p-4 md:grid-cols-2" aria-label="Résultats">
