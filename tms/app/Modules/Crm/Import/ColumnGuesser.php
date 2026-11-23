@@ -129,7 +129,7 @@ final class ColumnGuesser
         foreach ($target->fields() as $field => $label) {
             if (Text::key($label) === $key) {
                 $matches[$field] = 2.0;
-            } elseif (in_array($key, $target->synonyms($field), true)) {
+            } elseif (in_array($key, $target->synonyms($field), true) || in_array($key, $target->exactSynonyms($field), true)) {
                 $matches[$field] = 1.0;
             }
         }
