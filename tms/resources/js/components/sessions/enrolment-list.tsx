@@ -267,7 +267,7 @@ export function EnrolmentList({
     const [abandoning, setAbandoning] = useState<EnrolmentRow | null>(null);
     const [editing, setEditing] = useState<EnrolmentRow | null>(null);
 
-    const act = (row: EnrolmentRow, action: 'confirm' | 'promote' | 'cancel') => {
+    const act = (row: EnrolmentRow, action: 'promote' | 'cancel') => {
         if (action === 'cancel' && !window.confirm(`Annuler l'inscription de ${row.person.label} ? Personne n'est promu automatiquement.`)) return;
         router.post(route('enrolments.transition', { enrolment: row.id, action }), {}, { preserveScroll: true });
     };
@@ -278,12 +278,6 @@ export function EnrolmentList({
 
     return (
         <>
-            {references && rows.some((r) => r.can_update) && (
-                <p className="text-muted-foreground mb-2 text-xs">
-                    <strong>« Inscrit » suffit</strong> : convocations, présences, attestations et factures se font pour tout stagiaire inscrit. «
-                    Confirmé » est <strong>facultatif</strong> : il note seulement que la personne a confirmé sa venue, sans rien déclencher.
-                </p>
-            )}
             <ul className="divide-y rounded-xl border">
                 {rows.map((row) => (
                     <li key={row.id} className="grid gap-2 p-3 sm:grid-cols-[1fr_auto] sm:items-center">
@@ -331,17 +325,6 @@ export function EnrolmentList({
                         </div>
                         {row.can_update && references && row.status !== 'cancelled' && (
                             <div className="flex flex-wrap gap-1">
-                                {row.status === 'enrolled' && (
-                                    <Button
-                                        type="button"
-                                        size="sm"
-                                        variant="ghost"
-                                        title="Facultatif : note que la personne a confirmé sa venue (ne déclenche rien)."
-                                        onClick={() => act(row, 'confirm')}
-                                    >
-                                        Noter sa confirmation
-                                    </Button>
-                                )}
                                 {row.status === 'waitlisted' && (
                                     <Button
                                         type="button"

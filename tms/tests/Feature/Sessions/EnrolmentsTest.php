@@ -425,13 +425,12 @@ it('creates a trainee with the DAS of the training, and offers the similar peopl
     $this->postJson("/sessions/{$session->id}/trainees", ['last_name' => 'Nouveau', 'first_name' => 'Paul', 'email' => 'paul.nouveau@example.test', 'confirm_duplicate' => true])->assertCreated();
 });
 
-it('confirms, cancels and updates an enrolment from the screens', function () {
+it('cancels and updates an enrolment from the screens, never « confirms » it (it triggered nothing)', function () {
     $enrolment = enrol(enrDossier(), enrSession());
     $this->actingAs(admin(true));
 
-    $this->post("/enrolments/{$enrolment->id}/confirm")->assertRedirect();
-    expect($enrolment->fresh()->status)->toBe(EnrolmentStatus::Confirmed);
-    $this->post("/enrolments/{$enrolment->id}/confirm")->assertStatus(409);
+    $this->post("/enrolments/{$enrolment->id}/confirm")->assertNotFound();
+    expect($enrolment->fresh()->status)->toBe(EnrolmentStatus::Enrolled);
 
     $bpf = crmItem(ReferenceList::BpfCategory, 'Autres');
     $this->put("/enrolments/{$enrolment->id}", ['bpf_category_id' => $bpf->id, 'adaptation_needs' => 'Interprète LSF'])->assertRedirect();

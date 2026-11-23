@@ -162,7 +162,7 @@ Quand une session inter est complète (inscrits et confirmés au nombre de place
 
 ### États d'une inscription
 
-*Inscrit*, *En attente*, *Confirmé* (**Noter sa confirmation** : **facultatif**, note seulement que la personne a confirmé sa venue ; *Inscrit* suffit pour les convocations, présences, attestations et factures), *Abandon* (**Abandon**), *Annulé* (**Désinscrire** : retire le stagiaire du groupe et libère la place, sans promouvoir personne). **Modifier** change la date d'entrée, les heures prévues, la catégorie BPF, les besoins d'adaptation et les notes.
+*Inscrit* (suffit pour les convocations, présences, attestations et factures : il n'y a rien à confirmer), *En attente*, *Abandon* (**Abandon**), *Annulé* (**Désinscrire** : retire le stagiaire du groupe et libère la place, sans promouvoir personne). **Modifier** change la date d'entrée, les heures prévues, la catégorie BPF, les besoins d'adaptation et les notes.
 
 ### Prix par stagiaire
 
