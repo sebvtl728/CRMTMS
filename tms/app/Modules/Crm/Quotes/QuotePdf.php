@@ -118,6 +118,7 @@ class QuotePdf
                 'valid_until' => $quote->valid_until->format('d/m/Y'),
                 'subject' => $quote->opportunity?->title,
                 'notes' => $quote->notes,
+                'funding' => $quote->fundingMode?->label,
                 'vat_exempt' => $quote->vat_exempt,
                 'vat_notice' => $quote->vat_exempt ? LegalMentions::vatExemptionNotice($quote->issued_on) : null,
             ],

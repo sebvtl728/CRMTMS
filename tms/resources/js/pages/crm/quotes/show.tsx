@@ -33,6 +33,7 @@ interface QuoteLineRow {
 interface QuoteData extends QuoteRow {
     contact: { id: string; name: string } | null;
     notes: string | null;
+    funding_mode: string | null;
     vat_exempt: boolean;
     vat_notice: string | null;
     sent_at: string | null;
@@ -273,6 +274,7 @@ export default function QuoteShow({
                         </Item>
                         <Item label="Date du devis">{formatDay(q.issued_on)}</Item>
                         <Item label="Valable jusqu'au">{formatDay(q.valid_until)}</Item>
+                        <Item label="Financement envisagé">{q.funding_mode}</Item>
                         <Item label="Responsable de l'opportunité">{q.responsible}</Item>
                         <Item label="Créé le">{formatDateTime(q.created_at)}</Item>
                         {q.sent_at && <Item label="Envoyé le">{formatDateTime(q.sent_at)}</Item>}

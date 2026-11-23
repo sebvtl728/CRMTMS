@@ -3,6 +3,7 @@
 namespace App\Modules\Core\References;
 
 use App\Http\Controllers\Controller;
+use App\Modules\Core\Tenancy\TenantContext;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -36,6 +37,7 @@ class ReferenceController extends Controller
                 'has_reached' => $list->hasReached(),
                 'has_default_for' => $list->hasDefaultFor(),
                 'has_external_billing' => $list->hasExternalBilling(),
+                'has_funding_type' => $list->hasFundingType(),
                 'has_client' => $list->hasClient(),
                 'items' => ($items[$list->value] ?? collect())->map(fn (ReferenceItem $i) => [
                     'id' => $i->id,
@@ -167,6 +169,8 @@ class ReferenceController extends Controller
             'meta.reached' => ['nullable', 'boolean'],
             'meta.default_for' => ['nullable', Rule::in(array_keys(ReferenceItem::DEFAULT_FOR))],
             'meta.external_billing' => ['nullable', 'boolean'],
+            'meta.funding_type_id' => ['nullable', 'uuid', Rule::exists('reference_items', 'id')
+                ->where('tenant_id', app(TenantContext::class)->id())->where('list', ReferenceList::FundingType->value)->whereNull('deleted_at')],
             'meta.client' => ['nullable', 'boolean'],
         ], [
             'label.required' => 'Le libellé est obligatoire.',
@@ -174,6 +178,8 @@ class ReferenceController extends Controller
             'meta.probability.required' => 'La probabilité (0 à 100) est obligatoire pour une étape.',
             'meta.probability.between' => 'La probabilité doit être comprise entre 0 et 100.',
             'meta.probability.integer' => 'La probabilité doit être un nombre entier.',
+            'meta.funding_type_id.uuid' => 'Choisissez un type de financeur de la liste.',
+            'meta.funding_type_id.exists' => 'Choisissez un type de financeur de la liste.',
             'meta.color.regex' => 'La couleur doit être au format #RRGGBB.',
             'meta.planning.in' => 'Choisissez Rendez-vous, Appel ou rien pour le planning.',
             'meta.quote_stage.boolean' => 'Cochez ou décochez la case.',
@@ -248,6 +254,13 @@ class ReferenceController extends Controller
                 $meta['external_billing'] = true;
             } else {
                 unset($meta['external_billing']);
+            }
+        }
+        // Funding type a funding mode gives the dossier: kept unless the form sends it (null clears it).
+        if ($list->hasFundingType() && array_key_exists('funding_type_id', $input)) {
+            $meta['funding_type_id'] = $input['funding_type_id'];
+            if ($meta['funding_type_id'] === null) {
+                unset($meta['funding_type_id']);
             }
         }
         // Organisation type showing the commercial status: kept unless the form sends it.

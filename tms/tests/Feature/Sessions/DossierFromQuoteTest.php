@@ -491,3 +491,31 @@ it('refuses the assistant when the quote\'s DAS is outside « Ses DAS » for the
     $this->actingAs($user)->get(route('crm.quotes.show', $quote))->assertOk()
         ->assertInertia(fn (Assert $page) => $page->where('links', []));
 });
+
+it('funds the dossier with the funding type linked to the funding mode of the quote, else of its opportunity', function () {
+    $admin = admin(true);
+    $org = Organisation::query()->create(['name' => 'Hôtel du Parc']);
+    $quote = dfqQuote($org);
+    $quote->forceFill(['funding_mode_id' => crmItem(ReferenceList::FundingMode, 'OPCO')->id])->save();
+
+    $this->actingAs($admin)->postJson(route('dossiers.from-quote.store', $quote->id), ['lines' => [[], [], []]])->assertCreated();
+    $funding = Funding::query()->sole();
+    expect($funding->funding_type_id)->toBe(crmItem(ReferenceList::FundingType, 'OPCO')->id)
+        ->and($funding->funder_organisation_id)->toBe($org->id)
+        ->and($funding->status)->toBe(FundingStatus::ToRequest);
+
+    // A quote without mode: the opportunity's (CPF for a particulier).
+    $person = makePerson('Durand', ['first_name' => 'Paul', 'is_individual' => true]);
+    $second = dfqQuote($person);
+    $second->opportunity->forceFill(['funding_mode_id' => crmItem(ReferenceList::FundingMode, 'CPF')->id])->save();
+    $this->postJson(route('dossiers.from-quote.store', $second->id), ['lines' => [[], [], []]])->assertCreated();
+    expect(Dossier::query()->where('account_person_id', $person->id)->sole()->fundings()->sole()->funding_type_id)
+        ->toBe(crmItem(ReferenceList::FundingType, 'CPF')->id);
+
+    // A mode linked to no type (« Autre »): the type flagged for the contractant.
+    $third = dfqQuote(Organisation::query()->create(['name' => 'Le Bistrot']));
+    $third->forceFill(['funding_mode_id' => crmItem(ReferenceList::FundingMode, 'Autre')->id])->save();
+    $this->postJson(route('dossiers.from-quote.store', $third->id), ['lines' => [[], [], []]])->assertCreated();
+    expect(Dossier::query()->where('quote_id', $third->id)->sole()->fundings()->sole()->funding_type_id)
+        ->toBe(crmItem(ReferenceList::FundingType, 'Entreprise')->id);
+});

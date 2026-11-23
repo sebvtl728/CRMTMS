@@ -34,6 +34,7 @@ interface FormProps {
         number: string | null;
         company_id: string;
         contact_person_id: string | null;
+        funding_mode_id: string | null;
         issued_on: string;
         valid_until: string;
         notes: string | null;
@@ -47,6 +48,7 @@ interface FormProps {
     options: {
         companies: CompanyOption[];
         contacts: Option[];
+        funding_modes: Option[];
         units: Option[];
         vat_rates: Option[];
         training: QuoteTrainingOption[];
@@ -57,6 +59,7 @@ type QuoteForm = {
     opportunity_id: string;
     company_id: string;
     contact_person_id: string;
+    funding_mode_id: string;
     issued_on: string;
     valid_until: string;
     notes: string;
@@ -87,6 +90,7 @@ export default function QuoteFormPage({
         opportunity_id: opportunity.id,
         company_id: quote.company_id,
         contact_person_id: quote.contact_person_id ?? '',
+        funding_mode_id: quote.funding_mode_id ?? '',
         issued_on: quote.issued_on,
         valid_until: quote.valid_until,
         notes: quote.notes ?? '',
@@ -204,6 +208,26 @@ export default function QuoteFormPage({
                                 </SelectContent>
                             </Select>
                             <InputError message={errors.contact_person_id} />
+                        </div>
+                        <div className="grid gap-2">
+                            <Label htmlFor="funding_mode_id">Financement envisagé</Label>
+                            <Select value={data.funding_mode_id || NONE} onValueChange={(v) => setData('funding_mode_id', v === NONE ? '' : v)}>
+                                <SelectTrigger id="funding_mode_id">
+                                    <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value={NONE}>Non renseigné</SelectItem>
+                                    {options.funding_modes.map((m) => (
+                                        <SelectItem key={m.value} value={m.value}>
+                                            {m.label}
+                                        </SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                            <p className="text-muted-foreground text-xs">
+                                Repris de l'opportunité, imprimé sur le devis ; le dossier créé depuis le devis part de ce financement.
+                            </p>
+                            <InputError message={errors.funding_mode_id} />
                         </div>
                         <div className="grid gap-2">
                             <Label htmlFor="issued_on">Date du devis *</Label>

@@ -406,3 +406,36 @@ it('never rewrites a quote that is no longer a draft', function () {
     ]))->toThrow(LogicException::class, 'Seul un brouillon de devis se modifie.');
     expect($quote->refresh()->total_ht)->toBe('1000.00');
 });
+
+it('carries the funding mode of the opportunity into the quote, editable on the draft and kept by a new version', function () {
+    $this->actingAs(commercial());
+    $company = Company::factory()->default()->create();
+    $opportunity = makeOpportunity(Organisation::query()->create(['name' => 'Le Bistrot']));
+    $opco = crmItem(ReferenceList::FundingMode, 'OPCO');
+    $cpf = crmItem(ReferenceList::FundingMode, 'CPF');
+    $opportunity->forceFill(['funding_mode_id' => $opco->id])->save();
+
+    $this->get("/crm/opportunities/{$opportunity->id}/quotes/create")->assertOk()
+        ->assertInertia(fn (Assert $page) => $page->where('quote.funding_mode_id', $opco->id)
+            ->where('options.funding_modes', fn ($modes) => collect($modes)->pluck('label')->contains('OPCO')));
+
+    $this->post('/crm/quotes', quotePayload($opportunity, $company, null, ['funding_mode_id' => $opco->id]))->assertSessionHasNoErrors();
+    $quote = Quote::query()->sole();
+    expect($quote->funding_mode_id)->toBe($opco->id);
+
+    $this->get("/crm/quotes/{$quote->id}")->assertInertia(fn (Assert $page) => $page->where('quote.funding_mode', 'OPCO'));
+
+    $this->put("/crm/quotes/{$quote->id}/edit", quotePayload($opportunity, $company, null, ['funding_mode_id' => $cpf->id]))->assertSessionHasNoErrors();
+    expect($quote->refresh()->funding_mode_id)->toBe($cpf->id);
+
+    // Another list's value is refused in French; empty clears it.
+    $this->put("/crm/quotes/{$quote->id}/edit", quotePayload($opportunity, $company, null, ['funding_mode_id' => crmItem(ReferenceList::Das, 'Hôtellerie-restauration')->id]))
+        ->assertSessionHasErrors(['funding_mode_id' => 'Choisissez un mode de financement de la liste.']);
+    $this->put("/crm/quotes/{$quote->id}/edit", quotePayload($opportunity, $company, null, ['funding_mode_id' => '']))->assertSessionHasNoErrors();
+    expect($quote->refresh()->funding_mode_id)->toBeNull();
+
+    $quote->forceFill(['funding_mode_id' => $cpf->id])->save();
+    $copy = app(QuoteWriter::class)->duplicate($quote->refresh(), $opportunity);
+    expect($copy->funding_mode_id)->toBe($cpf->id)
+        ->and(ReferenceUsage::isInUse($cpf))->toBeTrue();
+});

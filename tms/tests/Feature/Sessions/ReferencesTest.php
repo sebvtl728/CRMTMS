@@ -203,3 +203,44 @@ it('lets an administrator choose the funding type of each contractant, one per k
     $this->put("/admin/references/abandon_reason/{$reason->id}", ['label' => 'Démission', 'meta' => ['default_for' => 'person']])->assertRedirect();
     expect($reason->fresh()->meta)->toBeNull();
 });
+
+it('links each funding mode of the CRM to the funding type of the dossier it gives', function () {
+    inTenant();
+    CapFormationReferenceSeeder::run(tenant());
+    $mode = fn (string $code) => ReferenceItem::query()->where('list', ReferenceList::FundingMode)->where('code', $code)->firstOrFail();
+    $type = fn (string $code) => ReferenceItem::query()->where('list', ReferenceList::FundingType)->where('code', $code)->firstOrFail();
+
+    // Seeded: same value in both lists; « Autre » links to nothing.
+    expect($mode('opco')->meta)->toBe(['funding_type_id' => $type('opco')->id])
+        ->and($mode('cpf')->meta)->toBe(['funding_type_id' => $type('cpf')->id])
+        ->and($mode('autre')->meta)->toBeNull();
+
+    $this->actingAs(admin(twoFactor: true))->get('/admin/references')->assertInertia(fn (Assert $page) => $page
+        ->where('lists.funding_mode.has_funding_type', true)->where('lists.funding_type.has_funding_type', false));
+
+    $this->put("/admin/references/funding_mode/{$mode('autre')->id}", ['label' => 'Autre', 'meta' => ['funding_type_id' => $type('region')->id]])->assertRedirect();
+    expect($mode('autre')->meta)->toBe(['funding_type_id' => $type('region')->id]);
+    $this->put("/admin/references/funding_mode/{$mode('autre')->id}", ['label' => 'Autre', 'meta' => ['funding_type_id' => null]])->assertRedirect();
+    expect($mode('autre')->meta)->toBeNull();
+
+    // Only a funding type of the list.
+    $this->put("/admin/references/funding_mode/{$mode('autre')->id}", ['label' => 'Autre', 'meta' => ['funding_type_id' => $mode('cpf')->id]])
+        ->assertSessionHasErrors(['meta.funding_type_id' => 'Choisissez un type de financeur de la liste.']);
+});
+
+it('links by migration the funding modes of each organisme to the funding type of the same value, once', function () {
+    inTenant();
+    CapFormationReferenceSeeder::run(tenant());
+    $mode = fn (string $code) => ReferenceItem::query()->where('list', ReferenceList::FundingMode)->where('code', $code)->firstOrFail();
+    $type = fn (string $code) => ReferenceItem::query()->where('list', ReferenceList::FundingType)->where('code', $code)->firstOrFail();
+    ReferenceItem::query()->where('list', ReferenceList::FundingMode)->update(['meta' => null]);
+    // A choice of the organisme is kept.
+    $mode('cpf')->update(['meta' => ['funding_type_id' => $type('personnel')->id]]);
+    $migration = lot2aMigration('2027_01_30_000019_add_funding_mode_to_quotes');
+
+    $migration->linkFundingModes();
+    expect($mode('opco')->meta)->toBe(['funding_type_id' => $type('opco')->id])
+        ->and($mode('france-travail')->meta)->toBe(['funding_type_id' => $type('france-travail')->id])
+        ->and($mode('cpf')->meta)->toBe(['funding_type_id' => $type('personnel')->id])
+        ->and($mode('autre')->meta)->toBeNull();
+});

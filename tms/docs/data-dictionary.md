@@ -332,6 +332,7 @@ Index : (`tenant_id`, `das_id`), (`tenant_id`, `title`). Journalisée (`training
 | `opportunity_id` | uuid (FK `opportunities`) | Opportunité ; la visibilité d'un devis est celle de son opportunité (`CrmVisibility::quotes`) |
 | `organisation_id`, `person_id` | uuid, null (FK) | Compte copié de l'opportunité : **exactement un** des deux (CHECK `quotes_account_check`) |
 | `contact_person_id` | uuid, null (FK `people`) | Destinataire (interlocuteur ou particulier) |
+| `funding_mode_id` | uuid, null (FK `reference_items`, liste `funding_mode`) | Financement envisagé : repris de l'opportunité à la création, modifiable sur le brouillon, imprimé sur le PDF ; donne le financement de départ du dossier (`meta.funding_type_id` du mode). Une valeur utilisée ne se supprime pas |
 | `status` | string(20), défaut `draft` | `draft`, `sent`, `reminded`, `accepted`, `refused`, `expired` (CHECK) |
 | `issued_on`, `valid_until` | date | Date du devis et validité (CHECK `valid_until >= issued_on`) |
 | `sent_at`, `reminded_at` | timestamptz, null | Envoi et dernière relance (dernier contact des fiches, taux de réussite) |

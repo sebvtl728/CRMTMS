@@ -4,6 +4,7 @@ namespace App\Modules\Crm\Quotes;
 
 use App\Modules\Core\Audit\Auditable;
 use App\Modules\Core\Companies\Company;
+use App\Modules\Core\References\ReferenceItem;
 use App\Modules\Core\Tenancy\BelongsToTenant;
 use App\Modules\Crm\Opportunities\Opportunity;
 use App\Modules\Crm\Organisations\Organisation;
@@ -29,6 +30,7 @@ use Illuminate\Support\Facades\Auth;
  * @property string|null $organisation_id
  * @property string|null $person_id
  * @property string|null $contact_person_id recipient: an interlocuteur of the entreprise, or the particulier
+ * @property string|null $funding_mode_id planned funding (« Modes de financement »), copied from the opportunity at creation
  * @property QuoteStatus $status
  * @property Carbon $issued_on
  * @property Carbon $valid_until
@@ -74,7 +76,7 @@ class Quote extends Model
     /** @var list<string> */
     protected $fillable = [
         'company_id', 'opportunity_id', 'organisation_id', 'person_id', 'contact_person_id',
-        'issued_on', 'valid_until', 'notes',
+        'funding_mode_id', 'issued_on', 'valid_until', 'notes',
     ];
 
     /** @var array<string, mixed> */
@@ -145,6 +147,14 @@ class Quote extends Model
     public function company(): BelongsTo
     {
         return $this->belongsTo(Company::class)->withTrashed();
+    }
+
+    /**
+     * @return BelongsTo<ReferenceItem, $this>
+     */
+    public function fundingMode(): BelongsTo
+    {
+        return $this->belongsTo(ReferenceItem::class, 'funding_mode_id')->withTrashed();
     }
 
     /**

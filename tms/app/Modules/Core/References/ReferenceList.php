@@ -125,6 +125,12 @@ enum ReferenceList: string
      * e.g. the CPF through EDOF): their share comes off the contractant's
      * invoice and no invoice of the TMS is issued for it (0.9).
      */
+    /** A funding mode gives the dossier a funding type (meta.funding_type_id). */
+    public function hasFundingType(): bool
+    {
+        return $this === self::FundingMode;
+    }
+
     public function hasExternalBilling(): bool
     {
         return $this === self::FundingType;

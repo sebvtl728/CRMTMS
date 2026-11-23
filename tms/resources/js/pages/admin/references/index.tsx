@@ -22,6 +22,7 @@ type ReferenceMeta = {
     reached?: boolean;
     default_for?: 'organisation' | 'person' | null;
     external_billing?: boolean;
+    funding_type_id?: string | null;
     client?: boolean;
 };
 
@@ -52,6 +53,7 @@ interface ReferenceListData {
     has_reached: boolean;
     has_default_for: boolean;
     has_external_billing: boolean;
+    has_funding_type: boolean;
     has_client: boolean;
     items: ReferenceItem[];
 }
@@ -72,6 +74,7 @@ interface EditorState {
     reached: boolean;
     defaultFor: string; // '' = none
     externalBilling: boolean;
+    fundingType: string; // '' = none
     client: boolean;
 }
 
@@ -81,6 +84,9 @@ export default function ReferencesIndex({ lists }: ReferencesIndexProps) {
     const keys = Object.keys(lists);
     const [current, setCurrent] = useState(keys[0]);
     const list = lists[current];
+    // Funding types a funding mode can give the dossier (meta.funding_type_id).
+    const fundingTypes = lists.funding_type?.items ?? [];
+    const fundingTypeLabel = (id: string | null | undefined) => fundingTypes.find((t) => t.id === id)?.label;
     const errors = usePage().props.errors as Record<string, string>;
 
     const [order, setOrder] = useState<ReferenceItem[]>(list.items);
@@ -115,6 +121,7 @@ export default function ReferencesIndex({ lists }: ReferencesIndexProps) {
             reached: item?.meta.reached === true,
             defaultFor: item?.meta.default_for ?? '',
             externalBilling: item?.meta.external_billing === true,
+            fundingType: item?.meta.funding_type_id ?? '',
             client: item?.meta.client === true,
         });
 
@@ -132,6 +139,7 @@ export default function ReferencesIndex({ lists }: ReferencesIndexProps) {
         if (list.has_reached) meta.reached = editor.reached;
         if (list.has_default_for) meta.default_for = editor.defaultFor === '' ? null : (editor.defaultFor as 'organisation' | 'person');
         if (list.has_external_billing) meta.external_billing = editor.externalBilling;
+        if (list.has_funding_type) meta.funding_type_id = editor.fundingType === '' ? null : editor.fundingType;
         if (list.has_client) meta.client = editor.client;
         const payload = { label: editor.label, meta };
         const options = {
@@ -250,6 +258,9 @@ export default function ReferencesIndex({ lists }: ReferencesIndexProps) {
                                     <Badge variant="outline">Par défaut : {DEFAULT_FOR[item.meta.default_for]}</Badge>
                                 )}
                                 {list.has_external_billing && item.meta.external_billing && <Badge variant="outline">Facturé hors du TMS</Badge>}
+                                {list.has_funding_type && fundingTypeLabel(item.meta.funding_type_id) && (
+                                    <Badge variant="outline">Dossier : {fundingTypeLabel(item.meta.funding_type_id)}</Badge>
+                                )}
                                 {list.has_client && item.meta.client && <Badge variant="outline">Affiche le statut commercial</Badge>}
                                 {item.is_system && <Badge variant="secondary">Système</Badge>}
                                 {item.in_use && <Badge variant="secondary">Utilisée</Badge>}
@@ -435,10 +446,38 @@ export default function ReferencesIndex({ lists }: ReferencesIndexProps) {
                                     <option value="person">Par défaut quand le contractant est un particulier</option>
                                 </select>
                                 <p className="text-muted-foreground text-xs">
-                                    Un dossier créé depuis un devis accepté reçoit un financement de ce type pour tout son prix. Une seule valeur par
-                                    cas ; aucune : pas de financement initial.
+                                    Un dossier créé depuis un devis accepté reçoit un financement de ce type pour tout son prix, quand le mode de
+                                    financement du devis ne désigne aucun type. Une seule valeur par cas ; aucune : pas de financement initial.
                                 </p>
                                 <InputError message={errors['meta.default_for']} />
+                            </div>
+                        )}
+
+                        {list.has_funding_type && (
+                            <div className="grid gap-1">
+                                <label htmlFor="reference_funding_type" className="text-sm font-medium">
+                                    Financement du dossier
+                                </label>
+                                <select
+                                    id="reference_funding_type"
+                                    className="border-input bg-background focus:ring-ring h-9 w-full rounded-md border px-3 text-sm focus:ring-2 focus:outline-hidden"
+                                    value={editor?.fundingType ?? ''}
+                                    onChange={(e) => setEditor((s) => s && { ...s, fundingType: e.target.value })}
+                                >
+                                    <option value="">Aucun : le type par défaut du contractant</option>
+                                    {fundingTypes
+                                        .filter((t) => t.is_active || t.id === editor?.fundingType)
+                                        .map((t) => (
+                                            <option key={t.id} value={t.id}>
+                                                {t.label}
+                                            </option>
+                                        ))}
+                                </select>
+                                <p className="text-muted-foreground text-xs">
+                                    Le dossier créé depuis un devis de ce mode commence avec un financement de ce type (Types de financeur), « À
+                                    demander », pour tout son prix.
+                                </p>
+                                <InputError message={errors['meta.funding_type_id']} />
                             </div>
                         )}
 
