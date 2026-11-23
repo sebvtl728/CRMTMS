@@ -5,6 +5,11 @@ Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) ; ve
 
 ## [Non publié]
 
+### Ajouté
+
+- Devis : **Financement envisagé** (OPCO, CPF…), repris du mode de financement de l'opportunité, modifiable sur le brouillon, affiché sur le devis et imprimé dans son PDF.
+- Dossier créé depuis un devis : le financement de départ suit ce mode (OPCO → financement OPCO « À demander », CPF → CPF). Référentiel *Modes de financement* : champ **Financement du dossier** (lien vers un type de financeur), posé à la mise à jour sur la valeur du même nom ; sans lien, le type par défaut du contractant comme avant.
+
 ## [0.15.16] - 2026-11-23
 
 ### Ajouté

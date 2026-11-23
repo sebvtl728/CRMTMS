@@ -224,7 +224,9 @@ export default function QuoteFormPage({
                                     ))}
                                 </SelectContent>
                             </Select>
-                            <p className="text-muted-foreground text-xs">Repris de l'opportunité, imprimé sur le devis ; le dossier créé depuis le devis part de ce financement.</p>
+                            <p className="text-muted-foreground text-xs">
+                                Repris de l'opportunité, imprimé sur le devis ; le dossier créé depuis le devis part de ce financement.
+                            </p>
                             <InputError message={errors.funding_mode_id} />
                         </div>
                         <div className="grid gap-2">
