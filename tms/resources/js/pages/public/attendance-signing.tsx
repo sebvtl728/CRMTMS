@@ -25,6 +25,8 @@ interface Props {
     banner?: string | null;
     trainee_first_name?: string;
     code_url?: string;
+    /** A grouped catch-up: every half-day the one drawing signs. */
+    halves?: string[] | null;
 }
 
 /**
@@ -123,7 +125,7 @@ function ClassSigning({ state, organisme, session, date, half_label, trainees = 
 }
 
 /** The remote catch-up of one trainee: consent, a code by e-mail, the drawing. */
-function RemoteCatchUp({ organisme, session, date, half_label, trainee_first_name, banner, code_url, post_url }: Props) {
+function RemoteCatchUp({ organisme, session, date, half_label, trainee_first_name, banner, code_url, post_url, halves }: Props) {
     const [consent, setConsent] = useState(false);
     const [codeSent, setCodeSent] = useState(false);
     const [code, setCode] = useState('');
@@ -160,7 +162,10 @@ function RemoteCatchUp({ organisme, session, date, half_label, trainee_first_nam
     };
 
     return (
-        <AuthLayout title={`Émargement – ${half_label ?? ''}`} description={`${organisme ?? ''} · ${session ?? ''} · ${date ?? ''}`}>
+        <AuthLayout
+            title={halves ? `Émargement – ${halves.length} demi-journées` : `Émargement – ${half_label ?? ''}`}
+            description={`${organisme ?? ''} · ${session ?? ''}${halves ? '' : ` · ${date ?? ''}`}`}
+        >
             <Head title="Émargement" />
             {done ? (
                 <p className="flex items-center gap-2 rounded-md border p-4 text-sm" role="status">
@@ -170,13 +175,24 @@ function RemoteCatchUp({ organisme, session, date, half_label, trainee_first_nam
             ) : (
                 <div className="grid gap-4">
                     {banner && <p className="rounded-md border border-amber-300 bg-amber-50 p-2 text-sm text-amber-900">{banner}</p>}
-                    <p className="text-sm">
-                        Bonjour {trainee_first_name}, signez votre présence du {date}, {half_label?.toLowerCase()}.
-                    </p>
+                    {halves ? (
+                        <div className="grid gap-1 text-sm">
+                            <p>Bonjour {trainee_first_name}, signez une fois votre présence à ces demi-journées :</p>
+                            <ul className="list-disc pl-5">
+                                {halves.map((h) => (
+                                    <li key={h}>{h}</li>
+                                ))}
+                            </ul>
+                        </div>
+                    ) : (
+                        <p className="text-sm">
+                            Bonjour {trainee_first_name}, signez votre présence du {date}, {half_label?.toLowerCase()}.
+                        </p>
+                    )}
                     <div className="flex items-start gap-2">
                         <Checkbox id="consent" checked={consent} onCheckedChange={(v) => setConsent(v === true)} />
                         <Label htmlFor="consent" className="text-sm leading-snug font-normal">
-                            Je confirme avoir été présent(e) à cette demi-journée.
+                            {halves ? 'Je confirme avoir été présent(e) à chacune de ces demi-journées.' : 'Je confirme avoir été présent(e) à cette demi-journée.'}
                         </Label>
                     </div>
                     <SignaturePad id="drawing" onChange={setDrawing} invalid={!!errors.drawing} />

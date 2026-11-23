@@ -6,6 +6,7 @@ use App\Modules\Core\Access\AccessScope;
 use App\Modules\Core\Access\Scopes;
 use App\Modules\Core\Users\User;
 use App\Modules\Crm\Public\Fiches;
+use App\Modules\Sessions\Attendance\Signing\SlotRows;
 use App\Modules\Sessions\Enrolments\Enrolment;
 use App\Modules\Sessions\Modules\DatingMode;
 use App\Modules\Sessions\Modules\SessionModule;
@@ -158,6 +159,8 @@ final class AttendanceRows
             'can' => [
                 'manage' => $manage,
                 'close' => SessionsVisibility::allows($user, Permissions::ATTENDANCE_CLOSE, $session),
+                // « Rattrapage de plusieurs demi-journées »: a manager, never a trainer alone.
+                'catch_up' => SlotRows::mayCatchUpOn($session->id, $user),
             ],
             'seances' => $seances->map(fn (Seance $s) => [
                 'id' => $s->id,
@@ -187,10 +190,10 @@ final class AttendanceRows
                 ),
             ],
             'realised' => $realised,
-            'slots' => Signing\SlotRows::forMonth($session->id, $first),
+            'slots' => SlotRows::forMonth($session->id, $first),
             'signed_sheets' => Signing\SignedSheetController::list($session->id),
             // Catch-ups to confirm: attendance managers only (never « Ses séances »).
-            'catch_ups' => $manage ? Signing\SlotRows::pendingCatchUps($session->id, $first) : [],
+            'catch_ups' => $manage ? SlotRows::pendingCatchUps($session->id, $first) : [],
         ];
     }
 
