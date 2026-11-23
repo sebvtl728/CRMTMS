@@ -5,6 +5,10 @@ Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) ; ve
 
 ## [Non publié]
 
+### Corrigé
+
+- **Reste à financer par ligne ou par stagiaire** : un financement du dossier entier n'était pas compté dans le détail ; une ligne visée par un autre financement affichait encore « Reste à financer » alors que le dossier était soldé. Il couvre maintenant d'abord ce que rien ne vise, puis ce qui manque aux lignes et aux stagiaires détaillés.
+
 ### Ajouté
 
 - **Financements d'un dossier** : sous « Reste à financer », la part **Accordé** et la part **En attente d'accord** (« À demander », « Demandé »). Un financement de départ « À demander » couvrait tout le prix et affichait « Reste à financer : 0,00 € » sans rien dire de l'accord.
