@@ -69,11 +69,13 @@ final class TrainingModules
      */
     public static function gap(Training $training): bool
     {
-        if ($training->duration_hours === null || ! $training->modules()->exists()) {
+        // The modules are taught in the centre: compared with the centre hours when given.
+        $target = $training->centre_hours ?? $training->duration_hours;
+        if ($target === null || ! $training->modules()->exists()) {
             return false;
         }
 
-        return self::hours($training) !== self::format(TrainingData::cents((string) $training->duration_hours) ?? 0);
+        return self::hours($training) !== self::format(TrainingData::cents((string) $target) ?? 0);
     }
 
     private static function format(int $cents): string

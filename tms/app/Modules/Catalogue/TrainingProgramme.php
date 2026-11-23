@@ -67,6 +67,8 @@ final class TrainingProgramme
                 'das' => $training->das?->label,
                 'duration_hours' => $training->duration_hours,
                 'duration_days' => $training->duration_days,
+                'centre_hours' => $training->centre_hours,
+                'company_hours' => $training->company_hours,
                 'price_company' => $training->price_company,
                 'price_individual' => $training->price_individual,
                 'funding_modes' => $training->fundingModes->pluck('label')->all(),

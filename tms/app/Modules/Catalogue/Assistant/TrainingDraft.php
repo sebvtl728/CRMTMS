@@ -2,6 +2,7 @@
 
 namespace App\Modules\Catalogue\Assistant;
 
+use App\Modules\Catalogue\Training;
 use App\Modules\Catalogue\TrainingListQuery;
 use App\Modules\Catalogue\TrainingRequest;
 use App\Modules\Core\References\ReferenceList;
@@ -25,6 +26,8 @@ final class TrainingDraft
 
     public const MAX_DAYS = 365;
 
+    public const MAX_PRICE = 1000000;
+
     public const TEXTS = ['description', 'audience', 'prerequisites', ...TrainingRequest::SHEET_TEXTS];
 
     /**
@@ -41,6 +44,10 @@ final class TrainingDraft
             'das' => $text(200),
             'duration_hours' => $hours,
             'duration_days' => ['type' => ['number', 'null'], 'exclusiveMinimum' => 0, 'maximum' => self::MAX_DAYS],
+            'centre_hours' => $hours,
+            'company_hours' => $hours,
+            'price_company' => ['type' => ['number', 'null'], 'minimum' => 0, 'maximum' => self::MAX_PRICE],
+            'price_individual' => ['type' => ['number', 'null'], 'minimum' => 0, 'maximum' => self::MAX_PRICE],
             ...$texts,
             'objectives' => ['type' => 'array', 'maxItems' => TrainingRequest::MAX_OBJECTIVES, 'items' => ['type' => 'string', 'maxLength' => 500]],
             'modules' => ['type' => 'array', 'maxItems' => TrainingRequest::MAX_MODULES, 'items' => [
@@ -90,6 +97,10 @@ final class TrainingDraft
             'das_id' => self::match($answer['das'] ?? null, $das),
             'duration_hours' => self::decimal($answer['duration_hours'] ?? null),
             'duration_days' => self::decimal($answer['duration_days'] ?? null),
+            'centre_hours' => self::decimal($answer['centre_hours'] ?? null),
+            'company_hours' => self::decimal($answer['company_hours'] ?? null),
+            'price_company' => self::decimal($answer['price_company'] ?? null),
+            'price_individual' => self::decimal($answer['price_individual'] ?? null),
         ];
         foreach (self::TEXTS as $key) {
             $proposal[$key] = self::text($answer[$key] ?? null);
@@ -113,7 +124,64 @@ final class TrainingDraft
             ];
         }
 
+        // Only one duration given: the other from it (7 h a day, days to the half day).
+        $hours = self::hundredths($answer['duration_hours'] ?? null);
+        $days = self::hundredths($answer['duration_days'] ?? null);
+        if ($hours !== null && $days === null) {
+            $proposal['duration_days'] = self::decimal(round($hours / 100 / Training::HOURS_PER_DAY * 2) / 2);
+        } elseif ($days !== null && $hours === null && $days / 100 * Training::HOURS_PER_DAY <= self::MAX_HOURS) {
+            $proposal['duration_hours'] = self::decimal($days / 100 * Training::HOURS_PER_DAY);
+        }
+
+        $proposal['modules'] = self::spread($proposal['modules'], self::hundredths($answer['centre_hours'] ?? null)
+            ?? (self::hundredths($answer['duration_hours'] ?? null) === null ? null
+                : self::hundredths($answer['duration_hours']) - (self::hundredths($answer['company_hours'] ?? null) ?? 0)),
+            self::hundredths($answer['duration_hours'] ?? null));
+
         return $proposal;
+    }
+
+    /**
+     * The hours of the centre spread over the modules the AI left without
+     * hours, in half hours (the last module takes the rest): a module
+     * holding the whole duration while the others have none is not a module
+     * duration and is spread too. Modules with their own hours keep them;
+     * nothing changes when every module has hours or nothing is left.
+     *
+     * @param  list<array{title: string, duration_hours: ?string, modality_id: ?string, content: ?string}>  $modules
+     * @return list<array{title: string, duration_hours: ?string, modality_id: ?string, content: ?string}>
+     */
+    private static function spread(array $modules, ?int $target, ?int $total): array
+    {
+        if ($target === null || $target <= 0 || count($modules) === 0) {
+            return $modules;
+        }
+        $hours = array_map(fn (array $m) => $m['duration_hours'] === null ? null : (int) round((float) str_replace(',', '.', $m['duration_hours']) * 100), $modules);
+        $filled = array_keys(array_filter($hours, fn ($h) => $h !== null));
+        if (count($modules) > 1 && count($filled) === 1 && in_array($hours[$filled[0]], array_filter([$target, $total]), true)) {
+            $hours[$filled[0]] = null;
+        }
+        $empty = array_keys(array_filter($hours, fn ($h) => $h === null));
+        $left = $target - array_sum(array_filter($hours, fn ($h) => $h !== null));
+        if ($empty === [] || $left <= 0) {
+            return $modules;
+        }
+        $each = intdiv(intdiv($left, count($empty)), 50) * 50;
+        if ($each === 0) {
+            return $modules;
+        }
+        foreach ($empty as $n => $index) {
+            $value = $n === count($empty) - 1 ? $left - $each * (count($empty) - 1) : $each;
+            $modules[$index]['duration_hours'] = self::decimal($value / 100);
+        }
+
+        return $modules;
+    }
+
+    /** Hours as integer hundredths, null when not a positive number. */
+    private static function hundredths(mixed $value): ?int
+    {
+        return (is_int($value) || is_float($value)) && $value > 0 ? (int) round($value * 100) : null;
     }
 
     private static function text(mixed $value): ?string

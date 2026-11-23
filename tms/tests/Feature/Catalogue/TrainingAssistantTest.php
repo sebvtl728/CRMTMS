@@ -45,6 +45,10 @@ function assistantAnswer(array $overrides = []): array
         'das' => 'Hôtellerie-restauration',
         'duration_hours' => 14.0,
         'duration_days' => 2,
+        'centre_hours' => null,
+        'company_hours' => null,
+        'price_company' => null,
+        'price_individual' => null,
         'description' => 'Aller plus loin avec Excel.',
         'objectives' => ['Construire un tableau croisé dynamique', 'Écrire des formules imbriquées'],
         'audience' => 'Utilisateurs réguliers d’Excel.',
@@ -349,4 +353,61 @@ it('leaves a duration empty when it rounds to zero hours', function () {
         ->assertJsonPath('proposal.duration_days', null)
         ->assertJsonPath('proposal.modules.0.duration_hours', null)
         ->assertJsonPath('proposal.modules.1.duration_hours', '0,01');
+});
+
+it('proposes the centre and company hours and the prices', function () {
+    assistantConnector();
+    fakeAssistantAi(assistantAnswer(['duration_hours' => 1316, 'centre_hours' => 994, 'company_hours' => 322,
+        'price_company' => 9940, 'price_individual' => 8500.5]));
+    $this->actingAs(admin(twoFactor: true));
+
+    $this->postJson('/catalogue/assistant/prompt', ['prompt' => 'Commis de cuisine'])->assertOk()
+        ->assertJsonPath('proposal.duration_hours', '1316')
+        ->assertJsonPath('proposal.centre_hours', '994')
+        ->assertJsonPath('proposal.company_hours', '322')
+        ->assertJsonPath('proposal.price_company', '9940')
+        ->assertJsonPath('proposal.price_individual', '8500,5');
+});
+
+it('spreads the centre hours over the modules the AI left without hours, in half hours', function () {
+    assistantConnector();
+    fakeAssistantAi(assistantAnswer(['duration_hours' => 100, 'centre_hours' => 70, 'company_hours' => 30, 'modules' => [
+        // The whole duration on the first module only: not a module duration.
+        ['title' => 'Accueil', 'duration_hours' => 100, 'modality' => null, 'content' => null],
+        ['title' => 'Hygiène', 'duration_hours' => null, 'modality' => null, 'content' => null],
+        ['title' => 'Cuisine', 'duration_hours' => null, 'modality' => null, 'content' => null],
+    ]]));
+    $this->actingAs(admin(twoFactor: true));
+
+    $modules = $this->postJson('/catalogue/assistant/prompt', ['prompt' => 'Une formation'])->assertOk()->json('proposal.modules');
+    expect(array_column($modules, 'duration_hours'))->toBe(['23', '23', '24']);
+});
+
+it('keeps the hours the AI gave to modules and spreads only what is left', function () {
+    assistantConnector();
+    fakeAssistantAi(assistantAnswer(['duration_hours' => 21, 'centre_hours' => null, 'company_hours' => null, 'modules' => [
+        ['title' => 'Bases', 'duration_hours' => 7, 'modality' => null, 'content' => null],
+        ['title' => 'Pratique', 'duration_hours' => null, 'modality' => null, 'content' => null],
+        ['title' => 'Évaluation', 'duration_hours' => null, 'modality' => null, 'content' => null],
+    ]]));
+    $this->actingAs(admin(twoFactor: true));
+
+    $modules = $this->postJson('/catalogue/assistant/prompt', ['prompt' => 'Une formation'])->assertOk()->json('proposal.modules');
+    expect(array_column($modules, 'duration_hours'))->toBe(['7', '7', '7']);
+});
+
+it('fills the days from the hours (7 h a day) and the hours from the days when the AI gives only one', function () {
+    assistantConnector();
+    fakeAssistantAi(assistantAnswer(['duration_hours' => 35, 'duration_days' => null]));
+    $this->actingAs(admin(twoFactor: true));
+    $this->postJson('/catalogue/assistant/prompt', ['prompt' => 'Une formation'])->assertOk()
+        ->assertJsonPath('proposal.duration_days', '5');
+
+    fakeAssistantAi(assistantAnswer(['duration_hours' => null, 'duration_days' => 3]));
+    $this->postJson('/catalogue/assistant/prompt', ['prompt' => 'Une formation'])->assertOk()
+        ->assertJsonPath('proposal.duration_hours', '21');
+
+    fakeAssistantAi(assistantAnswer(['duration_hours' => 24, 'duration_days' => null]));
+    $this->postJson('/catalogue/assistant/prompt', ['prompt' => 'Une formation'])->assertOk()
+        ->assertJsonPath('proposal.duration_days', '3,5');
 });

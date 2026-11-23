@@ -62,6 +62,8 @@ class TrainingController extends Controller
             'training' => [
                 ...self::row($training, new TrainingExport),
                 'rncp_code' => $training->rncp_code,
+                'centre_hours' => ExportCell::display((new TrainingExport)->value($training, 'centre_hours')),
+                'company_hours' => ExportCell::display((new TrainingExport)->value($training, 'company_hours')),
                 'bpf_objective' => $training->bpf_objective?->label(),
                 'nsf' => Nsf::display($training->nsf_code),
                 'competences_count' => Competences::count($training->competences),
@@ -136,6 +138,8 @@ class TrainingController extends Controller
                 'das_id' => $training->das_id,
                 'duration_hours' => $training->duration_hours,
                 'duration_days' => $training->duration_days,
+                'centre_hours' => $training->centre_hours,
+                'company_hours' => $training->company_hours,
                 'audience' => $training->audience,
                 'prerequisites' => $training->prerequisites,
                 'price_company' => $training->price_company,

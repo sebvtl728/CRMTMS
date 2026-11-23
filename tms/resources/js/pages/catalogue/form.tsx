@@ -25,6 +25,8 @@ interface FormProps {
         das_id: string;
         duration_hours: string | null;
         duration_days: string | null;
+        centre_hours: string | null;
+        company_hours: string | null;
         audience: string | null;
         prerequisites: string | null;
         price_company: string | null;
@@ -73,6 +75,8 @@ type TrainingForm = {
     das_id: string;
     duration_hours: string;
     duration_days: string;
+    centre_hours: string;
+    company_hours: string;
     audience: string;
     prerequisites: string;
     price_company: string;
@@ -109,6 +113,8 @@ export default function TrainingFormPage({ training, options, assistant, brochur
         das_id: training?.das_id ?? '',
         duration_hours: decimalInput(training?.duration_hours),
         duration_days: decimalInput(training?.duration_days),
+        centre_hours: decimalInput(training?.centre_hours),
+        company_hours: decimalInput(training?.company_hours),
         audience: training?.audience ?? '',
         prerequisites: training?.prerequisites ?? '',
         price_company: amountInput(training?.price_company),
@@ -148,7 +154,7 @@ export default function TrainingFormPage({ training, options, assistant, brochur
     };
 
     const text = (
-        key: 'code' | 'rncp_code' | 'duration_hours' | 'duration_days' | 'price_company' | 'price_individual',
+        key: 'code' | 'rncp_code' | 'duration_hours' | 'duration_days' | 'centre_hours' | 'company_hours' | 'price_company' | 'price_individual',
         label: string,
         props: Record<string, unknown> = {},
     ) => (
@@ -209,7 +215,37 @@ export default function TrainingFormPage({ training, options, assistant, brochur
     // Sum of the modules (hours typed the French way) against the duration of the training: a warning only.
     const toHours = (v: string) => Number.parseFloat(v.replace(/\s/g, '').replace(',', '.'));
     const modulesSum = data.modules.reduce((sum, m) => sum + (Number.isFinite(toHours(m.duration_hours)) ? toHours(m.duration_hours) : 0), 0);
-    const duration = toHours(data.duration_hours);
+    // The modules are taught in the centre: compared with the centre hours when given.
+    const duration = toHours(data.centre_hours) || toHours(data.duration_hours);
+    const durationLabel = toHours(data.centre_hours) ? 'aux heures en centre' : 'à la durée de la formation';
+    const frenchHours = (n: number) => String(Math.round(n * 100) / 100).replace('.', ',');
+    // 7 h a day (Training::HOURS_PER_DAY): an empty duration is filled from the other, never overwritten.
+    const fillOtherDuration = (from: 'duration_hours' | 'duration_days') => {
+        const value = toHours(data[from]);
+        if (!Number.isFinite(value) || value <= 0) return;
+        if (from === 'duration_hours' && data.duration_days.trim() === '') setData('duration_days', frenchHours(Math.round((value / 7) * 2) / 2));
+        if (from === 'duration_days' && data.duration_hours.trim() === '') setData('duration_hours', frenchHours(value * 7));
+    };
+    // « Répartir les heures »: the centre hours (else the duration) over the modules, in half hours, the last one taking the rest.
+    const spreadHours = () => {
+        const total = Math.round(duration * 100);
+        if (!Number.isFinite(duration) || total <= 0 || data.modules.length === 0) return;
+        if (data.modules.some((m) => m.duration_hours.trim() !== '') && !confirm('Remplacer les durées des modules par une répartition égale ?'))
+            return;
+        const each = Math.floor(total / data.modules.length / 50) * 50;
+        setData(
+            'modules',
+            data.modules.map((m, i) => ({
+                ...m,
+                duration_hours: frenchHours((i === data.modules.length - 1 ? total - each * (data.modules.length - 1) : each) / 100),
+            })),
+        );
+    };
+    const partsGap =
+        data.centre_hours.trim() !== '' &&
+        data.company_hours.trim() !== '' &&
+        Number.isFinite(toHours(data.duration_hours)) &&
+        Math.abs(toHours(data.centre_hours) + toHours(data.company_hours) - toHours(data.duration_hours)) > 0.004;
     // As loaded: the server's verdict; once the form is edited: the live sum.
     const gap = isDirty
         ? data.modules.length > 0 && Number.isFinite(duration) && Math.abs(modulesSum - duration) > 0.004
@@ -316,8 +352,24 @@ export default function TrainingFormPage({ training, options, assistant, brochur
                                 options.nsf,
                                 "Nomenclature des spécialités de formation, cadre F-4 du BPF. Ex. 334 pour l'hôtellerie.",
                             )}
-                            {text('duration_hours', 'Durée (heures)', { inputMode: 'decimal', placeholder: '21' })}
-                            {text('duration_days', 'Durée (jours)', { inputMode: 'decimal', placeholder: '3' })}
+                            {text('duration_hours', 'Durée totale (heures)', {
+                                inputMode: 'decimal',
+                                placeholder: '21',
+                                onBlur: () => fillOtherDuration('duration_hours'),
+                            })}
+                            {text('duration_days', 'Durée (jours, 7 h par jour)', {
+                                inputMode: 'decimal',
+                                placeholder: '3',
+                                onBlur: () => fillOtherDuration('duration_days'),
+                            })}
+                            {text('centre_hours', 'Heures en centre (période de formation)', { inputMode: 'decimal', placeholder: '994' })}
+                            {text('company_hours', 'Heures en entreprise', { inputMode: 'decimal', placeholder: '322' })}
+                            {partsGap && (
+                                <p className="text-xs text-amber-700 md:col-span-2 dark:text-amber-400">
+                                    Heures en centre + heures en entreprise = {frenchHours(toHours(data.centre_hours) + toHours(data.company_hours))}{' '}
+                                    h, différent de la durée totale ({frenchHours(toHours(data.duration_hours))} h).
+                                </p>
+                            )}
                             {text('price_company', 'Tarif entreprise HT par stagiaire (€)', { inputMode: 'decimal', placeholder: '1 250,00' })}
                             {text('price_individual', 'Tarif particulier HT par stagiaire (€)', { inputMode: 'decimal', placeholder: '990,00' })}
                             {area('description', 'Description courte')}
@@ -511,7 +563,7 @@ export default function TrainingFormPage({ training, options, assistant, brochur
                             )}
                             {gap && (
                                 <p role="alert" className="rounded-md border border-amber-500 bg-amber-50 p-2 text-sm text-amber-900">
-                                    Attention : la somme des modules ({hoursText(modulesSum)} h) ne correspond pas à la durée de la formation (
+                                    Attention : la somme des modules ({hoursText(modulesSum)} h) ne correspond pas {durationLabel} (
                                     {hoursText(duration)} h). Vous pouvez tout de même enregistrer.
                                 </p>
                             )}
@@ -529,6 +581,16 @@ export default function TrainingFormPage({ training, options, assistant, brochur
                                     }
                                 >
                                     <Plus className="h-4 w-4" /> Ajouter un module
+                                </Button>{' '}
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="sm"
+                                    disabled={data.modules.length === 0 || !Number.isFinite(duration) || duration <= 0}
+                                    title="Répartit les heures en centre (sinon la durée totale) entre les modules, par demi-heure ; modifiables ensuite"
+                                    onClick={spreadHours}
+                                >
+                                    Répartir les heures
                                 </Button>
                             </div>
                         </fieldset>
