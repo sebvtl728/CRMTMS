@@ -5,6 +5,8 @@ Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) ; ve
 
 ## [Non publié]
 
+## [0.15.6] - 2026-11-23
+
 ### Modifié
 
 - **Attestations et certificats de réalisation automatiques** : envoyés **le dernier jour de formation à 13 h 30** aux stagiaires présents (l'après-midi comptée comme réalisée ; les absents du jour et les sortis exclus) ; la clôture du mois reste le rattrapage.
