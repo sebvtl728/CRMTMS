@@ -5,6 +5,8 @@ Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) ; ve
 
 ## [Non publié]
 
+## [0.15.3] - 2026-11-23
+
 ### Ajouté
 
 - **Acompte demandé à un financeur** : sur un financement accordé qui paie directement l'organisme, un pourcentage et une date ; dès cette date et jusqu'à la fin de la formation, le financeur reçoit une **facture d'acompte** ; la facture finale, au réalisé, la déduit (avoir si l'acompte dépassait le réalisé) et rappelle les acomptes déjà facturés.
