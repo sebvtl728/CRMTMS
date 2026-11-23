@@ -6,7 +6,7 @@ import {
     type OpportunityFilterOptions,
     type OpportunityFilterValues,
 } from '@/components/crm/opportunity-filters';
-import { StageBadge, type OpportunityRow } from '@/components/crm/opportunity-list';
+import { NextAction, StageBadge, type OpportunityRow } from '@/components/crm/opportunity-list';
 import { StageDialog, type StageOption } from '@/components/crm/stage-dialog';
 import Heading from '@/components/heading';
 import { Button } from '@/components/ui/button';
@@ -82,6 +82,7 @@ function CardBody({ card }: { card: OpportunityRow }) {
                 {[card.das, card.responsible ?? 'Sans responsable'].filter(Boolean).join(' · ')}
                 {card.expected_close_on && ` · ${formatDay(card.expected_close_on)}`}
             </p>
+            {card.next_action && <NextAction action={card.next_action} className="mt-1 block" />}
         </>
     );
 }

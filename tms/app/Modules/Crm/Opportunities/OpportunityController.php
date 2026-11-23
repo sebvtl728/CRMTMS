@@ -46,9 +46,11 @@ class OpportunityController extends Controller
             ->selectRaw('coalesce(sum(opportunities.amount), 0) as amount, coalesce(sum(opportunities.weighted_amount), 0) as weighted')
             ->first();
 
+        $page = $query->with(OpportunityRows::WITH)->paginate(25)->withQueryString();
+        $next = OpportunityRows::nextActions($page->getCollection(), $user);
+
         return Inertia::render('crm/opportunities/index', [
-            'opportunities' => $query->with(OpportunityRows::WITH)->paginate(25)->withQueryString()
-                ->through(fn (Opportunity $o) => OpportunityRows::row($o)),
+            'opportunities' => $page->through(fn (Opportunity $o) => OpportunityRows::row($o, $next[(string) $o->id] ?? null)),
             'totals' => [
                 'amount' => number_format((float) ($totals->amount ?? 0), 2, '.', ''),
                 'weighted_amount' => number_format((float) ($totals->weighted ?? 0), 2, '.', ''),

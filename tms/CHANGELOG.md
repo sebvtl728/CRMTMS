@@ -5,6 +5,10 @@ Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) ; ve
 
 ## [Non publié]
 
+### Ajouté
+
+- **Prochaine action** des opportunités : colonne de la liste et ligne des cartes du pipeline (date, type, objet ; en rouge si en retard), comme le demande le cahier des charges.
+
 ## [0.15.8] - 2026-11-23
 
 ### Ajouté

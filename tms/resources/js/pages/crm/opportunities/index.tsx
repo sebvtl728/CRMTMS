@@ -6,7 +6,7 @@ import {
     type OpportunityFilterOptions,
     type OpportunityFilterValues,
 } from '@/components/crm/opportunity-filters';
-import { OpportunityCards, StageBadge, type OpportunityRow } from '@/components/crm/opportunity-list';
+import { NextAction, OpportunityCards, StageBadge, type OpportunityRow } from '@/components/crm/opportunity-list';
 import Heading from '@/components/heading';
 import { Button } from '@/components/ui/button';
 import AppLayout from '@/layouts/app-layout';
@@ -97,6 +97,7 @@ export default function OpportunitiesIndex({ opportunities, totals, filters, opt
                                         {sortHeader('amount', 'Montant', 'text-right')}
                                         {sortHeader('weighted_amount', 'Pondéré', 'text-right')}
                                         {sortHeader('expected_close_on', 'Clôture prévue')}
+                                        <th className="px-3 py-2 font-medium">Prochaine action</th>
                                         <th className="px-3 py-2 font-medium">Responsable</th>
                                         {sortHeader('created_at', 'Créée le')}
                                     </tr>
@@ -124,6 +125,9 @@ export default function OpportunitiesIndex({ opportunities, totals, filters, opt
                                             <td className="px-3 py-2 text-right whitespace-nowrap">{formatAmount(o.amount)}</td>
                                             <td className="px-3 py-2 text-right whitespace-nowrap">{formatAmount(o.weighted_amount)}</td>
                                             <td className="px-3 py-2 whitespace-nowrap">{formatDay(o.expected_close_on)}</td>
+                                            <td className="max-w-56 px-3 py-2">
+                                                <NextAction action={o.next_action} />
+                                            </td>
                                             <td className="px-3 py-2">{o.responsible ?? '-'}</td>
                                             <td className="px-3 py-2 whitespace-nowrap">{formatDate(o.created_at)}</td>
                                         </tr>

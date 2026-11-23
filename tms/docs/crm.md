@@ -99,10 +99,11 @@ Sur la page d'une opportunité, **Changer d'étape** ouvre la même fenêtre.
 - Les colonnes **Gagné** et **Perdu** ne montrent que les affaires closes depuis **90 jours**.
 - Une colonne affiche au plus 100 cartes (les totaux comptent tout) : affinez les filtres.
 - Sur téléphone, le pipeline devient une liste groupée par étape, avec **Changer d'étape** sur chaque carte.
+- Chaque carte montre sa **prochaine action** (la plus proche action à faire datée de l'opportunité, en rouge si elle est en retard) ; visible seulement avec le droit « Consulter les actions ».
 
 ### Liste, filtres et export
 
-**Opportunités** liste les affaires avec les totaux (montant et pondéré). Filtres : recherche (objet ou nom de la fiche), DAS, **formation**, entreprises ou particuliers, responsable, priorité, étape, clôture prévue du / au, **Mes opportunités** ; tri par clôture prévue, montant, montant pondéré ou création. **Vue pipeline** / **Vue liste** passent de l'une à l'autre en gardant les filtres. **Exporter (.xlsx)** exporte la liste filtrée (mêmes règles que les autres exports ; la colonne **Formations** donne leurs intitulés séparés par « ; »).
+**Opportunités** liste les affaires avec les totaux (montant et pondéré). Filtres : recherche (objet ou nom de la fiche), DAS, **formation**, entreprises ou particuliers, responsable, priorité, étape, clôture prévue du / au, **Mes opportunités** ; tri par clôture prévue, montant, montant pondéré ou création. La colonne **Prochaine action** donne la date, le type et l'objet de la plus proche action à faire datée (en rouge si en retard, « Aucune action prévue » sinon). **Vue pipeline** / **Vue liste** passent de l'une à l'autre en gardant les filtres. **Exporter (.xlsx)** exporte la liste filtrée (mêmes règles que les autres exports ; la colonne **Formations** donne leurs intitulés séparés par « ; »).
 
 ## 4. Catalogue de formations
 
