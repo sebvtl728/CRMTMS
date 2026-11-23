@@ -23,7 +23,7 @@ const parseMonths = (text: string): (number | string)[] =>
         .filter((v) => v !== '')
         .map((v) => (/^\d+$/.test(v) ? Number(v) : v));
 
-export default function CrmSettings({ settings, stages, status }: CrmSettingsProps) {
+export default function CrmSettings({ settings, stages }: CrmSettingsProps) {
     const { data, setData, transform, put, processing, errors } = useForm({
         reactivation: settings.reactivation_months.join(', '),
         lead_stage_id: settings.lead_stage_id ?? '',
@@ -48,7 +48,6 @@ export default function CrmSettings({ settings, stages, status }: CrmSettingsPro
             <Head title="Réglages du CRM" />
             <div className="flex flex-col gap-6 p-4">
                 <Heading title="Réglages du CRM" description="Rappels de réactivation et calcul des tableaux de bord." />
-                {status && <div className="text-sm font-medium text-green-600">{status}</div>}
 
                 <form onSubmit={submit} className="flex max-w-xl flex-col gap-6">
                     <div className="grid gap-2">

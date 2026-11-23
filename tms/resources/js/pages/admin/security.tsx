@@ -16,7 +16,7 @@ interface SecurityProps {
 
 const breadcrumbs: BreadcrumbItem[] = [{ title: 'Sécurité', href: '/admin/security' }];
 
-export default function Security({ settings, status }: SecurityProps) {
+export default function Security({ settings }: SecurityProps) {
     const { data, setData, put, processing, errors } = useForm({
         force_2fa: settings.force_2fa,
         idle_timeout_minutes: String(settings.idle_timeout_minutes),
@@ -33,8 +33,6 @@ export default function Security({ settings, status }: SecurityProps) {
 
             <div className="flex flex-col gap-6 p-4">
                 <Heading title="Sécurité" description="Règles de connexion et de session appliquées à tous les comptes de votre organisme" />
-
-                {status && <div className="text-sm font-medium text-green-600">{status}</div>}
 
                 <form onSubmit={submit} className="flex max-w-xl flex-col gap-6">
                     <div className="flex items-start gap-3">

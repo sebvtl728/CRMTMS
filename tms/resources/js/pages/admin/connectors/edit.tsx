@@ -71,7 +71,7 @@ function initialSetting(key: string, field: FieldMeta | undefined, saved: string
     return key === 'port' ? '587' : key === 'encryption' ? 'tls' : '';
 }
 
-export default function EditConnector({ connector, companyId, companies, config, status }: EditProps) {
+export default function EditConnector({ connector, companyId, companies, config }: EditProps) {
     const label = (key: string) => connector.labels[key] ?? key;
     const field = (key: string): FieldMeta | undefined => connector.fields[key];
 
@@ -150,8 +150,6 @@ export default function EditConnector({ connector, companyId, companies, config,
 
             <div className="max-w-2xl p-4">
                 <Heading title={connector.label} description="Les secrets sont chiffrés et ne sont jamais réaffichés." />
-
-                {status && <div className="mb-4 text-sm font-medium text-green-600">{status}</div>}
 
                 {!connector.organisme_wide && (
                     <div className="mb-6 grid gap-2">

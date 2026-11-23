@@ -1,5 +1,6 @@
 import Heading from '@/components/heading';
 import InputError from '@/components/input-error';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
@@ -8,7 +9,6 @@ import AppLayout from '@/layouts/app-layout';
 import { formatDay } from '@/lib/crm';
 import { formatCents } from '@/lib/revenue';
 import { type BreadcrumbItem } from '@/types';
-import { Badge } from '@/components/ui/badge';
 import { Head, Link, router, useForm } from '@inertiajs/react';
 import { Download, HandCoins, Trash2 } from 'lucide-react';
 import { useState } from 'react';
@@ -53,13 +53,20 @@ const breadcrumbs: BreadcrumbItem[] = [{ title: 'À reverser', href: '/finance/p
 const amountInput = (cents: number) => (cents / 100).toFixed(2).replace('.', ',');
 
 /** Finance › À reverser: what the mandataire owes the co-contractors of its free invoices (2026-11-20). */
-export default function PayoutsIndex({ rows, totals, filters, cotraitants, today, status }: Props) {
+export default function PayoutsIndex({ rows, totals, filters, cotraitants, today }: Props) {
     const [row, setRow] = useState<PayoutRow | null>(null);
     const form = useForm({ invoice_id: '', cotraitant_id: '', amount: '', paid_on: today, reference: '', notes: '' });
 
     const open = (r: PayoutRow) => {
         form.clearErrors();
-        form.setData({ invoice_id: r.invoice_id, cotraitant_id: r.cotraitant_id, amount: amountInput(r.left_cents), paid_on: today, reference: '', notes: '' });
+        form.setData({
+            invoice_id: r.invoice_id,
+            cotraitant_id: r.cotraitant_id,
+            amount: amountInput(r.left_cents),
+            paid_on: today,
+            reference: '',
+            notes: '',
+        });
         setRow(r);
     };
     const filter = (next: Partial<Props['filters']>) =>
@@ -84,13 +91,11 @@ export default function PayoutsIndex({ rows, totals, filters, cotraitants, today
                 </div>
 
                 <p className="bg-muted/40 rounded-xl border p-3 text-sm">
-                    Seules les lignes de facture qui <strong>désignent un co-traitant</strong> apparaissent ici (champ « Co-traitant » d'une
-                    ligne de facture libre, avant validation). Pour chacune : le dû (TTC de la ligne, moins un avoir), ce qui est déjà
-                    reversé, le reste et son état. « Marquer reversé » enregistre un virement ; un reversement saisi par erreur se supprime
-                    avec la corbeille à côté de son montant.
+                    Seules les lignes de facture qui <strong>désignent un co-traitant</strong> apparaissent ici (champ « Co-traitant » d'une ligne de
+                    facture libre, avant validation). Pour chacune : le dû (TTC de la ligne, moins un avoir), ce qui est déjà reversé, le reste et son
+                    état. « Marquer reversé » enregistre un virement ; un reversement saisi par erreur se supprime avec la corbeille à côté de son
+                    montant.
                 </p>
-
-                {status && <div className="text-sm font-medium text-green-600">{status}</div>}
 
                 <div className="flex flex-wrap items-end gap-3">
                     <div className="grid gap-1">
@@ -128,9 +133,7 @@ export default function PayoutsIndex({ rows, totals, filters, cotraitants, today
 
                 {rows.length === 0 ? (
                     <div className="text-muted-foreground rounded-xl border p-8 text-center text-sm">
-                        {filters.state === 'open'
-                            ? 'Tout est reversé.'
-                            : 'Aucune ligne de facture validée ne désigne de co-traitant pour le moment.'}
+                        {filters.state === 'open' ? 'Tout est reversé.' : 'Aucune ligne de facture validée ne désigne de co-traitant pour le moment.'}
                     </div>
                 ) : (
                     <div className="overflow-x-auto rounded-xl border">
@@ -183,7 +186,9 @@ export default function PayoutsIndex({ rows, totals, filters, cotraitants, today
                                         </td>
                                         <td className="px-3 py-2 text-right whitespace-nowrap tabular-nums">{formatCents(r.owed_cents)}</td>
                                         <td className="px-3 py-2 text-right whitespace-nowrap tabular-nums">{formatCents(r.paid_out_cents)}</td>
-                                        <td className="px-3 py-2 text-right font-medium whitespace-nowrap tabular-nums">{formatCents(r.left_cents)}</td>
+                                        <td className="px-3 py-2 text-right font-medium whitespace-nowrap tabular-nums">
+                                            {formatCents(r.left_cents)}
+                                        </td>
                                         <td className="px-3 py-2 whitespace-nowrap">
                                             <Badge variant={STATE_VARIANT[r.state]}>{r.state_label}</Badge>
                                         </td>

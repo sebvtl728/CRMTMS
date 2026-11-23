@@ -76,7 +76,7 @@ function BlockForm({ block, type, companyId }: { block: Block; type: string; com
     );
 }
 
-export default function DocumentTexts({ types, type, companies, company_id, fields, blocks, status }: Props) {
+export default function DocumentTexts({ types, type, companies, company_id, fields, blocks }: Props) {
     const go = (next: { type?: string; company?: string | null }) =>
         router.get(
             '/admin/document-texts',
@@ -92,7 +92,6 @@ export default function DocumentTexts({ types, type, companies, company_id, fiel
                     title="Modèles de documents"
                     description="La mise en page est fournie par le TMS ; vous adaptez les textes, pour l’organisme ou pour une société. Un texte vide revient au texte d’origine."
                 />
-                {status && <p className="text-sm font-medium text-green-600">{status}</p>}
                 <div className="grid gap-3 sm:grid-cols-2">
                     <OptionSelect id="doc-type" label="Document" value={type} options={types} onChange={(v) => v && go({ type: v })} />
                     <OptionSelect

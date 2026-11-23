@@ -159,7 +159,7 @@ function ClosureDialog({ closure, onClose }: { closure: ClosureRow | null; onClo
     );
 }
 
-export default function SessionsSettings({ rooms, closures, status }: Props) {
+export default function SessionsSettings({ rooms, closures }: Props) {
     const [room, setRoom] = useState<RoomRow | null | 'new'>(null);
     const [closure, setClosure] = useState<ClosureRow | null | 'new'>(null);
 
@@ -183,8 +183,6 @@ export default function SessionsSettings({ rooms, closures, status }: Props) {
                     title="Salles et fermetures"
                     description="Les salles de formation et les périodes de fermeture de l'organisme, utilisées par le planning des séances."
                 />
-
-                {status && <div className="text-sm font-medium text-green-600">{status}</div>}
 
                 <section className="flex flex-col gap-3" aria-labelledby="rooms_title">
                     <div className="flex items-center justify-between gap-2">

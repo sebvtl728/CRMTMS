@@ -1,8 +1,8 @@
+import { FichePicker, type PickedFiche } from '@/components/finance/fiche-picker';
 import { InvoiceSendDialog, type InvoiceMessageDefaults } from '@/components/finance/invoice-send-dialog';
 import { PaymentsPanel, type InvoiceBalance, type InvoicePayment } from '@/components/finance/payments-panel';
 import { RemindersPanel, type InvoiceReminders } from '@/components/finance/reminders-panel';
 import Heading from '@/components/heading';
-import { FichePicker, type PickedFiche } from '@/components/finance/fiche-picker';
 import InputError from '@/components/input-error';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -291,10 +291,14 @@ function DraftEditor({ invoice, options }: { invoice: InvoicePage; options: Show
                             </div>
                             {free && (
                                 <div className="grid gap-1">
-                                    <Label htmlFor={`line-${index}-cotraitant`}>Co-traitant (facultatif : ligne réalisée par un membre du groupement)</Label>
+                                    <Label htmlFor={`line-${index}-cotraitant`}>
+                                        Co-traitant (facultatif : ligne réalisée par un membre du groupement)
+                                    </Label>
                                     <FichePicker
                                         id={`line-${index}-cotraitant`}
-                                        value={line.cotraitant_id ? { type: 'organisation', id: line.cotraitant_id, label: line.cotraitant_label } : null}
+                                        value={
+                                            line.cotraitant_id ? { type: 'organisation', id: line.cotraitant_id, label: line.cotraitant_label } : null
+                                        }
                                         onlyOrganisations
                                         placeholder="Rechercher une entreprise co-traitante…"
                                         onChange={(f: PickedFiche | null) =>
@@ -558,7 +562,7 @@ function EmailPanel({ invoice, email, canSend }: { invoice: InvoicePage; email: 
     );
 }
 
-export default function InvoiceShow({ invoice, options, can, email, balance, payments, reminders, warnings, status }: ShowProps) {
+export default function InvoiceShow({ invoice, options, can, email, balance, payments, reminders, warnings }: ShowProps) {
     const { errors } = usePage<{ errors: Record<string, string> }>().props;
     const breadcrumbs: BreadcrumbItem[] = [
         { title: 'Factures', href: '/finance/invoices' },
@@ -578,7 +582,6 @@ export default function InvoiceShow({ invoice, options, can, email, balance, pay
                     <Badge variant={invoiceStatusVariant(invoice.status)}>{invoice.status_label}</Badge>
                 </div>
 
-                {status && <div className="text-sm font-medium text-green-600">{status}</div>}
                 <InputError message={errors.invoice} />
                 {warnings.map((w) => (
                     <p

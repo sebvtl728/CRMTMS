@@ -7,6 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import AppLayout from '@/layouts/app-layout';
 import { type Option } from '@/lib/crm';
+import { estimateEndDate, HOURS_PER_DAY, parseHours } from '@/lib/sessions';
 import { type BreadcrumbItem } from '@/types';
 import { Head, Link, useForm } from '@inertiajs/react';
 import { LoaderCircle } from 'lucide-react';
@@ -197,6 +198,11 @@ export default function SessionFormPage({ session, defaults, options }: FormProp
     };
 
     const fromModules = editing ? null : (options.training.find((t) => t.value === data.training_id)?.modules_hours ?? null);
+    // Hours the end date is estimated from: typed, else the modules' sum, else the training's.
+    const sessionHours =
+        [data.planned_hours, fromModules, options.training.find((t) => t.value === data.training_id)?.hours]
+            .map((h) => parseHours(h))
+            .find((h) => Number.isFinite(h) && h > 0) ?? Number.NaN;
 
     const pickTraining = (id: string) => {
         setData((d) => {
@@ -321,10 +327,24 @@ export default function SessionFormPage({ session, defaults, options }: FormProp
                                 type="date"
                                 value={data.starts_on}
                                 onChange={(e) =>
-                                    setData((d) => ({ ...d, starts_on: e.target.value, ends_on: d.ends_on === '' ? e.target.value : d.ends_on }))
+                                    setData((d) => {
+                                        // The end follows the start while it is empty or still the previous estimate (7 h a working day).
+                                        const estimate = estimateEndDate(e.target.value, sessionHours) ?? e.target.value;
+                                        const previous = estimateEndDate(d.starts_on, sessionHours) ?? d.starts_on;
+                                        return {
+                                            ...d,
+                                            starts_on: e.target.value,
+                                            ends_on: d.ends_on === '' || d.ends_on === previous ? estimate : d.ends_on,
+                                        };
+                                    })
                                 }
                             />
                             <InputError message={errors.starts_on} />
+                            {!editing && Number.isFinite(sessionHours) && data.starts_on && (
+                                <p className="text-muted-foreground text-xs">
+                                    Fin estimée à {HOURS_PER_DAY} h par jour ouvré (jours fériés exclus) : à ajuster.
+                                </p>
+                            )}
                         </div>
                         <div className="grid gap-2">
                             <Label htmlFor="ends_on">Fin *</Label>

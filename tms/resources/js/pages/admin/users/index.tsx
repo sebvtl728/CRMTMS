@@ -161,7 +161,7 @@ function DasDialog({ user, options, onClose }: { user: UserRow | null; options: 
     );
 }
 
-export default function UsersIndex({ users, dasOptions, roleOptions, invitations, status, warning, activationLink }: UsersIndexProps) {
+export default function UsersIndex({ users, dasOptions, roleOptions, invitations, warning, activationLink }: UsersIndexProps) {
     const [dasUser, setDasUser] = useState<UserRow | null>(null);
     const [error, setError] = useState<string | null>(null);
 
@@ -198,7 +198,6 @@ export default function UsersIndex({ users, dasOptions, roleOptions, invitations
                     </Button>
                 </div>
 
-                {status && <div className="text-sm font-medium text-green-600">{status}</div>}
                 {warning && <ActivationLinkNotice warning={warning} link={activationLink} />}
                 {error && (
                     <div role="alert" className="text-sm font-medium text-red-600 dark:text-red-400">

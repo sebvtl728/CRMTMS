@@ -76,7 +76,7 @@ interface IndexProps {
 
 const breadcrumbs: BreadcrumbItem[] = [{ title: 'Interlocuteurs', href: '/crm/people' }];
 
-export default function PeopleIndex({ people, filters, options, can, savedFilters, activeSavedId, columns, status }: IndexProps) {
+export default function PeopleIndex({ people, filters, options, can, savedFilters, activeSavedId, columns }: IndexProps) {
     const [search, setSearch] = useState(filters.q);
     const first = useRef(true);
     const [selected, setSelected] = useListColumns('people', columns, savedFilters, activeSavedId);
@@ -152,8 +152,6 @@ export default function PeopleIndex({ people, filters, options, can, savedFilter
                         )}
                     </div>
                 </div>
-
-                {status && <div className="text-sm font-medium text-green-600">{status}</div>}
 
                 <ListToolbar
                     resource="people"

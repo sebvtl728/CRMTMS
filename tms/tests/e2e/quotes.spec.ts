@@ -52,7 +52,7 @@ test('quotes: training in the catalogue, amount of the opportunity, quote, pdf, 
     await page.getByLabel('Code', { exact: true }).fill('E2E-HACCP');
     await page.getByLabel('DAS *').click();
     await page.getByRole('option').first().click();
-    await page.getByLabel('Durée (heures)').fill('14');
+    await page.getByLabel('Durée totale (heures)').fill('14');
     await page.getByLabel('Tarif entreprise HT par stagiaire (€)').fill('1 200,00');
     await page.getByRole('button', { name: 'Enregistrer' }).click();
     await expect(page).toHaveURL(/\/catalogue$/);

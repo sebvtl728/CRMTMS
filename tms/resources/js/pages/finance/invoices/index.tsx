@@ -1,4 +1,5 @@
 import { FilterSelect } from '@/components/crm/filter-select';
+import { FreeInvoiceDialog } from '@/components/finance/free-invoice-dialog';
 import { paymentStatusVariant } from '@/components/finance/payments-panel';
 import Heading from '@/components/heading';
 import { Badge } from '@/components/ui/badge';
@@ -9,7 +10,6 @@ import { invoiceStatusVariant, type InvoiceRow } from '@/lib/finance';
 import { formatCents } from '@/lib/revenue';
 import { type BreadcrumbItem } from '@/types';
 import { Head, Link, router, usePage } from '@inertiajs/react';
-import { FreeInvoiceDialog } from '@/components/finance/free-invoice-dialog';
 import { ChevronLeft, ChevronRight, Download, ShieldCheck } from 'lucide-react';
 import { useState } from 'react';
 
@@ -30,7 +30,7 @@ interface InvoicesIndexProps {
 
 const breadcrumbs: BreadcrumbItem[] = [{ title: 'Factures', href: '/finance/invoices' }];
 
-export default function InvoicesIndex({ invoices, filters, options, can, status }: InvoicesIndexProps) {
+export default function InvoicesIndex({ invoices, filters, options, can }: InvoicesIndexProps) {
     const { errors } = usePage<{ errors: Record<string, string> }>().props;
     const [checking, setChecking] = useState(false);
     const visit = (changes: Partial<Filters>) => {
@@ -87,7 +87,6 @@ export default function InvoicesIndex({ invoices, filters, options, can, status 
                     </div>
                 </div>
 
-                {status && <div className="text-sm font-medium text-green-600">{status}</div>}
                 {errors.integrity && (
                     <div role="alert" className="text-destructive text-sm font-medium">
                         {errors.integrity}

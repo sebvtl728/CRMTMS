@@ -153,7 +153,13 @@ final class MonthIndicators extends BaseIndicator
             'this_year' => Period::of('year', (string) $f->from->year),
             default => Period::range($f->from, $f->to),
         };
-        $revenue = DasRevenue::for($user, $period);
+        // The commercial and target filters narrow the sales (the team targets no longer apply).
+        $narrow = $f->responsible === null && $f->target === null ? null : function ($q) use ($f): void {
+            $q->when($f->responsible, fn ($q, string $v) => $q->where('opportunities.responsible_user_id', $v))
+                ->when($f->target === 'organisation', fn ($q) => $q->whereNotNull('opportunities.organisation_id'))
+                ->when($f->target === 'person', fn ($q) => $q->whereNull('opportunities.organisation_id'));
+        };
+        $revenue = DasRevenue::for($user, $period, $narrow);
         $rows = collect($revenue['rows'])->filter(fn (array $r) => $f->das === null || $r['das_id'] === $f->das);
         $targets = $rows->pluck('target_cents')->filter(fn ($t) => $t !== null);
 

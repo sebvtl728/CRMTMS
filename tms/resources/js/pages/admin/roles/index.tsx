@@ -198,7 +198,7 @@ function RenameDialog({ role, onClose }: { role: RoleColumn | null; onClose: () 
     );
 }
 
-export default function Roles({ roles, groups, scopeOptions, status }: RolesProps) {
+export default function Roles({ roles, groups, scopeOptions }: RolesProps) {
     const [saving, setSaving] = useState<string | null>(null);
     const [error, setError] = useState<string | null>(null);
     const [creating, setCreating] = useState(false);
@@ -253,11 +253,6 @@ export default function Roles({ roles, groups, scopeOptions, status }: RolesProp
                     </Button>
                 </div>
 
-                {status && (
-                    <div role="status" className="text-sm font-medium text-green-600">
-                        {status}
-                    </div>
-                )}
                 {error && (
                     <div role="alert" className="text-sm font-medium text-red-600 dark:text-red-400">
                         {error}

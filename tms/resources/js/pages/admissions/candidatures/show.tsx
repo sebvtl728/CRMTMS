@@ -89,7 +89,7 @@ function formatNir(value: string): string {
         .join(' ');
 }
 
-export default function CandidatureShow({ candidature: c, custom_fields, history, options, can, positioning: positioningTests, status }: ShowProps) {
+export default function CandidatureShow({ candidature: c, custom_fields, history, options, can, positioning: positioningTests }: ShowProps) {
     const errors = usePage().props.errors as Record<string, string | undefined>;
     const [stage, setStage] = useState<string | null>(null);
     const [reason, setReason] = useState<string | null>(null);
@@ -209,7 +209,6 @@ export default function CandidatureShow({ candidature: c, custom_fields, history
                     </div>
                 </div>
 
-                {status && <div className="text-sm font-medium text-green-600">{status}</div>}
                 {(errors.training_id || errors.custom_values || errors.decision_reason_id || errors.positioning_received_on) && stage === null && (
                     <div role="alert" className="text-destructive text-sm">
                         {errors.training_id ?? errors.custom_values ?? errors.decision_reason_id ?? errors.positioning_received_on}

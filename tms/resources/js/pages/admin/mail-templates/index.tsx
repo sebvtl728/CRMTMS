@@ -14,14 +14,13 @@ interface TemplateRow {
 
 const breadcrumbs: BreadcrumbItem[] = [{ title: "Modèles d'e-mails", href: '/admin/mail-templates' }];
 
-export default function MailTemplatesIndex({ templates, status }: { templates: TemplateRow[]; status?: string }) {
+export default function MailTemplatesIndex({ templates }: { templates: TemplateRow[]; status?: string }) {
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Modèles d'e-mails" />
 
             <div className="flex flex-col gap-4 p-4">
                 <Heading title="Modèles d'e-mails" description="Les textes des e-mails envoyés par le TMS au nom de votre organisme" />
-                {status && <div className="text-sm font-medium text-green-600">{status}</div>}
 
                 <ul className="grid gap-3">
                     {templates.map((t) => (

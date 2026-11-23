@@ -49,7 +49,7 @@ function remoteLabel(remote: Last['remote']): string {
 /** While a backup is requested or running, the page reloads its state every 15 seconds. */
 const POLL_MS = 15000;
 
-export default function Backups({ last, stale, snapshots, running, pending, request_stale, status }: BackupsProps) {
+export default function Backups({ last, stale, snapshots, running, pending, request_stale }: BackupsProps) {
     const { post, processing, errors } = useForm<{ request?: string }>({});
     const busy = running || pending;
     const { start, stop } = usePoll(POLL_MS, { only: ['last', 'stale', 'snapshots', 'running', 'pending', 'request_stale'] }, { autoStart: false });
@@ -73,8 +73,6 @@ export default function Backups({ last, stale, snapshots, running, pending, requ
 
             <div className="flex flex-col gap-6 p-4">
                 <Heading title="Sauvegardes" description="État des sauvegardes de votre serveur" />
-
-                {status && <div className="text-sm font-medium text-green-600">{status}</div>}
 
                 {last === null ? (
                     <Alert variant="destructive">

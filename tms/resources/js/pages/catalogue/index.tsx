@@ -70,7 +70,7 @@ function duration(row: TrainingRow): string {
     return parts.length > 0 ? parts.join(' · ') : '-';
 }
 
-export default function CatalogueIndex({ trainings, filters, options, can, status }: IndexProps) {
+export default function CatalogueIndex({ trainings, filters, options, can }: IndexProps) {
     const errors = usePage().props.errors as Record<string, string | undefined>;
     const [search, setSearch] = useState(filters.q);
     const first = useRef(true);
@@ -166,7 +166,6 @@ export default function CatalogueIndex({ trainings, filters, options, can, statu
                     </div>
                 </div>
 
-                {status && <div className="text-sm font-medium text-green-600">{status}</div>}
                 <InputError message={errors.training ?? errors.export ?? errors.columns} />
 
                 <section aria-label="Filtres" className="grid gap-3 rounded-xl border p-3 sm:grid-cols-2 lg:grid-cols-4">

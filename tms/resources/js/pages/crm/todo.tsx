@@ -191,7 +191,7 @@ function TodoItem({ row, canEdit, team }: { row: TodoRow; canEdit: boolean; team
     );
 }
 
-export default function Todo({ sections, team, can_team, can_edit, status }: TodoProps) {
+export default function Todo({ sections, team, can_team, can_edit }: TodoProps) {
     const toggleTeam = () => router.get(route('crm.todo'), team ? {} : { team: 1 }, { preserveState: true, replace: true });
     const total = sections.overdue.length + sections.today.length + sections.week.length;
 
@@ -218,8 +218,6 @@ export default function Todo({ sections, team, can_team, can_edit, status }: Tod
                         </Button>
                     )}
                 </div>
-
-                {status && <div className="text-sm font-medium text-green-600">{status}</div>}
 
                 {total === 0 && <p className="text-muted-foreground text-sm">Aucune action à faire pour le moment.</p>}
 

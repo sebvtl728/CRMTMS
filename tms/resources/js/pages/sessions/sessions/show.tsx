@@ -124,7 +124,6 @@ export default function SessionShow({
     blocks,
     checklist,
     notes_panel,
-    status,
     warning,
 }: ShowProps) {
     const [step, setStep] = useStep(steps);
@@ -204,7 +203,6 @@ export default function SessionShow({
                     </div>
                 </div>
 
-                {status && <div className="text-sm font-medium text-green-600">{status}</div>}
                 {warning && <div className="text-sm font-medium text-amber-700 dark:text-amber-400">{warning}</div>}
 
                 {session.status === 'cancelled' && step !== 'synthese' && (

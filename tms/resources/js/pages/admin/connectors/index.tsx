@@ -39,15 +39,13 @@ const statusVariant = { pending: 'secondary', success: 'default', failed: 'destr
 
 const formatDate = (iso: string) => new Date(iso).toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short' });
 
-export default function ConnectorsIndex({ connectors, runs, status }: IndexProps) {
+export default function ConnectorsIndex({ connectors, runs }: IndexProps) {
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Connecteurs" />
 
             <div className="flex flex-col gap-6 p-4">
                 <Heading title="Connecteurs" description="Liens avec vos logiciels externes (messagerie, comptabilité, signature…)" />
-
-                {status && <div className="text-sm font-medium text-green-600">{status}</div>}
 
                 <section className="overflow-x-auto rounded-xl border">
                     <table className="w-full text-sm">

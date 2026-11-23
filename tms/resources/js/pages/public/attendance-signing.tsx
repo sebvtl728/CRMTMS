@@ -192,7 +192,9 @@ function RemoteCatchUp({ organisme, session, date, half_label, trainee_first_nam
                     <div className="flex items-start gap-2">
                         <Checkbox id="consent" checked={consent} onCheckedChange={(v) => setConsent(v === true)} />
                         <Label htmlFor="consent" className="text-sm leading-snug font-normal">
-                            {halves ? 'Je confirme avoir été présent(e) à chacune de ces demi-journées.' : 'Je confirme avoir été présent(e) à cette demi-journée.'}
+                            {halves
+                                ? 'Je confirme avoir été présent(e) à chacune de ces demi-journées.'
+                                : 'Je confirme avoir été présent(e) à cette demi-journée.'}
                         </Label>
                     </div>
                     <SignaturePad id="drawing" onChange={setDrawing} invalid={!!errors.drawing} />
