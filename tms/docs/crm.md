@@ -336,12 +336,14 @@ L'import (menu **Imports**) charge des fiches depuis un fichier **Excel (.xlsx)*
 
 ### Étape 1 : Déposer le fichier
 
+**Réimporter un export** : un fichier exporté depuis **Entreprises** ou **Personnes** (bouton **Exporter (.xlsx)**), retouché dans Excel, se réimporte tel quel. Toutes ses colonnes sont reconnues, sauf « Dernier contact », « Création » et « Système source », calculées par le TMS. Les **Rôles** (Types) et les **Formations d'intérêt** sont ajoutés à ceux de la fiche, jamais retirés ; une formation inconnue du catalogue est signalée. La **Base légale** est reprise. L'annulation d'un import ne retire pas ces ajouts sur une fiche qui existait déjà.
+
 Une fois le type choisi, **Télécharger le modèle Excel** fournit un classeur prêt à remplir : l'onglet **Données** porte les colonnes attendues (reconnues automatiquement à l'étape suivante) et une **ligne d'exemple fictive** marquée « Exemple — à supprimer » (si vous la laissez, elle est ignorée à l'import, motif « Ligne d'exemple du modèle ignorée ») ; l'onglet **Listes** donne les valeurs actives de vos listes (origines, DAS, secteurs…).
 
 Choisissez ce que contient votre fichier :
 
 - **Entreprises** : une ligne par entreprise ;
-- **Personnes** : une ligne par personne (particuliers ou contacts sans entreprise) ;
+- **Personnes** : une ligne par personne. Quand la ligne nomme une entreprise (colonne **Entreprises** de l'export), la personne y est rattachée comme interlocuteur avec sa **Fonction** et ses coordonnées pro. L'entreprise est retrouvée par son nom exact s'il est unique, sinon créée. Si plusieurs entreprises sont séparées par `;`, seule la première est rattachée et les autres sont signalées. La colonne **Type** (« Particulier », « Interlocuteur ») règle le particulier ;
 - **Interlocuteurs (personne et entreprise)** : une ligne par interlocuteur, la personne et son entreprise sont créées ensemble et reliées ;
 - **Historique d'échanges (notes)** : échanges passés (appels, rendez-vous…) rattachés à une fiche déjà présente, retrouvée par SIRET, e-mail ou identifiant source ;
 - **Catalogue de formations** (gestionnaires du catalogue) : une ligne par formation (intitulé et DAS obligatoires ; code, durées, public, prérequis, tarifs, financements séparés par `,` ou `;`, active, identifiant source). Une formation est retrouvée par son identifiant source, puis par son code ; **Mettre à jour la formation existante** remplace ses valeurs par celles du fichier (cellules vides exceptées) et ses financements par ceux du fichier.

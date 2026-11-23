@@ -5,6 +5,10 @@ Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) ; ve
 
 ## [Non publié]
 
+### Modifié
+
+- **Import** : un export Entreprises ou Personnes se **réimporte tel quel**. Toutes les colonnes sont reconnues : rôles, formations d'intérêt, base légale, type particulier ou interlocuteur. Les entreprises, la fonction et les coordonnées pro d'une personne créent son rattachement, l'entreprise étant retrouvée par son nom exact. Dans l'export Personnes, les entreprises sont maintenant séparées par « ; ».
+
 ## [0.15.9] - 2026-11-23
 
 ### Ajouté

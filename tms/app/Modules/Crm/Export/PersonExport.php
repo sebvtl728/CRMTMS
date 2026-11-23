@@ -82,7 +82,7 @@ final class PersonExport implements ExportResource
             'last_name' => $model->last_name,
             'first_name' => $model->first_name,
             'type' => collect([$model->is_individual ? 'Particulier' : null, $affiliations->isNotEmpty() ? 'Interlocuteur' : null])->filter()->implode(', ') ?: null,
-            'organisations' => $affiliations->map(fn ($a) => $a->organisation?->name)->filter()->unique()->implode(', ') ?: null,
+            'organisations' => $affiliations->map(fn ($a) => $a->organisation?->name)->filter()->unique()->implode(' ; ') ?: null,
             'job_title' => $affiliations->pluck('job_title')->filter()->unique()->implode(', ') ?: null,
             'email' => $model->email,
             'email_secondary' => $model->email_secondary,

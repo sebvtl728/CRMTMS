@@ -35,6 +35,34 @@ final class Trainings
     }
 
     /**
+     * Ids of the trainings named by these titles (exact title, case and
+     * accents ignored; active or not, out of the trash), keyed by the title
+     * as given. Unknown titles are left out.
+     *
+     * @param  list<string>  $titles
+     * @return array<string, string>
+     */
+    public function idsByTitles(array $titles): array
+    {
+        if ($titles === []) {
+            return [];
+        }
+        $key = fn (string $t) => mb_strtolower(trim((string) preg_replace('/\s+/u', ' ', Str::ascii($t))));
+        $byKey = [];
+        foreach (Training::query()->orderBy('created_at')->get(['id', 'title']) as $training) {
+            $byKey[$key($training->title)] ??= $training->id;
+        }
+        $found = [];
+        foreach ($titles as $title) {
+            if (isset($byKey[$key($title)])) {
+                $found[$title] = $byKey[$key($title)];
+            }
+        }
+
+        return $found;
+    }
+
+    /**
      * The trainings of these ids (active or not, as find()), keyed by id;
      * unknown ids are left out. One query, for lists and exports.
      *

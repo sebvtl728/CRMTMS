@@ -8,6 +8,8 @@ use App\Modules\Crm\Affiliations\Affiliation;
 use App\Modules\Crm\Affiliations\AffiliationRequest;
 use App\Modules\Crm\Duplicates\DuplicateCandidate;
 use App\Modules\Crm\Duplicates\DuplicateFinder;
+use App\Modules\Crm\Gdpr\LegalBasis;
+use App\Modules\Crm\Interests\FicheTrainings;
 use App\Modules\Crm\Organisations\Organisation;
 use App\Modules\Crm\Organisations\OrganisationRequest;
 use App\Modules\Crm\Organisations\OrganisationStatus;
@@ -62,7 +64,7 @@ final class RowImporter
 
     private const PERSON_FIELDS = [
         'civility', 'first_name', 'last_name', 'email', 'email_secondary', 'phone', 'mobile', 'address_line1', 'address_line2', 'postal_code',
-        'city', 'country', 'birth_date', 'is_individual', 'project', 'professional_situation_id', 'funding_mode_id', 'origin_id', 'status', 'responsible_user_id',
+        'city', 'country', 'birth_date', 'is_individual', 'project', 'professional_situation_id', 'funding_mode_id', 'origin_id', 'status', 'responsible_user_id', 'legal_basis',
     ];
 
     private const LINK_FIELDS = ['job_title', 'decision_role_id', 'work_email', 'work_phone', 'is_referent', 'started_on'];
@@ -329,6 +331,27 @@ final class RowImporter
                 } else {
                     $values[$field] = $date;
                 }
+            } elseif ($field === 'is_individual' && ($kind = self::ficheKind($raw)) !== null) {
+                // « Type » of a people export: « Particulier », « Interlocuteur » or both.
+                $values[$field] = $kind;
+            } elseif ($field === 'legal_basis') {
+                $basis = self::legalBasis($raw);
+                $basis === null ? $errors[] = "{$label} : choisissez Intérêt légitime, Consentement, Contrat ou Obligation légale." : $values[$field] = $basis;
+            } elseif ($field === 'interest_trainings') {
+                $titles = preg_split('/\s*[;\n]\s*/u', $raw, -1, PREG_SPLIT_NO_EMPTY) ?: [];
+                $found = app(Trainings::class)->idsByTitles($titles);
+                $values[$field] = array_values(array_unique(array_values($found)));
+                $unknown = array_values(array_filter($titles, fn (string $t) => ! array_key_exists($t, $found)));
+                if ($unknown !== []) {
+                    $warnings[] = "{$label} : formation inconnue du catalogue, ignorée : ".implode(', ', array_map(fn (string $t) => "« {$t} »", $unknown)).'.';
+                }
+            } elseif ($field === 'organisation.name' && $this->batch->target === ImportTarget::People && str_contains($raw, ';')) {
+                // A people export lists every entreprise: the first is linked, the others named.
+                $names = preg_split('/\s*;\s*/u', $raw, -1, PREG_SPLIT_NO_EMPTY) ?: [];
+                $values[$field] = $names[0] ?? $raw;
+                if (count($names) > 1) {
+                    $warnings[] = 'Plusieurs entreprises : rattachée à « '.$names[0].' » seulement ; rattachez '.implode(', ', array_map(fn (string $n) => "« {$n} »", array_slice($names, 1))).' depuis la fiche.';
+                }
             } elseif (in_array($base, ['is_individual', 'is_referent'], true)) {
                 $bool = Values::bool($raw);
                 $bool === null ? $errors[] = "{$label} : répondez par Oui ou Non." : $values[$field] = $bool;
@@ -337,7 +360,7 @@ final class RowImporter
                 $civility === null ? $errors[] = "{$label} : choisissez M. ou Mme." : $values[$field] = $civility;
             } elseif ($base === 'country') {
                 $values[$field] = Values::country($raw);
-            } elseif ($base === 'das') {
+            } elseif (in_array($base, ['das', 'types'], true)) {
                 $ids = [];
                 foreach (preg_split('/\s*[;,|\n]\s*/u', $raw, -1, PREG_SPLIT_NO_EMPTY) ?: [] as $one) {
                     $resolved = $this->values->resolve($field, $one);
@@ -381,8 +404,9 @@ final class RowImporter
         $errors = [];
         $target = $this->batch->target;
 
-        if ($target === ImportTarget::Organisations || ($target === ImportTarget::Affiliations && $this->hasOrganisation($values))) {
-            $prefix = $target === ImportTarget::Affiliations ? 'organisation.' : '';
+        $linked = in_array($target, [ImportTarget::Affiliations, ImportTarget::People], true) && $this->hasOrganisation($values);
+        if ($target === ImportTarget::Organisations || $linked) {
+            $prefix = $target === ImportTarget::Organisations ? '' : 'organisation.';
             $attributes = $this->organisationAttributes($values);
             $attributes = [...$attributes, ...OrganisationRequest::normalise($attributes)];
             $errors = [...$errors, ...$this->check($attributes, OrganisationRequest::fieldRules(), OrganisationRequest::validationMessages(), $prefix)];
@@ -396,7 +420,7 @@ final class RowImporter
             $this->store($values, $attributes, '');
         }
 
-        if ($target === ImportTarget::Affiliations) {
+        if ($target === ImportTarget::Affiliations || $linked) {
             $attributes = $this->linkAttributes($values);
             if (isset($attributes['work_email'])) {
                 $attributes['work_email'] = mb_strtolower((string) $attributes['work_email']);
@@ -468,7 +492,7 @@ final class RowImporter
      */
     private function organisationAttributes(array $values): array
     {
-        $prefix = $this->batch->target === ImportTarget::Affiliations ? 'organisation.' : '';
+        $prefix = $this->batch->target === ImportTarget::Organisations ? '' : 'organisation.';
 
         return $this->attributes($values, self::ORGANISATION_FIELDS, $prefix);
     }
@@ -524,6 +548,85 @@ final class RowImporter
         return false;
     }
 
+    /**
+     * Roles of an entreprise and trainings of interest of a fiche: added to
+     * what the fiche already has (an import never removes them).
+     *
+     * @param  array{fiche: Organisation|Person|null, created: bool, skipped: bool}  $result
+     * @param  array<string, mixed>  $values
+     */
+    private function extras(array $result, array $values, RowOutcome $outcome): void
+    {
+        $fiche = $result['fiche'];
+        if ($this->dryRun || $fiche === null || $result['skipped']) {
+            return;
+        }
+        $types = $fiche instanceof Organisation ? array_values(array_filter((array) ($values['types'] ?? []), 'is_string')) : [];
+        $missingTypes = array_values(array_diff($types, $fiche instanceof Organisation ? $fiche->types()->pluck('reference_items.id')->all() : []));
+        if ($fiche instanceof Organisation && $missingTypes !== []) {
+            $fiche->types()->attach(array_fill_keys($missingTypes, ['tenant_id' => $fiche->tenant_id]));
+        }
+        $trainings = array_values(array_filter((array) ($values['interest_trainings'] ?? []), 'is_string'));
+        $before = FicheTrainings::ids($fiche);
+        $missingTrainings = array_values(array_diff($trainings, $before));
+        if ($missingTrainings !== []) {
+            app(FicheTrainings::class)->sync($fiche, [...$before, ...$missingTrainings]);
+        }
+        if (($missingTypes !== [] || $missingTrainings !== []) && $outcome->status === ImportRow::SKIPPED) {
+            $outcome->status = ImportRow::UPDATED;
+        }
+    }
+
+    /**
+     * The only live entreprise whose name is exactly $attributes['name']
+     * (case and accents ignored), when the row gives nothing else to compare
+     * (no SIRET, e-mail, phone nor place); null otherwise.
+     *
+     * @param  array<string, mixed>  $attributes
+     */
+    private function onlyByName(array $attributes): ?Organisation
+    {
+        $name = $attributes['name'] ?? null;
+        foreach (['siret', 'email', 'phone', 'postal_code', 'city'] as $other) {
+            if (($attributes[$other] ?? null) !== null && $attributes[$other] !== '') {
+                return null;
+            }
+        }
+        if (! is_string($name) || trim($name) === '') {
+            return null;
+        }
+        $matches = Organisation::query()
+            ->whereRaw('public.immutable_unaccent(lower(organisations.name)) = public.immutable_unaccent(lower(?))', [trim($name)])
+            ->limit(2)->get();
+
+        return $matches->count() === 1 ? $matches->first() : null;
+    }
+
+    /** « Particulier » (true), « Interlocuteur » (false), null for anything else. */
+    private static function ficheKind(string $raw): ?bool
+    {
+        $key = Text::key($raw);
+
+        return match (true) {
+            str_contains($key, 'particulier') => true,
+            str_contains($key, 'interlocuteur') || str_contains($key, 'contact') => false,
+            default => null,
+        };
+    }
+
+    /** The legal basis of a label (« Consentement ») or a stored value. */
+    private static function legalBasis(string $raw): ?string
+    {
+        $key = Text::key($raw);
+        foreach (LegalBasis::cases() as $basis) {
+            if ($key === Text::key($basis->label()) || $key === Text::key($basis->value)) {
+                return $basis->value;
+            }
+        }
+
+        return null;
+    }
+
     // ------------------------------------------------------------------
     // Targets
     // ------------------------------------------------------------------
@@ -540,6 +643,7 @@ final class RowImporter
 
         $result = $this->resolveOrganisation($line, $attributes, is_string($sourceId) ? $sourceId : null, $das, $outcome, standalone: true);
         $outcome->subject($result['fiche'], $result['created']);
+        $this->extras($result, $values, $outcome);
 
         return $outcome;
     }
@@ -549,6 +653,10 @@ final class RowImporter
      */
     private function personRow(int $line, array $values): RowOutcome
     {
+        if ($this->hasOrganisation($values)) {
+            // A people export row naming an entreprise: an interlocuteur, linked like in an « Interlocuteurs » file.
+            return $this->affiliationRow($line, $values);
+        }
         $outcome = new RowOutcome(ImportRow::SKIPPED);
         $attributes = $this->personAttributes($values);
         $sourceId = $values['source_id'] ?? null;
@@ -556,6 +664,7 @@ final class RowImporter
         // A file of « Personnes » holds individuals unless told otherwise.
         $result = $this->resolvePerson($line, $attributes, is_string($sourceId) ? $sourceId : null, $values['das'] ?? [], $outcome, standalone: true, onCreate: ['is_individual' => true]);
         $outcome->subject($result['fiche'], $result['created']);
+        $this->extras($result, $values, $outcome);
 
         return $outcome;
     }
@@ -597,6 +706,7 @@ final class RowImporter
         }
 
         $outcome->subject($person['fiche'], $person['created']);
+        $this->extras($person, $values, $outcome);
         if (! $withOrganisation) {
             return $outcome;
         }
@@ -749,6 +859,13 @@ final class RowImporter
 
                 return ['fiche' => null, 'created' => false, 'skipped' => false];
             }
+        }
+
+        // 2 bis. An entreprise named alone on a person's row (people export,
+        // « Entreprises »): the only entreprise of that exact name (case and
+        // accents ignored) is the one meant; never on an entreprise file.
+        if (! $standalone && ($named = $this->onlyByName($attributes)) !== null) {
+            return ['fiche' => $named, 'created' => false, 'skipped' => false];
         }
 
         // 2. Duplicate of an existing fiche, or of an earlier row (simulation).
