@@ -13,7 +13,9 @@ use Illuminate\Validation\ValidationException;
  * What the « Générer les séances » assistant asks: days of the week (ISO,
  * 1 = Monday … 7 = Sunday), one or more slots of the day (« H:i », a break
  * in minutes, not overlapping on a common day; « days »: the weekdays of
- * that slot only, among the ticked ones — empty: every ticked day), a period within the session's dates
+ * that slot only, among the ticked ones — empty: every ticked day; on a
+ * day named by a slot, only the slots naming it apply: « another timetable
+ * on Fridays » replaces the every-day slots that day), a period within the session's dates
  * (default: the module's, else the session's), trainer, room, free place.
  * « until » = hours: no end date, the assistant goes on from the start
  * until the planned hours of the module are reached (at the latest the
@@ -38,6 +40,24 @@ final readonly class GenerationRequest
         public ?string $placeText = null,
         public bool $untilPlanned = false,
     ) {}
+
+    /**
+     * The weekdays named by a slot (those days, only the slots naming them apply).
+     *
+     * @param  array<int|string, array<string, mixed>>  $slots
+     * @return list<int>
+     */
+    public static function namedDays(array $slots): array
+    {
+        $days = [];
+        foreach ($slots as $slot) {
+            foreach (is_array($slot['days'] ?? null) ? $slot['days'] : [] as $day) {
+                $days[] = (int) $day;
+            }
+        }
+
+        return array_values(array_unique($days));
+    }
 
     /**
      * From untrusted input, French validation errors (keys weekdays, slots,
@@ -121,6 +141,7 @@ final readonly class GenerationRequest
             if (is_array($data['slots'])) {
                 $previous = [];
                 $ticked = is_array($data['weekdays']) ? array_map('intval', $data['weekdays']) : [];
+                $named = self::namedDays(array_filter($data['slots'], 'is_array'));
                 foreach ($data['slots'] as $i => $slot) {
                     if (! is_array($slot) || $errors->hasAny(["slots.{$i}.start", "slots.{$i}.end"])) {
                         continue;
@@ -131,7 +152,8 @@ final readonly class GenerationRequest
 
                         continue;
                     }
-                    $days = $days === [] ? $ticked : $days;
+                    // An every-day slot applies on the days no slot names.
+                    $days = $days === [] ? array_values(array_diff($ticked, $named)) : $days;
                     $length = Seances::minutesBetween((string) $slot['start'], (string) $slot['end']);
                     if ($length <= 0) {
                         $errors->add("slots.{$i}.end", 'La fin du créneau doit suivre son début.');

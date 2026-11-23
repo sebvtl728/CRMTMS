@@ -658,7 +658,7 @@ function GeneratorDialog({ session, planning, onClose }: { session: SessionDates
                                 </Button>
                                 <div className="col-span-4 flex flex-wrap items-center gap-1 text-xs">
                                     <span className="text-muted-foreground mr-1">
-                                        {slot.days.length === 0 ? 'Tous les jours cochés · ou seulement :' : 'Seulement :'}
+                                        {slot.days.length === 0 ? 'Tous les jours cochés · ou seulement :' : 'Seulement (remplace ce jour-là les créneaux de tous les jours) :'}
                                     </span>
                                     {weekdays.map((d) => (
                                         <button
@@ -680,7 +680,8 @@ function GeneratorDialog({ session, planning, onClose }: { session: SessionDates
                             </div>
                         ))}
                         <p className="text-muted-foreground text-xs">
-                            Un horaire différent certains jours (par exemple le vendredi) : ajoutez un créneau et cliquez sur ses jours.
+                            Un horaire différent certains jours (par exemple le vendredi) : ajoutez un créneau et cliquez sur ses jours. Ces
+                            jours-là, seuls les créneaux qui les nomment s'appliquent.
                         </p>
                         <InputError message={errors.slots} />
                         {slots.length < 6 && (

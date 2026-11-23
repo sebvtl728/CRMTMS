@@ -9,7 +9,7 @@ Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) ; ve
 
 ### Modifié
 
-- **Générer les séances** : un créneau peut être limité à certains jours de la semaine (« un autre horaire le vendredi ») ; deux créneaux peuvent se chevaucher s'ils n'ont aucun jour en commun.
+- **Générer les séances** : un créneau peut être limité à certains jours de la semaine (« un autre horaire le vendredi ») : ces jours-là, il remplace les créneaux « tous les jours » (plus de faux « Les créneaux ne doivent pas se chevaucher ») ; deux créneaux peuvent se chevaucher s'ils n'ont aucun jour en commun.
 - **Suivi d'un module de session** : « Intervalle de dates » devient **« Période, heures saisies chaque mois »**, « Séances » devient **« Séances planifiées »**, chacun expliqué à l'écran ; « Passer en intervalle / en séances » devient **« Changer le suivi… »**, une fenêtre qui décrit le nouveau suivi (et pourquoi le bouton est grisé quand il y a déjà des séances ou des heures).
 
 ## [0.15.4] - 2026-11-23
