@@ -393,6 +393,16 @@ Guide utilisateur : `admissions.md`.
 - **Fichiers** : zone `admissions` du disque privé de l'organisme (`TenantStorage`), comprise dans la sauvegarde.
 - **Conservation** : `tms:admissions:purge` (chaque nuit, 3 h 50, heure de Paris) anonymise les candidatures non retenues ou désistées sans modification depuis 2 ans.
 
+### 19 bis. Livret d'apprentissage
+
+**Administration › Livret d'apprentissage** (droit `settings.manage`) règle ce qui est imprimé dans le livret de chaque apprenti (voir `admissions.md` § 4 bis) :
+
+- l'**équipe** : rôle, nom, téléphone, e-mail, 15 lignes au plus. Exemples : responsable de formation, référent handicap, référent mobilité, assistante correspondante OPCO. Les formateurs des séances s'ajoutent tout seuls.
+- le **mot de la direction**, imprimé sur la page de garde ;
+- les **annexes** : PDF de 20 Mo au plus, 8 au plus, au contenu vérifié. Ce sont par exemple le statut de l'apprenti, le règlement intérieur, le règlement du CFA ou les engagements réciproques. Elles s'insèrent dans l'ordre de la liste, après le planning et avant les pages de suivi. Elles sont stockées dans la zone `admissions` (`booklet/`).
+
+Réglages dans `tenants.settings.admissions.booklet`.
+
 ## 20. Documents de formation (0.10)
 
 - **Modèles de documents** (droit `settings.manage`) : textes de la convention et du contrat, pour l'organisme ou par

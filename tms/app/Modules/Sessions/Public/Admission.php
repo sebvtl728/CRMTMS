@@ -174,7 +174,7 @@ final class Admission
      * and his placements (at his own dates) with their host. Null when the
      * person has no live enrolment in the dossier.
      *
-     * @return array{session: string, starts_on: string, ends_on: string, centre_minutes: int, months: array<string, int>, trainers: list<array{name: string, modules: list<string>}>, placements: list<array{label: string, from: string, to: string, host: ?string}>}|null
+     * @return array{session: string, starts_on: string, ends_on: string, centre_minutes: int, months: array<string, int>, teachers: list<array{name: string, modules: list<string>}>, placements: list<array{label: string, from: string, to: string, host: ?string}>}|null
      */
     public static function booklet(string $dossierId, string $personId): ?array
     {
@@ -240,7 +240,7 @@ final class Admission
             'ends_on' => $session->ends_on->toDateString(),
             'centre_minutes' => (int) $seances->sum('duration_minutes'),
             'months' => $months,
-            'trainers' => array_map(fn (string $name, array $mods) => ['name' => $name, 'modules' => $mods], array_keys($taught), array_values($taught)),
+            'teachers' => array_map(fn (string $name, array $mods) => ['name' => $name, 'modules' => $mods], array_keys($taught), array_values($taught)),
             'placements' => $placements,
         ];
     }

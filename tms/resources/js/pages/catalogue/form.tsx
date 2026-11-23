@@ -558,7 +558,9 @@ export default function TrainingFormPage({ training, options, assistant, brochur
                                 value={data.competences_text}
                                 onChange={(e) => setData('competences_text', e.target.value)}
                                 className={`${textareaClass} font-mono text-xs`}
-                                placeholder={'AT Préparer et dresser des entrées et des desserts\nCP Réaliser la mise en place des entrées et des desserts\n- Peser les produits'}
+                                placeholder={
+                                    'AT Préparer et dresser des entrées et des desserts\nCP Réaliser la mise en place des entrées et des desserts\n- Peser les produits'
+                                }
                             />
                             <InputError message={errors.competences_text} />
                         </fieldset>

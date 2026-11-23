@@ -75,6 +75,8 @@ export interface Candidature {
     dossier_id: string | null;
     dossier: { id: string; number: string; href: string; trashed: boolean } | null;
     alternance: Alternance | null;
+    /** Modules of the training and the exemptions of the candidate (apprenticeship booklet). */
+    booklet: { modules: { id: string; title: string; duration_hours: string | null; dispensed: boolean }[] };
     files: CandidatureFileRow[];
     is_minor: boolean;
     deleted_at: string | null;

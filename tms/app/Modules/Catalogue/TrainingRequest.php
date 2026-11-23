@@ -216,7 +216,8 @@ class TrainingRequest extends FormRequest
             try {
                 Competences::parse($text);
             } catch (ValidationException $e) {
-                $validator->errors()->add('competences_text', (string) collect($e->errors()['competences_text'] ?? [])->first());
+                $messages = $e->errors()['competences_text'] ?? [];
+                $validator->errors()->add('competences_text', (string) ($messages[0] ?? 'Grille de compétences invalide.'));
             }
         }];
     }

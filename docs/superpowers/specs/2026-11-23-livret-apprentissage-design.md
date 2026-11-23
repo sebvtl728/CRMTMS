@@ -1,6 +1,6 @@
 # Livret d'apprentissage — conception courte
 
-Statut : **partie A à valider** ; partie B décrite pour mémoire, conçue en détail après A.
+Statut : **partie A faite** (validée le 23/11/2026) ; partie B décrite pour mémoire, conçue en détail après A.
 
 ## Intention
 

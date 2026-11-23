@@ -44,7 +44,7 @@ final class Trainings
     {
         $training = Str::isUuid($id) ? Training::query()->find($id) : null;
 
-        return $training?->competences ?? [];
+        return $training === null ? [] : ($training->competences ?? []);
     }
 
     /**

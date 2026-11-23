@@ -62,6 +62,24 @@ Sur une candidature **admise**, **Créer le dossier** (droits : modifier la cand
 
 Une candidature n'a qu'un dossier ; mis à la corbeille, il peut être recréé. La page du dossier affiche le bloc **Candidature**.
 
+## 4 bis. Livret d'apprentissage
+
+Dès qu'un contrat d'alternance est saisi, la carte **Alternance** propose **Livret d'apprentissage (PDF)**, avec le droit « Consulter les candidatures ». Le livret sort **déjà rempli** avec ce que le TMS sait :
+
+1. **Couverture** : entreprise, apprenti, période du contrat, titre visé, mot de la direction.
+2. **Partenaires** : apprenti, représentant légal, employeur (activité = secteur de la fiche), maître d'apprentissage (= tuteur du contrat), OPCO, centre de formation (société par défaut).
+3. **Équipe** : les rôles d'Administration › Livret d'apprentissage et les formateurs des séances avec les modules qu'ils animent.
+4. **Parcours individualisé** : modules de la formation avec leur durée et la case **Dispensé**, plus la durée en centre (séances prévues de la session du dossier).
+5. **Planning** mois par mois du contrat (heures en centre), puis les périodes en entreprise.
+6. **Annexes** de l'organisme (PDF déposés une fois : statut de l'apprenti, règlements…), insérées telles quelles.
+7. **Pages de suivi mensuel** déjà titrées : une page « entreprise » chaque mois, plus une page « centre de formation » les mois où il y a des séances.
+8. **Grilles d'évaluation** : la grille de compétences de la formation (catalogue, onglet Compétences), colonnes A / ECA / NA centre et entreprise.
+9. **Suivis en entreprise** : le tableau des visites.
+
+Les pages de suivi, les grilles et les visites se remplissent encore **à la main**. Le livret est généré à chaque clic, jamais stocké, et suit donc les dernières données.
+
+**Modules dispensés** : sous le bouton, cochez les modules dont l'apprenti est dispensé, puis **Enregistrer les dispenses** (droit « Modifier les candidatures »).
+
 ## 5. Liste « Candidats »
 
 Onglets **Candidats** (sans dossier en cours ; non retenus et désistés seulement avec le filtre d'étape), **Stagiaires** (dossier sans contrat), **Alternants** (dossier et contrat), **Tous** ; filtres étape, formation, DAS, responsable, **parcours** (dont *À définir*), type de contrat ; recherche par nom ou numéro. **Exporter (.csv)** (droit « Exporter ») : numéro, nom, prénom, étape, parcours, formation, code RNCP, DAS, responsable, contrat, employeur, dates, dossier — jamais de donnée sensible.

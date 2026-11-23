@@ -81,7 +81,7 @@ final class BookletPdf
     private function data(Candidature $candidature, AlternanceContract $contract): array
     {
         $person = $this->fiches->contactCard('person', $candidature->person_id);
-        $employer = $contract->employer_organisation_id === null ? null : $this->fiches->contactCard('organisation', $contract->employer_organisation_id);
+        $employer = $this->fiches->contactCard('organisation', $contract->employer_organisation_id);
         $tutor = $contract->tutor_person_id === null ? null : $this->fiches->contactCard('person', $contract->tutor_person_id);
         $opco = $contract->opco_organisation_id === null ? null : $this->fiches->contactCard('organisation', $contract->opco_organisation_id);
         $training = $candidature->training_id === null ? null : $this->trainings->find($candidature->training_id);
@@ -150,7 +150,7 @@ final class BookletPdf
             'schedule' => $schedule === null ? null : [
                 'session' => $schedule['session'],
                 'centre_hours' => self::hours((string) round($schedule['centre_minutes'] / 60, 2)),
-                'trainers' => $schedule['trainers'],
+                'teachers' => $schedule['teachers'],
                 'placements' => array_map(fn (array $p) => [...$p, 'from' => self::day($p['from']), 'to' => self::day($p['to'])], $schedule['placements']),
             ],
             'months' => array_map(fn (array $m) => [...$m, 'centre_hours' => $m['centre_minutes'] > 0 ? self::hours((string) round($m['centre_minutes'] / 60, 2)) : null], $months),

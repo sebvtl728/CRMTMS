@@ -27,16 +27,19 @@
         h3 { font-size: 10.5pt; margin: 12pt 0 4pt; color: #102a43; }
         .muted { color: #52606d; }
         .small { font-size: 8pt; }
-        table { width: 100%; border-collapse: collapse; }
-        td, th { border: 0.6pt solid #9aa5b1; padding: 4pt 5pt; vertical-align: top; text-align: left; }
+        /* 99.5 %: a 100 % table loses its right border at the edge of the page. */
+        table { width: 99.5%; border-collapse: collapse; }
+        thead { display: table-header-group; }
+        td, th { border: 0.6pt solid #9aa5b1; padding: 3pt 5pt; vertical-align: top; text-align: left; }
         th { background: #e4e7eb; font-weight: 700; }
         td.k { width: 34%; color: #52606d; }
         .cover { text-align: center; padding-top: 60pt; }
         .cover img { max-height: 70pt; max-width: 220pt; }
         .cover .box { margin: 22pt auto; width: 80%; border: 1pt solid #102a43; padding: 12pt; text-align: left; }
         .cover .box div { margin: 4pt 0; }
-        .write { height: 70pt; }
+        .write { height: 105pt; }
         .write-sm { height: 34pt; }
+        .visit { height: 60pt; }
         .grid td.mark { width: 22pt; text-align: center; }
         .grid tr { page-break-inside: avoid; }
         .at { background: #102a43; color: #fff; font-weight: 700; }
@@ -130,10 +133,10 @@
             </table>
         @endif
         <h3>Formateurs et domaines</h3>
-        @if ($schedule !== null && $schedule['trainers'] !== [])
+        @if ($schedule !== null && $schedule['teachers'] !== [])
             <table>
                 <tr><th>Formateur.trice</th><th>Domaine(s)</th></tr>
-                @foreach ($schedule['trainers'] as $trainer)
+                @foreach ($schedule['teachers'] as $trainer)
                     <tr><td>{{ $trainer['name'] }}</td><td>{{ implode(', ', $trainer['modules']) }}</td></tr>
                 @endforeach
             </table>
@@ -227,8 +230,10 @@
             <h2>Grilles d'évaluation - {{ $training['title'] }}</h2>
             <p class="small muted">A : acquis - ECA : en cours d'acquisition - NA : non acquis</p>
             <table class="grid">
-                <tr><th></th><th colspan="3" style="text-align: center;">Centre de formation</th><th colspan="3" style="text-align: center;">Entreprise</th></tr>
-                <tr><th></th><th>A</th><th>ECA</th><th>NA</th><th>A</th><th>ECA</th><th>NA</th></tr>
+                <thead>
+                    <tr><th></th><th colspan="3" style="text-align: center;">Centre de formation</th><th colspan="3" style="text-align: center;">Entreprise</th></tr>
+                    <tr><th></th><th>A</th><th>ECA</th><th>NA</th><th>A</th><th>ECA</th><th>NA</th></tr>
+                </thead>
                 @foreach ($competences as $i => $activity)
                     <tr><td colspan="7" class="at">Activité type {{ $i + 1 }} - {{ $activity['title'] }}</td></tr>
                     @foreach ($activity['competences'] as $competence)
@@ -254,7 +259,7 @@
         <table>
             <tr><th style="width: 60pt;">Date</th><th>Points abordés</th><th>Formateur.trice et émargement</th><th>Tuteur.trice, émargement et cachet</th></tr>
             @for ($i = 0; $i < 6; $i++)
-                <tr><td class="write"></td><td class="write"></td><td class="write"></td><td class="write"></td></tr>
+                <tr><td class="visit"></td><td class="visit"></td><td class="visit"></td><td class="visit"></td></tr>
             @endfor
         </table>
     </section>
