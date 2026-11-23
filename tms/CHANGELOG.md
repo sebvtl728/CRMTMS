@@ -5,6 +5,11 @@ Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) ; ve
 
 ## [Non publié]
 
+### Modifié
+
+- **Documents des stagiaires** (session) : chaque type dit s'il part tout seul (badge « Automatique », date prévue ou « pensez à confirmer la session ») ou s'il est à faire à la main, avec le nombre émis et envoyés ; les boutons manuels sont repliés quand l'envoi est automatique, les cases vides disent « Partira seul ».
+- **Inscrits** : « Inscrit » suffit (convocations, présences, attestations, factures) ; « Confirmer » devient **« Noter sa confirmation »** (facultatif, ne déclenche rien), « Promouvoir » devient **« Passer en inscrit »**.
+
 ## [0.15.5] - 2026-11-23
 
 ### Modifié

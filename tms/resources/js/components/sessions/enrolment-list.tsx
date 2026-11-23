@@ -278,6 +278,12 @@ export function EnrolmentList({
 
     return (
         <>
+            {references && rows.some((r) => r.can_update) && (
+                <p className="text-muted-foreground mb-2 text-xs">
+                    <strong>« Inscrit » suffit</strong> : convocations, présences, attestations et factures se font pour tout stagiaire inscrit. «
+                    Confirmé » est <strong>facultatif</strong> : il note seulement que la personne a confirmé sa venue, sans rien déclencher.
+                </p>
+            )}
             <ul className="divide-y rounded-xl border">
                 {rows.map((row) => (
                     <li key={row.id} className="grid gap-2 p-3 sm:grid-cols-[1fr_auto] sm:items-center">
@@ -326,13 +332,25 @@ export function EnrolmentList({
                         {row.can_update && references && row.status !== 'cancelled' && (
                             <div className="flex flex-wrap gap-1">
                                 {row.status === 'enrolled' && (
-                                    <Button type="button" size="sm" variant="outline" onClick={() => act(row, 'confirm')}>
-                                        Confirmer
+                                    <Button
+                                        type="button"
+                                        size="sm"
+                                        variant="ghost"
+                                        title="Facultatif : note que la personne a confirmé sa venue (ne déclenche rien)."
+                                        onClick={() => act(row, 'confirm')}
+                                    >
+                                        Noter sa confirmation
                                     </Button>
                                 )}
                                 {row.status === 'waitlisted' && (
-                                    <Button type="button" size="sm" variant="outline" onClick={() => act(row, 'promote')}>
-                                        Promouvoir
+                                    <Button
+                                        type="button"
+                                        size="sm"
+                                        variant="outline"
+                                        title="Une place s'est libérée : la personne devient inscrite (jamais automatiquement)."
+                                        onClick={() => act(row, 'promote')}
+                                    >
+                                        Passer en inscrit
                                     </Button>
                                 )}
                                 {(row.status === 'enrolled' || row.status === 'confirmed') && (
