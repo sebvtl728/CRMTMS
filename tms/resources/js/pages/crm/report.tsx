@@ -70,7 +70,7 @@ function ficheName(m: Meeting): string {
  * « Compte rendu de RDV »: one form for the phone. The only meeting of the
  * day is preselected; result, report, stage and follow-up are one tap each.
  */
-export default function Report({ meetings, selected, fiche, types, results, stages, loss_reasons, can_create, status }: ReportProps) {
+export default function Report({ meetings, selected, fiche, types, results, stages, loss_reasons, can_create }: ReportProps) {
     const initialMeeting = selected ?? (meetings.length === 1 ? meetings[0].id : '');
     const defaultType = types.find((t) => t.code === 'rendez-vous-physique')?.value ?? '';
 
@@ -165,12 +165,6 @@ export default function Report({ meetings, selected, fiche, types, results, stag
 
             <form onSubmit={submit} noValidate className="mx-auto flex w-full max-w-xl min-w-0 flex-col gap-5 p-4 pb-24 md:pb-4">
                 <Heading title="Compte rendu de RDV" description="Résultat, compte rendu, étape et prochaine relance en une seule saisie." />
-
-                {status && (
-                    <div role="status" className="text-sm font-medium text-green-600">
-                        {status}
-                    </div>
-                )}
 
                 <fieldset className="grid gap-2">
                     <legend className="mb-2 text-sm font-semibold">Rendez-vous du jour</legend>

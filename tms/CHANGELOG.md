@@ -5,6 +5,16 @@ Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) ; ve
 
 ## [Non publié]
 
+### Corrigé
+
+- **Messages en double** : le message d'une action (« Formation créée. »…) s'affichait à la fois en haut de la page et dans la bannière en bas à droite ; il ne reste que la bannière (52 pages).
+- **Barre de progression** des chargements : ses styles étaient refusés par la politique de sécurité du navigateur (erreur dans la console sur chaque page) ; ils reçoivent le jeton de la page.
+- **Textes anglais** des composants de base : info-bulle « Toggle Sidebar » du bouton de menu, libellés lus par les lecteurs d'écran (« Close », « More »…).
+
+### Ajouté
+
+- **Test de visite** (`tests/e2e/zz-smoke.spec.ts`) : chaque page du menu et la première fiche de chaque liste s'ouvrent sans erreur serveur, sans erreur JavaScript ni texte cassé.
+
 ## [0.15.15] - 2026-11-23
 
 ### Ajouté

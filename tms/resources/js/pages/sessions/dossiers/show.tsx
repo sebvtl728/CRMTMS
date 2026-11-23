@@ -1,7 +1,7 @@
 import { DossierBlockPanel, type DossierBlock } from '@/components/dossier-blocks';
-import { DossierSteps, type DossierStepsData } from '@/components/sessions/dossier-steps';
 import Heading from '@/components/heading';
 import InputError from '@/components/input-error';
+import { DossierSteps, type DossierStepsData } from '@/components/sessions/dossier-steps';
 import { EnrolDialog, type EnrolSessionOption } from '@/components/sessions/enrolment-dialog';
 import { EnrolmentList, type EnrolmentReferences, type EnrolmentRow } from '@/components/sessions/enrolment-list';
 import { FundingSection, type FundingBalance, type FundingOptions, type FundingRow } from '@/components/sessions/funding-section';
@@ -198,7 +198,6 @@ export default function DossierShow({
     funding_options,
     history,
     blocks,
-    status,
 }: ShowProps) {
     const [cancelling, setCancelling] = useState(false);
     const [enrolling, setEnrolling] = useState(false);
@@ -279,8 +278,6 @@ export default function DossierShow({
                         )}
                     </div>
                 </div>
-
-                {status && <div className="text-sm font-medium text-green-600">{status}</div>}
 
                 {dossier.status === 'cancelled' && (
                     <div className="border-destructive/40 bg-destructive/5 rounded-xl border p-3 text-sm">

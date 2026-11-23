@@ -77,7 +77,7 @@ interface EditorState {
 
 const breadcrumbs: BreadcrumbItem[] = [{ title: 'Référentiels', href: '/admin/references' }];
 
-export default function ReferencesIndex({ lists, status }: ReferencesIndexProps) {
+export default function ReferencesIndex({ lists }: ReferencesIndexProps) {
     const keys = Object.keys(lists);
     const [current, setCurrent] = useState(keys[0]);
     const list = lists[current];
@@ -170,7 +170,6 @@ export default function ReferencesIndex({ lists, status }: ReferencesIndexProps)
                     description="Listes de valeurs de votre organisme, utilisées dans les fiches, le pipeline et les actions"
                 />
 
-                {status && <div className="text-sm font-medium text-green-600">{status}</div>}
                 {errors.item && (
                     <div
                         role="alert"

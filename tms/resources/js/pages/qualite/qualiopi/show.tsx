@@ -243,7 +243,7 @@ function AddProof({ number }: { number: number }) {
     );
 }
 
-export default function QualiopiShow({ indicator, criterion, proofs, measures, users, statuses, verify_notice, can, status }: Props) {
+export default function QualiopiShow({ indicator, criterion, proofs, measures, users, statuses, verify_notice, can }: Props) {
     const breadcrumbs: BreadcrumbItem[] = [
         { title: 'Qualiopi', href: '/qualite/qualiopi' },
         { title: `Indicateur ${indicator.number}`, href: `/qualite/qualiopi/${indicator.number}` },
@@ -264,7 +264,6 @@ export default function QualiopiShow({ indicator, criterion, proofs, measures, u
                         description={`Critère ${criterion.number} - ${criterion.title}`}
                     />
                 </div>
-                {status && <p className="text-sm font-medium text-green-600">{status}</p>}
                 <div className="flex flex-wrap gap-2">
                     {indicator.applicable ? (
                         <span className={`rounded-full px-2 py-0.5 text-xs ${STATUS_STYLES[indicator.status]}`}>{statuses[indicator.status]}</span>

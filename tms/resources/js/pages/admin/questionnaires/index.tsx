@@ -22,7 +22,7 @@ interface TemplateRow {
 
 const breadcrumbs: BreadcrumbItem[] = [{ title: 'Modèles de questionnaires', href: '/admin/questionnaires' }];
 
-export default function QuestionnairesIndex({ templates, cold_months, status }: { templates: TemplateRow[]; cold_months: number; status?: string }) {
+export default function QuestionnairesIndex({ templates, cold_months }: { templates: TemplateRow[]; cold_months: number; status?: string }) {
     const delay = useForm({ months: String(cold_months) });
     const submitDelay: FormEventHandler = (e) => {
         e.preventDefault();
@@ -37,7 +37,6 @@ export default function QuestionnairesIndex({ templates, cold_months, status }: 
                     title="Questionnaires de satisfaction"
                     description="Les modèles par défaut servent aux questionnaires à chaud (fin de session) et à froid (quelques mois après). Une session garde la copie des questions qu'elle a envoyées."
                 />
-                {status && <div className="text-sm font-medium text-green-600">{status}</div>}
 
                 <div>
                     <Button asChild>

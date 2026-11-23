@@ -170,7 +170,7 @@ function KanbanColumn({
  * « Perdu » the stage dialog asks for the date or the loss reason first.
  * Below 768 px: the opportunities grouped by stage, with « Changer d'étape ».
  */
-export default function OpportunitiesKanban({ columns, filters, options, stages, lossReasons, closedDays, cardsLimit, can, status }: KanbanProps) {
+export default function OpportunitiesKanban({ columns, filters, options, stages, lossReasons, closedDays, cardsLimit, can }: KanbanProps) {
     /** Moves sent and not yet answered: card id => target stage (the card is shown there meanwhile). */
     const [pending, setPending] = useState<Record<string, string>>({});
     const [dragged, setDragged] = useState<OpportunityRow | null>(null);
@@ -259,7 +259,6 @@ export default function OpportunitiesKanban({ columns, filters, options, stages,
                     </div>
                 </div>
 
-                {status && <div className="text-sm font-medium text-green-600">{status}</div>}
                 {error && (
                     <p role="alert" className="text-destructive text-sm">
                         {error}

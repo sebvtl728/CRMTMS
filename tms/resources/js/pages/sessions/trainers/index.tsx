@@ -189,7 +189,7 @@ function AddTrainerDialog({ statusOptions, userOptions, onClose }: { statusOptio
     );
 }
 
-export default function Trainers({ trainers, das, dasOptions, statusOptions, userOptions, status }: Props) {
+export default function Trainers({ trainers, das, dasOptions, statusOptions, userOptions }: Props) {
     const [adding, setAdding] = useState(false);
 
     return (
@@ -206,8 +206,6 @@ export default function Trainers({ trainers, das, dasOptions, statusOptions, use
                         <Plus className="mr-1 h-4 w-4" /> Ajouter un formateur
                     </Button>
                 </div>
-
-                {status && <div className="text-sm font-medium text-green-600">{status}</div>}
 
                 <div className="grid max-w-xs gap-2">
                     <Label htmlFor="trainers_das">DAS</Label>

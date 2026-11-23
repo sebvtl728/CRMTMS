@@ -57,7 +57,7 @@ interface IndexProps {
 
 const breadcrumbs: BreadcrumbItem[] = [{ title: 'Entreprises', href: '/crm/organisations' }];
 
-export default function OrganisationsIndex({ organisations, filters, options, can, savedFilters, activeSavedId, columns, status }: IndexProps) {
+export default function OrganisationsIndex({ organisations, filters, options, can, savedFilters, activeSavedId, columns }: IndexProps) {
     const [search, setSearch] = useState(filters.q);
     const first = useRef(true);
     const [selected, setSelected] = useListColumns('organisations', columns, savedFilters, activeSavedId);
@@ -131,8 +131,6 @@ export default function OrganisationsIndex({ organisations, filters, options, ca
                         )}
                     </div>
                 </div>
-
-                {status && <div className="text-sm font-medium text-green-600">{status}</div>}
 
                 <ListToolbar
                     resource="organisations"

@@ -134,7 +134,7 @@ function SourcesPanel({ row, period, onClose }: { row: RevenueRow | null; period
     );
 }
 
-export default function RevenueIndex({ period, rows, totals, own, can, status }: Props) {
+export default function RevenueIndex({ period, rows, totals, own, can }: Props) {
     const [detail, setDetail] = useState<RevenueRow | null>(null);
     const [targetsOpen, setTargetsOpen] = useState(false);
 
@@ -156,8 +156,6 @@ export default function RevenueIndex({ period, rows, totals, own, can, status }:
                         </Button>
                     )}
                 </div>
-
-                {status && <div className="text-sm font-medium text-green-600">{status}</div>}
 
                 <div className="flex flex-wrap items-center justify-between gap-3">
                     <div role="group" aria-label="Type de période" className="flex gap-1">

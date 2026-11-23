@@ -30,7 +30,7 @@ const breadcrumbs: BreadcrumbItem[] = [{ title: "Livret d'apprentissage", href: 
 const textareaClass = 'border-input bg-background focus:ring-ring w-full rounded-md border px-3 py-2 text-sm focus:ring-2 focus:outline-hidden';
 
 /** Administration › Livret d'apprentissage: the team printed in it, the word of the director and the annexes merged at the end. */
-export default function Booklet({ settings, status }: BookletProps) {
+export default function Booklet({ settings }: BookletProps) {
     const { data, setData, put, processing, errors } = useForm({
         team: settings.team.map((m) => ({ ...m, phone: m.phone ?? '', email: m.email ?? '' })),
         director_note: settings.director_note ?? '',
@@ -76,7 +76,6 @@ export default function Booklet({ settings, status }: BookletProps) {
                     title="Livret d'apprentissage"
                     description="Ce qui est imprimé dans le livret de chaque apprenti (bouton « Livret d'apprentissage (PDF) » de la candidature)."
                 />
-                {status && <div className="text-sm font-medium text-green-600">{status}</div>}
 
                 <form onSubmit={submit} className="grid gap-4">
                     <fieldset className="grid gap-3 rounded-xl border p-4">

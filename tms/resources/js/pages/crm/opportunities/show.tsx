@@ -64,7 +64,6 @@ export default function OpportunityShow({
     stages,
     lossReasons,
     can,
-    status,
 }: ShowProps) {
     const [moving, setMoving] = useState(false);
     const [confirming, setConfirming] = useState(false);
@@ -120,8 +119,6 @@ export default function OpportunityShow({
                         )}
                     </div>
                 </div>
-
-                {status && <div className="text-sm font-medium text-green-600">{status}</div>}
 
                 {fundingWarning && (
                     <div

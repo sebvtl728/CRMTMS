@@ -244,12 +244,13 @@ function Editor({ test, options, status }: EditProps) {
     const [sections, setSections] = useState<Section[]>(test.content.sections ?? []);
     const [errors, setErrors] = useState<Record<string, string>>({});
     const [saving, setSaving] = useState(false);
-    const [message, setMessage] = useState<string | undefined>(status);
+    // Messages of this page's own saves; the server's messages (« Test publié… ») are in the banner at the bottom.
+    const [message, setMessage] = useState<string | undefined>(undefined);
     const [dirty, setDirty] = useState(false);
 
-    // A message from the server (« Test publié… ») replaces the local one.
+    // A message from the server clears the previous local one.
     useEffect(() => {
-        if (status) setMessage(status);
+        if (status) setMessage(undefined);
     }, [status]);
 
     const breadcrumbs: BreadcrumbItem[] = [

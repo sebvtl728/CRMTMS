@@ -33,7 +33,7 @@ interface CalendarProps {
     outlook_error?: string | null;
 }
 
-export default function Calendar({ calendar, url, status, crm, sources, outlook, outlook_error }: CalendarProps) {
+export default function Calendar({ calendar, url, crm, sources, outlook, outlook_error }: CalendarProps) {
     const what = [crm ? 'vos rendez-vous et appels planifiés dans le CRM' : null, sources ? 'vos séances de formation' : null]
         .filter(Boolean)
         .join(' et ');
@@ -98,8 +98,6 @@ export default function Calendar({ calendar, url, status, crm, sources, outlook,
             <SettingsLayout>
                 <div className="space-y-6">
                     <HeadingSmall title="Mon agenda" description={`Abonnez votre agenda (Outlook, Google, Apple) à ${what}.`} />
-
-                    {status && <p className="text-sm font-medium text-green-700 dark:text-green-400">{status}</p>}
 
                     <div className="text-muted-foreground space-y-2 text-sm">
                         {crm && (

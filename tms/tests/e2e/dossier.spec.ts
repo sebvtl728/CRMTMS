@@ -45,7 +45,7 @@ test('dossier from an accepted quote: summary, new intra session, trainees found
     await page.getByLabel('Intitulé *').fill(TRAINING);
     await page.getByLabel('DAS *').click();
     await page.getByRole('option').first().click();
-    await page.getByLabel('Durée (heures)').fill('7');
+    await page.getByLabel('Durée totale (heures)').fill('7');
     await page.getByLabel('Tarif entreprise HT par stagiaire (€)').fill('900,00');
     await page.getByRole('button', { name: 'Enregistrer' }).click();
     await expect(page.getByText('Formation créée.')).toBeVisible();

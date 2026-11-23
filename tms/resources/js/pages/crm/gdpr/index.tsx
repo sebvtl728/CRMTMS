@@ -38,7 +38,7 @@ interface GdprProps {
 
 const breadcrumbs: BreadcrumbItem[] = [{ title: 'RGPD', href: '/crm/gdpr' }];
 
-export default function GdprIndex({ pending, pendingTotal, kept, retention, status }: GdprProps) {
+export default function GdprIndex({ pending, pendingTotal, kept, retention }: GdprProps) {
     const [keeping, setKeeping] = useState<PendingRow | null>(null);
     const keepForm = useForm({ reason: '' });
     const retentionForm = useForm({ retention_years: String(retention.years) });
@@ -69,8 +69,6 @@ export default function GdprIndex({ pending, pendingTotal, kept, retention, stat
                     title="RGPD"
                     description={`Les personnes sans relation contractuelle et sans contact depuis ${retention.years} an${retention.years > 1 ? 's' : ''} sont listées ici, puis anonymisées ${retention.delay_days} jours plus tard, sauf si vous les conservez.`}
                 />
-
-                {status && <div className="text-sm font-medium text-green-600">{status}</div>}
 
                 <section aria-labelledby="pending-title" className="flex flex-col gap-3">
                     <h2 id="pending-title" className="text-base font-semibold">

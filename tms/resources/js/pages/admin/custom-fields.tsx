@@ -52,7 +52,7 @@ function payload(d: Draft): { label: string; type: string | null; options: strin
  * Administration › Champs personnalisés: the organisme's own fields on the
  * candidature fiche. A field already filled is hidden, never deleted.
  */
-export default function CustomFields({ fields, types, status }: { fields: Field[]; types: Option[]; status?: string }) {
+export default function CustomFields({ fields, types }: { fields: Field[]; types: Option[]; status?: string }) {
     const errors = usePage().props.errors as Record<string, string | undefined>;
     const [draft, setDraft] = useState<Draft>(empty);
     const [editing, setEditing] = useState<string | null>(null);
@@ -105,7 +105,6 @@ export default function CustomFields({ fields, types, status }: { fields: Field[
                     title="Champs personnalisés"
                     description="Vos propres champs sur la fiche candidat, dans le bloc « Informations complémentaires »."
                 />
-                {status && <div className="text-sm font-medium text-green-600">{status}</div>}
 
                 <section className="grid gap-3 rounded-xl border p-4">
                     <h2 className="text-sm font-semibold">Nouveau champ</h2>

@@ -36,7 +36,7 @@ function xsrf(): string {
     return match ? decodeURIComponent(match[1]) : '';
 }
 
-export default function MailTemplateEdit({ template: t, status }: { template: TemplateData; status?: string }) {
+export default function MailTemplateEdit({ template: t }: { template: TemplateData; status?: string }) {
     const breadcrumbs: BreadcrumbItem[] = [
         { title: "Modèles d'e-mails", href: '/admin/mail-templates' },
         { title: t.label, href: route('admin.mail-templates.edit', t.key) },
@@ -108,11 +108,6 @@ export default function MailTemplateEdit({ template: t, status }: { template: Te
                     {!t.editable && <Badge variant="outline">Modèle système</Badge>}
                     {t.customised && <Badge variant="secondary">Personnalisé</Badge>}
                 </div>
-                {status && (
-                    <div role="status" className="text-sm font-medium text-green-600">
-                        {status}
-                    </div>
-                )}
 
                 {!t.editable ? (
                     <div className="max-w-3xl rounded-xl border p-4 text-sm">

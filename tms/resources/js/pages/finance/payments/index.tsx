@@ -36,7 +36,7 @@ interface PaymentsIndexProps {
 const breadcrumbs: BreadcrumbItem[] = [{ title: 'Règlements', href: '/finance/payments' }];
 
 /** Finance › Règlements: the payments received and how much of each settles invoices. */
-export default function PaymentsIndex({ payments, filters, options, status }: PaymentsIndexProps) {
+export default function PaymentsIndex({ payments, filters, options }: PaymentsIndexProps) {
     const visit = (changes: Partial<Filters>) => {
         const next = { ...filters, ...changes };
         const query: Record<string, string> = {};
@@ -58,8 +58,6 @@ export default function PaymentsIndex({ payments, filters, options, status }: Pa
                         </Link>
                     </Button>
                 </div>
-
-                {status && <div className="text-sm font-medium text-green-600">{status}</div>}
 
                 <section aria-label="Filtres" className="grid gap-3 rounded-xl border p-3 sm:grid-cols-2 lg:grid-cols-4">
                     <FilterSelect label="Société" value={filters.company} options={options.company} onChange={(v) => visit({ company: v })} />

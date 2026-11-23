@@ -10,6 +10,18 @@ declare global {
     const route: typeof routeFn;
 }
 
+// The progress bar of Inertia adds its own <style> elements, without the CSP nonce the page requires (style-src):
+// they get the nonce the page already publishes for Vite (meta « csp-nonce »), so the bar is styled and nothing is refused.
+const cspNonce = document.querySelector<HTMLMetaElement>('meta[property="csp-nonce"]')?.nonce ?? '';
+if (cspNonce !== '') {
+    const appendChild = document.head.appendChild.bind(document.head);
+    document.head.appendChild = <T extends Node>(node: T): T => {
+        if (node instanceof HTMLStyleElement && !node.nonce) node.nonce = cspNonce;
+
+        return appendChild(node);
+    };
+}
+
 const appName = import.meta.env.VITE_APP_NAME || 'TMS';
 
 // Tab title: the organisme's name (default company) once signed in, else the application's.

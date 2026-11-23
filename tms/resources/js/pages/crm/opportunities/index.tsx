@@ -26,7 +26,7 @@ interface IndexProps {
 
 const breadcrumbs: BreadcrumbItem[] = [{ title: 'Opportunités', href: '/crm/opportunities' }];
 
-export default function OpportunitiesIndex({ opportunities, totals, filters, options, can, status }: IndexProps) {
+export default function OpportunitiesIndex({ opportunities, totals, filters, options, can }: IndexProps) {
     const visit = (changes: Partial<OpportunityFilterValues>) =>
         router.get(route('crm.opportunities.index'), opportunityQuery({ ...filters, ...changes }), { preserveState: true, replace: true });
 
@@ -70,8 +70,6 @@ export default function OpportunitiesIndex({ opportunities, totals, filters, opt
                         )}
                     </div>
                 </div>
-
-                {status && <div className="text-sm font-medium text-green-600">{status}</div>}
 
                 <OpportunityFilters routeName="crm.opportunities.index" filters={filters} options={options} />
 

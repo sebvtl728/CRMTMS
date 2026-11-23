@@ -48,7 +48,7 @@ function dossiersQuery(filters: Filters): Record<string, string> {
     return query;
 }
 
-export default function DossiersIndex({ dossiers, filters, options, can, status }: IndexProps) {
+export default function DossiersIndex({ dossiers, filters, options, can }: IndexProps) {
     const [search, setSearch] = useState(filters.q);
     const [checking, setChecking] = useState(false);
     const [refusal, setRefusal] = useState<string | null>(null);
@@ -145,8 +145,6 @@ export default function DossiersIndex({ dossiers, filters, options, can, status 
                         )}
                     </div>
                 </div>
-
-                {status && <div className="text-sm font-medium text-green-600">{status}</div>}
 
                 <section aria-label="Filtres" className="grid gap-3 rounded-xl border p-3 sm:grid-cols-2 lg:grid-cols-4">
                     <div className="grid gap-1 sm:col-span-2 lg:col-span-4">

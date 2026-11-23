@@ -47,7 +47,7 @@ function concerns(row: BrochureRow): string {
     return parts.length > 0 ? parts.join(', ') : '-';
 }
 
-export default function BrochuresIndex({ brochures, filters, kinds, can, status }: IndexProps) {
+export default function BrochuresIndex({ brochures, filters, kinds, can }: IndexProps) {
     const errors = usePage().props.errors as Record<string, string | undefined>;
     const [search, setSearch] = useState(filters.q);
     const first = useRef(true);
@@ -125,7 +125,6 @@ export default function BrochuresIndex({ brochures, filters, kinds, can, status 
                     </div>
                 </div>
 
-                {status && <div className="text-sm font-medium text-green-600">{status}</div>}
                 <InputError message={errors.brochure} />
 
                 <div className="flex flex-wrap items-end gap-3">

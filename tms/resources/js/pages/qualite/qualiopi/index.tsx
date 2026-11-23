@@ -22,7 +22,7 @@ interface Props {
 const breadcrumbs: BreadcrumbItem[] = [{ title: 'Qualiopi', href: '/qualite/qualiopi' }];
 
 /** The Qualiopi file: the 33 indicators by criterion, their state and the audit export. */
-export default function QualiopiIndex({ criteria, progress, decree, verify_notice, statuses, status }: Props) {
+export default function QualiopiIndex({ criteria, progress, decree, verify_notice, statuses }: Props) {
     const [filter, setFilter] = useState<string>('');
     const percent = progress.applicable === 0 ? 0 : Math.round((progress.ready * 100) / progress.applicable);
     const shown = (i: IndicatorRow) => filter === '' || (filter === 'na' ? !i.applicable : i.applicable && i.status === filter);
@@ -40,7 +40,6 @@ export default function QualiopiIndex({ criteria, progress, decree, verify_notic
                         </a>
                     </Button>
                 </div>
-                {status && <p className="text-sm font-medium text-green-600">{status}</p>}
                 <p className="rounded-md border border-amber-300 bg-amber-50 p-2 text-xs text-amber-900 dark:bg-amber-950 dark:text-amber-100">
                     {verify_notice}
                 </p>

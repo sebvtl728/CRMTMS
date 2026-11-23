@@ -35,7 +35,7 @@ interface Props {
 
 const NONE = '__none__';
 
-export default function TrainerShow({ trainer, unavailabilities, statusOptions, dasOptions, dasEditable, userOptions, invite_url, status }: Props) {
+export default function TrainerShow({ trainer, unavailabilities, statusOptions, dasOptions, dasEditable, userOptions, invite_url }: Props) {
     const breadcrumbs: BreadcrumbItem[] = [
         { title: 'Formateurs', href: '/trainers' },
         { title: trainer.label, href: `/trainers/${trainer.id}` },
@@ -85,8 +85,6 @@ export default function TrainerShow({ trainer, unavailabilities, statusOptions, 
                         </Button>
                     </div>
                 </div>
-
-                {status && <div className="text-sm font-medium text-green-600">{status}</div>}
 
                 <section className="flex max-w-xl flex-col gap-3" aria-labelledby="details_title">
                     <h2 id="details_title" className="text-lg font-semibold">

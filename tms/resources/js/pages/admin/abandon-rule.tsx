@@ -16,7 +16,7 @@ interface AbandonRuleProps {
 
 const breadcrumbs: BreadcrumbItem[] = [{ title: "Règle d'abandon", href: '/admin/abandon-rule' }];
 
-export default function AbandonRule({ rule, trainer_follow_up_months, status }: AbandonRuleProps) {
+export default function AbandonRule({ rule, trainer_follow_up_months }: AbandonRuleProps) {
     const { data, setData, put, processing, errors } = useForm({
         mode: rule.mode,
         dedit_percent: rule.dedit_percent === null ? '' : String(rule.dedit_percent),
@@ -42,8 +42,6 @@ export default function AbandonRule({ rule, trainer_follow_up_months, status }: 
                     title="Règle d'abandon"
                     description="Règle appliquée quand un stagiaire quitte une formation avant la fin. Chaque dossier peut la remplacer par la sienne."
                 />
-
-                {status && <div className="text-sm font-medium text-green-600">{status}</div>}
 
                 <form onSubmit={submit} className="flex max-w-xl flex-col gap-6">
                     <fieldset className="grid gap-3">

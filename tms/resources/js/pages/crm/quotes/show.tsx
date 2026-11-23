@@ -101,7 +101,6 @@ export default function QuoteShow({
     links,
     send_blocked: sendBlocked,
     vat_regime_changed: regimeChanged,
-    status,
 }: ShowProps) {
     const [confirming, setConfirming] = useState(false);
     const [mailing, setMailing] = useState<'send' | 'remind' | null>(null);
@@ -221,7 +220,6 @@ export default function QuoteShow({
                     </div>
                 </div>
 
-                {status && <div className="text-sm font-medium text-green-600">{status}</div>}
                 {can.send && sendBlocked && (
                     <p
                         role="alert"
