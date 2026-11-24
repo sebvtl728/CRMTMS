@@ -48,6 +48,7 @@ Sur l'onglet **Informations** d'une entreprise ou d'une personne, le bloc **Form
 
 - Une formation **désactivée** dans le catalogue reste affichée (grisée, « inactive ») sur les fiches qui l'avaient ; elle ne peut plus être ajoutée ailleurs. Une formation d'intérêt d'une fiche ne peut pas être supprimée du catalogue (seulement désactivée).
 - **Nouvelle opportunité** depuis la fiche : ses formations d'intérêt actives sont proposées dans les **Formations** de l'opportunité (quantité 1), à garder, retirer ou compléter avant d'enregistrer.
+- La liste **Entreprises** a un filtre **Code APE (NAF)** pour cibler un secteur : un code complet (« 5610A ») ou son début pour toute une famille (« 56 » : restauration, « 56.10 » : restaurants) ; le point, les espaces et la casse ne comptent pas (« 56.10a » = « 5610A »), une saisie qui ne peut pas être un début de code est ignorée. Il se combine aux autres filtres, s'enregistre dans un filtre et s'applique à l'export.
 - Les listes **Entreprises** et **Interlocuteurs** ont un filtre **Formation d'intérêt** (enregistrable dans un filtre) et une colonne d'export **Formations d'intérêt** (intitulés séparés par « ; »).
 - Chaque changement apparaît dans l'**Historique** de la fiche : « Formations d'intérêt modifiées ».
 - Une fiche dans la corbeille ne se modifie pas : restaurez-la d'abord.
@@ -491,7 +492,9 @@ première fois l'étape choisie dans les réglages du CRM (« Contacté » par d
 **Actions à faire** compte les actions non faites dont l'échéance est dépassée ou tombe dans la période ; **Rendez-vous
 faits**, les actions d'un type dont le champ Planning commercial vaut « Rendez-vous » (Administration › Référentiels) faites dans
 la période ; **Suivis à venir**, les relances non faites (tout type sauf rendez-vous) prévues de demain à la fin de la
-période (zéro pour une période passée). Les actions d'une fiche ou d'une opportunité à la corbeille ne comptent pas.
+période (zéro pour une période passée). Dans **Mois / direction** seulement, **Actions faites** compte les actions
+réalisées dans la période, tous types confondus. « Voir le détail » d'**Actions faites** et de **Rendez-vous faits** ouvre
+la liste de ces actions (date, type, objet, fiche, résultat, responsable), avec les filtres du tableau de bord. Les actions d'une fiche ou d'une opportunité à la corbeille ne comptent pas.
 
 **Rappels de réactivation** : chaque matin, une action « Appel » est créée **6 et 12 mois** (réglables, Administration ›
 Réglages du CRM) après la fin d'un dossier, sur la fiche du client (l'entreprise, ou le particulier), pour le **responsable

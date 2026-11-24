@@ -9,6 +9,18 @@ Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) ; ve
 
 - **Suivi de formation d'un candidat admis** : sur la fiche candidature, dès qu'il est inscrit à une session, son **planning** (séances à venir et passées : horaires, module, formateur, lieu ou distanciel), ses **présences** par séance avec heures réalisées / prévues, et ses **signatures d'émargement** par demi-journée (heure, à l'heure ou rattrapage et son état, dessin de la signature). Planning selon *Consulter les sessions*, présences et signatures selon les droits de présences (hors « Ses séances »). Un gestionnaire des présences y **note la présence** d'une séance passée, **confirme ou refuse** un rattrapage et **envoie un lien de rattrapage** pour une demi-journée non signée (jamais sur un mois clôturé).
 
+## [0.15.22] - 2026-11-24
+
+### Ajouté
+
+- **Entreprises** : filtre **Code APE (NAF)** dans la liste, pour cibler un secteur : code complet (« 5610A ») ou début de code pour toute une famille (« 56 », « 56.10 ») ; point, espaces et casse indifférents. Se combine aux autres filtres, s'enregistre dans un filtre et s'applique à l'export.
+
+## [0.15.21] - 2026-11-24
+
+### Ajouté
+
+- **Tableaux de bord** (onglet Mois / direction) : carte **Actions faites**, les actions réalisées dans la période, tous types confondus. « Voir le détail » de **Actions faites** et de **Rendez-vous faits** ouvre la liste de ces actions, avec les filtres du tableau de bord.
+
 ## [0.15.20] - 2026-11-24
 
 ### Ajouté
