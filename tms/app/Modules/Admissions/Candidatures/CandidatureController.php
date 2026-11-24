@@ -114,6 +114,8 @@ class CandidatureController extends Controller
             'candidature' => CandidaturePresenter::show($candidature, $user),
             'custom_fields' => CustomFieldValues::forPage($candidature, AdmissionsVisibility::sensitive($user)),
             'history' => CandidatureHistory::forCandidature($candidature),
+            // Planning, attendance and signatures of the trainee, as the rights on Sessions allow (null: nothing to show).
+            'follow_up' => $candidature->dossier_id === null ? null : Admission::followUp($candidature->dossier_id, $candidature->person_id, $user),
             'can' => [
                 'update' => AdmissionsVisibility::allows($user, Permissions::CANDIDATURES_UPDATE, $candidature) && ! $candidature->trashed(),
                 'delete' => AdmissionsVisibility::allows($user, Permissions::CANDIDATURES_DELETE, $candidature),

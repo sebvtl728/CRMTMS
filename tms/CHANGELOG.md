@@ -5,6 +5,12 @@ Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) ; ve
 
 ## [Non publié]
 
+## [0.15.23] - 2026-11-24
+
+### Ajouté
+
+- **Suivi de formation d'un candidat admis** : sur la fiche candidature, dès qu'il est inscrit à une session, son **planning** (séances à venir et passées : horaires, module, formateur, lieu ou distanciel), ses **présences** par séance avec heures réalisées / prévues, et ses **signatures d'émargement** par demi-journée (heure, à l'heure ou rattrapage et son état, dessin de la signature). Planning selon *Consulter les sessions*, présences et signatures selon les droits de présences (hors « Ses séances »). Un gestionnaire des présences y **note la présence** d'une séance passée, **confirme ou refuse** un rattrapage et **envoie un lien de rattrapage** pour une demi-journée non signée (jamais sur un mois clôturé).
+
 ## [0.15.22] - 2026-11-24
 
 ### Ajouté
