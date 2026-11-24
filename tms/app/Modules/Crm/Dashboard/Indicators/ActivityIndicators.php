@@ -6,11 +6,13 @@ use App\Modules\Core\References\ReferenceItem;
 use App\Modules\Core\References\ReferenceList;
 use App\Modules\Core\Users\User;
 use App\Modules\Crm\Activities\Activity;
+use App\Modules\Crm\Activities\TodoQuery;
 use App\Modules\Crm\Dashboard\DashboardFilters;
 use App\Modules\Crm\Dashboard\Indicator;
 use App\Modules\Crm\Dashboard\IndicatorValue;
 use App\Modules\Crm\Dashboard\Sources;
 use App\Modules\Crm\Permissions;
+use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Builder;
 
 /**
@@ -18,9 +20,17 @@ use Illuminate\Database\Eloquent\Builder;
  * done_at), meetings fixed (types meta.planning = meeting, by created_at,
  * like ActivityStats) and the response rate (calls done whose result is
  * meta.reached / calls done; null without any « joint » result).
+ * Also: actions to do (not done, due before the end of the period: overdue
+ * included), meetings done (meeting types, by done_at) and follow-ups to
+ * come (not done, not a meeting, due from tomorrow to the end of the
+ * period), on live fiches and opportunities like « À faire ».
  */
 final class ActivityIndicators extends BaseIndicator
 {
+    private const TZ = 'Europe/Paris';
+
+    private const MONTH_SUFFIX = '_month';
+
     /** @return list<self> */
     public static function all(): array
     {
@@ -28,6 +38,23 @@ final class ActivityIndicators extends BaseIndicator
             new self('crm.calls', Indicator::WEEK, 'Appels faits', 'Actions de type appel faites dans la période', Permissions::ACTIVITIES_VIEW),
             new self('crm.meetings', Indicator::WEEK, 'Rendez-vous fixés', 'Rendez-vous créés dans la période', Permissions::ACTIVITIES_VIEW),
             new self('crm.response_rate', Indicator::WEEK, 'Taux de réponse', 'Appels faits avec un résultat « joint » / appels faits', Permissions::ACTIVITIES_VIEW),
+            ...self::actions(Indicator::WEEK, ''),
+            ...self::actions(Indicator::MONTH, self::MONTH_SUFFIX),
+        ];
+    }
+
+    /**
+     * Actions to do, meetings done and follow-ups to come, on a tab (the
+     * month copies carry a key suffix: one key per card in the registry).
+     *
+     * @return list<self>
+     */
+    private static function actions(string $tab, string $suffix): array
+    {
+        return [
+            new self('crm.todo'.$suffix, $tab, 'Actions à faire', 'Actions non faites en retard ou prévues dans la période', Permissions::ACTIVITIES_VIEW),
+            new self('crm.meetings_done'.$suffix, $tab, 'Rendez-vous faits', 'Rendez-vous réalisés dans la période', Permissions::ACTIVITIES_VIEW),
+            new self('crm.follow_ups'.$suffix, $tab, 'Suivis à venir', 'Relances non faites (hors rendez-vous) prévues de demain à la fin de la période', Permissions::ACTIVITIES_VIEW),
         ];
     }
 
@@ -37,12 +64,32 @@ final class ActivityIndicators extends BaseIndicator
         $calls = Sources::activities($f, $user)->whereIn('activities.type_id', $types('call'))
             ->whereBetween('activities.done_at', [$f->start(), $f->end()]);
 
-        return match ($this->key()) {
+        $open = fn () => TodoQuery::onLiveFiches(Sources::activities($f, $user))->whereNull('activities.done_at')->whereNotNull('activities.due_at');
+
+        return match ($this->kind()) {
+            'crm.todo' => new IndicatorValue($open()->where('activities.due_at', '<=', $f->end())->count(), IndicatorValue::COUNT),
+            'crm.meetings_done' => new IndicatorValue(TodoQuery::onLiveFiches(Sources::activities($f, $user))->whereIn('activities.type_id', $types('meeting'))
+                ->whereBetween('activities.done_at', [$f->start(), $f->end()])->count(), IndicatorValue::COUNT),
+            'crm.follow_ups' => new IndicatorValue($open()->whereNotIn('activities.type_id', $types('meeting'))
+                ->whereBetween('activities.due_at', [max($f->start(), CarbonImmutable::now()->setTimezone(self::TZ)->addDay()->startOfDay()), $f->end()])->count(), IndicatorValue::COUNT),
             'crm.meetings' => new IndicatorValue(Sources::activities($f, $user)->whereIn('activities.type_id', $types('meeting'))
                 ->whereBetween('activities.created_at', [$f->start(), $f->end()])->count(), IndicatorValue::COUNT),
             'crm.response_rate' => $this->responseRate($calls),
             default => new IndicatorValue($calls->count(), IndicatorValue::COUNT),
         };
+    }
+
+    public function detailUrl(DashboardFilters $f): ?string
+    {
+        return in_array($this->kind(), ['crm.todo', 'crm.follow_ups'], true) ? '/crm/todo' : null;
+    }
+
+    /** The key without the month suffix: the same card on both tabs. */
+    private function kind(): string
+    {
+        $key = $this->key();
+
+        return str_ends_with($key, self::MONTH_SUFFIX) ? substr($key, 0, -strlen(self::MONTH_SUFFIX)) : $key;
     }
 
     /** @param  Builder<Activity>  $calls */
