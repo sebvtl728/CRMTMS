@@ -173,3 +173,23 @@ it('shows the actions to do, the meetings done and the follow-ups to come on the
         ->and(Indicators::get('crm.todo_month')?->label())->toBe('Actions à faire')
         ->and(Indicators::get('crm.follow_ups_month')?->detailUrl(DashboardFilters::from([], CarbonImmutable::now(), 'month')))->toBe('/crm/todo');
 });
+
+it('counts the actions done in the month on the month tab, in the user scope and on live fiches', function () {
+    $me = dashOwnUser([Permissions::ACTIVITIES_VIEW]);
+    $other = commercial();
+    wkAction('Appel', $me, ['due_at' => '2026-11-03 09:00', 'done_at' => '2026-11-03 09:10']);
+    wkAction('E-mail', $me, ['done_at' => '2026-11-12 14:00']);
+    wkAction('Rendez-vous physique', $me, ['due_at' => '2026-11-17 10:00', 'done_at' => '2026-11-17 11:00']);
+    wkAction('Appel', $me, ['due_at' => '2026-11-25 09:00']); // not done
+    wkAction('Appel', $me, ['done_at' => '2026-10-28 09:00']); // last month
+    wkAction('Appel', $other, ['done_at' => '2026-11-05 09:00']); // not his
+    $trashed = Organisation::query()->create(['name' => 'Corbeille SA']);
+    wkAction('Appel', $me, ['done_at' => '2026-11-06 09:00', 'organisation_id' => $trashed->id]);
+    $trashed->delete();
+
+    expect(dashValue('crm.actions_done_month', $me))->toBe(3)
+        ->and(dashValue('crm.actions_done_month', $me, ['preset' => 'last_month']))->toBe(1)
+        ->and(Indicators::get('crm.actions_done_month')?->tab())->toBe('month')
+        ->and(Indicators::get('crm.actions_done_month')?->label())->toBe('Actions faites')
+        ->and(Indicators::get('crm.actions_done'))->toBeNull();
+});

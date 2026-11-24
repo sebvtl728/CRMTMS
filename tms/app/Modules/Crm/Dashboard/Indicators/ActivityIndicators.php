@@ -23,7 +23,8 @@ use Illuminate\Database\Eloquent\Builder;
  * Also: actions to do (not done, due before the end of the period: overdue
  * included), meetings done (meeting types, by done_at) and follow-ups to
  * come (not done, not a meeting, due from tomorrow to the end of the
- * period), on live fiches and opportunities like « À faire ».
+ * period), on live fiches and opportunities like « À faire »; on the month
+ * tab only, actions done (any type, by done_at).
  */
 final class ActivityIndicators extends BaseIndicator
 {
@@ -53,6 +54,7 @@ final class ActivityIndicators extends BaseIndicator
     {
         return [
             new self('crm.todo'.$suffix, $tab, 'Actions à faire', 'Actions non faites en retard ou prévues dans la période', Permissions::ACTIVITIES_VIEW),
+            ...($tab === Indicator::MONTH ? [new self('crm.actions_done'.$suffix, $tab, 'Actions faites', 'Actions réalisées dans la période, tous types', Permissions::ACTIVITIES_VIEW)] : []),
             new self('crm.meetings_done'.$suffix, $tab, 'Rendez-vous faits', 'Rendez-vous réalisés dans la période', Permissions::ACTIVITIES_VIEW),
             new self('crm.follow_ups'.$suffix, $tab, 'Suivis à venir', 'Relances non faites (hors rendez-vous) prévues de demain à la fin de la période', Permissions::ACTIVITIES_VIEW),
         ];
@@ -68,8 +70,8 @@ final class ActivityIndicators extends BaseIndicator
 
         return match ($this->kind()) {
             'crm.todo' => new IndicatorValue($open()->where('activities.due_at', '<=', $f->end())->count(), IndicatorValue::COUNT),
-            'crm.meetings_done' => new IndicatorValue(TodoQuery::onLiveFiches(Sources::activities($f, $user))->whereIn('activities.type_id', $types('meeting'))
-                ->whereBetween('activities.done_at', [$f->start(), $f->end()])->count(), IndicatorValue::COUNT),
+            'crm.actions_done' => new IndicatorValue(self::done($f, $user, false)->count(), IndicatorValue::COUNT),
+            'crm.meetings_done' => new IndicatorValue(self::done($f, $user, true)->count(), IndicatorValue::COUNT),
             'crm.follow_ups' => new IndicatorValue($open()->whereNotIn('activities.type_id', $types('meeting'))
                 ->whereBetween('activities.due_at', [max($f->start(), CarbonImmutable::now()->setTimezone(self::TZ)->addDay()->startOfDay()), $f->end()])->count(), IndicatorValue::COUNT),
             'crm.meetings' => new IndicatorValue(Sources::activities($f, $user)->whereIn('activities.type_id', $types('meeting'))
@@ -81,7 +83,39 @@ final class ActivityIndicators extends BaseIndicator
 
     public function detailUrl(DashboardFilters $f): ?string
     {
-        return in_array($this->kind(), ['crm.todo', 'crm.follow_ups'], true) ? '/crm/todo' : null;
+        return match ($this->kind()) {
+            'crm.todo', 'crm.follow_ups' => '/crm/todo',
+            'crm.actions_done' => self::doneUrl($f, 'done'),
+            'crm.meetings_done' => self::doneUrl($f, 'meetings'),
+            default => null,
+        };
+    }
+
+    /**
+     * Actions done in the period (meetings only: types meta.planning =
+     * meeting), on live fiches: the source of the « Actions faites » and
+     * « Rendez-vous faits » cards and of their detail list.
+     *
+     * @return Builder<Activity>
+     */
+    public static function done(DashboardFilters $f, User $user, bool $meetingsOnly): Builder
+    {
+        return TodoQuery::onLiveFiches(Sources::activities($f, $user))
+            ->when($meetingsOnly, fn (Builder $q) => $q->whereIn('activities.type_id',
+                ReferenceItem::withTrashed()->where('list', ReferenceList::ActionType)->where('meta->planning', 'meeting')->pluck('id')->all()))
+            ->whereBetween('activities.done_at', [$f->start(), $f->end()]);
+    }
+
+    /** The detail list of the done actions, with the dashboard filters. */
+    private static function doneUrl(DashboardFilters $f, string $kind): string
+    {
+        $filters = $f->toArray();
+
+        return '/crm/dashboards/actions?'.http_build_query(array_filter([
+            'kind' => $kind, 'tab' => $filters['tab'], 'preset' => $filters['preset'],
+            'from' => $f->preset === 'custom' ? $filters['from'] : null, 'to' => $f->preset === 'custom' ? $filters['to'] : null,
+            'target' => $f->target, 'responsible' => $f->responsible,
+        ], fn ($v) => $v !== null));
     }
 
     /** The key without the month suffix: the same card on both tabs. */

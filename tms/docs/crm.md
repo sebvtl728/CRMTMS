@@ -491,7 +491,9 @@ première fois l'étape choisie dans les réglages du CRM (« Contacté » par d
 **Actions à faire** compte les actions non faites dont l'échéance est dépassée ou tombe dans la période ; **Rendez-vous
 faits**, les actions d'un type dont le champ Planning commercial vaut « Rendez-vous » (Administration › Référentiels) faites dans
 la période ; **Suivis à venir**, les relances non faites (tout type sauf rendez-vous) prévues de demain à la fin de la
-période (zéro pour une période passée). Les actions d'une fiche ou d'une opportunité à la corbeille ne comptent pas.
+période (zéro pour une période passée). Dans **Mois / direction** seulement, **Actions faites** compte les actions
+réalisées dans la période, tous types confondus. « Voir le détail » d'**Actions faites** et de **Rendez-vous faits** ouvre
+la liste de ces actions (date, type, objet, fiche, résultat, responsable), avec les filtres du tableau de bord. Les actions d'une fiche ou d'une opportunité à la corbeille ne comptent pas.
 
 **Rappels de réactivation** : chaque matin, une action « Appel » est créée **6 et 12 mois** (réglables, Administration ›
 Réglages du CRM) après la fin d'un dossier, sur la fiche du client (l'entreprise, ou le particulier), pour le **responsable
