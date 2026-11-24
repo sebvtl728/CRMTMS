@@ -72,6 +72,7 @@ it('creates the same values for an existing organisme by migration, without dupl
     $migration->up();
     lot2aMigration('2026_12_13_000001_flag_default_funding_types')->up();
     lot2aMigration('2027_01_15_000001_flag_cpf_billed_outside')->up();
+    lot2aMigration('2027_01_30_000020_flag_opco_funding_type')->up();
     $migrated = lot2aItems();
     expect($migrated['funding_type'])->toHaveCount(6)->and($migrated['abandon_reason'][1][3])->toBe(['force_majeure' => true]);
 
@@ -135,7 +136,7 @@ it('lets an administrator flag an abandon reason as force majeure', function () 
     // The flag exists on abandon reasons only: ignored elsewhere.
     $funding = ReferenceItem::query()->where('list', ReferenceList::FundingType)->where('code', 'opco')->firstOrFail();
     $this->put("/admin/references/funding_type/{$funding->id}", ['label' => 'OPCO', 'meta' => ['force_majeure' => true]])->assertRedirect();
-    expect($funding->fresh()->meta)->toBeNull();
+    expect($funding->fresh()->meta)->toBe(['opco' => true]);
 });
 
 it('flags once, by migration, the funding types funding a new dossier by default', function () {
@@ -243,4 +244,25 @@ it('links by migration the funding modes of each organisme to the funding type o
         ->and($mode('france-travail')->meta)->toBe(['funding_type_id' => $type('france-travail')->id])
         ->and($mode('cpf')->meta)->toBe(['funding_type_id' => $type('personnel')->id])
         ->and($mode('autre')->meta)->toBeNull();
+});
+
+it('flags the funding type « OPCO » as paid by the OPCO of the collective agreement, editable, and once by migration', function () {
+    inTenant();
+    CapFormationReferenceSeeder::run(tenant());
+    $type = fn (string $code) => ReferenceItem::query()->where('list', ReferenceList::FundingType)->where('code', $code)->firstOrFail();
+    expect($type('opco')->meta)->toBe(['opco' => true])
+        ->and($type('region')->meta)->toBeNull();
+
+    $this->actingAs(admin(twoFactor: true))->get('/admin/references')->assertInertia(fn (Assert $page) => $page
+        ->where('lists.funding_type.has_opco', true)->where('lists.funding_mode.has_opco', false));
+    $this->put("/admin/references/funding_type/{$type('opco')->id}", ['label' => 'OPCO', 'meta' => ['opco' => false]])->assertRedirect();
+    expect($type('opco')->meta)->toBeNull();
+
+    // The migration flags it again only where the key was never set.
+    $type('opco')->update(['meta' => null]);
+    lot2aMigration('2027_01_30_000020_flag_opco_funding_type')->up();
+    expect($type('opco')->meta)->toBe(['opco' => true]);
+    $type('opco')->update(['meta' => ['opco' => false]]);
+    lot2aMigration('2027_01_30_000020_flag_opco_funding_type')->up();
+    expect($type('opco')->meta)->toBe(['opco' => false]);
 });

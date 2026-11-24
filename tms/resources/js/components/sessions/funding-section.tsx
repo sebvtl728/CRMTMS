@@ -66,6 +66,10 @@ interface BalancePart {
 export interface FundingBalance {
     price: string;
     funded: string;
+    /** Of the amount funded: « Accordé », and what still waits for an agreement (À demander, Demandé). */
+    agreed: string;
+    pending: string;
+    pending_cents: number;
     remaining_cents: number;
     /** « Reste à financer : 900,00 € » or « Financements supérieurs au prix : 100,00 € ». */
     message: string;
@@ -235,8 +239,8 @@ function FundingDialog({
                         )}
                         {suggested && !suggested.id && !funder && (
                             <p className="text-muted-foreground text-xs">
-                                Selon la table officielle de France compétences, l'OPCO de la convention IDCC {suggested.idcc} est{' '}
-                                {suggested.label}. Aucune fiche entreprise à ce nom : créez-la pour la choisir.
+                                Selon la table officielle de France compétences, l'OPCO de la convention IDCC {suggested.idcc} est {suggested.label}.
+                                Aucune fiche entreprise à ce nom : créez-la pour la choisir.
                             </p>
                         )}
                         <InputError message={fieldErrors.funder ?? fieldErrors.funder_organisation_id ?? fieldErrors.funder_person_id} />
@@ -457,6 +461,12 @@ export function FundingSection({
             </div>
 
             <Alert remaining={balance.remaining_cents} message={balance.message} />
+            {fundings.length > 0 && (
+                <p className={`text-sm ${balance.pending_cents > 0 ? 'text-amber-800 dark:text-amber-300' : 'text-muted-foreground'}`}>
+                    Accordé : <strong>{balance.agreed}</strong> · En attente d'accord : <strong>{balance.pending}</strong>
+                    {balance.pending_cents > 0 && ' (financements « À demander » ou « Demandé »)'}
+                </p>
+            )}
 
             {fundings.length === 0 ? (
                 <div className="text-muted-foreground rounded-xl border p-6 text-center text-sm">Aucun financement.</div>

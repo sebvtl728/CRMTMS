@@ -125,6 +125,12 @@ enum ReferenceList: string
      * e.g. the CPF through EDOF): their share comes off the contractant's
      * invoice and no invoice of the TMS is issued for it (0.9).
      */
+    /** A funding type paid by the OPCO of the contractant's collective agreement (meta.opco). */
+    public function hasOpco(): bool
+    {
+        return $this === self::FundingType;
+    }
+
     /** A funding mode gives the dossier a funding type (meta.funding_type_id). */
     public function hasFundingType(): bool
     {
