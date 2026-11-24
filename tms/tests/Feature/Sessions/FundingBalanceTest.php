@@ -205,7 +205,8 @@ it('counts for a line the fundings of the line and of its enrolments', function 
 
     expect($balance['lines'])->toBe([$line->id => ['price_cents' => 300000, 'funded_cents' => 300000, 'remaining_cents' => 0]])
         ->and($balance['remaining_cents'])->toBe(0)
-        ->and($balance['enrolments'][$enrolments[0]->id])->toBe(['price_cents' => 100000, 'funded_cents' => 70000, 'remaining_cents' => 30000, 'cancelled' => false]);
+        // The 900 € of the line cover the 300 € left on each trainee.
+        ->and($balance['enrolments'][$enrolments[0]->id])->toBe(['price_cents' => 100000, 'funded_cents' => 100000, 'remaining_cents' => 0, 'cancelled' => false]);
 });
 
 it('shows a line whose enrolments only are targeted', function () {
@@ -219,6 +220,48 @@ it('shows a line whose enrolments only are targeted', function () {
 
     expect(FundingBalance::for($dossier->refresh())['lines'])
         ->toBe([$line->id => ['price_cents' => 300000, 'funded_cents' => 70000, 'remaining_cents' => 230000]]);
+});
+
+it('lets a funding of the whole dossier cover the line and the trainees detailed (D-2026-0004)', function () {
+    // One line of 19 012 €: 9 000 € on the line, 10 012 € on the whole dossier.
+    $dossier = balDossier([['unit_price' => '19012']]);
+    $line = $dossier->lines->firstOrFail();
+    balFund($dossier, '9000', 'OPCO', ['dossier_line_id' => $line->id, 'status' => 'agreed', 'agreed_on' => '2026-11-16']);
+    balFund($dossier, '10012', 'Entreprise', ['status' => 'agreed', 'agreed_on' => '2026-11-16']);
+
+    $balance = FundingBalance::for($dossier->refresh());
+    expect($balance['remaining_cents'])->toBe(0)
+        ->and($balance['lines'])->toBe([$line->id => ['price_cents' => 1901200, 'funded_cents' => 1901200, 'remaining_cents' => 0]]);
+});
+
+it('spends a funding of the whole dossier on the lines nobody targets first, then on the lines detailed, in order', function () {
+    $dossier = balDossier([['unit_price' => '2000'], ['unit_price' => '1000'], ['kind' => 'fee', 'training_id' => null, 'pricing_mode' => null, 'label' => 'Déplacement', 'unit_price' => '500']]);
+    [$first, $second] = [$dossier->lines[0], $dossier->lines[1]];
+    balFund($dossier, '1500', 'OPCO', ['dossier_line_id' => $first->id]);
+    balFund($dossier, '200', 'OPCO', ['dossier_line_id' => $second->id]);
+    // 500 € go to the fee line (no funding of its own), 500 € to the first line, 200 € to the second.
+    balFund($dossier, '1200', 'Entreprise');
+
+    $balance = FundingBalance::for($dossier->refresh());
+    expect($balance['remaining_cents'])->toBe(60000)
+        ->and($balance['lines'][$first->id])->toBe(['price_cents' => 200000, 'funded_cents' => 200000, 'remaining_cents' => 0])
+        ->and($balance['lines'][$second->id])->toBe(['price_cents' => 100000, 'funded_cents' => 40000, 'remaining_cents' => 60000]);
+});
+
+it('covers the trainees nobody targets before the trainees detailed, never a cancelled one', function () {
+    $dossier = balDossier([['unit_price' => '3000', 'pricing_mode' => 'per_trainee']]);
+    $session = balSession();
+    [$a, $b, $c] = [balEnrol($dossier, $session), balEnrol($dossier, $session), balEnrol($dossier, $session)];
+    balFund($dossier, '400', 'OPCO', ['enrolment_id' => $a->id]);
+    balFund($dossier, '1000', 'Personnel', ['enrolment_id' => $b->id]);
+    // 1 000 € for the whole dossier: the untargeted trainee C first (1 000), nothing left for A.
+    balFund($dossier, '1000', 'Entreprise');
+
+    $balance = FundingBalance::for($dossier->refresh());
+    expect($balance['enrolments'][$a->id]['remaining_cents'])->toBe(60000)
+        ->and($balance['enrolments'][$b->id]['remaining_cents'])->toBe(0)
+        ->and($balance['remaining_cents'])->toBe(60000);
+    expect($c->id)->not->toBeIn(array_keys($balance['enrolments']));
 });
 
 it('words the funding of a cancelled enrolment as an amount to move', function () {
