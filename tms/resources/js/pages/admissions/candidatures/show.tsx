@@ -1,6 +1,7 @@
 import { DossierDialog } from '@/components/admissions/dossier-dialog';
 import { CandidatureFiles, OptionSelect, TextField, textareaClass } from '@/components/admissions/fields';
 import { PositioningPanel, type PositioningProps } from '@/components/admissions/positioning-panel';
+import { TrainingFollowUp, type TrainingFollowUpProps } from '@/components/admissions/training-follow-up';
 import Heading from '@/components/heading';
 import InputError from '@/components/input-error';
 import { FichePicker, type Picked } from '@/components/sessions/fiche-picker';
@@ -24,6 +25,8 @@ interface ShowProps {
     options: AdmissionOptions;
     can: { update: boolean; delete: boolean; sensitive: boolean; create_dossier: boolean };
     positioning: PositioningProps;
+    /** Planning, attendance and signatures of the trainee (null: no dossier, or no right on the session). */
+    follow_up: TrainingFollowUpProps | null;
     status?: string;
 }
 
@@ -89,7 +92,15 @@ function formatNir(value: string): string {
         .join(' ');
 }
 
-export default function CandidatureShow({ candidature: c, custom_fields, history, options, can, positioning: positioningTests }: ShowProps) {
+export default function CandidatureShow({
+    candidature: c,
+    custom_fields,
+    history,
+    options,
+    can,
+    positioning: positioningTests,
+    follow_up: followUp,
+}: ShowProps) {
     const errors = usePage().props.errors as Record<string, string | undefined>;
     const [stage, setStage] = useState<string | null>(null);
     const [reason, setReason] = useState<string | null>(null);
@@ -769,6 +780,8 @@ export default function CandidatureShow({ candidature: c, custom_fields, history
                         </Card>
                     )}
                 </div>
+
+                {followUp && <TrainingFollowUp followUp={followUp} />}
 
                 <HistoryList entries={history.map((h) => ({ type: 'candidature', at: h.at, title: h.title, body: null, author: h.author }))} />
             </div>

@@ -62,6 +62,16 @@ Sur une candidature **admise**, **Créer le dossier** (droits : modifier la cand
 
 Une candidature n'a qu'un dossier ; mis à la corbeille, il peut être recréé. La page du dossier affiche le bloc **Candidature**.
 
+### Suivi de formation
+
+Une fois le candidat inscrit à une session par son dossier, la fiche candidature affiche le bloc **Suivi de formation** (sous les cartes) :
+
+- **Planning** : les séances de sa session entre son entrée et sa sortie (date, horaires, module, formateur, salle, lieu ou distanciel), les séances à venir d'abord, **Afficher les séances passées** pour l'historique ; une séance annulée est barrée. Il faut **Consulter les sessions** sur la session (son périmètre) ; sans ce droit, le bloc n'apparaît pas.
+- **Présences** : pour chaque séance passée, présent / partiel / absent / absence justifiée (ou « Non saisie »), et ses **heures réalisées** sur ses **heures prévues**. Il faut **Saisir les présences** sur un autre périmètre que « Ses séances » (ou **Clôturer les présences**) sur la session.
+- **Émargement en ligne** (mêmes droits que les présences) : chaque demi-journée ouverte à la signature sur ses jours de séance, signée ou non, l'heure, le type (à l'heure, rattrapage sur place ou à distance, avec son état : à confirmer, confirmé, refusé) et la signature dessinée (cliquez pour l'agrandir).
+
+Seul ce stagiaire apparaît : jamais les autres inscrits de la session.
+
 ## 4 bis. Livret d'apprentissage
 
 Dès qu'un contrat d'alternance est saisi, la carte **Alternance** propose **Livret d'apprentissage (PDF)**, avec le droit « Consulter les candidatures ». Le livret sort **déjà rempli** avec ce que le TMS sait :

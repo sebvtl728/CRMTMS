@@ -5,6 +5,7 @@ namespace App\Modules\Sessions\Public;
 use App\Modules\Catalogue\Trainings;
 use App\Modules\Core\Users\User;
 use App\Modules\Crm\Public\Fiches;
+use App\Modules\Sessions\Attendance\TraineeFollowUp;
 use App\Modules\Sessions\Dossiers\Dossier;
 use App\Modules\Sessions\Dossiers\DossierLine;
 use App\Modules\Sessions\Dossiers\DossierWriter;
@@ -243,5 +244,18 @@ final class Admission
             'teachers' => array_map(fn (string $name, array $mods) => ['name' => $name, 'modules' => $mods], array_keys($taught), array_values($taught)),
             'placements' => $placements,
         ];
+    }
+
+    /**
+     * The individual follow-up of the person in the dossier, as $user may see
+     * it (TraineeFollowUp): the séances of his session; with the attendance
+     * right, his attendance, realised hours and signatures. Null when the
+     * person has no live enrolment there or $user does not see the session.
+     *
+     * @return array<string, mixed>|null
+     */
+    public static function followUp(string $dossierId, string $personId, User $user): ?array
+    {
+        return TraineeFollowUp::of($dossierId, $personId, $user);
     }
 }
