@@ -35,7 +35,7 @@ const ROUTES = {
 } as const;
 
 const SAVABLE: Record<Resource, string[]> = {
-    organisations: ['q', 'status', 'das', 'sector', 'responsible', 'origin', 'training', 'mine'],
+    organisations: ['q', 'ape', 'status', 'das', 'sector', 'responsible', 'origin', 'training', 'mine'],
     people: ['q', 'type', 'status', 'situation', 'funding', 'origin', 'responsible', 'training', 'mine'],
 };
 
