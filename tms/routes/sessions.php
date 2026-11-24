@@ -6,6 +6,7 @@ use App\Modules\Sessions\Attendance\AttendanceSheetController;
 use App\Modules\Sessions\Attendance\Signing\CatchUpController;
 use App\Modules\Sessions\Attendance\Signing\GroupCatchUpController;
 use App\Modules\Sessions\Attendance\Signing\PublicSigningController;
+use App\Modules\Sessions\Attendance\Signing\SignatureDrawingController;
 use App\Modules\Sessions\Attendance\Signing\SignedSheetController;
 use App\Modules\Sessions\Attendance\Signing\SigningController;
 use App\Modules\Sessions\Dossiers\DossierController;
@@ -114,6 +115,9 @@ Route::middleware(['auth', 'can:sessions.attendance.manage'])->prefix('sessions/
     Route::post('catch-up-links', [SigningController::class, 'sendCatchUpLink'])->middleware('throttle:attendance-signing-open')->name('catch-up-links');
     Route::post('advance-entry', [SigningController::class, 'advanceEntry'])->name('advance-entry');
 });
+
+// The drawing of a signature, for the follow-up of a trainee (an attendance manager).
+Route::get('sessions/signatures/{signature}/dessin', SignatureDrawingController::class)->middleware(['auth', 'can:sessions.attendance.manage'])->name('sessions.signatures.drawing');
 
 // Catch-ups of the online signing (2026-11-21): an attendance manager confirms or refuses them.
 Route::middleware(['auth', 'can:sessions.attendance.manage'])->prefix('sessions/rattrapages/{signature}')->name('sessions.catch-ups.')->group(function () {
