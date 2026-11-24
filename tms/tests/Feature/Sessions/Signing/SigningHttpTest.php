@@ -213,3 +213,21 @@ it('refuses to bring in a trainee of another session', function () {
     $this->actingAs($manager)->postJson("/sessions/emargement/{$slotId}/advance-entry", ['enrolment_id' => $other->id])->assertNotFound();
     expect($other->refresh()->entered_on->toDateString())->toBe('2026-09-14');
 });
+
+it('keeps the half-days and their signatures in every answer of the attendance dialog (« Tous présents », a status, a clear)', function () {
+    $session = plSession();
+    $seance = plSeance(plModule($session), '2026-09-10');
+    $lea = atEnrol($session, 'Durand');
+    $paul = atEnrol($session, 'Martin');
+    [, $url] = hOpen($seance->id);
+    auth()->logout();
+    $this->postJson('/emargement/'.hToken($url), ['enrolment_id' => $lea->id, 'drawing' => sigDrawing()])->assertCreated();
+    $manager = atManager();
+
+    $this->actingAs($manager)->postJson("/seances/{$seance->id}/attendance/all-present")->assertOk()
+        ->assertJsonPath('count', 2)->assertJsonPath('slots.0.half', 'morning')->assertJsonPath('slots.0.signed', 1);
+    $this->postJson("/seances/{$seance->id}/attendance", ['enrolment_id' => $paul->id, 'status' => 'absent', 'minutes' => null, 'reason' => ''])->assertOk()
+        ->assertJsonPath('slots.0.signed', 1);
+    $this->deleteJson("/seances/{$seance->id}/attendance/{$paul->id}")->assertOk()
+        ->assertJsonPath('slots.0.signed', 1);
+});
