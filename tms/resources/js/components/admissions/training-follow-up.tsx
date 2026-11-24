@@ -42,6 +42,9 @@ export interface TrainingFollowUpProps {
     signatures?: FollowUpSignature[];
 }
 
+/** Séances to come shown before « Afficher toutes les séances à venir ». */
+const UPCOMING_LIMIT = 10;
+
 const time = new Intl.DateTimeFormat('fr-FR', { timeStyle: 'short', timeZone: 'Europe/Paris' });
 
 const ATTENDANCE_VARIANT: Record<string, 'default' | 'secondary' | 'destructive' | 'outline'> = {
@@ -70,9 +73,12 @@ export function TrainingFollowUp({ followUp }: { followUp: TrainingFollowUpProps
     const { session, seances, hours, signatures } = followUp;
     const withAttendance = hours !== undefined;
     const [showPast, setShowPast] = useState(false);
+    const [showAllUpcoming, setShowAllUpcoming] = useState(false);
     const upcoming = seances.filter((s) => !s.past);
     const past = seances.filter((s) => s.past);
-    const shown = showPast ? seances : upcoming;
+    // A long training holds hundreds of séances: the next ones only, unless asked.
+    const shownUpcoming = showAllUpcoming ? upcoming : upcoming.slice(0, UPCOMING_LIMIT);
+    const shown = showPast ? [...past, ...shownUpcoming] : shownUpcoming;
 
     return (
         <section aria-label="Suivi de formation" className="grid gap-4 rounded-xl border p-4">
@@ -113,11 +119,18 @@ export function TrainingFollowUp({ followUp }: { followUp: TrainingFollowUpProps
             <div className="grid gap-2">
                 <div className="flex flex-wrap items-center justify-between gap-2">
                     <h3 className="text-sm font-medium">Planning</h3>
-                    {past.length > 0 && (
-                        <button type="button" className="text-primary text-sm hover:underline" onClick={() => setShowPast((v) => !v)}>
-                            {showPast ? 'Masquer les séances passées' : `Afficher les séances passées (${past.length})`}
-                        </button>
-                    )}
+                    <div className="flex flex-wrap gap-4">
+                        {past.length > 0 && (
+                            <button type="button" className="text-primary text-sm hover:underline" onClick={() => setShowPast((v) => !v)}>
+                                {showPast ? 'Masquer les séances passées' : `Afficher les séances passées (${past.length})`}
+                            </button>
+                        )}
+                        {upcoming.length > UPCOMING_LIMIT && (
+                            <button type="button" className="text-primary text-sm hover:underline" onClick={() => setShowAllUpcoming((v) => !v)}>
+                                {showAllUpcoming ? 'Réduire' : `Afficher toutes les séances à venir (${upcoming.length})`}
+                            </button>
+                        )}
+                    </div>
                 </div>
                 {shown.length === 0 ? (
                     <p className="text-muted-foreground text-sm">{seances.length === 0 ? 'Aucune séance planifiée.' : 'Aucune séance à venir.'}</p>
