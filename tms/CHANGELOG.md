@@ -5,9 +5,17 @@ Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) ; ve
 
 ## [Non publié]
 
+## [0.15.20] - 2026-11-24
+
 ### Ajouté
 
 - **Tableaux de bord** (onglets Semaine et Mois / direction) : trois cartes d'actions. **Actions à faire** (non faites, en retard ou prévues dans la période), **Rendez-vous faits** (rendez-vous réalisés dans la période) et **Suivis à venir** (relances non faites hors rendez-vous, prévues de demain à la fin de la période) ; « Voir le détail » ouvre Mes actions commerciales pour les actions et les suivis.
+
+## [0.15.19] - 2026-11-24
+
+### Corrigé
+
+- **Présences d'une séance** : après « Tous présents » (ou une présence notée ou effacée), les demi-journées d'émargement et leurs signatures disparaissaient de la fenêtre jusqu'à sa réouverture. Rien n'était effacé : chaque réponse les renvoie maintenant.
 
 ## [0.15.18] - 2026-11-24
 
