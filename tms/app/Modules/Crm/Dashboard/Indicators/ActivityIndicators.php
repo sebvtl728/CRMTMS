@@ -23,7 +23,8 @@ use Illuminate\Database\Eloquent\Builder;
  * Also: actions to do (not done, due before the end of the period: overdue
  * included), meetings done (meeting types, by done_at) and follow-ups to
  * come (not done, not a meeting, due from tomorrow to the end of the
- * period), on live fiches and opportunities like « À faire ».
+ * period), on live fiches and opportunities like « À faire »; on the month
+ * tab only, actions done (any type, by done_at).
  */
 final class ActivityIndicators extends BaseIndicator
 {
@@ -53,6 +54,7 @@ final class ActivityIndicators extends BaseIndicator
     {
         return [
             new self('crm.todo'.$suffix, $tab, 'Actions à faire', 'Actions non faites en retard ou prévues dans la période', Permissions::ACTIVITIES_VIEW),
+            ...($tab === Indicator::MONTH ? [new self('crm.actions_done'.$suffix, $tab, 'Actions faites', 'Actions réalisées dans la période, tous types', Permissions::ACTIVITIES_VIEW)] : []),
             new self('crm.meetings_done'.$suffix, $tab, 'Rendez-vous faits', 'Rendez-vous réalisés dans la période', Permissions::ACTIVITIES_VIEW),
             new self('crm.follow_ups'.$suffix, $tab, 'Suivis à venir', 'Relances non faites (hors rendez-vous) prévues de demain à la fin de la période', Permissions::ACTIVITIES_VIEW),
         ];
@@ -68,6 +70,8 @@ final class ActivityIndicators extends BaseIndicator
 
         return match ($this->kind()) {
             'crm.todo' => new IndicatorValue($open()->where('activities.due_at', '<=', $f->end())->count(), IndicatorValue::COUNT),
+            'crm.actions_done' => new IndicatorValue(TodoQuery::onLiveFiches(Sources::activities($f, $user))
+                ->whereBetween('activities.done_at', [$f->start(), $f->end()])->count(), IndicatorValue::COUNT),
             'crm.meetings_done' => new IndicatorValue(TodoQuery::onLiveFiches(Sources::activities($f, $user))->whereIn('activities.type_id', $types('meeting'))
                 ->whereBetween('activities.done_at', [$f->start(), $f->end()])->count(), IndicatorValue::COUNT),
             'crm.follow_ups' => new IndicatorValue($open()->whereNotIn('activities.type_id', $types('meeting'))
