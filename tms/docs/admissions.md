@@ -70,6 +70,14 @@ Une fois le candidat inscrit à une session par son dossier, la fiche candidatur
 - **Présences** : pour chaque séance passée, présent / partiel / absent / absence justifiée (ou « Non saisie »), et ses **heures réalisées** sur ses **heures prévues**. Il faut **Saisir les présences** sur un autre périmètre que « Ses séances » (ou **Clôturer les présences**) sur la session.
 - **Émargement en ligne** (mêmes droits que les présences) : chaque demi-journée ouverte à la signature sur ses jours de séance, signée ou non, l'heure, le type (à l'heure, rattrapage sur place ou à distance, avec son état : à confirmer, confirmé, refusé) et la signature dessinée (cliquez pour l'agrandir).
 
+**Actions** (gestionnaire des présences : **Saisir les présences** hors « Ses séances » sur la session ; jamais sur un mois clôturé, ni pour qui ne fait que clôturer) :
+
+- **Noter la présence** (ou **Modifier**) sur une séance passée : présent, partiel (minutes de présence) ou absent ;
+- **Confirmer** / **Refuser** (motif obligatoire) une signature en rattrapage à confirmer ;
+- **Envoyer un lien de rattrapage** sur une demi-journée passée non signée : l'e-mail du stagiaire est prérempli et modifiable ; le lien vaut 7 jours, pour une seule signature (un nouvel envoi annule le précédent). La date du dernier lien envoyé s'affiche.
+
+Ces actions passent par les mêmes contrôles que l'écran de la session ; le bloc se met à jour après chacune.
+
 Seul ce stagiaire apparaît : jamais les autres inscrits de la session.
 
 ## 4 bis. Livret d'apprentissage
