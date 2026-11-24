@@ -5,6 +5,10 @@ Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) ; ve
 
 ## [Non publié]
 
+### Ajouté
+
+- **Tableaux de bord › Semaine** : trois cartes d'actions. **Actions à faire** (non faites, en retard ou prévues dans la période), **Rendez-vous faits** (rendez-vous réalisés dans la période) et **Suivis à venir** (relances non faites hors rendez-vous, prévues de demain à la fin de la période) ; « Voir le détail » ouvre Mes actions commerciales pour les actions et les suivis.
+
 ## [0.15.17] - 2026-11-23
 
 ### Ajouté

@@ -474,8 +474,8 @@ Administration › Rôles et droits ; accordé par défaut aux rôles qui voient
 l'accueil). Deux vues, mêmes filtres (période : cette semaine, semaine dernière, ce mois, mois dernier, ce trimestre,
 cette année ou dates libres ; DAS ; cible entreprises / particuliers ; commercial) :
 
-- **Semaine** (réunion commerciale) : appels faits, rendez-vous fixés, taux de réponse, nouveaux leads, pipeline pondéré,
-  opportunités à clôturer, devis envoyés et acceptés ;
+- **Semaine** (réunion commerciale) : appels faits, rendez-vous fixés, rendez-vous faits, taux de réponse, actions à faire,
+  suivis à venir, nouveaux leads, pipeline pondéré, opportunités à clôturer, devis envoyés et acceptés ;
 - **Mois / direction** : CA signé par DAS et objectifs, taux de conversion, CA prévisionnel, durée du cycle de vente
   (moyenne et médiane), formations vendues, entreprises / particuliers, origine des leads, motifs de perte, taux de
   rétention (clients ayant au moins deux dossiers sur la fenêtre glissante) et réachats.
@@ -487,6 +487,10 @@ fois). Le taux de réponse compte les appels dont le résultat est marqué « Co
 Référentiels › Résultats d'action ; « Réussi » par défaut). Un lead est une fiche dont une opportunité atteint pour la
 première fois l'étape choisie dans les réglages du CRM (« Contacté » par défaut). Exports : **Excel (CSV)** et **PDF**
 (droits « Consulter les tableaux de bord » et « Exporter vers Excel », journalisés). Le filtre DAS ne s'applique pas aux cartes d'actions (une action n'a pas de DAS).
+**Actions à faire** compte les actions non faites dont l'échéance est dépassée ou tombe dans la période ; **Rendez-vous
+faits**, les actions d'un type dont le champ Planning commercial vaut « Rendez-vous » (Administration › Référentiels) faites dans
+la période ; **Suivis à venir**, les relances non faites (tout type sauf rendez-vous) prévues de demain à la fin de la
+période (zéro pour une période passée). Les actions d'une fiche ou d'une opportunité à la corbeille ne comptent pas.
 
 **Rappels de réactivation** : chaque matin, une action « Appel » est créée **6 et 12 mois** (réglables, Administration ›
 Réglages du CRM) après la fin d'un dossier, sur la fiche du client (l'entreprise, ou le particulier), pour le **responsable
