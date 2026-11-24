@@ -478,7 +478,8 @@ cette année ou dates libres ; DAS ; cible entreprises / particuliers ; commerci
   suivis à venir, nouveaux leads, pipeline pondéré, opportunités à clôturer, devis envoyés et acceptés ;
 - **Mois / direction** : CA signé par DAS et objectifs, taux de conversion, CA prévisionnel, durée du cycle de vente
   (moyenne et médiane), formations vendues, entreprises / particuliers, origine des leads, motifs de perte, taux de
-  rétention (clients ayant au moins deux dossiers sur la fenêtre glissante) et réachats.
+  rétention (clients ayant au moins deux dossiers sur la fenêtre glissante) et réachats ; les cartes d'actions de la vue
+  Semaine (actions à faire, rendez-vous faits, suivis à venir) y figurent aussi, sur le mois choisi.
 
 Chaque carte montre sa **formule**, la valeur de la **période précédente** et l'écart, et « Voir le détail » ouvre la liste
 qui la compose. Chaque carte suit le périmètre de son droit : un commercial sur « ses fiches » ne compte que les siennes.

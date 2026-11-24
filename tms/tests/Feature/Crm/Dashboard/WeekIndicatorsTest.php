@@ -154,3 +154,22 @@ it('counts the actions to do, the meetings done and the follow-ups to come, in t
         ->and(Indicators::get('crm.todo')?->detailUrl(DashboardFilters::from([], CarbonImmutable::now(), 'week')))->toBe('/crm/todo')
         ->and(Indicators::get('crm.follow_ups')?->tab())->toBe('week');
 });
+
+it('shows the actions to do, the meetings done and the follow-ups to come on the month tab too', function () {
+    $me = dashOwnUser([Permissions::ACTIVITIES_VIEW]);
+    wkAction('Appel', $me, ['due_at' => '2026-10-20 09:00']); // overdue
+    wkAction('E-mail', $me, ['due_at' => '2026-11-27 09:00']); // later this month: follow-up
+    wkAction('Rendez-vous physique', $me, ['due_at' => '2026-11-25 14:00']); // to do, not a follow-up
+    wkAction('Appel', $me, ['due_at' => '2026-12-02 09:00']); // next month
+    wkAction('Prise de rendez-vous', $me, ['due_at' => '2026-11-03 10:00', 'done_at' => '2026-11-03 10:15']);
+    wkAction('Rendez-vous physique', $me, ['due_at' => '2026-10-12 10:00', 'done_at' => '2026-10-12 11:00']); // last month
+
+    expect(dashValue('crm.todo_month', $me))->toBe(3)
+        ->and(dashValue('crm.meetings_done_month', $me))->toBe(1)
+        ->and(dashValue('crm.meetings_done_month', $me, ['preset' => 'last_month']))->toBe(1)
+        ->and(dashValue('crm.follow_ups_month', $me))->toBe(1)
+        ->and(dashValue('crm.todo_month', $me, ['target' => 'person']))->toBe(0)
+        ->and(Indicators::get('crm.todo_month')?->tab())->toBe('month')
+        ->and(Indicators::get('crm.todo_month')?->label())->toBe('Actions à faire')
+        ->and(Indicators::get('crm.follow_ups_month')?->detailUrl(DashboardFilters::from([], CarbonImmutable::now(), 'month')))->toBe('/crm/todo');
+});

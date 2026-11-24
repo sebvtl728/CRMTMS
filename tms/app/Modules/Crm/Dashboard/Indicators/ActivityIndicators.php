@@ -29,6 +29,8 @@ final class ActivityIndicators extends BaseIndicator
 {
     private const TZ = 'Europe/Paris';
 
+    private const MONTH_SUFFIX = '_month';
+
     /** @return list<self> */
     public static function all(): array
     {
@@ -36,9 +38,23 @@ final class ActivityIndicators extends BaseIndicator
             new self('crm.calls', Indicator::WEEK, 'Appels faits', 'Actions de type appel faites dans la période', Permissions::ACTIVITIES_VIEW),
             new self('crm.meetings', Indicator::WEEK, 'Rendez-vous fixés', 'Rendez-vous créés dans la période', Permissions::ACTIVITIES_VIEW),
             new self('crm.response_rate', Indicator::WEEK, 'Taux de réponse', 'Appels faits avec un résultat « joint » / appels faits', Permissions::ACTIVITIES_VIEW),
-            new self('crm.todo', Indicator::WEEK, 'Actions à faire', 'Actions non faites en retard ou prévues dans la période', Permissions::ACTIVITIES_VIEW),
-            new self('crm.meetings_done', Indicator::WEEK, 'Rendez-vous faits', 'Rendez-vous réalisés dans la période', Permissions::ACTIVITIES_VIEW),
-            new self('crm.follow_ups', Indicator::WEEK, 'Suivis à venir', 'Relances non faites (hors rendez-vous) prévues de demain à la fin de la période', Permissions::ACTIVITIES_VIEW),
+            ...self::actions(Indicator::WEEK, ''),
+            ...self::actions(Indicator::MONTH, self::MONTH_SUFFIX),
+        ];
+    }
+
+    /**
+     * Actions to do, meetings done and follow-ups to come, on a tab (the
+     * month copies carry a key suffix: one key per card in the registry).
+     *
+     * @return list<self>
+     */
+    private static function actions(string $tab, string $suffix): array
+    {
+        return [
+            new self('crm.todo'.$suffix, $tab, 'Actions à faire', 'Actions non faites en retard ou prévues dans la période', Permissions::ACTIVITIES_VIEW),
+            new self('crm.meetings_done'.$suffix, $tab, 'Rendez-vous faits', 'Rendez-vous réalisés dans la période', Permissions::ACTIVITIES_VIEW),
+            new self('crm.follow_ups'.$suffix, $tab, 'Suivis à venir', 'Relances non faites (hors rendez-vous) prévues de demain à la fin de la période', Permissions::ACTIVITIES_VIEW),
         ];
     }
 
@@ -50,7 +66,7 @@ final class ActivityIndicators extends BaseIndicator
 
         $open = fn () => TodoQuery::onLiveFiches(Sources::activities($f, $user))->whereNull('activities.done_at')->whereNotNull('activities.due_at');
 
-        return match ($this->key()) {
+        return match ($this->kind()) {
             'crm.todo' => new IndicatorValue($open()->where('activities.due_at', '<=', $f->end())->count(), IndicatorValue::COUNT),
             'crm.meetings_done' => new IndicatorValue(TodoQuery::onLiveFiches(Sources::activities($f, $user))->whereIn('activities.type_id', $types('meeting'))
                 ->whereBetween('activities.done_at', [$f->start(), $f->end()])->count(), IndicatorValue::COUNT),
@@ -65,7 +81,15 @@ final class ActivityIndicators extends BaseIndicator
 
     public function detailUrl(DashboardFilters $f): ?string
     {
-        return in_array($this->key(), ['crm.todo', 'crm.follow_ups'], true) ? '/crm/todo' : null;
+        return in_array($this->kind(), ['crm.todo', 'crm.follow_ups'], true) ? '/crm/todo' : null;
+    }
+
+    /** The key without the month suffix: the same card on both tabs. */
+    private function kind(): string
+    {
+        $key = $this->key();
+
+        return str_ends_with($key, self::MONTH_SUFFIX) ? substr($key, 0, -strlen(self::MONTH_SUFFIX)) : $key;
     }
 
     /** @param  Builder<Activity>  $calls */
