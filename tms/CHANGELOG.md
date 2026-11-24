@@ -9,7 +9,7 @@ Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) ; ve
 
 ### Ajouté
 
-- **Tableaux de bord** (onglet Mois / direction) : carte **Actions faites**, les actions réalisées dans la période, tous types confondus.
+- **Tableaux de bord** (onglet Mois / direction) : carte **Actions faites**, les actions réalisées dans la période, tous types confondus. « Voir le détail » de **Actions faites** et de **Rendez-vous faits** ouvre la liste de ces actions, avec les filtres du tableau de bord.
 
 ## [0.15.20] - 2026-11-24
 
