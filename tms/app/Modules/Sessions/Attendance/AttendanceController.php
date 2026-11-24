@@ -57,7 +57,7 @@ class AttendanceController extends Controller
             is_string($reason = $request->input('reason')) ? $reason : null,
         );
 
-        return self::json(AttendanceRows::grid($seance->refresh()));
+        return self::json(self::rows($request, $seance->refresh()));
     }
 
     public function allPresent(Request $request, Seance $seance): JsonResponse
@@ -65,7 +65,7 @@ class AttendanceController extends Controller
         self::authorizeSeance($request, $seance);
         $count = $this->attendances->allPresent($seance);
 
-        return self::json(['count' => $count, ...AttendanceRows::grid($seance->refresh())]);
+        return self::json(['count' => $count, ...self::rows($request, $seance->refresh())]);
     }
 
     public function clear(Request $request, Seance $seance, string $enrolmentId): JsonResponse
@@ -73,7 +73,18 @@ class AttendanceController extends Controller
         self::authorizeSeance($request, $seance);
         $this->attendances->clear($seance, $enrolmentId);
 
-        return self::json(AttendanceRows::grid($seance->refresh()));
+        return self::json(self::rows($request, $seance->refresh()));
+    }
+
+    /**
+     * The grid with the half-days of the day and their signatures: the dialog
+     * replaces what it shows by each answer, so the signatures stay in it.
+     *
+     * @return array<string, mixed>
+     */
+    private static function rows(Request $request, Seance $seance): array
+    {
+        return [...AttendanceRows::grid($seance), 'slots' => SlotRows::forSeance($seance, self::user($request))];
     }
 
     /**

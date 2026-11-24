@@ -5,6 +5,10 @@ Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) ; ve
 
 ## [Non publié]
 
+### Corrigé
+
+- **Présences d'une séance** : après « Tous présents » (ou une présence notée ou effacée), les demi-journées d'émargement et leurs signatures disparaissaient de la fenêtre jusqu'à sa réouverture. Rien n'était effacé : chaque réponse les renvoie maintenant.
+
 ## [0.15.17] - 2026-11-23
 
 ### Ajouté
