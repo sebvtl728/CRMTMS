@@ -5,6 +5,8 @@ Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) ; ve
 
 ## [Non publié]
 
+## [0.15.18] - 2026-11-24
+
 ### Corrigé
 
 - **Reste à financer par ligne ou par stagiaire** : un financement du dossier entier n'était pas compté dans le détail ; une ligne visée par un autre financement affichait encore « Reste à financer » alors que le dossier était soldé. Il couvre maintenant d'abord ce que rien ne vise, puis ce qui manque aux lignes et aux stagiaires détaillés.
