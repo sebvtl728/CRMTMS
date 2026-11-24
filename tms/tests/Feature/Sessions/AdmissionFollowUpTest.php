@@ -2,6 +2,8 @@
 
 use App\Modules\Core\Access\AccessScope;
 use App\Modules\Core\Tenancy\TenantStorage;
+use App\Modules\Crm\People\Person;
+use App\Modules\Sessions\Attendance\AttendanceClosure;
 use App\Modules\Sessions\Attendance\Attendances;
 use App\Modules\Sessions\Attendance\Signing\AttendanceSignature;
 use App\Modules\Sessions\Attendance\Signing\AttendanceSigning;
@@ -129,4 +131,75 @@ it('serves the drawing of a signature to an attendance manager only', function (
     $this->actingAs(l2User([Permissions::SESSIONS_VIEW => null]))->get($url)->assertForbidden();
     $this->actingAs(l2User([Permissions::ATTENDANCE_MANAGE => AccessScope::Own]))->get($url)->assertNotFound();
     $this->actingAs(atManager())->get('/sessions/signatures/'.$paulSignature->id.'x/dessin')->assertNotFound();
+});
+
+/** Léa expected on the 9th's morning (a séance, the half-day closed), without signing it. */
+function fuUnsignedHalfDay(TrainingSession $session): SignSlot
+{
+    plSeance(plModule($session), '2026-09-09', '09:00', '12:00');
+
+    return SignSlot::query()->create(['training_session_id' => $session->id, 'date' => '2026-09-09', 'half' => SignSlot::MORNING,
+        'status' => SignSlot::CLOSED, 'opened_at' => now()]);
+}
+
+it('offers the actions on the trainee to who manages the attendance', function () {
+    ['session' => $session, 'lea' => $lea] = fuSetUp();
+    fuUnsignedHalfDay($session);
+
+    $followUp = Admission::followUp($lea->dossier_id, $lea->person_id, atManager());
+
+    expect($followUp['enrolment_id'])->toBe($lea->id)
+        ->and($followUp['email'])->toBe(Person::query()->find($lea->person_id)?->email)
+        ->and(collect($followUp['seances'])->firstWhere('date', '2026-09-08')['can_record'])->toBeTrue()
+        // To come: nothing to note yet.
+        ->and(collect($followUp['seances'])->firstWhere('date', '2026-09-15')['can_record'])->toBeFalse();
+    $signatures = collect($followUp['signatures'])->keyBy('date');
+    expect($signatures['2026-09-08'])->toMatchArray(['can_confirm' => true, 'can_send_link' => false])
+        ->and($signatures['2026-09-09'])->toMatchArray(['signed' => false, 'can_confirm' => false, 'can_send_link' => true, 'catch_up_link' => null])
+        // On time: nothing to confirm.
+        ->and($signatures['2026-09-10'])->toMatchArray(['can_confirm' => false, 'can_send_link' => false]);
+});
+
+it('offers no action to who only closes the months, nor on a closed month', function () {
+    ['session' => $session, 'lea' => $lea] = fuSetUp();
+    fuUnsignedHalfDay($session);
+
+    $closer = l2User([Permissions::SESSIONS_VIEW => null, Permissions::ATTENDANCE_CLOSE => null]);
+    $followUp = Admission::followUp($lea->dossier_id, $lea->person_id, $closer);
+    expect($followUp['signatures'])->not->toBeEmpty()
+        ->and(collect($followUp['seances'])->pluck('can_record')->unique()->all())->toBe([false])
+        ->and(collect($followUp['signatures'])->pluck('can_confirm')->unique()->all())->toBe([false])
+        ->and(collect($followUp['signatures'])->pluck('can_send_link')->unique()->all())->toBe([false])
+        ->and($followUp)->not->toHaveKey('email');
+
+    (new AttendanceClosure)->forceFill(['training_session_id' => $session->id, 'month' => '2026-09-01', 'closed_at' => now()])->save();
+    $followUp = Admission::followUp($lea->dossier_id, $lea->person_id, atManager());
+    expect(collect($followUp['seances'])->pluck('can_record')->unique()->all())->toBe([false])
+        ->and(collect($followUp['signatures'])->pluck('can_confirm')->unique()->all())->toBe([false])
+        ->and(collect($followUp['signatures'])->pluck('can_send_link')->unique()->all())->toBe([false]);
+});
+
+it('acts through the endpoints of the session with the ids of the follow-up', function () {
+    ['session' => $session, 'lea' => $lea, 'paulSignature' => $paulSignature] = fuSetUp();
+    $slot = fuUnsignedHalfDay($session);
+    $manager = atManager();
+    $followUp = Admission::followUp($lea->dossier_id, $lea->person_id, $manager);
+    $seance = collect($followUp['seances'])->firstWhere('date', '2026-09-08');
+    $pending = collect($followUp['signatures'])->firstWhere('date', '2026-09-08');
+
+    $this->actingAs($manager)->postJson("/seances/{$seance['id']}/attendance", ['enrolment_id' => $lea->id, 'status' => 'partial', 'minutes' => 90])->assertOk();
+    $this->postJson("/sessions/rattrapages/{$pending['id']}/refuse", ['reason' => ''])->assertUnprocessable();
+    $this->postJson("/sessions/rattrapages/{$pending['id']}/confirm")->assertOk();
+    $this->postJson("/sessions/emargement/{$slot->id}/catch-up-links", ['enrolment_id' => $lea->id, 'email' => 'lea@example.test'])->assertOk();
+
+    $after = Admission::followUp($lea->dossier_id, $lea->person_id, $manager);
+    expect(collect($after['seances'])->firstWhere('date', '2026-09-08')['attendance'])->toMatchArray(['status' => 'partial', 'minutes' => 90])
+        ->and(collect($after['signatures'])->firstWhere('date', '2026-09-08'))->toMatchArray(['state' => 'confirmed', 'can_confirm' => false])
+        ->and(collect($after['signatures'])->firstWhere('date', '2026-09-09')['catch_up_link'])->not->toBeNull()
+        // An on-time signature (Paul's) is never a catch-up to confirm.
+        ->and($this->postJson("/sessions/rattrapages/{$paulSignature->id}/confirm")->status())->toBe(404);
+
+    // A closed month: the attendance is refused (409, French).
+    (new AttendanceClosure)->forceFill(['training_session_id' => $session->id, 'month' => '2026-09-01', 'closed_at' => now()])->save();
+    $this->postJson("/seances/{$seance['id']}/attendance", ['enrolment_id' => $lea->id, 'status' => 'present'])->assertStatus(409);
 });

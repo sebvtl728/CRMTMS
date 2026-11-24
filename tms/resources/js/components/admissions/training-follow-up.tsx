@@ -1,7 +1,13 @@
+import InputError from '@/components/input-error';
 import { Badge } from '@/components/ui/badge';
-import { formatDay } from '@/lib/crm';
+import { Button } from '@/components/ui/button';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { formatDateTime, formatDay } from '@/lib/crm';
 import { formatMinutes } from '@/lib/finance';
-import { Link } from '@inertiajs/react';
+import { sendJson } from '@/lib/sessions';
+import { Link, router } from '@inertiajs/react';
 import { Video } from 'lucide-react';
 import { useState } from 'react';
 
@@ -19,6 +25,8 @@ export interface FollowUpSeance {
     past: boolean;
     /** Absent without the attendance right; null: nothing entered yet. */
     attendance?: { status: string; label: string; minutes: number } | null;
+    /** « Noter la présence »: a manager of the attendance, a past séance of an open month. */
+    can_record?: boolean;
 }
 
 export interface FollowUpSignature {
@@ -33,6 +41,10 @@ export interface FollowUpSignature {
     kind: 'on_time' | 'catch_up_onsite' | 'catch_up_remote' | null;
     state: 'pending' | 'confirmed' | 'refused' | null;
     drawing_url: string | null;
+    /** The remote catch-up link last sent for this half-day (not revoked). */
+    catch_up_link: { sent_at: string | null; email_status: string | null; expires_at: string; used: boolean } | null;
+    can_confirm: boolean;
+    can_send_link: boolean;
 }
 
 export interface TrainingFollowUpProps {
@@ -40,7 +52,18 @@ export interface TrainingFollowUpProps {
     seances: FollowUpSeance[];
     hours?: { realised_minutes: number; planned_minutes: number };
     signatures?: FollowUpSignature[];
+    /** With the attendance right: the enrolment the actions write to. */
+    enrolment_id?: string;
+    /** For a manager of the attendance: the trainee's e-mail, to prefill the catch-up link. */
+    email?: string | null;
 }
+
+type Action =
+    | { kind: 'record'; seance: FollowUpSeance }
+    | { kind: 'refuse'; signature: FollowUpSignature }
+    | { kind: 'link'; signature: FollowUpSignature };
+
+const LINK_STATUS: Record<string, string> = { pending: 'envoi en cours', sent: 'envoyé', failed: "échec de l'envoi" };
 
 /** Séances to come shown before « Afficher toutes les séances à venir ». */
 const UPCOMING_LIMIT = 10;
@@ -79,6 +102,15 @@ export function TrainingFollowUp({ followUp }: { followUp: TrainingFollowUpProps
     // A long training holds hundreds of séances: the next ones only, unless asked.
     const shownUpcoming = showAllUpcoming ? upcoming : upcoming.slice(0, UPCOMING_LIMIT);
     const shown = showPast ? [...past, ...shownUpcoming] : shownUpcoming;
+    const [action, setAction] = useState<Action | null>(null);
+    const [notice, setNotice] = useState<string | null>(null);
+
+    const confirmCatchUp = async (signature: FollowUpSignature) => {
+        if (!signature.id || !confirm(`Confirmer le rattrapage du ${formatDay(signature.date)} (${signature.half_label.toLowerCase()}) ?`)) return;
+        const answer = await sendJson('POST', `/sessions/rattrapages/${signature.id}/confirm`);
+        setNotice(answer.ok ? 'Rattrapage confirmé.' : answer.message);
+        if (answer.ok) router.reload({ only: ['follow_up'] });
+    };
 
     return (
         <section aria-label="Suivi de formation" className="grid gap-4 rounded-xl border p-4">
@@ -178,6 +210,15 @@ export function TrainingFollowUp({ followUp }: { followUp: TrainingFollowUpProps
                                                 ) : (
                                                     <span className="text-muted-foreground">À venir</span>
                                                 )}
+                                                {s.can_record && (
+                                                    <button
+                                                        type="button"
+                                                        className="text-primary ml-2 text-xs hover:underline"
+                                                        onClick={() => setAction({ kind: 'record', seance: s })}
+                                                    >
+                                                        {s.attendance ? 'Modifier' : 'Noter la présence'}
+                                                    </button>
+                                                )}
                                             </td>
                                         )}
                                     </tr>
@@ -201,7 +242,10 @@ export function TrainingFollowUp({ followUp }: { followUp: TrainingFollowUpProps
                                         <th className="py-1 pr-3 font-normal">Demi-journée</th>
                                         <th className="py-1 pr-3 font-normal">Signé</th>
                                         <th className="py-1 pr-3 font-normal">Type</th>
-                                        <th className="py-1 font-normal">Signature</th>
+                                        <th className="py-1 pr-3 font-normal">Signature</th>
+                                        <th className="py-1 font-normal">
+                                            <span className="sr-only">Actions</span>
+                                        </th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -246,6 +290,44 @@ export function TrainingFollowUp({ followUp }: { followUp: TrainingFollowUpProps
                                                     <span className="text-muted-foreground">-</span>
                                                 )}
                                             </td>
+                                            <td className="py-1">
+                                                <div className="flex flex-wrap items-center gap-2">
+                                                    {s.can_confirm && (
+                                                        <>
+                                                            <Button type="button" size="sm" variant="outline" onClick={() => confirmCatchUp(s)}>
+                                                                Confirmer
+                                                            </Button>
+                                                            <Button
+                                                                type="button"
+                                                                size="sm"
+                                                                variant="ghost"
+                                                                onClick={() => setAction({ kind: 'refuse', signature: s })}
+                                                            >
+                                                                Refuser
+                                                            </Button>
+                                                        </>
+                                                    )}
+                                                    {!s.signed && s.catch_up_link && (
+                                                        <span className="text-muted-foreground text-xs">
+                                                            Lien{' '}
+                                                            {s.catch_up_link.used
+                                                                ? 'utilisé'
+                                                                : (LINK_STATUS[s.catch_up_link.email_status ?? ''] ?? 'envoyé')}{' '}
+                                                            le {formatDateTime(s.catch_up_link.sent_at)}
+                                                        </span>
+                                                    )}
+                                                    {s.can_send_link && (
+                                                        <Button
+                                                            type="button"
+                                                            size="sm"
+                                                            variant="outline"
+                                                            onClick={() => setAction({ kind: 'link', signature: s })}
+                                                        >
+                                                            {s.catch_up_link ? 'Renvoyer un lien' : 'Envoyer un lien de rattrapage'}
+                                                        </Button>
+                                                    )}
+                                                </div>
+                                            </td>
                                         </tr>
                                     ))}
                                 </tbody>
@@ -254,6 +336,153 @@ export function TrainingFollowUp({ followUp }: { followUp: TrainingFollowUpProps
                     )}
                 </div>
             )}
+
+            {notice && (
+                <p role="status" className="text-sm">
+                    {notice}
+                </p>
+            )}
+
+            {action && followUp.enrolment_id && (
+                <ActionDialog
+                    action={action}
+                    enrolmentId={followUp.enrolment_id}
+                    email={followUp.email ?? ''}
+                    onClose={() => setAction(null)}
+                    onDone={(message) => {
+                        setAction(null);
+                        setNotice(message);
+                        router.reload({ only: ['follow_up'] });
+                    }}
+                />
+            )}
         </section>
+    );
+}
+
+/** Notes the attendance of a séance, refuses a catch-up (reason required) or sends a remote catch-up link. */
+function ActionDialog({
+    action,
+    enrolmentId,
+    email: initialEmail,
+    onClose,
+    onDone,
+}: {
+    action: Action;
+    enrolmentId: string;
+    email: string;
+    onClose: () => void;
+    onDone: (message: string) => void;
+}) {
+    const [status, setStatus] = useState(action.kind === 'record' ? (action.seance.attendance?.status ?? 'present') : 'present');
+    const [minutes, setMinutes] = useState(
+        action.kind === 'record' && action.seance.attendance?.status === 'partial' ? String(action.seance.attendance.minutes) : '',
+    );
+    const [reason, setReason] = useState('');
+    const [email, setEmail] = useState(initialEmail);
+    const [errors, setErrors] = useState<Record<string, string>>({});
+    const [message, setMessage] = useState<string | null>(null);
+    const [busy, setBusy] = useState(false);
+
+    const submit = async () => {
+        setBusy(true);
+        const answer =
+            action.kind === 'record'
+                ? await sendJson('POST', `/seances/${action.seance.id}/attendance`, {
+                      enrolment_id: enrolmentId,
+                      status,
+                      minutes: status === 'partial' ? minutes : null,
+                  })
+                : action.kind === 'refuse'
+                  ? await sendJson('POST', `/sessions/rattrapages/${action.signature.id}/refuse`, { reason })
+                  : await sendJson('POST', `/sessions/emargement/${action.signature.slot_id}/catch-up-links`, { enrolment_id: enrolmentId, email });
+        setBusy(false);
+        if (answer.ok) {
+            onDone(
+                action.kind === 'record' ? 'Présence enregistrée.' : action.kind === 'refuse' ? 'Rattrapage refusé.' : 'Lien de rattrapage envoyé.',
+            );
+        } else {
+            setErrors(answer.errors);
+            setMessage(Object.keys(answer.errors).length > 0 ? null : answer.message);
+        }
+    };
+
+    const title =
+        action.kind === 'record' ? 'Noter la présence' : action.kind === 'refuse' ? 'Refuser le rattrapage' : 'Envoyer un lien de rattrapage';
+    const subject =
+        action.kind === 'record'
+            ? `Séance du ${formatDay(action.seance.date)}, ${action.seance.starts_at}–${action.seance.ends_at}`
+            : `${formatDay(action.signature.date)}, ${action.signature.half_label.toLowerCase()}`;
+
+    return (
+        <Dialog open onOpenChange={(open) => !open && onClose()}>
+            <DialogContent>
+                <DialogHeader>
+                    <DialogTitle>{title}</DialogTitle>
+                    <DialogDescription>{subject}</DialogDescription>
+                </DialogHeader>
+                <div className="grid gap-3">
+                    {action.kind === 'record' && (
+                        <>
+                            <fieldset className="grid gap-2">
+                                <legend className="sr-only">Présence</legend>
+                                {[
+                                    ['present', 'Présent'],
+                                    ['partial', 'Partiel'],
+                                    ['absent', 'Absent'],
+                                ].map(([value, label]) => (
+                                    <label key={value} className="flex items-center gap-2 text-sm">
+                                        <input
+                                            type="radio"
+                                            name="status"
+                                            value={value}
+                                            checked={status === value}
+                                            onChange={() => setStatus(value)}
+                                        />
+                                        {label}
+                                    </label>
+                                ))}
+                            </fieldset>
+                            {status === 'partial' && (
+                                <div className="grid gap-1">
+                                    <Label htmlFor="follow-up-minutes">Minutes de présence (sur {action.seance.duration_minutes})</Label>
+                                    <Input id="follow-up-minutes" inputMode="numeric" value={minutes} onChange={(e) => setMinutes(e.target.value)} />
+                                    <InputError message={errors.minutes} />
+                                </div>
+                            )}
+                            <InputError message={errors.status ?? errors.enrolment_id} />
+                        </>
+                    )}
+                    {action.kind === 'refuse' && (
+                        <div className="grid gap-1">
+                            <Label htmlFor="follow-up-reason">Motif (obligatoire)</Label>
+                            <Input id="follow-up-reason" value={reason} maxLength={300} onChange={(e) => setReason(e.target.value)} />
+                            <InputError message={errors.reason} />
+                        </div>
+                    )}
+                    {action.kind === 'link' && (
+                        <div className="grid gap-1">
+                            <Label htmlFor="follow-up-email">Adresse e-mail du stagiaire</Label>
+                            <Input id="follow-up-email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
+                            <p className="text-muted-foreground text-xs">Le lien est valable 7 jours, pour une seule signature.</p>
+                            <InputError message={errors.email ?? errors.enrolment_id} />
+                        </div>
+                    )}
+                    {message && (
+                        <p role="alert" className="text-destructive text-sm">
+                            {message}
+                        </p>
+                    )}
+                </div>
+                <DialogFooter>
+                    <Button type="button" variant="ghost" onClick={onClose}>
+                        Annuler
+                    </Button>
+                    <Button type="button" onClick={submit} disabled={busy}>
+                        {action.kind === 'record' ? 'Enregistrer' : action.kind === 'refuse' ? 'Refuser' : 'Envoyer'}
+                    </Button>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
     );
 }
