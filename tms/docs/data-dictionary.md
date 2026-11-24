@@ -175,6 +175,7 @@ Conventions communes : UUID v7, `tenant_id`, suppression logique (`deleted_at`) 
 | `merged_sources` | jsonb | Origine des champs fusionnés |
 | `search_vector` | text, générée | Nom, ville, SIRET sans accents ni majuscules ; index trigramme (recherche) |
 | `dup_email`, `dup_phone`, `dup_postal_code`, `dup_city` | text, générées | Clés de détection des doublons (e-mail en minuscules, téléphone en chiffres, code postal, ville sans accents) |
+| `naf_key` | text collation C, générée | Code NAF normalisé (sans point ni espace, majuscules) pour le filtre « Code APE » (comparé par intervalle : index utilisable sous RLS) |
 | `created_at`, `updated_at`, `deleted_at` | timestamp | |
 
 ### `organisation_types` — types d'une entreprise

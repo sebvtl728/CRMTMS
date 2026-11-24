@@ -48,6 +48,7 @@ Sur l'onglet **Informations** d'une entreprise ou d'une personne, le bloc **Form
 
 - Une formation **désactivée** dans le catalogue reste affichée (grisée, « inactive ») sur les fiches qui l'avaient ; elle ne peut plus être ajoutée ailleurs. Une formation d'intérêt d'une fiche ne peut pas être supprimée du catalogue (seulement désactivée).
 - **Nouvelle opportunité** depuis la fiche : ses formations d'intérêt actives sont proposées dans les **Formations** de l'opportunité (quantité 1), à garder, retirer ou compléter avant d'enregistrer.
+- La liste **Entreprises** a un filtre **Code APE (NAF)** pour cibler un secteur : un code complet (« 5610A ») ou son début pour toute une famille (« 56 » : restauration, « 56.10 » : restaurants) ; le point, les espaces et la casse ne comptent pas (« 56.10a » = « 5610A »), une saisie qui ne peut pas être un début de code est ignorée. Il se combine aux autres filtres, s'enregistre dans un filtre et s'applique à l'export.
 - Les listes **Entreprises** et **Interlocuteurs** ont un filtre **Formation d'intérêt** (enregistrable dans un filtre) et une colonne d'export **Formations d'intérêt** (intitulés séparés par « ; »).
 - Chaque changement apparaît dans l'**Historique** de la fiche : « Formations d'intérêt modifiées ».
 - Une fiche dans la corbeille ne se modifie pas : restaurez-la d'abord.

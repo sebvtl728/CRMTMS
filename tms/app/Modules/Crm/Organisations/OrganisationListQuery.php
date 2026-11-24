@@ -20,16 +20,17 @@ final class OrganisationListQuery
     public const SORTS = ['name', 'city', 'last_contact_at', 'created_at'];
 
     /** Filters a saved filter may hold (trashed is a view, never saved). */
-    public const SAVABLE = ['q', 'status', 'das', 'type', 'sector', 'responsible', 'origin', 'training', 'mine', 'sort', 'dir'];
+    public const SAVABLE = ['q', 'ape', 'status', 'das', 'type', 'sector', 'responsible', 'origin', 'training', 'mine', 'sort', 'dir'];
 
     /**
      * @param  array<array-key, mixed>  $input  query string or saved filter
-     * @return array{q: string, status: ?string, das: ?string, type: ?string, sector: ?string, responsible: ?string, origin: ?string, training: ?string, mine: bool, trashed: bool, sort: string, dir: string}
+     * @return array{q: string, ape: ?string, status: ?string, das: ?string, type: ?string, sector: ?string, responsible: ?string, origin: ?string, training: ?string, mine: bool, trashed: bool, sort: string, dir: string}
      */
     public static function filters(array $input, User $user): array
     {
         return [
             'q' => FilterInput::text($input['q'] ?? null),
+            'ape' => self::ape($input['ape'] ?? null),
             'status' => FilterInput::oneOf($input['status'] ?? null, array_column(OrganisationStatus::cases(), 'value')),
             'das' => FilterInput::id($input['das'] ?? null),
             'type' => FilterInput::id($input['type'] ?? null),
@@ -53,6 +54,7 @@ final class OrganisationListQuery
     {
         return [
             'q' => ['string', 'max:100'],
+            'ape' => ['string', 'max:10'],
             'status' => [Rule::in(array_column(OrganisationStatus::cases(), 'value'))],
             'das' => ['uuid'],
             'type' => ['uuid'],
@@ -67,7 +69,7 @@ final class OrganisationListQuery
     }
 
     /**
-     * @param  array{q: string, status: ?string, das: ?string, type: ?string, sector: ?string, responsible: ?string, origin: ?string, training: ?string, mine: bool, trashed: bool, sort: string, dir: string}  $filters
+     * @param  array{q: string, ape: ?string, status: ?string, das: ?string, type: ?string, sector: ?string, responsible: ?string, origin: ?string, training: ?string, mine: bool, trashed: bool, sort: string, dir: string}  $filters
      * @return Builder<Organisation>
      */
     public static function build(array $filters, User $user): Builder
@@ -75,6 +77,7 @@ final class OrganisationListQuery
         $query = CrmVisibility::organisations(Organisation::query(), $user)
             ->when($filters['trashed'], fn (Builder $q) => $q->onlyTrashed()->whereNull('merged_into_id'))
             ->when($filters['q'] !== '', fn (Builder $q) => $q->search($filters['q']))
+            ->when($filters['ape'], fn (Builder $q, string $v) => self::whereApe($q, $v))
             ->when($filters['status'], fn (Builder $q, string $v) => $q->where('status', $v))
             ->when($filters['sector'], fn (Builder $q, string $v) => $q->where('sector_id', $v))
             ->when($filters['origin'], fn (Builder $q, string $v) => $q->where('origin_id', $v))
@@ -91,5 +94,35 @@ final class OrganisationListQuery
         }
 
         return $query->orderBy('name')->orderBy('id');
+    }
+
+    /**
+     * APE (NAF) code or family typed by the user, normalised like the stored
+     * key: « 56.10a » → « 5610A », « 56 » → « 56 ». Anything that cannot be the
+     * start of a code (« restaurant », « 5610AB ») is « no filter ».
+     */
+    public static function ape(mixed $value): ?string
+    {
+        if (! is_string($value)) {
+            return null;
+        }
+        $code = mb_strtoupper(str_replace(['.', ' '], '', $value));
+
+        return preg_match('/^(\d{1,4}|\d{4}[A-Z])$/', $code) === 1 ? $code : null;
+    }
+
+    /**
+     * Prefix match on the generated `naf_key` (collation C) written as a range
+     * (key ≥ « 56 » and key < « 57 »): LIKE and upper() are not leakproof and
+     * would keep the index out of reach under row-level security.
+     *
+     * @param  Builder<Organisation>  $query
+     * @return Builder<Organisation>
+     */
+    private static function whereApe(Builder $query, string $code): Builder
+    {
+        $next = substr($code, 0, -1).chr(ord($code[strlen($code) - 1]) + 1);
+
+        return $query->where('organisations.naf_key', '>=', $code)->where('organisations.naf_key', '<', $next);
     }
 }
