@@ -512,7 +512,9 @@ final class DossierFromQuote
      * (meta.funding_type_id of « Modes de financement »: OPCO → OPCO), else
      * the one flagged for his kind (meta.default_for organisation|person of
      * « Types de financeur », first by position): none, or a free dossier, no
-     * initial funding.
+     * initial funding. A type paid by the OPCO (meta.opco) goes to the OPCO
+     * of the contractant's collective agreement (Fiches::opcoFor, a fiche
+     * only), else to the contractant.
      */
     private function fund(Dossier $dossier, AcceptedQuoteData $quote): void
     {
@@ -528,8 +530,13 @@ final class DossierFromQuote
         if ($total <= 0 || ! is_string($type)) {
             return;
         }
+        // A type paid by the OPCO (meta.opco): the OPCO of the contractant's collective agreement when its fiche is known.
+        $funder = $organisation ? $quote->account['id'] : null;
+        if ($organisation && (ReferenceItem::query()->whereKey($type)->first()?->meta['opco'] ?? false) === true) {
+            $funder = $this->fiches->opcoFor($quote->account['id'])['id'] ?? $funder;
+        }
         $this->fundings->create($dossier, [
-            'funder_organisation_id' => $organisation ? $quote->account['id'] : null,
+            'funder_organisation_id' => $funder,
             'funder_person_id' => $organisation ? null : $quote->account['id'],
             'funding_type_id' => $type,
             'target' => 'dossier',

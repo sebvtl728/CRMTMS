@@ -519,3 +519,30 @@ it('funds the dossier with the funding type linked to the funding mode of the qu
     expect(Dossier::query()->where('quote_id', $third->id)->sole()->fundings()->sole()->funding_type_id)
         ->toBe(crmItem(ReferenceList::FundingType, 'Entreprise')->id);
 });
+
+it('gives an OPCO funding to the OPCO of the contractant\'s collective agreement when its fiche is known', function () {
+    $admin = admin(true);
+    $akto = Organisation::query()->create(['name' => 'AKTO', 'covered_idcc' => ['1979']]);
+    $org = Organisation::query()->create(['name' => 'Hôtel du Parc', 'idcc' => '1979']);
+    $quote = dfqQuote($org);
+    $quote->forceFill(['funding_mode_id' => crmItem(ReferenceList::FundingMode, 'OPCO')->id])->save();
+
+    $this->actingAs($admin)->postJson(route('dossiers.from-quote.store', $quote->id), ['lines' => [[], [], []]])->assertCreated();
+    $funding = Funding::query()->sole();
+    expect($funding->funding_type_id)->toBe(crmItem(ReferenceList::FundingType, 'OPCO')->id)
+        ->and($funding->funder_organisation_id)->toBe($akto->id)
+        ->and($funding->pays_directly)->toBeFalse();
+
+    // Without IDCC (or no OPCO fiche): the contractant, as before.
+    $other = Organisation::query()->create(['name' => 'Le Bistrot']);
+    $second = dfqQuote($other);
+    $second->forceFill(['funding_mode_id' => crmItem(ReferenceList::FundingMode, 'OPCO')->id])->save();
+    $this->postJson(route('dossiers.from-quote.store', $second->id), ['lines' => [[], [], []]])->assertCreated();
+    expect(Dossier::query()->where('quote_id', $second->id)->sole()->fundings()->sole()->funder_organisation_id)->toBe($other->id);
+
+    // A funding type not flagged « OPCO de la convention » keeps the contractant.
+    $third = dfqQuote(Organisation::query()->create(['name' => 'Auberge', 'idcc' => '1979']));
+    $third->forceFill(['funding_mode_id' => crmItem(ReferenceList::FundingMode, 'Région')->id])->save();
+    $this->postJson(route('dossiers.from-quote.store', $third->id), ['lines' => [[], [], []]])->assertCreated();
+    expect(Dossier::query()->where('quote_id', $third->id)->sole()->fundings()->sole()->funder_organisation_id)->not->toBe($akto->id);
+});

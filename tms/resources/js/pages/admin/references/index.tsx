@@ -23,6 +23,7 @@ type ReferenceMeta = {
     default_for?: 'organisation' | 'person' | null;
     external_billing?: boolean;
     funding_type_id?: string | null;
+    opco?: boolean;
     client?: boolean;
 };
 
@@ -54,6 +55,7 @@ interface ReferenceListData {
     has_default_for: boolean;
     has_external_billing: boolean;
     has_funding_type: boolean;
+    has_opco: boolean;
     has_client: boolean;
     items: ReferenceItem[];
 }
@@ -75,6 +77,7 @@ interface EditorState {
     defaultFor: string; // '' = none
     externalBilling: boolean;
     fundingType: string; // '' = none
+    opco: boolean;
     client: boolean;
 }
 
@@ -122,6 +125,7 @@ export default function ReferencesIndex({ lists }: ReferencesIndexProps) {
             defaultFor: item?.meta.default_for ?? '',
             externalBilling: item?.meta.external_billing === true,
             fundingType: item?.meta.funding_type_id ?? '',
+            opco: item?.meta.opco === true,
             client: item?.meta.client === true,
         });
 
@@ -139,6 +143,7 @@ export default function ReferencesIndex({ lists }: ReferencesIndexProps) {
         if (list.has_reached) meta.reached = editor.reached;
         if (list.has_default_for) meta.default_for = editor.defaultFor === '' ? null : (editor.defaultFor as 'organisation' | 'person');
         if (list.has_external_billing) meta.external_billing = editor.externalBilling;
+        if (list.has_opco) meta.opco = editor.opco;
         if (list.has_funding_type) meta.funding_type_id = editor.fundingType === '' ? null : editor.fundingType;
         if (list.has_client) meta.client = editor.client;
         const payload = { label: editor.label, meta };
@@ -258,6 +263,7 @@ export default function ReferencesIndex({ lists }: ReferencesIndexProps) {
                                     <Badge variant="outline">Par défaut : {DEFAULT_FOR[item.meta.default_for]}</Badge>
                                 )}
                                 {list.has_external_billing && item.meta.external_billing && <Badge variant="outline">Facturé hors du TMS</Badge>}
+                                {list.has_opco && item.meta.opco && <Badge variant="outline">OPCO de la convention</Badge>}
                                 {list.has_funding_type && fundingTypeLabel(item.meta.funding_type_id) && (
                                     <Badge variant="outline">Dossier : {fundingTypeLabel(item.meta.funding_type_id)}</Badge>
                                 )}
@@ -496,6 +502,24 @@ export default function ReferencesIndex({ lists }: ReferencesIndexProps) {
                                     sous-traitant ne le montre pas.
                                 </p>
                                 <InputError message={errors['meta.client']} />
+                            </div>
+                        )}
+
+                        {list.has_opco && (
+                            <div className="grid gap-1">
+                                <label className="flex items-center gap-2 text-sm">
+                                    <input
+                                        type="checkbox"
+                                        checked={editor?.opco ?? false}
+                                        onChange={(e) => setEditor((s) => s && { ...s, opco: e.target.checked })}
+                                    />
+                                    Payé par l'OPCO de la convention collective
+                                </label>
+                                <p className="text-muted-foreground text-xs">
+                                    Le dossier créé depuis un devis donne ce financement à l'OPCO de la convention collective (IDCC) de l'entreprise
+                                    contractante, quand sa fiche existe ; sinon à l'entreprise.
+                                </p>
+                                <InputError message={errors['meta.opco']} />
                             </div>
                         )}
 

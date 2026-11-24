@@ -7,7 +7,18 @@ Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) ; ve
 
 ### Ajouté
 
-- **Tableaux de bord › Semaine** : trois cartes d'actions. **Actions à faire** (non faites, en retard ou prévues dans la période), **Rendez-vous faits** (rendez-vous réalisés dans la période) et **Suivis à venir** (relances non faites hors rendez-vous, prévues de demain à la fin de la période) ; « Voir le détail » ouvre Mes actions commerciales pour les actions et les suivis.
+- **Tableaux de bord** (onglets Semaine et Mois / direction) : trois cartes d'actions. **Actions à faire** (non faites, en retard ou prévues dans la période), **Rendez-vous faits** (rendez-vous réalisés dans la période) et **Suivis à venir** (relances non faites hors rendez-vous, prévues de demain à la fin de la période) ; « Voir le détail » ouvre Mes actions commerciales pour les actions et les suivis.
+
+## [0.15.18] - 2026-11-24
+
+### Corrigé
+
+- **Reste à financer par ligne ou par stagiaire** : un financement du dossier entier n'était pas compté dans le détail ; une ligne visée par un autre financement affichait encore « Reste à financer » alors que le dossier était soldé. Il couvre maintenant d'abord ce que rien ne vise, puis ce qui manque aux lignes et aux stagiaires détaillés.
+
+### Ajouté
+
+- **Financements d'un dossier** : sous « Reste à financer », la part **Accordé** et la part **En attente d'accord** (« À demander », « Demandé »). Un financement de départ « À demander » couvrait tout le prix et affichait « Reste à financer : 0,00 € » sans rien dire de l'accord.
+- **Financement OPCO** d'un dossier créé depuis un devis : le financeur est l'OPCO de la convention collective (IDCC) de l'entreprise quand sa fiche existe, sinon l'entreprise. Référentiel *Types de financeur* : case **Payé par l'OPCO de la convention collective**, cochée à la mise à jour sur « OPCO ».
 
 ## [0.15.17] - 2026-11-23
 
