@@ -31,6 +31,7 @@ interface Row {
 
 interface Filters {
     q: string;
+    ape: string | null;
     status: string | null;
     das: string | null;
     type: string | null;
@@ -59,13 +60,16 @@ const breadcrumbs: BreadcrumbItem[] = [{ title: 'Entreprises', href: '/crm/organ
 
 export default function OrganisationsIndex({ organisations, filters, options, can, savedFilters, activeSavedId, columns }: IndexProps) {
     const [search, setSearch] = useState(filters.q);
+    const [ape, setApe] = useState(filters.ape ?? '');
     const first = useRef(true);
+    const firstApe = useRef(true);
     const [selected, setSelected] = useListColumns('organisations', columns, savedFilters, activeSavedId);
 
     const visit = (changes: Partial<Filters>) => {
         const next = { ...filters, ...changes };
         const query: Record<string, string> = {};
         if (next.q) query.q = next.q;
+        if (next.ape) query.ape = next.ape;
         (['status', 'das', 'type', 'sector', 'responsible', 'origin', 'training'] as const).forEach((k) => {
             if (next[k]) query[k] = String(next[k]);
         });
@@ -90,10 +94,22 @@ export default function OrganisationsIndex({ organisations, filters, options, ca
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [search]);
 
+    // Debounced APE code (normalised by the server: « 56.10a » → « 5610A »).
+    useEffect(() => {
+        if (firstApe.current) {
+            firstApe.current = false;
+            return;
+        }
+        const timer = setTimeout(() => visit({ ape: ape.trim() || null }), 300);
+        return () => clearTimeout(timer);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [ape]);
+
     const sortBy = (column: string) => visit({ sort: column, dir: filters.sort === column && filters.dir === 'asc' ? 'desc' : 'asc' });
 
     const filtered = Boolean(
         filters.q ||
+            filters.ape ||
             filters.status ||
             filters.das ||
             filters.type ||
@@ -167,6 +183,19 @@ export default function OrganisationsIndex({ organisations, filters, options, ca
                         onChange={(v) => visit({ responsible: v })}
                     />
                     <FilterSelect label="Origine" value={filters.origin} options={options.origin} onChange={(v) => visit({ origin: v })} />
+                    <div className="grid gap-1">
+                        <Label htmlFor="ape" className="text-xs">
+                            Code APE (NAF)
+                        </Label>
+                        <Input
+                            id="ape"
+                            type="search"
+                            value={ape}
+                            onChange={(e) => setApe(e.target.value)}
+                            placeholder="Ex. 5610A, ou 56 pour la famille"
+                            maxLength={10}
+                        />
+                    </div>
                     <FilterSelect
                         label="Formation d'intérêt"
                         value={filters.training}

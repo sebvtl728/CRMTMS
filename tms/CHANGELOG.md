@@ -5,6 +5,12 @@ Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) ; ve
 
 ## [Non publié]
 
+## [0.15.22] - 2026-11-24
+
+### Ajouté
+
+- **Entreprises** : filtre **Code APE (NAF)** dans la liste, pour cibler un secteur : code complet (« 5610A ») ou début de code pour toute une famille (« 56 », « 56.10 ») ; point, espaces et casse indifférents. Se combine aux autres filtres, s'enregistre dans un filtre et s'applique à l'export.
+
 ## [0.15.21] - 2026-11-24
 
 ### Ajouté

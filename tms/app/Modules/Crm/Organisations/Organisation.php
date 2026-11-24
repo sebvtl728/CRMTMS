@@ -68,14 +68,14 @@ class Organisation extends Model
      *
      * @var list<string>
      */
-    protected array $auditIgnore = ['search_vector', 'created_by', 'updated_by', 'last_contact_at', 'merged_sources', 'dup_email', 'dup_phone', 'dup_postal_code', 'dup_city'];
+    protected array $auditIgnore = ['search_vector', 'created_by', 'updated_by', 'last_contact_at', 'merged_sources', 'dup_email', 'dup_phone', 'dup_postal_code', 'dup_city', 'naf_key'];
 
     /**
      * Generated comparison keys of the duplicate detection (never shown).
      *
      * @var list<string>
      */
-    protected $hidden = ['search_vector', 'dup_email', 'dup_phone', 'dup_postal_code', 'dup_city'];
+    protected $hidden = ['search_vector', 'dup_email', 'dup_phone', 'dup_postal_code', 'dup_city', 'naf_key'];
 
     /** @var list<string> */
     protected $fillable = [
