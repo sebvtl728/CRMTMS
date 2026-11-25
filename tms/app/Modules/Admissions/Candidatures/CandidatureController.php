@@ -4,8 +4,8 @@ namespace App\Modules\Admissions\Candidatures;
 
 use App\Http\Controllers\Controller;
 use App\Modules\Admissions\AdmissionsVisibility;
-use App\Modules\Admissions\Booklet\BookletAccess;
 use App\Modules\Admissions\Alternance\ContractType;
+use App\Modules\Admissions\Booklet\BookletAccess;
 use App\Modules\Admissions\CustomFields\CustomFieldValues;
 use App\Modules\Admissions\History\CandidatureHistory;
 use App\Modules\Admissions\OnlineTests\OnlineReview;

@@ -446,6 +446,11 @@ Réglages dans `tenants.settings.admissions.booklet`.
     *N* jours (7 par défaut, de 0 à 30 ; 0 = désactivé). Une session confirmée plus tard reçoit ses convocations le
     lendemain matin ; la veille du début, plus rien ne part. Une convocation déjà émise, envoyée à la main ou
     **annulée** n'est jamais refaite ; un stagiaire sans e-mail reçoit une convocation émise mais non envoyée.
+  - **Livret d'apprentissage** (désactivé par défaut) : le 1er du mois, ou les jours suivants s'il n'a pas pu partir,
+    le lien du mois écoulé à chaque apprenti dont le contrat couvre ce mois (sauf page déjà signée, en ligne ou sur
+    papier, ou lien ouvert) ; le lien du tuteur suit la signature de l'apprenti. Rappel à 7 puis 14 jours du premier
+    lien à qui n'a pas signé, avec un nouveau lien (l'ancien est fermé). Jamais deux fois le même envoi ; un apprenti
+    sans e-mail est retenté les jours suivants.
   - **Rappel la veille** (activé par défaut) : un e-mail à chaque stagiaire attendu et à chaque formateur des séances
     du lendemain (horaires, module, lieu ; jamais de prix ni la liste des autres stagiaires). Sessions confirmées
     seulement.

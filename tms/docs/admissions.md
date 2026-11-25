@@ -104,6 +104,8 @@ Menu **Formation › Livrets d'apprentissage** (droit « Suivre le livret d'appr
 - **Grille de compétences** : A / ECA / NA par savoir-faire, colonne **centre** ; la colonne entreprise est remplie par le tuteur. Une évaluation d'un savoir-faire retiré de la formation est gardée mais n'apparaît plus (un message les compte).
 - **Visites en entreprise** : date et points abordés ; les émargements de la visite restent sur le PDF.
 
+**Automatique** (Administration › Automatismes, « Livret d'apprentissage », désactivé par défaut) : le lien du mois écoulé part seul le 1er du mois, avec des rappels à 7 et 14 jours (`admin.md` § 23). « À traiter » compte les livrets dont une page d'un mois fini depuis plus de 30 jours n'est pas visée. Mesures Qualiopi 11 et 28 : `qualite.md`.
+
 **Par le lien** (sans compte) : l'apprenti décrit ses travaux semaine par semaine (pages entreprise et centre) ; le tuteur lit les travaux de la page entreprise, écrit ses observations et coche la grille côté entreprise. Tout s'enregistre au fur et à mesure. Pour signer : **Recevoir mon code** (6 chiffres par e-mail, 10 minutes, 5 essais), dessin de la signature, **Signer**. Une signature ferme le lien. Le tuteur ne voit ni la page centre ni la candidature. Le représentant légal signe toujours à la main sur le PDF. Modèles d'e-mails : « Livret d'apprentissage : suivi du mois (apprenti / tuteur) » et « code de signature ».
 
 **Modules dispensés** : sous le bouton, cochez les modules dont l'apprenti est dispensé, puis **Enregistrer les dispenses** (droit « Modifier les candidatures »).

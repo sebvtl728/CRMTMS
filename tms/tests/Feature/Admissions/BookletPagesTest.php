@@ -1,5 +1,6 @@
 <?php
 
+use App\Modules\Admissions\Permissions;
 use App\Modules\Core\Access\Role;
 use App\Modules\Core\Companies\Company;
 use Carbon\CarbonImmutable;
@@ -60,6 +61,6 @@ it('offers « Suivi du livret » on the candidature to whoever follows the bookl
 
     $this->actingAs(admin(twoFactor: true))->get("/admissions/candidatures/{$c->id}")
         ->assertInertia(fn (Assert $page) => $page->where('can.booklet', true));
-    $this->actingAs(adUser([App\Modules\Admissions\Permissions::CANDIDATURES_VIEW => null]))->get("/admissions/candidatures/{$c->id}")
+    $this->actingAs(adUser([Permissions::CANDIDATURES_VIEW => null]))->get("/admissions/candidatures/{$c->id}")
         ->assertInertia(fn (Assert $page) => $page->where('can.booklet', false));
 });

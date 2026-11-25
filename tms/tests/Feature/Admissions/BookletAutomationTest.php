@@ -8,6 +8,7 @@ use App\Modules\Core\Automation\AutomationSettings;
 use App\Modules\Core\Companies\Company;
 use App\Modules\Crm\People\Person;
 use Carbon\CarbonImmutable;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Queue;
 
 require_once __DIR__.'/Support/admissions.php';
@@ -16,7 +17,7 @@ require_once __DIR__.'/Support/booklet.php';
 beforeEach(function () {
     adSetUp();
     Company::factory()->default()->create();
-    Illuminate\Support\Facades\Http::fake(); // the alternance convention issued with the dossier
+    Http::fake(); // the alternance convention issued with the dossier
     $this->c = bookletApprentice(); // contract 04/01/2027 – 31/03/2027
     Person::query()->whereKey($this->c->person_id)->update(['email' => 'lea.durand@example.test']);
     AutomationSettings::save(['booklet' => true]);
