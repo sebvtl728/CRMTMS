@@ -239,7 +239,9 @@ class DocumentIssuer
         if ($type === DocumentType::Contract && $contractor !== 'person') {
             throw new UserFacingHttpException(409, self::CONTRACT_FOR_INDIVIDUAL);
         }
-        $living = Document::query()->where('dossier_id', $dossier['id'])->where('type', $type->value)
+        // One living convention of an alternance dossier, whatever its type (the contract type may have changed).
+        $types = $type->isAlternance() ? [DocumentType::ApprenticeshipConvention->value, DocumentType::ProfessionalisationConvention->value] : [$type->value];
+        $living = Document::query()->where('dossier_id', $dossier['id'])->whereIn('type', $types)
             ->where('status', '!=', DocumentStatus::Cancelled->value)->exists();
         if ($living) {
             throw new UserFacingHttpException(409, $type->forCompany()

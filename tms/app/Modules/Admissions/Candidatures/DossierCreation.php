@@ -98,7 +98,7 @@ final class DossierCreation
             'uuid' => 'Valeur inconnue.',
         ])->validate();
 
-        return DB::transaction(function () use ($candidature, $values): string {
+        return DB::transaction(function () use ($candidature, $values, $by): string {
             /** @var Candidature $locked */
             $locked = Candidature::query()->lockForUpdate()->findOrFail($candidature->getKey());
             if ($locked->status !== CandidatureStatus::Admitted) {
@@ -128,7 +128,7 @@ final class DossierCreation
                     'funding_type_id' => $values['funding']['funding_type_id'],
                     'amount' => str_replace([' ', ','], ['', '.'], $values['funding']['amount']),
                 ],
-            ]);
+            ], $by);
             $locked->forceFill(['dossier_id' => $dossierId])->save();
             $candidature->setRawAttributes($locked->getAttributes(), true);
 

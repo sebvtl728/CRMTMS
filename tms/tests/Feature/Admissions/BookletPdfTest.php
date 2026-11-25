@@ -41,6 +41,7 @@ beforeEach(function () {
 it('prints the booklet already filled: partners, pathway, planning, monthly pages and grids', function () {
     BookletSettings::save(['team' => [['role' => 'Responsable de formation', 'name' => 'Franck Gardie-Rondeau', 'phone' => null, 'email' => null]], 'director_note' => 'Fabrice Robert, directeur général']);
     $c = bookletApprentice();
+    $this->html = []; // the alternance convention issued with the dossier is not the booklet
 
     $response = $this->actingAs(admin(twoFactor: true))->get("/admissions/candidatures/{$c->id}/livret.pdf")->assertOk();
 
@@ -68,6 +69,7 @@ it('merges the annexes of the organisme after the pathway and before the monthly
     $this->actingAs(admin(twoFactor: true));
     BookletSettings::addAnnex('Règlement intérieur', UploadedFile::fake()->createWithContent('r.pdf', "%PDF-1.4\nannexe"));
     $c = bookletApprentice();
+    $this->html = []; // the alternance convention issued with the dossier is not the booklet
 
     $this->get("/admissions/candidatures/{$c->id}/livret.pdf")->assertOk()->assertContent('%PDF-1.7 livret complet');
     expect($this->merged)->toBe(1)->and($this->html)->toHaveCount(2)
@@ -85,6 +87,7 @@ it('needs a contract and the right to see the candidature', function () {
 it('prints what was typed: weeks, observations, visa, marks and visits', function () {
     CarbonImmutable::setTestNow(CarbonImmutable::parse('2027-02-15 10:00', 'Europe/Paris'));
     $c = bookletApprentice();
+    $this->html = []; // the alternance convention issued with the dossier is not the booklet
     $trainer = bookletTrainerUser('Cauret');
     $page = BookletMonths::page($c, '2027-01', 'company');
     $page->forceFill(['apprentice_entries' => ['w1' => 'Mise en place du buffet'], 'observations' => ['w1' => 'Très investie']])->save();
@@ -108,6 +111,7 @@ it('prints what was typed: weeks, observations, visa, marks and visits', functio
 it('prints the drawing and the time of an online signature, or « Signé sur papier »', function () {
     CarbonImmutable::setTestNow(CarbonImmutable::parse('2027-02-15 10:00', 'Europe/Paris'));
     $c = bookletApprentice();
+    $this->html = []; // the alternance convention issued with the dossier is not the booklet
     $path = TenantStorage::path('booklet_signatures', 'test.png');
     Storage::disk(TenantStorage::DISK)->put($path, base64_decode('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg=='));
     BookletMonths::page($c, '2027-01', 'company')->forceFill([

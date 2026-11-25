@@ -10,6 +10,7 @@ use App\Modules\Core\Users\User;
 use App\Modules\Crm\Public\FicheLinks;
 use App\Modules\Documents\Automation\CertificateAutomation;
 use App\Modules\Documents\Automation\ConventionAutomation;
+use App\Modules\Documents\AlternanceConventions;
 use App\Modules\Documents\Automation\ConvocationAutomation;
 use App\Modules\Documents\Gdpr\DocumentAnonymisation;
 use App\Modules\Documents\Texts\DocumentText;
@@ -48,6 +49,10 @@ class DocumentsServiceProvider extends ServiceProvider
         DailyAutomations::register('certificates', fn (CarbonImmutable $today): int => app(CertificateAutomation::class)->run($today));
         DossierHooks::onCreatedFromQuote('documents.convention', function (string $dossierId, User $by): void {
             app(ConventionAutomation::class)->forDossier($dossierId, $by);
+        });
+        // The dossier of an alternance candidate: its convention d'apprentissage / de professionnalisation, issued at once.
+        DossierHooks::onCreatedFromCandidature('documents.alternance_convention', function (string $dossierId, User $by): void {
+            app(AlternanceConventions::class)->issueForDossier($dossierId, $by);
         });
         DocumentMailTemplates::register();
         Event::listen(SignatureCompleted::class, fn (SignatureCompleted $e) => DocumentSignatures::completed($e, app(Paperwork::class)));

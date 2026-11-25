@@ -43,7 +43,8 @@ it('issues the apprenticeship convention of an alternance dossier with its contr
     alternanceGotenberg($this);
     $c = bookletApprentice();
 
-    $document = app(App\Modules\Documents\DocumentIssuer::class)->issue(admin(), App\Modules\Documents\Texts\DocumentType::ApprenticeshipConvention, $c->dossier_id);
+    // Issued at the creation of the dossier.
+    $document = App\Modules\Documents\Document::query()->where('dossier_id', $c->dossier_id)->sole();
 
     expect($document->type)->toBe('apprenticeship_convention')
         ->and($document->recipient_snapshot['name'])->toBe('Hôtel du Parc');
@@ -68,6 +69,11 @@ it('offers the professionalisation text for a professionalisation contract', fun
     alternanceGotenberg($this);
     $c = bookletApprentice();
     App\Modules\Admissions\Alternance\AlternanceContract::query()->where('candidature_id', $c->id)->update(['contract_type' => 'professionalisation']);
+    $issuer = app(App\Modules\Documents\DocumentIssuer::class);
+    $first = App\Modules\Documents\Document::query()->where('dossier_id', $c->dossier_id)->sole();
+    expect(fn () => $issuer->issue(admin(), App\Modules\Documents\Texts\DocumentType::ProfessionalisationConvention, $c->dossier_id))
+        ->toThrow(App\Exceptions\UserFacingHttpException::class, 'Une convention est déjà émise');
+    $issuer->cancel(admin(), $first, 'Contrat de professionnalisation');
 
     app(App\Modules\Documents\DocumentIssuer::class)->issue(admin(), App\Modules\Documents\Texts\DocumentType::ProfessionalisationConvention, $c->dossier_id);
     expect(end($this->html))->toContain('Convention de formation – professionnalisation')->toContain('contrat de professionnalisation')
@@ -78,4 +84,21 @@ it('lists the two alternance conventions in the document templates', function ()
     $this->actingAs(admin(twoFactor: true))->get('/admin/document-texts?type=apprenticeship_convention')->assertOk()
         ->assertInertia(fn (Inertia\Testing\AssertableInertia $page) => $page->where('type', 'apprenticeship_convention')
             ->where('types', fn ($types) => collect($types)->pluck('value')->contains('professionalisation_convention')));
+});
+
+it('issues the alternance convention when the dossier of the candidature is created', function () {
+    alternanceGotenberg($this);
+    $c = bookletApprentice(); // its dossier is created at the end
+
+    $document = App\Modules\Documents\Document::query()->where('dossier_id', $c->dossier_id)->sole();
+    expect($document->type)->toBe('apprenticeship_convention')
+        ->and($document->issued_by)->not->toBeNull();
+});
+
+it('issues nothing for a dossier without alternance contract', function () {
+    alternanceGotenberg($this);
+    $c = bookletApprentice();
+    App\Modules\Admissions\Alternance\AlternanceContract::query()->where('candidature_id', $c->id)->delete();
+
+    expect(app(App\Modules\Documents\AlternanceConventions::class)->issueForDossier($c->dossier_id, admin()))->toBeNull();
 });
