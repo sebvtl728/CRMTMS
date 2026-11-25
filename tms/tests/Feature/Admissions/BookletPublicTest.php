@@ -168,3 +168,13 @@ it('answers the same 404 for an unknown, expired, closed link or a trashed candi
     CarbonImmutable::setTestNow(CarbonImmutable::parse('2027-03-18 00:01', 'Europe/Paris'));
     $this->get("/livret/{$token}")->assertNotFound();
 });
+
+it('refuses the apprentice a change on a page the tutor already signed', function () {
+    $apprentice = bookletToken($this->c, 'apprentice');
+    BookletMonths::page($this->c, '2027-01', 'company')->forceFill(['tutor_signed_at' => now(), 'tutor_signer_name' => 'Paul MARTIN'])->save();
+
+    $this->postJson("/livret/{$apprentice}/save", ['entries' => ['company' => ['w1' => 'Réécrit après coup']]])
+        ->assertStatus(409)->assertJson(['message' => BookletAnswering::TUTOR_SIGNED]);
+    $this->postJson("/livret/{$apprentice}/save", ['entries' => ['centre' => ['w1' => 'Cours']]])->assertOk();
+    expect(BookletMonths::months($this->c)[1]['pages']['company']['entries']['w1'])->toBeNull();
+});

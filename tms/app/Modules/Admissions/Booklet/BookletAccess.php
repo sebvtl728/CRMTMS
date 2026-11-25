@@ -18,7 +18,8 @@ use Illuminate\Database\Eloquent\Builder;
  * a live enrolment in a session where the user's trainer has a séance),
  * « Ses fiches » (responsible or creator of the candidature), « Ses DAS »,
  * « Tout ». Only candidatures with an alternance contract, out of the
- * trash. A trainer reaches the booklet, never the candidature itself.
+ * trash and not anonymised. A trainer reaches the booklet, never the
+ * candidature itself.
  */
 final class BookletAccess
 {
@@ -29,7 +30,8 @@ final class BookletAccess
     public static function candidatures(Builder $query, User $user): Builder
     {
         $model = $query->getModel();
-        $query->whereIn($model->qualifyColumn('id'), AlternanceContract::query()->select('candidature_id'));
+        $query->whereIn($model->qualifyColumn('id'), AlternanceContract::query()->select('candidature_id'))
+            ->whereNull($model->qualifyColumn('anonymised_at'));
 
         return match (Scopes::of($user, Permissions::BOOKLET_MANAGE)) {
             null => $query->whereRaw('false'),

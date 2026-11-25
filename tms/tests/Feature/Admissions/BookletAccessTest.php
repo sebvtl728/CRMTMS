@@ -41,3 +41,11 @@ it('grants the new right by default with « Ses séances » for the trainers', f
         ->and(Scopes::of(admin(), Permissions::BOOKLET_MANAGE))->toBe(AccessScope::All)
         ->and(userWithRole(Role::Commercial)->can(Permissions::BOOKLET_MANAGE))->toBeFalse();
 });
+
+it('closes the booklet of an anonymised apprentice', function () {
+    $c = bookletApprentice();
+    app(App\Modules\Admissions\Gdpr\CandidatureAnonymisation::class)->anonymise($c);
+
+    expect(BookletAccess::allows(admin(), $c->fresh()))->toBeFalse();
+    $this->actingAs(admin(twoFactor: true))->get("/admissions/livret/{$c->id}")->assertNotFound();
+});

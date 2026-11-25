@@ -47,6 +47,8 @@ final class BookletAnswering
 
     public const SIGNED = 'Cette page est déjà signée.';
 
+    public const TUTOR_SIGNED = 'Le tuteur a déjà signé cette page : elle ne se modifie plus.';
+
     public function __construct(
         private readonly Fiches $fiches,
         private readonly Trainings $trainings,
@@ -258,6 +260,10 @@ final class BookletAnswering
         $page = BookletMonth::query()->lockForUpdate()->firstOrCreate(['candidature_id' => $link->candidature_id, 'month' => $link->month->toDateString(), 'place' => $place]);
         if ($page->signedBy($link->signer)) {
             throw new UserFacingHttpException(409, self::SIGNED);
+        }
+        // What the tutor signed (the apprentice's weeks he read) never changes afterwards.
+        if ($link->signer === BookletLink::APPRENTICE && $page->signedBy(BookletLink::TUTOR)) {
+            throw new UserFacingHttpException(409, self::TUTOR_SIGNED);
         }
         $clean = BookletMonths::cleanWeeks($weeks, $column === 'observations' ? 'observations' : "entries.{$place}");
         $current = is_array($page->{$column}) ? $page->{$column} : [];

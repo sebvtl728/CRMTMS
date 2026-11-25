@@ -86,20 +86,55 @@ function OpenBooklet({ signer, month_label, organisme, apprentice, employer, tra
     const pending = useRef<Record<string, unknown> | null>(null);
     pending.current = dirty;
 
+    // Puts back what could not be saved under what was typed since (the newest wins), so nothing typed is lost.
+    const restore = (body: Record<string, unknown>) => {
+        const since = pending.current ?? {};
+        const back: Record<string, unknown> = { ...body };
+        for (const [key, value] of Object.entries(since)) {
+            if (key === 'marks') back.marks = [...((back.marks as unknown[]) ?? []), ...(value as unknown[])];
+            else if (key === 'entries') {
+                const merged: Record<string, Weeks> = { ...((back.entries as Record<string, Weeks>) ?? {}) };
+                for (const [place, weeks] of Object.entries(value as Record<string, Weeks>)) merged[place] = { ...(merged[place] ?? {}), ...weeks };
+                back.entries = merged;
+            } else back[key] = { ...((back[key] as object) ?? {}), ...(value as object) };
+        }
+        pending.current = back;
+        setDirty(back);
+    };
+
+    // Sends what was typed; false (and kept to send again) when it could not be saved.
     const save = async (): Promise<boolean> => {
         const body = pending.current;
         if (!body || !save_url) return true;
+        pending.current = null;
         setDirty(null);
         setSaved('saving');
-        const answer = await sendJson('POST', save_url, body);
+        let answer;
+        try {
+            answer = await sendJson('POST', save_url, body);
+        } catch {
+            restore(body);
+            setSaved('error');
+            return false;
+        }
         if (answer.status === 404) {
             router.reload();
             return false;
         }
-        setSaved(answer.ok ? 'saved' : 'error');
-        if (!answer.ok) setErrors({ ...answer.errors, general: answer.message ?? undefined });
+        if (answer.ok) {
+            setSaved('saved');
+            return true;
+        }
+        // An unknown skill (the grid changed meanwhile) would fail every time: those marks are dropped, the texts kept.
+        const marksRefused = answer.status === 422 && Object.keys(answer.errors).some((k) => k === 'key' || k === 'level' || k.startsWith('marks'));
+        restore(marksRefused ? Object.fromEntries(Object.entries(body).filter(([k]) => k !== 'marks')) : body);
+        setSaved('error');
+        setErrors({
+            ...answer.errors,
+            general: marksRefused ? "Une évaluation n'a pas pu être enregistrée : vérifiez la grille." : (answer.message ?? undefined),
+        });
 
-        return answer.ok;
+        return false;
     };
 
     // Saved as typed: every 10 seconds when something changed, and on leaving a field.
@@ -135,30 +170,41 @@ function OpenBooklet({ signer, month_label, organisme, apprentice, employer, tra
     const askCode = async () => {
         if (!code_url) return;
         setBusy(true);
-        if (!(await save())) return setBusy(false);
-        const answer = await sendJson('POST', code_url);
-        setBusy(false);
-        if (answer.ok) {
-            setCodeSent(true);
-            setErrors({});
-        } else if (answer.status === 404) router.reload();
-        else setErrors({ general: answer.message ?? undefined });
+        try {
+            if (!(await save())) return;
+            const answer = await sendJson('POST', code_url);
+            if (answer.ok) {
+                setCodeSent(true);
+                setErrors({});
+            } else if (answer.status === 404) router.reload();
+            else setErrors({ general: answer.message ?? undefined });
+        } catch {
+            setErrors({ general: 'Connexion impossible : réessayez dans un instant.' });
+        } finally {
+            setBusy(false);
+        }
     };
 
+    // Never signs a page whose last typing is not saved.
     const sign = async () => {
         if (!sign_url) return;
         setBusy(true);
-        if (!(await save())) return setBusy(false);
-        const answer = await sendJson('POST', sign_url, { code, drawing });
-        setBusy(false);
-        if (answer.ok) setDone(true);
-        else if (answer.status === 404) router.reload();
-        else
-            setErrors({
-                code: answer.errors.code,
-                drawing: answer.errors.drawing,
-                general: answer.errors.code || answer.errors.drawing ? undefined : (answer.message ?? undefined),
-            });
+        try {
+            if (!(await save())) return;
+            const answer = await sendJson('POST', sign_url, { code, drawing });
+            if (answer.ok) setDone(true);
+            else if (answer.status === 404) router.reload();
+            else
+                setErrors({
+                    code: answer.errors.code,
+                    drawing: answer.errors.drawing,
+                    general: answer.errors.code || answer.errors.drawing ? undefined : (answer.message ?? undefined),
+                });
+        } catch {
+            setErrors({ general: 'Connexion impossible : réessayez dans un instant.' });
+        } finally {
+            setBusy(false);
+        }
     };
 
     const title = `Livret d'apprentissage - ${month_label}`;
@@ -276,7 +322,7 @@ function OpenBooklet({ signer, month_label, organisme, apprentice, employer, tra
             )}
 
             <p className="text-muted-foreground text-xs" aria-live="polite">
-                {saved === 'saving' ? 'Enregistrement…' : saved === 'saved' ? 'Enregistré.' : saved === 'error' ? "L'enregistrement a échoué." : ''}
+                {saved === 'saving' ? 'Enregistrement…' : saved === 'saved' ? 'Enregistré.' : saved === 'error' ? "L'enregistrement a échoué : votre texte est gardé et sera renvoyé." : ''}
             </p>
 
             <section className="flex flex-col gap-4 rounded-md border p-4">
