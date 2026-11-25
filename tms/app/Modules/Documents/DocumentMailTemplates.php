@@ -68,5 +68,15 @@ final class DocumentMailTemplates
             body: "Bonjour,\n\nVous trouverez ci-joint le certificat de réalisation de {destinataire} pour la formation « {formation} » ({dates}).\n\nCordialement,\n{societe}",
             variables: $trainee,
         ));
+        foreach ([[DocumentType::ApprenticeshipConvention, "d'apprentissage"], [DocumentType::ProfessionalisationConvention, 'de professionnalisation']] as [$type, $kind]) {
+            MailTemplateRegistry::register(new MailTemplateDefinition(
+                key: self::key($type),
+                label: "Envoi d'une convention de formation – contrat {$kind}",
+                description: 'Proposé dans la fenêtre « Envoyer » de la convention d\'un dossier en alternance, toujours modifiable avant l\'envoi. Le PDF est joint automatiquement.',
+                subject: '{document} {numero} - {societe}',
+                body: "Bonjour,\n\nVeuillez trouver ci-jointe la convention de formation {numero} liée au contrat {$kind} pour la formation « {formation} » ({dates}).\n\nMerci de nous la retourner signée.\n\nCordialement,\n{societe}",
+                variables: $variables,
+            ));
+        }
     }
 }

@@ -31,6 +31,10 @@ class DocumentIssuer
 {
     public const CONVENTION_FOR_COMPANY = 'La convention concerne un contractant entreprise : pour un particulier, émettez un contrat.';
 
+    public const ALTERNANCE_DOSSIER = 'Ce dossier est en alternance : émettez la convention d\'apprentissage ou de professionnalisation.';
+
+    public const NO_ALTERNANCE = 'Ce dossier n\'a pas de contrat d\'alternance.';
+
     public const CONTRACT_FOR_INDIVIDUAL = 'Le contrat concerne un particulier : pour une entreprise, émettez une convention.';
 
     public function __construct(
@@ -212,6 +216,23 @@ class DocumentIssuer
             throw new UserFacingHttpException(409, 'Ce dossier est annulé : aucun document ne peut être émis.');
         }
         $contractor = $dossier['contractor']['type'];
+        $alternance = $dossier['alternance'] ?? null;
+        if ($type === DocumentType::Convention && $alternance !== null) {
+            throw new UserFacingHttpException(409, self::ALTERNANCE_DOSSIER);
+        }
+        if ($type->isAlternance()) {
+            if ($alternance === null) {
+                throw new UserFacingHttpException(409, self::NO_ALTERNANCE);
+            }
+            if (DocumentType::forContract((string) $alternance['contract_type']) !== $type) {
+                throw new UserFacingHttpException(409, $alternance['contract_type'] === 'professionalisation'
+                    ? 'Le contrat est un contrat de professionnalisation : émettez la convention de professionnalisation.'
+                    : 'Le contrat est un contrat d\'apprentissage : émettez la convention d\'apprentissage.');
+            }
+            if ($contractor !== 'organisation') {
+                throw new UserFacingHttpException(409, self::CONVENTION_FOR_COMPANY);
+            }
+        }
         if ($type === DocumentType::Convention && $contractor !== 'organisation') {
             throw new UserFacingHttpException(409, self::CONVENTION_FOR_COMPANY);
         }
@@ -221,7 +242,7 @@ class DocumentIssuer
         $living = Document::query()->where('dossier_id', $dossier['id'])->where('type', $type->value)
             ->where('status', '!=', DocumentStatus::Cancelled->value)->exists();
         if ($living) {
-            throw new UserFacingHttpException(409, $type === DocumentType::Convention
+            throw new UserFacingHttpException(409, $type->forCompany()
                 ? 'Une convention est déjà émise : annulez-la avant d\'en émettre une nouvelle.'
                 : 'Un contrat est déjà émis : annulez-le avant d\'en émettre un nouveau.');
         }
@@ -241,18 +262,18 @@ class DocumentIssuer
         $contractor = $dossier['contractor'];
         $identity = $this->fiches->billingIdentity($contractor['type'], $contractor['id'])
             ?? throw new UserFacingHttpException(409, 'Le contractant de ce dossier est introuvable ou anonymisé.');
-        $contactId = $type === DocumentType::Convention ? $dossier['contact_person_id'] : $contractor['id'];
+        $contactId = $type->forCompany() ? $dossier['contact_person_id'] : $contractor['id'];
         $contact = $contactId === null ? null : ($this->fiches->personLabels([$contactId])[$contactId] ?? null);
         $email = $contactId === null ? null : ($this->fiches->personEmails([$contactId])[$contactId] ?? null);
 
         return [
             'name' => $identity['name'],
-            'attention' => $type === DocumentType::Convention ? ($contact['label'] ?? null) : null,
+            'attention' => $type->forCompany() ? ($contact['label'] ?? null) : null,
             'address_line1' => $identity['address_line1'],
             'address_line2' => $identity['address_line2'],
             'postal_code' => $identity['postal_code'],
             'city' => $identity['city'],
-            'email' => $email ?? ($type === DocumentType::Convention ? $identity['email'] : null),
+            'email' => $email ?? ($type->forCompany() ? $identity['email'] : null),
             'person_id' => $contactId,
             ...($contractor['type'] === 'organisation' ? ($this->fiches->organisationCodes($contractor['id']) ?? []) : []),
         ];

@@ -27,7 +27,9 @@ final class DossierDocumentsBlock
         }
         $canManage = Paperwork::allows($viewer, Permissions::MANAGE, $dossierId);
         $documents = Document::query()->where('dossier_id', $dossierId)->orderByDesc('issued_at')->orderByDesc('id')->get();
-        $issuable = $dossier['contractor']['type'] === 'organisation' ? DocumentType::Convention : DocumentType::Contract;
+        // An alternance dossier: the convention of its contract type replaces the classic one.
+        $issuable = $dossier['alternance'] !== null ? DocumentType::forContract((string) $dossier['alternance']['contract_type'])
+            : ($dossier['contractor']['type'] === 'organisation' ? DocumentType::Convention : DocumentType::Contract);
 
         return [
             'title' => 'Documents',
@@ -55,7 +57,7 @@ final class DossierDocumentsBlock
                     'cancel_reason' => $d->cancel_reason,
                     'defaults' => $canManage && ! $d->isCancelled() ? DocumentMail::defaults($d) : null,
                     'signature' => DocumentSignatures::state($d),
-                    'can_sign' => $canManage && in_array($d->type, [DocumentType::Convention->value, DocumentType::Contract->value], true)
+                    'can_sign' => $canManage && (DocumentType::tryFrom($d->type)?->signable() ?? false)
                         && ! $d->isCancelled() && $d->status !== DocumentStatus::Signed,
                 ])->values()->all(),
             ],

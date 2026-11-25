@@ -113,7 +113,7 @@ class SendDocument implements ShouldQueue
                 'updated_at' => $now,
             ]);
         });
-        if (in_array($document->type, [DocumentType::Convention->value, DocumentType::Contract->value], true)) {
+        if (DocumentType::tryFrom($document->type)?->signable() ?? false) {
             $paperwork->markConventionSent($document->dossier_id, $now);
         }
         if ($document->type === DocumentType::Convocation->value && self::everyTraineeConvened($document->dossier_id)) {

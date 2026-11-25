@@ -18,7 +18,7 @@ use Illuminate\Validation\ValidationException;
 final class DocumentTexts
 {
     /** The fields a text may hold. */
-    public const FIELDS = ['{stagiaire}', '{stagiaires}', '{formation}', '{dates}', '{duree}', '{lieu}', '{prix}', '{contractant}', '{societe}', '{numero_dossier}', '{heures_realisees}', '{date_entree}', '{date_sortie}'];
+    public const FIELDS = ['{stagiaire}', '{stagiaires}', '{formation}', '{dates}', '{duree}', '{lieu}', '{prix}', '{contractant}', '{societe}', '{numero_dossier}', '{heures_realisees}', '{date_entree}', '{date_sortie}', '{apprenti}', '{employeur}', '{tuteur}', '{type_contrat}', '{debut_contrat}', '{fin_contrat}', '{heures_centre}', '{code_rncp}', '{opco}'];
 
     public const MAX_LENGTH = 5000;
 
@@ -61,7 +61,31 @@ final class DocumentTexts
                 'assiduite' => self::block('Assiduité', "Présence du {date_entree} au {date_sortie} : {heures_realisees} réalisées sur {duree} prévues. Les objectifs et la nature de l'action figurent au programme de la formation."),
             ],
             DocumentType::RealisationCertificate => [],
+            // Default texts of the alternance conventions: to be checked by the organisme (Administration › Modèles de documents).
+            DocumentType::ApprenticeshipConvention => self::alternanceBlocks('apprentissage', "le maître d'apprentissage"),
+            DocumentType::ProfessionalisationConvention => self::alternanceBlocks('professionnalisation', 'le tuteur'),
         };
+    }
+
+    /**
+     * The blocks of an alternance convention: the same frame for an
+     * apprenticeship and a professionalisation contract.
+     *
+     * @return array<string, array{label: string, default: string, required: bool}>
+     */
+    private static function alternanceBlocks(string $kind, string $tutorRole): array
+    {
+        return [
+            'parties' => self::block('Parties', "La présente convention est conclue entre {societe}, organisme de formation (centre de formation), et {employeur}, employeur, pour la formation de {apprenti} dans le cadre de son {type_contrat}.", true),
+            'objet' => self::block('Objet', "La convention fixe les conditions dans lesquelles {societe} assure la formation « {formation} » (titre ou diplôme visé, code RNCP {code_rncp}) de {apprenti}, salarié(e) de {employeur} par un contrat de {$kind} conclu du {debut_contrat} au {fin_contrat}.", true),
+            'organisation' => self::block('Organisation de la formation en alternance', "La formation alterne des périodes en centre de formation, pour une durée de {heures_centre}, {dates}, à l'adresse suivante : {lieu}, et des périodes en entreprise. Le planning de l'alternance et le programme sont annexés à la présente convention."),
+            'centre' => self::block('Engagements du centre de formation', "{societe} s'engage à dispenser les enseignements prévus au programme, à suivre l'assiduité de l'apprenant par des feuilles d'émargement, à informer l'employeur de ses absences et à évaluer sa progression, en lien avec l'entreprise."),
+            'employeur' => self::block("Engagements de l'employeur", "{employeur} s'engage à permettre à {apprenti} de suivre l'ensemble de la formation en centre, temps compris dans son temps de travail, et à lui confier des activités en rapport avec la qualification visée, sous la responsabilité de {$tutorRole}, {tuteur}."),
+            'suivi' => self::block('Suivi et évaluation', "Le suivi de l'alternance est assuré conjointement par {societe} et {$tutorRole} : livret de suivi, échanges réguliers et visites en entreprise. Les évaluations prévues au référentiel de la certification sont organisées par {societe}."),
+            'financement' => self::block('Dispositions financières', "Le coût de la formation est pris en charge par l'opérateur de compétences de l'entreprise ({opco}) selon le niveau de prise en charge qu'il fixe. Le prix de la formation est de {prix} ; tout reste à charge éventuel de l'employeur est facturé selon les modalités prévues au dossier {numero_dossier}.", true),
+            'rupture' => self::block('Rupture du contrat', "En cas de rupture du contrat de {$kind}, l'employeur en informe sans délai {societe}. La présente convention prend fin à la date de la rupture ; seules les heures de formation réalisées restent dues."),
+            'litiges' => self::block('Litiges', "Si une contestation ou un différend ne peut être réglé à l'amiable, le tribunal compétent est celui du siège de {societe}."),
+        ];
     }
 
     /**
