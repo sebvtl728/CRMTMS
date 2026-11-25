@@ -3,6 +3,7 @@
 namespace App\Modules\Admissions;
 
 use App\Modules\Admissions\Alternance\AlternanceContract;
+use App\Modules\Admissions\Alternance\AlternanceFacts;
 use App\Modules\Admissions\Booklet\BookletAccess;
 use App\Modules\Admissions\Booklet\BookletEvaluation;
 use App\Modules\Admissions\Booklet\BookletMail;
@@ -33,6 +34,7 @@ use App\Modules\Core\Users\User;
 use App\Modules\Crm\Public\FicheBlocks;
 use App\Modules\Crm\Public\FicheLinks;
 use App\Modules\Sessions\Public\DossierBlocks;
+use App\Modules\Sessions\Public\Paperwork;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Support\Facades\DB;
@@ -88,6 +90,8 @@ class AdmissionsServiceProvider extends ServiceProvider
         self::registerTrainingUsage();
         self::registerCrm();
         Quality\AdmissionsMeasures::register();
+        // The documents of a dossier know its alternance contract (convention d'apprentissage / de professionnalisation).
+        Paperwork::registerAlternance(fn (string $dossierId): ?array => AlternanceFacts::forDossier($dossierId));
 
         // A test sent to a candidate stays downloadable from the history once trashed in the library.
         Brochures::registerSentCheck('admissions.positioning', fn (string $versionId): bool => DB::table('positioning_sending_versions')->where('brochure_version_id', $versionId)->exists());

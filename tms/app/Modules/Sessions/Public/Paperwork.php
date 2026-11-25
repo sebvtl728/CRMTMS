@@ -36,6 +36,28 @@ final class Paperwork
     public function __construct(private readonly DossierTransitions $transitions) {}
 
     /**
+     * The module owning the alternance contracts (Admissions) tells the
+     * contract of a dossier, without Sessions nor Documents knowing it: null
+     * when the dossier has none. Kept in the container (one per application).
+     *
+     * @param  \Closure(string): ?array<string, mixed>  $provider  dossier id => contract (contract_type, starts_on, ends_on, apprentice_person_id, employer_organisation_id, tutor_person_id, opco_organisation_id, rncp_code)
+     */
+    public static function registerAlternance(\Closure $provider): void
+    {
+        app()->instance(self::class.'.alternance', $provider);
+    }
+
+    /**
+     * @return array<string, mixed>|null
+     */
+    public static function alternance(string $dossierId): ?array
+    {
+        $provider = app()->bound(self::class.'.alternance') ? app(self::class.'.alternance') : null;
+
+        return $provider instanceof \Closure ? $provider($dossierId) : null;
+    }
+
+    /**
      * @return array<string, mixed>|null
      */
     public static function dossier(string $dossierId): ?array
@@ -51,6 +73,7 @@ final class Paperwork
         return [
             ...$billing,
             'contact_person_id' => $dossier->contact_person_id,
+            'alternance' => self::alternance($dossierId),
             'sessions' => array_map(function (array $s) use ($sessions): array {
                 $session = $sessions[$s['id']];
 
