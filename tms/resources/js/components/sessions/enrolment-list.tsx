@@ -46,6 +46,8 @@ export interface EnrolmentRow {
     adaptation_needs: string | null;
     notes: string | null;
     can_update: boolean;
+    /** « Suivi »: planning, attendance and signatures of the trainee; null when not offered. */
+    follow_up_url?: string | null;
 }
 
 export interface EnrolmentReferences {
@@ -323,30 +325,45 @@ export function EnrolmentList({
                             )}
                             {row.adaptation_needs && <p className="text-sm">Besoins d'adaptation : {row.adaptation_needs}</p>}
                         </div>
-                        {row.can_update && references && row.status !== 'cancelled' && (
+                        {((row.can_update && references && row.status !== 'cancelled') || row.follow_up_url) && (
                             <div className="flex flex-wrap gap-1">
-                                {row.status === 'waitlisted' && (
-                                    <Button
-                                        type="button"
-                                        size="sm"
-                                        variant="outline"
-                                        title="Une place s'est libérée : la personne devient inscrite (jamais automatiquement)."
-                                        onClick={() => act(row, 'promote')}
-                                    >
-                                        Passer en inscrit
+                                {row.follow_up_url && (
+                                    <Button asChild size="sm" variant="outline">
+                                        <Link href={row.follow_up_url}>Suivi individuel</Link>
                                     </Button>
                                 )}
-                                {(row.status === 'enrolled' || row.status === 'confirmed') && (
-                                    <Button type="button" size="sm" variant="outline" onClick={() => setAbandoning(row)}>
-                                        Abandon
-                                    </Button>
+                                {row.can_update && references && row.status !== 'cancelled' && (
+                                    <>
+                                        {row.status === 'waitlisted' && (
+                                            <Button
+                                                type="button"
+                                                size="sm"
+                                                variant="outline"
+                                                title="Une place s'est libérée : la personne devient inscrite (jamais automatiquement)."
+                                                onClick={() => act(row, 'promote')}
+                                            >
+                                                Passer en inscrit
+                                            </Button>
+                                        )}
+                                        {(row.status === 'enrolled' || row.status === 'confirmed') && (
+                                            <Button type="button" size="sm" variant="outline" onClick={() => setAbandoning(row)}>
+                                                Abandon
+                                            </Button>
+                                        )}
+                                        <Button type="button" size="sm" variant="ghost" onClick={() => setEditing(row)}>
+                                            Modifier
+                                        </Button>
+                                        <Button
+                                            type="button"
+                                            size="sm"
+                                            variant="ghost"
+                                            className="text-destructive"
+                                            onClick={() => act(row, 'cancel')}
+                                        >
+                                            Désinscrire
+                                        </Button>
+                                    </>
                                 )}
-                                <Button type="button" size="sm" variant="ghost" onClick={() => setEditing(row)}>
-                                    Modifier
-                                </Button>
-                                <Button type="button" size="sm" variant="ghost" className="text-destructive" onClick={() => act(row, 'cancel')}>
-                                    Désinscrire
-                                </Button>
                             </div>
                         )}
                     </li>

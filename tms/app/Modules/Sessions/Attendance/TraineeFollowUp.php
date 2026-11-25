@@ -54,8 +54,24 @@ final class TraineeFollowUp
         $enrolment = Enrolment::query()->where('dossier_id', $dossierId)->where('person_id', $personId)
             ->whereNotIn('status', [EnrolmentStatus::Cancelled->value, EnrolmentStatus::Waitlisted->value])
             ->orderByDesc('created_at')->first();
-        $session = $enrolment === null ? null : TrainingSession::query()->find($enrolment->training_session_id);
-        if ($enrolment === null || $session === null
+
+        return $enrolment === null ? null : self::forEnrolment($enrolment, $user);
+    }
+
+    /**
+     * The follow-up of one enrolment (the « Suivi » of the trainees step of a
+     * session); null for a cancelled or waitlisted enrolment, or a session
+     * out of the view scope.
+     *
+     * @return array<string, mixed>|null
+     */
+    public static function forEnrolment(Enrolment $enrolment, User $user): ?array
+    {
+        if (in_array($enrolment->status, [EnrolmentStatus::Cancelled, EnrolmentStatus::Waitlisted], true)) {
+            return null;
+        }
+        $session = TrainingSession::query()->find($enrolment->training_session_id);
+        if ($session === null
             || ! SessionsVisibility::sessions(TrainingSession::query()->whereKey($session->id), $user)->exists()) {
             return null;
         }

@@ -12,6 +12,7 @@ use App\Modules\Sessions\Attendance\Signing\SigningController;
 use App\Modules\Sessions\Dossiers\DossierController;
 use App\Modules\Sessions\Dossiers\DossierFromQuoteController;
 use App\Modules\Sessions\Enrolments\EnrolmentController;
+use App\Modules\Sessions\Enrolments\EnrolmentFollowUpController;
 use App\Modules\Sessions\Fundings\FundingController;
 use App\Modules\Sessions\Modules\SessionModuleController;
 use App\Modules\Sessions\Notes\SessionNoteController;
@@ -53,6 +54,8 @@ Route::middleware(['auth'])->prefix('sessions')->name('sessions.')->group(functi
     // Enrolments: sessions.sessions.update on the session (SessionPolicy).
     Route::get('{trainingSession}/trainees', [EnrolmentController::class, 'trainees'])->middleware(['can:sessions.sessions.update', 'throttle:sessions-trainees'])->name('trainees');
     Route::post('{trainingSession}/trainees', [EnrolmentController::class, 'createTrainee'])->middleware(['can:sessions.sessions.update', 'throttle:sessions-trainees'])->name('trainees.store');
+    // « Suivi » of an enrolled trainee (planning, attendance, signatures).
+    Route::get('{trainingSession}/stagiaires/{enrolment}/suivi', EnrolmentFollowUpController::class)->middleware('can:sessions.sessions.view')->name('enrolments.follow-up');
     Route::post('{trainingSession}/enrolments', [EnrolmentController::class, 'store'])->middleware('can:sessions.sessions.update')->name('enrolments.store');
     Route::get('{trainingSession}/rattrapages/demi-journees', [GroupCatchUpController::class, 'halves'])->middleware('can:sessions.attendance.manage')->name('catch-ups.halves');
     Route::post('{trainingSession}/rattrapages/groupe', [GroupCatchUpController::class, 'send'])->middleware(['can:sessions.attendance.manage', 'throttle:attendance-signing-open'])->name('catch-ups.group');
