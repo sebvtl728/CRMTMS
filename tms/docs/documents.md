@@ -29,6 +29,15 @@ Sur la page du dossier, bloc **Documents** :
 - une seule convention (ou un seul contrat) **valide** par dossier : pour corriger, **Annuler** (motif obligatoire) puis
   émettre un nouveau document. Le document annulé reste consultable avec son motif.
 
+**Dossier en alternance** (créé depuis une candidature avec contrat d'alternance) : la convention de formation est
+remplacée par la **convention de formation – apprentissage** ou **– professionnalisation**, selon le type du contrat.
+Elle est **émise automatiquement** à la création du dossier (au nom de l'utilisateur qui le crée) ; si l'émission
+échoue (moteur PDF indisponible, société émettrice absente), le dossier est quand même créé et le bloc propose de
+l'émettre. Elle s'adresse à l'employeur (le contractant) et à son contact, s'envoie et se signe en ligne comme la
+convention. La convention classique est refusée à un dossier en alternance ; un contrat dont le type change exige
+d'annuler la convention émise puis d'émettre l'autre. Avant le dossier, la candidature en propose un **aperçu**
+(`admissions.md` § 3).
+
 Si le moteur PDF est indisponible, l'émission est refusée (« Le PDF n'a pas pu être généré, réessayez dans un instant ») et
 aucun numéro n'est consommé.
 
@@ -46,7 +55,10 @@ aucun numéro n'est consommé.
 
 **Administration › Modèles de documents** (droit `settings.manage`) : pour chaque document, les articles (préambule,
 objet, durée, prix, dédit, rétractation…) avec leur texte d'origine, conforme aux articles L6353-1 à L6353-7 du Code du
-travail.
+travail. Les deux conventions d'alternance ont leurs propres articles (parties, objet, organisation de l'alternance,
+engagements du centre et de l'employeur, suivi, financement par l'OPCO, rupture, litiges) et les champs `{apprenti}`,
+`{employeur}`, `{tuteur}`, `{type_contrat}`, `{debut_contrat}`, `{fin_contrat}`, `{heures_centre}`, `{code_rncp}`,
+`{opco}` : leurs textes d'origine sont **à faire vérifier** par l'organisme avant usage.
 
 - Les textes se règlent pour **l'organisme** (toutes les sociétés) ou pour **une société** ; à défaut, le texte de
   l'organisme, puis le texte d'origine.
