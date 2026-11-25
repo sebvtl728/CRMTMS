@@ -221,6 +221,26 @@ final class Attendances
     }
 
     /**
+     * His hours at the séance changed (IndividualPlanningWriter, under its
+     * locks): his attendance, if any, goes « à revoir », present recomputed
+     * at his duration, a partial at or above it made present.
+     */
+    public static function reviewTrainee(Seance $seance, string $enrolmentId): void
+    {
+        $attendance = Attendance::query()->where('seance_id', $seance->id)->where('enrolment_id', $enrolmentId)->lockForUpdate()->first();
+        if ($attendance === null) {
+            return;
+        }
+        $duration = IndividualPlanning::minutesAt($enrolmentId, $seance);
+        $attendance->needs_review = true;
+        if ($attendance->status === Attendance::PRESENT || ($attendance->status === Attendance::PARTIAL && $attendance->minutes >= $duration)) {
+            $attendance->status = Attendance::PRESENT;
+            $attendance->minutes = $duration;
+        }
+        $attendance->save();
+    }
+
+    /**
      * The séance locked for the write, its session held shared: 409 when it
      * is cancelled or its month closed.
      */
