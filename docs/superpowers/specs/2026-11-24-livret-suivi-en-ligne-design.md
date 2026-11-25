@@ -133,11 +133,13 @@ Même page : textes de l'apprenti (lecture, page entreprise seulement), ses quat
 - Un formateur qui pourrait modifier ce que l'apprenti ou le tuteur a signé.
 - Une saisie perdue : chaque cadre s'enregistre au fil de l'eau, avant la signature.
 
-## B3 (pour mémoire, conçu après le test)
+## B3 — validé le 25/11/2026
 
-- Automatisme `booklet` dans `DailyAutomations` : le 1er de chaque mois, lien du mois écoulé à l'apprenti de chaque contrat en cours ; rappel à J+7 et J+14 aux signataires qui n'ont pas signé (nouveau jeton, `AutomationSends::claim`), réglage dans Administration › Automatismes.
-- Mesures Qualiopi : indicateur 11 (part des savoir-faire évalués, apprentis en cours) ; indicateur 28 (part des mois signés par le tuteur, visites par apprenti sur 12 mois).
-- « À traiter » : mois non visés de plus de 30 jours.
+- **Envoi mensuel** : automatisme `booklet` (`Core\Automation\DailyAutomations`, déclaré par Admissions). Chaque jour d'un mois, pour chaque contrat d'alternance couvrant le **mois écoulé** (candidature hors corbeille, non anonymisée), le lien du mois écoulé part à l'apprenti, sauf si sa part est signée (en ligne ou papier) ou si un lien apprenti est ouvert pour ce mois ; une fois par mois et par candidature (`AutomationSends` `booklet`, occurrence `<AAAA-MM>:apprentice`) ; un envoi impossible (pas d'e-mail) est retenté les jours suivants. Le lien du tuteur suit la signature de l'apprenti (B2).
+- **Rappels** : à J+7 et J+14 du **premier** lien d'une part (apprenti ou tuteur) d'un mois, si la part n'est ni signée ni signée sur papier et qu'un lien est ouvert : nouveau lien (l'ancien est fermé) ; `AutomationSends` `booklet_reminder`, occurrence `<AAAA-MM>:<signataire>:<1|2>` ; un rattrapage n'envoie qu'un e-mail.
+- **Réglage** `automation.booklet` (Administration › Automatismes), **désactivé par défaut** ; « Exécuter maintenant » le déclenche.
+- **Qualiopi** : indicateur 11 « Savoir-faire évalués côté centre (apprentis en cours) » ; indicateur 28 « Pages entreprise des mois écoulés signées par le tuteur (apprentis en cours) » et « Visites en entreprise sur 12 mois » (visites / apprentis dont le contrat couvre la période).
+- **À traiter** : « Livrets avec des pages non visées depuis plus de 30 jours » (une page d'un mois fini depuis plus de 30 jours sans visa), droit `admissions.booklet.manage` et son périmètre, lien `/admissions/livret`.
 
 ## Laissé au constructeur
 
