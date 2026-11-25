@@ -5,6 +5,8 @@ Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) ; ve
 
 ## [Non publié]
 
+## [0.15.25] - 2026-11-25
+
 ### Ajouté
 
 - **Livret d'apprentissage automatique** (Administration › Automatismes, désactivé par défaut) : le lien du mois écoulé part seul à l'apprenti le 1er du mois, avec des rappels à 7 et 14 jours à qui n'a pas signé. « À traiter » : livrets avec des pages non visées depuis plus de 30 jours. Qualiopi : mesures automatiques des indicateurs 11 (savoir-faire évalués) et 28 (pages signées par le tuteur, visites en entreprise).
