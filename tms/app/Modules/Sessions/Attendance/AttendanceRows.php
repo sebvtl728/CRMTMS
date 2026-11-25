@@ -2,6 +2,7 @@
 
 namespace App\Modules\Sessions\Attendance;
 
+use App\Modules\Sessions\Planning\IndividualPlanning;
 use App\Modules\Core\Access\AccessScope;
 use App\Modules\Core\Access\Scopes;
 use App\Modules\Core\Users\User;
@@ -109,6 +110,7 @@ final class AttendanceRows
         // Séances of the month and their counts (expected trainees computed here, no query each).
         $seances = Seance::query()->where('training_session_id', $session->id)->whereBetween('date', [$first->toDateString(), $last->toDateString()])
             ->orderBy('date')->orderBy('starts_at')->orderBy('id')->get();
+        $exempt = IndividualPlanning::exemptPairs($seances, $enrolments->pluck('id')->all());
         $counts = Attendance::query()->whereIn('seance_id', $seances->pluck('id')->all())
             ->selectRaw('seance_id, count(*) as recorded, count(*) filter (where needs_review) as review')->groupBy('seance_id')
             ->toBase()->get()->keyBy('seance_id');
@@ -174,7 +176,7 @@ final class AttendanceRows
                 'can_record' => $manage || ($ownTrainerId !== null && $s->trainer_id === $ownTrainerId),
                 'recorded' => (int) ($counts[$s->id]->recorded ?? 0),
                 'needs_review' => (int) ($counts[$s->id]->review ?? 0),
-                'expected' => $enrolments->filter(fn (Enrolment $e) => self::attendsDay($e, $s->date))->count(),
+                'expected' => $enrolments->filter(fn (Enrolment $e) => self::attendsDay($e, $s->date) && ! isset($exempt[$e->id.'|'.$s->id]))->count(),
                 'signing' => self::signing($s, $seances, $validated),
             ])->values()->all(),
             'monthly' => [

@@ -2,6 +2,7 @@
 
 namespace App\Modules\Sessions\Attendance;
 
+use App\Modules\Sessions\Planning\IndividualPlanning;
 use App\Modules\Sessions\Enrolments\Enrolment;
 use App\Modules\Sessions\Modules\DatingMode;
 use App\Modules\Sessions\Modules\SessionModule;
@@ -23,6 +24,8 @@ use Illuminate\Validation\ValidationException;
  */
 final class MonthlyHours
 {
+    public const EXEMPTED = 'Ce stagiaire est dispensé de ce module.';
+
     /** 31 days of 24 h. */
     public const MAX_MINUTES = 44640;
 
@@ -44,6 +47,9 @@ final class MonthlyHours
 
         DB::transaction(function () use ($enrolmentId, $module, $first, $minutes, $trainerId): void {
             $enrolment = self::lock($module, $first, $enrolmentId);
+            if (in_array($module->id, IndividualPlanning::exemptModules([$enrolment->id])[$enrolment->id] ?? [], true)) {
+                throw ValidationException::withMessages(['enrolment_id' => self::EXEMPTED]);
+            }
             $row = MonthlyHour::query()->where('enrolment_id', $enrolment->id)->where('session_module_id', $module->id)
                 ->where('month', $first->toDateString())->lockForUpdate()->first()
                 ?? new MonthlyHour(['enrolment_id' => $enrolment->id, 'session_module_id' => $module->id, 'month' => $first->toDateString()]);

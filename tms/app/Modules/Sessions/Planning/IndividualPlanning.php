@@ -8,6 +8,7 @@ use App\Modules\Sessions\Modules\SessionModule;
 use App\Modules\Sessions\Modules\SessionModules;
 use App\Modules\Sessions\Sessions\TrainingSession;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Collection;
 use Illuminate\Database\Query\Builder as QueryBuilder;
 
 /**
@@ -104,31 +105,143 @@ final class IndividualPlanning
     {
         $session = TrainingSession::withTrashed()->findOrFail($enrolment->training_session_id);
         $base = SessionModules::minutesOf($enrolment->planned_hours_base ?? $enrolment->planned_hours ?? $session->planned_hours) ?? 0;
-        $modules = SessionModule::query()->where('training_session_id', $session->id)->pluck('planned_minutes', 'id');
-        $adjustments = EnrolmentAdjustment::query()->with('seance')->where('enrolment_id', $enrolment->id)->get();
+        $cuts = self::moduleCuts(collect([$enrolment]))[$enrolment->id];
 
-        $exemptModules = $adjustments->where('kind', EnrolmentAdjustment::EXEMPT_MODULE)->pluck('session_module_id')->all();
-        $less = 0;
-        $byModule = [];
-        $added = 0;
-        foreach ($adjustments as $adjustment) {
-            $seance = $adjustment->seance;
-            if ($seance === null || $seance->trashed() || $seance->isCancelled()) {
-                continue;
+        return max(0, $base - array_sum($cuts['modules']) + $cuts['added']);
+    }
+
+    /**
+     * Per trainee, what his planning takes off each module of his session
+     * (capped at the module's planned minutes; the whole of it when
+     * exempted) and the minutes of the séances added. Two queries.
+     *
+     * @param  Collection<int, Enrolment>  $enrolments
+     * @return array<string, array{modules: array<string, int>, added: int}>
+     */
+    public static function moduleCuts(Collection $enrolments): array
+    {
+        $ids = $enrolments->pluck('id')->all();
+        $modules = SessionModule::query()->whereIn('training_session_id', $enrolments->pluck('training_session_id')->unique()->values()->all())
+            ->get(['id', 'training_session_id', 'planned_minutes'])->groupBy('training_session_id');
+        $adjustments = $ids === [] ? collect() : EnrolmentAdjustment::query()->with('seance')->whereIn('enrolment_id', $ids)->get()->groupBy('enrolment_id');
+
+        $out = [];
+        foreach ($enrolments as $enrolment) {
+            $mine = $adjustments[$enrolment->id] ?? collect();
+            $exempt = $mine->where('kind', EnrolmentAdjustment::EXEMPT_MODULE)->pluck('session_module_id')->all();
+            $byModule = [];
+            $added = 0;
+            foreach ($mine as $adjustment) {
+                $seance = $adjustment->seance;
+                if ($seance === null || $seance->trashed() || $seance->isCancelled()) {
+                    continue;
+                }
+                $hours = self::hoursOf($seance, $adjustment);
+                match ($adjustment->kind) {
+                    EnrolmentAdjustment::ADDED_SEANCE => $added += $hours['minutes'],
+                    EnrolmentAdjustment::EXEMPT_SEANCE => $byModule[$seance->session_module_id] = ($byModule[$seance->session_module_id] ?? 0) + $seance->duration_minutes,
+                    EnrolmentAdjustment::OWN_HOURS => $byModule[$seance->session_module_id] = ($byModule[$seance->session_module_id] ?? 0) + $seance->duration_minutes - $hours['minutes'],
+                    default => null,
+                };
             }
-            $hours = self::hoursOf($seance, $adjustment);
-            match ($adjustment->kind) {
-                EnrolmentAdjustment::ADDED_SEANCE => $added += $hours['minutes'],
-                EnrolmentAdjustment::EXEMPT_SEANCE => $byModule[$seance->session_module_id] = ($byModule[$seance->session_module_id] ?? 0) + $seance->duration_minutes,
-                EnrolmentAdjustment::OWN_HOURS => $byModule[$seance->session_module_id] = ($byModule[$seance->session_module_id] ?? 0) + $seance->duration_minutes - $hours['minutes'],
-                default => null,
-            };
-        }
-        foreach ($modules as $moduleId => $planned) {
-            $less += in_array($moduleId, $exemptModules, true) ? (int) $planned : min($byModule[$moduleId] ?? 0, (int) $planned);
+            $cuts = [];
+            foreach ($modules[$enrolment->training_session_id] ?? [] as $module) {
+                $planned = (int) ($module->planned_minutes ?? 0);
+                $cuts[$module->id] = in_array($module->id, $exempt, true) ? $planned : min($byModule[$module->id] ?? 0, $planned);
+            }
+            $out[$enrolment->id] = ['modules' => $cuts, 'added' => $added];
         }
 
-        return max(0, $base - $less + $added);
+        return $out;
+    }
+
+    /**
+     * The modules each trainee is exempted from (one query).
+     *
+     * @param  list<string>  $enrolmentIds
+     * @return array<string, list<string>> enrolment id => module ids
+     */
+    public static function exemptModules(array $enrolmentIds): array
+    {
+        return $enrolmentIds === [] ? [] : EnrolmentAdjustment::query()->whereIn('enrolment_id', $enrolmentIds)
+            ->where('kind', EnrolmentAdjustment::EXEMPT_MODULE)->get(['enrolment_id', 'session_module_id'])
+            ->groupBy('enrolment_id')->map(fn ($rows) => $rows->pluck('session_module_id')->map(fn ($id) => (string) $id)->values()->all())->all();
+    }
+
+    /**
+     * The (trainee, séance) pairs exempted, as « enrolment id|séance id »
+     * keys, the séance itself or its module (two queries).
+     *
+     * @param  Collection<int, Seance>  $seances
+     * @param  list<string>  $enrolmentIds
+     * @return array<string, true>
+     */
+    public static function exemptPairs(Collection $seances, array $enrolmentIds): array
+    {
+        if ($seances->isEmpty() || $enrolmentIds === []) {
+            return [];
+        }
+        $out = [];
+        foreach (EnrolmentAdjustment::query()->whereIn('enrolment_id', $enrolmentIds)->where('kind', EnrolmentAdjustment::EXEMPT_SEANCE)
+            ->whereIn('seance_id', $seances->pluck('id')->all())->get(['enrolment_id', 'seance_id']) as $row) {
+            $out[$row->enrolment_id.'|'.$row->seance_id] = true;
+        }
+        foreach (self::exemptModules($enrolmentIds) as $enrolmentId => $moduleIds) {
+            foreach ($seances->whereIn('session_module_id', $moduleIds) as $seance) {
+                $out[$enrolmentId.'|'.$seance->id] = true;
+            }
+        }
+
+        return $out;
+    }
+
+    /**
+     * The séances of each trainee's planning, in order, at his hours: those
+     * of his session within his entry and leaving days (and $from / $to),
+     * not exempted, plus the séances added to him. Cancelled ones only with
+     * $withCancelled; deleted ones never. A fixed number of queries.
+     *
+     * @param  Collection<int, Enrolment>  $enrolments
+     * @return array<string, list<PlannedSeance>>
+     */
+    public static function seancesOf(Collection $enrolments, ?string $from = null, ?string $to = null, bool $withCancelled = false): array
+    {
+        $ids = $enrolments->pluck('id')->all();
+        if ($ids === []) {
+            return [];
+        }
+        $adjustments = EnrolmentAdjustment::query()->whereIn('enrolment_id', $ids)->whereNotNull('seance_id')->get()
+            ->keyBy(fn (EnrolmentAdjustment $a) => $a->enrolment_id.'|'.$a->seance_id);
+        $addedIds = $adjustments->where('kind', EnrolmentAdjustment::ADDED_SEANCE)->pluck('seance_id')->unique()->values()->all();
+        $seances = Seance::query()
+            ->where(fn ($q) => $q->whereIn('training_session_id', $enrolments->pluck('training_session_id')->unique()->values()->all())->orWhereIn('id', $addedIds))
+            ->when(! $withCancelled, fn ($q) => $q->where('status', Seance::PLANNED))
+            ->when($from !== null, fn ($q) => $q->where('date', '>=', $from))
+            ->when($to !== null, fn ($q) => $q->where('date', '<=', $to))
+            ->orderBy('date')->orderBy('starts_at')->orderBy('id')->get();
+        $exempt = self::exemptPairs($seances, $ids);
+
+        $out = [];
+        foreach ($enrolments as $enrolment) {
+            $entered = $enrolment->entered_on?->toDateString();
+            $left = $enrolment->left_on?->toDateString();
+            $list = [];
+            foreach ($seances as $seance) {
+                $key = $enrolment->id.'|'.$seance->id;
+                $adjustment = $adjustments[$key] ?? null;
+                $added = $adjustment?->kind === EnrolmentAdjustment::ADDED_SEANCE;
+                $date = $seance->date->toDateString();
+                if ((! $added && $seance->training_session_id !== $enrolment->training_session_id) || isset($exempt[$key])
+                    || ($entered !== null && $date < $entered) || ($left !== null && $date > $left)) {
+                    continue;
+                }
+                $hours = self::hoursOf($seance, $adjustment);
+                $list[] = new PlannedSeance($seance, $hours['start'], $hours['end'], $hours['minutes'], $added);
+            }
+            $out[$enrolment->id] = $list;
+        }
+
+        return $out;
     }
 
     /**

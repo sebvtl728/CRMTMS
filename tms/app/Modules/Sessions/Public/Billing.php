@@ -199,6 +199,9 @@ final class Billing
         $attendance = Attendance::query()
             ->join('seances', 'seances.id', '=', 'attendances.seance_id')
             ->join('enrolments', 'enrolments.id', '=', 'attendances.enrolment_id')
+            // His own hours at the séance (individual planning): his duration, never the séance's.
+            ->leftJoin('enrolment_adjustments as own', fn ($j) => $j->on('own.seance_id', '=', 'attendances.seance_id')
+                ->on('own.enrolment_id', '=', 'attendances.enrolment_id')->whereNotNull('own.starts_at'))
             ->whereIn('attendances.enrolment_id', $ids)
             ->whereNull('seances.deleted_at')
             ->where('seances.status', '<>', Seance::CANCELLED)
@@ -206,8 +209,8 @@ final class Billing
             ->where(fn ($q) => $q->whereNull('enrolments.left_on')->orWhereColumn('seances.date', '<=', 'enrolments.left_on'))
             ->groupByRaw("attendances.enrolment_id, to_char(seances.date, 'YYYY-MM')")
             ->selectRaw("attendances.enrolment_id as enrolment_id, to_char(seances.date, 'YYYY-MM') as month, sum(attendances.minutes)::bigint as realised"
-                .', sum(case when seances.date < ?::date and attendances.status = ? then seances.duration_minutes'
-                .' when seances.date < ?::date and attendances.status = ? then greatest(seances.duration_minutes - attendances.minutes, 0)'
+                .', sum(case when seances.date < ?::date and attendances.status = ? then coalesce(own.duration_minutes, seances.duration_minutes)'
+                .' when seances.date < ?::date and attendances.status = ? then greatest(coalesce(own.duration_minutes, seances.duration_minutes) - attendances.minutes, 0)'
                 .' else 0 end)::bigint as absent', [$today, Attendance::ABSENT, $today, Attendance::PARTIAL])
             ->toBase()->get();
 

@@ -10,6 +10,7 @@ use App\Modules\Sessions\Attendance\Months;
 use App\Modules\Sessions\Enrolments\Enrolment;
 use App\Modules\Sessions\Modules\SessionModule;
 use App\Modules\Sessions\Modules\SessionModules;
+use App\Modules\Sessions\Planning\IndividualPlanning;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
@@ -122,6 +123,7 @@ final class RealisedHours
             ->groupBy('training_session_id')
             ->map(fn ($rows) => $rows->map(fn (AttendanceClosure $c) => Months::key($c->month))->values()->all());
 
+        $cuts = IndividualPlanning::moduleCuts($enrolments);
         $result = [];
         foreach ($enrolments as $enrolment) {
             $byModule = [];
@@ -130,7 +132,9 @@ final class RealisedHours
             foreach ($modules[$enrolment->training_session_id] ?? [] as $module) {
                 $modulePlanned = $module->planned_minutes ?? 0;
                 $moduleRealised = $realised[$enrolment->id.'|'.$module->id] ?? 0;
-                $byModule[] = ['module_id' => $module->id, 'planned' => $modulePlanned, 'realised' => $moduleRealised];
+                // His part of the module: his individual planning may take some of it off.
+                $his = max(0, $modulePlanned - ($cuts[$enrolment->id]['modules'][$module->id] ?? 0));
+                $byModule[] = ['module_id' => $module->id, 'planned' => $his, 'realised' => $moduleRealised];
                 $planned += $modulePlanned;
                 $total += $moduleRealised;
             }

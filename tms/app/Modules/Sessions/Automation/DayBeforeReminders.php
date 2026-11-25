@@ -10,6 +10,7 @@ use App\Modules\Crm\Public\Fiches;
 use App\Modules\Sessions\Attendance\Attendances;
 use App\Modules\Sessions\Modules\SessionModule;
 use App\Modules\Sessions\Planning\PlanningRows;
+use App\Modules\Sessions\Planning\IndividualPlanning;
 use App\Modules\Sessions\Planning\Seance;
 use App\Modules\Sessions\Resources\Room;
 use App\Modules\Sessions\Sessions\SessionLocation;
@@ -50,8 +51,8 @@ final class DayBeforeReminders
         $labels = PlanningRows::sessionLabels($sessions->values());
         $modules = SessionModule::query()->whereKey($seances->pluck('session_module_id')->unique()->all())->pluck('title', 'id');
         $rooms = Room::query()->whereKey($seances->pluck('room_id')->filter()->unique()->all())->get()->keyBy('id');
-        $line = fn (Seance $s, bool $withSession): string => implode(' · ', array_filter([
-            $s->start().'–'.$s->end(),
+        $line = fn (Seance $s, bool $withSession, ?array $hours = null): string => implode(' · ', array_filter([
+            ($hours['start'] ?? $s->start()).'–'.($hours['end'] ?? $s->end()),
             $withSession ? ($labels[$s->training_session_id] ?? null) : null,
             $modules[$s->session_module_id] ?? null,
             self::place($s, $sessions[$s->training_session_id], $rooms),
@@ -63,9 +64,12 @@ final class DayBeforeReminders
         foreach ($seances->groupBy('training_session_id') as $sessionId => $own) {
             $byEnrolment = [];
             foreach ($own as $seance) {
-                foreach (Attendances::expected($seance)->get(['id', 'person_id']) as $enrolment) {
+                $expected = Attendances::expected($seance)->get(['enrolments.id', 'enrolments.person_id']);
+                // His own hours (individual planning) in his e-mail.
+                $times = IndividualPlanning::times($seance, $expected->pluck('id')->map(fn ($id) => (string) $id)->all());
+                foreach ($expected as $enrolment) {
                     $byEnrolment[$enrolment->id]['person'] = (string) $enrolment->person_id;
-                    $byEnrolment[$enrolment->id]['seances'][] = $seance;
+                    $byEnrolment[$enrolment->id]['seances'][] = [$seance, $times[$enrolment->id]];
                 }
             }
             $people = $this->recipients(array_column($byEnrolment, 'person'));
@@ -76,7 +80,7 @@ final class DayBeforeReminders
                 }
                 $text = $this->templates->render(DayBeforeMailTemplates::TRAINEE, [
                     'stagiaire' => $person['name'], 'session' => (string) ($labels[$sessionId] ?? ''), 'date' => $day,
-                    'seances' => implode("\n", array_map(fn (Seance $s) => '- '.$line($s, false), $row['seances'])), 'organisme' => $organisme,
+                    'seances' => implode("\n", array_map(fn (array $s) => '- '.$line($s[0], false, $s[1]), $row['seances'])), 'organisme' => $organisme,
                 ]);
                 $sent += $this->queue((string) $enrolmentId, $date, $person['email'], $text);
             }

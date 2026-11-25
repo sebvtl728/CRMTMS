@@ -84,3 +84,16 @@ it('does nothing when day_before is off', function () {
 
     expect(dbRun())->toBe(0);
 });
+
+it('follows the individual planning: his own hours, nothing when exempted', function () {
+    ['lea' => $lea, 'paul' => $paul, 'morning' => $morning] = dbSession();
+    $afternoon = Seance::query()->where('id', '<>', $morning->id)->sole();
+    $this->actingAs(atManager());
+    app(\App\Modules\Sessions\Planning\IndividualPlanningWriter::class)->exemptSeances($paul, [$morning->id, $afternoon->id], null);
+    app(\App\Modules\Sessions\Planning\IndividualPlanningWriter::class)->setOwnHours($lea, $morning->id, '10:00', '12:30', 0);
+
+    expect(dbRun())->toBe(2);
+    Mail::assertNotSent(DayBeforeMail::class, fn (DayBeforeMail $m) => $m->hasTo('paul@example.test'));
+    Mail::assertSent(DayBeforeMail::class, fn (DayBeforeMail $m) => $m->hasTo('lea@example.test')
+        && str_contains($m->text, '10:00–12:30') && ! str_contains($m->text, '09:00'));
+});

@@ -12,6 +12,8 @@ use App\Modules\Sessions\Dossiers\DossierStatus;
 use App\Modules\Sessions\Dossiers\DossierTransitions;
 use App\Modules\Sessions\Enrolments\Enrolment;
 use App\Modules\Sessions\Enrolments\EnrolmentStatus;
+use App\Modules\Sessions\Planning\IndividualPlanning;
+use App\Modules\Sessions\Planning\PlannedSeance;
 use App\Modules\Sessions\Planning\Seance;
 use App\Modules\Sessions\Sessions\SessionLocation;
 use App\Modules\Sessions\Sessions\SessionPlace;
@@ -92,12 +94,12 @@ final class Paperwork
         }
         $session = TrainingSession::withTrashed()->findOrFail($enrolment->training_session_id);
         $hours = RealisedHours::forEnrolment($enrolment->id);
-        $seances = Seance::query()->where('training_session_id', $session->id)->where('status', 'planned')
-            ->orderBy('date')->orderBy('starts_at')->get();
+        // His individual planning: his séances, at his hours.
+        $seances = collect(IndividualPlanning::seancesOf(collect([$enrolment]))[$enrolment->id] ?? []);
         if ($completeOn !== null) {
             $recorded = Attendance::query()->where('enrolment_id', $enrolment->id)->pluck('seance_id')->map(fn ($id) => (string) $id)->all();
             $hours['realised_minutes'] = (int) $hours['realised_minutes'] + (int) $seances
-                ->filter(fn (Seance $s) => $s->date->toDateString() === $completeOn && ! in_array($s->id, $recorded, true))->sum('duration_minutes');
+                ->filter(fn (PlannedSeance $p) => $p->seance->date->toDateString() === $completeOn && ! in_array($p->seance->id, $recorded, true))->sum('minutes');
         }
 
         return [
@@ -118,11 +120,11 @@ final class Paperwork
                 'place' => self::place($session),
                 'cancelled' => $session->isCancelled(),
             ],
-            'schedule' => $seances->map(fn (Seance $s) => [
-                'date' => $s->date->toDateString(),
-                'starts_at' => substr($s->starts_at, 0, 5),
-                'ends_at' => substr($s->ends_at, 0, 5),
-                'place' => $s->place_text,
+            'schedule' => $seances->map(fn (PlannedSeance $p) => [
+                'date' => $p->seance->date->toDateString(),
+                'starts_at' => $p->start,
+                'ends_at' => $p->end,
+                'place' => $p->seance->place_text,
             ])->values()->all(),
         ];
     }

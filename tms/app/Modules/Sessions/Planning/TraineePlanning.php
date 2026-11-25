@@ -36,11 +36,9 @@ final class TraineePlanning
             return [];
         }
         $day = $today->toDateString();
-        $seances = Seance::query()->whereIn('training_session_id', $sessionIds)->where('status', Seance::PLANNED)
-            ->where('date', '>=', $day)->orderBy('date')->orderBy('starts_at')->orderBy('id')
-            ->get(['id', 'training_session_id', 'session_module_id', 'date', 'starts_at', 'ends_at', 'room_id', 'place_text'])
-            ->groupBy('training_session_id');
-        $all = $seances->flatten(1);
+        // His individual planning: exempted séances left out, added ones in, at his hours.
+        $planned = IndividualPlanning::seancesOf($enrolments, $day);
+        $all = collect($planned)->flatten(1)->map(fn (PlannedSeance $p) => $p->seance);
         $modules = SessionModule::withTrashed()->whereIn('id', $all->pluck('session_module_id')->unique()->values()->all())->pluck('title', 'id');
         $rooms = Room::withTrashed()->whereIn('id', $all->pluck('room_id')->filter()->unique()->values()->all())->pluck('name', 'id');
         $periods = PlacementPeriod::query()->with('hosts')->whereIn('training_session_id', $sessionIds)
@@ -50,15 +48,12 @@ final class TraineePlanning
 
         $out = [];
         foreach ($enrolments as $enrolment) {
-            $from = max($day, $enrolment->entered_on?->toDateString() ?? $day);
-            $to = $enrolment->left_on?->toDateString();
-            $his = ($seances[$enrolment->training_session_id] ?? collect())
-                ->filter(fn (Seance $s) => $s->date->toDateString() >= $from && ($to === null || $s->date->toDateString() <= $to))->values();
-            $lines = $his->take(self::UPCOMING)->map(fn (Seance $s) => implode(' · ', array_filter([
-                self::WEEKDAYS[$s->date->isoWeekday()].' '.$s->date->format('d/m/Y'),
-                $s->start().'–'.$s->end(),
-                $modules[$s->session_module_id] ?? null,
-                $s->room_id !== null ? ($rooms[$s->room_id] ?? null) : $s->place_text,
+            $his = collect($planned[$enrolment->id] ?? []);
+            $lines = $his->take(self::UPCOMING)->map(fn (PlannedSeance $p) => implode(' · ', array_filter([
+                self::WEEKDAYS[$p->seance->date->isoWeekday()].' '.$p->seance->date->format('d/m/Y'),
+                $p->start.'–'.$p->end,
+                $modules[$p->seance->session_module_id] ?? null,
+                $p->seance->room_id !== null ? ($rooms[$p->seance->room_id] ?? null) : $p->seance->place_text,
             ])))->all();
             if ($his->count() > self::UPCOMING) {
                 $more = $his->count() - self::UPCOMING;
