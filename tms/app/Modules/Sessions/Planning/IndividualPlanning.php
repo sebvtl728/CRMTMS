@@ -43,6 +43,58 @@ final class IndividualPlanning
             ->exists();
     }
 
+    /**
+     * The hours of each trainee at the séance: his own hours where he has
+     * some, kept within the séance (a séance moved since: the overlap, the
+     * séance's hours when nothing overlaps), else the séance's. One query.
+     *
+     * @param  list<string>  $enrolmentIds
+     * @return array<string, array{start: string, end: string, break: int, minutes: int}>
+     */
+    public static function times(Seance $seance, array $enrolmentIds): array
+    {
+        $own = $enrolmentIds === [] ? collect() : EnrolmentAdjustment::query()->where('seance_id', $seance->id)
+            ->whereIn('enrolment_id', $enrolmentIds)->whereNotNull('starts_at')
+            ->get(['enrolment_id', 'starts_at', 'ends_at', 'break_minutes'])->keyBy('enrolment_id');
+        $out = [];
+        foreach ($enrolmentIds as $id) {
+            $out[$id] = self::hoursOf($seance, $own[$id] ?? null);
+        }
+
+        return $out;
+    }
+
+    /** His duration at the séance, in minutes (see times()). */
+    public static function minutesAt(string $enrolmentId, Seance $seance): int
+    {
+        return self::times($seance, [$enrolmentId])[$enrolmentId]['minutes'];
+    }
+
+    /**
+     * @return array{start: string, end: string, break: int, minutes: int}
+     */
+    public static function hoursOf(Seance $seance, ?EnrolmentAdjustment $own): array
+    {
+        $default = ['start' => $seance->start(), 'end' => $seance->end(), 'break' => $seance->break_minutes, 'minutes' => $seance->duration_minutes];
+        if ($own === null || $own->starts_at === null || $own->ends_at === null) {
+            return $default;
+        }
+        $start = max(substr($own->starts_at, 0, 5), $seance->start());
+        $end = min(substr($own->ends_at, 0, 5), $seance->end());
+        if ($end <= $start) {
+            return $default;
+        }
+        $span = self::minutesOfDay($end) - self::minutesOfDay($start);
+        $break = min((int) $own->break_minutes, $span - 1);
+
+        return ['start' => $start, 'end' => $end, 'break' => $break, 'minutes' => $span - $break];
+    }
+
+    private static function minutesOfDay(string $time): int
+    {
+        return ((int) substr($time, 0, 2)) * 60 + (int) substr($time, 3, 2);
+    }
+
     private static function exemptionOf(QueryBuilder $q, Seance $seance): void
     {
         $q->selectRaw('1')->from('enrolment_adjustments')

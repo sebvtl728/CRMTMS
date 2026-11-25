@@ -63,9 +63,10 @@ final class Attendances
             $locked = self::lock($seance);
             $enrolment = self::enrolmentOf($locked, $enrolmentId);
             self::assertExpected($enrolment, $locked->date, $locked);
+            $duration = IndividualPlanning::minutesAt($enrolment->id, $locked);
             $realised = match ($status) {
-                Attendance::PRESENT => $locked->duration_minutes,
-                Attendance::PARTIAL => self::partial($minutes, $locked->duration_minutes),
+                Attendance::PRESENT => $duration,
+                Attendance::PARTIAL => self::partial($minutes, $duration),
                 default => 0,
             };
             $attendance = Attendance::query()->where('seance_id', $locked->id)->where('enrolment_id', $enrolment->id)->lockForUpdate()->first()
@@ -93,12 +94,14 @@ final class Attendances
             $locked = self::lock($seance);
             $entered = Attendance::query()->where('seance_id', $locked->id)->pluck('enrolment_id')->all();
             $count = 0;
-            foreach (self::expected($locked)->whereNotIn('id', $entered)->orderBy('id')->get() as $enrolment) {
+            $missing = self::expected($locked)->whereNotIn('id', $entered)->orderBy('id')->get();
+            $times = IndividualPlanning::times($locked, $missing->pluck('id')->all());
+            foreach ($missing as $enrolment) {
                 (new Attendance([
                     'seance_id' => $locked->id,
                     'enrolment_id' => $enrolment->id,
                     'status' => Attendance::PRESENT,
-                    'minutes' => $locked->duration_minutes,
+                    'minutes' => $times[$enrolment->id]['minutes'],
                     'needs_review' => false,
                     'recorded_by' => self::userId(),
                 ]))->save();
@@ -129,7 +132,7 @@ final class Attendances
             $attendance ??= new Attendance(['seance_id' => $locked->id, 'enrolment_id' => $enrolment->id]);
             $attendance->fill([
                 'status' => $status,
-                'minutes' => $status === Attendance::PRESENT ? $locked->duration_minutes : $minutes,
+                'minutes' => $status === Attendance::PRESENT ? IndividualPlanning::minutesAt($enrolment->id, $locked) : $minutes,
                 'reason' => null,
                 'needs_review' => false,
                 'recorded_by' => self::userId(),
@@ -198,15 +201,17 @@ final class Attendances
     {
         /** @var Collection<int, Attendance> $rows */
         $rows = Attendance::query()->where('seance_id', $seance->id)->orderBy('id')->lockForUpdate()->get();
+        $times = IndividualPlanning::times($seance, $rows->pluck('enrolment_id')->map(fn ($id) => (string) $id)->unique()->values()->all());
         foreach ($rows as $attendance) {
+            $duration = $times[$attendance->enrolment_id]['minutes'];
             $attendance->needs_review = true;
             if ($kind === SeanceChanged::CANCELLED || $seance->isCancelled()) {
                 $attendance->minutes = 0;
             } elseif ($attendance->status === Attendance::PRESENT) {
-                $attendance->minutes = $seance->duration_minutes;
-            } elseif ($attendance->status === Attendance::PARTIAL && $attendance->minutes >= $seance->duration_minutes) {
+                $attendance->minutes = $duration;
+            } elseif ($attendance->status === Attendance::PARTIAL && $attendance->minutes >= $duration) {
                 $attendance->status = Attendance::PRESENT;
-                $attendance->minutes = $seance->duration_minutes;
+                $attendance->minutes = $duration;
             }
             $attendance->save();
         }
