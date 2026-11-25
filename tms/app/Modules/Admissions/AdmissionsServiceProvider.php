@@ -4,7 +4,9 @@ namespace App\Modules\Admissions;
 
 use App\Modules\Admissions\Alternance\AlternanceContract;
 use App\Modules\Admissions\Alternance\AlternanceFacts;
+use App\Modules\Core\Automation\DailyAutomations;
 use App\Modules\Admissions\Booklet\BookletAccess;
+use App\Modules\Admissions\Booklet\BookletAutomation;
 use App\Modules\Admissions\Booklet\BookletEvaluation;
 use App\Modules\Admissions\Booklet\BookletMail;
 use App\Modules\Admissions\Booklet\BookletMonth;
@@ -90,6 +92,8 @@ class AdmissionsServiceProvider extends ServiceProvider
         self::registerTrainingUsage();
         self::registerCrm();
         Quality\AdmissionsMeasures::register();
+        // The apprenticeship booklet: monthly link of the past month and reminders (Administration › Automatismes).
+        DailyAutomations::register('booklet', fn (CarbonImmutable $today): int => app(BookletAutomation::class)->run($today));
         // The documents of a dossier know its alternance contract (convention d'apprentissage / de professionnalisation).
         Paperwork::registerAlternance(fn (string $dossierId): ?array => AlternanceFacts::forDossier($dossierId));
 

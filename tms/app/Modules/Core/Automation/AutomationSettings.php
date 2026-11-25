@@ -21,6 +21,7 @@ final class AutomationSettings
         'signature_reminder_max' => 2,
         'certificates' => false,
         'convention_on_quote' => false,
+        'booklet' => false,
     ];
 
     public const MAX_DAYS = 30;
@@ -55,6 +56,14 @@ final class AutomationSettings
         return is_bool($value) ? $value : self::DEFAULTS['convention_on_quote'];
     }
 
+    /** The apprenticeship booklet: monthly link to the apprentice and reminders (Admissions): off by default. */
+    public static function booklet(): bool
+    {
+        $value = data_get(self::settings(), 'automation.booklet');
+
+        return is_bool($value) ? $value : self::DEFAULTS['booklet'];
+    }
+
     public static function signatureReminderDays(): int
     {
         return self::int('signature_reminder_days', self::MAX_DAYS);
@@ -65,7 +74,7 @@ final class AutomationSettings
         return self::int('signature_reminder_max', self::MAX_REMINDERS);
     }
 
-    /** @return array{convocation_days: int, day_before: bool, signature_reminder_days: int, signature_reminder_max: int, certificates: bool, convention_on_quote: bool} */
+    /** @return array{convocation_days: int, day_before: bool, signature_reminder_days: int, signature_reminder_max: int, certificates: bool, convention_on_quote: bool, booklet: bool} */
     public static function all(): array
     {
         return [
@@ -75,6 +84,7 @@ final class AutomationSettings
             'signature_reminder_max' => self::signatureReminderMax(),
             'certificates' => self::certificates(),
             'convention_on_quote' => self::conventionOnQuote(),
+            'booklet' => self::booklet(),
         ];
     }
 
@@ -94,6 +104,7 @@ final class AutomationSettings
             'signature_reminder_max' => ['sometimes', 'integer', 'min:1', 'max:'.self::MAX_REMINDERS],
             'certificates' => ['sometimes', 'boolean'],
             'convention_on_quote' => ['sometimes', 'boolean'],
+            'booklet' => ['sometimes', 'boolean'],
         ], [
             '*.integer' => 'Indiquez un nombre entier.',
             '*.min' => 'Indiquez un nombre positif.',
