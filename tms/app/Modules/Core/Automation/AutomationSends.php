@@ -23,6 +23,12 @@ final class AutomationSends
 
     public const CONVENTION = 'convention';
 
+    /** The monthly link of the apprenticeship booklet (Admissions). */
+    public const BOOKLET = 'booklet';
+
+    /** A reminder of a monthly booklet link (Admissions). */
+    public const BOOKLET_REMINDER = 'booklet_reminder';
+
     public static function claim(string $kind, string $subjectId, string $occurrence): bool
     {
         return DB::table('automation_sends')->insertOrIgnore([

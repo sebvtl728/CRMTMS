@@ -22,6 +22,9 @@ final class Permissions
 
     public const SENSITIVE_VIEW = 'admissions.sensitive.view';
 
+    /** Follow the apprenticeship booklet (grids, visits, monthly pages, links); « Ses séances » for the trainers. */
+    public const BOOKLET_MANAGE = 'admissions.booklet.manage';
+
     /**
      * Themes of the « Rôles et droits » screen, in order: theme => permissions.
      *
@@ -30,6 +33,7 @@ final class Permissions
     public const GROUPS = [
         'Candidatures' => [self::CANDIDATURES_VIEW, self::CANDIDATURES_UPDATE, self::CANDIDATURES_DELETE],
         'Données sensibles des candidats' => [self::SENSITIVE_VIEW],
+        'Livret d\'apprentissage' => [self::BOOKLET_MANAGE],
     ];
 
     /**
@@ -41,6 +45,7 @@ final class Permissions
             self::CANDIDATURES_VIEW => ['Consulter les candidatures', 'Voir les candidats, apprenants et alternants, leur parcours d\'admission et leur contrat.'],
             self::CANDIDATURES_UPDATE => ['Créer et modifier les candidatures', 'Ouvrir une candidature, saisir le positionnement, l\'entretien, le contrat d\'alternance, changer l\'étape.'],
             self::CANDIDATURES_DELETE => ['Supprimer des candidatures', 'Mettre des candidatures à la corbeille et les restaurer.'],
+            self::BOOKLET_MANAGE => ['Suivre le livret d\'apprentissage', 'Saisir les grilles, les visites et les observations du centre, viser les pages du mois et envoyer les liens de suivi à l\'apprenti et au tuteur. « Ses séances » : les apprentis des sessions où le formateur a des séances.'],
             self::SENSITIVE_VIEW => ['Voir les données sensibles des candidats', 'Voir et saisir la RQTH, les besoins d\'adaptation et le compte rendu d\'entretien.'],
         ];
     }
@@ -58,7 +63,15 @@ final class Permissions
      */
     public static function scoped(): array
     {
-        return self::GROUPS['Candidatures'];
+        return [...self::GROUPS['Candidatures'], self::BOOKLET_MANAGE];
+    }
+
+    /**
+     * @return array<string, list<AccessScope>>
+     */
+    public static function extraScopes(): array
+    {
+        return [self::BOOKLET_MANAGE => [AccessScope::Trainer]];
     }
 
     /**
@@ -71,8 +84,9 @@ final class Permissions
         return match ($role) {
             Role::AdminOrganisme => self::all(),
             Role::Direction => [self::CANDIDATURES_VIEW, self::SENSITIVE_VIEW],
-            Role::ResponsableDas, Role::Commercial, Role::ChargeRelations, Role::Assistant => $work,
-            Role::Formateur => [],
+            Role::Commercial => $work,
+            Role::ResponsableDas, Role::ChargeRelations, Role::Assistant => [...$work, self::BOOKLET_MANAGE],
+            Role::Formateur => [self::BOOKLET_MANAGE],
         };
     }
 
@@ -81,6 +95,10 @@ final class Permissions
      */
     public static function defaultScopesFor(Role $role): array
     {
-        return $role === Role::ResponsableDas ? array_fill_keys(self::scoped(), AccessScope::Das) : [];
+        return match ($role) {
+            Role::ResponsableDas => array_fill_keys(self::scoped(), AccessScope::Das),
+            Role::Formateur => [self::BOOKLET_MANAGE => AccessScope::Trainer],
+            default => [],
+        };
     }
 }

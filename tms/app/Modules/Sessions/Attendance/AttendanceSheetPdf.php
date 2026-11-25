@@ -60,7 +60,8 @@ final class AttendanceSheetPdf
         $modules = SessionModule::withTrashed()->whereKey($live->pluck('session_module_id')->all())->pluck('title', 'id');
         $trainers = SeanceRows::trainerLabels($live->pluck('trainer_id')->filter()->unique()->values()->all());
 
-        $enrolments = Attendances::expected($first)->get();
+        // Every trainee expected at one séance of the sheet (an individual planning may leave him out of some).
+        $enrolments = $live->flatMap(fn (Seance $s) => Attendances::expected($s)->get())->unique('id')->values();
         $people = app(Fiches::class)->personLabels($enrolments->pluck('person_id')->map(fn ($id) => (string) $id)->unique()->values()->all());
         $trainees = $enrolments->map(fn (Enrolment $e) => $people[$e->person_id]['label'] ?? 'Stagiaire')
             ->sortBy(fn (string $name) => mb_strtolower($name))->values()->all();

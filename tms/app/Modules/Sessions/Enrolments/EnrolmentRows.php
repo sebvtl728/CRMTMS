@@ -95,6 +95,8 @@ final class EnrolmentRows
                 'left_on' => $e->left_on?->toDateString(),
                 'abandon_reason' => $e->abandon_reason_id === null ? null : ($labels[$e->abandon_reason_id] ?? null),
                 'planned_hours' => SessionRows::hours($e->planned_hours),
+                // His planned hours before his individual planning (null: none): what « Heures prévues » edits then.
+                'planned_hours_base' => SessionRows::hours($e->planned_hours_base),
                 'price_share' => $seesDossier && $e->price_share !== null ? Amounts::display(Amounts::cents((string) $e->price_share)) : null,
                 'bpf_category_id' => $e->bpf_category_id,
                 'bpf_category' => $e->bpf_category_id === null ? null : ($labels[$e->bpf_category_id] ?? null),

@@ -3,6 +3,13 @@
 namespace App\Modules\Admissions;
 
 use App\Modules\Admissions\Alternance\AlternanceContract;
+use App\Modules\Admissions\Alternance\AlternanceFacts;
+use App\Modules\Admissions\Booklet\BookletAccess;
+use App\Modules\Admissions\Booklet\BookletAutomation;
+use App\Modules\Admissions\Booklet\BookletEvaluation;
+use App\Modules\Admissions\Booklet\BookletMail;
+use App\Modules\Admissions\Booklet\BookletMonth;
+use App\Modules\Admissions\Booklet\BookletVisit;
 use App\Modules\Admissions\Candidatures\Candidature;
 use App\Modules\Admissions\Candidatures\CandidatureFile;
 use App\Modules\Admissions\Crm\CandidatureLinks;
@@ -22,12 +29,14 @@ use App\Modules\Core\Access\Permissions as CorePermissions;
 use App\Modules\Core\Access\Role;
 use App\Modules\Core\Access\Scopes;
 use App\Modules\Core\Audit\MorphAliases;
+use App\Modules\Core\Automation\DailyAutomations;
 use App\Modules\Core\References\ReferenceList;
 use App\Modules\Core\References\ReferenceUsage;
 use App\Modules\Core\Users\User;
 use App\Modules\Crm\Public\FicheBlocks;
 use App\Modules\Crm\Public\FicheLinks;
 use App\Modules\Sessions\Public\DossierBlocks;
+use App\Modules\Sessions\Public\Paperwork;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Support\Facades\DB;
@@ -55,6 +64,7 @@ class AdmissionsServiceProvider extends ServiceProvider
                 $group,
                 array_values(array_intersect(Permissions::scoped(), $permissions)),
                 fn (Role $role): array => array_intersect_key(Permissions::defaultScopesFor($role), array_flip($permissions)),
+                array_intersect_key(Permissions::extraScopes(), array_flip($permissions)),
             );
         }
 
@@ -66,9 +76,13 @@ class AdmissionsServiceProvider extends ServiceProvider
             PositioningSending::MORPH_ALIAS => PositioningSending::class,
             OnlineTest::MORPH_ALIAS => OnlineTest::class,
             OnlineAttempt::MORPH_ALIAS => OnlineAttempt::class,
+            BookletMonth::MORPH_ALIAS => BookletMonth::class,
+            BookletEvaluation::MORPH_ALIAS => BookletEvaluation::class,
+            BookletVisit::MORPH_ALIAS => BookletVisit::class,
         ]);
 
         PositioningSendings::registerTemplate();
+        BookletMail::registerTemplates();
     }
 
     public function boot(): void
@@ -78,6 +92,11 @@ class AdmissionsServiceProvider extends ServiceProvider
         self::registerTrainingUsage();
         self::registerCrm();
         Quality\AdmissionsMeasures::register();
+        Quality\BookletMeasures::register();
+        // The apprenticeship booklet: monthly link of the past month and reminders (Administration › Automatismes).
+        DailyAutomations::register('booklet', fn (CarbonImmutable $today): int => app(BookletAutomation::class)->run($today));
+        // The documents of a dossier know its alternance contract (convention d'apprentissage / de professionnalisation).
+        Paperwork::registerAlternance(fn (string $dossierId): ?array => AlternanceFacts::forDossier($dossierId));
 
         // A test sent to a candidate stays downloadable from the history once trashed in the library.
         Brochures::registerSentCheck('admissions.positioning', fn (string $versionId): bool => DB::table('positioning_sending_versions')->where('brochure_version_id', $versionId)->exists());
@@ -110,6 +129,16 @@ class AdmissionsServiceProvider extends ServiceProvider
             }
 
             return AdmissionsVisibility::candidatures($query, $user)->findOrFail($value);
+        });
+
+        // The booklet follow-up: 404 out of the scope of admissions.booklet.manage.
+        Route::bind('bookletCandidature', function (string $value): Candidature {
+            $user = request()->user();
+            if (! Str::isUuid($value) || ! $user instanceof User) {
+                throw (new ModelNotFoundException)->setModel(Candidature::class, [$value]);
+            }
+
+            return BookletAccess::candidatures(Candidature::query(), $user)->findOrFail($value);
         });
     }
 

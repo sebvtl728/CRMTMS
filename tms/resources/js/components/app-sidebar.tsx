@@ -79,6 +79,7 @@ const trainingNavItems: (NavItem & { permission: string })[] = [
     { title: 'Sessions', url: '/sessions', icon: CalendarDays, permission: 'sessions.sessions.view' },
     { title: 'Planning des séances', url: '/sessions/planning', icon: CalendarRange, permission: 'sessions.seances.view' },
     { title: 'Formateurs', url: '/trainers', icon: GraduationCap, permission: 'sessions.trainers.manage' },
+    { title: 'Livrets d\'apprentissage', url: '/admissions/livret', icon: BookOpenCheck, permission: 'admissions.booklet.manage' },
     { title: 'Tests en ligne', url: '/admissions/online-tests', icon: ClipboardCheck, permission: 'catalogue.manage' },
 ];
 
@@ -181,8 +182,15 @@ export function AppSidebar() {
 
             <SidebarContent>
                 {auth.trainer_only ? (
-                    // A trainer and nothing else: his planning, and his follow-up calls when he holds them.
-                    <NavMain items={[myPlanningItem, ...commercialItems.filter((item) => item.url === '/crm/todo')]} label="Navigation" />
+                    // A trainer and nothing else: his planning, his apprentices' booklets and his follow-up calls when he holds them.
+                    <NavMain
+                        items={[
+                            myPlanningItem,
+                            ...trainingItems.filter((item) => item.url === '/admissions/livret'),
+                            ...commercialItems.filter((item) => item.url === '/crm/todo'),
+                        ]}
+                        label="Navigation"
+                    />
                 ) : (
                     <>
                         <NavMain

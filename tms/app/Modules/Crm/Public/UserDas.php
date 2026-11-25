@@ -18,4 +18,14 @@ final class UserDas
     {
         return FollowedDas::ids($user);
     }
+
+    /**
+     * Who follows each DAS of the current organisme, in one query.
+     *
+     * @return array<string, list<string>> user ids keyed by DAS id
+     */
+    public static function followers(): array
+    {
+        return FollowedDas::followers();
+    }
 }

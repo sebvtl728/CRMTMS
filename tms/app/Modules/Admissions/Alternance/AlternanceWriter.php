@@ -5,6 +5,7 @@ namespace App\Modules\Admissions\Alternance;
 use App\Exceptions\UserFacingHttpException;
 use App\Modules\Admissions\Candidatures\Candidature;
 use App\Modules\Admissions\Candidatures\CandidatureStatus;
+use App\Modules\Admissions\Candidatures\CandidatureTransitions;
 use App\Modules\Admissions\Candidatures\Pathway;
 use App\Modules\Core\Users\User;
 use App\Modules\Crm\Public\Fiches;
@@ -12,11 +13,13 @@ use App\Modules\Sessions\Public\Admission;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 
 /**
  * The alternance contract of a candidature (one at most), recorded from the
  * interview on; removed only while no dossier exists. The employer, the
  * tutor and the OPCO are CRM fiches out of the trash (Crm\Public\Fiches).
+ * Saved at the interview, it admits the candidate (admitAtInterview).
  */
 final class AlternanceWriter
 {
@@ -87,6 +90,29 @@ final class AlternanceWriter
 
             return $contract;
         });
+    }
+
+    /**
+     * Saving the contract at the interview admits the candidate (the usual
+     * checks of CandidatureTransitions apply). Null when admitted or not at
+     * the interview; the French reason when the admission was refused (the
+     * contract stays saved).
+     */
+    public function admitAtInterview(Candidature $candidature, User $by): ?string
+    {
+        $candidature = $candidature->fresh() ?? $candidature;
+        if ($candidature->status !== CandidatureStatus::Interview) {
+            return null;
+        }
+        try {
+            app(CandidatureTransitions::class)->move($candidature, CandidatureStatus::Admitted, $by);
+        } catch (ValidationException $e) {
+            return (string) collect($e->errors())->flatten()->first();
+        } catch (UserFacingHttpException $e) {
+            return $e->getMessage();
+        }
+
+        return null;
     }
 
     public function delete(Candidature $candidature): void

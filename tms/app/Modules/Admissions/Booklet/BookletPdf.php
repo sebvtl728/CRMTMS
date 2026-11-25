@@ -26,13 +26,12 @@ use Illuminate\Support\Str;
  */
 final class BookletPdf
 {
-    private const MONTHS = [1 => 'Janvier', 'Février', 'Mars', 'Avril', 'Mai', 'Juin', 'Juillet', 'Août', 'Septembre', 'Octobre', 'Novembre', 'Décembre'];
-
     public function __construct(
         private readonly PdfRenderer $renderer,
         private readonly CompanyBranding $branding,
         private readonly Fiches $fiches,
         private readonly Trainings $trainings,
+        private readonly BookletGrid $grid,
     ) {}
 
     public static function fileName(Candidature $candidature): string
@@ -92,16 +91,16 @@ final class BookletPdf
         $settings = BookletSettings::all();
         $legal = is_array($candidature->legal_representative) ? $candidature->legal_representative : [];
 
-        $start = CarbonImmutable::parse($contract->starts_on->toDateString())->startOfMonth();
-        $end = CarbonImmutable::parse($contract->ends_on->toDateString())->startOfMonth();
-        $months = [];
-        for ($m = $start; $m <= $end && count($months) < 48; $m = $m->addMonth()) {
-            $key = $m->format('Y-m');
-            $months[] = [
-                'label' => self::MONTHS[(int) $m->format('n')].' '.$m->format('Y'),
-                'centre_minutes' => (int) ($schedule['months'][$key] ?? 0),
-            ];
-        }
+        $months = array_map(fn (array $m) => [
+            'label' => $m['label'],
+            'places' => $m['places'],
+            'centre_hours' => $m['centre_minutes'] > 0 ? self::hours((string) round($m['centre_minutes'] / 60, 2)) : null,
+            'pages' => array_map(fn (array $page) => [
+                ...$page,
+                'apprentice' => self::signature($page['apprentice']),
+                'tutor' => $page['tutor'] === null ? null : self::signature($page['tutor']),
+            ], $m['pages']),
+        ], BookletMonths::months($candidature, wholeContract: true));
 
         return [
             'company' => $company === null ? null : [
@@ -146,17 +145,32 @@ final class BookletPdf
                 'hours' => self::hours($m['duration_hours']),
                 'dispensed' => in_array($m['id'], $dispensed, true),
             ], $modules),
-            'competences' => $candidature->training_id === null ? [] : $this->trainings->competences($candidature->training_id),
+            'grid' => $this->grid->tree($candidature)['types'],
+            'visits' => array_map(fn (array $v) => [...$v, 'visited_on' => self::day($v['visited_on'])], BookletVisits::list($candidature)),
             'schedule' => $schedule === null ? null : [
                 'session' => $schedule['session'],
                 'centre_hours' => self::hours((string) round($schedule['centre_minutes'] / 60, 2)),
                 'teachers' => $schedule['teachers'],
                 'placements' => array_map(fn (array $p) => [...$p, 'from' => self::day($p['from']), 'to' => self::day($p['to'])], $schedule['placements']),
             ],
-            'months' => array_map(fn (array $m) => [...$m, 'centre_hours' => $m['centre_minutes'] > 0 ? self::hours((string) round($m['centre_minutes'] / 60, 2)) : null], $months),
+            'months' => $months,
             'team' => $settings['team'],
             'director_note' => $settings['director_note'],
         ];
+    }
+
+    /**
+     * A signature state with its drawing as a data URI (read from the
+     * archive; null when missing).
+     *
+     * @param  array{status: string, at: ?string, name: ?string, drawing: ?string}  $state
+     * @return array{status: string, at: ?string, name: ?string, drawing: ?string}
+     */
+    private static function signature(array $state): array
+    {
+        $bytes = $state['drawing'] === null ? null : Storage::disk(TenantStorage::DISK)->get($state['drawing']);
+
+        return [...$state, 'drawing' => is_string($bytes) && $bytes !== '' ? 'data:image/png;base64,'.base64_encode($bytes) : null];
     }
 
     private static function day(?string $date): ?string

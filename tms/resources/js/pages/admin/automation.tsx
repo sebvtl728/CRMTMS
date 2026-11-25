@@ -18,6 +18,7 @@ interface AutomationProps {
         signature_reminder_max: number;
         certificates: boolean;
         convention_on_quote: boolean;
+        booklet: boolean;
     };
     status?: string;
 }
@@ -33,6 +34,7 @@ export default function Automation({ settings }: AutomationProps) {
         signature_reminder_max: String(settings.signature_reminder_max),
         certificates: settings.certificates,
         convention_on_quote: settings.convention_on_quote,
+        booklet: settings.booklet,
     });
     const [running, setRunning] = useState(false);
     const number = (v: string) => (v === '' ? null : Number(v));
@@ -46,6 +48,7 @@ export default function Automation({ settings }: AutomationProps) {
             signature_reminder_max: number(d.signature_reminder_max),
             certificates: d.certificates,
             convention_on_quote: d.convention_on_quote,
+            booklet: d.booklet,
         }));
         put(route('admin.automation.update'), { preserveScroll: true });
     };
@@ -126,6 +129,20 @@ export default function Automation({ settings }: AutomationProps) {
                             à la main n'est jamais refait. Désactivé par défaut.
                         </p>
                         <InputError message={errors.certificates} />
+                    </section>
+
+                    <section className="grid gap-2 rounded-md border p-4">
+                        <h3 className="font-medium">Livret d'apprentissage</h3>
+                        <div className="flex items-center gap-2">
+                            <Checkbox id="booklet" checked={data.booklet} onCheckedChange={(v) => setData('booklet', v === true)} />
+                            <Label htmlFor="booklet">Envoyer chaque mois le lien du suivi et relancer les signatures</Label>
+                        </div>
+                        <p className="text-muted-foreground text-xs">
+                            Le 1er du mois (ou les jours suivants), le lien du mois écoulé part à chaque apprenti dont le contrat couvre ce mois, sauf
+                            si sa page est déjà signée ou si un lien est ouvert ; le lien du tuteur suit sa signature. Rappel à 7 puis 14 jours à qui
+                            n'a pas signé, avec un nouveau lien. Désactivé par défaut.
+                        </p>
+                        <InputError message={errors.booklet} />
                     </section>
 
                     <section className="grid gap-2 rounded-md border p-4">

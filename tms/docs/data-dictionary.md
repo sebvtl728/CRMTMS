@@ -609,13 +609,29 @@ Module `Sessions` (`Enrolment`, écrit par `Enrolments` et `PriceShares` seuleme
 | `waitlist_position` | integer, null | Ordre d'arrivée sur la liste d'attente ; renseigné si et seulement si `waitlisted` (CHECK) |
 | `entered_on`, `left_on` | date, null | Entrée (début de la session par défaut) et sortie ; sortie ≥ entrée (CHECK) |
 | `abandon_reason_id` | uuid, null (FK `reference_items`, motifs d'abandon) | Obligatoire avec la date de sortie pour un abandon (CHECK) ; gardé si l'abandon est ensuite annulé |
-| `planned_hours` | numeric(6,2), null | Heures prévues du stagiaire : celles de la session à l'inscription, modifiables (0 < h ≤ heures de la session) ; journalisées |
+| `planned_hours` | numeric(6,2), null | Heures prévues du stagiaire : celles de la session à l'inscription, modifiables (0 < h ≤ heures de la session) ; journalisées. Avec un planning individuel : calculées (`IndividualPlanning::refresh`) |
+| `planned_hours_base` | numeric(6,2), null | Heures prévues avant le premier écart du planning individuel (null : aucun écart) ; ce que « Heures prévues » modifie alors |
 | `price_share` | numeric(12,2), null | Part d'une ligne « prix par stagiaire » (`PriceShares` : total réparti au centime entre inscrits, confirmés et abandons, reste aux premières inscriptions par `created_at, id`) ; null en prix de groupe, en attente ou annulée |
 | `bpf_category_id` | uuid, null (FK `reference_items`, catégories BPF) | Catégorie de stagiaire (lot 3) |
 | `adaptation_needs`, `notes` | text, null | Situation de handicap / besoins d'adaptation et notes : données personnelles, journalisées sans valeur (`$auditPersonal`) |
 | `created_at`, `updated_at` | | |
 
 Une session avec des inscriptions non annulées garde sa formation, son type et son entreprise et ne va pas à la corbeille. « En cours » / « Réalisé » d'un dossier se calculent d'après la première date de début et la dernière date de fin des sessions de ses inscriptions non annulées (sessions annulées ou à la corbeille exclues : `DossierSchedule`).
+
+### `enrolment_adjustments` — planning individuel d'un stagiaire (2026-11-24)
+Module `Sessions` (`EnrolmentAdjustment`, écrit par `IndividualPlanningWriter`, lu par `IndividualPlanning` seulement).
+
+| Colonne | Type | Rôle |
+|---|---|---|
+| `id`, `tenant_id` | uuid | |
+| `enrolment_id` | uuid (FK `enrolments`, cascade) | Inscription concernée |
+| `kind` | string(20) | `exempt_seance` (dispensé d'une séance), `exempt_module` (d'un module entier, séances futures comprises), `own_hours` (ses horaires à une séance de sa session), `added_seance` (séance d'une autre session ajoutée) — CHECK |
+| `seance_id` | uuid, null (FK `seances`) | Séance visée ; nulle seulement pour `exempt_module` (CHECK) ; unique par inscription |
+| `session_module_id` | uuid, null (FK `session_modules`) | Module dispensé (`exempt_module` seulement) ; unique par inscription |
+| `starts_at`, `ends_at`, `break_minutes` | time, time, smallint, null | Ses horaires (obligatoires pour `own_hours`, facultatifs pour `added_seance`, interdits pour une dispense — CHECK) ; toujours dans ceux de la séance |
+| `duration_minutes` | integer, générée | Fin − début − pause |
+| `reason` | string(300), null | Motif : donnée personnelle, journalisé sans valeur, effacé par l'anonymisation |
+| `created_by`, `created_at`, `updated_at` | | |
 
 ### `fundings` — financements d'un dossier
 Module `Sessions` (`Funding`, écrit par `FundingWriter` seulement, sous le verrou du dossier) ; le financeur est lu par `Crm\Public\Fiches`. Droits : ceux du dossier (`sessions.dossiers.update` et son périmètre) ; affichés sur la page du dossier seulement, jamais sur une session.
@@ -760,6 +776,9 @@ Clé (`tenant_id`, `year`) : `last_number` (année de Paris, incrémenté dans l
 ### `alternance_contracts` — contrat d'alternance
 `candidature_id` (FK unique, cascade) · `contract_type` (`apprenticeship`, `professionalisation`, CHECK) · `employer_organisation_id` (FK `organisations`) · `tutor_person_id` (FK `people`, null) · `starts_on` ≤ `ends_on` (CHECK) · `opco_organisation_id` (FK `organisations`, null).
 
+### `booklet_months`, `booklet_links`, `booklet_evaluations`, `booklet_visits` — suivi en ligne du livret d'apprentissage
+`booklet_months` : une page par (`candidature_id`, `month` = 1er du mois, `place` `company` | `centre`, unique) · `apprentice_entries`, `observations` (jsonb `w1`, `w2`, `w3`, `w45` ; `$auditPersonal`) · pour `apprentice_` et `tutor_` : `signed_at`, `signature_path` (zone `booklet_signatures`), `signer_name` (figé), `paper` (signé sur papier), `ip`, `agent`, `link_id` · `visa_by`, `visa_at`. `booklet_links` : `candidature_id`, `month`, `signer` (`apprentice` | `tutor`), `person_id`, `email` et `signer_name` figés, `token_hash` (sha256, unique), `expires_at` (30 jours, fin de journée de Paris), `sent_at`, `email_status` (`pending`, `sent`, `failed`), `closed_at` (signature, renvoi, papier, anonymisation ; un seul lien ouvert par candidature, mois et signataire, index unique partiel), code (`code_hash` HMAC, `code_expires_at`, `code_attempts`, `code_sent_at`) ; non audité. `booklet_evaluations` : (`candidature_id`, `skill_key` = sha256 du chemin normalisé activité | compétence | savoir-faire, `side` `centre` | `company`, unique) · `level` (`A`, `ECA`, `NA`, CHECK) · `updated_by` (null : le tuteur). `booklet_visits` : `visited_on`, `points` (`$auditPersonal`), `trainer_user_id`, corbeille.
+
 ### `online_tests`, `online_test_versions`, `online_test_das`, `online_test_trainings`, `online_test_attempts` — tests en ligne
 `online_tests` : `title`, `draft_content` (jsonb : sections → questions, `OnlineTestContent`), `time_limit_minutes` (5–240, null = libre), `import_status` (`importing`, `failed`, null), `import_error` (motif fixe), `current_version_id` (version proposée), `created_by`, `updated_by`, corbeille. `online_test_versions` : `online_test_id`, `number` (unique par test), `content` (jsonb figé), `total_points`, `time_limit_minutes`, `published_by`, `created_at` ; jamais modifiée. `online_test_das` (`das_id` → `reference_items`, `ReferenceUsage`) et `online_test_trainings` (`training_id`, cascade) : DAS et formations servis. `online_test_attempts` : une par lien (`positioning_sending_id` unique), `candidature_id`, `online_test_version_id`, `started_at`, `deadline_at` (début + durée), `submitted_at`, `answers` (jsonb, id de question → réponse), `events` (jsonb : sorties de la page, collages et copies refusés), `auto_score`, `manual_scores` (jsonb, id → points), `score` (final, quand tout est noté), `max_score` ; réponses, traces et notes manuelles dans `$auditPersonal` ; réponses et traces effacées par l'anonymisation. `positioning_sendings.online_test_version_id` : le test en ligne du lien (null : tests PDF).
 
@@ -777,7 +796,7 @@ Clé (`tenant_id`, `year`) : `last_number` (année de Paris, incrémenté dans l
 ## Module Documents (0.10)
 
 ### `documents` — documents émis
-`type` (`convention`, `contract` pour le dossier ; `convocation`, `completion_certificate`, `realisation_certificate` par stagiaire, `enrolment_id` renseigné, CHECK) · `dossier_id` · `enrolment_id` (null) · `company_id` · `number` (`DOC-<année>-<NNNNN>`, unique par organisme) · `recipient_snapshot` (jsonb : nom, adresse, contact, e-mail, `person_id` ; `$auditPersonal`, effacé par l'anonymisation) · `pdf_path` (zone `documents`) · `pdf_sha256` · `status` (`issued`, `sent`, `signature_pending`, `signed`, `cancelled`) · `issued_at`, `issued_by` · `sent_at`, `email_status`, `email_error_code` · `cancelled_at`, `cancelled_by`, `cancel_reason`. Déclencheur `documents_immutable` : jamais supprimé ; seuls l'état, l'envoi, l'annulation et le destinataire figé (anonymisation) changent.
+`type` (`convention`, `contract`, `apprenticeship_convention`, `professionalisation_convention` (dossier en alternance) pour le dossier ; `convocation`, `completion_certificate`, `realisation_certificate` par stagiaire, `enrolment_id` renseigné, CHECK) · `dossier_id` · `enrolment_id` (null) · `company_id` · `number` (`DOC-<année>-<NNNNN>`, unique par organisme) · `recipient_snapshot` (jsonb : nom, adresse, contact, e-mail, `person_id` ; `$auditPersonal`, effacé par l'anonymisation) · `pdf_path` (zone `documents`) · `pdf_sha256` · `status` (`issued`, `sent`, `signature_pending`, `signed`, `cancelled`) · `issued_at`, `issued_by` · `sent_at`, `email_status`, `email_error_code` · `cancelled_at`, `cancelled_by`, `cancel_reason`. Déclencheur `documents_immutable` : jamais supprimé ; seuls l'état, l'envoi, l'annulation et le destinataire figé (anonymisation) changent.
 
 ### `document_sequences` — numérotation
 (`tenant_id`, `year`) unique · `last_number`.

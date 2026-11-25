@@ -34,7 +34,7 @@ export default function EnrolmentFollowUp({ trainee, back, follow_up: followUp }
                         </Link>
                     </Button>
                 </div>
-                <TrainingFollowUp followUp={followUp} />
+                <TrainingFollowUp followUp={followUp} name={trainee.label} />
             </div>
         </AppLayout>
     );

@@ -3,6 +3,7 @@
 namespace App\Modules\Admissions\Crm;
 
 use App\Modules\Admissions\Alternance\AlternanceContract;
+use App\Modules\Admissions\Booklet\BookletLink;
 use App\Modules\Admissions\Candidatures\Candidature;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Query\Builder;
@@ -19,7 +20,8 @@ final class CandidatureLinks
     {
         if ($type === 'person') {
             return Candidature::withTrashed()->where('person_id', $id)->exists()
-                || AlternanceContract::query()->where('tutor_person_id', $id)->exists();
+                || AlternanceContract::query()->where('tutor_person_id', $id)->exists()
+                || BookletLink::query()->where('person_id', $id)->exists();
         }
 
         return Candidature::withTrashed()->where('prescriber_organisation_id', $id)->exists()
@@ -31,6 +33,7 @@ final class CandidatureLinks
         if ($type === 'person') {
             Candidature::withTrashed()->where('person_id', $dropId)->update(['person_id' => $keepId]);
             AlternanceContract::query()->where('tutor_person_id', $dropId)->update(['tutor_person_id' => $keepId]);
+            BookletLink::query()->where('person_id', $dropId)->update(['person_id' => $keepId]);
 
             return;
         }

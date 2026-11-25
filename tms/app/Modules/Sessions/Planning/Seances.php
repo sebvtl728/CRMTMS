@@ -188,6 +188,7 @@ final class Seances
                 throw new UserFacingHttpException(409, self::HAS_ATTENDANCE);
             }
             $locked->delete();
+            self::runScheduleHooks($locked, SeanceChanged::DELETED);
             SeanceOutlook::touch($locked->id);
         });
     }

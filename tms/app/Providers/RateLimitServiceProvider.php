@@ -44,6 +44,9 @@ class RateLimitServiceProvider extends ServiceProvider
         'attendance-signing' => 240,
         'attendance-signing-post' => 60,
         'attendance-signing-open' => 30,
+        // Monthly link of the apprenticeship booklet (typing saved as typed; code and signature).
+        'booklet-public' => 240,
+        'booklet-public-post' => 30,
         // Local sandbox reset (Administration › Bac à sable).
         'sandbox-reset' => 6,
     ];
@@ -98,6 +101,7 @@ class RateLimitServiceProvider extends ServiceProvider
         return match ($name) {
             'calendar-feed' => 'feed:'.hash('sha256', $token),
             'attendance-signing', 'attendance-signing-post' => 'sign:'.hash('sha256', $token).'|'.$request->ip(),
+            'booklet-public', 'booklet-public-post' => 'booklet:'.hash('sha256', $token).'|'.$request->ip(),
             default => null,
         };
     }

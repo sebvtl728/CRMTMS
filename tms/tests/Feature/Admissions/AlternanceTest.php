@@ -93,3 +93,33 @@ it('shows the contract on the candidature page and deletes it', function () {
     $this->delete("/admissions/candidatures/{$c->id}/alternance")->assertRedirect();
     expect(AlternanceContract::query()->count())->toBe(0);
 });
+
+it('admits the candidate at the interview once the contract is saved', function () {
+    $c = adInterview();
+
+    $this->actingAs(commercial())->put("/admissions/candidatures/{$c->id}/alternance", adContract())
+        ->assertRedirect()->assertSessionHas('status', 'Contrat enregistré : candidat admis.');
+
+    expect($c->fresh()->status)->toBe(CandidatureStatus::Admitted);
+});
+
+it('keeps the contract and says why when the candidate cannot be admitted yet', function () {
+    $c = adInterview();
+    Candidature::query()->whereKey($c->id)->update(['training_id' => null]);
+
+    $this->actingAs(commercial())->put("/admissions/candidatures/{$c->id}/alternance", adContract())
+        ->assertRedirect()->assertSessionHas('status', 'Contrat enregistré. Pas encore admis : Choisissez la formation visée avant d\'admettre le candidat.');
+
+    expect($c->fresh()->status)->toBe(CandidatureStatus::Interview)
+        ->and(AlternanceContract::query()->count())->toBe(1);
+});
+
+it('leaves an admitted candidate where he is when the contract changes', function () {
+    $c = adInterview();
+    app(AlternanceWriter::class)->save($c, adContract(), admin());
+    app(CandidatureTransitions::class)->move($c->fresh(), CandidatureStatus::Admitted, admin());
+
+    $this->actingAs(commercial())->put("/admissions/candidatures/{$c->id}/alternance", adContract(['contract_type' => 'professionalisation']))
+        ->assertSessionHas('status', 'Contrat enregistré.');
+    expect($c->fresh()->status)->toBe(CandidatureStatus::Admitted);
+});

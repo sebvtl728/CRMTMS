@@ -50,6 +50,20 @@ class DocumentPdf
         return $this->renderer->fromHtml($source->html, $source->footer);
     }
 
+    /**
+     * A preview of a dossier document (no number, never stored): the
+     * alternance convention before the dossier exists.
+     *
+     * @param  array<string, mixed>  $dossier  shaped like Paperwork::dossier(), price and number null
+     * @param  array<string, mixed>  $recipient
+     */
+    public function preview(DocumentType $type, array $dossier, Company $company, array $recipient): string
+    {
+        $footer = view('documents.document-footer', ['label' => $type->label().' - aperçu, non émis'])->render();
+
+        return $this->renderer->fromHtml($this->html($type, $dossier, $company, 'Aperçu - non émis', CarbonImmutable::now(), $recipient), $footer);
+    }
+
     private static function footer(DocumentType $type, string $number): string
     {
         return view('documents.document-footer', ['label' => $type->label().' '.$number])->render();
@@ -73,20 +87,23 @@ class DocumentPdf
             '{dates}' => implode(' ; ', array_map(fn (array $s) => self::period($s['starts_on'], $s['ends_on']), $sessions)),
             '{duree}' => $minutes > 0 ? self::hours($minutes) : 'la durée indiquée au programme',
             '{lieu}' => implode(' ; ', array_values(array_unique(array_filter(array_map(fn (array $s) => $s['place'] ?? null, $sessions))))) ?: 'le lieu indiqué dans la convocation',
-            '{prix}' => self::euros((int) $dossier['price_cents']).($exempt ? ' net de taxe' : ' HT'),
+            '{prix}' => $dossier['price_cents'] === null ? self::TO_COMPLETE : self::euros((int) $dossier['price_cents']).($exempt ? ' net de taxe' : ' HT'),
             '{contractant}' => (string) $recipient['name'],
             '{societe}' => $company->name,
-            '{numero_dossier}' => (string) $dossier['number'],
+            '{numero_dossier}' => (string) ($dossier['number'] ?? self::TO_COMPLETE),
+            ...$this->alternanceValues($dossier['alternance'] ?? null, $minutes),
         ];
+        // The alternance conventions share the frame of the convention.
+        $view = $type->isAlternance() ? 'convention' : $type->value;
 
-        return view('documents.training-'.$type->value, [
+        return view('documents.training-'.$view, [
             'title' => $type->label(),
             'number' => $number,
             'issued_on' => $issuedAt->setTimezone('Europe/Paris')->format('d/m/Y'),
             'company' => $this->companyData($company, $issuedAt),
             'recipient' => $recipient,
             'dossier_number' => $dossier['number'],
-            'lines' => array_map(fn (array $l) => ['label' => $l['label'], 'total' => self::euros((int) $l['total_cents'])], $dossier['lines']),
+            'lines' => array_map(fn (array $l) => ['label' => $l['label'], 'total' => $l['total_cents'] === null ? self::TO_COMPLETE : self::euros((int) $l['total_cents'])], $dossier['lines']),
             'price' => $values['{prix}'],
             'sessions' => array_map(fn (array $s) => ['label' => $s['label'], 'period' => self::period($s['starts_on'], $s['ends_on']),
                 'hours' => $s['planned_minutes'] === null ? null : self::hours((int) $s['planned_minutes']), 'place' => $s['place']], $sessions),
@@ -97,6 +114,35 @@ class DocumentPdf
                 'text' => DocumentTexts::fill($text, $values),
             ])->values()->all(),
         ])->render();
+    }
+
+    /**
+     * The fields of an alternance convention (empty strings without a
+     * contract): apprentice, employer, tutor, OPCO, contract type and dates,
+     * hours in centre, RNCP code.
+     *
+     * @param  array<string, mixed>|null  $alternance  Paperwork::dossier()['alternance']
+     * @return array<string, string>
+     */
+    private function alternanceValues(?array $alternance, int $minutes): array
+    {
+        if ($alternance === null) {
+            return array_fill_keys(['{apprenti}', '{employeur}', '{tuteur}', '{type_contrat}', '{debut_contrat}', '{fin_contrat}', '{heures_centre}', '{code_rncp}', '{opco}'], '');
+        }
+        $people = $this->fiches->personLabels(array_values(array_filter([$alternance['apprentice_person_id'], $alternance['tutor_person_id']])));
+        $organisations = $this->fiches->organisationLabels(array_values(array_filter([$alternance['employer_organisation_id'], $alternance['opco_organisation_id']])));
+
+        return [
+            '{apprenti}' => $people[$alternance['apprentice_person_id']]['label'] ?? self::TO_COMPLETE,
+            '{employeur}' => $organisations[$alternance['employer_organisation_id']]['label'] ?? self::TO_COMPLETE,
+            '{tuteur}' => $alternance['tutor_person_id'] === null ? self::TO_COMPLETE : ($people[$alternance['tutor_person_id']]['label'] ?? self::TO_COMPLETE),
+            '{type_contrat}' => $alternance['contract_type'] === 'professionalisation' ? 'contrat de professionnalisation' : "contrat d'apprentissage",
+            '{debut_contrat}' => CarbonImmutable::parse($alternance['starts_on'])->format('d/m/Y'),
+            '{fin_contrat}' => CarbonImmutable::parse($alternance['ends_on'])->format('d/m/Y'),
+            '{heures_centre}' => $minutes > 0 ? self::hours($minutes) : 'la durée indiquée au programme',
+            '{code_rncp}' => $alternance['rncp_code'] ?: self::TO_COMPLETE,
+            '{opco}' => $alternance['opco_organisation_id'] === null ? self::TO_COMPLETE : ($organisations[$alternance['opco_organisation_id']]['label'] ?? self::TO_COMPLETE),
+        ];
     }
 
     /**
@@ -247,6 +293,9 @@ class DocumentPdf
 
         return $content;
     }
+
+    /** What a preview cannot know yet (no dossier, no price). */
+    public const TO_COMPLETE = 'à compléter';
 
     public static function euros(int $cents): string
     {

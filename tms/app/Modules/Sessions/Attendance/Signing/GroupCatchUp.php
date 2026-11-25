@@ -7,6 +7,7 @@ use App\Modules\Sessions\Attendance\Attendance;
 use App\Modules\Sessions\Attendance\AttendanceClosure;
 use App\Modules\Sessions\Attendance\Attendances;
 use App\Modules\Sessions\Attendance\Closures;
+use App\Modules\Sessions\Planning\IndividualPlanning;
 use App\Modules\Sessions\Planning\Seance;
 use App\Modules\Sessions\Sessions\TrainingSession;
 use Carbon\CarbonImmutable;
@@ -51,17 +52,17 @@ final class GroupCatchUp
             ->get(['date', 'half'])->map(fn (SignSlot $s) => $s->date->toDateString().'|'.$s->half)->all();
 
         $halves = [];
-        $expected = [];
         foreach ($seances as $seance) {
             $date = $seance->date->toDateString();
             if (in_array(substr($date, 0, 7), $closed, true)) {
                 continue;
             }
-            $expected[$date] ??= Attendances::expected($seance)->whereKey($enrolmentId)->exists();
-            if (! $expected[$date]) {
+            // His individual planning: this séance (not exempted), at his hours.
+            if (! Attendances::expected($seance)->whereKey($enrolmentId)->exists()) {
                 continue;
             }
-            foreach (Halves::of($seance->start(), $seance->end()) as $half) {
+            $his = IndividualPlanning::times($seance, [$enrolmentId])[$enrolmentId];
+            foreach (Halves::of($his['start'], $his['end']) as $half) {
                 $key = "{$date}|{$half}";
                 // An absence (excused or not) entered on a séance of the half-day: never caught up.
                 if (in_array($seance->id, $noted, true)) {

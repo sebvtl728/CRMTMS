@@ -5,6 +5,7 @@ namespace App\Modules\Admissions\Candidatures;
 use App\Http\Controllers\Controller;
 use App\Modules\Admissions\AdmissionsVisibility;
 use App\Modules\Admissions\Alternance\ContractType;
+use App\Modules\Admissions\Booklet\BookletAccess;
 use App\Modules\Admissions\CustomFields\CustomFieldValues;
 use App\Modules\Admissions\History\CandidatureHistory;
 use App\Modules\Admissions\OnlineTests\OnlineReview;
@@ -20,7 +21,9 @@ use App\Modules\Core\References\ReferenceItem;
 use App\Modules\Core\References\ReferenceList;
 use App\Modules\Core\Users\User;
 use App\Modules\Crm\Public\Fiches;
+use App\Modules\Crm\Public\Trainees;
 use App\Modules\Sessions\Public\Admission;
+use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\RedirectResponse;
@@ -87,9 +90,29 @@ class CandidatureController extends Controller
 
         return Inertia::render('admissions/candidatures/create', [
             'custom_fields' => CustomFieldValues::forPage(new Candidature, AdmissionsVisibility::sensitive(self::user($request))),
-            'person' => $person === null ? null : ['id' => $person['id'], 'label' => $person['label']],
+            'person' => $person === null ? null : ['id' => $person['id'], 'label' => $person['label'], ...self::candidateCard($person['id'])],
             'options' => self::options(null),
+            // Who receives the candidature, by DAS (the page follows the DAS of the training chosen).
+            'das_recipients' => DasRecipients::names(),
         ]);
+    }
+
+    /**
+     * Age (whole years, Paris days) and professional situation of a candidate.
+     *
+     * @return array{age: ?int, situation: ?string}
+     */
+    private static function candidateCard(string $personId): array
+    {
+        $profile = app(Trainees::class)->profile($personId);
+        $birth = $profile['birth_date'] ?? null;
+        $situationId = $profile['professional_situation_id'] ?? null;
+
+        return [
+            'age' => $birth === null ? null : (int) CarbonImmutable::parse($birth, 'Europe/Paris')
+                ->diffInYears(CarbonImmutable::now('Europe/Paris')->startOfDay()),
+            'situation' => $situationId === null ? null : ReferenceItem::query()->whereKey($situationId)->value('label'),
+        ];
     }
 
     public function store(Request $request, CandidatureWriter $writer): RedirectResponse
@@ -120,6 +143,8 @@ class CandidatureController extends Controller
                 'update' => AdmissionsVisibility::allows($user, Permissions::CANDIDATURES_UPDATE, $candidature) && ! $candidature->trashed(),
                 'delete' => AdmissionsVisibility::allows($user, Permissions::CANDIDATURES_DELETE, $candidature),
                 'sensitive' => AdmissionsVisibility::sensitive($user),
+                // « Suivi du livret » (carte Alternance): the booklet follow-up of this apprentice.
+                'booklet' => $user->can(Permissions::BOOKLET_MANAGE) && BookletAccess::allows($user, $candidature),
                 'create_dossier' => $candidature->status === CandidatureStatus::Admitted && ! $candidature->trashed()
                     && ($candidature->dossier_id === null || Admission::dossierState($candidature->dossier_id) !== 'live')
                     && AdmissionsVisibility::allows($user, Permissions::CANDIDATURES_UPDATE, $candidature)

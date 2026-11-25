@@ -11,10 +11,16 @@ import { type AdmissionOptions, type CustomField } from '@/types/admissions';
 import { Head, router, usePage } from '@inertiajs/react';
 import { useState } from 'react';
 
+interface CandidateCard extends Picked {
+    age: number | null;
+    situation: string | null;
+}
+
 interface CreateProps {
-    person: Picked | null;
+    person: CandidateCard | null;
     options: AdmissionOptions;
     custom_fields: CustomField[];
+    das_recipients: Record<string, string[]>;
 }
 
 const breadcrumbs: BreadcrumbItem[] = [
@@ -43,7 +49,7 @@ function csrf(): string {
  * Opens a candidature: a person of the CRM (an interlocuteur becomes a
  * candidate) or a new one, then the training aimed at.
  */
-export default function CandidatureCreate({ person, options }: CreateProps) {
+export default function CandidatureCreate({ person, options, das_recipients }: CreateProps) {
     const errors = usePage().props.errors as Record<string, string | undefined>;
     const [picked, setPicked] = useState<Picked | null>(person);
     const [creating, setCreating] = useState(false);
@@ -51,8 +57,23 @@ export default function CandidatureCreate({ person, options }: CreateProps) {
     const [draftErrors, setDraftErrors] = useState<Record<string, string>>({});
     const [duplicates, setDuplicates] = useState<{ id: string; last_name: string; first_name: string | null }[]>([]);
     const [trainingId, setTrainingId] = useState<string | null>(null);
-    const [responsible, setResponsible] = useState<string | null>(null);
     const [processing, setProcessing] = useState(false);
+
+    // Age and situation are read by the server: reload the person prop when another one is picked.
+    const pick = (p: Picked | null) => {
+        setPicked(p);
+        if (p !== null && p.id !== person?.id) {
+            router.get(
+                '/admissions/candidatures/create',
+                { person: p.id },
+                { only: ['person'], preserveState: true, preserveScroll: true, replace: true },
+            );
+        }
+    };
+    const card = person !== null && picked !== null && person.id === picked.id ? person : null;
+    const training = options.training_options.find((t) => t.value === trainingId) ?? null;
+    const das = training?.das_id ? (options.das.find((d) => d.value === training.das_id) ?? null) : null;
+    const recipients = training?.das_id ? (das_recipients[training.das_id] ?? []) : [];
 
     const createPerson = async (confirm: boolean) => {
         setDraftErrors({});
@@ -74,7 +95,7 @@ export default function CandidatureCreate({ person, options }: CreateProps) {
             return;
         }
         if (response.ok) {
-            setPicked({ id: json.id, label: [draft.first_name, draft.last_name].filter(Boolean).join(' ') });
+            pick({ id: json.id, label: [draft.first_name, draft.last_name].filter(Boolean).join(' ') });
             setCreating(false);
             setDuplicates([]);
         }
@@ -83,11 +104,7 @@ export default function CandidatureCreate({ person, options }: CreateProps) {
     const submit = () => {
         if (!picked) return;
         setProcessing(true);
-        router.post(
-            '/admissions/candidatures',
-            { person_id: picked.id, training_id: trainingId, responsible_user_id: responsible },
-            { onFinish: () => setProcessing(false) },
-        );
+        router.post('/admissions/candidatures', { person_id: picked.id, training_id: trainingId }, { onFinish: () => setProcessing(false) });
     };
 
     const field = (key: keyof NewPerson, label: string, type = 'text') => (
@@ -111,12 +128,24 @@ export default function CandidatureCreate({ person, options }: CreateProps) {
                             id="person"
                             kind="person"
                             value={picked}
-                            onPick={setPicked}
+                            onPick={pick}
                             placeholder="Rechercher une personne du CRM (nom, e-mail)"
                             searchUrl="/admissions/candidatures/lookup/people"
                         />
                     )}
                     <InputError message={errors.person_id} />
+                    {card && (
+                        <dl className="grid grid-cols-2 gap-2 text-sm" aria-label="Profil du candidat">
+                            <div>
+                                <dt className="text-muted-foreground">Âge</dt>
+                                <dd>{card.age === null ? 'Date de naissance non renseignée' : `${card.age} ans`}</dd>
+                            </div>
+                            <div>
+                                <dt className="text-muted-foreground">Statut</dt>
+                                <dd>{card.situation ?? 'Non renseigné'}</dd>
+                            </div>
+                        </dl>
+                    )}
                     {!picked && !creating && (
                         <Button type="button" variant="outline" size="sm" className="justify-self-start" onClick={() => setCreating(true)}>
                             Créer la personne
@@ -139,7 +168,7 @@ export default function CandidatureCreate({ person, options }: CreateProps) {
                                                     type="button"
                                                     className="underline"
                                                     onClick={() => {
-                                                        setPicked({ id: d.id, label: [d.first_name, d.last_name].filter(Boolean).join(' ') });
+                                                        pick({ id: d.id, label: [d.first_name, d.last_name].filter(Boolean).join(' ') });
                                                         setCreating(false);
                                                         setDuplicates([]);
                                                     }}
@@ -182,14 +211,18 @@ export default function CandidatureCreate({ person, options }: CreateProps) {
                         onChange={setTrainingId}
                         error={errors.training_id ?? errors.das_id}
                     />
-                    <OptionSelect
-                        id="responsible"
-                        label="Responsable"
-                        value={responsible}
-                        options={options.users}
-                        onChange={setResponsible}
-                        error={errors.responsible_user_id}
-                    />
+                    <div className="grid gap-1 text-sm">
+                        <span className="text-muted-foreground">Destinataire</span>
+                        <span>
+                            {training === null
+                                ? 'Choisissez la formation : la candidature ira au responsable de son DAS.'
+                                : !training.das_id
+                                  ? 'Formation sans DAS : aucun responsable de DAS.'
+                                  : recipients.length === 0
+                                    ? `Aucun responsable pour le DAS ${das?.label ?? ''}.`
+                                    : `${recipients.join(', ')} (responsable${recipients.length > 1 ? 's' : ''} du DAS ${das?.label ?? ''})`}
+                        </span>
+                    </div>
                 </section>
 
                 <div>

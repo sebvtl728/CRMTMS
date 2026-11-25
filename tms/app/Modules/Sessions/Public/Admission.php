@@ -22,6 +22,7 @@ use App\Modules\Sessions\Sessions\SessionStatus;
 use App\Modules\Sessions\Sessions\TrainingSession;
 use App\Modules\Sessions\SessionsVisibility;
 use App\Modules\Sessions\Trainers\Trainer;
+use App\Modules\Sessions\Trainers\Trainers;
 use Illuminate\Database\Query\Builder;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -98,6 +99,26 @@ final class Admission
     }
 
     /**
+     * Ids of the dossiers « of the trainer » linked to $user (the
+     * apprenticeship booklet, « Ses séances »): those with a live enrolment
+     * in a session holding a non-cancelled séance of that trainer; none
+     * when the user is no trainer. A subquery (whereIn).
+     */
+    public static function trainerDossierIds(User $user): Builder
+    {
+        $trainer = Trainers::forUser($user);
+        if ($trainer === null) {
+            return Dossier::query()->select('id')->whereRaw('false')->toBase();
+        }
+
+        return Enrolment::query()->select('dossier_id')
+            ->whereNotIn('status', [EnrolmentStatus::Cancelled->value, EnrolmentStatus::Waitlisted->value])
+            ->whereIn('training_session_id', Seance::query()->select('training_session_id')
+                ->where('trainer_id', $trainer->id)->where('status', '<>', Seance::CANCELLED))
+            ->toBase();
+    }
+
+    /**
      * « live », « trashed », or null when the dossier is gone.
      */
     public static function dossierState(string $dossierId): ?string
@@ -116,11 +137,12 @@ final class Admission
      * @param  array{account: array{type: string, id: string}, company_id?: ?string, das_id: string, responsible_user_id?: ?string,
      *     training_id: string, label: string, quantity: string, unit: string, unit_price: string, session_id?: ?string, person_id: string,
      *     funding?: ?array{funder_organisation_id: string, funding_type_id: string, amount: string}}  $data
+     * @param  User|null  $by  who creates it: the other modules act once it is committed (DossierHooks)
      * @return string the dossier id
      */
-    public static function createDossier(array $data): string
+    public static function createDossier(array $data, ?User $by = null): string
     {
-        return DB::transaction(function () use ($data): string {
+        return DB::transaction(function () use ($data, $by): string {
             $account = $data['account'];
             $dossier = app(DossierWriter::class)->create([
                 'company_id' => $data['company_id'] ?? DossierWriter::defaultCompanyId(),
@@ -162,6 +184,10 @@ final class Admission
                     'notes' => null,
                     'pays_directly' => true,
                 ]);
+            }
+
+            if ($by !== null) {
+                DossierHooks::createdFromCandidature($dossier->id, $by);
             }
 
             return $dossier->id;

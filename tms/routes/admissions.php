@@ -1,9 +1,16 @@
 <?php
 
 use App\Modules\Admissions\Alternance\AlternanceController;
+use App\Modules\Admissions\Alternance\AlternanceConventionController;
 use App\Modules\Admissions\Booklet\BookletController;
+use App\Modules\Admissions\Booklet\BookletGridController;
+use App\Modules\Admissions\Booklet\BookletLinkController;
+use App\Modules\Admissions\Booklet\BookletMonthController;
+use App\Modules\Admissions\Booklet\BookletPageController;
 use App\Modules\Admissions\Booklet\BookletSettingsController;
+use App\Modules\Admissions\Booklet\BookletVisitController;
 use App\Modules\Admissions\Booklet\DispensesController;
+use App\Modules\Admissions\Booklet\PublicBookletController;
 use App\Modules\Admissions\Candidatures\CandidatureController;
 use App\Modules\Admissions\Candidatures\CandidatureFileController;
 use App\Modules\Admissions\Candidatures\CandidatureStatusController;
@@ -43,6 +50,7 @@ Route::middleware(['auth'])->prefix('admissions/candidatures')->name('admissions
     Route::post('{candidature}/positioning/send', [PositioningController::class, 'send'])->middleware(['can:admissions.candidatures.update', 'throttle:positioning-send'])->name('positioning.send');
     Route::put('{candidature}/alternance', [AlternanceController::class, 'update'])->middleware('can:admissions.candidatures.update')->name('alternance.update');
     Route::get('{candidature}/livret.pdf', [BookletController::class, 'show'])->middleware(['can:admissions.candidatures.view', 'throttle:admissions-booklet'])->name('booklet');
+    Route::get('{candidature}/convention-alternance.pdf', [AlternanceConventionController::class, 'show'])->middleware(['can:admissions.candidatures.view', 'throttle:admissions-booklet'])->name('alternance-convention');
     Route::get('{candidature}/cerfa.pdf', [CerfaSheetController::class, 'show'])->middleware(['can:admissions.candidatures.view', 'throttle:admissions-booklet'])->name('cerfa');
     Route::put('{candidature}/dispenses', [DispensesController::class, 'update'])->middleware('can:admissions.candidatures.update')->name('dispenses.update');
     Route::delete('{candidature}/alternance', [AlternanceController::class, 'destroy'])->middleware('can:admissions.candidatures.update')->name('alternance.destroy');
@@ -50,6 +58,30 @@ Route::middleware(['auth'])->prefix('admissions/candidatures')->name('admissions
     Route::post('{candidature}/dossier', [DossierCreationController::class, 'store'])->middleware('can:admissions.candidatures.update')->name('dossier.store');
     Route::delete('{candidature}', [CandidatureController::class, 'destroy'])->middleware('can:admissions.candidatures.delete')->name('destroy');
     Route::post('{candidature}/restore', [CandidatureController::class, 'restore'])->middleware('can:admissions.candidatures.delete')->name('restore');
+});
+
+// Online follow-up of the apprenticeship booklet (trainers: « Ses séances »).
+Route::middleware(['auth', 'can:admissions.booklet.manage'])->prefix('admissions/livret')->name('admissions.booklet.')->group(function () {
+    Route::get('/', [BookletPageController::class, 'index'])->name('index');
+    Route::get('{bookletCandidature}', [BookletPageController::class, 'show'])->name('show');
+    Route::get('{bookletCandidature}/livret.pdf', [BookletPageController::class, 'pdf'])->middleware('throttle:admissions-booklet')->name('pdf');
+    Route::put('{bookletCandidature}/grille', [BookletGridController::class, 'update'])->name('grid');
+    Route::put('{bookletCandidature}/mois/{month}/{place}/observations', [BookletMonthController::class, 'observations'])->where(['month' => '\d{4}-\d{2}', 'place' => 'company|centre'])->name('months.observations');
+    Route::post('{bookletCandidature}/mois/{month}/{place}/visa', [BookletMonthController::class, 'visa'])->where(['month' => '\d{4}-\d{2}', 'place' => 'company|centre'])->name('months.visa');
+    Route::delete('{bookletCandidature}/mois/{month}/{place}/visa', [BookletMonthController::class, 'unvisa'])->where(['month' => '\d{4}-\d{2}', 'place' => 'company|centre'])->name('months.unvisa');
+    Route::post('{bookletCandidature}/mois/{month}/envoyer/{signer}', [BookletLinkController::class, 'send'])->where(['month' => '\d{4}-\d{2}', 'signer' => 'apprentice|tutor'])->middleware('throttle:positioning-send')->name('months.send');
+    Route::post('{bookletCandidature}/mois/{month}/papier/{signer}', [BookletMonthController::class, 'paper'])->where(['month' => '\d{4}-\d{2}', 'signer' => 'apprentice|tutor'])->name('months.paper');
+    Route::post('{bookletCandidature}/visites', [BookletVisitController::class, 'store'])->name('visits.store');
+    Route::put('{bookletCandidature}/visites/{visit}', [BookletVisitController::class, 'update'])->whereUuid('visit')->name('visits.update');
+    Route::delete('{bookletCandidature}/visites/{visit}', [BookletVisitController::class, 'destroy'])->whereUuid('visit')->name('visits.destroy');
+});
+
+// Monthly link of the apprentice or the tutor (no account; the host gives the organisme): per link and address.
+Route::prefix('livret')->name('booklet.public.')->where(['token' => '[A-Za-z0-9]{40}'])->group(function () {
+    Route::get('{token}', [PublicBookletController::class, 'show'])->middleware('throttle:booklet-public')->name('show');
+    Route::post('{token}/save', [PublicBookletController::class, 'save'])->middleware('throttle:booklet-public')->name('save');
+    Route::post('{token}/code', [PublicBookletController::class, 'code'])->middleware('throttle:booklet-public-post')->name('code');
+    Route::post('{token}/sign', [PublicBookletController::class, 'sign'])->middleware('throttle:booklet-public-post')->name('sign');
 });
 
 Route::middleware(['auth', 'can:settings.manage'])->prefix('admin/livret-apprentissage')->name('admin.booklet.')->group(function () {

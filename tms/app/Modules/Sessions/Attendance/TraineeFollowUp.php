@@ -15,6 +15,8 @@ use App\Modules\Sessions\Enrolments\Enrolment;
 use App\Modules\Sessions\Enrolments\EnrolmentStatus;
 use App\Modules\Sessions\Modules\SessionModule;
 use App\Modules\Sessions\Permissions;
+use App\Modules\Sessions\Planning\IndividualPlanning;
+use App\Modules\Sessions\Planning\PlannedSeance;
 use App\Modules\Sessions\Planning\Seance;
 use App\Modules\Sessions\Public\RealisedHours;
 use App\Modules\Sessions\Resources\Room;
@@ -79,13 +81,9 @@ final class TraineeFollowUp
         $manage = $attendance && SlotRows::mayCatchUpOn($session->id, $user);
         $closed = $attendance ? RealisedHours::forEnrolment($enrolment->id)['closed_months'] : [];
 
-        $from = $enrolment->entered_on?->toDateString();
-        $to = $enrolment->left_on?->toDateString();
-        $seances = Seance::query()->where('training_session_id', $session->id)
-            ->when($from !== null, fn ($q) => $q->where('date', '>=', $from))
-            ->when($to !== null, fn ($q) => $q->where('date', '<=', $to))
-            ->orderBy('date')->orderBy('starts_at')->orderBy('id')
-            ->get(['id', 'date', 'starts_at', 'ends_at', 'duration_minutes', 'session_module_id', 'trainer_id', 'room_id', 'place_text', 'status']);
+        // His individual planning (cancelled séances shown): exempted ones out, added ones in, at his hours.
+        $planned = collect(IndividualPlanning::seancesOf(collect([$enrolment]), withCancelled: true)[$enrolment->id] ?? [])->keyBy(fn (PlannedSeance $p) => $p->seance->id);
+        $seances = $planned->map(fn (PlannedSeance $p) => $p->seance)->values();
 
         $modules = SessionModule::withTrashed()->whereIn('id', $seances->pluck('session_module_id')->unique()->values()->all())->pluck('title', 'id');
         $rooms = Room::withTrashed()->whereIn('id', $seances->pluck('room_id')->filter()->unique()->values()->all())->pluck('name', 'id');
@@ -97,14 +95,15 @@ final class TraineeFollowUp
         $now = CarbonImmutable::now('Europe/Paris');
         $location = SessionLocation::tryFrom($session->location_kind);
 
-        $rows = $seances->map(function (Seance $s) use ($modules, $rooms, $trainers, $names, $marks, $attendance, $manage, $closed, $now, $session, $location): array {
+        $rows = $seances->map(function (Seance $s) use ($planned, $modules, $rooms, $trainers, $names, $marks, $attendance, $manage, $closed, $now, $session, $location): array {
             $trainerPerson = $s->trainer_id === null ? null : ($trainers[$s->trainer_id] ?? null);
+            $his = $planned[$s->id];
             $row = [
                 'id' => $s->id,
                 'date' => $s->date->toDateString(),
-                'starts_at' => $s->start(),
-                'ends_at' => $s->end(),
-                'duration_minutes' => (int) $s->duration_minutes,
+                'starts_at' => $his->start,
+                'ends_at' => $his->end,
+                'duration_minutes' => $his->minutes,
                 'module' => $modules[$s->session_module_id] ?? null,
                 'trainer' => $trainerPerson === null ? null : ($names[$trainerPerson]['label'] ?? null),
                 'place' => $s->room_id !== null && isset($rooms[$s->room_id]) ? $rooms[$s->room_id]
@@ -136,6 +135,10 @@ final class TraineeFollowUp
             ],
             'seances' => $rows,
         ];
+        if (SessionsVisibility::allows($user, Permissions::SESSIONS_UPDATE, $session)) {
+            // « Planning individuel » (2026-11-24): who may change the enrolment.
+            $result['planning_enrolment_id'] = $enrolment->id;
+        }
         if (! $attendance) {
             return $result;
         }

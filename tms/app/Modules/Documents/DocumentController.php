@@ -26,12 +26,12 @@ class DocumentController extends Controller
         $user = self::user($request);
         abort_unless(Str::isUuid($dossierId) && Paperwork::allows($user, Permissions::VIEW, $dossierId), 404);
         abort_unless(Paperwork::allows($user, Permissions::MANAGE, $dossierId), 403);
-        $values = $request->validate(['type' => ['required', Rule::in([DocumentType::Convention->value, DocumentType::Contract->value])]], ['type.*' => 'Type de document inconnu.']);
+        $values = $request->validate(['type' => ['required', Rule::in([DocumentType::Convention->value, DocumentType::Contract->value, DocumentType::ApprenticeshipConvention->value, DocumentType::ProfessionalisationConvention->value])]], ['type.*' => 'Type de document inconnu.']);
 
         $type = DocumentType::from($values['type']);
         $document = $issuer->issue($user, $type, $dossierId);
 
-        return back()->with('status', $type->label().' '.$document->number.' '.($type === DocumentType::Convention ? 'émise' : 'émis').'.');
+        return back()->with('status', $type->label().' '.$document->number.' '.($type->forCompany() ? 'émise' : 'émis').'.');
     }
 
     /** « Émettre » for one trainee (convocation, attestation, certificate). */

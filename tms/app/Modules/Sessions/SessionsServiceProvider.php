@@ -51,6 +51,8 @@ use App\Modules\Sessions\History\SessionsHistory;
 use App\Modules\Sessions\Modules\SessionModule;
 use App\Modules\Sessions\Notes\SessionNote;
 use App\Modules\Sessions\Notes\SessionTask;
+use App\Modules\Sessions\Planning\EnrolmentAdjustment;
+use App\Modules\Sessions\Planning\IndividualPlanning;
 use App\Modules\Sessions\Planning\PlacementPeriod;
 use App\Modules\Sessions\Planning\PlacementPeriodHost;
 use App\Modules\Sessions\Planning\Seance;
@@ -117,6 +119,7 @@ class SessionsServiceProvider extends ServiceProvider
             TrainerUnavailability::MORPH_ALIAS => TrainerUnavailability::class,
             TrainerDas::MORPH_ALIAS => TrainerDas::class,
             Seance::MORPH_ALIAS => Seance::class,
+            EnrolmentAdjustment::MORPH_ALIAS => EnrolmentAdjustment::class,
             PlacementPeriod::MORPH_ALIAS => PlacementPeriod::class,
             PlacementPeriodHost::MORPH_ALIAS => PlacementPeriodHost::class,
             Attendance::MORPH_ALIAS => Attendance::class,
@@ -319,6 +322,7 @@ class SessionsServiceProvider extends ServiceProvider
         Seances::registerAttendance('sessions.attendance', fn (string $seanceId): bool => Attendance::query()->where('seance_id', $seanceId)->exists());
         Seances::guardMonthsWith(fn (TrainingSession $session, string $date) => Closures::assertOpen($session->id, $date));
         Seances::onScheduleChange('sessions.attendance', fn (Seance $seance, string $kind) => Attendances::review($seance, $kind));
+        Seances::onScheduleChange('sessions.individual_planning', fn (Seance $seance) => IndividualPlanning::refreshForSeance($seance));
     }
 
     /**

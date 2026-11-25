@@ -7,6 +7,7 @@ use App\Modules\Sessions\Enrolments\Enrolment;
 use App\Modules\Sessions\Enrolments\EnrolmentStatus;
 use App\Modules\Sessions\Modules\SessionModules;
 use App\Modules\Sessions\Planning\Events\SeanceChanged;
+use App\Modules\Sessions\Planning\IndividualPlanning;
 use App\Modules\Sessions\Planning\Seance;
 use App\Modules\Sessions\Sessions\TrainingSession;
 use Carbon\CarbonImmutable;
@@ -40,6 +41,8 @@ final class Attendances
 
     public const UNKNOWN_TRAINEE = 'Stagiaire introuvable sur cette session.';
 
+    public const EXEMPTED = 'Ce stagiaire est dispensé de cette séance.';
+
     public const NOT_ATTENDING = 'Seul un stagiaire inscrit, confirmé ou sorti en cours de formation a des présences.';
 
     /**
@@ -59,10 +62,11 @@ final class Attendances
         return DB::transaction(function () use ($seance, $enrolmentId, $status, $minutes, $reason): Attendance {
             $locked = self::lock($seance);
             $enrolment = self::enrolmentOf($locked, $enrolmentId);
-            self::assertExpected($enrolment, $locked->date);
+            self::assertExpected($enrolment, $locked->date, $locked);
+            $duration = IndividualPlanning::minutesAt($enrolment->id, $locked);
             $realised = match ($status) {
-                Attendance::PRESENT => $locked->duration_minutes,
-                Attendance::PARTIAL => self::partial($minutes, $locked->duration_minutes),
+                Attendance::PRESENT => $duration,
+                Attendance::PARTIAL => self::partial($minutes, $duration),
                 default => 0,
             };
             $attendance = Attendance::query()->where('seance_id', $locked->id)->where('enrolment_id', $enrolment->id)->lockForUpdate()->first()
@@ -90,12 +94,14 @@ final class Attendances
             $locked = self::lock($seance);
             $entered = Attendance::query()->where('seance_id', $locked->id)->pluck('enrolment_id')->all();
             $count = 0;
-            foreach (self::expected($locked)->whereNotIn('id', $entered)->orderBy('id')->get() as $enrolment) {
+            $missing = self::expected($locked)->whereNotIn('id', $entered)->orderBy('id')->get();
+            $times = IndividualPlanning::times($locked, $missing->pluck('id')->all());
+            foreach ($missing as $enrolment) {
                 (new Attendance([
                     'seance_id' => $locked->id,
                     'enrolment_id' => $enrolment->id,
                     'status' => Attendance::PRESENT,
-                    'minutes' => $locked->duration_minutes,
+                    'minutes' => $times[$enrolment->id]['minutes'],
                     'needs_review' => false,
                     'recorded_by' => self::userId(),
                 ]))->save();
@@ -118,7 +124,7 @@ final class Attendances
         return DB::transaction(function () use ($seance, $enrolmentId, $status, $minutes): bool {
             $locked = self::lock($seance);
             $enrolment = self::enrolmentOf($locked, $enrolmentId);
-            self::assertExpected($enrolment, $locked->date);
+            self::assertExpected($enrolment, $locked->date, $locked);
             $attendance = Attendance::query()->where('seance_id', $locked->id)->where('enrolment_id', $enrolment->id)->lockForUpdate()->first();
             if ($attendance !== null && $attendance->source !== Attendance::SOURCE_SIGNING) {
                 return false;
@@ -126,7 +132,7 @@ final class Attendances
             $attendance ??= new Attendance(['seance_id' => $locked->id, 'enrolment_id' => $enrolment->id]);
             $attendance->fill([
                 'status' => $status,
-                'minutes' => $status === Attendance::PRESENT ? $locked->duration_minutes : $minutes,
+                'minutes' => $status === Attendance::PRESENT ? IndividualPlanning::minutesAt($enrolment->id, $locked) : $minutes,
                 'reason' => null,
                 'needs_review' => false,
                 'recorded_by' => self::userId(),
@@ -156,12 +162,7 @@ final class Attendances
      */
     public static function expected(Seance $seance): Builder
     {
-        $date = $seance->date->toDateString();
-
-        return Enrolment::query()->where('training_session_id', $seance->training_session_id)
-            ->whereIn('status', self::ATTENDING)
-            ->where(fn (Builder $q) => $q->whereNull('entered_on')->orWhere('entered_on', '<=', $date))
-            ->where(fn (Builder $q) => $q->whereNull('left_on')->orWhere('left_on', '>=', $date));
+        return IndividualPlanning::expectedAt($seance);
     }
 
     /** States of a trainee who has attendance (abandons up to their leaving day). */
@@ -172,7 +173,7 @@ final class Attendances
      *
      * @throws ValidationException
      */
-    public static function assertExpected(Enrolment $enrolment, CarbonImmutable $day): void
+    public static function assertExpected(Enrolment $enrolment, CarbonImmutable $day, ?Seance $seance = null): void
     {
         if (! in_array($enrolment->status->value, self::ATTENDING, true)) {
             throw ValidationException::withMessages(['enrolment_id' => self::NOT_ATTENDING]);
@@ -183,6 +184,9 @@ final class Attendances
         }
         if ($enrolment->left_on !== null && $date > $enrolment->left_on->toDateString()) {
             throw ValidationException::withMessages(['enrolment_id' => 'Ce stagiaire a quitté la formation le '.$enrolment->left_on->format('d/m/Y').' : pas de présence après cette date.']);
+        }
+        if ($seance !== null && IndividualPlanning::exempted($enrolment->id, $seance)) {
+            throw ValidationException::withMessages(['enrolment_id' => self::EXEMPTED]);
         }
     }
 
@@ -195,20 +199,45 @@ final class Attendances
      */
     public static function review(Seance $seance, string $kind): void
     {
+        if ($kind === SeanceChanged::DELETED) {
+            return;
+        }
         /** @var Collection<int, Attendance> $rows */
         $rows = Attendance::query()->where('seance_id', $seance->id)->orderBy('id')->lockForUpdate()->get();
+        $times = IndividualPlanning::times($seance, $rows->pluck('enrolment_id')->map(fn ($id) => (string) $id)->unique()->values()->all());
         foreach ($rows as $attendance) {
+            $duration = $times[$attendance->enrolment_id]['minutes'];
             $attendance->needs_review = true;
             if ($kind === SeanceChanged::CANCELLED || $seance->isCancelled()) {
                 $attendance->minutes = 0;
             } elseif ($attendance->status === Attendance::PRESENT) {
-                $attendance->minutes = $seance->duration_minutes;
-            } elseif ($attendance->status === Attendance::PARTIAL && $attendance->minutes >= $seance->duration_minutes) {
+                $attendance->minutes = $duration;
+            } elseif ($attendance->status === Attendance::PARTIAL && $attendance->minutes >= $duration) {
                 $attendance->status = Attendance::PRESENT;
-                $attendance->minutes = $seance->duration_minutes;
+                $attendance->minutes = $duration;
             }
             $attendance->save();
         }
+    }
+
+    /**
+     * His hours at the séance changed (IndividualPlanningWriter, under its
+     * locks): his attendance, if any, goes « à revoir », present recomputed
+     * at his duration, a partial at or above it made present.
+     */
+    public static function reviewTrainee(Seance $seance, string $enrolmentId): void
+    {
+        $attendance = Attendance::query()->where('seance_id', $seance->id)->where('enrolment_id', $enrolmentId)->lockForUpdate()->first();
+        if ($attendance === null) {
+            return;
+        }
+        $duration = IndividualPlanning::minutesAt($enrolmentId, $seance);
+        $attendance->needs_review = true;
+        if ($attendance->status === Attendance::PRESENT || ($attendance->status === Attendance::PARTIAL && $attendance->minutes >= $duration)) {
+            $attendance->status = Attendance::PRESENT;
+            $attendance->minutes = $duration;
+        }
+        $attendance->save();
     }
 
     /**
@@ -232,8 +261,10 @@ final class Attendances
      */
     private static function enrolmentOf(Seance $seance, string $enrolmentId): Enrolment
     {
+        // His session's trainees, or a trainee of another session the séance was added to (catch-up).
         $enrolment = Str::isUuid($enrolmentId)
-            ? Enrolment::query()->where('training_session_id', $seance->training_session_id)->find($enrolmentId)
+            ? Enrolment::query()->where(fn ($q) => $q->where('training_session_id', $seance->training_session_id)
+                ->orWhereIn('id', IndividualPlanning::guestsAt($seance)->pluck('id')->all()))->find($enrolmentId)
             : null;
 
         return $enrolment ?? throw ValidationException::withMessages(['enrolment_id' => self::UNKNOWN_TRAINEE]);

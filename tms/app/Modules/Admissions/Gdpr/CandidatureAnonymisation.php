@@ -2,6 +2,7 @@
 
 namespace App\Modules\Admissions\Gdpr;
 
+use App\Modules\Admissions\Booklet\BookletAnonymisation;
 use App\Modules\Admissions\Candidatures\Candidature;
 use App\Modules\Admissions\Candidatures\CandidatureFiles;
 use App\Modules\Admissions\OnlineTests\OnlineAttempt;
@@ -23,6 +24,8 @@ final class CandidatureAnonymisation
         }
         DB::transaction(function () use ($candidature): void {
             app(CandidatureFiles::class)->purge($candidature);
+            // The booklet follow-up: texts, drawings, names and e-mails go; the marks stay.
+            BookletAnonymisation::forCandidature($candidature->id);
             // The answers and traces of the online tests go.
             OnlineAttempt::query()->where('candidature_id', $candidature->id)->toBase()
                 ->update(['answers' => '{}', 'events' => '[]', 'updated_at' => now()]);
@@ -52,5 +55,7 @@ final class CandidatureAnonymisation
     {
         Candidature::withTrashed()->whereIn('person_id', $personIds)->whereNull('anonymised_at')->get()
             ->each(fn (Candidature $c) => $this->anonymise($c));
+        // A tutor of a booklet: his name, drawing and e-mails go.
+        BookletAnonymisation::forTutors($personIds);
     }
 }

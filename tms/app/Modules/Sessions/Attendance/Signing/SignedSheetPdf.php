@@ -100,9 +100,10 @@ final class SignedSheetPdf
                     'validator_signature' => $image($slot?->trainer_signature_path),
                 ];
             }
-            $firstSeance = $daySeances->first();
             $rows = [];
-            foreach (Attendances::expected($firstSeance)->get() as $e) {
+            // Every trainee expected at one séance of the day (an individual planning may leave him out of some).
+            $dayTrainees = $daySeances->flatMap(fn ($seance) => Attendances::expected($seance)->get())->unique('id')->sortBy('id')->values();
+            foreach ($dayTrainees as $e) {
                 $cells = [];
                 foreach ($halves as $half => $h) {
                     $sig = $h['slot'] === null ? null : ($signatures[$h['slot']->id.'|'.$e->id] ?? null);

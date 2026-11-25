@@ -5,6 +5,7 @@ namespace App\Modules\Documents;
 use App\Modules\Core\Access\Permissions as CorePermissions;
 use App\Modules\Core\Audit\MorphAliases;
 use App\Modules\Core\Automation\DailyAutomations;
+use App\Modules\Core\Documents\Previews;
 use App\Modules\Core\Signatures\Events\SignatureCompleted;
 use App\Modules\Core\Users\User;
 use App\Modules\Crm\Public\FicheLinks;
@@ -49,7 +50,12 @@ class DocumentsServiceProvider extends ServiceProvider
         DossierHooks::onCreatedFromQuote('documents.convention', function (string $dossierId, User $by): void {
             app(ConventionAutomation::class)->forDossier($dossierId, $by);
         });
+        // The dossier of an alternance candidate: its convention d'apprentissage / de professionnalisation, issued at once.
+        DossierHooks::onCreatedFromCandidature('documents.alternance_convention', function (string $dossierId, User $by): void {
+            app(AlternanceConventions::class)->issueForDossier($dossierId, $by);
+        });
         DocumentMailTemplates::register();
+        Previews::register(AlternancePreview::KEY, fn (array $data): string => app(AlternancePreview::class)->render($data));
         Event::listen(SignatureCompleted::class, fn (SignatureCompleted $e) => DocumentSignatures::completed($e, app(Paperwork::class)));
         RateLimiter::for('document-mail', fn (Request $request) => Limit::perMinute(20)->by('document-mail:'.($request->user()?->getAuthIdentifier() ?? $request->ip())));
         FicheLinks::registerAnonymisation('documents', fn (array $personIds) => DocumentAnonymisation::clear($personIds));

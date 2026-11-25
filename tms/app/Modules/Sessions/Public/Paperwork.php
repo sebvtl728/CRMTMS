@@ -12,6 +12,9 @@ use App\Modules\Sessions\Dossiers\DossierStatus;
 use App\Modules\Sessions\Dossiers\DossierTransitions;
 use App\Modules\Sessions\Enrolments\Enrolment;
 use App\Modules\Sessions\Enrolments\EnrolmentStatus;
+use App\Modules\Sessions\Planning\EnrolmentAdjustment;
+use App\Modules\Sessions\Planning\IndividualPlanning;
+use App\Modules\Sessions\Planning\PlannedSeance;
 use App\Modules\Sessions\Planning\Seance;
 use App\Modules\Sessions\Sessions\SessionLocation;
 use App\Modules\Sessions\Sessions\SessionPlace;
@@ -33,6 +36,28 @@ final class Paperwork
     public function __construct(private readonly DossierTransitions $transitions) {}
 
     /**
+     * The module owning the alternance contracts (Admissions) tells the
+     * contract of a dossier, without Sessions nor Documents knowing it: null
+     * when the dossier has none. Kept in the container (one per application).
+     *
+     * @param  \Closure(string): ?array<string, mixed>  $provider  dossier id => contract (contract_type, starts_on, ends_on, apprentice_person_id, employer_organisation_id, tutor_person_id, opco_organisation_id, rncp_code)
+     */
+    public static function registerAlternance(\Closure $provider): void
+    {
+        app()->instance(self::class.'.alternance', $provider);
+    }
+
+    /**
+     * @return array<string, mixed>|null
+     */
+    public static function alternance(string $dossierId): ?array
+    {
+        $provider = app()->bound(self::class.'.alternance') ? app(self::class.'.alternance') : null;
+
+        return $provider instanceof \Closure ? $provider($dossierId) : null;
+    }
+
+    /**
      * @return array<string, mixed>|null
      */
     public static function dossier(string $dossierId): ?array
@@ -48,6 +73,7 @@ final class Paperwork
         return [
             ...$billing,
             'contact_person_id' => $dossier->contact_person_id,
+            'alternance' => self::alternance($dossierId),
             'sessions' => array_map(function (array $s) use ($sessions): array {
                 $session = $sessions[$s['id']];
 
@@ -92,12 +118,12 @@ final class Paperwork
         }
         $session = TrainingSession::withTrashed()->findOrFail($enrolment->training_session_id);
         $hours = RealisedHours::forEnrolment($enrolment->id);
-        $seances = Seance::query()->where('training_session_id', $session->id)->where('status', 'planned')
-            ->orderBy('date')->orderBy('starts_at')->get();
+        // His individual planning: his séances, at his hours.
+        $seances = collect(IndividualPlanning::seancesOf(collect([$enrolment]))[$enrolment->id] ?? []);
         if ($completeOn !== null) {
             $recorded = Attendance::query()->where('enrolment_id', $enrolment->id)->pluck('seance_id')->map(fn ($id) => (string) $id)->all();
             $hours['realised_minutes'] = (int) $hours['realised_minutes'] + (int) $seances
-                ->filter(fn (Seance $s) => $s->date->toDateString() === $completeOn && ! in_array($s->id, $recorded, true))->sum('duration_minutes');
+                ->filter(fn (PlannedSeance $p) => $p->seance->date->toDateString() === $completeOn && ! in_array($p->seance->id, $recorded, true))->sum('minutes');
         }
 
         return [
@@ -118,11 +144,11 @@ final class Paperwork
                 'place' => self::place($session),
                 'cancelled' => $session->isCancelled(),
             ],
-            'schedule' => $seances->map(fn (Seance $s) => [
-                'date' => $s->date->toDateString(),
-                'starts_at' => substr($s->starts_at, 0, 5),
-                'ends_at' => substr($s->ends_at, 0, 5),
-                'place' => $s->place_text,
+            'schedule' => $seances->map(fn (PlannedSeance $p) => [
+                'date' => $p->seance->date->toDateString(),
+                'starts_at' => $p->start,
+                'ends_at' => $p->end,
+                'place' => $p->seance->place_text,
             ])->values()->all(),
         ];
     }
@@ -156,6 +182,11 @@ final class Paperwork
     {
         $candidates = AttendanceClosure::query()->whereNotNull('closed_at')->where('closed_at', '>=', $since)
             ->distinct()->pluck('training_session_id')->map(fn ($id) => (string) $id)->all();
+        // A catch-up closed in its host session lets the trainee's own session be looked at again.
+        $candidates = array_values(array_unique([...$candidates, ...Enrolment::query()
+            ->whereIn('id', EnrolmentAdjustment::query()->select('enrolment_id')->where('kind', EnrolmentAdjustment::ADDED_SEANCE)
+                ->whereIn('seance_id', Seance::query()->select('id')->whereIn('training_session_id', $candidates)))
+            ->distinct()->pluck('training_session_id')->map(fn ($id) => (string) $id)->all()]));
         if ($candidates === []) {
             return [];
         }
@@ -173,6 +204,34 @@ final class Paperwork
         }
 
         return $out;
+    }
+
+    /**
+     * Whether a séance added to the trainee from another session (a
+     * catch-up, individual planning) still waits: its month not closed in
+     * its host session, or (with $after, a Paris day) held after that day.
+     * The automatic certificates wait for it.
+     */
+    public static function catchUpPending(string $enrolmentId, ?string $after = null): bool
+    {
+        if (! Str::isUuid($enrolmentId)) {
+            return false;
+        }
+        $added = Seance::query()->where('status', Seance::PLANNED)
+            ->whereIn('id', EnrolmentAdjustment::query()->select('seance_id')->where('enrolment_id', $enrolmentId)->where('kind', EnrolmentAdjustment::ADDED_SEANCE))
+            ->get(['training_session_id', 'date']);
+        foreach ($added as $seance) {
+            if ($after !== null && $seance->date->toDateString() > $after) {
+                return true;
+            }
+            $closed = AttendanceClosure::query()->where('training_session_id', $seance->training_session_id)->whereNotNull('closed_at')
+                ->where('month', Months::of($seance->date->toDateString())->toDateString())->exists();
+            if ($after === null && ! $closed) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**

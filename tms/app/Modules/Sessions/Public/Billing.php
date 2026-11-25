@@ -190,8 +190,13 @@ final class Billing
         $sessions = TrainingSession::withTrashed()->whereKey($sessionIds)->orderBy('starts_on')->orderBy('number')->get(['id', 'starts_on', 'ends_on']);
         $modules = SessionModule::query()->whereIn('training_session_id', $sessionIds)
             ->get(['id', 'training_session_id', 'planned_minutes', 'dating_mode'])->groupBy('training_session_id');
+        // Séances added to these trainees from other sessions (catch-ups): their months close with their host session.
+        $added = DB::table('enrolment_adjustments')->join('seances', 'seances.id', '=', 'enrolment_adjustments.seance_id')
+            ->whereIn('enrolment_adjustments.enrolment_id', $ids)->where('enrolment_adjustments.kind', 'added_seance')
+            ->whereNull('seances.deleted_at')->where('seances.status', '<>', Seance::CANCELLED)
+            ->selectRaw("enrolment_adjustments.enrolment_id, seances.training_session_id, to_char(seances.date, 'YYYY-MM') as month")->distinct()->get();
         /** @var array<string, list<string>> $closed */
-        $closed = AttendanceClosure::query()->whereIn('training_session_id', $sessionIds)->whereNotNull('closed_at')
+        $closed = AttendanceClosure::query()->whereIn('training_session_id', [...$sessionIds, ...$added->pluck('training_session_id')->unique()->all()])->whereNotNull('closed_at')
             ->orderBy('month')->get(['training_session_id', 'month'])->groupBy('training_session_id')
             ->map(fn ($rows) => $rows->map(fn (AttendanceClosure $c) => Months::key($c->month))->values()->all())->all();
 
@@ -199,15 +204,18 @@ final class Billing
         $attendance = Attendance::query()
             ->join('seances', 'seances.id', '=', 'attendances.seance_id')
             ->join('enrolments', 'enrolments.id', '=', 'attendances.enrolment_id')
+            // His own hours at the séance (individual planning): his duration, never the séance's.
+            ->leftJoin('enrolment_adjustments as own', fn ($j) => $j->on('own.seance_id', '=', 'attendances.seance_id')
+                ->on('own.enrolment_id', '=', 'attendances.enrolment_id')->whereNotNull('own.starts_at'))
             ->whereIn('attendances.enrolment_id', $ids)
             ->whereNull('seances.deleted_at')
             ->where('seances.status', '<>', Seance::CANCELLED)
             ->where(fn ($q) => $q->whereNull('enrolments.entered_on')->orWhereColumn('seances.date', '>=', 'enrolments.entered_on'))
             ->where(fn ($q) => $q->whereNull('enrolments.left_on')->orWhereColumn('seances.date', '<=', 'enrolments.left_on'))
-            ->groupByRaw("attendances.enrolment_id, to_char(seances.date, 'YYYY-MM')")
-            ->selectRaw("attendances.enrolment_id as enrolment_id, to_char(seances.date, 'YYYY-MM') as month, sum(attendances.minutes)::bigint as realised"
-                .', sum(case when seances.date < ?::date and attendances.status = ? then seances.duration_minutes'
-                .' when seances.date < ?::date and attendances.status = ? then greatest(seances.duration_minutes - attendances.minutes, 0)'
+            ->groupByRaw("attendances.enrolment_id, seances.training_session_id, to_char(seances.date, 'YYYY-MM')")
+            ->selectRaw("attendances.enrolment_id as enrolment_id, seances.training_session_id as session_id, to_char(seances.date, 'YYYY-MM') as month, sum(attendances.minutes)::bigint as realised"
+                .', sum(case when seances.date < ?::date and attendances.status = ? then coalesce(own.duration_minutes, seances.duration_minutes)'
+                .' when seances.date < ?::date and attendances.status = ? then greatest(coalesce(own.duration_minutes, seances.duration_minutes) - attendances.minutes, 0)'
                 .' else 0 end)::bigint as absent', [$today, Attendance::ABSENT, $today, Attendance::PARTIAL])
             ->toBase()->get();
 
@@ -237,7 +245,8 @@ final class Billing
         $realised = [];
         $absent = [];
         foreach ($attendance as $row) {
-            if ($counts($sessionOf[$row->enrolment_id], $row->month)) {
+            // A catch-up counts once its month is closed in the session that held it.
+            if ($counts((string) $row->session_id, $row->month)) {
                 $realised[$row->enrolment_id] = ($realised[$row->enrolment_id] ?? 0) + (int) $row->realised;
                 $absent[$row->enrolment_id] = ($absent[$row->enrolment_id] ?? 0) + (int) $row->absent;
             }
@@ -264,7 +273,8 @@ final class Billing
             'planned_minutes' => SessionModules::minutesOf($e->planned_hours) ?? $planned($e->training_session_id),
             'realised_minutes' => $realised[$e->id] ?? 0,
             'absent_minutes' => $absent[$e->id] ?? 0,
-            'all_months_closed' => $allClosed($e->training_session_id),
+            'all_months_closed' => $allClosed($e->training_session_id)
+                && $added->where('enrolment_id', $e->id)->every(fn ($a) => in_array($a->month, $closed[$a->training_session_id] ?? [], true)),
             'closed_months' => $closed[$e->training_session_id] ?? [],
         ])->values()->all();
 
