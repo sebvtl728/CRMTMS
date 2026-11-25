@@ -57,7 +57,6 @@ export default function CandidatureCreate({ person, options, das_recipients }: C
     const [draftErrors, setDraftErrors] = useState<Record<string, string>>({});
     const [duplicates, setDuplicates] = useState<{ id: string; last_name: string; first_name: string | null }[]>([]);
     const [trainingId, setTrainingId] = useState<string | null>(null);
-    const [responsible, setResponsible] = useState<string | null>(null);
     const [processing, setProcessing] = useState(false);
 
     // Age and situation are read by the server: reload the person prop when another one is picked.
@@ -105,11 +104,7 @@ export default function CandidatureCreate({ person, options, das_recipients }: C
     const submit = () => {
         if (!picked) return;
         setProcessing(true);
-        router.post(
-            '/admissions/candidatures',
-            { person_id: picked.id, training_id: trainingId, responsible_user_id: responsible },
-            { onFinish: () => setProcessing(false) },
-        );
+        router.post('/admissions/candidatures', { person_id: picked.id, training_id: trainingId }, { onFinish: () => setProcessing(false) });
     };
 
     const field = (key: keyof NewPerson, label: string, type = 'text') => (
@@ -215,14 +210,6 @@ export default function CandidatureCreate({ person, options, das_recipients }: C
                         options={options.training_options}
                         onChange={setTrainingId}
                         error={errors.training_id ?? errors.das_id}
-                    />
-                    <OptionSelect
-                        id="responsible"
-                        label="Responsable"
-                        value={responsible}
-                        options={options.users}
-                        onChange={setResponsible}
-                        error={errors.responsible_user_id}
                     />
                     <div className="grid gap-1 text-sm">
                         <span className="text-muted-foreground">Destinataire</span>

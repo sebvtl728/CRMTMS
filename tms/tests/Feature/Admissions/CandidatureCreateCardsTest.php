@@ -1,5 +1,6 @@
 <?php
 
+use App\Modules\Admissions\Candidatures\Candidature;
 use App\Modules\Admissions\Permissions;
 use App\Modules\Core\Access\AccessScope;
 use App\Modules\Core\References\ReferenceList;
@@ -56,4 +57,16 @@ it('names the DAS responsibles who will receive the candidature, by DAS', functi
 
     $this->actingAs(admin(twoFactor: true))->get('/admissions/candidatures/create')->assertInertia(fn (Assert $p) => $p
         ->where('das_recipients', [$hotel->id => ['Claire Responsable'], $support->id => ['Marc Support']]));
+});
+
+it('opens a candidature without responsible: its creator keeps it on « Ses fiches »', function () {
+    $own = adUser([Permissions::CANDIDATURES_VIEW => AccessScope::Own, Permissions::CANDIDATURES_UPDATE => AccessScope::Own]);
+    $lea = adPerson();
+
+    $this->actingAs($own)->post('/admissions/candidatures', ['person_id' => $lea->id, 'training_id' => adTraining()->id])->assertRedirect();
+
+    $candidature = Candidature::query()->where('person_id', $lea->id)->firstOrFail();
+    expect($candidature->responsible_user_id)->toBeNull()
+        ->and($candidature->created_by)->toBe($own->id);
+    $this->actingAs($own)->get("/admissions/candidatures/{$candidature->id}")->assertOk();
 });
