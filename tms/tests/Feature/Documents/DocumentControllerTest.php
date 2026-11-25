@@ -28,7 +28,8 @@ it('shows the documents block on the dossier, with what the viewer may do', func
         ->where('blocks', fn ($blocks) => ($block = collect($blocks)->firstWhere('key', 'documents.dossier')) !== null
             && $block['component'] === 'documents.dossier'
             && $block['props']['can_manage'] === true
-            && $block['props']['issuable'] === [['value' => 'convention', 'label' => 'Convention de formation']]
+            && $block['props']['issuable'][0] === ['value' => 'convention', 'label' => 'Convention de formation', 'per_trainee' => false]
+            && count($block['props']['issuable']) === 4
             && $block['props']['documents'][0]['number'] === $doc->number
             && $block['props']['documents'][0]['status_label'] === 'Émis'
             && $block['props']['documents'][0]['defaults']['to'] === 'claire.martin@hotel-parc.test'));

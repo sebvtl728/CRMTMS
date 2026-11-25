@@ -67,7 +67,7 @@ it('refuses to sign a convocation or a cancelled document, and cancelling a docu
     $issuer = app(DocumentIssuer::class);
     $convocation = $issuer->issueForEnrolment(admin(), DocumentType::Convocation, $x['lea']->id);
     expect(fn () => app(DocumentSignatures::class)->request(admin(), $convocation, 'lea.durand@example.test'))
-        ->toThrow(UserFacingHttpException::class, 'Seuls la convention et le contrat se signent en ligne.');
+        ->toThrow(UserFacingHttpException::class, 'Ce document ne se signe pas en ligne.');
 
     $doc = $issuer->issue(admin(), DocumentType::Contract, docIndividualDossier()->id);
     $request = app(DocumentSignatures::class)->request(admin(), $doc, 'ana.roux@example.test');

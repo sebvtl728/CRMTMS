@@ -68,6 +68,20 @@ final class DocumentMailTemplates
             body: "Bonjour,\n\nVous trouverez ci-joint le certificat de réalisation de {destinataire} pour la formation « {formation} » ({dates}).\n\nCordialement,\n{societe}",
             variables: $trainee,
         ));
+        foreach ([
+            [DocumentType::IndividualContract, "Envoi d'un contrat individuel de formation", 'Contrat individuel de formation - {formation}', "Bonjour {destinataire},\n\nVeuillez trouver ci-joint votre contrat individuel de formation {numero} pour la formation « {formation} » ({dates}).\n\nMerci de nous le retourner signé.\n\nCordialement,\n{societe}"],
+            [DocumentType::InternalRules, 'Envoi du règlement intérieur et de la charte du stagiaire', 'Règlement intérieur - {formation}', "Bonjour {destinataire},\n\nVeuillez trouver ci-joint le règlement intérieur et la charte des droits et devoirs du stagiaire ({numero}) pour la formation « {formation} » ({dates}).\n\nMerci de nous le retourner signé, précédé de la mention « Lu et approuvé ».\n\nCordialement,\n{societe}"],
+            [DocumentType::ImageRights, "Envoi d'une autorisation de droit à l'image", "Autorisation de droit à l'image - {formation}", "Bonjour {destinataire},\n\nVeuillez trouver ci-jointe l'autorisation de droit à l'image ({numero}) pour la formation « {formation} » ({dates}).\n\nMerci de cocher votre choix et de nous la retourner signée.\n\nCordialement,\n{societe}"],
+        ] as [$type, $label, $subject, $body]) {
+            MailTemplateRegistry::register(new MailTemplateDefinition(
+                key: self::key($type),
+                label: $label,
+                description: 'Proposé dans la fenêtre « Envoyer » du document d\'un stagiaire, toujours modifiable avant l\'envoi. Le PDF est joint automatiquement.',
+                subject: $subject,
+                body: $body,
+                variables: $trainee,
+            ));
+        }
         foreach ([[DocumentType::ApprenticeshipConvention, "d'apprentissage"], [DocumentType::ProfessionalisationConvention, 'de professionnalisation']] as [$type, $kind]) {
             MailTemplateRegistry::register(new MailTemplateDefinition(
                 key: self::key($type),

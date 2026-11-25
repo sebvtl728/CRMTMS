@@ -21,14 +21,21 @@ use Illuminate\Validation\Rule;
  */
 class DocumentController extends Controller
 {
-    public function store(Request $request, string $dossierId, DocumentIssuer $issuer): RedirectResponse
+    public function store(Request $request, string $dossierId, DocumentIssuer $issuer, DocumentBatch $batch): RedirectResponse
     {
         $user = self::user($request);
         abort_unless(Str::isUuid($dossierId) && Paperwork::allows($user, Permissions::VIEW, $dossierId), 404);
         abort_unless(Paperwork::allows($user, Permissions::MANAGE, $dossierId), 403);
-        $values = $request->validate(['type' => ['required', Rule::in([DocumentType::Convention->value, DocumentType::Contract->value, DocumentType::ApprenticeshipConvention->value, DocumentType::ProfessionalisationConvention->value])]], ['type.*' => 'Type de document inconnu.']);
+        $types = [DocumentType::Convention, DocumentType::Contract, DocumentType::ApprenticeshipConvention, DocumentType::ProfessionalisationConvention, ...DocumentType::fromDossier()];
+        $values = $request->validate(['type' => ['required', Rule::in(array_map(fn (DocumentType $t) => $t->value, $types))]], ['type.*' => 'Type de document inconnu.']);
 
         $type = DocumentType::from($values['type']);
+        // A trainee's form: one for each trainee of the dossier.
+        if ($type->perEnrolment()) {
+            $count = $batch->issueForDossier($user, $type, $dossierId);
+
+            return back()->with('status', $count > 1 ? "{$count} documents émis." : '1 document émis.');
+        }
         $document = $issuer->issue($user, $type, $dossierId);
 
         return back()->with('status', $type->label().' '.$document->number.' '.($type->forCompany() ? 'émise' : 'émis').'.');
