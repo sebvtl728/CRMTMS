@@ -41,6 +41,9 @@
         .write-sm { height: 34pt; }
         .visit { height: 60pt; }
         .grid td.mark { width: 22pt; text-align: center; }
+        td.text { white-space: pre-line; vertical-align: top; font-size: 9pt; }
+        td.sig { vertical-align: top; }
+        td.sig img { max-width: 100%; max-height: 40pt; display: block; }
         .grid tr { page-break-inside: avoid; }
         .at { background: #102a43; color: #fff; font-weight: 700; }
         .cp { background: #e4e7eb; font-weight: 700; }
@@ -199,9 +202,11 @@
 @endif
 
 @if ($follow)
-    {{-- Monthly follow-up pages --}}
+    {{-- Monthly follow-up pages (filled with the online follow-up, part B) --}}
     @foreach ($months as $month)
-        @foreach (array_filter(['entreprise', $month['centre_hours'] !== null ? 'centre' : null]) as $where)
+        @foreach ($month['places'] as $place)
+            @php($where = $place === 'company' ? 'entreprise' : 'centre')
+            @php($page = $month['pages'][$place])
             <section class="page">
                 <h2>Suivi de l'alternance - {{ $month['label'] }}</h2>
                 <h3>Travaux effectués {{ $where === 'entreprise' ? 'en entreprise' : 'en centre de formation' }}</h3>
@@ -211,21 +216,41 @@
                 </p>
                 <table>
                     <tr><th style="width: 70pt;"></th><th>Apprenti.e</th><th>Observations du {{ $where === 'entreprise' ? 'tuteur' : 'formateur' }}</th></tr>
-                    @foreach (['Semaine 1', 'Semaine 2', 'Semaine 3', 'Semaine 4-5'] as $week)
-                        <tr><td>{{ $week }}</td><td class="write"></td><td class="write"></td></tr>
+                    @foreach (['w1' => 'Semaine 1', 'w2' => 'Semaine 2', 'w3' => 'Semaine 3', 'w45' => 'Semaine 4-5'] as $week => $weekLabel)
+                        <tr>
+                            <td>{{ $weekLabel }}</td>
+                            <td class="write text">{{ $page['entries'][$week] ?? '' }}</td>
+                            <td class="write text">{{ $page['observations'][$week] ?? '' }}</td>
+                        </tr>
                     @endforeach
                 </table>
                 <h3>Signatures</h3>
                 <table>
                     <tr><th>Tuteur.trice</th><th>Représentant légal</th><th>Apprenti.e</th><th>Formateur.trice</th></tr>
-                    <tr><td class="write-sm"></td><td class="write-sm"></td><td class="write-sm"></td><td class="write-sm"></td></tr>
+                    <tr>
+                        @foreach ([$page['tutor'], null, $page['apprentice']] as $i => $sig)
+                            <td class="write-sm sig">
+                                @if ($sig !== null && $sig['status'] === 'signed')
+                                    @if ($sig['drawing'])<img src="{{ $sig['drawing'] }}" alt="Signature">@endif
+                                    <div class="small">Signé en ligne le {{ $sig['at'] }}@if ($sig['name']) par {{ $sig['name'] }}@endif</div>
+                                @elseif ($sig !== null && $sig['status'] === 'paper')
+                                    <div class="small muted">Signé sur papier</div>
+                                @endif
+                            </td>
+                        @endforeach
+                        <td class="write-sm sig">
+                            @if ($page['visa'])
+                                <div class="small">Visé par {{ $page['visa']['by'] ?? '' }} le {{ $page['visa']['at'] }}</div>
+                            @endif
+                        </td>
+                    </tr>
                 </table>
             </section>
         @endforeach
     @endforeach
 
     {{-- Competence grids --}}
-    @if ($competences !== [])
+    @if ($grid !== [])
         <section class="page">
             <h2>Grilles d'évaluation - {{ $training['title'] }}</h2>
             <p class="small muted">A : acquis - ECA : en cours d'acquisition - NA : non acquis</p>
@@ -234,12 +259,19 @@
                     <tr><th></th><th colspan="3" style="text-align: center;">Centre de formation</th><th colspan="3" style="text-align: center;">Entreprise</th></tr>
                     <tr><th></th><th>A</th><th>ECA</th><th>NA</th><th>A</th><th>ECA</th><th>NA</th></tr>
                 </thead>
-                @foreach ($competences as $i => $activity)
+                @foreach ($grid as $i => $activity)
                     <tr><td colspan="7" class="at">Activité type {{ $i + 1 }} - {{ $activity['title'] }}</td></tr>
                     @foreach ($activity['competences'] as $competence)
                         <tr><td colspan="7" class="cp">{{ $competence['title'] }}</td></tr>
                         @foreach ($competence['skills'] as $skill)
-                            <tr><td>{{ $skill }}</td><td class="mark"></td><td class="mark"></td><td class="mark"></td><td class="mark"></td><td class="mark"></td><td class="mark"></td></tr>
+                            <tr>
+                                <td>{{ $skill['title'] }}</td>
+                                @foreach (['centre', 'company'] as $side)
+                                    @foreach (['A', 'ECA', 'NA'] as $level)
+                                        <td class="mark">{{ $skill[$side] === $level ? 'X' : '' }}</td>
+                                    @endforeach
+                                @endforeach
+                            </tr>
                         @endforeach
                     @endforeach
                 @endforeach
@@ -258,7 +290,10 @@
         <h3>Visites</h3>
         <table>
             <tr><th style="width: 60pt;">Date</th><th>Points abordés</th><th>Formateur.trice et émargement</th><th>Tuteur.trice, émargement et cachet</th></tr>
-            @for ($i = 0; $i < 6; $i++)
+            @foreach ($visits as $visit)
+                <tr><td class="visit">{{ $visit['visited_on'] }}</td><td class="visit text">{{ $visit['points'] }}</td><td class="visit">{{ $visit['trainer'] ?? '' }}</td><td class="visit"></td></tr>
+            @endforeach
+            @for ($i = 0; $i < max(2, 6 - count($visits)); $i++)
                 <tr><td class="visit"></td><td class="visit"></td><td class="visit"></td><td class="visit"></td></tr>
             @endfor
         </table>

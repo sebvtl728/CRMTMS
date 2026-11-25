@@ -3,6 +3,7 @@
 namespace App\Modules\Admissions\Gdpr;
 
 use App\Modules\Admissions\Alternance\AlternanceContract;
+use App\Modules\Admissions\Booklet\BookletAnonymisation;
 use App\Modules\Admissions\Candidatures\Candidature;
 use App\Modules\Admissions\CustomFields\CustomFieldDefinition;
 use App\Modules\Catalogue\Trainings;
@@ -55,6 +56,7 @@ final class PersonCandidaturesExport
                     'fin' => $contract->ends_on->toDateString(),
                 ],
                 'champs_personnalises' => $custom,
+                'livret' => $contract === null ? null : BookletAnonymisation::export($c->id),
                 'creee_le' => $c->created_at?->toIso8601String(),
                 'supprimee' => $c->trashed(),
             ];

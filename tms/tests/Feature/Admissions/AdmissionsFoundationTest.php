@@ -43,7 +43,7 @@ it('isolates candidatures by tenant', function () {
 it('declares the admissions rights, scoped but for the sensitive data', function () {
     expect(Permissions::all())->toBe([
         'admissions.candidatures.view', 'admissions.candidatures.update', 'admissions.candidatures.delete',
-        'admissions.sensitive.view',
+        'admissions.sensitive.view', 'admissions.booklet.manage',
     ])->and(CorePermissions::all())->toContain(...Permissions::all());
 
     foreach (Permissions::all() as $permission) {
@@ -55,9 +55,9 @@ it('declares the admissions rights, scoped but for the sensitive data', function
 it('grants the default rights and scopes per role', function () {
     expect(Permissions::defaultsFor(Role::AdminOrganisme))->toEqualCanonicalizing(Permissions::all())
         ->and(Permissions::defaultsFor(Role::Direction))->toEqualCanonicalizing([Permissions::CANDIDATURES_VIEW, Permissions::SENSITIVE_VIEW])
-        ->and(Permissions::defaultsFor(Role::ResponsableDas))->toEqualCanonicalizing([Permissions::CANDIDATURES_VIEW, Permissions::CANDIDATURES_UPDATE])
+        ->and(Permissions::defaultsFor(Role::ResponsableDas))->toEqualCanonicalizing([Permissions::CANDIDATURES_VIEW, Permissions::CANDIDATURES_UPDATE, Permissions::BOOKLET_MANAGE])
         ->and(Permissions::defaultsFor(Role::Commercial))->toEqualCanonicalizing([Permissions::CANDIDATURES_VIEW, Permissions::CANDIDATURES_UPDATE])
-        ->and(Permissions::defaultsFor(Role::Formateur))->toBe([]);
+        ->and(Permissions::defaultsFor(Role::Formateur))->toBe([Permissions::BOOKLET_MANAGE]);
 
     $commercial = commercial();
     expect($commercial->can(Permissions::CANDIDATURES_UPDATE))->toBeTrue()

@@ -22,6 +22,7 @@ use App\Modules\Sessions\Sessions\SessionStatus;
 use App\Modules\Sessions\Sessions\TrainingSession;
 use App\Modules\Sessions\SessionsVisibility;
 use App\Modules\Sessions\Trainers\Trainer;
+use App\Modules\Sessions\Trainers\Trainers;
 use Illuminate\Database\Query\Builder;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -95,6 +96,26 @@ final class Admission
     public static function liveDossierIds(): Builder
     {
         return Dossier::query()->select('id')->toBase();
+    }
+
+    /**
+     * Ids of the dossiers « of the trainer » linked to $user (the
+     * apprenticeship booklet, « Ses séances »): those with a live enrolment
+     * in a session holding a non-cancelled séance of that trainer; none
+     * when the user is no trainer. A subquery (whereIn).
+     */
+    public static function trainerDossierIds(User $user): Builder
+    {
+        $trainer = Trainers::forUser($user);
+        if ($trainer === null) {
+            return Dossier::query()->select('id')->whereRaw('false')->toBase();
+        }
+
+        return Enrolment::query()->select('dossier_id')
+            ->whereNotIn('status', [EnrolmentStatus::Cancelled->value, EnrolmentStatus::Waitlisted->value])
+            ->whereIn('training_session_id', Seance::query()->select('training_session_id')
+                ->where('trainer_id', $trainer->id)->where('status', '<>', Seance::CANCELLED))
+            ->toBase();
     }
 
     /**

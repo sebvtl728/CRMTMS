@@ -3,6 +3,11 @@
 namespace App\Modules\Admissions;
 
 use App\Modules\Admissions\Alternance\AlternanceContract;
+use App\Modules\Admissions\Booklet\BookletAccess;
+use App\Modules\Admissions\Booklet\BookletEvaluation;
+use App\Modules\Admissions\Booklet\BookletMail;
+use App\Modules\Admissions\Booklet\BookletMonth;
+use App\Modules\Admissions\Booklet\BookletVisit;
 use App\Modules\Admissions\Candidatures\Candidature;
 use App\Modules\Admissions\Candidatures\CandidatureFile;
 use App\Modules\Admissions\Crm\CandidatureLinks;
@@ -55,6 +60,7 @@ class AdmissionsServiceProvider extends ServiceProvider
                 $group,
                 array_values(array_intersect(Permissions::scoped(), $permissions)),
                 fn (Role $role): array => array_intersect_key(Permissions::defaultScopesFor($role), array_flip($permissions)),
+                array_intersect_key(Permissions::extraScopes(), array_flip($permissions)),
             );
         }
 
@@ -66,9 +72,13 @@ class AdmissionsServiceProvider extends ServiceProvider
             PositioningSending::MORPH_ALIAS => PositioningSending::class,
             OnlineTest::MORPH_ALIAS => OnlineTest::class,
             OnlineAttempt::MORPH_ALIAS => OnlineAttempt::class,
+            BookletMonth::MORPH_ALIAS => BookletMonth::class,
+            BookletEvaluation::MORPH_ALIAS => BookletEvaluation::class,
+            BookletVisit::MORPH_ALIAS => BookletVisit::class,
         ]);
 
         PositioningSendings::registerTemplate();
+        BookletMail::registerTemplates();
     }
 
     public function boot(): void
@@ -110,6 +120,16 @@ class AdmissionsServiceProvider extends ServiceProvider
             }
 
             return AdmissionsVisibility::candidatures($query, $user)->findOrFail($value);
+        });
+
+        // The booklet follow-up: 404 out of the scope of admissions.booklet.manage.
+        Route::bind('bookletCandidature', function (string $value): Candidature {
+            $user = request()->user();
+            if (! Str::isUuid($value) || ! $user instanceof User) {
+                throw (new ModelNotFoundException)->setModel(Candidature::class, [$value]);
+            }
+
+            return BookletAccess::candidatures(Candidature::query(), $user)->findOrFail($value);
         });
     }
 
