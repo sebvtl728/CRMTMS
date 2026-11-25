@@ -199,6 +199,9 @@ final class Attendances
      */
     public static function review(Seance $seance, string $kind): void
     {
+        if ($kind === SeanceChanged::DELETED) {
+            return;
+        }
         /** @var Collection<int, Attendance> $rows */
         $rows = Attendance::query()->where('seance_id', $seance->id)->orderBy('id')->lockForUpdate()->get();
         $times = IndividualPlanning::times($seance, $rows->pluck('enrolment_id')->map(fn ($id) => (string) $id)->unique()->values()->all());

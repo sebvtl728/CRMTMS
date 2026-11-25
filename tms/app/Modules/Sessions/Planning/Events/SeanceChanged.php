@@ -19,6 +19,9 @@ final class SeanceChanged implements ShouldDispatchAfterCommit
 
     public const CANCELLED = 'cancelled';
 
+    /** Only for the schedule hooks (Seances::onScheduleChange): never dispatched. */
+    public const DELETED = 'deleted';
+
     public function __construct(
         public readonly string $seanceId,
         public readonly string $kind,

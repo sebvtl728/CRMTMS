@@ -4,6 +4,9 @@ namespace App\Modules\Sessions\Planning;
 
 use App\Modules\Sessions\Attendance\Attendances;
 use App\Modules\Sessions\Enrolments\Enrolment;
+use App\Modules\Sessions\Modules\SessionModule;
+use App\Modules\Sessions\Modules\SessionModules;
+use App\Modules\Sessions\Sessions\TrainingSession;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Query\Builder as QueryBuilder;
 
@@ -88,6 +91,84 @@ final class IndividualPlanning
         $break = min((int) $own->break_minutes, $span - 1);
 
         return ['start' => $start, 'end' => $end, 'break' => $break, 'minutes' => $span - $break];
+    }
+
+    /**
+     * His planned minutes (spec § 6): the base (his planned hours before the
+     * first adjustment) − per module of his session, the whole module when
+     * exempted, else the séances exempted and the minutes his own hours
+     * miss, capped at the module's planned minutes − + the séances added.
+     * Cancelled and deleted séances count nothing; never below 0.
+     */
+    public static function plannedMinutes(Enrolment $enrolment): int
+    {
+        $session = TrainingSession::withTrashed()->findOrFail($enrolment->training_session_id);
+        $base = SessionModules::minutesOf($enrolment->planned_hours_base ?? $enrolment->planned_hours ?? $session->planned_hours) ?? 0;
+        $modules = SessionModule::query()->where('training_session_id', $session->id)->pluck('planned_minutes', 'id');
+        $adjustments = EnrolmentAdjustment::query()->with('seance')->where('enrolment_id', $enrolment->id)->get();
+
+        $exemptModules = $adjustments->where('kind', EnrolmentAdjustment::EXEMPT_MODULE)->pluck('session_module_id')->all();
+        $less = 0;
+        $byModule = [];
+        $added = 0;
+        foreach ($adjustments as $adjustment) {
+            $seance = $adjustment->seance;
+            if ($seance === null || $seance->trashed() || $seance->isCancelled()) {
+                continue;
+            }
+            $hours = self::hoursOf($seance, $adjustment);
+            match ($adjustment->kind) {
+                EnrolmentAdjustment::ADDED_SEANCE => $added += $hours['minutes'],
+                EnrolmentAdjustment::EXEMPT_SEANCE => $byModule[$seance->session_module_id] = ($byModule[$seance->session_module_id] ?? 0) + $seance->duration_minutes,
+                EnrolmentAdjustment::OWN_HOURS => $byModule[$seance->session_module_id] = ($byModule[$seance->session_module_id] ?? 0) + $seance->duration_minutes - $hours['minutes'],
+                default => null,
+            };
+        }
+        foreach ($modules as $moduleId => $planned) {
+            $less += in_array($moduleId, $exemptModules, true) ? (int) $planned : min($byModule[$moduleId] ?? 0, (int) $planned);
+        }
+
+        return max(0, $base - $less + $added);
+    }
+
+    /**
+     * Writes his computed planned hours (in the caller's transaction): with
+     * adjustments, the base is kept (planned_hours_base, set at the first
+     * one) and planned_hours computed; without any, planned_hours goes back
+     * to the base and the base is emptied.
+     */
+    public static function refresh(Enrolment $enrolment): void
+    {
+        $has = EnrolmentAdjustment::query()->where('enrolment_id', $enrolment->id)->exists();
+        if (! $has) {
+            if ($enrolment->planned_hours_base !== null) {
+                $enrolment->planned_hours = $enrolment->planned_hours_base;
+                $enrolment->planned_hours_base = null;
+                $enrolment->save();
+            }
+
+            return;
+        }
+        if ($enrolment->planned_hours_base === null) {
+            $enrolment->planned_hours_base = $enrolment->planned_hours
+                ?? TrainingSession::withTrashed()->findOrFail($enrolment->training_session_id)->planned_hours;
+        }
+        $enrolment->planned_hours = SessionModules::hoursDecimal(self::plannedMinutes($enrolment));
+        if ($enrolment->isDirty()) {
+            $enrolment->save();
+        }
+    }
+
+    /**
+     * A séance was moved, cancelled or deleted: the planned hours of the
+     * trainees with an adjustment on it are computed again (id order).
+     */
+    public static function refreshForSeance(Seance $seance): void
+    {
+        $ids = EnrolmentAdjustment::query()->where('seance_id', $seance->id)->distinct()->orderBy('enrolment_id')->pluck('enrolment_id')->all();
+        foreach (Enrolment::query()->whereKey($ids)->orderBy('id')->lockForUpdate()->get() as $enrolment) {
+            self::refresh($enrolment);
+        }
     }
 
     private static function minutesOfDay(string $time): int

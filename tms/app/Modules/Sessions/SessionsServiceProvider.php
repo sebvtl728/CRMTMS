@@ -54,6 +54,7 @@ use App\Modules\Sessions\Notes\SessionTask;
 use App\Modules\Sessions\Planning\PlacementPeriod;
 use App\Modules\Sessions\Planning\PlacementPeriodHost;
 use App\Modules\Sessions\Planning\EnrolmentAdjustment;
+use App\Modules\Sessions\Planning\IndividualPlanning;
 use App\Modules\Sessions\Planning\Seance;
 use App\Modules\Sessions\Planning\SeanceCalendar;
 use App\Modules\Sessions\Planning\SeanceOutlook;
@@ -321,6 +322,7 @@ class SessionsServiceProvider extends ServiceProvider
         Seances::registerAttendance('sessions.attendance', fn (string $seanceId): bool => Attendance::query()->where('seance_id', $seanceId)->exists());
         Seances::guardMonthsWith(fn (TrainingSession $session, string $date) => Closures::assertOpen($session->id, $date));
         Seances::onScheduleChange('sessions.attendance', fn (Seance $seance, string $kind) => Attendances::review($seance, $kind));
+        Seances::onScheduleChange('sessions.individual_planning', fn (Seance $seance) => IndividualPlanning::refreshForSeance($seance));
     }
 
     /**

@@ -3,6 +3,9 @@
 use App\Modules\Core\Tenancy\Tenant;
 use App\Modules\Sessions\Attendance\Attendance;
 use App\Modules\Sessions\Attendance\Attendances;
+use App\Modules\Sessions\Enrolments\Enrolment;
+use App\Modules\Sessions\Enrolments\Enrolments;
+use App\Modules\Sessions\Modules\SessionModules;
 use App\Modules\Sessions\Planning\EnrolmentAdjustment;
 use App\Modules\Sessions\Planning\IndividualPlanning;
 use App\Modules\Sessions\Planning\Seances;
@@ -133,4 +136,130 @@ it('reviews a moved séance at his own duration', function () {
     // His own hours kept within the séance: 14:00–16:00.
     expect($rows[$lea->id]->minutes)->toBe(120)->and($rows[$lea->id]->needs_review)->toBeTrue()
         ->and($rows[$marc->id]->minutes)->toBe(420);
+});
+
+// ---------------------------------------------------------------- planned hours
+
+function ipExempt(string $enrolmentId, string $seanceId): EnrolmentAdjustment
+{
+    return EnrolmentAdjustment::query()->create(['enrolment_id' => $enrolmentId, 'kind' => EnrolmentAdjustment::EXEMPT_SEANCE, 'seance_id' => $seanceId]);
+}
+
+function ipRefreshed(Enrolment $enrolment): Enrolment
+{
+    IndividualPlanning::refresh($enrolment->refresh());
+
+    return $enrolment->refresh();
+}
+
+it('subtracts an exempted séance from the planned hours', function () {
+    $session = plSession();
+    $seance = plSeance(plModule($session), '2026-09-02', '09:00', '12:30');
+    $lea = atEnrol($session);
+    ipExempt($lea->id, $seance->id);
+
+    $lea = ipRefreshed($lea);
+
+    expect($lea->planned_hours)->toBe('17.50')->and($lea->planned_hours_base)->toBe('21.00');
+});
+
+it('subtracts the planned hours of an exempted module', function () {
+    $session = plSession();
+    plModule($session);
+    $workshop = atIntervalModule($session, 600);
+    SessionModules::recompute($session->refresh());
+    $lea = atEnrol($session->refresh());
+    EnrolmentAdjustment::query()->create(['enrolment_id' => $lea->id, 'kind' => EnrolmentAdjustment::EXEMPT_MODULE, 'session_module_id' => $workshop->id]);
+
+    expect(ipRefreshed($lea)->planned_hours)->toBe('21.00');
+});
+
+it('never subtracts more than the planned hours of a module', function () {
+    $session = plSession();
+    $module = plModule($session);
+    $lea = atEnrol($session);
+    foreach (['2026-09-02', '2026-09-03', '2026-09-04', '2026-09-07'] as $day) {
+        ipExempt($lea->id, plSeance($module, $day, '09:00', '17:00', ['break_minutes' => 60])->id);
+    }
+
+    expect(ipRefreshed($lea)->planned_hours)->toBe('0.00');
+});
+
+it('subtracts the hours a trainee with own hours misses', function () {
+    $session = plSession();
+    $seance = plSeance(plModule($session), '2026-09-02', '09:00', '17:00', ['break_minutes' => 60]);
+    $lea = atEnrol($session);
+    ipOwnHours($lea->id, $seance->id, '14:00', '17:00');
+
+    expect(ipRefreshed($lea)->planned_hours)->toBe('17.00');
+});
+
+it('starts from the hours typed by hand and comes back to them', function () {
+    $session = plSession();
+    $seance = plSeance(plModule($session), '2026-09-02', '09:00', '12:30');
+    $lea = atEnrol($session, 'Durand', ['planned_hours' => '20']);
+    $exemption = ipExempt($lea->id, $seance->id);
+
+    expect(ipRefreshed($lea)->planned_hours)->toBe('16.50');
+
+    $exemption->delete();
+    $lea = ipRefreshed($lea);
+
+    expect($lea->planned_hours)->toBe('20.00')->and($lea->planned_hours_base)->toBeNull();
+});
+
+it('writes the base when the planned hours are typed with adjustments', function () {
+    $session = plSession();
+    $seance = plSeance(plModule($session), '2026-09-02', '09:00', '12:30');
+    $lea = atEnrol($session);
+    ipExempt($lea->id, $seance->id);
+    $lea = ipRefreshed($lea);
+
+    $lea = app(Enrolments::class)->update($lea, ['planned_hours' => '18'])->refresh();
+
+    expect($lea->planned_hours_base)->toBe('18.00')->and($lea->planned_hours)->toBe('14.50');
+});
+
+it('recomputes when a séance with own hours is cancelled or moved', function () {
+    $session = plSession();
+    $seance = plSeance(plModule($session), '2026-09-02', '09:00', '17:00', ['break_minutes' => 60]);
+    $lea = atEnrol($session);
+    ipOwnHours($lea->id, $seance->id, '14:00', '17:00');
+    $lea = ipRefreshed($lea);
+    expect($lea->planned_hours)->toBe('17.00');
+
+    $seance = app(Seances::class)->reschedule($seance, ['date' => '2026-09-02', 'starts_at' => '09:00', 'ends_at' => '18:00', 'break_minutes' => 60]);
+    expect($lea->refresh()->planned_hours)->toBe('16.00');
+
+    app(Attendances::class)->record($seance, $lea->id, 'present', null, null);
+    app(Seances::class)->cancel($seance, 'Formateur absent');
+
+    expect($lea->refresh()->planned_hours)->toBe('21.00')
+        ->and(Attendance::query()->sole()->minutes)->toBe(0)
+        ->and(Attendance::query()->sole()->needs_review)->toBeTrue();
+});
+
+it('recomputes when an exempted séance is deleted', function () {
+    $session = plSession();
+    $seance = plSeance(plModule($session), '2026-09-02', '09:00', '12:30');
+    $lea = atEnrol($session);
+    ipExempt($lea->id, $seance->id);
+    expect(ipRefreshed($lea)->planned_hours)->toBe('17.50');
+
+    app(Seances::class)->delete($seance);
+
+    expect($lea->refresh()->planned_hours)->toBe('21.00');
+});
+
+it('keeps the base when the session hours change', function () {
+    $session = plSession();
+    $module = plModule($session);
+    $seance = plSeance($module, '2026-09-02', '09:00', '12:30');
+    $lea = atEnrol($session);
+    ipExempt($lea->id, $seance->id);
+    ipRefreshed($lea);
+
+    app(SessionModules::class)->save($session->refresh(), ['title' => $module->title, 'planned_hours' => '30'], $module->refresh());
+
+    expect($lea->refresh()->planned_hours)->toBe('17.50')->and($lea->planned_hours_base)->toBe('21.00');
 });

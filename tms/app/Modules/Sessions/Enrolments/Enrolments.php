@@ -10,6 +10,7 @@ use App\Modules\Sessions\Amounts;
 use App\Modules\Sessions\Attendance\Closures;
 use App\Modules\Sessions\Dossiers\Dossier;
 use App\Modules\Sessions\Dossiers\DossierLine;
+use App\Modules\Sessions\Planning\IndividualPlanning;
 use App\Modules\Sessions\Sessions\SessionKind;
 use App\Modules\Sessions\Sessions\SessionRows;
 use App\Modules\Sessions\Sessions\SessionWriter;
@@ -287,7 +288,13 @@ final class Enrolments
                 [$from, $to] = [$values['entered_on'], $locked->entered_on->toDateString()];
                 Closures::assertOpenBetween($locked->training_session_id, min($from, $to), max($from, $to));
             }
+            if (array_key_exists('planned_hours', $values) && $locked->planned_hours_base !== null) {
+                // An individual planning: the hours typed are its base, the planned hours computed from it.
+                $locked->planned_hours_base = $values['planned_hours'];
+                unset($values['planned_hours']);
+            }
             $locked->fill($values)->save();
+            IndividualPlanning::refresh($locked);
         });
     }
 
