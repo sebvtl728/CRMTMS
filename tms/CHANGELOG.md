@@ -5,11 +5,16 @@ Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) ; ve
 
 ## [Non publié]
 
-## [0.15.25] - 2026-11-25
+## [0.15.26] - 2026-11-25
 
 ### Ajouté
 
 - **Documents de chaque stagiaire depuis le dossier** : bloc Documents, ligne « Pour chaque stagiaire » : **contrat individuel de formation**, **règlement intérieur et charte des droits et devoirs du stagiaire**, **autorisation de droit à l'image** (cases J'autorise / Je n'autorise pas). Un document par stagiaire inscrit, PDF archivé, envoi et signature en ligne par le stagiaire ; textes et e-mails modifiables (textes d'origine à faire vérifier).
+
+## [0.15.25] - 2026-11-25
+
+### Ajouté
+
 - **Livret d'apprentissage automatique** (Administration › Automatismes, désactivé par défaut) : le lien du mois écoulé part seul à l'apprenti le 1er du mois, avec des rappels à 7 et 14 jours à qui n'a pas signé. « À traiter » : livrets avec des pages non visées depuis plus de 30 jours. Qualiopi : mesures automatiques des indicateurs 11 (savoir-faire évalués) et 28 (pages signées par le tuteur, visites en entreprise).
 - **Convention de formation en alternance** : deux nouveaux documents, **Convention de formation – apprentissage** et **– professionnalisation**, choisis selon le contrat. Ils remplacent la convention de formation d'un dossier en alternance et sont **émis automatiquement à la création du dossier**, avec envoi et signature en ligne comme la convention. Sur la candidature, **Convention d'alternance (aperçu PDF)** et l'ouverture de l'aperçu après « Enregistrer le contrat » (candidat admis). Textes modifiables dans Administration › Modèles de documents (textes d'origine à faire vérifier).
 - **Candidature en alternance** : enregistrer le contrat d'alternance à l'étape **Entretien** fait passer le candidat à **Admis**, avec les contrôles habituels (formation visée, test reçu, champs requis pour l'admission). S'il en manque un, le contrat est enregistré et le message dit ce qui bloque l'admission.

@@ -4,7 +4,7 @@ Fil rouge : **une entreprise cliente demande une formation pour trois salariés*
 à l'encaissement, puis on montre le parcours d'une personne qui postule et la qualité (Qualiopi). Durée visée :
 **50 minutes** + questions.
 
-> Version à installer sur le serveur avant la démo : **v0.15.25** (`sudo /opt/tms/ops/update.sh`).
+> Version à installer sur le serveur avant la démo : **v0.15.26** (`sudo /opt/tms/ops/update.sh`).
 
 **Deux parcours, à nommer dès le début** (ils répondent d'avance à « où sont les candidats après un devis ? ») :
 
