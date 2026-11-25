@@ -2,10 +2,10 @@
 
 namespace App\Modules\Sessions\Attendance;
 
-use App\Modules\Sessions\Planning\IndividualPlanning;
 use App\Modules\Sessions\Enrolments\Enrolment;
 use App\Modules\Sessions\Modules\DatingMode;
 use App\Modules\Sessions\Modules\SessionModule;
+use App\Modules\Sessions\Planning\IndividualPlanning;
 use App\Modules\Sessions\Sessions\TrainingSession;
 use App\Modules\Sessions\Trainers\Trainer;
 use Carbon\CarbonImmutable;

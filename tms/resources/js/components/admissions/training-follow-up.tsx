@@ -1,4 +1,5 @@
 import InputError from '@/components/input-error';
+import { IndividualPlanningDialog } from '@/components/sessions/individual-planning';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -56,6 +57,8 @@ export interface TrainingFollowUpProps {
     enrolment_id?: string;
     /** For a manager of the attendance: the trainee's e-mail, to prefill the catch-up link. */
     email?: string | null;
+    /** Who may change the enrolment: « Planning individuel » (exemptions, own hours). */
+    planning_enrolment_id?: string;
 }
 
 type Action =
@@ -104,6 +107,7 @@ export function TrainingFollowUp({ followUp }: { followUp: TrainingFollowUpProps
     const shown = showPast ? [...past, ...shownUpcoming] : shownUpcoming;
     const [action, setAction] = useState<Action | null>(null);
     const [notice, setNotice] = useState<string | null>(null);
+    const [planningOpen, setPlanningOpen] = useState(false);
 
     const confirmCatchUp = async (signature: FollowUpSignature) => {
         if (!signature.id || !confirm(`Confirmer le rattrapage du ${formatDay(signature.date)} (${signature.half_label.toLowerCase()}) ?`)) return;
@@ -152,6 +156,11 @@ export function TrainingFollowUp({ followUp }: { followUp: TrainingFollowUpProps
                 <div className="flex flex-wrap items-center justify-between gap-2">
                     <h3 className="text-sm font-medium">Planning</h3>
                     <div className="flex flex-wrap gap-4">
+                        {followUp.planning_enrolment_id && (
+                            <button type="button" className="text-sm underline" onClick={() => setPlanningOpen(true)}>
+                                Planning individuel
+                            </button>
+                        )}
                         {past.length > 0 && (
                             <button type="button" className="text-primary text-sm hover:underline" onClick={() => setShowPast((v) => !v)}>
                                 {showPast ? 'Masquer les séances passées' : `Afficher les séances passées (${past.length})`}
@@ -352,6 +361,16 @@ export function TrainingFollowUp({ followUp }: { followUp: TrainingFollowUpProps
                     onDone={(message) => {
                         setAction(null);
                         setNotice(message);
+                        router.reload({ only: ['follow_up'] });
+                    }}
+                />
+            )}
+            {planningOpen && followUp.planning_enrolment_id && (
+                <IndividualPlanningDialog
+                    enrolmentId={followUp.planning_enrolment_id}
+                    name="ce stagiaire"
+                    onClose={() => {
+                        setPlanningOpen(false);
                         router.reload({ only: ['follow_up'] });
                     }}
                 />

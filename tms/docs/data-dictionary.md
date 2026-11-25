@@ -609,13 +609,29 @@ Module `Sessions` (`Enrolment`, écrit par `Enrolments` et `PriceShares` seuleme
 | `waitlist_position` | integer, null | Ordre d'arrivée sur la liste d'attente ; renseigné si et seulement si `waitlisted` (CHECK) |
 | `entered_on`, `left_on` | date, null | Entrée (début de la session par défaut) et sortie ; sortie ≥ entrée (CHECK) |
 | `abandon_reason_id` | uuid, null (FK `reference_items`, motifs d'abandon) | Obligatoire avec la date de sortie pour un abandon (CHECK) ; gardé si l'abandon est ensuite annulé |
-| `planned_hours` | numeric(6,2), null | Heures prévues du stagiaire : celles de la session à l'inscription, modifiables (0 < h ≤ heures de la session) ; journalisées |
+| `planned_hours` | numeric(6,2), null | Heures prévues du stagiaire : celles de la session à l'inscription, modifiables (0 < h ≤ heures de la session) ; journalisées. Avec un planning individuel : calculées (`IndividualPlanning::refresh`) |
+| `planned_hours_base` | numeric(6,2), null | Heures prévues avant le premier écart du planning individuel (null : aucun écart) ; ce que « Heures prévues » modifie alors |
 | `price_share` | numeric(12,2), null | Part d'une ligne « prix par stagiaire » (`PriceShares` : total réparti au centime entre inscrits, confirmés et abandons, reste aux premières inscriptions par `created_at, id`) ; null en prix de groupe, en attente ou annulée |
 | `bpf_category_id` | uuid, null (FK `reference_items`, catégories BPF) | Catégorie de stagiaire (lot 3) |
 | `adaptation_needs`, `notes` | text, null | Situation de handicap / besoins d'adaptation et notes : données personnelles, journalisées sans valeur (`$auditPersonal`) |
 | `created_at`, `updated_at` | | |
 
 Une session avec des inscriptions non annulées garde sa formation, son type et son entreprise et ne va pas à la corbeille. « En cours » / « Réalisé » d'un dossier se calculent d'après la première date de début et la dernière date de fin des sessions de ses inscriptions non annulées (sessions annulées ou à la corbeille exclues : `DossierSchedule`).
+
+### `enrolment_adjustments` — planning individuel d'un stagiaire (2026-11-24)
+Module `Sessions` (`EnrolmentAdjustment`, écrit par `IndividualPlanningWriter`, lu par `IndividualPlanning` seulement).
+
+| Colonne | Type | Rôle |
+|---|---|---|
+| `id`, `tenant_id` | uuid | |
+| `enrolment_id` | uuid (FK `enrolments`, cascade) | Inscription concernée |
+| `kind` | string(20) | `exempt_seance` (dispensé d'une séance), `exempt_module` (d'un module entier, séances futures comprises), `own_hours` (ses horaires à une séance de sa session), `added_seance` (séance d'une autre session ajoutée) — CHECK |
+| `seance_id` | uuid, null (FK `seances`) | Séance visée ; nulle seulement pour `exempt_module` (CHECK) ; unique par inscription |
+| `session_module_id` | uuid, null (FK `session_modules`) | Module dispensé (`exempt_module` seulement) ; unique par inscription |
+| `starts_at`, `ends_at`, `break_minutes` | time, time, smallint, null | Ses horaires (obligatoires pour `own_hours`, facultatifs pour `added_seance`, interdits pour une dispense — CHECK) ; toujours dans ceux de la séance |
+| `duration_minutes` | integer, générée | Fin − début − pause |
+| `reason` | string(300), null | Motif : donnée personnelle, journalisé sans valeur, effacé par l'anonymisation |
+| `created_by`, `created_at`, `updated_at` | | |
 
 ### `fundings` — financements d'un dossier
 Module `Sessions` (`Funding`, écrit par `FundingWriter` seulement, sous le verrou du dossier) ; le financeur est lu par `Crm\Public\Fiches`. Droits : ceux du dossier (`sessions.dossiers.update` et son périmètre) ; affichés sur la page du dossier seulement, jamais sur une session.

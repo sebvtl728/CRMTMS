@@ -22,6 +22,7 @@ use Illuminate\Support\Facades\DB;
  *    attendance (status and minutes stay: realised hours, invoicing); the
  *    monthly hours stay; the signed scans of the sessions stay (collective
  *    proof) except on an individual session (one trainee), where they go;
+ *  - her individual planning: the reasons of its adjustments;
  *  - her online signatures: drawings, address and browser erased (the hour
  *    stays); the signed sheets go with the scans on an individual session.
  * Dossiers of an entreprise she is the contact of keep their notes (they
@@ -44,6 +45,9 @@ final class EnrolmentAnonymisation
             ->update(['adaptation_needs' => null, 'notes' => null, 'updated_at' => $now]);
 
         DB::table('attendances')->whereNotNull('reason')->whereIn('enrolment_id', $enrolments->clone()->select('id'))
+            ->update(['reason' => null, 'updated_at' => $now]);
+        // The reasons of her individual planning (exemptions, séances added).
+        DB::table('enrolment_adjustments')->whereNotNull('reason')->whereIn('enrolment_id', $enrolments->clone()->select('id'))
             ->update(['reason' => null, 'updated_at' => $now]);
 
         // The signed sheets are a proof shared by the whole session: kept, except

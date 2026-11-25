@@ -119,6 +119,10 @@ final class TraineeFollowUp
             ],
             'seances' => $rows,
         ];
+        if (SessionsVisibility::allows($user, Permissions::SESSIONS_UPDATE, $session) && $enrolment->status !== EnrolmentStatus::Cancelled) {
+            // « Planning individuel » (2026-11-24): who may change the enrolment.
+            $result['planning_enrolment_id'] = $enrolment->id;
+        }
         if (! $attendance) {
             return $result;
         }

@@ -1,9 +1,8 @@
 <?php
 
 use App\Exceptions\UserFacingHttpException;
-use App\Modules\Core\References\ReferenceList;
-use Carbon\CarbonImmutable;
 use App\Modules\Core\Audit\AuditLog;
+use App\Modules\Core\References\ReferenceList;
 use App\Modules\Sessions\Attendance\Attendance;
 use App\Modules\Sessions\Attendance\Attendances;
 use App\Modules\Sessions\Attendance\Closures;
@@ -12,6 +11,7 @@ use App\Modules\Sessions\Enrolments\Enrolments;
 use App\Modules\Sessions\Planning\EnrolmentAdjustment;
 use App\Modules\Sessions\Planning\IndividualPlanningWriter as Writer;
 use App\Modules\Sessions\Planning\Seances;
+use Carbon\CarbonImmutable;
 use Illuminate\Validation\ValidationException;
 
 require_once __DIR__.'/Support/lot2a.php';

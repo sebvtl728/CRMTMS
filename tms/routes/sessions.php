@@ -15,6 +15,7 @@ use App\Modules\Sessions\Enrolments\EnrolmentController;
 use App\Modules\Sessions\Fundings\FundingController;
 use App\Modules\Sessions\Modules\SessionModuleController;
 use App\Modules\Sessions\Notes\SessionNoteController;
+use App\Modules\Sessions\Planning\IndividualPlanningController;
 use App\Modules\Sessions\Planning\PlacementController;
 use App\Modules\Sessions\Planning\PlanningController;
 use App\Modules\Sessions\Planning\SeanceController;
@@ -169,6 +170,14 @@ Route::middleware(['auth', 'can:sessions.attendance.manage'])->prefix('seances/{
 Route::middleware(['auth', 'can:sessions.sessions.update'])->prefix('enrolments')->name('enrolments.')->group(function () {
     Route::put('{enrolment}', [EnrolmentController::class, 'update'])->name('update');
     Route::post('{enrolment}/abandon', [EnrolmentController::class, 'abandon'])->name('abandon');
+    // His individual planning (2026-11-24).
+    Route::get('{enrolment}/planning', [IndividualPlanningController::class, 'show'])->name('planning.show');
+    Route::post('{enrolment}/planning/exemptions', [IndividualPlanningController::class, 'exempt'])->name('planning.exempt');
+    Route::get('{enrolment}/planning/available', [IndividualPlanningController::class, 'available'])->middleware('throttle:sessions-trainees')->name('planning.available');
+    Route::post('{enrolment}/planning/additions', [IndividualPlanningController::class, 'add'])->name('planning.add');
+    Route::put('{enrolment}/planning/seances/{seanceId}/hours', [IndividualPlanningController::class, 'hours'])->whereUuid('seanceId')->name('planning.hours');
+    Route::delete('{enrolment}/planning/seances/{seanceId}/hours', [IndividualPlanningController::class, 'clearHours'])->whereUuid('seanceId')->name('planning.hours.clear');
+    Route::delete('{enrolment}/planning/adjustments/{adjustmentId}', [IndividualPlanningController::class, 'remove'])->whereUuid('adjustmentId')->name('planning.remove');
     Route::post('{enrolment}/{action}', [EnrolmentController::class, 'transition'])->whereIn('action', array_keys(EnrolmentController::ACTIONS))->name('transition');
 });
 

@@ -121,6 +121,15 @@ Code dans `tms/app/Modules/Sessions/` (Sessions, Dossiers, Enrolments, Fundings,
 - **Séances dans Outlook** : `Planning\SeanceOutlook` déclare la source `sessions.seance` auprès de `Connectors\Calendar\OutlookSources` (registre ; `crm.activity` réservé) et appelle `OutlookSources::push` après commit ; `PushSourceToOutlook` relit l'état courant (`OutlookItem`) ; `calendar_link_events` est clé (`calendar_link_id`, `source`, `source_id`). Jamais de stagiaire, de note ni de prix dans l'évènement.
 - **Fiche formation** : `Catalogue\TrainingBlocks` (registre, comme `FicheBlocks`) ; `Summary\TrainingSessionsBlock` y déclare le bloc Sessions (`SessionsServiceProvider::boot`) ; le Catalogue n'importe jamais Sessions.
 
+## Planning individuel d'un stagiaire (2026-11-24) : points d'architecture à connaître
+
+Code dans `tms/app/Modules/Sessions/Planning/` (`IndividualPlanning`, `IndividualPlanningWriter`, `EnrolmentAdjustment`, `IndividualPlanningView`, `IndividualPlanningController`). Guide : `tms/docs/sessions.md` (§ 3 « Planning individuel ») ; spec : `docs/superpowers/specs/2026-11-24-planning-individuel-stagiaire-design.md`.
+
+- **Écarts** (`enrolment_adjustments`) : `exempt_seance`, `exempt_module` (séances futures comprises), `own_hours` (dans la séance), `added_seance` (séance d'une autre session). **`IndividualPlanning` est la seule source** de « qui est attendu à quelle séance, à quelle heure » : `expectedAt` (derrière `Attendances::expected`), `times` / `minutesAt` (présent = **sa** durée), `seancesOf` (planning, convocation, rappel, suivi), `exemptPairs`, `guestCounts`, `moduleCuts` ; aucune autre classe ne lit la table.
+- **Heures prévues** : `planned_hours` calculées (`refresh`) dès le premier écart, à partir de `planned_hours_base` (valeur d'avant) ; par module, la réduction est plafonnée à ses heures prévues ; prix inchangé. Crochet `Seances::onScheduleChange('sessions.individual_planning')` (déplacement, annulation, suppression : `SeanceChanged::DELETED`, jamais diffusé).
+- **Écritures** : `IndividualPlanningWriter`, verrous sessions (partagé) → séances (id) → inscription ; jamais sur séance annulée, mois clôturé, ni par-dessus une présence ou une signature.
+- **Rattrapage** : la présence est sur l'inscription d'origine ; heures dans `RealisedHours.by_module` (entrée `module_id` nul) ; `Billing::hours` compte un mois de séance ajoutée selon la clôture de la session d'accueil ; `Paperwork::catchUpPending` retient les attestations automatiques ; jamais dans les inscrits, places, heures ou facturation de la session d'accueil.
+
 ## Sauvegardes (0.8.2) : points d'architecture à connaître
 
 Guide : `tms/docs/install.md` (« Sauvegardes », « Déménager vers un autre serveur »), `tms/docs/admin.md` (§ 17). Spec : `docs/superpowers/specs/2026-11-17-0.8.2-sauvegardes-design.md`.
