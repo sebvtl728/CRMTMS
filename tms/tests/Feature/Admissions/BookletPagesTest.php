@@ -54,3 +54,12 @@ it('lets the trainer download the booklet of his apprentice only', function () {
     $this->actingAs(bookletTrainerUser('Cauret'))->get("/admissions/livret/{$c->id}/livret.pdf")->assertOk()->assertContent('%PDF-1.7 livret');
     $this->actingAs(bookletTrainerUser('Autre'))->get("/admissions/livret/{$c->id}/livret.pdf")->assertNotFound();
 });
+
+it('offers « Suivi du livret » on the candidature to whoever follows the booklet', function () {
+    $c = bookletApprentice();
+
+    $this->actingAs(admin(twoFactor: true))->get("/admissions/candidatures/{$c->id}")
+        ->assertInertia(fn (Assert $page) => $page->where('can.booklet', true));
+    $this->actingAs(adUser([App\Modules\Admissions\Permissions::CANDIDATURES_VIEW => null]))->get("/admissions/candidatures/{$c->id}")
+        ->assertInertia(fn (Assert $page) => $page->where('can.booklet', false));
+});

@@ -24,7 +24,7 @@ interface ShowProps {
     custom_fields: CustomField[];
     history: { at: string; title: string; author: string | null }[];
     options: AdmissionOptions;
-    can: { update: boolean; delete: boolean; sensitive: boolean; create_dossier: boolean };
+    can: { update: boolean; delete: boolean; sensitive: boolean; create_dossier: boolean; booklet: boolean };
     positioning: PositioningProps;
     /** Planning, attendance and signatures of the trainee (null: no dossier, or no right on the session). */
     follow_up: TrainingFollowUpProps | null;
@@ -603,7 +603,7 @@ export default function CandidatureShow({
                                                 )}
                                             </div>
                                         )}
-                                        {c.alternance && <BookletPanel candidatureId={c.id} modules={c.booklet.modules} canUpdate={can.update} />}
+                                        {c.alternance && <BookletPanel candidatureId={c.id} modules={c.booklet.modules} canUpdate={can.update} canFollow={can.booklet} />}
                                         {c.alternance && (
                                             <div className="grid gap-1">
                                                 <Label>Contrat signé</Label>
@@ -887,7 +887,9 @@ function BookletPanel({
     candidatureId,
     modules,
     canUpdate,
+    canFollow,
 }: {
+    canFollow: boolean;
     candidatureId: string;
     modules: Candidature['booklet']['modules'];
     canUpdate: boolean;
@@ -915,6 +917,11 @@ function BookletPanel({
                             Convention d'alternance (aperçu PDF)
                         </a>
                     </Button>
+                    {canFollow && (
+                        <Button asChild size="sm">
+                            <Link href={`/admissions/livret/${candidatureId}`}>Suivi du livret</Link>
+                        </Button>
+                    )}
                 </div>
             </div>
             <p className="text-muted-foreground text-xs">

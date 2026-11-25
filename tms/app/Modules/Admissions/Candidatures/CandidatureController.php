@@ -4,6 +4,7 @@ namespace App\Modules\Admissions\Candidatures;
 
 use App\Http\Controllers\Controller;
 use App\Modules\Admissions\AdmissionsVisibility;
+use App\Modules\Admissions\Booklet\BookletAccess;
 use App\Modules\Admissions\Alternance\ContractType;
 use App\Modules\Admissions\CustomFields\CustomFieldValues;
 use App\Modules\Admissions\History\CandidatureHistory;
@@ -142,6 +143,8 @@ class CandidatureController extends Controller
                 'update' => AdmissionsVisibility::allows($user, Permissions::CANDIDATURES_UPDATE, $candidature) && ! $candidature->trashed(),
                 'delete' => AdmissionsVisibility::allows($user, Permissions::CANDIDATURES_DELETE, $candidature),
                 'sensitive' => AdmissionsVisibility::sensitive($user),
+                // « Suivi du livret » (carte Alternance): the booklet follow-up of this apprentice.
+                'booklet' => $user->can(Permissions::BOOKLET_MANAGE) && BookletAccess::allows($user, $candidature),
                 'create_dossier' => $candidature->status === CandidatureStatus::Admitted && ! $candidature->trashed()
                     && ($candidature->dossier_id === null || Admission::dossierState($candidature->dossier_id) !== 'live')
                     && AdmissionsVisibility::allows($user, Permissions::CANDIDATURES_UPDATE, $candidature)
