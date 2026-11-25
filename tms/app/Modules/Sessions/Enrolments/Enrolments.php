@@ -290,7 +290,8 @@ final class Enrolments
             }
             if (array_key_exists('planned_hours', $values) && $locked->planned_hours_base !== null) {
                 // An individual planning: the hours typed are its base, the planned hours computed from it.
-                $locked->planned_hours_base = $values['planned_hours'];
+                // Emptied on a session without hours: the base stays (never rebuilt from the computed hours).
+                $locked->planned_hours_base = $values['planned_hours'] ?? $locked->planned_hours_base;
                 unset($values['planned_hours']);
             }
             $locked->fill($values)->save();

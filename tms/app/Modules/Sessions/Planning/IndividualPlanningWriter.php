@@ -42,6 +42,8 @@ final class IndividualPlanningWriter
 
     public const UNKNOWN_MODULE = 'Module introuvable sur cette session.';
 
+    public const ADDED_NOT_EXEMPT = 'Cette séance lui a été ajoutée : retirez-la de son planning plutôt que de l\'en dispenser.';
+
     public const OWN_SESSION = 'Cette séance est déjà dans sa session : rien à ajouter.';
 
     public const ALREADY_PLANNED = 'Cette séance est déjà dans son planning.';
@@ -101,8 +103,11 @@ final class IndividualPlanningWriter
                 if (self::moduleExempted($locked->id, $seance->session_module_id)) {
                     throw ValidationException::withMessages(['seance_ids' => self::ALREADY_MODULE]);
                 }
-                self::assertNothingEntered($locked->id, $seance);
                 $current = self::adjustmentAt($locked->id, $seance->id);
+                if ($current?->kind === EnrolmentAdjustment::ADDED_SEANCE) {
+                    throw ValidationException::withMessages(['seance_ids' => self::ADDED_NOT_EXEMPT]);
+                }
+                self::assertNothingEntered($locked->id, $seance);
                 if ($current?->kind === EnrolmentAdjustment::EXEMPT_SEANCE) {
                     continue;
                 }
@@ -208,6 +213,12 @@ final class IndividualPlanningWriter
                 return;
             }
             $seance = $seances->first();
+            if ($row->kind === EnrolmentAdjustment::EXEMPT_MODULE && $row->session_module_id !== null) {
+                // He becomes expected again on the whole module: never in a closed month.
+                foreach (Seance::query()->where('session_module_id', $row->session_module_id)->where('status', Seance::PLANNED)->get(['training_session_id', 'date']) as $s) {
+                    Closures::assertOpen($s->training_session_id, $s->date->toDateString());
+                }
+            }
             if ($row->kind === EnrolmentAdjustment::ADDED_SEANCE && $seance !== null) {
                 self::assertNothingEntered($locked->id, $seance);
             }
