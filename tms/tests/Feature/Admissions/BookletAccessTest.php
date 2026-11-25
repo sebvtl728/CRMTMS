@@ -5,13 +5,14 @@ use App\Modules\Admissions\Permissions;
 use App\Modules\Core\Access\AccessScope;
 use App\Modules\Core\Access\Role;
 use App\Modules\Core\Access\Scopes;
+use App\Modules\Core\Companies\Company;
 
 require_once __DIR__.'/Support/admissions.php';
 require_once __DIR__.'/Support/booklet.php';
 
 beforeEach(function () {
     adSetUp();
-    App\Modules\Core\Companies\Company::factory()->default()->create();
+    Company::factory()->default()->create();
 });
 
 it('lets a trainer reach only the apprentices of his séances', function () {

@@ -1,5 +1,6 @@
 <?php
 
+use App\Exceptions\UserFacingHttpException;
 use App\Modules\Admissions\Booklet\BookletAnswering;
 use App\Modules\Admissions\Booklet\BookletGrid;
 use App\Modules\Admissions\Booklet\BookletLink;
@@ -151,7 +152,7 @@ it('signs once when the link was closed meanwhile', function () {
     app(BookletAnswering::class)->sign($link, $code, sigDrawing(), '127.0.0.1', 'test');
 
     expect(fn () => app(BookletAnswering::class)->sign($link, $code, sigDrawing(), '127.0.0.1', 'test'))
-        ->toThrow(App\Exceptions\UserFacingHttpException::class, BookletAnswering::SIGNED);
+        ->toThrow(UserFacingHttpException::class, BookletAnswering::SIGNED);
 });
 
 it('answers the same 404 for an unknown, expired, closed link or a trashed candidature', function () {

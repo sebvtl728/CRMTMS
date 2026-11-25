@@ -1,10 +1,12 @@
 <?php
 
+use App\Exceptions\UserFacingHttpException;
 use App\Modules\Admissions\Alternance\AlternanceContract;
 use App\Modules\Admissions\Booklet\BookletLink;
 use App\Modules\Admissions\Booklet\BookletLinks;
 use App\Modules\Admissions\Booklet\BookletMonths;
 use App\Modules\Admissions\Booklet\SendBookletLink;
+use App\Modules\Admissions\Candidatures\Candidature;
 use App\Modules\Core\Companies\Company;
 use App\Modules\Crm\People\Person;
 use Carbon\CarbonImmutable;
@@ -22,7 +24,7 @@ beforeEach(function () {
 
 afterEach(fn () => CarbonImmutable::setTestNow());
 
-function bookletWithEmail(): App\Modules\Admissions\Candidatures\Candidature
+function bookletWithEmail(): Candidature
 {
     $c = bookletApprentice();
     Person::query()->whereKey($c->person_id)->update(['email' => 'lea.durand@example.test']);
@@ -65,7 +67,7 @@ it('refuses without e-mail, without tutor, for a month to come or a part already
     $this->actingAs($trainer)->post("{$base}/2027-01/envoyer/apprentice")->assertStatus(409);
 
     AlternanceContract::query()->where('candidature_id', $c->id)->update(['tutor_person_id' => null]);
-    expect(fn () => app(BookletLinks::class)->send($c, '2027-02', 'tutor', $trainer))->toThrow(App\Exceptions\UserFacingHttpException::class, BookletLinks::NO_TUTOR);
+    expect(fn () => app(BookletLinks::class)->send($c, '2027-02', 'tutor', $trainer))->toThrow(UserFacingHttpException::class, BookletLinks::NO_TUTOR);
     Queue::assertNothingPushed();
 });
 

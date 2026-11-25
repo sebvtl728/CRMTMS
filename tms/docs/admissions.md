@@ -94,7 +94,17 @@ Dès qu'un contrat d'alternance est saisi, la carte **Alternance** propose **Liv
 8. **Grilles d'évaluation** : la grille de compétences de la formation (catalogue, onglet Compétences), colonnes A / ECA / NA centre et entreprise.
 9. **Suivis en entreprise** : le tableau des visites.
 
-Les pages de suivi, les grilles et les visites se remplissent encore **à la main**. Le livret est généré à chaque clic, jamais stocké, et suit donc les dernières données.
+Les pages de suivi, les grilles et les visites reprennent ce qui a été saisi en ligne (ci-dessous) ; le reste se remplit à la main. Le livret est généré à chaque clic, jamais stocké, et suit donc les dernières données.
+
+### Suivi en ligne du livret
+
+Menu **Formation › Livrets d'apprentissage** (droit « Suivre le livret d'apprentissage ») : les apprentis que vous suivez, avec le nombre de signatures en attente des mois passés. Un formateur y voit, par défaut, les apprentis des sessions où il a des séances (« Ses séances ») ; il n'ouvre jamais la candidature elle-même. Le livret d'un apprenti a trois onglets :
+
+- **Suivi mensuel** : chaque mois du contrat jusqu'au mois en cours. Une page « en entreprise » et, les mois avec séances, une page « en centre de formation ». On y lit ce que l'apprenti et le tuteur ont écrit, on saisit les **observations du formateur** de la page centre puis **Viser** (le visa fige les observations ; **Retirer le visa** les rouvre). **Envoyer à l'apprenti** / **Envoyer au tuteur** envoie le lien du mois (valable 30 jours ; **Renvoyer** remplace l'ancien lien). Quand l'apprenti a signé, le lien du tuteur part tout seul. **Signé sur papier** note une part signée à la main (le lien ouvert est fermé).
+- **Grille de compétences** : A / ECA / NA par savoir-faire, colonne **centre** ; la colonne entreprise est remplie par le tuteur. Une évaluation d'un savoir-faire retiré de la formation est gardée mais n'apparaît plus (un message les compte).
+- **Visites en entreprise** : date et points abordés ; les émargements de la visite restent sur le PDF.
+
+**Par le lien** (sans compte) : l'apprenti décrit ses travaux semaine par semaine (pages entreprise et centre) ; le tuteur lit les travaux de la page entreprise, écrit ses observations et coche la grille côté entreprise. Tout s'enregistre au fur et à mesure. Pour signer : **Recevoir mon code** (6 chiffres par e-mail, 10 minutes, 5 essais), dessin de la signature, **Signer**. Une signature ferme le lien. Le tuteur ne voit ni la page centre ni la candidature. Le représentant légal signe toujours à la main sur le PDF. Modèles d'e-mails : « Livret d'apprentissage : suivi du mois (apprenti / tuteur) » et « code de signature ».
 
 **Modules dispensés** : sous le bouton, cochez les modules dont l'apprenti est dispensé, puis **Enregistrer les dispenses** (droit « Modifier les candidatures »).
 
@@ -115,6 +125,8 @@ Ce que le TMS ne connaît pas (NIR, nationalité, effectif, salaire, durée hebd
 Onglets **Candidats** (sans dossier en cours ; non retenus et désistés seulement avec le filtre d'étape), **Stagiaires** (dossier sans contrat), **Alternants** (dossier et contrat), **Tous** ; filtres étape, formation, DAS, responsable, **parcours** (dont *À définir*), type de contrat ; recherche par nom ou numéro. **Exporter (.csv)** (droit « Exporter ») : numéro, nom, prénom, étape, parcours, formation, code RNCP, DAS, responsable, contrat, employeur, dates, dossier — jamais de donnée sensible.
 
 ## 6. Données personnelles
+
+Livret : l'anonymisation de l'apprenti efface textes, observations, points de visite, dessins de signature, adresses IP et e-mails des liens (les évaluations A / ECA / NA restent) ; celle d'un tuteur efface son nom, son dessin et ses e-mails. L'export RGPD d'une candidature avec contrat contient le livret (`livret`).
 
 - Les données personnelles et sensibles ne figurent jamais en clair dans le journal d'audit.
 - L'**export RGPD** d'une personne contient ses candidatures (données sensibles et champs personnalisés compris) : il est réservé à qui voit tout l'organisme, candidatures et données sensibles comprises.

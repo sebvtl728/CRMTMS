@@ -26,7 +26,6 @@ use Illuminate\Support\Str;
  */
 final class BookletPdf
 {
-
     public function __construct(
         private readonly PdfRenderer $renderer,
         private readonly CompanyBranding $branding,

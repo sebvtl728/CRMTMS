@@ -1,5 +1,6 @@
 <?php
 
+use App\Modules\Core\Access\Role;
 use App\Modules\Core\Companies\Company;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\Http;
@@ -27,7 +28,7 @@ it('lists only the apprentices of the trainer', function () {
         ->where('rows.0.employer', 'Hôtel du Parc')
         ->where('rows.0.pending', 2));
     $this->actingAs(bookletTrainerUser('Autre'))->get('/admissions/livret')->assertInertia(fn (Assert $page) => $page->has('rows', 0));
-    $this->actingAs(userWithRole(App\Modules\Core\Access\Role::Commercial))->get('/admissions/livret')->assertForbidden();
+    $this->actingAs(userWithRole(Role::Commercial))->get('/admissions/livret')->assertForbidden();
 });
 
 it('shows the follow-up of an apprentice without the candidature data', function () {

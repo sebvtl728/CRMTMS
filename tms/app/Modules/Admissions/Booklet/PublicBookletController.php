@@ -23,13 +23,15 @@ final class PublicBookletController extends Controller
             return Inertia::render('public/booklet', ['state' => 'invalid'])->toResponse($request)->setStatusCode(404);
         }
 
-        return Inertia::render('public/booklet', [
+        $response = Inertia::render('public/booklet', [
             ...$this->answering->view($link),
             'save_url' => route('booklet.public.save', $token, false),
             'code_url' => route('booklet.public.code', $token, false),
             'sign_url' => route('booklet.public.sign', $token, false),
-        ])->toResponse($request)
-            ->header('Cache-Control', 'no-store, private');
+        ])->toResponse($request);
+        $response->headers->set('Cache-Control', 'no-store, private');
+
+        return $response;
     }
 
     public function save(Request $request, string $token): JsonResponse
