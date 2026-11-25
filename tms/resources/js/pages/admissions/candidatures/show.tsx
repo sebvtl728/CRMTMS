@@ -32,9 +32,9 @@ interface ShowProps {
 
 type Values = Record<string, unknown>;
 
-function Card({ title, children, id }: { title: string; children: ReactNode; id?: string }) {
+function Card({ title, children, id, className }: { title: string; children: ReactNode; id?: string; className?: string }) {
     return (
-        <section id={id} aria-label={title} className="grid gap-3 rounded-xl border p-4">
+        <section id={id} aria-label={title} className={`grid content-start gap-3 rounded-xl border p-4 ${className ?? ''}`}>
             <h2 className="text-sm font-semibold">{title}</h2>
             {children}
         </section>
@@ -248,26 +248,6 @@ export default function CandidatureShow({
                                 Modifier dans le CRM
                             </Link>
                         )}
-                    </Card>
-
-                    <Card title="Dossier de formation">
-                        {c.dossier ? (
-                            <p className="text-sm">
-                                <Link href={c.dossier.href} className="font-medium hover:underline">
-                                    {c.dossier.number}
-                                </Link>
-                                {c.dossier.trashed && <span className="text-muted-foreground"> (à la corbeille)</span>}
-                            </p>
-                        ) : (
-                            <p className="text-muted-foreground text-sm">
-                                {c.status !== 'admitted'
-                                    ? 'Le dossier se crée une fois le candidat admis.'
-                                    : c.pathway === 'alternance' && c.alternance === null
-                                      ? 'Candidat admis en alternance sans contrat : saisissez le contrat avant de créer son dossier.'
-                                      : `Candidat admis : créez son dossier pour qu'il devienne ${c.alternance ? 'alternant' : 'stagiaire'}.`}
-                            </p>
-                        )}
-                        {!c.dossier && c.status === 'interview' && <Suggest c={c} to="admitted" label="Admis" canUpdate={can.update} />}
                     </Card>
 
                     <Card title="Orientation">
@@ -675,6 +655,27 @@ export default function CandidatureShow({
                             )}
                         </Card>
                     )}
+
+                    {/* After the contract and the apprenticeship booklet: the next step of the path. */}
+                    <Card title="Dossier de formation" className="lg:col-span-2">
+                        {c.dossier ? (
+                            <p className="text-sm">
+                                <Link href={c.dossier.href} className="font-medium hover:underline">
+                                    {c.dossier.number}
+                                </Link>
+                                {c.dossier.trashed && <span className="text-muted-foreground"> (à la corbeille)</span>}
+                            </p>
+                        ) : (
+                            <p className="text-muted-foreground text-sm">
+                                {c.status !== 'admitted'
+                                    ? 'Le dossier se crée une fois le candidat admis.'
+                                    : c.pathway === 'alternance' && c.alternance === null
+                                      ? 'Candidat admis en alternance sans contrat : saisissez le contrat avant de créer son dossier.'
+                                      : `Candidat admis : créez son dossier pour qu'il devienne ${c.alternance ? 'alternant' : 'stagiaire'}.`}
+                            </p>
+                        )}
+                        {!c.dossier && c.status === 'interview' && <Suggest c={c} to="admitted" label="Admis" canUpdate={can.update} />}
+                    </Card>
 
                     {/* Not a step: the organisme's own fields are open from the start. */}
                     {custom_fields.length > 0 && (
