@@ -7,6 +7,7 @@ use App\Modules\Admissions\Booklet\BookletLinkController;
 use App\Modules\Admissions\Booklet\BookletMonthController;
 use App\Modules\Admissions\Booklet\BookletPageController;
 use App\Modules\Admissions\Booklet\BookletVisitController;
+use App\Modules\Admissions\Booklet\PublicBookletController;
 use App\Modules\Admissions\Booklet\BookletSettingsController;
 use App\Modules\Admissions\Booklet\DispensesController;
 use App\Modules\Admissions\Candidatures\CandidatureController;
@@ -71,6 +72,14 @@ Route::middleware(['auth', 'can:admissions.booklet.manage'])->prefix('admissions
     Route::post('{bookletCandidature}/visites', [BookletVisitController::class, 'store'])->name('visits.store');
     Route::put('{bookletCandidature}/visites/{visit}', [BookletVisitController::class, 'update'])->whereUuid('visit')->name('visits.update');
     Route::delete('{bookletCandidature}/visites/{visit}', [BookletVisitController::class, 'destroy'])->whereUuid('visit')->name('visits.destroy');
+});
+
+// Monthly link of the apprentice or the tutor (no account; the host gives the organisme): per link and address.
+Route::prefix('livret')->name('booklet.public.')->where(['token' => '[A-Za-z0-9]{40}'])->group(function () {
+    Route::get('{token}', [PublicBookletController::class, 'show'])->middleware('throttle:booklet-public')->name('show');
+    Route::post('{token}/save', [PublicBookletController::class, 'save'])->middleware('throttle:booklet-public')->name('save');
+    Route::post('{token}/code', [PublicBookletController::class, 'code'])->middleware('throttle:booklet-public-post')->name('code');
+    Route::post('{token}/sign', [PublicBookletController::class, 'sign'])->middleware('throttle:booklet-public-post')->name('sign');
 });
 
 Route::middleware(['auth', 'can:settings.manage'])->prefix('admin/livret-apprentissage')->name('admin.booklet.')->group(function () {
