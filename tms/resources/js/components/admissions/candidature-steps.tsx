@@ -46,7 +46,7 @@ export function CandidatureSteps({ c, onCreateDossier }: { c: Candidature; onCre
     return (
         <nav
             aria-label="Étapes de la candidature"
-            className="flex flex-col gap-3 rounded-xl border p-3 lg:flex-row lg:items-center lg:justify-between"
+            className="flex flex-col gap-3 rounded-xl border border-green-200 bg-green-50 p-3 dark:border-green-900 dark:bg-green-950/40 lg:flex-row lg:items-center lg:justify-between"
         >
             <ol className="flex flex-wrap items-center gap-1 text-sm">
                 {STEPS.map((step, i) => {
