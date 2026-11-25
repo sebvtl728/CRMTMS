@@ -122,6 +122,8 @@ Chaque dossier reçoit un numéro `D-2026-0001`.
 
 ### Bloc Documents (0.10)
 
+À l'étape **Stagiaires**, le bouton **Suivi individuel** d'un inscrit ouvre sa page de suivi : planning (séances à venir, puis passées sur demande), présences et heures réalisées, signatures d'émargement par demi-journée. Les présences et signatures n'apparaissent qu'avec le droit de saisir les présences (hors « Ses séances ») ; un gestionnaire y note une présence, confirme ou refuse un rattrapage et envoie un lien de rattrapage. Pas de bouton pour la liste d'attente ni pour un désinscrit.
+
 Sur la page de la **session** (étape Stagiaires), un bloc **Documents** émet et envoie convocations, attestations et certificats de réalisation, un par un ou pour tous ; la synthèse porte les cartes **Convocations** et **Attestations**. Les modules ajoutent leurs blocs et cartes par `Sessions\Public\SessionBlocks` et `SessionCards`.
 
 La page du dossier porte un bloc **Documents** (droit « Consulter les documents ») : convention (contractant entreprise) ou contrat (particulier), émis, archivés, envoyés et annulés depuis le dossier. Voir `documents.md`.

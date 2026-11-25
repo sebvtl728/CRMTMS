@@ -101,6 +101,10 @@ final class EnrolmentRows
                 'adaptation_needs' => $canUpdate ? $e->adaptation_needs : null,
                 'notes' => $canUpdate ? $e->notes : null,
                 'can_update' => $canUpdate,
+                // « Suivi »: planning, attendance and signatures of the trainee.
+                'follow_up_url' => $session !== null && isset($visibleSessions[$session->id])
+                    && ! in_array($e->status, [EnrolmentStatus::Cancelled, EnrolmentStatus::Waitlisted], true)
+                    ? route('sessions.enrolments.follow-up', [$session->id, $e->id], false) : null,
             ];
         })->values()->all();
     }
