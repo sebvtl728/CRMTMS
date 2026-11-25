@@ -113,19 +113,20 @@ final class SlotValidation
             ->where('status', SignSlot::VALIDATED)->get()->keyBy('half');
         $signed = AttendanceSignature::query()->counted()->whereIn('slot_id', $validated->pluck('id')->all())->get(['slot_id', 'enrolment_id'])
             ->groupBy('enrolment_id')->map(fn ($rows) => $rows->map(fn (AttendanceSignature $r) => $validated->firstWhere('id', $r->slot_id)?->half)->filter()->values()->all());
-        $expected = SlotSeances::expected($slot);
-        foreach (SlotSeances::ofSlot($slot) as $seance) {
-            $halves = Halves::of($seance->start(), $seance->end());
-            foreach ($expected as $enrolment) {
-                $mine = array_values(array_intersect($halves, $signed[$enrolment->id] ?? []));
-                $minutes = Halves::minutes($seance->duration_minutes, $seance->start(), $seance->end(), $mine);
-                [$status, $minutes] = match (true) {
-                    count($mine) === count($halves) => [Attendance::PRESENT, $seance->duration_minutes],
-                    $minutes > 0 => [Attendance::PARTIAL, max(1, min($seance->duration_minutes - 1, $minutes))],
-                    default => [Attendance::ABSENT, 0],
-                };
-                $this->attendances->fromSigning($seance, $enrolment->id, $status, $minutes);
+        foreach (SlotSeances::followed($slot) as $row) {
+            ['seance' => $seance, 'enrolment_id' => $enrolmentId, 'start' => $start, 'end' => $end, 'minutes' => $duration] = $row;
+            $halves = Halves::of($start, $end);
+            if (! in_array($slot->half, $halves, true)) {
+                continue;
             }
+            $mine = array_values(array_intersect($halves, $signed[$enrolmentId] ?? []));
+            $minutes = Halves::minutes($duration, $start, $end, $mine);
+            [$status, $minutes] = match (true) {
+                count($mine) === count($halves) => [Attendance::PRESENT, $duration],
+                $minutes > 0 => [Attendance::PARTIAL, max(1, min($duration - 1, $minutes))],
+                default => [Attendance::ABSENT, 0],
+            };
+            $this->attendances->fromSigning($seance, $enrolmentId, $status, $minutes);
         }
     }
 }
