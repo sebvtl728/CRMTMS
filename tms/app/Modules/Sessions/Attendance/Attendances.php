@@ -7,6 +7,7 @@ use App\Modules\Sessions\Enrolments\Enrolment;
 use App\Modules\Sessions\Enrolments\EnrolmentStatus;
 use App\Modules\Sessions\Modules\SessionModules;
 use App\Modules\Sessions\Planning\Events\SeanceChanged;
+use App\Modules\Sessions\Planning\IndividualPlanning;
 use App\Modules\Sessions\Planning\Seance;
 use App\Modules\Sessions\Sessions\TrainingSession;
 use Carbon\CarbonImmutable;
@@ -40,6 +41,8 @@ final class Attendances
 
     public const UNKNOWN_TRAINEE = 'Stagiaire introuvable sur cette session.';
 
+    public const EXEMPTED = 'Ce stagiaire est dispensé de cette séance.';
+
     public const NOT_ATTENDING = 'Seul un stagiaire inscrit, confirmé ou sorti en cours de formation a des présences.';
 
     /**
@@ -59,7 +62,7 @@ final class Attendances
         return DB::transaction(function () use ($seance, $enrolmentId, $status, $minutes, $reason): Attendance {
             $locked = self::lock($seance);
             $enrolment = self::enrolmentOf($locked, $enrolmentId);
-            self::assertExpected($enrolment, $locked->date);
+            self::assertExpected($enrolment, $locked->date, $locked);
             $realised = match ($status) {
                 Attendance::PRESENT => $locked->duration_minutes,
                 Attendance::PARTIAL => self::partial($minutes, $locked->duration_minutes),
@@ -118,7 +121,7 @@ final class Attendances
         return DB::transaction(function () use ($seance, $enrolmentId, $status, $minutes): bool {
             $locked = self::lock($seance);
             $enrolment = self::enrolmentOf($locked, $enrolmentId);
-            self::assertExpected($enrolment, $locked->date);
+            self::assertExpected($enrolment, $locked->date, $locked);
             $attendance = Attendance::query()->where('seance_id', $locked->id)->where('enrolment_id', $enrolment->id)->lockForUpdate()->first();
             if ($attendance !== null && $attendance->source !== Attendance::SOURCE_SIGNING) {
                 return false;
@@ -156,12 +159,7 @@ final class Attendances
      */
     public static function expected(Seance $seance): Builder
     {
-        $date = $seance->date->toDateString();
-
-        return Enrolment::query()->where('training_session_id', $seance->training_session_id)
-            ->whereIn('status', self::ATTENDING)
-            ->where(fn (Builder $q) => $q->whereNull('entered_on')->orWhere('entered_on', '<=', $date))
-            ->where(fn (Builder $q) => $q->whereNull('left_on')->orWhere('left_on', '>=', $date));
+        return IndividualPlanning::expectedAt($seance);
     }
 
     /** States of a trainee who has attendance (abandons up to their leaving day). */
@@ -172,7 +170,7 @@ final class Attendances
      *
      * @throws ValidationException
      */
-    public static function assertExpected(Enrolment $enrolment, CarbonImmutable $day): void
+    public static function assertExpected(Enrolment $enrolment, CarbonImmutable $day, ?Seance $seance = null): void
     {
         if (! in_array($enrolment->status->value, self::ATTENDING, true)) {
             throw ValidationException::withMessages(['enrolment_id' => self::NOT_ATTENDING]);
@@ -183,6 +181,9 @@ final class Attendances
         }
         if ($enrolment->left_on !== null && $date > $enrolment->left_on->toDateString()) {
             throw ValidationException::withMessages(['enrolment_id' => 'Ce stagiaire a quitté la formation le '.$enrolment->left_on->format('d/m/Y').' : pas de présence après cette date.']);
+        }
+        if ($seance !== null && IndividualPlanning::exempted($enrolment->id, $seance)) {
+            throw ValidationException::withMessages(['enrolment_id' => self::EXEMPTED]);
         }
     }
 

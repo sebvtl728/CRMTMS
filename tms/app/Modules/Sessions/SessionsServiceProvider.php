@@ -53,6 +53,7 @@ use App\Modules\Sessions\Notes\SessionNote;
 use App\Modules\Sessions\Notes\SessionTask;
 use App\Modules\Sessions\Planning\PlacementPeriod;
 use App\Modules\Sessions\Planning\PlacementPeriodHost;
+use App\Modules\Sessions\Planning\EnrolmentAdjustment;
 use App\Modules\Sessions\Planning\Seance;
 use App\Modules\Sessions\Planning\SeanceCalendar;
 use App\Modules\Sessions\Planning\SeanceOutlook;
@@ -117,6 +118,7 @@ class SessionsServiceProvider extends ServiceProvider
             TrainerUnavailability::MORPH_ALIAS => TrainerUnavailability::class,
             TrainerDas::MORPH_ALIAS => TrainerDas::class,
             Seance::MORPH_ALIAS => Seance::class,
+            EnrolmentAdjustment::MORPH_ALIAS => EnrolmentAdjustment::class,
             PlacementPeriod::MORPH_ALIAS => PlacementPeriod::class,
             PlacementPeriodHost::MORPH_ALIAS => PlacementPeriodHost::class,
             Attendance::MORPH_ALIAS => Attendance::class,
