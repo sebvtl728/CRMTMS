@@ -4,6 +4,7 @@ use App\Exceptions\UserFacingHttpException;
 use App\Modules\Core\Documents\PdfSource;
 use App\Modules\Core\Signatures\SignatureMail;
 use App\Modules\Core\Signatures\Signatures;
+use App\Modules\Core\Tenancy\TenantStorage;
 use App\Modules\Documents\Document;
 use App\Modules\Documents\DocumentBatch;
 use App\Modules\Documents\DocumentIssuer;
@@ -15,9 +16,8 @@ use App\Modules\Documents\Texts\DocumentType;
 use App\Modules\Sessions\Dossiers\DossierStatus;
 use App\Modules\Sessions\Enrolments\Enrolments;
 use Carbon\CarbonImmutable;
-use App\Modules\Core\Tenancy\TenantStorage;
-use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\Storage;
 use Inertia\Testing\AssertableInertia as Assert;
 
 require_once __DIR__.'/Support/documents.php';
@@ -125,4 +125,24 @@ it('offers the three forms on the dossier page and issues them from there', func
     $this->post("/dossiers/{$dossier->id}/documents", ['type' => 'image_rights'])->assertSessionHas('status', '2 documents émis.');
     expect(Document::query()->where('type', 'image_rights')->count())->toBe(2);
     $this->post("/dossiers/{$dossier->id}/documents", ['type' => 'internal_rules'])->assertSessionHas('status', '2 documents émis.');
+});
+
+it('offers « Demander la signature » on each trainee form and e-mails the link to the trainee', function () {
+    $x = docFinishedSession();
+    $this->actingAs(admin(twoFactor: true));
+    foreach (DocumentType::fromDossier() as $type) {
+        app(DocumentBatch::class)->issueForDossier(admin(), $type, $x['dossier']->id);
+    }
+
+    $this->get("/dossiers/{$x['dossier']->id}")->assertInertia(fn (Assert $p) => $p
+        ->where('blocks', fn ($blocks) => collect(collect($blocks)->firstWhere('key', 'documents.dossier')['props']['documents'])
+            ->filter(fn ($d) => in_array($d['type'], ['individual_contract', 'internal_rules', 'image_rights'], true))
+            ->every(fn ($d) => $d['can_sign'] === true)));
+
+    foreach (Document::query()->where('enrolment_id', $x['lea']->id)->get() as $doc) {
+        $this->post("/documents/{$doc->id}/signature", ['email' => 'lea.durand@example.test'])->assertSessionHas('status');
+        expect($doc->fresh()->status)->toBe(DocumentStatus::SignaturePending);
+    }
+    Mail::assertSent(SignatureMail::class, 3);
+    Mail::assertSent(SignatureMail::class, fn ($m) => $m->hasTo('lea.durand@example.test') && str_contains($m->text, '/signature/'));
 });
