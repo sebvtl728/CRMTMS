@@ -76,3 +76,42 @@ it('needs a contract and the right to see the candidature', function () {
         ->assertStatus(409);
     $this->actingAs(adUser(['crm.opportunities.view' => null]))->get("/admissions/candidatures/{$c->id}/livret.pdf")->assertNotFound();
 });
+
+it('prints what was typed: weeks, observations, visa, marks and visits', function () {
+    Carbon\CarbonImmutable::setTestNow(Carbon\CarbonImmutable::parse('2027-02-15 10:00', 'Europe/Paris'));
+    $c = bookletApprentice();
+    $trainer = bookletTrainerUser('Cauret');
+    $page = App\Modules\Admissions\Booklet\BookletMonths::page($c, '2027-01', 'company');
+    $page->forceFill(['apprentice_entries' => ['w1' => 'Mise en place du buffet'], 'observations' => ['w1' => 'Très investie']])->save();
+    $centre = App\Modules\Admissions\Booklet\BookletMonths::page($c, '2027-01', 'centre');
+    App\Modules\Admissions\Booklet\BookletMonths::saveObservations($centre, ['w2' => 'Bonne technique'], $trainer);
+    App\Modules\Admissions\Booklet\BookletMonths::visa($centre, $trainer);
+    $grid = app(App\Modules\Admissions\Booklet\BookletGrid::class);
+    $key = $grid->tree($c)['types'][0]['competences'][0]['skills'][0]['key'];
+    $grid->set($c, $key, 'centre', 'ECA', $trainer);
+    App\Modules\Admissions\Booklet\BookletVisits::create($c, ['visited_on' => '2027-02-10', 'points' => 'Points abordés : hygiène'], $trainer);
+
+    $this->actingAs(admin(twoFactor: true))->get("/admissions/candidatures/{$c->id}/livret.pdf")->assertOk();
+    $html = $this->html[0];
+    expect($html)->toContain('Mise en place du buffet')->toContain('Très investie')->toContain('Bonne technique')
+        ->toContain('Visé par '.e($trainer->name).' le 15/02/2027')
+        ->toContain('<td class="mark">X</td>')
+        ->toContain('10/02/2027')->toContain('Points abordés : hygiène');
+    Carbon\CarbonImmutable::setTestNow();
+});
+
+it('prints the drawing and the time of an online signature, or « Signé sur papier »', function () {
+    Carbon\CarbonImmutable::setTestNow(Carbon\CarbonImmutable::parse('2027-02-15 10:00', 'Europe/Paris'));
+    $c = bookletApprentice();
+    $path = App\Modules\Core\Tenancy\TenantStorage::path('booklet_signatures', 'test.png');
+    Storage::disk(App\Modules\Core\Tenancy\TenantStorage::DISK)->put($path, base64_decode('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg=='));
+    App\Modules\Admissions\Booklet\BookletMonths::page($c, '2027-01', 'company')->forceFill([
+        'apprentice_signed_at' => '2027-02-01 09:30:00+01', 'apprentice_signature_path' => $path, 'apprentice_signer_name' => 'Léa DURAND', 'tutor_paper' => true,
+    ])->save();
+
+    $this->actingAs(admin(twoFactor: true))->get("/admissions/candidatures/{$c->id}/livret.pdf")->assertOk();
+    expect($this->html[0])->toContain('data:image/png;base64,iVBOR')
+        ->toContain('Signé en ligne le 01/02/2027 à 09:30')
+        ->toContain('Signé sur papier');
+    Carbon\CarbonImmutable::setTestNow();
+});
