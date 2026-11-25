@@ -40,7 +40,9 @@ final class DossierDocumentsBlock
             'props' => [
                 'dossier_id' => $dossierId,
                 'can_manage' => $canManage,
-                'issuable' => $canManage ? [['value' => $issuable->value, 'label' => $issuable->label()]] : [],
+                // The document of the dossier, then the trainee's forms (one per trainee).
+                'issuable' => $canManage ? array_map(fn (DocumentType $t) => ['value' => $t->value, 'label' => $t->label(), 'per_trainee' => $t->perEnrolment()],
+                    [$issuable, ...DocumentType::fromDossier()]) : [],
                 'documents' => $documents->map(fn (Document $d) => [
                     'id' => $d->id,
                     'type' => $d->type,

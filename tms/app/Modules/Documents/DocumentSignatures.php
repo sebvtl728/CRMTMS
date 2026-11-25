@@ -14,9 +14,10 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
 
 /**
- * Online signature of a convention or a contract (Core\Signatures): the
- * archived PDF is what is signed; the document waits « En attente de
- * signature », then « Signé » and its dossier « Convention signée ».
+ * Online signature of a convention, a contract or a trainee's form
+ * (Core\Signatures): the archived PDF is what is signed; the document waits
+ * « En attente de signature », then « Signé » and, for a document of the
+ * dossier (convention, contract), its dossier « Convention signée ».
  */
 final class DocumentSignatures
 {
@@ -30,7 +31,7 @@ final class DocumentSignatures
             ['email.required' => 'Indiquez l\'adresse du signataire.', 'email.email' => 'Adresse e-mail invalide.'])->validate();
         $type = DocumentType::from($document->type);
         if (! $type->signable()) {
-            throw new UserFacingHttpException(409, 'Seuls la convention et le contrat se signent en ligne.');
+            throw new UserFacingHttpException(409, 'Ce document ne se signe pas en ligne.');
         }
         if ($document->isCancelled() || $document->status === DocumentStatus::Signed) {
             throw new UserFacingHttpException(409, $document->isCancelled() ? 'Ce document est annulé : il ne peut pas être signé.' : 'Ce document est déjà signé.');
@@ -61,7 +62,8 @@ final class DocumentSignatures
 
             return $document;
         });
-        if ($document !== null) {
+        // A trainee's form (individual contract, rules, image rights) never says anything of the dossier.
+        if ($document !== null && ! DocumentType::from($document->type)->perEnrolment()) {
             $paperwork->markConventionSigned($document->dossier_id, $event->signedAt->setTimezone('Europe/Paris'));
         }
     }

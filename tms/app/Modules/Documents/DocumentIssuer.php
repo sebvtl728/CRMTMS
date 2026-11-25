@@ -147,7 +147,7 @@ class DocumentIssuer
             throw new UserFacingHttpException(409, 'Ce stagiaire n\'est pas inscrit : aucun document ne peut être émis.');
         }
         $ended = $enrolment['session']['ends_on'] <= CarbonImmutable::now('Europe/Paris')->toDateString();
-        if ($type !== DocumentType::Convocation && ! $ended && $enrolment['left_on'] === null) {
+        if ($type->afterTraining() && ! $ended && $enrolment['left_on'] === null) {
             throw new UserFacingHttpException(409, 'L\'attestation et le certificat s\'émettent à la fin de la formation ou à la sortie du stagiaire.');
         }
         $living = Document::query()->where('enrolment_id', $enrolment['id'])->where('type', $type->value)
@@ -156,6 +156,9 @@ class DocumentIssuer
             throw new UserFacingHttpException(409, match ($type) {
                 DocumentType::Convocation => 'Une convocation est déjà émise pour ce stagiaire : annulez-la avant d\'en émettre une nouvelle.',
                 DocumentType::CompletionCertificate => 'Une attestation est déjà émise pour ce stagiaire : annulez-la avant d\'en émettre une nouvelle.',
+                DocumentType::IndividualContract => 'Un contrat individuel est déjà émis pour ce stagiaire : annulez-le avant d\'en émettre un nouveau.',
+                DocumentType::InternalRules => 'Un règlement intérieur est déjà émis pour ce stagiaire : annulez-le avant d\'en émettre un nouveau.',
+                DocumentType::ImageRights => 'Une autorisation de droit à l\'image est déjà émise pour ce stagiaire : annulez-la avant d\'en émettre une nouvelle.',
                 default => 'Un certificat de réalisation est déjà émis pour ce stagiaire : annulez-le avant d\'en émettre un nouveau.',
             });
         }

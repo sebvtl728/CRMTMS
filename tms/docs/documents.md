@@ -38,6 +38,21 @@ convention. La convention classique est refusée à un dossier en alternance ; u
 d'annuler la convention émise puis d'émettre l'autre. Avant le dossier, la candidature en propose un **aperçu**
 (`admissions.md` § 3).
 
+**Documents de chaque stagiaire, depuis le dossier** (ligne « Pour chaque stagiaire ») :
+
+- **Contrat individuel de formation** (articles L6353-3 à L6353-7 du Code du travail), dans tout dossier, entreprise
+  ou particulier : il renvoie aux conditions financières du dossier conclu avec le contractant (pas de prix) ;
+- **Règlement intérieur et charte du stagiaire** (L6352-3 à L6352-5, R6352-1 à R6352-15) : hygiène et sécurité,
+  discipline, sanctions, représentation, droits et devoirs du stagiaire ;
+- **Autorisation de droit à l'image** (article 9 du Code civil) : cases « J'autorise » / « Je n'autorise pas » à
+  cocher ; signé en ligne, le document vaut autorisation (pour refuser, le stagiaire ne signe pas).
+
+Un clic émet un document par stagiaire inscrit ou confirmé qui n'en a pas déjà un valide (annulé = réémis) ; chaque
+document s'adresse au stagiaire (nom, adresse, e-mail), s'envoie et **se signe en ligne** par lui (§ 7), sans changer
+l'état du dossier (« Convention signée » reste réservé à la convention et au contrat). Textes modifiables (§ 4),
+e-mails dans Administration › Modèles d'e-mails (`document_individual_contract`, `document_internal_rules`,
+`document_image_rights`). Les textes d'origine sont à faire vérifier par l'organisme.
+
 Si le moteur PDF est indisponible, l'émission est refusée (« Le PDF n'a pas pu être généré, réessayez dans un instant ») et
 aucun numéro n'est consommé.
 

@@ -2,8 +2,10 @@
 
 namespace App\Modules\Documents;
 
+use App\Exceptions\UserFacingHttpException;
 use App\Modules\Core\Users\User;
 use App\Modules\Documents\Texts\DocumentType;
+use App\Modules\Sessions\Public\Billing;
 use App\Modules\Sessions\Public\Paperwork;
 use Illuminate\Support\Facades\DB;
 
@@ -29,6 +31,41 @@ final class DocumentBatch
                     $this->issuer->issueForEnrolment($by, $type, $enrolmentId);
                     $issued++;
                 }
+            }
+
+            return $issued;
+        });
+    }
+
+    /**
+     * A trainee's form (individual contract, rules, image rights) for each
+     * enrolled trainee of the dossier who has no valid one yet, all or
+     * nothing. The number of documents issued (409 when none).
+     */
+    public function issueForDossier(User $by, DocumentType $type, string $dossierId): int
+    {
+        if (! in_array($type, DocumentType::fromDossier(), true)) {
+            throw new \InvalidArgumentException("{$type->value} is not issued for the trainees of a dossier.");
+        }
+
+        return DB::transaction(function () use ($by, $type, $dossierId): int {
+            Billing::lockDossier($dossierId);
+            $dossier = Paperwork::dossier($dossierId) ?? throw new UserFacingHttpException(404, 'Dossier introuvable.');
+            $enrolments = array_column(array_filter($dossier['trainees'], fn (array $t) => in_array($t['status'], ['enrolled', 'confirmed'], true)), 'enrolment_id');
+            if ($enrolments === []) {
+                throw new UserFacingHttpException(409, 'Ce dossier n\'a aucun stagiaire inscrit : aucun document ne peut être émis.');
+            }
+            $issued = 0;
+            foreach ($enrolments as $enrolmentId) {
+                $living = Document::query()->where('enrolment_id', $enrolmentId)->where('type', $type->value)
+                    ->where('status', '!=', DocumentStatus::Cancelled->value)->exists();
+                if (! $living) {
+                    $this->issuer->issueForEnrolment($by, $type, $enrolmentId);
+                    $issued++;
+                }
+            }
+            if ($issued === 0) {
+                throw new UserFacingHttpException(409, 'Chaque stagiaire du dossier a déjà ce document : annulez-le pour en émettre un nouveau.');
             }
 
             return $issued;

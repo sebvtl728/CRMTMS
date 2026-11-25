@@ -30,7 +30,7 @@ interface DocumentRow {
 interface Props {
     dossier_id: string;
     can_manage: boolean;
-    issuable: { value: string; label: string }[];
+    issuable: { value: string; label: string; per_trainee: boolean }[];
     documents: DocumentRow[];
 }
 
@@ -157,7 +157,7 @@ function CancelDialog({ doc, onClose }: { doc: DocumentRow; onClose: () => void 
     );
 }
 
-/** The « Documents » block of a dossier: issue the convention or the contract, preview, send, cancel. */
+/** The « Documents » block of a dossier: issue the convention or the contract, and each trainee's forms; preview, send, sign, cancel. */
 export function DocumentsBlock({ dossier_id, can_manage, issuable, documents }: Props) {
     const [sending, setSending] = useState<DocumentRow | null>(null);
     const [cancelling, setCancelling] = useState<DocumentRow | null>(null);
@@ -173,13 +173,29 @@ export function DocumentsBlock({ dossier_id, can_manage, issuable, documents }: 
     return (
         <div className="grid gap-3">
             {can_manage && issuable.length > 0 && (
-                <div className="flex flex-wrap gap-2">
-                    {issuable.map((t) => (
-                        <Button key={t.value} size="sm" onClick={() => issue(t.value)} disabled={issuing}>
-                            {issuing ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <FileText className="h-4 w-4" />}
-                            Émettre : {t.label.toLowerCase()}
-                        </Button>
-                    ))}
+                <div className="grid gap-2">
+                    {[false, true].map((perTrainee) => {
+                        const types = issuable.filter((t) => t.per_trainee === perTrainee);
+                        return (
+                            types.length > 0 && (
+                                <div key={String(perTrainee)} className="flex flex-wrap items-center gap-2">
+                                    {perTrainee && <span className="text-muted-foreground text-xs">Pour chaque stagiaire :</span>}
+                                    {types.map((t) => (
+                                        <Button
+                                            key={t.value}
+                                            size="sm"
+                                            variant={perTrainee ? 'outline' : 'default'}
+                                            onClick={() => issue(t.value)}
+                                            disabled={issuing}
+                                        >
+                                            {issuing ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <FileText className="h-4 w-4" />}
+                                            Émettre : {t.label.charAt(0).toLowerCase() + t.label.slice(1)}
+                                        </Button>
+                                    ))}
+                                </div>
+                            )
+                        );
+                    })}
                 </div>
             )}
             {documents.length > 0 && (
