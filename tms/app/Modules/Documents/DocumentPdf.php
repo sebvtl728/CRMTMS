@@ -50,6 +50,20 @@ class DocumentPdf
         return $this->renderer->fromHtml($source->html, $source->footer);
     }
 
+    /**
+     * A preview of a dossier document (no number, never stored): the
+     * alternance convention before the dossier exists.
+     *
+     * @param  array<string, mixed>  $dossier  shaped like Paperwork::dossier(), price and number null
+     * @param  array<string, mixed>  $recipient
+     */
+    public function preview(DocumentType $type, array $dossier, Company $company, array $recipient): string
+    {
+        $footer = view('documents.document-footer', ['label' => $type->label().' - aperçu, non émis'])->render();
+
+        return $this->renderer->fromHtml($this->html($type, $dossier, $company, 'Aperçu - non émis', CarbonImmutable::now(), $recipient), $footer);
+    }
+
     private static function footer(DocumentType $type, string $number): string
     {
         return view('documents.document-footer', ['label' => $type->label().' '.$number])->render();

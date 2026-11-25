@@ -76,7 +76,7 @@ final class DocumentTexts
     private static function alternanceBlocks(string $kind, string $tutorRole): array
     {
         return [
-            'parties' => self::block('Parties', "La présente convention est conclue entre {societe}, organisme de formation (centre de formation), et {employeur}, employeur, pour la formation de {apprenti} dans le cadre de son {type_contrat}.", true),
+            'parties' => self::block('Parties', 'La présente convention est conclue entre {societe}, organisme de formation (centre de formation), et {employeur}, employeur, pour la formation de {apprenti} dans le cadre de son {type_contrat}.', true),
             'objet' => self::block('Objet', "La convention fixe les conditions dans lesquelles {societe} assure la formation « {formation} » (titre ou diplôme visé, code RNCP {code_rncp}) de {apprenti}, salarié(e) de {employeur} par un contrat de {$kind} conclu du {debut_contrat} au {fin_contrat}.", true),
             'organisation' => self::block('Organisation de la formation en alternance', "La formation alterne des périodes en centre de formation, pour une durée de {heures_centre}, {dates}, à l'adresse suivante : {lieu}, et des périodes en entreprise. Le planning de l'alternance et le programme sont annexés à la présente convention."),
             'centre' => self::block('Engagements du centre de formation', "{societe} s'engage à dispenser les enseignements prévus au programme, à suivre l'assiduité de l'apprenant par des feuilles d'émargement, à informer l'employeur de ses absences et à évaluer sa progression, en lien avec l'entreprise."),

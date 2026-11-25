@@ -559,7 +559,10 @@ export default function CandidatureShow({
                                                 <Button
                                                     type="button"
                                                     size="sm"
-                                                    onClick={() =>
+                                                    onClick={() => {
+                                                        // At the interview (admitted on save) or once admitted: the convention preview opens.
+                                                        // The tab is opened within the click, or the browser would block it.
+                                                        const preview = c.status === 'interview' || c.status === 'admitted' ? window.open('', '_blank') : null;
                                                         router.put(
                                                             `/admissions/candidatures/${c.id}/alternance`,
                                                             {
@@ -568,9 +571,20 @@ export default function CandidatureShow({
                                                                 tutor_person_id: tutor?.id ?? null,
                                                                 opco_organisation_id: opco?.id ?? null,
                                                             },
-                                                            { preserveScroll: true },
-                                                        )
-                                                    }
+                                                            {
+                                                                preserveScroll: true,
+                                                                onSuccess: (page) => {
+                                                                    const saved = (page.props as { candidature?: { status?: string } }).candidature;
+                                                                    if (preview && saved?.status === 'admitted') {
+                                                                        preview.location.href = `/admissions/candidatures/${c.id}/convention-alternance.pdf`;
+                                                                    } else {
+                                                                        preview?.close();
+                                                                    }
+                                                                },
+                                                                onError: () => preview?.close(),
+                                                            },
+                                                        );
+                                                    }}
                                                 >
                                                     Enregistrer le contrat
                                                 </Button>
@@ -894,6 +908,11 @@ function BookletPanel({
                     <Button asChild size="sm" variant="outline">
                         <a href={`/admissions/candidatures/${candidatureId}/cerfa.pdf`} target="_blank" rel="noopener">
                             Fiche Cerfa (PDF)
+                        </a>
+                    </Button>
+                    <Button asChild size="sm" variant="outline">
+                        <a href={`/admissions/candidatures/${candidatureId}/convention-alternance.pdf`} target="_blank" rel="noopener">
+                            Convention d'alternance (aperçu PDF)
                         </a>
                     </Button>
                 </div>

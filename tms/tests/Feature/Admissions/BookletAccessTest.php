@@ -1,6 +1,7 @@
 <?php
 
 use App\Modules\Admissions\Booklet\BookletAccess;
+use App\Modules\Admissions\Gdpr\CandidatureAnonymisation;
 use App\Modules\Admissions\Permissions;
 use App\Modules\Core\Access\AccessScope;
 use App\Modules\Core\Access\Role;
@@ -44,7 +45,7 @@ it('grants the new right by default with « Ses séances » for the trainers', f
 
 it('closes the booklet of an anonymised apprentice', function () {
     $c = bookletApprentice();
-    app(App\Modules\Admissions\Gdpr\CandidatureAnonymisation::class)->anonymise($c);
+    app(CandidatureAnonymisation::class)->anonymise($c);
 
     expect(BookletAccess::allows(admin(), $c->fresh()))->toBeFalse();
     $this->actingAs(admin(twoFactor: true))->get("/admissions/livret/{$c->id}")->assertNotFound();
