@@ -5,6 +5,7 @@ namespace App\Modules\Admissions;
 use App\Modules\Admissions\Alternance\AlternanceContract;
 use App\Modules\Admissions\Booklet\BookletAccess;
 use App\Modules\Admissions\Booklet\BookletEvaluation;
+use App\Modules\Admissions\Booklet\BookletMail;
 use App\Modules\Admissions\Booklet\BookletMonth;
 use App\Modules\Admissions\Booklet\BookletVisit;
 use App\Modules\Admissions\Candidatures\Candidature;
@@ -77,6 +78,7 @@ class AdmissionsServiceProvider extends ServiceProvider
         ]);
 
         PositioningSendings::registerTemplate();
+        BookletMail::registerTemplates();
     }
 
     public function boot(): void

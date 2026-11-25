@@ -3,6 +3,7 @@
 use App\Modules\Admissions\Alternance\AlternanceController;
 use App\Modules\Admissions\Booklet\BookletController;
 use App\Modules\Admissions\Booklet\BookletGridController;
+use App\Modules\Admissions\Booklet\BookletLinkController;
 use App\Modules\Admissions\Booklet\BookletMonthController;
 use App\Modules\Admissions\Booklet\BookletPageController;
 use App\Modules\Admissions\Booklet\BookletVisitController;
@@ -65,6 +66,7 @@ Route::middleware(['auth', 'can:admissions.booklet.manage'])->prefix('admissions
     Route::put('{bookletCandidature}/mois/{month}/{place}/observations', [BookletMonthController::class, 'observations'])->where(['month' => '\d{4}-\d{2}', 'place' => 'company|centre'])->name('months.observations');
     Route::post('{bookletCandidature}/mois/{month}/{place}/visa', [BookletMonthController::class, 'visa'])->where(['month' => '\d{4}-\d{2}', 'place' => 'company|centre'])->name('months.visa');
     Route::delete('{bookletCandidature}/mois/{month}/{place}/visa', [BookletMonthController::class, 'unvisa'])->where(['month' => '\d{4}-\d{2}', 'place' => 'company|centre'])->name('months.unvisa');
+    Route::post('{bookletCandidature}/mois/{month}/envoyer/{signer}', [BookletLinkController::class, 'send'])->where(['month' => '\d{4}-\d{2}', 'signer' => 'apprentice|tutor'])->middleware('throttle:positioning-send')->name('months.send');
     Route::post('{bookletCandidature}/mois/{month}/papier/{signer}', [BookletMonthController::class, 'paper'])->where(['month' => '\d{4}-\d{2}', 'signer' => 'apprentice|tutor'])->name('months.paper');
     Route::post('{bookletCandidature}/visites', [BookletVisitController::class, 'store'])->name('visits.store');
     Route::put('{bookletCandidature}/visites/{visit}', [BookletVisitController::class, 'update'])->whereUuid('visit')->name('visits.update');

@@ -1,13 +1,13 @@
 import { BookletGrid } from '@/components/admissions/booklet-grid';
 import { BookletMonths } from '@/components/admissions/booklet-months';
-import { type BookletMonthRow, type Grid, type Visit } from '@/components/admissions/booklet-types';
+import { type BookletMonthRow, type BookletPage, type Grid, type Signer, type Visit } from '@/components/admissions/booklet-types';
 import { BookletVisits } from '@/components/admissions/booklet-visits';
 import Heading from '@/components/heading';
 import { Button } from '@/components/ui/button';
 import AppLayout from '@/layouts/app-layout';
 import { cn } from '@/lib/utils';
 import { type BreadcrumbItem } from '@/types';
-import { Head, Link } from '@inertiajs/react';
+import { Head, Link, router } from '@inertiajs/react';
 import { FileDown } from 'lucide-react';
 
 type Tab = 'suivi' | 'grille' | 'visites';
@@ -35,6 +35,45 @@ const TABS: { key: Tab; label: string }[] = [
     { key: 'grille', label: 'Grille de compétences' },
     { key: 'visites', label: 'Visites en entreprise' },
 ];
+
+function SendButtons({ candidature, month }: { candidature: Props['candidature']; month: BookletMonthRow }) {
+    const company = month.pages.company as BookletPage;
+    const send = (signer: Signer) =>
+        router.post(route('admissions.booklet.months.send', [candidature.id, month.month, signer]), {}, { preserveScroll: true });
+    const button = (signer: Signer, who: string, email: string | null, done: boolean) => {
+        if (done) return null;
+        const link = month.links[signer];
+        if (!email) {
+            return (
+                <span key={signer} className="text-muted-foreground text-xs">
+                    {signer === 'tutor' && !candidature.tutor ? 'Indiquez le tuteur dans le contrat.' : `Ajoutez l'e-mail ${who} sur sa fiche.`}
+                </span>
+            );
+        }
+        return (
+            <span key={signer} className="flex flex-wrap items-center gap-2">
+                <Button size="sm" onClick={() => send(signer)}>
+                    {link?.open ? `Renvoyer ${who === "de l'apprenti" ? "à l'apprenti" : 'au tuteur'}` : `Envoyer ${who === "de l'apprenti" ? "à l'apprenti" : 'au tuteur'}`}
+                </Button>
+                {link?.open && (
+                    <span className="text-muted-foreground text-xs">
+                        {link.email_status === 'failed'
+                            ? `Échec de l'envoi à ${link.email}`
+                            : `Envoyé${link.sent_at ? ` le ${link.sent_at}` : ''} à ${link.email}, valable jusqu'au ${link.expires_on}`}
+                    </span>
+                )}
+            </span>
+        );
+    };
+    const isDone = (s: BookletPage['apprentice'] | null) => s?.status === 'signed' || s?.status === 'paper';
+
+    return (
+        <>
+            {button('apprentice', "de l'apprenti", candidature.apprentice_email, isDone(company.apprentice))}
+            {button('tutor', 'du tuteur', candidature.tutor_email, isDone(company.tutor))}
+        </>
+    );
+}
 
 export default function BookletShow({ candidature, months, grid, visits, tab }: Props) {
     const breadcrumbs: BreadcrumbItem[] = [
@@ -82,7 +121,11 @@ export default function BookletShow({ candidature, months, grid, visits, tab }: 
                     ))}
                 </nav>
 
-                {tab === 'suivi' && <BookletMonths candidatureId={candidature.id} months={months} />}
+                {tab === 'suivi' && (
+                    <BookletMonths candidatureId={candidature.id} months={months}>
+                        {(m) => <SendButtons candidature={candidature} month={m} />}
+                    </BookletMonths>
+                )}
                 {tab === 'grille' && <BookletGrid candidatureId={candidature.id} grid={grid} />}
                 {tab === 'visites' && <BookletVisits candidatureId={candidature.id} visits={visits} />}
             </div>
