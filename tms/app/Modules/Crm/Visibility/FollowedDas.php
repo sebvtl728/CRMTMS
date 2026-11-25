@@ -31,6 +31,19 @@ final class FollowedDas
         return DB::table('user_das')->where('user_id', $user->getKey())->pluck('das_id')->all();
     }
 
+    /**
+     * @return array<string, list<string>> user ids keyed by DAS id
+     */
+    public static function followers(): array
+    {
+        $followers = [];
+        foreach (DB::table('user_das')->get(['das_id', 'user_id']) as $row) {
+            $followers[(string) $row->das_id][] = (string) $row->user_id;
+        }
+
+        return $followers;
+    }
+
     public static function registerOnUsersPage(): void
     {
         UserPageExtensions::props(fn (Request $request): array => [
