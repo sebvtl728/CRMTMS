@@ -5,6 +5,8 @@ Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) ; ve
 
 ## [Non publié]
 
+## [0.15.25] - 2026-11-25
+
 ### Ajouté
 
 - **Documents de chaque stagiaire depuis le dossier** : bloc Documents, ligne « Pour chaque stagiaire » : **contrat individuel de formation**, **règlement intérieur et charte des droits et devoirs du stagiaire**, **autorisation de droit à l'image** (cases J'autorise / Je n'autorise pas). Un document par stagiaire inscrit, PDF archivé, envoi et signature en ligne par le stagiaire ; textes et e-mails modifiables (textes d'origine à faire vérifier).
