@@ -5,6 +5,8 @@ Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) ; ve
 
 ## [Non publié]
 
+## [0.15.24] - 2026-11-25
+
 ### Ajouté
 
 - **Suivi individuel d'un stagiaire depuis la session** : à l'étape **Stagiaires**, un bouton **Suivi individuel** sur chaque inscrit ouvre son planning, ses présences, ses heures et ses signatures (le même bloc que la fiche d'un candidat admis, avec les mêmes actions), même sans candidature. Absent pour la liste d'attente et les désinscrits.
