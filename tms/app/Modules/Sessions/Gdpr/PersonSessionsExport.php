@@ -14,6 +14,7 @@ use App\Modules\Sessions\Dossiers\DossierLine;
 use App\Modules\Sessions\Enrolments\Enrolment;
 use App\Modules\Sessions\Fundings\Funding;
 use App\Modules\Sessions\Modules\SessionModule;
+use App\Modules\Sessions\Planning\EnrolmentAdjustment;
 use App\Modules\Sessions\Planning\Seance;
 use App\Modules\Sessions\Sessions\TrainingSession;
 
@@ -58,6 +59,18 @@ final class PersonSessionsExport
         $signatures = AttendanceSignature::query()->whereIn('enrolment_id', $enrolmentIds)->orderBy('signed_at')->get();
         $slots = SignSlot::query()->whereKey($signatures->pluck('slot_id')->unique()->values()->all())->get()->keyBy('id');
 
+        // Her individual planning: each adjustment, with its reason (her own data).
+        $kinds = [EnrolmentAdjustment::EXEMPT_SEANCE => 'Dispense de séance', EnrolmentAdjustment::EXEMPT_MODULE => 'Dispense de module',
+            EnrolmentAdjustment::OWN_HOURS => 'Horaires individuels', EnrolmentAdjustment::ADDED_SEANCE => 'Séance ajoutée'];
+        $planning = EnrolmentAdjustment::query()->with('seance')->whereIn('enrolment_id', $enrolments->pluck('id')->all())->orderBy('created_at')->orderBy('id')->get()
+            ->groupBy('enrolment_id')->map(fn ($rows) => $rows->map(fn (EnrolmentAdjustment $a): array => [
+                'type' => $kinds[$a->kind] ?? $a->kind,
+                'seance' => $a->seance?->date->toDateString(),
+                'module' => $a->session_module_id === null ? null : SessionModule::withTrashed()->find($a->session_module_id)?->title,
+                'horaires' => $a->hasOwnHours() ? substr((string) $a->starts_at, 0, 5).'–'.substr((string) $a->ends_at, 0, 5) : null,
+                'motif' => $a->reason,
+            ])->values()->all())->all();
+
         return [
             'emargements' => $signatures->map(fn ($sig): array => [
                 'session' => $sessionOf[$sig->enrolment_id]?->number,
@@ -90,7 +103,7 @@ final class PersonSessionsExport
                 'mois' => $h->monthKey(),
                 'minutes' => $h->minutes,
             ])->values()->all(),
-            'inscriptions' => $enrolments->map(function (Enrolment $e) use ($trainings, $labels): array {
+            'inscriptions' => $enrolments->map(function (Enrolment $e) use ($trainings, $labels, $planning): array {
                 /** @var TrainingSession|null $session */
                 $session = $e->session;
 
@@ -112,6 +125,7 @@ final class PersonSessionsExport
                     'notes' => $e->notes,
                     'inscrite_le' => $e->created_at?->toIso8601String(),
                     'session_supprimee' => $session?->trashed() ?? false,
+                    'planning_individuel' => $planning[$e->id] ?? [],
                 ];
             })->values()->all(),
             'dossiers' => $dossiers->map(fn (Dossier $d): array => [

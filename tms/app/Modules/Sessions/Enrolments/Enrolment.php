@@ -29,7 +29,8 @@ use Illuminate\Support\Carbon;
  * @property CarbonImmutable|null $entered_on
  * @property CarbonImmutable|null $left_on
  * @property string|null $abandon_reason_id
- * @property string|null $planned_hours numeric(6,2), the session's
+ * @property string|null $planned_hours numeric(6,2), the session's (computed from his individual planning when he has one)
+ * @property string|null $planned_hours_base numeric(6,2), his planned hours before his first adjustment (IndividualPlanning), null: none
  * @property string|null $price_share numeric(12,2), null: priced for the group, waitlisted or cancelled
  * @property string|null $bpf_category_id
  * @property string|null $adaptation_needs personal data
@@ -70,6 +71,7 @@ class Enrolment extends Model
             'entered_on' => 'immutable_date',
             'left_on' => 'immutable_date',
             'planned_hours' => 'decimal:2',
+            'planned_hours_base' => 'decimal:2',
             'price_share' => 'decimal:2',
         ];
     }

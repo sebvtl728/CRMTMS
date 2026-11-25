@@ -45,7 +45,9 @@ final class CertificateAutomation
             $done = Document::query()->whereIn('enrolment_id', Paperwork::sessionEnrolments($sessionId))
                 ->whereIn('type', array_map(fn (DocumentType $t) => $t->value, self::TYPES))
                 ->toBase()->selectRaw('enrolment_id, count(distinct type) as n')->groupBy('enrolment_id')->pluck('n', 'enrolment_id');
-            $enrolmentIds = array_values(array_filter(Paperwork::sessionEnrolments($sessionId), fn (string $id) => (int) ($done[$id] ?? 0) < count(self::TYPES)));
+            // A catch-up still to hold or to close (individual planning) makes him wait.
+            $enrolmentIds = array_values(array_filter(Paperwork::sessionEnrolments($sessionId),
+                fn (string $id) => (int) ($done[$id] ?? 0) < count(self::TYPES) && ! Paperwork::catchUpPending($id)));
             $personIds = [];
             $realised = [];
             foreach ($enrolmentIds as $id) {
@@ -89,7 +91,8 @@ final class CertificateAutomation
             $candidates = [];
             foreach (Paperwork::sessionEnrolments($sessionId) as $enrolmentId) {
                 $enrolment = Paperwork::enrolment($enrolmentId);
-                if ($enrolment === null || $enrolment['status'] === 'abandoned' || $enrolment['left_on'] !== null || Paperwork::absentOn($enrolmentId, $today)) {
+                if ($enrolment === null || $enrolment['status'] === 'abandoned' || $enrolment['left_on'] !== null || Paperwork::absentOn($enrolmentId, $today)
+                    || Paperwork::catchUpPending($enrolmentId, $today)) {
                     continue;
                 }
                 $candidates[$enrolmentId] = (string) $enrolment['person_id'];

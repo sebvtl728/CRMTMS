@@ -169,6 +169,19 @@ Quand une session inter est complète (inscrits et confirmés au nombre de place
 
 *Inscrit* (suffit pour les convocations, présences, attestations et factures : il n'y a rien à confirmer), *En attente*, *Abandon* (**Abandon**), *Annulé* (**Désinscrire** : retire le stagiaire du groupe et libère la place, sans promouvoir personne). **Modifier** change la date d'entrée, les heures prévues, la catégorie BPF, les besoins d'adaptation et les notes.
 
+### Planning individuel d'un stagiaire
+
+Par défaut, un stagiaire suit toutes les séances de sa session entre ses dates d'entrée et de sortie. **Planning individuel** (liste des inscrits de la session ou du dossier, et bloc *Suivi de formation* de la fiche candidature ; droit « Créer et modifier les sessions et inscriptions » sur sa session) adapte son parcours, à lui seul :
+
+- **Dispenser de séances** : cochez les séances, un motif facultatif (donnée personnelle, effacée par l'anonymisation), **Dispenser**. Il n'est plus attendu à ces séances : ni présence, ni émargement, ni convocation, ni rappel de la veille.
+- **Dispenser du module** : tout le module, y compris les séances créées plus tard ; pour un module « période », ses heures du mois ne se saisissent plus.
+- **Ajouter des séances d'une autre session** (rattrapage, parcours personnalisé) : recherchez la session (celles que vous voyez, non annulées), cochez ses séances (dans ses dates, mois ouvert ; un chevauchement avec une de ses séances est signalé, pas refusé). Il apparaît dans les présences et l'émargement de la session d'accueil avec la mention « Rattrapage (D-…) », sans compter dans ses inscrits, ses places, ses heures, sa facturation ni ses questionnaires. Ses heures faites là comptent dans **son** dossier (ligne « Rattrapage » de ses heures réalisées) ; le mois d'une séance ajoutée compte quand la session d'accueil l'a clôturé : facture finale et attestation automatique l'attendent. Une séance ajoutée se retire tant qu'aucune présence n'est saisie.
+- **Ses horaires** : arrivée tardive ou départ anticipé prévus, toujours dans ceux de la séance. « Présent » vaut alors **sa** durée ; l'émargement ne l'attend qu'aux demi-journées que ses horaires touchent ; ses convocation, rappel et attestation reprennent ses horaires.
+
+Refusé sur une séance annulée, d'un mois clôturé, ou déjà saisie pour lui (présence ou signature : effacez-la d'abord). Changer ses horaires sur une séance déjà saisie met sa présence « à revoir ».
+
+**Heures prévues** : dès le premier changement, elles sont **calculées** — ses heures prévues d'alors (la *base*), moins, module par module, les séances dont il est dispensé et le temps que ses horaires lui font manquer (jamais plus que les heures prévues du module), moins les modules entiers dispensés, plus la durée des séances ajoutées. Exemple : base 21 h, une séance de 3 h 30 dispensée : 17 h 30. **Modifier** › Heures prévues change alors la base. Annuler toutes les dispenses et horaires remet la base. Le **prix ne change pas** : facturé au réalisé, un stagiaire dispensé qui suit tout le reste de son planning est facturé 100 % de sa part ; une remise se fait à la main dans le dossier.
+
 ### Prix par stagiaire
 
 Sur une ligne au prix par stagiaire, chaque inscription porte sa **part** : le montant de la ligne divisé entre les inscrits, confirmés et abandons, au centime ; le reste de la division va aux premières inscriptions (1 000 € pour 3 stagiaires : 333,34 + 333,33 + 333,33). Les parts sont recalculées à chaque inscription et désinscription ; un stagiaire en attente n'a pas de part ; un abandon garde la sienne.

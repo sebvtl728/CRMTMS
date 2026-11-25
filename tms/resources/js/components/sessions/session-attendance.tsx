@@ -20,6 +20,12 @@ interface GridRow {
     needs_review: boolean;
     /** Expected that day (entry and leaving days); false: entered before the trainee's dates changed. */
     eligible: boolean;
+    /** His own hours when they differ from the séance's (individual planning), « 14:00–17:00 ». */
+    own_hours?: string | null;
+    /** His duration at the séance, in minutes. */
+    duration_minutes?: number;
+    /** A trainee of another session (catch-up): « Rattrapage (D-2026-0004) ». */
+    guest?: string | null;
 }
 
 /** Signed scan of an attendance sheet (AttendanceSheetController::list). */
@@ -456,6 +462,8 @@ export function AttendanceDialog({ seanceId, open, onClose }: { seanceId: string
                                                 {row.status !== null && <span className="text-muted-foreground">{row.minutes_label}</span>}
                                                 {row.needs_review && <Badge variant="destructive">À revoir</Badge>}
                                                 {!row.eligible && <Badge variant="outline">Hors de ses dates</Badge>}
+                                                {row.own_hours && <Badge variant="secondary">Horaires {row.own_hours}</Badge>}
+                                                {row.guest && <Badge variant="secondary">{row.guest}</Badge>}
                                             </span>
                                         </div>
                                         <div role="group" aria-label={`Présence de ${row.name}`} className="mt-2 flex flex-wrap gap-2">
@@ -1191,7 +1199,15 @@ type Half = { date: string; half: string; label: string };
  * can still sign (never one entered absent or excused), one e-mail with one
  * link and one code, one drawing for all.
  */
-function GroupCatchUpButton({ sessionId, trainees, onSent }: { sessionId: string; trainees: { enrolment_id: string; name: string }[]; onSent: () => void }) {
+function GroupCatchUpButton({
+    sessionId,
+    trainees,
+    onSent,
+}: {
+    sessionId: string;
+    trainees: { enrolment_id: string; name: string }[];
+    onSent: () => void;
+}) {
     const [open, setOpen] = useState(false);
     const [enrolmentId, setEnrolmentId] = useState('');
     const [halves, setHalves] = useState<Half[] | null>(null);
@@ -1207,7 +1223,10 @@ function GroupCatchUpButton({ sessionId, trainees, onSent }: { sessionId: string
         setHalves(null);
         setErrors({});
         if (!id) return;
-        const answer = await sendJson<{ halves: Half[]; email: string | null }>('GET', route('sessions.catch-ups.halves', { trainingSession: sessionId, enrolment: id }));
+        const answer = await sendJson<{ halves: Half[]; email: string | null }>(
+            'GET',
+            route('sessions.catch-ups.halves', { trainingSession: sessionId, enrolment: id }),
+        );
         if (answer.ok && answer.data) {
             setHalves(answer.data.halves);
             setChosen(answer.data.halves.map(key));
@@ -1249,8 +1268,8 @@ function GroupCatchUpButton({ sessionId, trainees, onSent }: { sessionId: string
                     <DialogHeader>
                         <DialogTitle>Rattrapage de plusieurs demi-journées</DialogTitle>
                         <DialogDescription>
-                            Un seul e-mail, un seul code, une seule signature pour toutes les demi-journées cochées. Une demi-journée notée absente
-                            ou excusée n'est jamais proposée.
+                            Un seul e-mail, un seul code, une seule signature pour toutes les demi-journées cochées. Une demi-journée notée absente ou
+                            excusée n'est jamais proposée.
                         </DialogDescription>
                     </DialogHeader>
                     <div className="grid gap-3 text-sm">
@@ -1366,7 +1385,14 @@ function CatchUps({ sessionId, catchUps, onChange }: { sessionId: string; catchU
             )
                 .filter(([, t]) => t.n > 1)
                 .map(([id, t]) => (
-                    <Button key={id} size="sm" variant="outline" className="justify-self-start" disabled={busy !== null} onClick={() => confirmAll(id)}>
+                    <Button
+                        key={id}
+                        size="sm"
+                        variant="outline"
+                        className="justify-self-start"
+                        disabled={busy !== null}
+                        onClick={() => confirmAll(id)}
+                    >
                         <CheckCheck className="h-4 w-4" />
                         Tout confirmer pour {t.name} ({t.n})
                     </Button>

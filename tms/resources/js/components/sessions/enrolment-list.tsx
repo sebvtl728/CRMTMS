@@ -1,4 +1,5 @@
 import InputError from '@/components/input-error';
+import { IndividualPlanningDialog } from '@/components/sessions/individual-planning';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -39,6 +40,8 @@ export interface EnrolmentRow {
     left_on: string | null;
     abandon_reason: string | null;
     planned_hours: string | null;
+    /** His planned hours before his individual planning (null: none); « Heures prévues » edits it then. */
+    planned_hours_base: string | null;
     /** « 333,34 € », null: group price, waiting list, cancelled or dossier not visible. */
     price_share: string | null;
     bpf_category_id: string | null;
@@ -127,7 +130,7 @@ function AbandonDialog({ row, reasons, onClose }: { row: EnrolmentRow; reasons: 
 function EditDialog({ row, categories, onClose }: { row: EnrolmentRow; categories: Option[]; onClose: () => void }) {
     const { data, setData, put, processing, errors } = useForm({
         entered_on: row.entered_on ?? '',
-        planned_hours: row.planned_hours ?? '',
+        planned_hours: row.planned_hours_base ?? row.planned_hours ?? '',
         bpf_category_id: row.bpf_category_id ?? '',
         adaptation_needs: row.adaptation_needs ?? '',
         notes: row.notes ?? '',
@@ -148,7 +151,9 @@ function EditDialog({ row, categories, onClose }: { row: EnrolmentRow; categorie
                     </DialogHeader>
                     <EnrolmentDetailsFields data={data} setData={setData} errors={errors} categories={categories} withEntry />
                     <div className="grid gap-2">
-                        <Label htmlFor="enrolment_planned_hours">Heures prévues</Label>
+                        <Label htmlFor="enrolment_planned_hours">
+                            {row.planned_hours_base ? 'Heures prévues avant son planning individuel' : 'Heures prévues'}
+                        </Label>
                         <Input
                             id="enrolment_planned_hours"
                             inputMode="decimal"
@@ -157,6 +162,8 @@ function EditDialog({ row, categories, onClose }: { row: EnrolmentRow; categorie
                             placeholder={row.session?.planned_hours ?? ''}
                         />
                         <p className="text-muted-foreground text-xs">
+                            {row.planned_hours_base &&
+                                `Son planning individuel en retire ou ajoute : ${row.planned_hours ?? '0'} h prévues aujourd'hui. `}
                             {row.session?.planned_hours
                                 ? `Au plus les heures de la session (${row.session.planned_hours} h) ; vide : celles de la session.`
                                 : 'Vide : les heures de la session.'}
@@ -268,6 +275,7 @@ export function EnrolmentList({
 }) {
     const [abandoning, setAbandoning] = useState<EnrolmentRow | null>(null);
     const [editing, setEditing] = useState<EnrolmentRow | null>(null);
+    const [planning, setPlanning] = useState<EnrolmentRow | null>(null);
 
     const act = (row: EnrolmentRow, action: 'promote' | 'cancel') => {
         if (action === 'cancel' && !window.confirm(`Annuler l'inscription de ${row.person.label} ? Personne n'est promu automatiquement.`)) return;
@@ -353,6 +361,11 @@ export function EnrolmentList({
                                         <Button type="button" size="sm" variant="ghost" onClick={() => setEditing(row)}>
                                             Modifier
                                         </Button>
+                                        {row.status !== 'waitlisted' && (
+                                            <Button type="button" size="sm" variant="ghost" onClick={() => setPlanning(row)}>
+                                                Planning individuel
+                                            </Button>
+                                        )}
                                         <Button
                                             type="button"
                                             size="sm"
@@ -371,6 +384,7 @@ export function EnrolmentList({
             </ul>
             {abandoning && references && <AbandonDialog row={abandoning} reasons={references.abandon_reason} onClose={() => setAbandoning(null)} />}
             {editing && references && <EditDialog row={editing} categories={references.bpf_category} onClose={() => setEditing(null)} />}
+            {planning && <IndividualPlanningDialog enrolmentId={planning.id} name={planning.person.label} onClose={() => setPlanning(null)} />}
         </>
     );
 }
