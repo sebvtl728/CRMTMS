@@ -2,6 +2,7 @@
 
 use App\Modules\Admissions\Alternance\AlternanceController;
 use App\Modules\Admissions\Booklet\BookletController;
+use App\Modules\Admissions\Booklet\BookletGridController;
 use App\Modules\Admissions\Booklet\BookletSettingsController;
 use App\Modules\Admissions\Booklet\DispensesController;
 use App\Modules\Admissions\Candidatures\CandidatureController;
@@ -50,6 +51,11 @@ Route::middleware(['auth'])->prefix('admissions/candidatures')->name('admissions
     Route::post('{candidature}/dossier', [DossierCreationController::class, 'store'])->middleware('can:admissions.candidatures.update')->name('dossier.store');
     Route::delete('{candidature}', [CandidatureController::class, 'destroy'])->middleware('can:admissions.candidatures.delete')->name('destroy');
     Route::post('{candidature}/restore', [CandidatureController::class, 'restore'])->middleware('can:admissions.candidatures.delete')->name('restore');
+});
+
+// Online follow-up of the apprenticeship booklet (trainers: « Ses séances »).
+Route::middleware(['auth', 'can:admissions.booklet.manage'])->prefix('admissions/livret')->name('admissions.booklet.')->group(function () {
+    Route::put('{bookletCandidature}/grille', [BookletGridController::class, 'update'])->name('grid');
 });
 
 Route::middleware(['auth', 'can:settings.manage'])->prefix('admin/livret-apprentissage')->name('admin.booklet.')->group(function () {
