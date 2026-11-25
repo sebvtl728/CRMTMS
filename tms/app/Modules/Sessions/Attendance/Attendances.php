@@ -261,8 +261,10 @@ final class Attendances
      */
     private static function enrolmentOf(Seance $seance, string $enrolmentId): Enrolment
     {
+        // His session's trainees, or a trainee of another session the séance was added to (catch-up).
         $enrolment = Str::isUuid($enrolmentId)
-            ? Enrolment::query()->where('training_session_id', $seance->training_session_id)->find($enrolmentId)
+            ? Enrolment::query()->where(fn ($q) => $q->where('training_session_id', $seance->training_session_id)
+                ->orWhereIn('id', IndividualPlanning::guestsAt($seance)->pluck('id')->all()))->find($enrolmentId)
             : null;
 
         return $enrolment ?? throw ValidationException::withMessages(['enrolment_id' => self::UNKNOWN_TRAINEE]);

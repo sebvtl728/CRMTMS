@@ -42,6 +42,51 @@ final class IndividualPlanningWriter
 
     public const UNKNOWN_MODULE = 'Module introuvable sur cette session.';
 
+    public const OWN_SESSION = 'Cette séance est déjà dans sa session : rien à ajouter.';
+
+    public const ALREADY_PLANNED = 'Cette séance est déjà dans son planning.';
+
+    public const OUT_OF_DATES = 'Cette séance tombe hors de ses dates d\'entrée et de sortie.';
+
+    public const HOST_UNAVAILABLE = 'Cette session est annulée ou à la corbeille.';
+
+    /**
+     * Séances of other sessions added to his planning (a catch-up, a
+     * personalised path): his hours, his dossier; never counted in the host
+     * session (its trainees, places, hours, invoicing).
+     *
+     * @param  list<string>  $seanceIds
+     *
+     * @throws ValidationException
+     */
+    public function addSeances(Enrolment $enrolment, array $seanceIds, ?string $reason): void
+    {
+        $reason = self::reason($reason);
+        $this->write($enrolment, $seanceIds, function (Enrolment $locked, Collection $seances) use ($reason): void {
+            $hosts = TrainingSession::query()->whereKey($seances->pluck('training_session_id')->unique()->values()->all())->get()->keyBy('id');
+            foreach ($seances as $seance) {
+                if ($seance->training_session_id === $locked->training_session_id) {
+                    throw ValidationException::withMessages(['seance_ids' => self::OWN_SESSION]);
+                }
+                $host = $hosts->get($seance->training_session_id);
+                if ($host === null || $host->isCancelled()) {
+                    throw ValidationException::withMessages(['seance_ids' => self::HOST_UNAVAILABLE]);
+                }
+                if (self::adjustmentAt($locked->id, $seance->id) !== null) {
+                    throw ValidationException::withMessages(['seance_ids' => self::ALREADY_PLANNED]);
+                }
+                $date = $seance->date->toDateString();
+                if (($locked->entered_on !== null && $date < $locked->entered_on->toDateString())
+                    || ($locked->left_on !== null && $date > $locked->left_on->toDateString())) {
+                    throw ValidationException::withMessages(['seance_ids' => self::OUT_OF_DATES]);
+                }
+                EnrolmentAdjustment::query()->create([
+                    'enrolment_id' => $locked->id, 'kind' => EnrolmentAdjustment::ADDED_SEANCE, 'seance_id' => $seance->id, 'reason' => $reason,
+                ]);
+            }
+        });
+    }
+
     /**
      * @param  list<string>  $seanceIds
      *
@@ -183,7 +228,7 @@ final class IndividualPlanningWriter
      */
     private function write(Enrolment $enrolment, array $seanceIds, callable $change, bool $checkSeances = true): void
     {
-        $ids = array_values(array_unique(array_filter($seanceIds, fn ($id) => is_string($id) && Str::isUuid($id))));
+        $ids = array_values(array_unique(array_filter($seanceIds, fn (string $id) => Str::isUuid($id))));
         if (count($ids) !== count(array_unique($seanceIds))) {
             throw ValidationException::withMessages(['seance_ids' => self::NOT_HIS]);
         }

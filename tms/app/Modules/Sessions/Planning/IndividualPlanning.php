@@ -8,8 +8,8 @@ use App\Modules\Sessions\Modules\SessionModule;
 use App\Modules\Sessions\Modules\SessionModules;
 use App\Modules\Sessions\Sessions\TrainingSession;
 use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Support\Collection;
 use Illuminate\Database\Query\Builder as QueryBuilder;
+use Illuminate\Support\Collection;
 
 /**
  * The individual planning of a trainee (spec 2026-11-24): the séances of
@@ -31,11 +31,60 @@ final class IndividualPlanning
     {
         $date = $seance->date->toDateString();
 
-        return Enrolment::query()->where('training_session_id', $seance->training_session_id)
+        return Enrolment::query()
+            ->where(fn (Builder $q) => $q
+                ->where(fn (Builder $q) => $q->where('training_session_id', $seance->training_session_id)
+                    ->whereNotExists(fn (QueryBuilder $q) => self::exemptionOf($q, $seance)))
+                // Trainees of other sessions the séance was added to (catch-up).
+                ->orWhereIn('id', self::addedTo($seance)))
             ->whereIn('status', Attendances::ATTENDING)
             ->where(fn (Builder $q) => $q->whereNull('entered_on')->orWhere('entered_on', '<=', $date))
-            ->where(fn (Builder $q) => $q->whereNull('left_on')->orWhere('left_on', '>=', $date))
-            ->whereNotExists(fn (QueryBuilder $q) => self::exemptionOf($q, $seance));
+            ->where(fn (Builder $q) => $q->whereNull('left_on')->orWhere('left_on', '>=', $date));
+    }
+
+    /**
+     * The trainees of other sessions the séance was added to (whatever their
+     * state or dates): the « Rattrapage » rows of the host session.
+     *
+     * @return Collection<int, Enrolment>
+     */
+    public static function guestsAt(Seance $seance): Collection
+    {
+        return Enrolment::query()->whereIn('id', self::addedTo($seance))->orderBy('id')->get();
+    }
+
+    /**
+     * How many trainees of other sessions each séance expects (catch-ups,
+     * same state and date rules as expectedAt), one query.
+     *
+     * @param  Collection<int, Seance>  $seances
+     * @return array<string, int> séance id => count
+     */
+    public static function guestCounts(Collection $seances): array
+    {
+        if ($seances->isEmpty()) {
+            return [];
+        }
+
+        return EnrolmentAdjustment::query()->join('enrolments', 'enrolments.id', '=', 'enrolment_adjustments.enrolment_id')
+            ->join('seances', 'seances.id', '=', 'enrolment_adjustments.seance_id')
+            ->where('enrolment_adjustments.kind', EnrolmentAdjustment::ADDED_SEANCE)
+            ->whereIn('enrolment_adjustments.seance_id', $seances->pluck('id')->all())
+            ->whereIn('enrolments.status', Attendances::ATTENDING)
+            ->where(fn ($q) => $q->whereNull('enrolments.entered_on')->orWhereColumn('enrolments.entered_on', '<=', 'seances.date'))
+            ->where(fn ($q) => $q->whereNull('enrolments.left_on')->orWhereColumn('enrolments.left_on', '>=', 'seances.date'))
+            ->groupBy('enrolment_adjustments.seance_id')
+            ->selectRaw('enrolment_adjustments.seance_id as seance_id, count(*) as n')->toBase()->get()
+            ->mapWithKeys(fn ($r) => [(string) $r->seance_id => (int) $r->n])->all();
+    }
+
+    /**
+     * @return Builder<EnrolmentAdjustment>
+     */
+    private static function addedTo(Seance $seance): Builder
+    {
+        return EnrolmentAdjustment::query()->select('enrolment_id')
+            ->where('kind', EnrolmentAdjustment::ADDED_SEANCE)->where('seance_id', $seance->id);
     }
 
     /** Whether the trainee is exempted from the séance (itself or its module). */

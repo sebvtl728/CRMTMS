@@ -12,6 +12,7 @@ use App\Modules\Sessions\Dossiers\DossierStatus;
 use App\Modules\Sessions\Dossiers\DossierTransitions;
 use App\Modules\Sessions\Enrolments\Enrolment;
 use App\Modules\Sessions\Enrolments\EnrolmentStatus;
+use App\Modules\Sessions\Planning\EnrolmentAdjustment;
 use App\Modules\Sessions\Planning\IndividualPlanning;
 use App\Modules\Sessions\Planning\PlannedSeance;
 use App\Modules\Sessions\Planning\Seance;
@@ -158,6 +159,11 @@ final class Paperwork
     {
         $candidates = AttendanceClosure::query()->whereNotNull('closed_at')->where('closed_at', '>=', $since)
             ->distinct()->pluck('training_session_id')->map(fn ($id) => (string) $id)->all();
+        // A catch-up closed in its host session lets the trainee's own session be looked at again.
+        $candidates = array_values(array_unique([...$candidates, ...Enrolment::query()
+            ->whereIn('id', EnrolmentAdjustment::query()->select('enrolment_id')->where('kind', EnrolmentAdjustment::ADDED_SEANCE)
+                ->whereIn('seance_id', Seance::query()->select('id')->whereIn('training_session_id', $candidates)))
+            ->distinct()->pluck('training_session_id')->map(fn ($id) => (string) $id)->all()]));
         if ($candidates === []) {
             return [];
         }
@@ -175,6 +181,34 @@ final class Paperwork
         }
 
         return $out;
+    }
+
+    /**
+     * Whether a séance added to the trainee from another session (a
+     * catch-up, individual planning) still waits: its month not closed in
+     * its host session, or (with $after, a Paris day) held after that day.
+     * The automatic certificates wait for it.
+     */
+    public static function catchUpPending(string $enrolmentId, ?string $after = null): bool
+    {
+        if (! Str::isUuid($enrolmentId)) {
+            return false;
+        }
+        $added = Seance::query()->where('status', Seance::PLANNED)
+            ->whereIn('id', EnrolmentAdjustment::query()->select('seance_id')->where('enrolment_id', $enrolmentId)->where('kind', EnrolmentAdjustment::ADDED_SEANCE))
+            ->get(['training_session_id', 'date']);
+        foreach ($added as $seance) {
+            if ($after !== null && $seance->date->toDateString() > $after) {
+                return true;
+            }
+            $closed = AttendanceClosure::query()->where('training_session_id', $seance->training_session_id)->whereNotNull('closed_at')
+                ->where('month', Months::of($seance->date->toDateString())->toDateString())->exists();
+            if ($after === null && ! $closed) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**

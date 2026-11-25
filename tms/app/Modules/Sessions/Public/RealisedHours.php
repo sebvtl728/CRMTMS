@@ -31,12 +31,15 @@ use InvalidArgumentException;
  *    (its planned hours, integer minutes; empty = the session's total): what
  *    the trainee is due, to bill against (0.9 bills on the realised hours);
  *    planned_minutes stays the total of the session's modules;
+ *  - by_module: one entry per module of his session (his part of its planned
+ *    minutes), plus one with module_id null for the séances added from other
+ *    sessions (catch-ups, individual planning), counted in realised_minutes;
  *  - closed_months: the closed months of the session (« 2026-09 »), only
  *    the asked one when a month is given.
  *
  * A fixed number of queries whatever the number of trainees.
  *
- * @phpstan-type Hours array{planned_minutes: int, enrolment_planned_minutes: int, realised_minutes: int, by_module: list<array{module_id: string, planned: int, realised: int}>, closed_months: list<string>}
+ * @phpstan-type Hours array{planned_minutes: int, enrolment_planned_minutes: int, realised_minutes: int, by_module: list<array{module_id: string|null, planned: int, realised: int}>, closed_months: list<string>}
  */
 final class RealisedHours
 {
@@ -56,7 +59,7 @@ final class RealisedHours
      * Every trainee of the session who attends (enrolled, confirmed,
      * abandoned) or has hours entered, in order of entry.
      *
-     * @return list<array{enrolment_id: string, planned_minutes: int, enrolment_planned_minutes: int, realised_minutes: int, by_module: list<array{module_id: string, planned: int, realised: int}>, closed_months: list<string>}>
+     * @return list<array{enrolment_id: string, planned_minutes: int, enrolment_planned_minutes: int, realised_minutes: int, by_module: list<array{module_id: string|null, planned: int, realised: int}>, closed_months: list<string>}>
      */
     public static function forSession(string $sessionId, string $month): array
     {
@@ -137,6 +140,20 @@ final class RealisedHours
                 $byModule[] = ['module_id' => $module->id, 'planned' => $his, 'realised' => $moduleRealised];
                 $planned += $modulePlanned;
                 $total += $moduleRealised;
+            }
+            // Séances added from other sessions (catch-ups): one « rattrapage » entry, module null.
+            $own = array_map(fn (array $m) => $m['module_id'], $byModule);
+            $catchUp = 0;
+            foreach ($realised as $key => $minutes) {
+                [$enrolmentId, $moduleId] = explode('|', $key);
+                if ($enrolmentId === $enrolment->id && ! in_array($moduleId, $own, true)) {
+                    $catchUp += $minutes;
+                }
+            }
+            $addedPlanned = $cuts[$enrolment->id]['added'] ?? 0;
+            if ($catchUp > 0 || $addedPlanned > 0) {
+                $byModule[] = ['module_id' => null, 'planned' => $addedPlanned, 'realised' => $catchUp];
+                $total += $catchUp;
             }
             $result[$enrolment->id] = [
                 'planned_minutes' => $planned,

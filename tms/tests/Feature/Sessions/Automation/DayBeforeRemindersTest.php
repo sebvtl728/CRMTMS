@@ -6,6 +6,7 @@ use App\Modules\Sessions\Automation\DayBeforeMail;
 use App\Modules\Sessions\Automation\DayBeforeReminders;
 use App\Modules\Sessions\Enrolments\Enrolment;
 use App\Modules\Sessions\Enrolments\EnrolmentStatus;
+use App\Modules\Sessions\Planning\IndividualPlanningWriter;
 use App\Modules\Sessions\Planning\Seance;
 use App\Modules\Sessions\Sessions\TrainingSession;
 use App\Modules\Sessions\Trainers\Trainer;
@@ -89,11 +90,25 @@ it('follows the individual planning: his own hours, nothing when exempted', func
     ['lea' => $lea, 'paul' => $paul, 'morning' => $morning] = dbSession();
     $afternoon = Seance::query()->where('id', '<>', $morning->id)->sole();
     $this->actingAs(atManager());
-    app(\App\Modules\Sessions\Planning\IndividualPlanningWriter::class)->exemptSeances($paul, [$morning->id, $afternoon->id], null);
-    app(\App\Modules\Sessions\Planning\IndividualPlanningWriter::class)->setOwnHours($lea, $morning->id, '10:00', '12:30', 0);
+    app(IndividualPlanningWriter::class)->exemptSeances($paul, [$morning->id, $afternoon->id], null);
+    app(IndividualPlanningWriter::class)->setOwnHours($lea, $morning->id, '10:00', '12:30', 0);
 
     expect(dbRun())->toBe(2);
     Mail::assertNotSent(DayBeforeMail::class, fn (DayBeforeMail $m) => $m->hasTo('paul@example.test'));
     Mail::assertSent(DayBeforeMail::class, fn (DayBeforeMail $m) => $m->hasTo('lea@example.test')
         && str_contains($m->text, '10:00–12:30') && ! str_contains($m->text, '09:00'));
+});
+
+it('reminds a trainee in catch-up of the séance of the host session, under his own session', function () {
+    ['morning' => $morning] = dbSession();
+    $own = plSession('2026-12-01', '2026-12-20', ['status' => 'confirmed', 'title' => 'Groupe B']);
+    plModule($own);
+    $zoe = l2Enrol(l2Dossier(), $own, makePerson('Martin', ['first_name' => 'Zoé', 'email' => 'zoe@example.test']));
+    $this->actingAs(atManager());
+    app(IndividualPlanningWriter::class)->addSeances($zoe, [$morning->id], null);
+
+    dbRun();
+
+    Mail::assertSent(DayBeforeMail::class, fn (DayBeforeMail $m) => $m->hasTo('zoe@example.test')
+        && str_contains($m->text, 'Groupe B') && str_contains($m->text, '09:00–12:30'));
 });

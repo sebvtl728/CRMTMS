@@ -2,17 +2,18 @@
 
 namespace App\Modules\Sessions\Attendance;
 
-use App\Modules\Sessions\Planning\IndividualPlanning;
 use App\Modules\Core\Access\AccessScope;
 use App\Modules\Core\Access\Scopes;
 use App\Modules\Core\Users\User;
 use App\Modules\Crm\Public\Fiches;
 use App\Modules\Sessions\Attendance\Signing\SlotRows;
+use App\Modules\Sessions\Dossiers\Dossier;
 use App\Modules\Sessions\Enrolments\Enrolment;
 use App\Modules\Sessions\Modules\DatingMode;
 use App\Modules\Sessions\Modules\SessionModule;
 use App\Modules\Sessions\Modules\SessionModules;
 use App\Modules\Sessions\Permissions;
+use App\Modules\Sessions\Planning\IndividualPlanning;
 use App\Modules\Sessions\Planning\Seance;
 use App\Modules\Sessions\Planning\SeanceRows;
 use App\Modules\Sessions\Public\RealisedHours;
@@ -39,13 +40,18 @@ final class AttendanceRows
     {
         $attendance = Attendance::query()->where('seance_id', $seance->id)->get()->keyBy('enrolment_id');
         $expected = Attendances::expected($seance)->pluck('id')->all();
-        $enrolments = Enrolment::query()->whereKey([...$expected, ...$attendance->keys()->all()])->get(['id', 'person_id']);
+        $enrolments = Enrolment::query()->whereKey([...$expected, ...$attendance->keys()->all()])->get(['id', 'person_id', 'training_session_id', 'dossier_id']);
         $names = self::names($enrolments);
+        // Individual planning: his own hours, and the trainees of other sessions (catch-ups) with their dossier.
+        $times = IndividualPlanning::times($seance, $enrolments->pluck('id')->map(fn ($id) => (string) $id)->all());
+        $guests = Dossier::withTrashed()->whereKey($enrolments->where('training_session_id', '!=', $seance->training_session_id)->pluck('dossier_id')->all())->pluck('number', 'id');
         $closed = self::closed($seance->training_session_id, $seance->date);
         $module = SessionModule::withTrashed()->find($seance->session_module_id);
 
-        $rows = $enrolments->map(function (Enrolment $e) use ($attendance, $expected, $names): array {
+        $rows = $enrolments->map(function (Enrolment $e) use ($attendance, $expected, $names, $times, $guests, $seance): array {
             $a = $attendance[$e->id] ?? null;
+            $t = $times[$e->id];
+            $own = $t['start'] !== $seance->start() || $t['end'] !== $seance->end() || $t['minutes'] !== $seance->duration_minutes;
 
             return [
                 'enrolment_id' => $e->id,
@@ -57,6 +63,11 @@ final class AttendanceRows
                 'needs_review' => $a !== null && $a->needs_review,
                 // Entered while expected, the dates of the trainee changed since: kept, shown.
                 'eligible' => in_array($e->id, $expected, true),
+                // His hours when they differ from the séance's (« 14:00–17:00 »), his duration.
+                'own_hours' => $own ? $t['start'].'–'.$t['end'] : null,
+                'duration_minutes' => $t['minutes'],
+                'guest' => $e->training_session_id === $seance->training_session_id ? null
+                    : 'Rattrapage ('.($guests[$e->dossier_id] ?? 'autre dossier').')',
             ];
         })->sortBy(fn (array $r) => mb_strtolower($r['name']).$r['enrolment_id'])->values()->all();
 
@@ -111,6 +122,7 @@ final class AttendanceRows
         $seances = Seance::query()->where('training_session_id', $session->id)->whereBetween('date', [$first->toDateString(), $last->toDateString()])
             ->orderBy('date')->orderBy('starts_at')->orderBy('id')->get();
         $exempt = IndividualPlanning::exemptPairs($seances, $enrolments->pluck('id')->all());
+        $guestCounts = IndividualPlanning::guestCounts($seances);
         $counts = Attendance::query()->whereIn('seance_id', $seances->pluck('id')->all())
             ->selectRaw('seance_id, count(*) as recorded, count(*) filter (where needs_review) as review')->groupBy('seance_id')
             ->toBase()->get()->keyBy('seance_id');
@@ -176,7 +188,8 @@ final class AttendanceRows
                 'can_record' => $manage || ($ownTrainerId !== null && $s->trainer_id === $ownTrainerId),
                 'recorded' => (int) ($counts[$s->id]->recorded ?? 0),
                 'needs_review' => (int) ($counts[$s->id]->review ?? 0),
-                'expected' => $enrolments->filter(fn (Enrolment $e) => self::attendsDay($e, $s->date) && ! isset($exempt[$e->id.'|'.$s->id]))->count(),
+                'expected' => $enrolments->filter(fn (Enrolment $e) => self::attendsDay($e, $s->date) && ! isset($exempt[$e->id.'|'.$s->id]))->count()
+                    + ($guestCounts[$s->id] ?? 0),
                 'signing' => self::signing($s, $seances, $validated),
             ])->values()->all(),
             'monthly' => [

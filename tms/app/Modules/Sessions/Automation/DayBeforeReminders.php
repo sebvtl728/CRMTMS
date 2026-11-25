@@ -9,8 +9,8 @@ use App\Modules\Core\Tenancy\TenantContext;
 use App\Modules\Crm\Public\Fiches;
 use App\Modules\Sessions\Attendance\Attendances;
 use App\Modules\Sessions\Modules\SessionModule;
-use App\Modules\Sessions\Planning\PlanningRows;
 use App\Modules\Sessions\Planning\IndividualPlanning;
+use App\Modules\Sessions\Planning\PlanningRows;
 use App\Modules\Sessions\Planning\Seance;
 use App\Modules\Sessions\Resources\Room;
 use App\Modules\Sessions\Sessions\SessionLocation;
@@ -61,29 +61,33 @@ final class DayBeforeReminders
         $organisme = (string) (app(TenantContext::class)->current()->name ?? '');
         $sent = 0;
 
-        foreach ($seances->groupBy('training_session_id') as $sessionId => $own) {
-            $byEnrolment = [];
-            foreach ($own as $seance) {
-                $expected = Attendances::expected($seance)->get(['enrolments.id', 'enrolments.person_id']);
-                // His own hours (individual planning) in his e-mail.
-                $times = IndividualPlanning::times($seance, $expected->pluck('id')->map(fn ($id) => (string) $id)->all());
-                foreach ($expected as $enrolment) {
-                    $byEnrolment[$enrolment->id]['person'] = (string) $enrolment->person_id;
-                    $byEnrolment[$enrolment->id]['seances'][] = [$seance, $times[$enrolment->id]];
-                }
+        // One e-mail per trainee: his séances of tomorrow (a catch-up of another session included), at his hours.
+        $byEnrolment = [];
+        foreach ($seances as $seance) {
+            $expected = Attendances::expected($seance)->get(['enrolments.id', 'enrolments.person_id', 'enrolments.training_session_id']);
+            $times = IndividualPlanning::times($seance, $expected->pluck('id')->map(fn ($id) => (string) $id)->all());
+            foreach ($expected as $enrolment) {
+                $byEnrolment[$enrolment->id]['person'] = (string) $enrolment->person_id;
+                $byEnrolment[$enrolment->id]['session'] = (string) $enrolment->training_session_id;
+                $byEnrolment[$enrolment->id]['seances'][] = [$seance, $times[$enrolment->id]];
             }
-            $people = $this->recipients(array_column($byEnrolment, 'person'));
-            foreach ($byEnrolment as $enrolmentId => $row) {
-                $person = $people[$row['person']] ?? null;
-                if ($person === null) {
-                    continue;
-                }
-                $text = $this->templates->render(DayBeforeMailTemplates::TRAINEE, [
-                    'stagiaire' => $person['name'], 'session' => (string) ($labels[$sessionId] ?? ''), 'date' => $day,
-                    'seances' => implode("\n", array_map(fn (array $s) => '- '.$line($s[0], false, $s[1]), $row['seances'])), 'organisme' => $organisme,
-                ]);
-                $sent += $this->queue((string) $enrolmentId, $date, $person['email'], $text);
+        }
+        // His own session's label (a trainee in catch-up keeps his).
+        $missing = array_diff(array_unique(array_column($byEnrolment, 'session')), array_keys($labels));
+        if ($missing !== []) {
+            $labels += PlanningRows::sessionLabels(TrainingSession::withTrashed()->whereKey(array_values($missing))->get());
+        }
+        $people = $this->recipients(array_values(array_unique(array_column($byEnrolment, 'person'))));
+        foreach ($byEnrolment as $enrolmentId => $row) {
+            $person = $people[$row['person']] ?? null;
+            if ($person === null) {
+                continue;
             }
+            $text = $this->templates->render(DayBeforeMailTemplates::TRAINEE, [
+                'stagiaire' => $person['name'], 'session' => (string) ($labels[$row['session']] ?? ''), 'date' => $day,
+                'seances' => implode("\n", array_map(fn (array $s) => '- '.$line($s[0], $s[0]->training_session_id !== $row['session'], $s[1]), $row['seances'])), 'organisme' => $organisme,
+            ]);
+            $sent += $this->queue((string) $enrolmentId, $date, $person['email'], $text);
         }
 
         $trainers = Trainer::query()->whereKey($seances->pluck('trainer_id')->filter()->unique()->all())->get(['id', 'person_id'])->keyBy('id');
