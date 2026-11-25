@@ -54,3 +54,17 @@ function bookletApprentice(): Candidature
 
     return $c->fresh();
 }
+
+/** A user of the system role « Formateur » linked to the trainer whose person is named $lastName (created when missing). */
+function bookletTrainerUser(string $lastName): App\Modules\Core\Users\User
+{
+    $user = userWithRole(App\Modules\Core\Access\Role::Formateur); // a trainer is created for the account
+    $named = Trainer::query()->whereNull('user_id')
+        ->whereIn('person_id', App\Modules\Crm\People\Person::query()->where('last_name', $lastName)->select('id'))->first();
+    if ($named !== null) {
+        Trainer::query()->where('user_id', $user->id)->forceDelete();
+        $named->update(['user_id' => $user->id]);
+    }
+
+    return $user;
+}
