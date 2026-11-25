@@ -4,6 +4,7 @@ use App\Modules\Admissions\Alternance\AlternanceController;
 use App\Modules\Admissions\Booklet\BookletController;
 use App\Modules\Admissions\Booklet\BookletGridController;
 use App\Modules\Admissions\Booklet\BookletMonthController;
+use App\Modules\Admissions\Booklet\BookletPageController;
 use App\Modules\Admissions\Booklet\BookletVisitController;
 use App\Modules\Admissions\Booklet\BookletSettingsController;
 use App\Modules\Admissions\Booklet\DispensesController;
@@ -57,6 +58,9 @@ Route::middleware(['auth'])->prefix('admissions/candidatures')->name('admissions
 
 // Online follow-up of the apprenticeship booklet (trainers: « Ses séances »).
 Route::middleware(['auth', 'can:admissions.booklet.manage'])->prefix('admissions/livret')->name('admissions.booklet.')->group(function () {
+    Route::get('/', [BookletPageController::class, 'index'])->name('index');
+    Route::get('{bookletCandidature}', [BookletPageController::class, 'show'])->name('show');
+    Route::get('{bookletCandidature}/livret.pdf', [BookletPageController::class, 'pdf'])->middleware('throttle:admissions-booklet')->name('pdf');
     Route::put('{bookletCandidature}/grille', [BookletGridController::class, 'update'])->name('grid');
     Route::put('{bookletCandidature}/mois/{month}/{place}/observations', [BookletMonthController::class, 'observations'])->where(['month' => '\d{4}-\d{2}', 'place' => 'company|centre'])->name('months.observations');
     Route::post('{bookletCandidature}/mois/{month}/{place}/visa', [BookletMonthController::class, 'visa'])->where(['month' => '\d{4}-\d{2}', 'place' => 'company|centre'])->name('months.visa');
