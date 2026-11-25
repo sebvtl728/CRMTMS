@@ -3,6 +3,7 @@
 use App\Modules\Admissions\Alternance\AlternanceController;
 use App\Modules\Admissions\Booklet\BookletController;
 use App\Modules\Admissions\Booklet\BookletGridController;
+use App\Modules\Admissions\Booklet\BookletVisitController;
 use App\Modules\Admissions\Booklet\BookletSettingsController;
 use App\Modules\Admissions\Booklet\DispensesController;
 use App\Modules\Admissions\Candidatures\CandidatureController;
@@ -56,6 +57,9 @@ Route::middleware(['auth'])->prefix('admissions/candidatures')->name('admissions
 // Online follow-up of the apprenticeship booklet (trainers: « Ses séances »).
 Route::middleware(['auth', 'can:admissions.booklet.manage'])->prefix('admissions/livret')->name('admissions.booklet.')->group(function () {
     Route::put('{bookletCandidature}/grille', [BookletGridController::class, 'update'])->name('grid');
+    Route::post('{bookletCandidature}/visites', [BookletVisitController::class, 'store'])->name('visits.store');
+    Route::put('{bookletCandidature}/visites/{visit}', [BookletVisitController::class, 'update'])->whereUuid('visit')->name('visits.update');
+    Route::delete('{bookletCandidature}/visites/{visit}', [BookletVisitController::class, 'destroy'])->whereUuid('visit')->name('visits.destroy');
 });
 
 Route::middleware(['auth', 'can:settings.manage'])->prefix('admin/livret-apprentissage')->name('admin.booklet.')->group(function () {
