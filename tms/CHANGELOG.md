@@ -10,10 +10,25 @@ Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) ; ve
 - **Convention de formation en alternance** : deux nouveaux documents, **Convention de formation – apprentissage** et **– professionnalisation**, choisis selon le contrat. Ils remplacent la convention de formation d'un dossier en alternance et sont **émis automatiquement à la création du dossier**, avec envoi et signature en ligne comme la convention. Sur la candidature, **Convention d'alternance (aperçu PDF)** et l'ouverture de l'aperçu après « Enregistrer le contrat » (candidat admis). Textes modifiables dans Administration › Modèles de documents (textes d'origine à faire vérifier).
 - **Candidature en alternance** : enregistrer le contrat d'alternance à l'étape **Entretien** fait passer le candidat à **Admis**, avec les contrôles habituels (formation visée, test reçu, champs requis pour l'admission). S'il en manque un, le contrat est enregistré et le message dit ce qui bloque l'admission.
 - **Livret d'apprentissage en ligne** : menu **Livrets d'apprentissage** (nouveau droit « Suivre le livret d'apprentissage », « Ses séances » pour les formateurs). Le formateur saisit la grille A / ECA / NA côté centre, les visites en entreprise et les observations des pages « centre », vise chaque page du mois. L'apprenti puis le tuteur reçoivent un **lien du mois** : l'apprenti décrit ses travaux, le tuteur écrit ses observations et évalue les compétences en entreprise ; chacun signe en ligne (dessin et code par e-mail). « Signé sur papier » pour une page signée à la main. Le livret PDF reprend tout ce qui a été saisi.
-- **Suivi individuel d'un stagiaire depuis la session** : à l'étape **Stagiaires**, un bouton **Suivi individuel** sur chaque inscrit ouvre son planning, ses présences, ses heures et ses signatures (le même bloc que la fiche d'un candidat admis, avec les mêmes actions), même sans candidature. Absent pour la liste d'attente et les désinscrits.
 - **Planning individuel d'un stagiaire** (liste des inscrits et *Suivi de formation* de la fiche candidature) : **dispenser** un stagiaire de séances ou d'un module entier, lui donner **ses horaires** sur une séance (arrivée tardive, départ anticipé), lui **ajouter des séances d'une autre session** (rattrapage : présences et émargement dans la session d'accueil, heures et facturation dans son dossier). Présences, émargement, convocation, rappel de la veille, attestation, heures réalisées et facturation suivent son planning ; ses **heures prévues** se recalculent (base − dispenses, jamais plus que les heures d'un module), le prix ne change pas.
-- **Entreprises** : filtre **Code APE (NAF)** dans la liste, pour cibler un secteur : code complet (« 5610A ») ou début de code pour toute une famille (« 56 », « 56.10 ») ; point, espaces et casse indifférents. Se combine aux autres filtres, s'enregistre dans un filtre et s'applique à l'export.
+
+## [0.15.24] - 2026-11-25
+
+### Ajouté
+
+- **Suivi individuel d'un stagiaire depuis la session** : à l'étape **Stagiaires**, un bouton **Suivi individuel** sur chaque inscrit ouvre son planning, ses présences, ses heures et ses signatures (le même bloc que la fiche d'un candidat admis, avec les mêmes actions), même sans candidature. Absent pour la liste d'attente et les désinscrits.
+
+## [0.15.23] - 2026-11-24
+
+### Ajouté
+
 - **Suivi de formation d'un candidat admis** : sur la fiche candidature, dès qu'il est inscrit à une session, son **planning** (séances à venir et passées : horaires, module, formateur, lieu ou distanciel), ses **présences** par séance avec heures réalisées / prévues, et ses **signatures d'émargement** par demi-journée (heure, à l'heure ou rattrapage et son état, dessin de la signature). Planning selon *Consulter les sessions*, présences et signatures selon les droits de présences (hors « Ses séances »). Un gestionnaire des présences y **note la présence** d'une séance passée, **confirme ou refuse** un rattrapage et **envoie un lien de rattrapage** pour une demi-journée non signée (jamais sur un mois clôturé).
+
+## [0.15.22] - 2026-11-24
+
+### Ajouté
+
+- **Entreprises** : filtre **Code APE (NAF)** dans la liste, pour cibler un secteur : code complet (« 5610A ») ou début de code pour toute une famille (« 56 », « 56.10 ») ; point, espaces et casse indifférents. Se combine aux autres filtres, s'enregistre dans un filtre et s'applique à l'export.
 
 ## [0.15.21] - 2026-11-24
 
