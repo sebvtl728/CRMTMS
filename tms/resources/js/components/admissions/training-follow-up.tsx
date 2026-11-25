@@ -95,7 +95,13 @@ function weekday(day: string): string {
 }
 
 /** Planning, attendance and signatures of an admitted trainee (the keys sent follow the user's rights). */
-export function TrainingFollowUp({ followUp }: { followUp: TrainingFollowUpProps }) {
+export function TrainingFollowUp({
+    followUp,
+    name,
+}: {
+    followUp: TrainingFollowUpProps;
+    /** The trainee, shown in the « Planning individuel » title. */ name?: string;
+}) {
     const { session, seances, hours, signatures } = followUp;
     const withAttendance = hours !== undefined;
     const [showPast, setShowPast] = useState(false);
@@ -368,7 +374,7 @@ export function TrainingFollowUp({ followUp }: { followUp: TrainingFollowUpProps
             {planningOpen && followUp.planning_enrolment_id && (
                 <IndividualPlanningDialog
                     enrolmentId={followUp.planning_enrolment_id}
-                    name="ce stagiaire"
+                    name={name ?? 'ce stagiaire'}
                     onClose={() => {
                         setPlanningOpen(false);
                         router.reload({ only: ['follow_up'] });

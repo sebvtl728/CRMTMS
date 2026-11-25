@@ -630,7 +630,7 @@ export default function CandidatureShow({
 
                         {followUp && (
                             <div id="carte-suivi">
-                                <TrainingFollowUp followUp={followUp} />
+                                <TrainingFollowUp followUp={followUp} name={c.person.label} />
                             </div>
                         )}
                     </div>
