@@ -23,6 +23,18 @@ enum DocumentType: string
     case InternalRules = 'internal_rules';
     case ImageRights = 'image_rights';
 
+    public const UNKNOWN_LABEL = 'Type de document inconnu';
+
+    /**
+     * The label of a stored type, « Type de document inconnu » for a type
+     * this version does not know (added by a later one): a page that lists
+     * documents never fails on it.
+     */
+    public static function labelOf(string $value): string
+    {
+        return self::tryFrom($value)?->label() ?? self::UNKNOWN_LABEL;
+    }
+
     public function label(): string
     {
         return match ($this) {

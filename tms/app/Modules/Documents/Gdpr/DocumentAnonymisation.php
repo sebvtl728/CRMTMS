@@ -61,7 +61,7 @@ final class DocumentAnonymisation
             ->orderBy('issued_at')->orderBy('number')->get()
             ->map(fn (Document $d) => [
                 'numero' => $d->number,
-                'document' => DocumentType::from($d->type)->label(),
+                'document' => DocumentType::labelOf($d->type),
                 'etat' => $d->status->label(),
                 'emis_le' => $d->issued_at->setTimezone('Europe/Paris')->toDateString(),
                 'envoye_le' => $d->sent_at?->setTimezone('Europe/Paris')->toDateString(),

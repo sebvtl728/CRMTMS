@@ -46,7 +46,7 @@ final class DossierDocumentsBlock
                 'documents' => $documents->map(fn (Document $d) => [
                     'id' => $d->id,
                     'type' => $d->type,
-                    'type_label' => DocumentType::from($d->type)->label(),
+                    'type_label' => DocumentType::labelOf($d->type),
                     'number' => $d->number,
                     'status' => $d->status->value,
                     'status_label' => $d->status->label(),
@@ -57,7 +57,7 @@ final class DossierDocumentsBlock
                     'email_error' => $d->email_status === 'failed'
                         ? DocumentSending::query()->where('document_id', $d->id)->where('status', 'failed')->latest('created_at')->value('error') : null,
                     'cancel_reason' => $d->cancel_reason,
-                    'defaults' => $canManage && ! $d->isCancelled() ? DocumentMail::defaults($d) : null,
+                    'defaults' => $canManage && ! $d->isCancelled() && DocumentType::tryFrom($d->type) !== null ? DocumentMail::defaults($d) : null,
                     'signature' => DocumentSignatures::state($d),
                     'can_sign' => $canManage && (DocumentType::tryFrom($d->type)?->signable() ?? false)
                         && ! $d->isCancelled() && $d->status !== DocumentStatus::Signed,

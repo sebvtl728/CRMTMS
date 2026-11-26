@@ -5,6 +5,10 @@ Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) ; ve
 
 ## [Non publié]
 
+### Corrigé
+
+- **Page d'un dossier** : un document d'un type que la version installée ne connaît pas (ajouté par une version plus récente) s'affiche « Type de document inconnu » au lieu de faire planter la page.
+
 ### Amélioré
 
 - **« À facturer » et « À traiter » plus rapides** : ce qui est dû est calculé pour tous les dossiers en une fois. Le nombre de requêtes ne grandit plus avec le nombre de dossiers (« À facturer », dans les tests : 3 dossiers, environ 170 → 72 requêtes ; 9 dossiers, environ 460 → 72).
