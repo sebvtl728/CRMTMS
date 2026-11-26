@@ -93,8 +93,9 @@ final class Due
         $month = $filters['month'] ?? null;
         $rows = [];
         $soon = [];
+        $batch = new DueBatch($ids, $this->plans, $this->fiches);
         foreach ($ids as $id) {
-            $due = $this->forDossier($id);
+            $due = $this->compute($id, $batch);
             foreach ($due['rows'] as $row) {
                 if ($month === null || substr($row['period']['to'], 0, 7) === $month) {
                     $rows[] = $row;
@@ -111,16 +112,24 @@ final class Due
      */
     public function forDossier(string $dossierId): array
     {
-        $dossier = Billing::dossier($dossierId);
+        return $this->compute($dossierId, new DueBatch([$dossierId], $this->plans, $this->fiches));
+    }
+
+    /**
+     * @return array{rows: list<array<string, mixed>>, soon: list<array<string, mixed>>}
+     */
+    private function compute(string $dossierId, DueBatch $batch): array
+    {
+        $dossier = $batch->dossiers[strtolower($dossierId)] ?? null;
         if ($dossier === null || $dossier['trashed']) {
             return ['rows' => [], 'soon' => []];
         }
-        $ledger = Ledger::of($dossierId);
+        $ledger = $batch->ledgers[$dossierId];
         $cancelled = $dossier['status'] === 'cancelled';
         if ($cancelled && ! $ledger->issued) {
             return ['rows' => [], 'soon' => []];
         }
-        $plan = $this->plans->for($dossierId);
+        $plan = $batch->plans[$dossierId];
         $today = self::today();
         // A dossier cancelled after an invoice: what was done, today (a credit note or a complement).
         if ($cancelled) {
@@ -136,7 +145,7 @@ final class Due
         /** @var array<string, array{enrolments: list<array<string, mixed>>, sessions: list<array<string, mixed>>}> $hours */
         $hours = [];
         foreach ($cuts as $cut) {
-            $hours[$cut['month'] ?? ''] ??= Billing::hours($dossierId, $cut['month']);
+            $hours[$cut['month'] ?? ''] ??= $batch->hours($dossierId, $cut['month']);
             $shares = BillingCalculator::cumulative($dossier, $hours[$cut['month'] ?? ''], $plan, $plan['absences'], $cut['cut']);
             if (! $shares->ready) {
                 $reason = $shares->reason;
@@ -160,7 +169,7 @@ final class Due
             }
         }
 
-        $labels = $this->labels($dossier, $ledger);
+        $labels = self::labels($dossier, $ledger, $batch);
         $head = [
             'id' => $dossier['id'],
             'number' => $dossier['number'],
@@ -551,13 +560,13 @@ final class Due
     }
 
     /**
-     * Names keyed « organisation:<id> », « person:<id> » (the recipients,
-     * the contractor and the funders) and « trainee:<enrolment id> ».
+     * The fiches whose label a dossier's rows show, by type: its contractor
+     * and funders, the recipients of its invoices and its trainees.
      *
      * @param  array<string, mixed>  $dossier
-     * @return array<string, string>
+     * @return array<string, list<string>>
      */
-    private function labels(array $dossier, Ledger $ledger): array
+    public static function labelSubjects(array $dossier, Ledger $ledger): array
     {
         $fiches = [$dossier['contractor']['type'] => [$dossier['contractor']['id']]];
         foreach ($dossier['fundings'] as $f) {
@@ -572,10 +581,26 @@ final class Due
                 $fiches[$invoice->recipient_type][] = $invoice->recipient_id;
             }
         }
-        $names = $this->fiches->personLabels(array_values(array_unique([...$fiches['person'] ?? [], ...array_column($dossier['enrolments'], 'person_id')])));
+        $fiches['person'] = [...$fiches['person'] ?? [], ...array_column($dossier['enrolments'], 'person_id')];
+
+        return array_map(fn (array $ids) => array_values(array_unique(array_map('strval', $ids))), $fiches);
+    }
+
+    /**
+     * Names keyed « organisation:<id> », « person:<id> » (the recipients,
+     * the contractor and the funders) and « trainee:<enrolment id> ».
+     *
+     * @param  array<string, mixed>  $dossier
+     * @return array<string, string>
+     */
+    private static function labels(array $dossier, Ledger $ledger, DueBatch $batch): array
+    {
+        $fiches = self::labelSubjects($dossier, $ledger);
+        $names = array_intersect_key($batch->persons, array_flip($fiches['person'] ?? []));
+        $organisations = array_intersect_key($batch->organisations, array_flip($fiches['organisation'] ?? []));
 
         $labels = [];
-        foreach ($this->fiches->organisationLabels(array_values(array_unique($fiches['organisation'] ?? []))) as $id => $o) {
+        foreach ($organisations as $id => $o) {
             $labels['organisation:'.$id] = $o['label'];
         }
         foreach ($names as $id => $p) {

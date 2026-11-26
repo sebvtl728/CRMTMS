@@ -5,6 +5,10 @@ Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) ; ve
 
 ## [Non publié]
 
+### Amélioré
+
+- **« À facturer » et « À traiter » plus rapides** : ce qui est dû est calculé pour tous les dossiers en une fois. Le nombre de requêtes ne grandit plus avec le nombre de dossiers (« À facturer », dans les tests : 3 dossiers, environ 170 → 72 requêtes ; 9 dossiers, environ 460 → 72).
+
 ## [0.15.26] - 2026-11-25
 
 ### Ajouté

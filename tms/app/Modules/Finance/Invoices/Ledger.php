@@ -2,6 +2,8 @@
 
 namespace App\Modules\Finance\Invoices;
 
+use Illuminate\Database\Eloquent\Collection;
+
 /**
  * What was already invoiced on a dossier, per recipient (« contractor »,
  * « funding:<id> »; spec 0.9 § 4.3 step 4 and § 4 bis 3): the computed
@@ -44,9 +46,35 @@ final class Ledger
 
     public static function of(string $dossierId): self
     {
+        return self::ofMany([$dossierId])[$dossierId];
+    }
+
+    /**
+     * of() for several dossiers at once, keyed by the ids given, in two
+     * queries whatever their number.
+     *
+     * @param  list<string>  $dossierIds
+     * @return array<string, self>
+     */
+    public static function ofMany(array $dossierIds): array
+    {
+        $byDossier = Invoice::query()->whereIn('dossier_id', $dossierIds)->with('lines')
+            ->orderBy('validated_at')->orderBy('created_at')->orderBy('id')->get()
+            ->groupBy(fn (Invoice $i) => strtolower((string) $i->dossier_id));
+        $ledgers = [];
+        foreach ($dossierIds as $id) {
+            $ledgers[$id] = self::build($byDossier->get(strtolower($id), new Collection));
+        }
+
+        return $ledgers;
+    }
+
+    /**
+     * @param  Collection<int, Invoice>  $invoices  in order of validation
+     */
+    private static function build(Collection $invoices): self
+    {
         $ledger = new self;
-        $invoices = Invoice::query()->where('dossier_id', $dossierId)->with('lines')
-            ->orderBy('validated_at')->orderBy('created_at')->orderBy('id')->get();
 
         foreach ($invoices as $invoice) {
             $key = self::keyOf($invoice);
