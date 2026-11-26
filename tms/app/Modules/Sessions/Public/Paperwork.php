@@ -19,6 +19,7 @@ use App\Modules\Sessions\Planning\Seance;
 use App\Modules\Sessions\Sessions\SessionLocation;
 use App\Modules\Sessions\Sessions\SessionPlace;
 use App\Modules\Sessions\Sessions\TrainingSession;
+use App\Modules\Sessions\SessionsVisibility;
 use Brick\Math\BigDecimal;
 use Brick\Math\RoundingMode;
 use Carbon\CarbonImmutable;
@@ -292,9 +293,27 @@ final class Paperwork
      */
     public static function sessionEnrolments(string $sessionId): array
     {
+        return array_column(self::sessionTrainees($sessionId), 'id');
+    }
+
+    /**
+     * sessionEnrolments() with what a list of the session's documents
+     * shows of each, in one query.
+     *
+     * @return list<array{id: string, person_id: string, dossier_id: string, left_on: ?string}>
+     */
+    public static function sessionTrainees(string $sessionId): array
+    {
         return Enrolment::query()->where('training_session_id', $sessionId)
             ->whereIn('status', EnrolmentStatus::values(EnrolmentStatus::SHARING_THE_PRICE))
-            ->orderByRaw('entered_on asc nulls first')->orderBy('created_at')->orderBy('id')->pluck('id')->map(fn ($id) => (string) $id)->all();
+            ->orderByRaw('entered_on asc nulls first')->orderBy('created_at')->orderBy('id')
+            ->get(['id', 'person_id', 'dossier_id', 'left_on'])
+            ->map(fn (Enrolment $e) => [
+                'id' => (string) $e->id,
+                'person_id' => (string) $e->person_id,
+                'dossier_id' => (string) $e->dossier_id,
+                'left_on' => $e->left_on?->toDateString(),
+            ])->values()->all();
     }
 
     /**
@@ -318,6 +337,25 @@ final class Paperwork
     public static function allows(User $user, string $permission, string $dossierId): bool
     {
         return Billing::allows($user, $permission, $dossierId);
+    }
+
+    /**
+     * allows() for several dossiers in one query: the ids among $dossierIds
+     * that $permission (and its scope) reaches.
+     *
+     * @param  list<string>  $dossierIds
+     * @return list<string>
+     */
+    public static function allowedDossiers(User $user, string $permission, array $dossierIds): array
+    {
+        $dossierIds = array_values(array_unique(array_filter($dossierIds, fn (string $id) => Str::isUuid($id))));
+        if ($dossierIds === []) {
+            return [];
+        }
+
+        return Dossier::query()->whereKey($dossierIds)->get()
+            ->filter(fn (Dossier $d) => SessionsVisibility::allows($user, $permission, $d))
+            ->map(fn (Dossier $d) => (string) $d->id)->values()->all();
     }
 
     /** « Convention envoyée » from « Créé »; any later state stays as it is. */

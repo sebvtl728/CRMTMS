@@ -1,0 +1,10 @@
+2 x select * from "trainings" where "trainin <= Trainings.php:113 < SessionRows.php:39 < SessionRows.php:105 < SessionController.php:150 < EnsureTwoFactorEnrolled.php:38
+2 x select * from "trainings" where "trainin <= Trainings.php:113 < EnrolmentRows.php:53 < EnrolmentRows.php:122 < SessionController.php:174 < EnsureTwoFactorEnrolled.php:38
+2 x (select "session_module_id" from "seance <= SessionModules.php:245 < SessionModules.php:271 < SessionController.php:283 < SessionController.php:183 < EnsureTwoFactorEnrolled.php:38
+12 x select * from "enrolments" where "enrolm <= Paperwork.php:115 < SessionDocumentsBlock.php:31 < DocumentsServiceProvider.php:63 < SessionBlocks.php:36 < SessionController.php:193
+12 x select * from "enrolments" where "enrolm <= RealisedHours.php:52 < Paperwork.php:120 < SessionDocumentsBlock.php:31 < DocumentsServiceProvider.php:63 < SessionBlocks.php:36
+12 x select monthly_hours.enrolment_id as enr <= RealisedHours.php:115 < RealisedHours.php:53 < Paperwork.php:120 < SessionDocumentsBlock.php:31 < DocumentsServiceProvider.php:63
+12 x select * from "trainings" where "trainin <= Trainings.php:113 < Paperwork.php:140 < SessionDocumentsBlock.php:31 < DocumentsServiceProvider.php:63 < SessionBlocks.php:36
+2 x select * from "trainings" where "trainin <= Trainings.php:113 < Surveys.php:32 < SessionSurveysBlock.php:35 < QuestionnairesServiceProvider.php:53 < SessionBlocks.php:36
+1 x select * from "trainings" where "trainin <= Trainings.php:113 < Billing.php:97 < DueBatch.php:42 < Due.php:96 < FinanceTodo.php:17
+1 x select monthly_hours.enrolment_id as enr <= Billing.php:289 < DueBatch.php:67 < Due.php:148 < Due.php:98 < FinanceTodo.php:17
