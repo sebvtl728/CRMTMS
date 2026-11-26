@@ -142,6 +142,27 @@ final class Signatures
             ->orderByDesc('created_at')->orderByDesc('id')->first();
     }
 
+    /**
+     * latestFor() of several subjects in one query, keyed by subject id
+     * (subjects without a request left out).
+     *
+     * @param  list<string>  $subjectIds
+     * @return array<string, SignatureRequest>
+     */
+    public static function latestForMany(string $subjectType, array $subjectIds): array
+    {
+        if ($subjectIds === []) {
+            return [];
+        }
+        $latest = [];
+        foreach (SignatureRequest::query()->where('subject_type', $subjectType)->whereIn('subject_id', $subjectIds)
+            ->orderByDesc('created_at')->orderByDesc('id')->get() as $request) {
+            $latest[(string) $request->subject_id] ??= $request;
+        }
+
+        return $latest;
+    }
+
     public function sendCode(SignatureRequest $request): void
     {
         $code = DB::transaction(function () use ($request): string {

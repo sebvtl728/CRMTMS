@@ -73,9 +73,9 @@ final class DocumentSignatures
      *
      * @return array{status: string, signed_at: ?string, email: ?string}|null
      */
-    public static function state(Document $document): ?array
+    public static function state(Document $document, ?SignatureRequest $request = null, bool $preloaded = false): ?array
     {
-        $request = Signatures::latestFor(self::SUBJECT, $document->id);
+        $request = $preloaded ? $request : Signatures::latestFor(self::SUBJECT, $document->id);
 
         return $request === null ? null : [
             'status' => $request->status,
