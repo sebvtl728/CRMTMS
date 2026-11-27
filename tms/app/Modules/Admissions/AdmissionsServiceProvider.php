@@ -14,7 +14,7 @@ use App\Modules\Admissions\Candidatures\Candidature;
 use App\Modules\Admissions\Candidatures\CandidatureFile;
 use App\Modules\Admissions\Crm\CandidatureLinks;
 use App\Modules\Admissions\Crm\CandidaturesBlock;
-use App\Modules\Admissions\CustomFields\CustomFieldDefinition;
+use App\Modules\Admissions\CustomFields\CustomFieldValues;
 use App\Modules\Admissions\Gdpr\CandidatureAnonymisation;
 use App\Modules\Admissions\Gdpr\PersonCandidaturesExport;
 use App\Modules\Admissions\History\CandidatureHistory;
@@ -68,11 +68,12 @@ class AdmissionsServiceProvider extends ServiceProvider
             );
         }
 
+        CustomFieldValues::registerEntity();
+
         MorphAliases::register([
             Candidature::MORPH_ALIAS => Candidature::class,
             CandidatureFile::MORPH_ALIAS => CandidatureFile::class,
             AlternanceContract::MORPH_ALIAS => AlternanceContract::class,
-            CustomFieldDefinition::MORPH_ALIAS => CustomFieldDefinition::class,
             PositioningSending::MORPH_ALIAS => PositioningSending::class,
             OnlineTest::MORPH_ALIAS => OnlineTest::class,
             OnlineAttempt::MORPH_ALIAS => OnlineAttempt::class,

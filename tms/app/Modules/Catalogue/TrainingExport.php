@@ -50,6 +50,7 @@ final class TrainingExport implements ExportResource
             'results' => 'Résultats',
             'bpf_objective' => 'Objectif BPF',
             'nsf_code' => 'Code NSF',
+            ...TrainingCustomFields::columns(),
         ];
     }
 
@@ -102,7 +103,7 @@ final class TrainingExport implements ExportResource
             'results' => $model->results,
             'bpf_objective' => $model->bpf_objective?->label(),
             'nsf_code' => Nsf::display($model->nsf_code),
-            default => null,
+            default => TrainingCustomFields::value($model, $column),
         };
     }
 }

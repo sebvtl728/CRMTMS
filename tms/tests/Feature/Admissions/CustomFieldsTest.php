@@ -4,10 +4,10 @@ use App\Modules\Admissions\Candidatures\CandidatureFile;
 use App\Modules\Admissions\Candidatures\CandidatureStatus;
 use App\Modules\Admissions\Candidatures\CandidatureTransitions;
 use App\Modules\Admissions\Candidatures\CandidatureWriter;
-use App\Modules\Admissions\CustomFields\CustomFieldDefinition;
-use App\Modules\Admissions\CustomFields\CustomFieldDefinitions;
 use App\Modules\Admissions\CustomFields\CustomFieldValues;
 use App\Modules\Core\Audit\AuditLog;
+use App\Modules\Core\CustomFields\CustomFieldDefinition;
+use App\Modules\Core\CustomFields\CustomFieldDefinitions;
 use Illuminate\Validation\ValidationException;
 use Inertia\Testing\AssertableInertia as Assert;
 use Symfony\Component\HttpKernel\Exception\HttpException;
@@ -18,7 +18,7 @@ beforeEach(fn () => adSetUp());
 
 function adField(array $data): CustomFieldDefinition
 {
-    return app(CustomFieldDefinitions::class)->create($data);
+    return app(CustomFieldDefinitions::class)->create('candidature', $data);
 }
 
 /** The validation errors $fn throws, keyed by field. */
@@ -38,7 +38,7 @@ it('creates a field of each type, in order, a choice needing its options', funct
     }
     adField(['label' => 'Permis', 'type' => 'choice', 'options' => ['B', 'Aucun']]);
 
-    expect(app(CustomFieldDefinitions::class)->active()->pluck('label')->all())
+    expect(app(CustomFieldDefinitions::class)->active('candidature')->pluck('label')->all())
         ->toBe(['Champ text', 'Champ textarea', 'Champ number', 'Champ date', 'Champ boolean', 'Champ file', 'Permis']);
 
     expect(adErrors(fn () => adField(['label' => 'Vide', 'type' => 'choice', 'options' => []])))->toHaveKey('options');
@@ -82,9 +82,9 @@ it('deletes an unused field, hides a used one', function () {
     }
 
     app(CustomFieldDefinitions::class)->hide($used);
-    expect(app(CustomFieldDefinitions::class)->active()->pluck('id')->all())->not->toContain($used->id);
+    expect(app(CustomFieldDefinitions::class)->active('candidature')->pluck('id')->all())->not->toContain($used->id);
     app(CustomFieldDefinitions::class)->unhide($used->fresh());
-    expect(app(CustomFieldDefinitions::class)->active()->pluck('id')->all())->toContain($used->id);
+    expect(app(CustomFieldDefinitions::class)->active('candidature')->pluck('id')->all())->toContain($used->id);
 });
 
 it('a file field is used once a candidature holds its file', function () {
@@ -111,9 +111,9 @@ it('refuses to change the type of a used field or to remove a used choice', func
 it('reorders the fields', function () {
     $a = adField(['label' => 'A', 'type' => 'text']);
     $b = adField(['label' => 'B', 'type' => 'text']);
-    app(CustomFieldDefinitions::class)->reorder([$b->id, $a->id]);
+    app(CustomFieldDefinitions::class)->reorder('candidature', [$b->id, $a->id]);
 
-    expect(app(CustomFieldDefinitions::class)->active()->pluck('label')->all())->toBe(['B', 'A']);
+    expect(app(CustomFieldDefinitions::class)->active('candidature')->pluck('label')->all())->toBe(['B', 'A']);
 });
 
 it('refuses the admission while a field required for it is empty, a hidden one apart', function () {

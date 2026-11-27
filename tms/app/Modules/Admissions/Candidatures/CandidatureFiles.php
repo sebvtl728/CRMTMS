@@ -2,8 +2,9 @@
 
 namespace App\Modules\Admissions\Candidatures;
 
-use App\Modules\Admissions\CustomFields\CustomFieldDefinition;
-use App\Modules\Admissions\CustomFields\CustomFieldType;
+use App\Modules\Admissions\CustomFields\CustomFieldValues;
+use App\Modules\Core\CustomFields\CustomFieldDefinition;
+use App\Modules\Core\CustomFields\CustomFieldType;
 use App\Modules\Core\Tenancy\TenantStorage;
 use App\Modules\Core\Users\User;
 use Illuminate\Http\UploadedFile;
@@ -126,7 +127,7 @@ final class CandidatureFiles
         }
         if (str_starts_with($kind, 'custom:')) {
             $id = substr($kind, 7);
-            $field = Str::isUuid($id) ? CustomFieldDefinition::query()->whereKey($id)->whereNull('hidden_at')->first() : null;
+            $field = Str::isUuid($id) ? CustomFieldDefinition::query()->where('entity', CustomFieldValues::ENTITY)->whereKey($id)->whereNull('hidden_at')->first() : null;
             if ($field !== null && $field->type === CustomFieldType::File) {
                 return;
             }

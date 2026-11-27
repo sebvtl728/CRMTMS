@@ -68,6 +68,7 @@ class TrainingController extends Controller
                 'nsf' => Nsf::display($training->nsf_code),
                 'competences_count' => Competences::count($training->competences),
                 'updated_on' => TrainingProgramme::updatedOn($training)->toDateString(),
+                'custom_fields' => TrainingCustomFields::display($training),
                 'modalities' => ReferenceItem::query()->withTrashed()->whereKey($modalityIds)->orderBy('position')->orderBy('label')->pluck('label')->values()->all(),
             ],
             'brochures' => $brochures,
@@ -96,6 +97,7 @@ class TrainingController extends Controller
         return Inertia::render('catalogue/form', [
             'training' => null,
             'options' => self::formOptions(null),
+            'custom_fields' => TrainingCustomFields::form(),
             'assistant' => self::assistant(),
         ]);
     }
@@ -114,6 +116,8 @@ class TrainingController extends Controller
             $validated['competences'] = Competences::parse((string) ($validated['competences_text'] ?? ''));
             unset($validated['competences_text']);
         }
+
+        $validated['custom_values'] = TrainingCustomFields::apply(null, (array) ($validated['custom_values'] ?? []));
 
         DB::transaction(function () use ($validated, $funding, $modules): void {
             $training = Training::query()->create($validated);
@@ -161,8 +165,10 @@ class TrainingController extends Controller
                 'modules_hours' => TrainingModules::hours($training),
                 'modules_gap' => TrainingModules::gap($training),
                 'funding_mode_ids' => $training->fundingModes()->pluck('reference_items.id')->all(),
+                'custom_values' => (object) ($training->custom_values ?? []),
             ],
             'options' => self::formOptions($training),
+            'custom_fields' => TrainingCustomFields::form(),
             'assistant' => self::assistant(),
             'brochures' => app(Brochures::class)->forTrainingPage($training),
             'can' => ['brochures' => $this->user($request)->can(Permissions::VIEW), 'manage' => $this->user($request)->can(Permissions::MANAGE)],
@@ -183,6 +189,10 @@ class TrainingController extends Controller
         if (array_key_exists('competences_text', $validated)) {
             $validated['competences'] = Competences::parse((string) ($validated['competences_text'] ?? ''));
             unset($validated['competences_text']);
+        }
+
+        if (array_key_exists('custom_values', $validated)) {
+            $validated['custom_values'] = TrainingCustomFields::apply($training, (array) ($validated['custom_values'] ?? []));
         }
 
         DB::transaction(function () use ($training, $validated, $funding, $modules): void {

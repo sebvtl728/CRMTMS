@@ -5,6 +5,7 @@ namespace App\Modules\Core\Audit;
 use App\Modules\Core\Access\PrimaryRoleChanged;
 use App\Modules\Core\Access\RoleModel;
 use App\Modules\Core\Companies\Company;
+use App\Modules\Core\CustomFields\CustomFieldDefinition;
 use App\Modules\Core\Mail\MailTemplate;
 use App\Modules\Core\References\ReferenceItem;
 use App\Modules\Core\Signatures\SignatureRequest;
@@ -27,6 +28,7 @@ class AuditServiceProvider extends ServiceProvider
             'reference_item' => ReferenceItem::class,
             'role' => RoleModel::class,
             'mail_template' => MailTemplate::class,
+            CustomFieldDefinition::MORPH_ALIAS => CustomFieldDefinition::class,
         ]);
     }
 

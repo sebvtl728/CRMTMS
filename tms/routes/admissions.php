@@ -17,7 +17,6 @@ use App\Modules\Admissions\Candidatures\CandidatureStatusController;
 use App\Modules\Admissions\Candidatures\DossierCreationController;
 use App\Modules\Admissions\Candidatures\LookupController;
 use App\Modules\Admissions\Cerfa\CerfaSheetController;
-use App\Modules\Admissions\CustomFields\CustomFieldController;
 use App\Modules\Admissions\OnlineTests\OnlinePassage;
 use App\Modules\Admissions\OnlineTests\OnlineReviewController;
 use App\Modules\Admissions\OnlineTests\OnlineTestController;
@@ -89,16 +88,6 @@ Route::middleware(['auth', 'can:settings.manage'])->prefix('admin/livret-apprent
     Route::put('/', [BookletSettingsController::class, 'update'])->name('update');
     Route::post('annexes', [BookletSettingsController::class, 'storeAnnex'])->middleware('throttle:import-upload')->name('annexes.store');
     Route::delete('annexes/{annex}', [BookletSettingsController::class, 'destroyAnnex'])->name('annexes.destroy');
-});
-
-Route::middleware(['auth', 'can:settings.manage'])->prefix('admin/custom-fields')->name('admin.custom-fields.')->group(function () {
-    Route::get('/', [CustomFieldController::class, 'index'])->name('index');
-    Route::post('/', [CustomFieldController::class, 'store'])->name('store');
-    Route::post('reorder', [CustomFieldController::class, 'reorder'])->name('reorder');
-    Route::put('{customField}', [CustomFieldController::class, 'update'])->name('update');
-    Route::post('{customField}/hide', [CustomFieldController::class, 'hide'])->name('hide');
-    Route::post('{customField}/unhide', [CustomFieldController::class, 'unhide'])->name('unhide');
-    Route::delete('{customField}', [CustomFieldController::class, 'destroy'])->name('destroy');
 });
 
 // The candidate's personal link to a positioning test (no account): the host

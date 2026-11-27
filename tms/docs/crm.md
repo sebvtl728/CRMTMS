@@ -127,7 +127,7 @@ Sur la page d'une opportunité, **Changer d'étape** ouvre la même fenêtre.
 
 La fiche d'une formation regroupe ce que Qualiopi attend de la présentation d'une offre (indicateur 1), par blocs :
 
-- **Présentation** : intitulé, code, DAS, durées, tarifs, **description courte** ;
+- **Présentation** : intitulé, code, DAS, durées, tarifs, **description courte**, puis les **champs personnalisés** de l'organisme (texte court, texte long ou liste de choix, définis dans Administration › Champs personnalisés, onglet **Formations**, `admin.md` § 25). Un champ marqué obligatoire doit être rempli pour enregistrer la formation. Ces champs s'affichent sur la page de la formation, sont proposés comme colonnes de l'**export (.xlsx)** et, remplis, figurent dans le **programme (PDF)** ; ils sont copiés par **Dupliquer** ;
 - **Objectifs pédagogiques** : 20 au plus, une phrase chacun (500 caractères), dans l'ordre choisi (flèches pour monter ou descendre) ;
 - **Public et prérequis** ;
 - **Modules** : 30 au plus, chacun avec un **intitulé**, une **durée** en heures, une **modalité** (référentiel « Modalités de formation » de l'organisme : présentiel, distanciel…) et un **contenu** ; flèches pour les réordonner. Le total des modules s'affiche sous la liste ; s'il ne correspond pas à la durée de la formation, un **avertissement** apparaît, mais l'enregistrement reste possible ;

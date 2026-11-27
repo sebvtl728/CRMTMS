@@ -1,20 +1,19 @@
 <?php
 
-namespace App\Modules\Admissions\CustomFields;
+namespace App\Modules\Core\CustomFields;
 
 use App\Exceptions\UserFacingHttpException;
-use App\Modules\Admissions\Candidatures\Candidature;
-use App\Modules\Admissions\Candidatures\CandidatureFile;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 
 /**
- * The custom fields of the organisme (entity « candidature » only today).
- * A field with a value on a candidature (trashed ones included) is « used »:
- * it is hidden, never deleted; its type no longer changes and a choice in use
- * is never removed.
+ * The custom fields of the organisme, per entity (CustomFieldEntities). A
+ * field with a value on a fiche of its entity (trashed ones included) is
+ * « used »: it is hidden, never deleted; its type no longer changes and a
+ * choice in use is never removed. The entity's module tells what « used » is.
  */
 final class CustomFieldDefinitions
 {
@@ -25,7 +24,7 @@ final class CustomFieldDefinitions
      *
      * @return Collection<int, CustomFieldDefinition>
      */
-    public function active(string $entity = CustomFieldDefinition::CANDIDATURE): Collection
+    public function active(string $entity): Collection
     {
         return CustomFieldDefinition::query()->where('entity', $entity)->whereNull('hidden_at')->orderBy('position')->orderBy('created_at')->get();
     }
@@ -35,7 +34,7 @@ final class CustomFieldDefinitions
      *
      * @return Collection<int, CustomFieldDefinition>
      */
-    public function all(string $entity = CustomFieldDefinition::CANDIDATURE): Collection
+    public function all(string $entity): Collection
     {
         return CustomFieldDefinition::query()->where('entity', $entity)->orderBy('position')->orderBy('created_at')->get();
     }
@@ -43,13 +42,14 @@ final class CustomFieldDefinitions
     /**
      * @param  array<string, mixed>  $data
      */
-    public function create(array $data): CustomFieldDefinition
+    public function create(string $entity, array $data): CustomFieldDefinition
     {
-        $values = $this->validated($data, null);
+        $values = $this->validated(self::entity($entity), $data, null);
 
         return DB::transaction(fn () => CustomFieldDefinition::query()->create([
             ...$values,
-            'position' => (int) CustomFieldDefinition::query()->max('position') + 1,
+            'entity' => $entity,
+            'position' => (int) CustomFieldDefinition::query()->where('entity', $entity)->max('position') + 1,
         ]));
     }
 
@@ -58,20 +58,20 @@ final class CustomFieldDefinitions
      */
     public function update(CustomFieldDefinition $field, array $data): CustomFieldDefinition
     {
-        $values = $this->validated($data, $field);
+        $values = $this->validated(self::entity($field->entity), $data, $field);
         $field->update($values);
 
         return $field->refresh();
     }
 
     /**
-     * @param  list<string>  $ids  the new order
+     * @param  list<string>  $ids  the new order of the fields of $entity
      */
-    public function reorder(array $ids): void
+    public function reorder(string $entity, array $ids): void
     {
-        DB::transaction(function () use ($ids): void {
+        DB::transaction(function () use ($entity, $ids): void {
             foreach ($ids as $i => $id) {
-                CustomFieldDefinition::query()->whereKey($id)->update(['position' => $i + 1]);
+                CustomFieldDefinition::query()->where('entity', $entity)->whereKey($id)->update(['position' => $i + 1]);
             }
         });
     }
@@ -89,16 +89,17 @@ final class CustomFieldDefinitions
     public function delete(CustomFieldDefinition $field): void
     {
         if ($this->used($field)) {
-            throw new UserFacingHttpException(409, 'Ce champ est rempli sur des candidatures : masquez-le plutôt que de le supprimer.');
+            throw new UserFacingHttpException(409, 'Ce champ est rempli sur '.self::entity($field->entity)->records.' : masquez-le plutôt que de le supprimer.');
         }
         $field->delete();
     }
 
-    /** A candidature holds a value (or a file) of $field. */
+    /** A fiche of its entity holds a value (or a file) of $field. */
     public function used(CustomFieldDefinition $field): bool
     {
-        return Candidature::withTrashed()->whereRaw('jsonb_exists(custom_values, ?)', [$field->id])->exists()
-            || CandidatureFile::query()->where('kind', 'custom:'.$field->id)->exists();
+        $entity = CustomFieldEntities::find($field->entity);
+
+        return $entity !== null && ($entity->used)($field);
     }
 
     /**
@@ -119,12 +120,23 @@ final class CustomFieldDefinitions
         return $used;
     }
 
+    /** The registered entity, a validation error otherwise. */
+    private static function entity(string $key): CustomFieldEntity
+    {
+        return CustomFieldEntities::find($key) ?? throw ValidationException::withMessages(['entity' => 'Type de fiche inconnu.']);
+    }
+
     /**
      * @param  array<string, mixed>  $data
      * @return array<string, mixed>
      */
-    private function validated(array $data, ?CustomFieldDefinition $current): array
+    private function validated(CustomFieldEntity $entity, array $data, ?CustomFieldDefinition $current): array
     {
+        // « required » for every entity; « required_for_admission » (the column) still read.
+        if (array_key_exists('required', $data)) {
+            $data['required_for_admission'] = $data['required'];
+        }
+        unset($data['required']);
         if (is_string($data['label'] ?? null)) {
             $data['label'] = trim($data['label']);
         }
@@ -150,17 +162,21 @@ final class CustomFieldDefinitions
             'options.*.distinct' => 'Ce choix est en double.',
             'max' => 'Ce champ est trop long.',
         ]);
-        $validator->after(function ($v) use ($data, $current): void {
+        $validator->after(function ($v) use ($entity, $data, $current): void {
+            $asked = is_string($data['type'] ?? null) ? CustomFieldType::tryFrom($data['type']) : null;
+            if ($asked !== null && ! $entity->offers($asked) && $asked !== $current?->type) {
+                $v->errors()->add('type', 'Type non proposé pour ces fiches.');
+            }
             if ($current === null || ! $this->used($current)) {
                 return;
             }
             if (array_key_exists('type', $data) && $data['type'] !== $current->type->value) {
-                $v->errors()->add('type', 'Le type ne peut plus changer : des candidatures ont une valeur.');
+                $v->errors()->add('type', "Le type ne peut plus changer : {$entity->records} ont une valeur.");
             }
             if ($current->type === CustomFieldType::Choice && is_array($data['options'] ?? null)) {
                 foreach (array_diff($current->options ?? [], $data['options']) as $removed) {
-                    if (Candidature::withTrashed()->whereRaw('custom_values ->> ? = ?', [$current->id, $removed])->exists()) {
-                        $v->errors()->add('options', 'Ce choix est utilisé par des candidatures : masquez le champ plutôt que de le retirer.');
+                    if (($entity->choiceUsed)($current, (string) $removed)) {
+                        $v->errors()->add('options', "Ce choix est utilisé par {$entity->records} : masquez le champ plutôt que de le retirer.");
                         break;
                     }
                 }

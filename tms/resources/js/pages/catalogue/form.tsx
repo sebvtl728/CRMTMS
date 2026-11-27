@@ -45,12 +45,23 @@ interface FormProps {
         modules_hours: string;
         modules_gap: boolean;
         funding_mode_ids: string[];
+        custom_values: Record<string, string>;
     } | null;
+    /** The organisme's own fields (Administration › Champs personnalisés, tab « Formations »). */
+    custom_fields?: CustomField[];
     options: { das: Option[]; funding_mode: Option[]; modality: Option[]; bpf_objective: Option[]; nsf: Option[] };
     assistant?: { configured: boolean };
     brochures?: { id: string; title: string; original_name: string; size: number; source: 'training' | 'das' }[];
     can?: { brochures: boolean; manage?: boolean };
     status?: string | null;
+}
+
+interface CustomField {
+    id: string;
+    label: string;
+    type: 'text' | 'textarea' | 'choice';
+    options: string[];
+    required: boolean;
 }
 
 type ModuleForm = { uid: string; id?: string; title: string; duration_hours: string; modality_id: string; content: string };
@@ -83,6 +94,7 @@ type TrainingForm = {
     price_company: string;
     price_individual: string;
     funding_mode_ids: string[];
+    custom_values: Record<string, string>;
 };
 
 /** Stored decimal (« 14.50 ») as typed in a form (« 14,5 »). */
@@ -98,7 +110,7 @@ let newModuleCount = 0;
 
 const textareaClass = 'border-input bg-background focus:ring-ring w-full rounded-md border px-3 py-2 text-sm focus:ring-2 focus:outline-hidden';
 
-export default function TrainingFormPage({ training, options, assistant, brochures = [], can }: FormProps) {
+export default function TrainingFormPage({ training, options, assistant, brochures = [], can, custom_fields = [] }: FormProps) {
     const editing = training !== null;
     // One copy per click: « Dupliquer » stays disabled until the request ends.
     const [duplicating, setDuplicating] = useState(false);
@@ -121,6 +133,8 @@ export default function TrainingFormPage({ training, options, assistant, brochur
         price_company: amountInput(training?.price_company),
         price_individual: amountInput(training?.price_individual),
         funding_mode_ids: training?.funding_mode_ids ?? [],
+        // Every visible field is sent, an empty one clears its value.
+        custom_values: Object.fromEntries(custom_fields.map((f) => [f.id, training?.custom_values?.[f.id] ?? ''])),
         description: training?.description ?? '',
         objectives: training?.objectives ?? [],
         methods: training?.methods ?? '',
@@ -376,6 +390,41 @@ export default function TrainingFormPage({ training, options, assistant, brochur
                             {text('price_company', 'Tarif entreprise HT par stagiaire (€)', { inputMode: 'decimal', placeholder: '1 250,00' })}
                             {text('price_individual', 'Tarif particulier HT par stagiaire (€)', { inputMode: 'decimal', placeholder: '990,00' })}
                             {area('description', 'Description courte')}
+                            {custom_fields.map((f) => {
+                                const id = `custom-${f.id}`;
+                                const value = data.custom_values[f.id] ?? '';
+                                const set = (v: string) => setData('custom_values', { ...data.custom_values, [f.id]: v });
+                                const label = `${f.label}${f.required ? ' *' : ''}`;
+
+                                return (
+                                    <div key={f.id} className={`grid gap-2 ${f.type === 'textarea' ? 'md:col-span-2' : ''}`}>
+                                        <Label htmlFor={id}>{label}</Label>
+                                        {f.type === 'textarea' ? (
+                                            <textarea
+                                                id={id}
+                                                rows={3}
+                                                value={value}
+                                                onChange={(e) => set(e.target.value)}
+                                                maxLength={5000}
+                                                className={textareaClass}
+                                            />
+                                        ) : f.type === 'choice' ? (
+                                            <select id={id} value={value} onChange={(e) => set(e.target.value)} className={textareaClass}>
+                                                <option value="">Non renseigné</option>
+                                                {/* A stored choice since removed from the list stays shown. */}
+                                                {[...f.options, ...(value !== '' && !f.options.includes(value) ? [value] : [])].map((o) => (
+                                                    <option key={o} value={o}>
+                                                        {o}
+                                                    </option>
+                                                ))}
+                                            </select>
+                                        ) : (
+                                            <Input id={id} value={value} onChange={(e) => set(e.target.value)} maxLength={255} />
+                                        )}
+                                        <InputError message={nested(`custom_values.${f.id}`)} />
+                                    </div>
+                                );
+                            })}
                         </fieldset>
 
                         <fieldset className="grid gap-4 rounded-xl border p-4" aria-label="Objectifs">

@@ -108,6 +108,9 @@
         @if ($t['funding_modes'] !== [])
             <tr><td class="k">Financements possibles</td><td>{{ implode(', ', $t['funding_modes']) }}</td></tr>
         @endif
+        @foreach ($t['custom_fields'] as $field)
+            <tr><td class="k">{{ $field['label'] }}</td><td style="white-space: pre-line;">{{ $field['value'] }}</td></tr>
+        @endforeach
     </table>
 
     @if ($t['objectives'] !== [])

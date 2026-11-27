@@ -306,6 +306,7 @@ Module `Catalogue` : le Crm ne lit jamais ces tables directement (service `Catal
 | `objectives` | jsonb, null | Objectifs pédagogiques : liste ordonnée de textes (20 au plus, 500 caractères chacun) |
 | `methods`, `evaluation`, `sanction`, `accessibility`, `access_terms`, `results` | text, null | Méthodes et moyens, évaluation, sanction, accessibilité, modalités et délais d'accès, indicateurs de résultats (texte libre) |
 | `price_company`, `price_individual` | numeric(12,2), null | Tarifs HT par stagiaire, entreprise et particulier (CHECK ≥ 0) |
+| `custom_values` | jsonb, défaut `{}` (CHECK objet) | Valeurs des champs personnalisés (entité `training`), clé = id du champ (`Catalogue\TrainingCustomFields`) |
 | `is_active` | bool, défaut `true` | Désactivée : plus proposée, reste sur les opportunités et devis existants |
 | `source_system`, `source_id` | string(50) / string(255), null | Identifiant d'origine (import) ; unique partiel par organisme (`trainings_source_unique`) |
 | `created_by`, `updated_by` | uuid, null (FK `users`) | |
@@ -786,7 +787,7 @@ Clé (`tenant_id`, `year`) : `last_number` (année de Paris, incrémenté dans l
 `positioning_sendings` : `candidature_id` (FK cascade) · `email`, `subject`, `message` (`$auditPersonal`, effacés par l'anonymisation ; le message garde `{lien}`) · `token_hash` (sha256 du lien, unique, sert à la recherche) · `token_encrypted` (le jeton chiffré par la clé de l'application : le lien affiché sur la candidature à qui peut la modifier ; effacé par l'anonymisation) · `expires_at` (envoi + 14 jours, fin de journée de Paris) · `revoked_at` (envoi plus récent, anonymisation) · `submitted_at` (copie déposée, une seule fois) · `email_status` (`pending`, `sent`, `failed`, `none` = lien généré sans e-mail, CHECK), `email_error` (motif fixe) · `sent_at` · `created_by`. `positioning_sending_versions` : (`positioning_sending_id` cascade, `brochure_version_id` restrict) + `position`. Les copies déposées sont des `candidature_files` de type `positioning` (`uploaded_by` null).
 
 ### `custom_field_definitions` — champs personnalisés
-`entity` (`candidature` seulement aujourd'hui) · `label` · `type` (`text`, `textarea`, `number`, `date`, `boolean`, `choice`, `file`, `nir` (N° de sécurité sociale, vérifié, sensible), CHECK) · `options` (jsonb, choix) · `required_for_admission` · `position` · `hidden_at` (un champ utilisé se masque, ne se supprime pas).
+Socle `Core\CustomFields` (les modules déclarent leur fiche dans `CustomFieldEntities`). `entity` (`candidature`, `training`) · `label` · `type` (`text`, `textarea`, `number`, `date`, `boolean`, `choice`, `file`, `nir` (N° de sécurité sociale, vérifié, sensible), CHECK) · `options` (jsonb, choix) · `required_for_admission` (obligatoire : avant l'admission pour une candidature, à l'enregistrement pour une formation) · `position` · `hidden_at` (un champ utilisé se masque, ne se supprime pas).
 
 ### Catalogue
 `trainings.rncp_code` (string(20), null) : code RNCP de la certification (`RNCP` + chiffres).

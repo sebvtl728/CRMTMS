@@ -5,6 +5,12 @@ Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) ; ve
 
 ## [Non publié]
 
+## [0.15.28] - 2026-11-27
+
+### Ajouté
+
+- **Champs personnalisés des formations** : Administration › Champs personnalisés a un onglet **Formations** (texte court, texte long, liste de choix ; ordre ; obligatoire ou non). Les champs se remplissent dans la carte **Présentation** de la fiche formation, s'affichent sur sa page, sont proposés dans l'export du catalogue et figurent dans le programme (PDF).
+
 ## [0.15.27] - 2026-11-27
 
 ### Corrigé

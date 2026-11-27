@@ -22,6 +22,7 @@ require __DIR__.'/audit.php';
 require __DIR__.'/companies.php';
 require __DIR__.'/branding.php';
 require __DIR__.'/references.php';
+require __DIR__.'/custom-fields.php';
 require __DIR__.'/connectors.php';
 require __DIR__.'/calendar.php';
 require __DIR__.'/security.php';

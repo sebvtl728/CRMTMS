@@ -6,6 +6,7 @@ use App\Modules\Catalogue\Brochures\BrochureStore;
 use App\Modules\Core\Audit\Auditable;
 use App\Modules\Core\References\ReferenceItem;
 use App\Modules\Core\Tenancy\BelongsToTenant;
+use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -43,6 +44,7 @@ use Illuminate\Support\Facades\Auth;
  * @property string|null $results
  * @property BpfObjective|null $bpf_objective BPF cadre F-3
  * @property list<array{title: string, competences: list<array{title: string, skills: list<string>}>}>|null $competences grid (Competences)
+ * @property array<string, string> $custom_values values of the custom fields (TrainingCustomFields), keyed by field id
  * @property string|null $nsf_code NSF group of specialities (Nsf::CODES), BPF cadre F-4
  * @property bool $is_active
  * @property string|null $created_by
@@ -74,13 +76,27 @@ class Training extends Model
     protected $fillable = [
         'code', 'title', 'das_id', 'duration_hours', 'duration_days', 'centre_hours', 'company_hours', 'audience', 'prerequisites',
         'price_company', 'price_individual', 'is_active',
-        'description', 'objectives', 'methods', 'evaluation', 'sanction', 'accessibility', 'access_terms', 'results', 'rncp_code', 'bpf_objective', 'nsf_code', 'competences',
+        'description', 'objectives', 'methods', 'evaluation', 'sanction', 'accessibility', 'access_terms', 'results', 'rncp_code', 'bpf_objective', 'nsf_code', 'competences', 'custom_values',
     ];
 
     /** @var array<string, mixed> */
     protected $attributes = [
         'is_active' => true,
+        'custom_values' => '{}',
     ];
+
+    /**
+     * Values of the custom fields: always a JSON object (CHECK), even empty.
+     *
+     * @return Attribute<array<string, string>, array<string, string>>
+     */
+    protected function customValues(): Attribute
+    {
+        return Attribute::make(
+            get: fn (?string $value): array => $value === null ? [] : (array) json_decode($value, true),
+            set: fn (array $value): string => (string) json_encode((object) $value, JSON_UNESCAPED_UNICODE),
+        );
+    }
 
     protected static function booted(): void
     {

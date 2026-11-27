@@ -164,6 +164,7 @@ class TrainingRequest extends FormRequest
             'title' => ['required', 'string', 'max:200'],
             'rncp_code' => ['nullable', 'string', 'regex:/^RNCP\d{1,6}$/'],
             'competences_text' => ['nullable', 'string', 'max:300000'],
+            'custom_values' => ['sometimes', 'nullable', 'array'],
             'bpf_objective' => ['nullable', Rule::enum(BpfObjective::class)],
             'nsf_code' => ['nullable', 'string', Rule::in(array_keys(Nsf::CODES))],
             'das_id' => ['required', ...self::reference(ReferenceList::Das, array_filter([$current?->das_id]))],

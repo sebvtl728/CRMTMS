@@ -4,6 +4,11 @@ namespace App\Modules\Admissions\CustomFields;
 
 use App\Modules\Admissions\Candidatures\Candidature;
 use App\Modules\Admissions\Candidatures\CandidatureFile;
+use App\Modules\Core\CustomFields\CustomFieldDefinition;
+use App\Modules\Core\CustomFields\CustomFieldDefinitions;
+use App\Modules\Core\CustomFields\CustomFieldEntities;
+use App\Modules\Core\CustomFields\CustomFieldEntity;
+use App\Modules\Core\CustomFields\CustomFieldType;
 use Illuminate\Validation\ValidationException;
 
 /**
@@ -16,6 +21,26 @@ use Illuminate\Validation\ValidationException;
  */
 final class CustomFieldValues
 {
+    /** custom_field_definitions.entity of the candidature fields. */
+    public const ENTITY = 'candidature';
+
+    /** Declares the candidature fields to Core (AdmissionsServiceProvider::register). */
+    public static function registerEntity(): void
+    {
+        CustomFieldEntities::register(new CustomFieldEntity(
+            key: self::ENTITY,
+            label: 'Candidatures',
+            records: 'des candidatures',
+            description: 'Vos propres champs sur la fiche candidat, dans le bloc « Informations complémentaires ».',
+            requiredLabel: 'Obligatoire pour admettre un candidat',
+            types: CustomFieldType::cases(),
+            used: fn (CustomFieldDefinition $field): bool => Candidature::withTrashed()->whereRaw('jsonb_exists(custom_values, ?)', [$field->id])->exists()
+                || CandidatureFile::query()->where('kind', 'custom:'.$field->id)->exists(),
+            choiceUsed: fn (CustomFieldDefinition $field, string $choice): bool => Candidature::withTrashed()->whereRaw('custom_values ->> ? = ?', [$field->id, $choice])->exists(),
+            position: 10,
+        ));
+    }
+
     /**
      * @param  array<string, mixed>  $values
      * @return array<string, mixed> normalised; null for a key to remove
@@ -152,7 +177,7 @@ final class CustomFieldValues
     {
         $kinds = CandidatureFile::query()->where('candidature_id', $candidature->id)->pluck('kind')->all();
         $missing = [];
-        foreach (app(CustomFieldDefinitions::class)->active(CustomFieldDefinition::CANDIDATURE) as $field) {
+        foreach (app(CustomFieldDefinitions::class)->active(self::ENTITY) as $field) {
             if (! $field->required_for_admission) {
                 continue;
             }
@@ -176,7 +201,7 @@ final class CustomFieldValues
      */
     public static function forPage(Candidature $candidature, bool $sensitive = true): array
     {
-        return app(CustomFieldDefinitions::class)->active(CustomFieldDefinition::CANDIDATURE)
+        return app(CustomFieldDefinitions::class)->active(self::ENTITY)
             ->map(function (CustomFieldDefinition $f) use ($candidature, $sensitive): array {
                 $hidden = ! $sensitive && $f->type->sensitive();
 

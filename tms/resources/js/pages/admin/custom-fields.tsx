@@ -7,7 +7,7 @@ import { Label } from '@/components/ui/label';
 import AppLayout from '@/layouts/app-layout';
 import { type Option } from '@/lib/crm';
 import { type BreadcrumbItem } from '@/types';
-import { Head, router, usePage } from '@inertiajs/react';
+import { Head, Link, router, usePage } from '@inertiajs/react';
 import { ArrowDown, ArrowUp } from 'lucide-react';
 import { useState } from 'react';
 
@@ -17,7 +17,7 @@ interface Field {
     type: string;
     type_label: string;
     options: string[];
-    required_for_admission: boolean;
+    required: boolean;
     hidden: boolean;
     used: boolean;
 }
@@ -26,14 +26,20 @@ interface Draft {
     label: string;
     type: string | null;
     options: string;
-    required_for_admission: boolean;
+    required: boolean;
+}
+
+interface EntityInfo {
+    records: string;
+    description: string;
+    required_label: string;
 }
 
 const breadcrumbs: BreadcrumbItem[] = [{ title: 'Champs personnalisés', href: '/admin/custom-fields' }];
 
-const empty: Draft = { label: '', type: 'text', options: '', required_for_admission: false };
+const empty: Draft = { label: '', type: 'text', options: '', required: false };
 
-function payload(d: Draft): { label: string; type: string | null; options: string[] | null; required_for_admission: boolean } {
+function payload(d: Draft): { label: string; type: string | null; options: string[] | null; required: boolean } {
     return {
         label: d.label,
         type: d.type,
@@ -44,15 +50,30 @@ function payload(d: Draft): { label: string; type: string | null; options: strin
                       .map((o) => o.trim())
                       .filter(Boolean)
                 : null,
-        required_for_admission: d.required_for_admission,
+        required: d.required,
     };
 }
 
 /**
- * Administration › Champs personnalisés: the organisme's own fields on the
- * candidature fiche. A field already filled is hidden, never deleted.
+ * Administration › Champs personnalisés: the organisme's own fields, one tab
+ * per kind of fiche (candidatures, formations…). A field already filled is
+ * hidden, never deleted.
  */
-export default function CustomFields({ fields, types }: { fields: Field[]; types: Option[]; status?: string }) {
+interface Props {
+    entity: string;
+    entity_info: EntityInfo;
+    entities: Option[];
+    fields: Field[];
+    types: Option[];
+    status?: string;
+}
+
+/** A tab starts with an empty form: its types differ from the other tab's. */
+export default function CustomFields(props: Props) {
+    return <EntityFields key={props.entity} {...props} />;
+}
+
+function EntityFields({ entity, entity_info, entities, fields, types }: Props) {
     const errors = usePage().props.errors as Record<string, string | undefined>;
     const [draft, setDraft] = useState<Draft>(empty);
     const [editing, setEditing] = useState<string | null>(null);
@@ -84,8 +105,8 @@ export default function CustomFields({ fields, types }: { fields: Field[]; types
                 </div>
             )}
             <Label className="flex items-center gap-2 font-normal sm:col-span-2">
-                <input type="checkbox" checked={d.required_for_admission} onChange={(e) => set({ ...d, required_for_admission: e.target.checked })} />
-                Obligatoire pour admettre un candidat
+                <input type="checkbox" checked={d.required} onChange={(e) => set({ ...d, required: e.target.checked })} />
+                {entity_info.required_label}
             </Label>
         </div>
     );
@@ -94,17 +115,33 @@ export default function CustomFields({ fields, types }: { fields: Field[]; types
         const ids = fields.map((f) => f.id);
         const [moved] = ids.splice(index, 1);
         ids.splice(index + delta, 0, moved);
-        router.post('/admin/custom-fields/reorder', { ids }, { preserveScroll: true });
+        router.post('/admin/custom-fields/reorder', { entity, ids }, { preserveScroll: true });
     };
 
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Champs personnalisés" />
             <div className="flex max-w-3xl flex-col gap-6 p-4">
-                <Heading
-                    title="Champs personnalisés"
-                    description="Vos propres champs sur la fiche candidat, dans le bloc « Informations complémentaires »."
-                />
+                <Heading title="Champs personnalisés" description={entity_info.description} />
+
+                {entities.length > 1 && (
+                    <nav aria-label="Fiches" className="flex flex-wrap gap-1 border-b">
+                        {entities.map((e) => (
+                            <Link
+                                key={e.value}
+                                href={`/admin/custom-fields?entity=${e.value}`}
+                                aria-current={e.value === entity ? 'page' : undefined}
+                                className={`-mb-px border-b-2 px-3 py-2 text-sm ${
+                                    e.value === entity
+                                        ? 'border-primary font-medium'
+                                        : 'text-muted-foreground hover:text-foreground border-transparent'
+                                }`}
+                            >
+                                {e.label}
+                            </Link>
+                        ))}
+                    </nav>
+                )}
 
                 <section className="grid gap-3 rounded-xl border p-4">
                     <h2 className="text-sm font-semibold">Nouveau champ</h2>
@@ -114,7 +151,11 @@ export default function CustomFields({ fields, types }: { fields: Field[]; types
                             type="button"
                             size="sm"
                             onClick={() =>
-                                router.post('/admin/custom-fields', payload(draft), { preserveScroll: true, onSuccess: () => setDraft(empty) })
+                                router.post(
+                                    '/admin/custom-fields',
+                                    { entity, ...payload(draft) },
+                                    { preserveScroll: true, onSuccess: () => setDraft(empty) },
+                                )
                             }
                         >
                             Ajouter le champ
@@ -132,7 +173,7 @@ export default function CustomFields({ fields, types }: { fields: Field[]; types
                                     <div className="flex flex-wrap items-center gap-2">
                                         <span className="font-medium">{f.label}</span>
                                         <Badge variant="secondary">{f.type_label}</Badge>
-                                        {f.required_for_admission && <Badge variant="outline">Requis pour l'admission</Badge>}
+                                        {f.required && <Badge variant="outline">Obligatoire</Badge>}
                                         {f.hidden && <Badge variant="outline">Masqué</Badge>}
                                     </div>
                                     <div className="flex flex-wrap gap-1">
@@ -166,7 +207,7 @@ export default function CustomFields({ fields, types }: { fields: Field[]; types
                                                     label: f.label,
                                                     type: f.type,
                                                     options: f.options.join('\n'),
-                                                    required_for_admission: f.required_for_admission,
+                                                    required: f.required,
                                                 });
                                             }}
                                         >
@@ -206,7 +247,7 @@ export default function CustomFields({ fields, types }: { fields: Field[]; types
                                         {form(edit, setEdit, f.used)}
                                         {f.used && (
                                             <p className="text-muted-foreground text-xs">
-                                                Champ rempli sur des candidatures : son type ne change plus et un choix utilisé ne peut pas être
+                                                Champ rempli sur {entity_info.records} : son type ne change plus et un choix utilisé ne peut pas être
                                                 retiré.
                                             </p>
                                         )}
