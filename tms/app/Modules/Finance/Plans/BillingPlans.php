@@ -91,6 +91,26 @@ final class BillingPlans
     }
 
     /**
+     * for() for several dossiers at once, keyed by the ids given, in two
+     * queries whatever their number.
+     *
+     * @param  list<string>  $dossierIds
+     * @return array<string, Plan>
+     */
+    public function forMany(array $dossierIds): array
+    {
+        $plans = BillingPlan::query()->whereIn('dossier_id', array_values(array_filter($dossierIds, fn (string $id) => Str::isUuid($id))))
+            ->get()->keyBy(fn (BillingPlan $p) => strtolower((string) $p->dossier_id));
+        $absences = FinanceSettings::absencesDefault();
+        $result = [];
+        foreach ($dossierIds as $id) {
+            $result[$id] = self::shape($plans->get(strtolower($id)), $absences);
+        }
+
+        return $result;
+    }
+
+    /**
      * Validates and saves the plan of the dossier (French messages).
      *
      * @param  array<string, mixed>  $data  rhythm, basis, unjustified_absences, schedule

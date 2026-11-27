@@ -2,6 +2,8 @@
 
 namespace App\Modules\Documents;
 
+use App\Modules\Core\Companies\Company;
+use App\Modules\Core\Signatures\Signatures;
 use App\Modules\Core\Users\User;
 use App\Modules\Documents\Texts\DocumentType;
 use App\Modules\Sessions\Public\Paperwork;
@@ -27,6 +29,11 @@ final class DossierDocumentsBlock
         }
         $canManage = Paperwork::allows($viewer, Permissions::MANAGE, $dossierId);
         $documents = Document::query()->where('dossier_id', $dossierId)->orderByDesc('issued_at')->orderByDesc('id')->get();
+        // Read once for the whole list: signatures, last failed sendings, companies.
+        $signatures = Signatures::latestForMany(DocumentSignatures::SUBJECT, $documents->pluck('id')->all());
+        $failures = DocumentSending::query()->whereIn('document_id', $documents->where('email_status', 'failed')->pluck('id')->all())
+            ->where('status', 'failed')->orderByDesc('created_at')->get(['document_id', 'error'])->unique('document_id')->pluck('error', 'document_id');
+        $companies = Company::query()->whereKey($documents->pluck('company_id')->unique()->values()->all())->pluck('name', 'id');
         // An alternance dossier: the convention of its contract type replaces the classic one.
         $issuable = $dossier['alternance'] !== null ? DocumentType::forContract((string) $dossier['alternance']['contract_type'])
             : ($dossier['contractor']['type'] === 'organisation' ? DocumentType::Convention : DocumentType::Contract);
@@ -46,7 +53,7 @@ final class DossierDocumentsBlock
                 'documents' => $documents->map(fn (Document $d) => [
                     'id' => $d->id,
                     'type' => $d->type,
-                    'type_label' => DocumentType::from($d->type)->label(),
+                    'type_label' => DocumentType::labelOf($d->type),
                     'number' => $d->number,
                     'status' => $d->status->value,
                     'status_label' => $d->status->label(),
@@ -54,11 +61,10 @@ final class DossierDocumentsBlock
                     'recipient' => $d->recipient_snapshot['name'] ?? null,
                     'sent_at' => $d->sent_at?->toIso8601String(),
                     'email_status' => $d->email_status,
-                    'email_error' => $d->email_status === 'failed'
-                        ? DocumentSending::query()->where('document_id', $d->id)->where('status', 'failed')->latest('created_at')->value('error') : null,
+                    'email_error' => $d->email_status === 'failed' ? ($failures[$d->id] ?? null) : null,
                     'cancel_reason' => $d->cancel_reason,
-                    'defaults' => $canManage && ! $d->isCancelled() ? DocumentMail::defaults($d) : null,
-                    'signature' => DocumentSignatures::state($d),
+                    'defaults' => $canManage && ! $d->isCancelled() && DocumentType::tryFrom($d->type) !== null ? DocumentMail::defaults($d, $dossier, (string) ($companies[$d->company_id] ?? '')) : null,
+                    'signature' => DocumentSignatures::state($d, $signatures[$d->id] ?? null, true),
                     'can_sign' => $canManage && (DocumentType::tryFrom($d->type)?->signable() ?? false)
                         && ! $d->isCancelled() && $d->status !== DocumentStatus::Signed,
                 ])->values()->all(),

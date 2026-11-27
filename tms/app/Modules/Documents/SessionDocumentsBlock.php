@@ -25,15 +25,11 @@ final class SessionDocumentsBlock
      */
     public static function for(string $sessionId, User $viewer): ?array
     {
-        $visible = [];
-        $manage = false;
-        foreach (Paperwork::sessionEnrolments($sessionId) as $enrolmentId) {
-            $enrolment = Paperwork::enrolment($enrolmentId);
-            if ($enrolment !== null && Paperwork::allows($viewer, Permissions::VIEW, $enrolment['dossier_id'])) {
-                $visible[] = $enrolment;
-                $manage = $manage || Paperwork::allows($viewer, Permissions::MANAGE, $enrolment['dossier_id']);
-            }
-        }
+        $trainees = Paperwork::sessionTrainees($sessionId);
+        $dossierIds = array_column($trainees, 'dossier_id');
+        $viewable = array_flip(Paperwork::allowedDossiers($viewer, Permissions::VIEW, $dossierIds));
+        $visible = array_values(array_filter($trainees, fn (array $e) => isset($viewable[$e['dossier_id']])));
+        $manage = Paperwork::allowedDossiers($viewer, Permissions::MANAGE, array_column($visible, 'dossier_id')) !== [];
         if ($visible === []) {
             return null;
         }

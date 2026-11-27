@@ -78,3 +78,16 @@ it('answers 404 out of the scope and 403 without the right to manage', function 
 
     $this->actingAs(admin(twoFactor: true))->post("/dossiers/{$mine->id}/documents", ['type' => 'inconnu'])->assertSessionHasErrors('type');
 });
+
+it('still shows the dossier when a document has a type this version does not know', function () {
+    $dossier = docCompanyDossier();
+    app(DocumentIssuer::class)->issue(admin(), DocumentType::Convention, $dossier->id);
+    // A type added by a later version (its migration applied, its code not deployed).
+    Document::retrieved(fn (Document $d) => $d->setRawAttributes([...$d->getAttributes(), 'type' => 'future_type'], true));
+
+    $this->actingAs(admin(twoFactor: true))->get("/dossiers/{$dossier->id}")->assertOk()->assertInertia(fn (Assert $p) => $p
+        ->where('blocks', fn ($blocks) => ($doc = collect($blocks)->firstWhere('key', 'documents.dossier')['props']['documents'][0]) !== null
+            && $doc['type_label'] === 'Type de document inconnu'
+            && $doc['defaults'] === null
+            && $doc['can_sign'] === false));
+});
