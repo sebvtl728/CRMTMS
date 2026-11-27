@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Modules\Admissions\CustomFields;
+namespace App\Modules\Core\CustomFields;
 
 /** Types of a custom field. */
 enum CustomFieldType: string

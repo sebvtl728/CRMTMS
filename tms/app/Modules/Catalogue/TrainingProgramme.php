@@ -82,6 +82,7 @@ final class TrainingProgramme
                 'accessibility' => $training->accessibility,
                 'access_terms' => $training->access_terms,
                 'results' => $training->results,
+                'custom_fields' => TrainingCustomFields::filled($training),
             ],
             'modules' => $modules->map(fn (TrainingModule $m) => [
                 'title' => $m->title,

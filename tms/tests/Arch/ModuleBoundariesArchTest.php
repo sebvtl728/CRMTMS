@@ -337,7 +337,7 @@ it('detects every way Finance could reach Sessions, the Crm, the catalogue or th
 const ADMISSIONS_FOREIGN_REFERENCE = '/App\\\\Modules\\\\(?!(?:Admissions|Core)\b|Sessions\\\\Public\b|Crm\\\\Public\b|Qualite\\\\Public\b|Catalogue\\\\(?:Trainings|TrainingData|TrainingUsage|Brochures|Assistant\\\\PdfText)\b|Connectors\\\\(?:Smtp\\\\(?:TenantMailer|SmtpHostRefused)|Core\\\\(?:ConnectorRun|PermanentDeliveryFailure)|Ai\\\\(?:Ai|AiUnavailable|AiInvalidResponse))\b)\w+'
     .'|App\\\\Modules\\\\\{[^}]*\b(?!(?:Admissions|Core)\\\\|Sessions\\\\Public\b|Crm\\\\Public\b|Catalogue\\\\(?:Trainings|TrainingData|TrainingUsage|Brochures|Assistant\\\\PdfText)\b|Connectors\\\\(?:Smtp\\\\(?:TenantMailer|SmtpHostRefused)|Core\\\\(?:ConnectorRun|PermanentDeliveryFailure)|Ai\\\\(?:Ai|AiUnavailable|AiInvalidResponse))\b)(?:Sessions|Crm|Catalogue|Connectors|Finance)\\\\/';
 
-const ADMISSIONS_TABLES_LIST = 'candidatures|candidature_sequences|candidature_files|alternance_contracts|custom_field_definitions|positioning_sendings|positioning_sending_versions|online_tests|online_test_versions|online_test_das|online_test_trainings|online_test_attempts|booklet_months|booklet_links|booklet_evaluations|booklet_visits';
+const ADMISSIONS_TABLES_LIST = 'candidatures|candidature_sequences|candidature_files|alternance_contracts|positioning_sendings|positioning_sending_versions|online_tests|online_test_versions|online_test_das|online_test_trainings|online_test_attempts|booklet_months|booklet_links|booklet_evaluations|booklet_visits';
 
 const ADMISSIONS_TABLES = '/[\'"`](?:public\.)?(?:'.ADMISSIONS_TABLES_LIST.')(?:[\'"`.]|\s+as\b)'
     .'|\b(?:exists|unique):(?:public\.)?(?:'.ADMISSIONS_TABLES_LIST.')\b'
@@ -390,7 +390,7 @@ it('detects every way Admissions could reach another module beyond its public se
     ] as $code) {
         expect(preg_match(ADMISSIONS_FOREIGN_REFERENCE, $code), $code)->toBe(0);
     }
-    foreach (["DB::table('candidatures')", "->join('alternance_contracts as a', 'x', 'y')", 'select 1 from custom_field_definitions', "'x' => 'exists:candidature_files,id'"] as $code) {
+    foreach (["DB::table('candidatures')", "->join('alternance_contracts as a', 'x', 'y')", 'select 1 from candidature_sequences', "'x' => 'exists:candidature_files,id'"] as $code) {
         expect(preg_match(ADMISSIONS_TABLES, $code), $code)->toBe(1);
     }
     foreach (["'candidature_id'", "'admissions.candidatures.view'", '// the candidatures of a person'] as $code) {

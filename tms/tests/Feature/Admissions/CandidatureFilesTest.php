@@ -2,9 +2,9 @@
 
 use App\Modules\Admissions\Candidatures\CandidatureFile;
 use App\Modules\Admissions\Candidatures\CandidatureFiles;
-use App\Modules\Admissions\CustomFields\CustomFieldDefinitions;
 use App\Modules\Admissions\Permissions;
 use App\Modules\Core\Access\AccessScope;
+use App\Modules\Core\CustomFields\CustomFieldDefinitions;
 use App\Modules\Core\Tenancy\TenantStorage;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
@@ -64,7 +64,7 @@ it('keeps one signed contract and one file per custom field, the previous one le
     expect(CandidatureFile::query()->where('kind', 'contract')->pluck('id')->all())->toBe([$second->id])
         ->and(Storage::disk(TenantStorage::DISK)->exists($first->path))->toBeFalse();
 
-    $cv = app(CustomFieldDefinitions::class)->create(['label' => 'CV', 'type' => 'file']);
+    $cv = app(CustomFieldDefinitions::class)->create('candidature', ['label' => 'CV', 'type' => 'file']);
     app(CandidatureFiles::class)->store($c, "custom:{$cv->id}", adPdf('cv.pdf'), admin());
     expect(fn () => app(CandidatureFiles::class)->store($c, 'custom:0190a8c4-0000-7000-8000-000000000000', adPdf(), admin()))
         ->toThrow(ValidationException::class);

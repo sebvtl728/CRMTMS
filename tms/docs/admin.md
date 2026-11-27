@@ -488,3 +488,9 @@ docker compose exec app php artisan tms:rncp:sync
 
 Le serveur doit pouvoir joindre `www.data.gouv.fr` et `static.data.gouv.fr`. Tant que la table n'a jamais été chargée, la fiche formation l'indique et « À traiter » ne signale rien.
 
+## 25. Champs personnalisés des formations
+
+- **Administration › Champs personnalisés** (droit `settings.manage`) a un onglet par fiche : **Candidatures** (§ 19) et **Formations**. Un champ de formation est un **texte court** (255 caractères), un **texte long** (5 000) ou une **liste de choix** (50 choix au plus) ; on choisit son libellé, son ordre (flèches) et s'il est **obligatoire pour enregistrer une formation** (une formation existante sans valeur ne s'enregistre plus tant qu'il n'est pas rempli).
+- Les champs se remplissent dans la carte **Présentation** de la fiche formation (Catalogue › Modifier), s'affichent sur la page de la formation, sont proposés comme colonnes de l'export du catalogue et, remplis, figurent dans le programme (PDF). **Dupliquer** les copie.
+- Un champ rempli sur au moins une formation (supprimée comprise) ne se supprime pas : **masquez-le** (il disparaît de la fiche, de l'export et du programme, ses valeurs restent) ; son type ne change plus et un choix utilisé ne peut pas être retiré.
+- Technique : socle commun `Core\CustomFields` (registre `CustomFieldEntities`, chaque module déclare sa fiche) ; valeurs dans `trainings.custom_values`.

@@ -32,6 +32,7 @@ class CatalogueServiceProvider extends ServiceProvider
         // AccessServiceProvider::boot() defines one gate per permission.
         CorePermissions::registerModule('catalogue', Permissions::all(), Permissions::defaultsFor(...), Permissions::labels(), Permissions::GROUP);
 
+        TrainingCustomFields::registerEntity();
         MorphAliases::register(['training' => Training::class, 'training_module' => TrainingModule::class, 'brochure' => Brochure::class, 'brochure_version' => BrochureVersion::class]);
 
         $this->app->singleton(Trainings::class);

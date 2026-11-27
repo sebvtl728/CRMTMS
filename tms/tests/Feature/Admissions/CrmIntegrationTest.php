@@ -8,10 +8,10 @@ use App\Modules\Admissions\Candidatures\CandidatureFiles;
 use App\Modules\Admissions\Candidatures\CandidatureStatus;
 use App\Modules\Admissions\Candidatures\CandidatureTransitions;
 use App\Modules\Admissions\Candidatures\DossierCreation;
-use App\Modules\Admissions\CustomFields\CustomFieldDefinitions;
 use App\Modules\Admissions\Permissions;
 use App\Modules\Core\Access\AccessScope;
 use App\Modules\Core\Companies\Company;
+use App\Modules\Core\CustomFields\CustomFieldDefinitions;
 use App\Modules\Core\Tenancy\TenantStorage;
 use App\Modules\Crm\Duplicates\Merger;
 use App\Modules\Crm\Gdpr\Anonymiser;
@@ -117,7 +117,7 @@ it('repoints the candidatures and the contracts when two fiches are merged', fun
 
 it('anonymises the candidatures of an anonymised person, files included', function () {
     $lea = adPerson();
-    $field = app(CustomFieldDefinitions::class)->create(['label' => 'Taille', 'type' => 'text']);
+    $field = app(CustomFieldDefinitions::class)->create('candidature', ['label' => 'Taille', 'type' => 'text']);
     $c = adCandidature(['person_id' => $lea->id, 'rqth' => true, 'adaptation_needs' => 'Fauteuil', 'interview_report' => 'RAS',
         'last_diploma' => 'Brevet', 'france_travail_id' => '1234567A', 'positioning_result' => '14/20',
         'legal_representative' => ['last_name' => 'Durand'], 'custom_values' => [$field->id => 'M']], direction());
@@ -138,7 +138,7 @@ it('anonymises the candidatures of an anonymised person, files included', functi
 
 it('adds the candidatures to the RGPD export of the person', function () {
     $lea = adPerson();
-    $field = app(CustomFieldDefinitions::class)->create(['label' => 'Taille', 'type' => 'text']);
+    $field = app(CustomFieldDefinitions::class)->create('candidature', ['label' => 'Taille', 'type' => 'text']);
     $c = adCandidature(['person_id' => $lea->id, 'last_diploma' => 'Brevet', 'custom_values' => [$field->id => 'M']]);
     app(CustomFieldDefinitions::class)->hide($field);
 

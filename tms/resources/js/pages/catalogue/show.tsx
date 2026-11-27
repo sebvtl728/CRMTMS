@@ -50,6 +50,8 @@ interface ShowProps {
         funding_modes: string[];
         is_active: boolean;
         modalities: string[];
+        /** The organisme's own fields (Administration › Champs personnalisés). */
+        custom_fields: { label: string; value: string | null }[];
     };
     brochures: { id: string; title: string; original_name: string; size: number; source: 'training' | 'das' }[];
     blocks: Block[];
@@ -137,6 +139,7 @@ export default function TrainingShowPage({ training, brochures, blocks, can }: S
         ['Tarif entreprise HT', euros(training.price_company)],
         ['Tarif particulier HT', euros(training.price_individual)],
         ['Financements', training.funding_modes.length > 0 ? training.funding_modes.join(', ') : '-'],
+        ...training.custom_fields.map((f): [string, string] => [f.label, f.value ?? '-']),
     ];
 
     return (
@@ -163,10 +166,10 @@ export default function TrainingShowPage({ training, brochures, blocks, can }: S
                 </div>
 
                 <dl className="grid gap-x-6 gap-y-2 text-sm sm:grid-cols-2 lg:grid-cols-3">
-                    {facts.map(([label, value]) => (
-                        <div key={label}>
+                    {facts.map(([label, value], i) => (
+                        <div key={i}>
                             <dt className="text-muted-foreground text-xs">{label}</dt>
-                            <dd>{value}</dd>
+                            <dd className="whitespace-pre-line">{value}</dd>
                         </div>
                     ))}
                 </dl>

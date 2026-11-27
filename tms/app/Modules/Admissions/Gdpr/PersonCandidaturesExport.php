@@ -5,8 +5,9 @@ namespace App\Modules\Admissions\Gdpr;
 use App\Modules\Admissions\Alternance\AlternanceContract;
 use App\Modules\Admissions\Booklet\BookletAnonymisation;
 use App\Modules\Admissions\Candidatures\Candidature;
-use App\Modules\Admissions\CustomFields\CustomFieldDefinition;
+use App\Modules\Admissions\CustomFields\CustomFieldValues;
 use App\Modules\Catalogue\Trainings;
+use App\Modules\Core\CustomFields\CustomFieldDefinition;
 use App\Modules\Core\References\ReferenceItem;
 
 /**
@@ -22,7 +23,7 @@ final class PersonCandidaturesExport
     public static function for(string $personId): array
     {
         $candidatures = Candidature::withTrashed()->where('person_id', $personId)->orderBy('created_at')->get();
-        $labels = CustomFieldDefinition::query()->pluck('label', 'id');
+        $labels = CustomFieldDefinition::query()->where('entity', CustomFieldValues::ENTITY)->pluck('label', 'id');
         $reasons = ReferenceItem::withTrashed()->whereKey(array_values(array_filter($candidatures->pluck('decision_reason_id')->all())))->pluck('label', 'id');
         $trainings = app(Trainings::class)->findMany(array_values(array_filter($candidatures->pluck('training_id')->unique()->all())));
         $contracts = AlternanceContract::query()->whereIn('candidature_id', $candidatures->pluck('id'))->get()->keyBy('candidature_id');

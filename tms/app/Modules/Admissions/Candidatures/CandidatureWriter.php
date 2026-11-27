@@ -4,7 +4,6 @@ namespace App\Modules\Admissions\Candidatures;
 
 use App\Modules\Admissions\AdmissionsVisibility;
 use App\Modules\Admissions\Alternance\AlternanceContract;
-use App\Modules\Admissions\CustomFields\CustomFieldDefinition;
 use App\Modules\Admissions\CustomFields\CustomFieldValues;
 use App\Modules\Admissions\Permissions;
 use App\Modules\Admissions\Support\Rules;
@@ -169,7 +168,7 @@ final class CandidatureWriter
             if (! is_array($data['custom_values'])) {
                 throw ValidationException::withMessages(['custom_values' => 'Valeur invalide.']);
             }
-            $custom = CustomFieldValues::merge($current->custom_values ?? [], CustomFieldValues::validate(CustomFieldDefinition::CANDIDATURE, $data['custom_values'], AdmissionsVisibility::sensitive($by)));
+            $custom = CustomFieldValues::merge($current->custom_values ?? [], CustomFieldValues::validate(CustomFieldValues::ENTITY, $data['custom_values'], AdmissionsVisibility::sensitive($by)));
         }
 
         $profile = array_intersect_key($validated, array_flip(self::PROFILE));
