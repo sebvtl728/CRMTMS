@@ -5,6 +5,8 @@ Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) ; ve
 
 ## [Non publié]
 
+## [0.15.27] - 2026-11-27
+
 ### Corrigé
 
 - **Page d'un dossier** : un document d'un type que la version installée ne connaît pas (ajouté par une version plus récente) s'affiche « Type de document inconnu » au lieu de faire planter la page.
