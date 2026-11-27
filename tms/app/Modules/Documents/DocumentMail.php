@@ -32,19 +32,20 @@ class DocumentMail extends Mailable
      * What the window proposes: the frozen recipient's e-mail and the
      * organisme's template filled in.
      *
+     * @param  array<string, mixed>|null  $dossier  Paperwork::dossier(), already read for a page
      * @return array{to: string, subject: string, body: string}
      */
-    public static function defaults(Document $document): array
+    public static function defaults(Document $document, ?array $dossier = null, ?string $companyName = null): array
     {
         $type = DocumentType::from($document->type);
-        $dossier = Paperwork::dossier($document->dossier_id);
+        $dossier ??= Paperwork::dossier($document->dossier_id);
         $snapshot = $document->recipient_snapshot;
         $text = app(MailTemplates::class)->render(DocumentMailTemplates::key($type), [
             'numero' => $document->number,
             'document' => $type->label(),
             'formation' => $dossier === null ? '' : implode(' ; ', array_map(fn (array $l) => $l['label'], array_filter($dossier['lines'], fn (array $l) => $l['kind'] === 'training'))),
             'dates' => $dossier === null ? '' : implode(' ; ', array_map(fn (array $s) => DocumentPdf::period($s['starts_on'], $s['ends_on']), $dossier['sessions'])),
-            'societe' => Company::query()->find($document->company_id)->name ?? '',
+            'societe' => $companyName ?? Company::query()->find($document->company_id)->name ?? '',
             'destinataire' => (string) ($snapshot['name'] ?? ''),
         ]);
 

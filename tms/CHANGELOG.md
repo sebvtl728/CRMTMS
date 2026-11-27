@@ -9,6 +9,18 @@ Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) ; ve
 
 - **Champs personnalisés des formations** : Administration › Champs personnalisés a un onglet **Formations** (texte court, texte long, liste de choix ; ordre ; obligatoire ou non). Les champs se remplissent dans la carte **Présentation** de la fiche formation, s'affichent sur sa page, sont proposés dans l'export du catalogue et figurent dans le programme (PDF).
 
+## [0.15.27] - 2026-11-27
+
+### Corrigé
+
+- **Page d'un dossier** : un document d'un type que la version installée ne connaît pas (ajouté par une version plus récente) s'affiche « Type de document inconnu » au lieu de faire planter la page.
+
+### Amélioré
+
+- **Page d'une session plus rapide** : le bloc Documents des stagiaires ne relit plus chaque inscription, ses heures et sa formation une par une (session de 6 stagiaires : 259 → 164 requêtes, sur toutes les étapes).
+- **Page d'un dossier plus rapide** : le bloc Documents lit le dossier, les signatures, les envois en échec et les sociétés une seule fois pour toute la liste, et non plus une fois par document (dossier de 6 stagiaires avec leurs documents : 401 → 148 requêtes).
+- **« À facturer » et « À traiter » plus rapides** : ce qui est dû est calculé pour tous les dossiers en une fois. Le nombre de requêtes ne grandit plus avec le nombre de dossiers (« À facturer », dans les tests : 3 dossiers, environ 170 → 72 requêtes ; 9 dossiers, environ 460 → 72).
+
 ## [0.15.26] - 2026-11-25
 
 ### Ajouté

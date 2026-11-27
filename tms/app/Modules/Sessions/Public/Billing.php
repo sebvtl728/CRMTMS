@@ -13,6 +13,7 @@ use App\Modules\Sessions\Attendance\MonthlyHour;
 use App\Modules\Sessions\Attendance\Months;
 use App\Modules\Sessions\Dossiers\Dossier;
 use App\Modules\Sessions\Dossiers\DossierLine;
+use App\Modules\Sessions\Dossiers\DossierSchedule;
 use App\Modules\Sessions\Dossiers\DossierStatus;
 use App\Modules\Sessions\Enrolments\Enrolment;
 use App\Modules\Sessions\Enrolments\EnrolmentStatus;
@@ -24,6 +25,7 @@ use App\Modules\Sessions\Permissions;
 use App\Modules\Sessions\Planning\Seance;
 use App\Modules\Sessions\Sessions\TrainingSession;
 use App\Modules\Sessions\SessionsVisibility;
+use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\DB;
@@ -63,25 +65,65 @@ final class Billing
      */
     public static function dossier(string $dossierId): ?array
     {
-        if (! Str::isUuid($dossierId)) {
-            return null;
+        return self::dossiers([$dossierId])[strtolower($dossierId)] ?? null;
+    }
+
+    /**
+     * dossier() for several dossiers at once, keyed by id (the unknown ones
+     * left out), in a fixed number of queries whatever their number.
+     *
+     * @param  list<string>  $dossierIds
+     * @return array<string, array<string, mixed>>
+     */
+    public static function dossiers(array $dossierIds): array
+    {
+        $dossierIds = array_values(array_unique(array_filter($dossierIds, fn (string $id) => Str::isUuid($id))));
+        if ($dossierIds === []) {
+            return [];
         }
-        $dossier = Dossier::withTrashed()->with('lines')->find($dossierId);
-        if ($dossier === null) {
-            return null;
+        $dossiers = Dossier::withTrashed()->with('lines')->whereKey($dossierIds)->get();
+        if ($dossiers->isEmpty()) {
+            return [];
         }
-        $enrolments = self::enrolments($dossier->id);
-        $forceMajeure = ReferenceItem::withTrashed()->whereKey($enrolments->pluck('abandon_reason_id')->filter()->unique()->values()->all())
+        $ids = $dossiers->pluck('id')->all();
+        $allEnrolments = self::enrolmentsOf($ids);
+        $forceMajeure = ReferenceItem::withTrashed()->whereKey($allEnrolments->pluck('abandon_reason_id')->filter()->unique()->values()->all())
             ->get(['id', 'meta'])->filter(fn (ReferenceItem $i) => ($i->meta['force_majeure'] ?? false) === true)->pluck('id')->all();
-        $fundings = Funding::query()->where('dossier_id', $dossier->id)->orderBy('created_at')->orderBy('id')->get();
-        $externalTypes = ReferenceItem::withTrashed()->whereKey($fundings->pluck('funding_type_id')->unique()->values()->all())
+        $allFundings = Funding::query()->whereIn('dossier_id', $ids)->orderBy('created_at')->orderBy('id')->get();
+        $externalTypes = ReferenceItem::withTrashed()->whereKey($allFundings->pluck('funding_type_id')->unique()->values()->all())
             ->get(['id', 'meta'])->filter(fn (ReferenceItem $i) => ($i->meta['external_billing'] ?? false) === true)->pluck('id')->all();
-        $sessions = TrainingSession::withTrashed()->whereKey($enrolments->pluck('training_session_id')->unique()->values()->all())
+        $allSessions = TrainingSession::withTrashed()->whereKey($allEnrolments->pluck('training_session_id')->unique()->values()->all())
             ->orderBy('starts_on')->orderBy('number')->get();
-        $trainings = app(Trainings::class)->findMany($sessions->pluck('training_id')->unique()->values()->all());
+        $trainings = app(Trainings::class)->findMany($allSessions->pluck('training_id')->unique()->values()->all());
+        $spans = DossierSchedule::spans($ids);
+        $today = Dossier::today();
+
+        $result = [];
+        foreach ($dossiers as $dossier) {
+            $enrolments = $allEnrolments->where('dossier_id', $dossier->id)->values();
+            $fundings = $allFundings->where('dossier_id', $dossier->id)->values();
+            $sessionIds = $enrolments->pluck('training_session_id')->unique()->all();
+            $sessions = $allSessions->whereIn('id', $sessionIds)->values();
+            $result[$dossier->id] = self::shapeDossier($dossier, $enrolments, $fundings, $sessions, $trainings, $forceMajeure, $externalTypes, $spans[$dossier->id] ?? null, $today);
+        }
+
+        return $result;
+    }
+
+    /**
+     * @param  Collection<int, Enrolment>  $enrolments
+     * @param  Collection<int, Funding>  $fundings
+     * @param  Collection<int, TrainingSession>  $sessions
+     * @param  array<string, mixed>  $trainings
+     * @param  list<mixed>  $forceMajeure
+     * @param  list<mixed>  $externalTypes
+     * @param  array{starts_on: CarbonImmutable, ends_on: CarbonImmutable}|null  $span
+     * @return array<string, mixed>
+     */
+    private static function shapeDossier(Dossier $dossier, Collection $enrolments, Collection $fundings, Collection $sessions, array $trainings, array $forceMajeure, array $externalTypes, ?array $span, CarbonImmutable $today): array
+    {
         $order = $sessions->pluck('id')->flip();
         $rule = AbandonRule::forDossier($dossier);
-        $today = Dossier::today();
 
         return [
             'id' => $dossier->id,
@@ -90,7 +132,7 @@ final class Billing
             'das_id' => $dossier->das_id,
             'responsible_user_id' => $dossier->responsible_user_id,
             'created_by' => $dossier->created_by,
-            'status' => $dossier->effectiveStatus($today)->value,
+            'status' => $dossier->effectiveStatus($today, $span ?? ['starts_on' => null, 'ends_on' => null])->value,
             'trashed' => $dossier->trashed(),
             'contractor' => ['type' => $dossier->accountType(), 'id' => $dossier->accountId()],
             // The particulier's withdrawal delay runs from it (Finance 0.9.1).
@@ -176,18 +218,34 @@ final class Billing
      */
     public static function hours(string $dossierId, ?string $untilMonth = null): array
     {
+        return self::hoursMany([$dossierId], $untilMonth)[strtolower($dossierId)] ?? ['enrolments' => [], 'sessions' => []];
+    }
+
+    /**
+     * hours() for several dossiers at once, keyed by dossier id (every
+     * valid id given gets an entry), in a fixed number of queries whatever
+     * their number.
+     *
+     * @param  list<string>  $dossierIds
+     * @return array<string, array{enrolments: list<EnrolmentHours>, sessions: list<SessionHours>}>
+     *
+     * @throws InvalidArgumentException a malformed month
+     */
+    public static function hoursMany(array $dossierIds, ?string $untilMonth = null): array
+    {
         $until = $untilMonth === null ? null : (Months::parse($untilMonth) ?? throw new InvalidArgumentException("Mois invalide : {$untilMonth}"));
-        if (! Str::isUuid($dossierId)) {
-            return ['enrolments' => [], 'sessions' => []];
+        $dossierIds = array_values(array_unique(array_map('strtolower', array_filter($dossierIds, fn (string $id) => Str::isUuid($id)))));
+        if ($dossierIds === []) {
+            return [];
         }
-        $enrolments = self::enrolments($dossierId);
-        $ids = $enrolments->pluck('id')->all();
-        $sessionIds = $enrolments->pluck('training_session_id')->unique()->values()->all();
-        $groupLines = DossierLine::query()->where('dossier_id', $dossierId)->where('pricing_mode', DossierLine::GROUP)->pluck('id')->all();
-        $groupSessionIds = $enrolments->whereIn('dossier_line_id', $groupLines)->pluck('training_session_id')->unique()->values()->all();
+        $allEnrolments = self::enrolmentsOf($dossierIds);
+        $ids = $allEnrolments->pluck('id')->all();
+        $sessionIds = $allEnrolments->pluck('training_session_id')->unique()->values()->all();
+        $groupLines = DossierLine::query()->whereIn('dossier_id', $dossierIds)->where('pricing_mode', DossierLine::GROUP)->pluck('id')->all();
+        $allGroupSessionIds = $allEnrolments->whereIn('dossier_line_id', $groupLines)->pluck('training_session_id')->unique()->values()->all();
         $today = Dossier::today()->toDateString();
 
-        $sessions = TrainingSession::withTrashed()->whereKey($sessionIds)->orderBy('starts_on')->orderBy('number')->get(['id', 'starts_on', 'ends_on']);
+        $allSessions = TrainingSession::withTrashed()->whereKey($sessionIds)->orderBy('starts_on')->orderBy('number')->get(['id', 'starts_on', 'ends_on']);
         $modules = SessionModule::query()->whereIn('training_session_id', $sessionIds)
             ->get(['id', 'training_session_id', 'planned_minutes', 'dating_mode'])->groupBy('training_session_id');
         // Séances added to these trainees from other sessions (catch-ups): their months close with their host session.
@@ -231,17 +289,22 @@ final class Billing
             ->toBase()->get();
 
         // Séances held of the group sessions, per month.
-        $held = Seance::query()->whereIn('training_session_id', $groupSessionIds)
+        $held = Seance::query()->whereIn('training_session_id', $allGroupSessionIds)
             ->where('status', Seance::PLANNED)->where('date', '<', $today)
             ->groupByRaw("training_session_id, to_char(date, 'YYYY-MM')")
             ->selectRaw("training_session_id, to_char(date, 'YYYY-MM') as month, sum(duration_minutes)::bigint as minutes")
             ->toBase()->get();
 
-        $sessionOf = $enrolments->pluck('training_session_id', 'id')->all();
         $counts = function (string $sessionId, string $month) use ($until, $closed): bool {
             return $until === null || ($month <= Months::key($until) && in_array($month, $closed[$sessionId] ?? [], true));
         };
+        $planned = fn (string $sessionId): int => (int) ($modules[$sessionId] ?? new Collection)->sum(fn (SessionModule $m) => $m->planned_minutes ?? 0);
+        $sessionMonths = $allSessions->mapWithKeys(fn (TrainingSession $s) => [$s->id => Months::between($s->starts_on, $s->ends_on)])->all();
+        $allClosed = fn (string $sessionId): bool => isset($sessionMonths[$sessionId])
+            && array_diff($sessionMonths[$sessionId], $closed[$sessionId] ?? []) === [];
 
+        $sessionOf = $allEnrolments->pluck('training_session_id', 'id')->all();
+        $dossierOf = $allEnrolments->pluck('dossier_id', 'id')->all();
         $realised = [];
         $absent = [];
         foreach ($attendance as $row) {
@@ -251,6 +314,7 @@ final class Billing
                 $absent[$row->enrolment_id] = ($absent[$row->enrolment_id] ?? 0) + (int) $row->absent;
             }
         }
+        /** @var array<string, array<string, int>> $groupInterval dossier => session|module|month => most minutes of one of its trainees */
         $groupInterval = [];
         foreach ($monthly as $row) {
             $sessionId = $sessionOf[$row->enrolment_id];
@@ -258,52 +322,55 @@ final class Billing
                 continue;
             }
             $realised[$row->enrolment_id] = ($realised[$row->enrolment_id] ?? 0) + (int) $row->minutes;
+            $dossierId = (string) $dossierOf[$row->enrolment_id];
             $key = $sessionId.'|'.$row->module_id.'|'.$row->month;
-            $groupInterval[$key] = max($groupInterval[$key] ?? 0, (int) $row->minutes);
+            $groupInterval[$dossierId][$key] = max($groupInterval[$dossierId][$key] ?? 0, (int) $row->minutes);
         }
 
-        $planned = fn (string $sessionId): int => (int) ($modules[$sessionId] ?? new Collection)->sum(fn (SessionModule $m) => $m->planned_minutes ?? 0);
-        $sessionMonths = $sessions->mapWithKeys(fn (TrainingSession $s) => [$s->id => Months::between($s->starts_on, $s->ends_on)])->all();
-        $allClosed = fn (string $sessionId): bool => isset($sessionMonths[$sessionId])
-            && array_diff($sessionMonths[$sessionId], $closed[$sessionId] ?? []) === [];
+        $result = [];
+        foreach ($dossierIds as $dossierId) {
+            $enrolments = $allEnrolments->where('dossier_id', $dossierId);
+            $groupSessionIds = $enrolments->whereIn('dossier_line_id', $groupLines)->pluck('training_session_id')->unique()->values()->all();
 
-        $byEnrolment = $enrolments->map(fn (Enrolment $e) => [
-            'enrolment_id' => $e->id,
-            'session_id' => $e->training_session_id,
-            'planned_minutes' => SessionModules::minutesOf($e->planned_hours) ?? $planned($e->training_session_id),
-            'realised_minutes' => $realised[$e->id] ?? 0,
-            'absent_minutes' => $absent[$e->id] ?? 0,
-            'all_months_closed' => $allClosed($e->training_session_id)
-                && $added->where('enrolment_id', $e->id)->every(fn ($a) => in_array($a->month, $closed[$a->training_session_id] ?? [], true)),
-            'closed_months' => $closed[$e->training_session_id] ?? [],
-        ])->values()->all();
+            $byEnrolment = $enrolments->map(fn (Enrolment $e) => [
+                'enrolment_id' => $e->id,
+                'session_id' => $e->training_session_id,
+                'planned_minutes' => SessionModules::minutesOf($e->planned_hours) ?? $planned($e->training_session_id),
+                'realised_minutes' => $realised[$e->id] ?? 0,
+                'absent_minutes' => $absent[$e->id] ?? 0,
+                'all_months_closed' => $allClosed($e->training_session_id)
+                    && $added->where('enrolment_id', $e->id)->every(fn ($a) => in_array($a->month, $closed[$a->training_session_id] ?? [], true)),
+                'closed_months' => $closed[$e->training_session_id] ?? [],
+            ])->values()->all();
 
-        $bySession = [];
-        foreach ($sessions->whereIn('id', $groupSessionIds) as $session) {
-            $minutes = 0;
-            foreach ($held as $row) {
-                if ($row->training_session_id === $session->id && $counts($session->id, $row->month)) {
-                    $minutes += (int) $row->minutes;
+            $bySession = [];
+            foreach ($allSessions->whereIn('id', $groupSessionIds) as $session) {
+                $minutes = 0;
+                foreach ($held as $row) {
+                    if ($row->training_session_id === $session->id && $counts($session->id, $row->month)) {
+                        $minutes += (int) $row->minutes;
+                    }
                 }
-            }
-            $intervalModules = ($modules[$session->id] ?? new Collection)
-                ->filter(fn (SessionModule $m) => $m->dating_mode === DatingMode::Interval->value)->pluck('id')->all();
-            foreach ($groupInterval as $key => $value) {
-                [$sessionId, $moduleId] = explode('|', $key);
-                if ($sessionId === $session->id && in_array($moduleId, $intervalModules, true)) {
-                    $minutes += $value;
+                $intervalModules = ($modules[$session->id] ?? new Collection)
+                    ->filter(fn (SessionModule $m) => $m->dating_mode === DatingMode::Interval->value)->pluck('id')->all();
+                foreach ($groupInterval[$dossierId] ?? [] as $key => $value) {
+                    [$sessionId, $moduleId] = explode('|', $key);
+                    if ($sessionId === $session->id && in_array($moduleId, $intervalModules, true)) {
+                        $minutes += $value;
+                    }
                 }
+                $bySession[] = [
+                    'session_id' => $session->id,
+                    'planned_minutes' => $planned($session->id),
+                    'realised_minutes' => $minutes,
+                    'all_months_closed' => $allClosed($session->id),
+                    'closed_months' => $closed[$session->id] ?? [],
+                ];
             }
-            $bySession[] = [
-                'session_id' => $session->id,
-                'planned_minutes' => $planned($session->id),
-                'realised_minutes' => $minutes,
-                'all_months_closed' => $allClosed($session->id),
-                'closed_months' => $closed[$session->id] ?? [],
-            ];
+            $result[$dossierId] = ['enrolments' => $byEnrolment, 'sessions' => $bySession];
         }
 
-        return ['enrolments' => $byEnrolment, 'sessions' => $bySession];
+        return $result;
     }
 
     /**
@@ -409,13 +476,12 @@ final class Billing
     }
 
     /**
-     * The enrolments sharing the price of the dossier, in order of creation.
-     *
+     * @param  list<string>  $dossierIds
      * @return Collection<int, Enrolment>
      */
-    private static function enrolments(string $dossierId): Collection
+    private static function enrolmentsOf(array $dossierIds): Collection
     {
-        return Enrolment::query()->where('dossier_id', $dossierId)
+        return Enrolment::query()->whereIn('dossier_id', $dossierIds)
             ->whereIn('status', EnrolmentStatus::values(EnrolmentStatus::SHARING_THE_PRICE))
             ->orderBy('created_at')->orderBy('id')->get();
     }
